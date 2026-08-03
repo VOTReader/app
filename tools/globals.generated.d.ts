@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 475 distinct identifiers.
+// Total: 480 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -195,6 +195,7 @@ declare const React: any;
 declare const ReactDOM: any;
 declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
+declare const ReadingStatsStore: any;
 declare const ReadingStreakStore: any;
 declare const RecentNavStore: any;
 declare const Renderer: any;
@@ -335,7 +336,9 @@ declare const colPreface: any;
 declare const commitReadingNav: any;
 declare const computeEndTarget: any;
 declare const contentDocToNavItem: any;
+declare const countItemWords: any;
 declare const countReadFor: any;
+declare const countTextWords: any;
 declare const createAutoScroll: any;
 declare const createPressDrag: any;
 declare const data: any;
@@ -406,6 +409,7 @@ declare const progressCorporaReady: any;
 declare const readContainer: any;
 declare const readingFontById: any;
 declare const readingFontCss: any;
+declare const readingMinutes: any;
 declare const relativeDate: any;
 declare const removeRecentSearch: any;
 declare const renderCommentaryCite: any;
@@ -460,6 +464,7 @@ declare const useNavHistoryTracking: any;
 declare const useNavigateToLink: any;
 declare const usePersistedState: any;
 declare const useReadProgress: any;
+declare const useReadTracker: any;
 declare const useReadingChainNav: any;
 declare const useReadingDwell: any;
 declare const useReadingPositionNav: any;

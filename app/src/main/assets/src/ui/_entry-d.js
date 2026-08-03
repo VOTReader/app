@@ -73,6 +73,7 @@ import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from
 import { renderTextWithScripRefs } from '../utils/render-text.jsx';
 import { srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical, SRCH_CANONICAL_BOOK_IDS, SRCH_CANONICAL_BOOK_INDEX } from '../utils/search.js';
 import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning, withBackupLock } from '../utils/backup.js';
+import { countTextWords, countItemWords, readingMinutes } from '../utils/word-count.js';
 import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
 import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
@@ -221,6 +222,7 @@ Object.assign(window, {
   srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical,
   SRCH_CANONICAL_BOOK_IDS, SRCH_CANONICAL_BOOK_INDEX,
   buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning, withBackupLock,
+  countTextWords, countItemWords, readingMinutes,
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,

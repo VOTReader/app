@@ -29,7 +29,7 @@
         change detection.
 */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReadProgress } from './useMarkAsRead.js';
 
@@ -61,11 +61,39 @@ describe('useReadProgress — isRead + getReadKey shape', () => {
 });
 
 describe('useReadProgress — markRead', () => {
-  it('adds a key when markAsRead is enabled', () => {
+  it('adds a key when markAsRead is enabled (count-valued: first mark = 1)', () => {
     const { result } = setup();
     act(() => { result.current.markRead('matthew', 5); });
-    expect(result.current.readItems['v1:matthew:5']).toBe(true);
+    expect(result.current.readItems['v1:matthew:5']).toBe(1);
     expect(result.current.isRead('matthew', 5)).toBe(true);
+  });
+
+  it('a detector completion INCREMENTS the count; legacy `true` reads as 1', () => {
+    const { result } = setup({ savedReadItems: { 'v1:matthew:5': true } });
+    act(() => { result.current.markRead('matthew', 5, { words: 600, activeMs: 90000 }); });
+    expect(result.current.readItems['v1:matthew:5']).toBe(2);   // true → 1, +1
+    act(() => { result.current.markRead('matthew', 5, { words: 600, activeMs: 90000 }); });
+    expect(result.current.readItems['v1:matthew:5']).toBe(3);
+    expect(result.current.isRead('matthew', 5)).toBe(true);     // truthiness contract intact
+  });
+
+  it('a detector completion feeds ReadingStatsStore; a manual mark does not', () => {
+    const recordCompletion = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordCompletion };
+    try {
+      const { result } = setup();
+      act(() => { result.current.markRead('matthew', 5); });          // manual — a claim
+      expect(recordCompletion).not.toHaveBeenCalled();
+      act(() => { result.current.markRead('matthew', 5, { words: 640, activeMs: 120000 }); });
+      expect(recordCompletion).toHaveBeenCalledWith({
+        key: 'v1:matthew:5', words: 640, activeMs: 120000, wasReadBefore: true,
+      });
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
+
+  it('exports getReadKey so routes can hand the tracker the SAME key space', () => {
+    const { result } = setup();
+    expect(result.current.getReadKey('matthew', 5)).toBe('v1:matthew:5');
   });
 
   it('is idempotent — repeated markRead of same key produces the same object', () => {

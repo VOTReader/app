@@ -19,13 +19,16 @@
  *   — each => { errors: string[], warnings: string[] }.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createContext, runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
 import { COLLECTIONS, parseRefStr, findBook } from '../app/src/main/assets/src/data/scripture-resolution.js';
 import { splitFormatBInline } from '../app/src/main/assets/src/utils/format-b-inline.js';
+// The SAME counting module the app ships (word-count.js) — the baseline gate
+// and every in-app display derive from one definition, so they cannot drift.
+import { countItemWords } from '../app/src/main/assets/src/utils/word-count.js';
 
 // Consume Format B inline markup the SAME way WtlbEntryView.renderLine does
 // (same splitter → no drift), returning the VISIBLE text. A leftover `_` or `**`
@@ -1559,9 +1562,48 @@ function emit(result, label, count, noun, extra) {
   console.log(`  ${label}: ${count} ${noun}${extra || ''} — ${status} (${result.errors.length} errors, ${result.warnings.length} warnings)`);
 }
 
+/* ── Word-count baseline (2026-08-03) ─────────────────────────────────
+   A per-item word-count ledger built while the collections load anyway,
+   compared against tools/word-count-baseline.json. Any unintended
+   content loss or duplication in a corpus edit shifts a count, so this
+   catches the c9–c18 class of defect (eaten paragraphs, dropped header
+   lines, doubled refs) BETWEEN full audits, at zero runtime cost — the
+   baseline never ships in a bundle. Deliberate edits regenerate with:
+     node tools/validate-schemas.js --update-wordcounts
+   Scope: hand-edited prose (Formats A/B/D + Holy Days + Matthew study)
+   plus the NKJV base + matthew-plain + books-restored text. Generated
+   translation maps are excluded — validateTranslationCompleteness
+   already guards those, and their generator owns their content. */
+function _createWordLedger() {
+  /** @type {Record<string, Record<string, number>>} */
+  const byCollection = {};
+  return {
+    add(collection, id, words) {
+      const c = byCollection[collection] || (byCollection[collection] = {});
+      // Duplicate ids within a file are a validator error elsewhere; last
+      // write wins here so the ledger stays total-stable regardless.
+      c[String(id)] = words;
+    },
+    /** Sorted-keys snapshot for byte-stable diffs. */
+    snapshot() {
+      /** @type {Record<string, Record<string, number>>} */
+      const out = {};
+      for (const c of Object.keys(byCollection).sort()) {
+        /** @type {Record<string, number>} */
+        const items = {};
+        for (const id of Object.keys(byCollection[c]).sort()) items[id] = byCollection[c][id];
+        out[c] = items;
+      }
+      return out;
+    },
+  };
+}
+
 function runCli() {
   const args = process.argv.slice(2);
   const strict = args.includes('--strict');
+  const updateWordcounts = args.includes('--update-wordcounts');
+  const wordLedger = _createWordLedger();
   const dataDir = resolve(
     fileURLToPath(import.meta.url), '..', '..', 'app', 'src', 'main', 'assets', 'src', 'data'
   );
@@ -1619,6 +1661,8 @@ function runCli() {
     }
     if (preface) refOwners.push({ where: `${label}(preface)`, owner: preface, dicts: [preface.nkjv] });
     for (const L of letters) refOwners.push({ where: `${label} "${L.id || L.title || '?'}"`, owner: L, dicts: [L.nkjv] });
+    if (preface) wordLedger.add(label, preface.id || '(preface)', countItemWords(preface));
+    for (const L of letters) wordLedger.add(label, L.id || L.title, countItemWords(L));
   }
 
   // ── Format B ──
@@ -1639,6 +1683,7 @@ function runCli() {
     const rlB = GLOBAL_TO_REGISTRY.get(entry.arrayVar);
     if (rlB) for (const e of entries) registerTitle(rlB, e);
     for (const e of entries) refOwners.push({ where: `${label} "${e.id || e.title || '?'}"`, owner: e, dicts: [e.scriptures, scriptures] });
+    for (const e of entries) wordLedger.add(label, e.id || e.title, countItemWords(e));
   }
 
   // ── Holy Days (hybrid) ──
@@ -1657,6 +1702,7 @@ function runCli() {
       const rlH = GLOBAL_TO_REGISTRY.get(HOLY_DAYS_FILE.arrayVar);
       if (rlH) for (const e of entries) { registerTitle(rlH, e); for (const x of walkLetterXrefs(e)) xrefs.push(x); }
       for (const e of entries) refOwners.push({ where: `${label} "${e.id || e.title || '?'}"`, owner: e, dicts: [e.nkjv, e.scriptures] });
+      for (const e of entries) wordLedger.add(label, e.id || e.title, countItemWords(e));
     } else if (entries !== undefined) {
       loadErr(label, `variable "${HOLY_DAYS_FILE.arrayVar}" is not an array`);
     }
@@ -1674,6 +1720,15 @@ function runCli() {
     const n = Array.isArray(books) ? books.length : (books.chapters ? 1 : Object.keys(books).length);
     add(result, n);
     emit(result, label, n, 'books', entry.chromeOnly ? ' (chrome)' : '');
+    // Word ledger: one entry per chapter (chromeOnly files count their
+    // heading/title chrome — that overlay text is audited content too).
+    {
+      const bookArr = Array.isArray(books) ? books : (books.chapters ? [books] : Object.values(books));
+      for (const b of bookArr) {
+        if (!b || !Array.isArray(b.chapters)) continue;
+        for (const ch of b.chapters) wordLedger.add(label, `${b.id || '?'}:${ch && ch.num}`, countItemWords(ch));
+      }
+    }
   }
 
   // ── Format D ──
@@ -1698,6 +1753,7 @@ function runCli() {
         if (Array.isArray(n)) { n.forEach(collect); return; }
         if ((n.blocks || n.paragraphs) && (n.id || n.title)) {
           refOwners.push({ where: `${label} "${n.id || n.title}"`, owner: n, dicts: [n.nkjv, n.scriptures] });
+          wordLedger.add(label, n.id || n.title, countItemWords(n));
           return;
         }
         for (const k of Object.keys(n)) collect(n[k]);
@@ -1746,6 +1802,7 @@ function runCli() {
       const nCh = Array.isArray(study.chapters) ? study.chapters.length : 0;
       add(result, nCh);
       emit(result, label, nCh, 'chapters', '');
+      for (const ch of study.chapters || []) wordLedger.add(label, `matthew:${ch && ch.num}`, countItemWords(ch));
     } else if (study !== undefined) {
       loadErr(label, 'variable "MATTHEW" is not an object');
     }
@@ -1955,6 +2012,47 @@ function runCli() {
       totals.items += checked;
       console.log(`  ${checked} refs checked across ${refOwners.length} content owners — ${refErrors === 0 ? 'OK' : 'FAIL'} (${refErrors} unresolvable)`);
       delete globalThis.window.__ALL_BOOKS;
+    }
+  }
+
+  // ── Word-count baseline gate ──
+  {
+    const baselinePath = resolve(fileURLToPath(import.meta.url), '..', 'word-count-baseline.json');
+    const snap = wordLedger.snapshot();
+    if (updateWordcounts) {
+      writeFileSync(baselinePath, JSON.stringify(snap, null, 1) + '\n');
+      let items = 0, words = 0;
+      for (const c of Object.values(snap)) for (const w of Object.values(c)) { items++; words += w; }
+      console.log(`\nWord-count baseline: WROTE ${basename(baselinePath)} — ${items} items, ${words.toLocaleString()} words.`);
+    } else if (existsSync(baselinePath)) {
+      /** @type {Record<string, Record<string, number>>} */
+      let base;
+      try { base = JSON.parse(readFileSync(baselinePath, 'utf8')); }
+      catch (e) { base = {}; console.error(`  ERROR: word-count baseline unreadable: ${e.message}`); totals.errors++; }
+      const diffs = [];
+      const cols = new Set([...Object.keys(base), ...Object.keys(snap)]);
+      for (const c of cols) {
+        const b = base[c] || {}, s = snap[c] || {};
+        for (const id of new Set([...Object.keys(b), ...Object.keys(s)])) {
+          if (b[id] === s[id]) continue;
+          if (b[id] === undefined) diffs.push(`${c} :: ${id} — NEW item (${s[id]} words)`);
+          else if (s[id] === undefined) diffs.push(`${c} :: ${id} — MISSING (baseline had ${b[id]} words)`);
+          else diffs.push(`${c} :: ${id} — ${b[id]} → ${s[id]} words (${s[id] - b[id] > 0 ? '+' : ''}${s[id] - b[id]})`);
+        }
+      }
+      if (diffs.length) {
+        console.error(`\nWord-count baseline: ${diffs.length} item(s) drifted from ${basename(baselinePath)}.`);
+        console.error('An INTENDED edit regenerates with: node tools/validate-schemas.js --update-wordcounts');
+        console.error('An UNINTENDED drift is eaten/duplicated content — the c9–c18 audit class.');
+        for (const d of diffs.slice(0, 20)) console.error(`  DRIFT: ${d}`);
+        if (diffs.length > 20) console.error(`  … and ${diffs.length - 20} more`);
+        totals.errors += diffs.length;
+      } else {
+        console.log('\nWord-count baseline: OK (every item matches).');
+      }
+    } else {
+      console.warn('\nWord-count baseline: none found — seed it with: node tools/validate-schemas.js --update-wordcounts');
+      totals.warnings++;
     }
   }
 

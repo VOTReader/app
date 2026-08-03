@@ -81,13 +81,15 @@ describe('useReadingDwell → ReadingStreakStore (the dwell-gated half)', () => 
     expect(recordReadingDay).toHaveBeenCalledTimes(1);
   });
 
-  it('records a reading day when the __onDwellCommit bridge fires', () => {
-    const recordReadingDay = vi.fn();
-    window.ReadingStreakStore = { recordReadingDay };
+  it('TOMBSTONE: the __onDwellCommit bridge is gone (deleted 2026-08-03 — no callers)', () => {
+    // The bridge let ScreenLayout force a dwell commit; nothing had called
+    // it since position-is-immediate (2026-07-19), and the read tracker
+    // (use-read-tracker.js) now owns all screen-side reading signals. If
+    // this hook ever binds it again, that is a design regression — the
+    // streak day-record's ONLY trigger is the completed dwell timer.
     const { result } = mount();
     act(() => { result.current.setActiveReadKey('letter:wide-path'); });
-    act(() => { window.__onDwellCommit(); });
-    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+    expect(window.__onDwellCommit).toBeUndefined();
   });
 
   it('records NOTHING when the dwell is cancelled before committing', () => {

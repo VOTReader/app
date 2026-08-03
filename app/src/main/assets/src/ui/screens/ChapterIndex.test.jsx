@@ -18,8 +18,10 @@ import { render, cleanup } from '@testing-library/react';
 import { ChapterIndex } from './ChapterIndex.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import * as routes from '../screen-routes.jsx';
+import { countItemWords, readingMinutes } from '../../utils/word-count.js';
 
-const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons', 'LibraryNav'];
+const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons', 'LibraryNav',
+  'countItemWords', 'readingMinutes', 'ReadingStatsStore'];
 
 function setupGlobals() {
   globalThis.ScreenLayout = ({ children, navChildren }) => (
@@ -92,6 +94,38 @@ describe('ChapterIndex — current-chapter marker', () => {
     expect(cards[1].className).toContain('is-current');
     expect(cards[0].className).not.toContain('is-current');
     expect(cards[2].className).not.toContain('is-current');
+  });
+});
+
+describe('ChapterIndex — "~N min" reading-time chip', () => {
+  // 460 words at the 230-wpm default → 2 min; at a measured 100 wpm → 5 min.
+  const words = (n) => Array.from({ length: n }, () => 'w').join(' ');
+  const WORDY_BOOK = {
+    ...BOOK,
+    chapters: [{ num: 1, title: 'One', sections: [{ verses: [{ n: 1, text: words(460) }] }] }],
+  };
+
+  it('renders the chip from the chapter word count at the default pace', () => {
+    setupGlobals();
+    globalThis.countItemWords = countItemWords;
+    globalThis.readingMinutes = readingMinutes;
+    renderIndex({ book: WORDY_BOOK });
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('~2 min');
+  });
+
+  it('uses the measured pace when ReadingStatsStore has one', () => {
+    setupGlobals();
+    globalThis.countItemWords = countItemWords;
+    globalThis.readingMinutes = readingMinutes;
+    globalThis.ReadingStatsStore = { measuredWpm: () => 100 };
+    renderIndex({ book: WORDY_BOOK });
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('~5 min');
+  });
+
+  it('renders no chip when the word counters are absent (guard path)', () => {
+    setupGlobals();
+    renderIndex({ book: WORDY_BOOK });
+    expect(document.querySelector('.idx-min-chip')).toBeNull();
   });
 });
 

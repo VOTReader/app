@@ -61,6 +61,7 @@ import {
   JournalStatsStore, jrnShowMilestoneToast,
 } from './journal-stats-store.js';
 import { ReadingStreakStore } from './reading-streak-store.js';
+import { ReadingStatsStore } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
@@ -107,6 +108,7 @@ import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
 import { useJournalMediaSweep } from '../hooks/use-journal-media-sweep.js';
 import { useRestoreGuard } from '../hooks/use-restore-guard.js';
+import { useReadTracker } from '../hooks/use-read-tracker.js';
 import { useBackupReminder } from '../hooks/use-backup-reminder.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
@@ -178,6 +180,7 @@ Object.assign(window, {
   _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
   JournalStatsStore, jrnShowMilestoneToast,
   ReadingStreakStore,
+  ReadingStatsStore,
   GardenPosStore,
   JournalIndexStore,
   jrnId, JournalStore, JournalNotebookStore,
@@ -215,6 +218,7 @@ Object.assign(window, {
   useSurprise,
   useJournalMediaSweep,
   useRestoreGuard,
+  useReadTracker,
   useBackupReminder,
   useDomAnnotationSync,
   useKeyboardInset,

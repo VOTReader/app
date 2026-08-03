@@ -125,7 +125,7 @@ export function setupSettingsGlobals(overrides = {}) {
   // Stores touched by handlers/effects, never by a render gate.
   for (const s of ['StateStore', 'AnnotationStore', 'NoteStore', 'BookmarkStore',
     'LinkStore', 'NotebookStore', 'HistoryStore', 'JournalStore', 'JournalIndexStore',
-    'JournalMediaStore', 'JournalNotebookStore', 'JournalStatsStore', 'ReadingStreakStore',
+    'JournalMediaStore', 'JournalNotebookStore', 'JournalStatsStore', 'ReadingStreakStore', 'ReadingStatsStore',
     'ProphecyCardsStore', 'RecentNavStore', 'HomeOrderStore', 'GardenPosStore',
     'WelcomedFlagStore', 'AboutSeenFlagStore', 'GardenWarningFlagStore']) put(s, fakeStore());
 

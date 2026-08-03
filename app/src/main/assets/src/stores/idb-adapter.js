@@ -64,12 +64,17 @@ export const IDBAdapter = (function () {
   //   7 — added vot-ann-hint-dismissed (Wave-0 P1-1: the AnnotationHint
   //       coach-mark ✕ dismissal, previously a session-only window flag).
   //       Same additive pattern.
+  //   8 — added vot-reading-stats (the reading-measurement ledger: words
+  //       read, wpm samples, per-item frontiers — 2026-08-03). Same
+  //       additive pattern. (Found LIVE, not by tests: a CachedStore whose
+  //       name is missing here hydrates into 'degraded' and silently
+  //       queues every write — if you add a store, add it HERE + bump.)
   // W7.1 dropped 'vot-ann-migrated' from STORE_NAMES (its only consumer,
   // the pre-W2 annotation bootstrap migration, was deleted). Deliberately
   // NOT a version bump: fresh installs simply skip it; a pre-existing empty
   // store on older installs is orphaned + harmless (never accessed, since
   // STORE_SET no longer lists it).
-  const DB_VERSION = 7;
+  const DB_VERSION = 8;
 
   /**
    * The 17 vot-* localStorage keys that migrate into IDB, plus the
@@ -103,6 +108,7 @@ export const IDBAdapter = (function () {
     'vot-note-default',
     'vot-library-order',
     'vot-reading-streak',
+    'vot-reading-stats',
     'vot-garden-pos',
     'vot-ann-hint-dismissed',
     'meta',

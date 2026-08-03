@@ -27,7 +27,7 @@ export function BibleStudyChapterView({
   setStudyChapterId, setScreen, setBookId, setChapterNum,
   setFromStudies, setLetterId, setActiveReadKey, setSurpriseAnchor,
   // Read progress (from useReadProgress)
-  markRead, unmarkRead, isRead, studyReadKey,
+  markRead, unmarkRead, isRead, getReadKey, studyReadKey,
   // Reading position (from useReadingPositionNav)
   prophecyCardStatesRef, saveProphecyCardStates,
   // Study selection
@@ -159,7 +159,8 @@ export function BibleStudyChapterView({
       onNavigate={(chId) => { setSurpriseAnchor(null); selectStudyChapter(studyId, chId); }}
       onStudyNavigate={jumpToStudy}
       onLetterClick={handleLetterClick}
-      onMarkRead={() => markRead(studyReadKey(study.slug), studyChapterId)}
+      onMarkRead={(payload) => markRead(studyReadKey(study.slug), studyChapterId, payload)}
+      readTrackKey={getReadKey ? getReadKey(studyReadKey(study.slug), studyChapterId) : undefined}
       onUnmark={() => unmarkRead(studyReadKey(study.slug), studyChapterId)}
       isRead={(id) => isRead(studyReadKey(study.slug), id)}
       prevBoundary={prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null}

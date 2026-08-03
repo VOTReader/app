@@ -26,6 +26,7 @@
 import * as React from 'react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
+import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker.js';
 import { SheetHandle } from './app/src/main/assets/src/ui/components/SheetHandle.jsx';
 
 // (1) React as a global.
@@ -45,6 +46,13 @@ globalThis.useFocusTrap = useFocusTrap;
 // (1d) SheetHandle — the shared grabber/close module every bottom sheet
 //      renders as a free variable (same production reality as above).
 globalThis.SheetHandle = SheetHandle;
+// (1e) useReadTracker — ScreenLayout calls it as a free variable on every
+//      screen (2026-08-03 read detector). The REAL hook, not a stub: it
+//      self-disarms when no reading view holds the __onReadingComplete
+//      bridge, so it is inert in ordinary screen tests, and a test that
+//      wants the detector live just sets the bridge + fake timers
+//      (use-read-tracker.test.js drives it via direct import).
+globalThis.useReadTracker = useReadTracker;
 
 // (2) window.__* bridges. Stub each as a no-op so hook bodies that touch
 //     them at attach time (window.__closeSheet = onClose, etc.) don't
@@ -55,7 +63,6 @@ const _bridgeStubs = [
   '__bookmarkEdit',
   '__closeSheet',
   '__hideSelectionToolbar',
-  '__onDwellCommit',
   '__onReadingComplete',
   '__open',
   '__openBookmarkPopover',

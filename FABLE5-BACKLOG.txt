@@ -251,4 +251,40 @@ DONE LOG
   2026-07-30  [17] 200% zoom audit — DONE, PASSES. Unblocked by a session with the Browser pane. Done GEOMETRICALLY rather than visually (stronger for this question): 200% zoom halves the CSS layout viewport while px-pinned chrome keeps its size, so emulated as 640x400 (from 1280x800) STACKED with --font-scale:1.6, the documented worst case. DOM probe measured every visible element for horizontal overflow + content clipped by a non-scrolling fixed height across Home / Volumes / Volume One / Letter / History / Settings / Library / Scriptures / Tabs overview: clipped:[] and scrollWidth===640 everywhere. The one tall chrome piece, .sel-toolbar (no max-height, 157px after the ▲/▼ retirement), raised on real reading text: top 77 / bottom 234 in a 400px viewport = fully visible. hOverflow hits are all .pager-peek subtrees, parked ±one viewport BY DESIGN. CAVEAT: screenshots unavailable (pane must be displayed to composite), so this is layout geometry, not pixel polish — a visual pass is still worth doing if someone has the pane up.
   STILL OPEN (both need the owner, not model time): [19] golden-suite expansion — needs his real search vocabulary (ask him for 10-15 queries he actually uses, pin expected top-3s); [20] device-walk day — his time, tools/n1-smoke-walk.md.
   ── BACKLOG IS OTHERWISE CLEARED: 18 of 20 items landed. ──
+
+MEASUREMENT TRACK (added 2026-08-03 — post-backlog; the reading-measurement
+engine landed that day: word counts, multi-vector read detector, ReadingStats
+ledger, frontier resume, wpm, My Progress surfaces. These are the DEFERRED
+follow-ons, each one-session-scoped.)
+
+[21] PER-LETTER SKIM INDICATOR — ★ OWNER EXPLICITLY WANTS THIS, HOLD UNTIL
+     HE ASKS ★ (2026-08-03: "the subtle per-letter skim indicator is also
+     smart, but hold it for me and don't let me forget it in the future").
+     The data ALREADY ACCUMULATES: ReadingStatsStore.progress[key].c is the
+     per-segment credited set. Build: a subtle indicator on a read letter
+     whose middle segments were never credited ("you skimmed the middle"),
+     probably in the index row or letter header. Design taste matters —
+     subtle, not shaming. Depends on nothing further.
+[22] TTS (text-to-speech) with word highlighting — SpeechSynthesisUtterance
+     boundary events give charIndex into the flattened textContent; the
+     annotation engine's offset space (blockBoundaryOffsets /
+     applyDOMHighlights) already maps offsets → DOM. Word-by-word highlight
+     reuses the highlight painter. TTS playback time counts as read-tracker
+     dwell; completion = coverage. Big feature; own session(s).
+[23] READING MILESTONES + words/day streak-calendar depth — JournalStats'
+     milestone pattern applied to ReadingStatsStore (100k/500k/1M words,
+     "read Psalm 119", full-volume completions); upgrade the streak display
+     with wordsForDays() bar depth (a 14-day strip shipped 2026-08-03;
+     this is the full calendar). Toast via jrnShowMilestoneToast pattern.
+[24] YEAR IN REVIEW screen — composed entirely from ReadingStatsStore +
+     JournalStats + ReadingStreak data that already accrues. Seasonal;
+     build near year-end.
+[25] TRANSLATION FACTS in the picker — per-translation word counts are
+     measured (YLT 794,063 … BSB 725,263, −9.5%); a one-line "runs ~9%
+     longer than NKJV" note per option in the translation SelectField.
+     Trivial session; data is in tools/word-count-baseline.json lineage.
+[26] SMART RESUME EVERYWHERE — extend frontier resume (currently: reading
+     views, >1-viewport-away rule) to the Continue Reading entry points
+     (reading dot, History rows): show "62% read · ~4 min left" on the
+     resume affordances using progress + words + measuredWpm.
 ═══════════════════════════════════════════════════════════════════════════

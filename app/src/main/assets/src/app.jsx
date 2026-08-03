@@ -224,7 +224,7 @@ function App() {
      clearReadForBook. Called here so settings.markAsRead is in scope
      for the gate. */
   const {
-    readItems, isRead, markRead, unmarkRead,
+    readItems, isRead, markRead, unmarkRead, getReadKey,
     clearAllProgress, clearReadForBook,
   } = useReadProgress({
     savedReadItems: saved.readItems,
@@ -546,6 +546,18 @@ function App() {
      src/hooks/use-restore-guard.js (2026-08-03). */
   useRestoreGuard();
 
+  /* Boot-time mark (2026-08-03): one DiagnosticLog 'I' entry per cold boot
+     recording how long index.html -> App() first mount took. Rides the
+     existing timing channel (lazy-corpus loads already log there), so a
+     slow-boot report from the owner comes with real numbers attached. */
+  useEffect(() => {
+    try {
+      if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof performance !== 'undefined') {
+        DiagnosticLog.timing('boot', 'app-first-mount', Math.round(performance.now()));
+      }
+    } catch (_e) { /* diagnostics must never break boot */ }
+  }, []);
+
   // Expose the home-button handler globally so <HomeBtn /> can call it
   // without prop drilling. Clears return-breadcrumbs so Home means Home.
   useEffect(() => {
@@ -659,7 +671,7 @@ function App() {
     lastReadChapters, setLastReadChapters,
     lastReadLetterMap, setLastReadForVol,
     readItems, readHistory,
-    markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
+    markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
     activeLetter, activeVolKey,
     book, chapter,
     goHome, goNavOrigin, goSearch, goHistory, goSettings, goAbout,

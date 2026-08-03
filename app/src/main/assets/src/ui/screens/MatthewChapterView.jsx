@@ -29,6 +29,7 @@ export function MatthewChapterView({
   setSurpriseAnchor, setFromStudies, setMode, setShowStudy,
   // Read progress
   markRead,
+  getReadKey,
   // Selection
   selectMatthewCh,
   // Nav helpers
@@ -58,7 +59,8 @@ export function MatthewChapterView({
         setTitleFocusHidden={setTitleFocusHidden}
         onIndex={goMatthewIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectMatthewCh(num); }}
-        onMarkRead={() => markRead('matthew', chapterNum)}
+        onMarkRead={(payload) => markRead('matthew', chapterNum, payload)}
+        readTrackKey={getReadKey ? getReadKey('matthew', chapterNum) : undefined}
         markAsReadEnabled={settings.markAsRead}
         showProgressBar={settings.showProgressBar}
         prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}

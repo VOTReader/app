@@ -3,8 +3,12 @@
    ═══════════════════════════════════════════════════════════════════════
    "My Progress" dashboard — one read-only screen unifying data that all
    already exists elsewhere (zero new persistence):
-   - hero: chapters/letters read (mark-as-read), journal streak, entries
+   - hero: chapters/letters read (mark-as-read), journal streak, entries,
+     lifetime words read + measured pace (ReadingStatsStore)
+   - last-14-days words-read mini bars (ReadingStatsStore.wordsForDays)
    - per-collection reading progress (shared buildProgressGroups table)
+   - journaling: words written (journal text blocks) + voice-memo minutes
+     (JournalMediaStore durations)
    - library counts (notes / marks / bookmarks / links)
    - most-annotated books & letters (AnnotationStore, Hidden Manna
      filtered by progress-stats — never surfaces here)
@@ -13,6 +17,20 @@
    honors settings.markAsRead the same way Settings does (hidden behind
    an explanatory line while the toggle is off).
    ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Compact count for the hero cells: exact with separators below 10k
+ * ("9,999"), one-decimal k up to 1M ("12.4k"), one-decimal M beyond
+ * ("1.2M"). Trailing .0 drops ("12k", not "12.0k").
+ * @param {number} n
+ * @returns {string}
+ */
+export function _fmtWords(n) {
+  const v = Math.max(0, Math.round(n || 0));
+  if (v >= 1e6) return (Math.round(v / 1e5) / 10) + 'M';
+  if (v >= 1e4) return (Math.round(v / 100) / 10) + 'k';
+  return v.toLocaleString('en-US');
+}
 
 export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
   // The reading table + most-annotated titles read the lazy corpora
@@ -89,6 +107,27 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
     () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
   );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
+    () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
+  );
+
+  // Voice-memo minutes — JournalMediaStore.list() is async (IDB cursor);
+  // resolved once on mount. The row is omitted entirely at 0.
+  const [voiceMins, setVoiceMins] = React.useState(0);
+  React.useEffect(() => {
+    let alive = true;
+    if (typeof JournalMediaStore === 'undefined' || typeof JournalMediaStore.list !== 'function') return undefined;
+    JournalMediaStore.list()
+      .then((recs) => {
+        if (!alive) return;
+        let secs = 0;
+        (recs || []).forEach((r) => { if (r && r.type === 'audio' && r.duration > 0) secs += r.duration; });
+        setVoiceMins(Math.round(secs / 60));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // ── Aggregate ─────────────────────────────────────────────────────────
   const totalRead = readItems ? Object.keys(readItems).length : 0;
@@ -111,11 +150,32 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const topSources = mostAnnotatedSources(annData, 5);
   const markAsReadOn = !settings || settings.markAsRead !== false;
 
+  // Reading-measurement surfaces (ReadingStatsStore, bundle-b). Each is
+  // independently guarded — a missing store hides its element, never 0-lies.
+  const readingStats = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.get === 'function') ? ReadingStatsStore.get() : null;
+  const measuredWpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
+  const wordDays = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.wordsForDays === 'function') ? ReadingStatsStore.wordsForDays(14) : null;
+
+  // Words WRITTEN — every text-bearing journal block (p / h2 / quote);
+  // card excerpts and captions are quoted content, not the user's writing.
+  // null (not 0) when the counter or store is absent, so the row hides.
+  let journalWords = null;
+  if (typeof JournalStore !== 'undefined' && typeof JournalStore.all === 'function' && typeof countTextWords === 'function') {
+    journalWords = 0;
+    (JournalStore.all() || []).forEach((e) => {
+      ((e && e.blocks) || []).forEach((b) => {
+        if (b && (b.type === 'p' || b.type === 'h2' || b.type === 'quote')) journalWords += countTextWords(b.text);
+      });
+    });
+  }
+
   const heroStats = [
     { num: totalRead, label: 'Read', sub: totalRead === 1 ? 'chapter or letter' : 'chapters & letters' },
     { num: readStreak, label: 'Reading Streak', sub: readStreak === 1 ? 'day of reading' : 'days of reading' },
     { num: streak, label: 'Journal Streak', sub: streak === 1 ? 'day of journaling' : 'days of journaling' },
     { num: journalCount, label: journalCount === 1 ? 'Entry' : 'Entries', sub: 'in your journal' },
+    ...(readingStats ? [{ num: _fmtWords(readingStats.totalWordsRead || 0), label: 'Words Read', sub: 'across your reading' }] : []),
+    ...(measuredWpm ? [{ num: measuredWpm, label: 'Reading Pace', sub: 'words per minute' }] : []),
   ];
   const libraryRows = [
     { label: 'Notes', count: noteCount },
@@ -142,6 +202,25 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
             </div>
           ))}
         </div>
+
+        {wordDays ? (() => {
+          const max = Math.max(0, ...wordDays.map((d) => d.words));
+          const weekWords = wordDays.slice(-7).reduce((n, d) => n + d.words, 0);
+          return (
+            <div className="prg-days-wrap" role="group" aria-label="Words read, last 14 days">
+              <span className="sr-only">{_fmtWords(weekWords)} words this week</span>
+              <div className="prg-days-bars" aria-hidden="true">
+                {wordDays.map((d) => (
+                  <div
+                    key={d.date}
+                    className="prg-days-bar"
+                    style={d.words > 0 ? { height: Math.max(8, Math.round((d.words / max) * 100)) + '%' } : null}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })() : null}
 
         <div className="settings-section prg-section">
           <div className="settings-section-label">Reading</div>
@@ -188,6 +267,26 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
             ))}
           </div>
         </div>
+
+        {(journalWords !== null || voiceMins > 0) && (
+          <div className="settings-section prg-section">
+            <div className="settings-section-label">Journaling</div>
+            <div className="settings-card">
+              {journalWords !== null && (
+                <div className="progress-row">
+                  <span className="progress-row-label">Words written</span>
+                  <span className="progress-row-tally">{_fmtWords(journalWords)}</span>
+                </div>
+              )}
+              {voiceMins > 0 && (
+                <div className="progress-row">
+                  <span className="progress-row-label">Voice memos</span>
+                  <span className="progress-row-tally">{voiceMins} min</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="settings-section prg-section">
           <div className="settings-section-label">Most Annotated</div>

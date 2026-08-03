@@ -2490,6 +2490,13 @@
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:0.88rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
+    /* Estimated reading time — quiet, right-aligned, never wraps or
+       pushes the title (info is flex:1; the chip pins to the row end). */
+    .idx-min-chip {
+      margin-left:auto; flex-shrink:0; white-space:nowrap; align-self:center;
+      font-family:var(--font-body); font-style:italic;
+      font-size:0.72rem; color:var(--cream-muted); opacity:0.85;
+    }
     /* ── Part group cards (3-part study hierarchy) ── */
     /* Visual language matches .chapter-card-btn so Parts mesh with chapters. */
     .part-group-card { display:flex; align-items:center; gap:0.9rem; width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 1.1rem; transition:border-color 0.18s, background 0.18s; position:relative; }
@@ -4450,6 +4457,27 @@
     .prg-src-col {
       font-family: var(--font-body); font-style: italic;
       font-size: 0.78rem; color: var(--cream-muted);
+    }
+    /* 14-day words-read mini bars — a hero-matching card tucked directly
+       under the stat grid. Bars are purely decorative (aria-hidden); the
+       accessible summary is the sr-only sentence beside them. */
+    .prg-days-wrap {
+      width: 100%; max-width: 32.5rem;
+      margin: -0.9rem 0 1.8rem;
+      padding: 0.7rem 0.85rem 0.6rem;
+      background: var(--bg2);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+    }
+    .prg-days-bars {
+      display: flex; align-items: flex-end; gap: 0.25rem;
+      height: 2.5rem;
+    }
+    .prg-days-bar {
+      flex: 1; min-width: 0;
+      height: 2px; /* zero-word baseline; read days get an inline % height */
+      border-radius: 2px 2px 0 0;
+      background: var(--gold-dim);
     }
 
     /* ══════════════════════════════════════════════════════════════

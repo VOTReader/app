@@ -97,6 +97,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} markRead
  * @property {*} unmarkRead
  * @property {*} isRead
+ * @property {*} getReadKey
  * @property {*} clearReadForBook
  * @property {*} clearAllProgress
  * @property {*} clearHistory
@@ -203,7 +204,7 @@ export function buildScreenRoutes({
   lastReadChapters, setLastReadChapters,
   lastReadLetterMap, setLastReadForVol,
   readItems, readHistory,
-  markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
+  markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
   // ── Data resolved from screen state (F3: the active letter/entry only) ──
   activeLetter, activeVolKey,
   book, chapter,
@@ -261,7 +262,10 @@ export function buildScreenRoutes({
     const rk = COL_BY_KEY.get(volKey).readKey;
     return {
       volKey, // lets the reading view resolve neighbor content for the swipe peek
-      onMarkRead: () => markRead(rk, letterId),
+      onMarkRead: (payload) => markRead(rk, letterId, payload),
+      // Same key markRead's stats record uses — the tracker's frontier
+      // reports and the completion's frontier-clear must share one space.
+      readTrackKey: getReadKey(rk, letterId),
       onUnmark: () => unmarkRead(rk, letterId),
       isRead: (id) => isRead(rk, id),
       onNavigate: (id) => { if (clearSurprise) setSurpriseAnchor(null); setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); },
@@ -828,7 +832,8 @@ export function buildScreenRoutes({
         book={book} chapter={chapter}
         onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
-        onMarkRead={() => markRead(bookId, chapterNum)}
+        onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
+        readTrackKey={getReadKey(bookId, chapterNum)}
         markAsReadEnabled={settings.markAsRead}
         showProgressBar={settings.showProgressBar}
         translation={settings.translation}
@@ -886,6 +891,7 @@ export function buildScreenRoutes({
           setSurpriseAnchor={setSurpriseAnchor} setFromStudies={setFromStudies}
           setMode={setMode} setShowStudy={setShowStudy}
           markRead={markRead}
+          getReadKey={getReadKey}
           selectMatthewCh={selectMatthewCh}
           goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
           goToLetterFromMatthew={goToLetterFromMatthew}
@@ -937,6 +943,7 @@ export function buildScreenRoutes({
         setActiveReadKey={setActiveReadKey}
         setSurpriseAnchor={setSurpriseAnchor}
         markRead={markRead}
+        getReadKey={getReadKey}
         unmarkRead={unmarkRead}
         isRead={isRead}
         studyReadKey={studyReadKey}

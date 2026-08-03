@@ -4,7 +4,7 @@
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // "Go to Scripture" on the study-note scripture sheet — close the sheet,
@@ -90,7 +90,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   };
 
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
-  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
   const hasLinks = chapter.links && chapter.links.length > 0;
 
   return (

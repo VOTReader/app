@@ -73,10 +73,8 @@
                                            current goSearch closure so
                                            SelectionToolbar's Search
                                            action always calls the
-                                           latest closure. Same
-                                           identity-churn pattern as
-                                           useReadingDwell's __onDwellCommit
-                                           bridge (intentional design).
+                                           latest closure (intentional
+                                           per-render identity churn).
 
    DOES NOT OWN:
      - The search engine itself (window.VotSearchMini) — that's bundle-e's
@@ -268,10 +266,9 @@ export function useSearch({
 
   // ── window.__goSearch bridge effect ─────────────────────────────────────
   // No deps array — re-binds every render to expose the current goSearch
-  // closure to SelectionToolbar. Same identity-churn pattern as
-  // useReadingDwell's __onDwellCommit bridge: each render's goSearch
-  // closure captures the latest nav state, so SelectionToolbar's Search
-  // action always opens search with up-to-date context.
+  // closure to SelectionToolbar: each render's goSearch closure captures
+  // the latest nav state, so SelectionToolbar's Search action always
+  // opens search with up-to-date context.
   React.useEffect(() => {
     window.__goSearch = goSearch;
     return () => { window.__goSearch = null; };

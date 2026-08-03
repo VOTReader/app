@@ -29,7 +29,13 @@ function applySavedScrollToEl(el, saved) {
   if (y > 0) el.scrollTop = y;
 }
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
+// showProgress: accepted-unused (the _ prefix convention). Its ONLY runtime
+// consumer was the old scroll≥90% completion trigger (deleted 2026-08-03 —
+// which means the "progress bar" prop was secretly the auto-mark-as-read
+// gate); the VISIBLE notch is driven by body.scroll-notch from settings, not
+// this prop. Kept in the signature so the 50+ call sites stay untouched;
+// candidate for removal in a dedicated sweep.
+export function ScreenLayout({ navChildren, children, showProgress: _showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -87,39 +93,17 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on the saved record's primitive fields (not its object identity, which is rebuilt each render) so this re-applies only when the target offset actually changes.
   }, [inert, restoreScroll && restoreScroll.anchorKey, restoreScroll && restoreScroll.anchorOff, restoreScroll && restoreScroll.y]);
 
-  React.useEffect(() => {
-    if (inert || !showProgress) return;
-    const onScroll = () => {
-      if (!__scrollEl) return;
-      const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
-      const sentinel = __scrollEl.querySelector('.reading-end');
-      let max;
-      if (sentinel) {
-        const containerTop = __scrollEl.getBoundingClientRect().top;
-        const sentinelTop = sentinel.getBoundingClientRect().top;
-        const sentinelOffset = sentinelTop - containerTop + scrollTop;
-        max = Math.max(sentinelOffset - clientHeight, 1);
-      } else {
-        max = Math.max(scrollHeight - clientHeight, 1);
-      }
-      const pct = Math.min(scrollTop / max, 1);
-      if (pct >= 0.9 && window.__onReadingComplete) window.__onReadingComplete();
-    };
-    let el = null;
-    const attach = () => {
-      if (__scrollEl !== el) {
-        if (el) el.removeEventListener("scroll", onScroll);
-        el = __scrollEl;
-        if (el) el.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 300);
-    return () => {
-      clearInterval(poll);
-      if (el) el.removeEventListener("scroll", onScroll);
-    };
-  }, [showProgress, inert]);
+  /* Mark-as-read detection (2026-08-03): the old trigger here fired
+     __onReadingComplete at scroll ≥90% toward the sentinel — no time
+     vector (a flick marked a letter read), no coverage for content that
+     fits the viewport (no scroll event ever fired), and it was
+     accidentally gated on showProgress. Replaced by useReadTracker
+     (hooks/use-read-tracker.js): segment coverage + visibility-honest
+     dwell + content-scaled required time, independent of the progress
+     bar. The hook self-arms only while a reading view holds the
+     __onReadingComplete bridge, so it is a per-500ms property check on
+     every other screen. */
+  useReadTracker(scrollRef, inert, placeKey);
 
   React.useEffect(() => {
     if (inert) return;

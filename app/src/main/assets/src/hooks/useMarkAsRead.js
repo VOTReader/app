@@ -66,19 +66,26 @@
  * @param {() => void} onMarkRead  callback to invoke on completion
  * @returns {void}
  */
-export function useMarkAsRead(enabled, onMarkRead) {
+export function useMarkAsRead(enabled, onMarkRead, trackKey) {
   React.useEffect(() => {
     if (!enabled) return;
     window.__onReadingComplete = onMarkRead;
-    return () => { window.__onReadingComplete = null; };
-  }, [enabled, onMarkRead]);
+    // Identity for the read tracker's frontier reporting: the SAME key
+    // useReadProgress writes (routes build it with getReadKey), so a
+    // completion's ReadingStatsStore record clears exactly the frontier
+    // this visit accumulated.
+    window.__readTrackerMeta = trackKey ? { key: trackKey } : null;
+    return () => { window.__onReadingComplete = null; window.__readTrackerMeta = null; };
+  }, [enabled, onMarkRead, trackKey]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    useReadProgress — App-level per-collection read-cursor state (P7g)
    ═══════════════════════════════════════════════════════════════════════
    OWNS:
-     - readItems state (Record<string, true>, persisted via vot-state
+     - readItems state (Record<string, number> read COUNTS since
+       2026-08-03 — legacy `true` values read as 1 via Number coercion
+       and are never migrated in place; persisted via vot-state
        through usePersistedState)
      - VERSION_ID constant — currently "v1"; future format changes get
        their own version
@@ -121,16 +128,17 @@ import { useRefMirror } from './use-ref-mirror.js';
  * — mutations go through the named helpers.
  *
  * @param {{
- *   savedReadItems: Record<string, true> | undefined,
+ *   savedReadItems: Record<string, number | true> | undefined,
  *   markAsReadEnabled: boolean
  * }} args
  * @returns {{
- *   readItems: Record<string, true>,
+ *   readItems: Record<string, number | true>,
  *   isRead: (bid: string, cid: string | number) => boolean,
- *   markRead: (bid: string, cid: string | number) => void,
+ *   markRead: (bid: string, cid: string | number, payload?: { words: number, activeMs: number }) => void,
  *   unmarkRead: (bid: string, cid: string | number) => void,
  *   clearAllProgress: () => void,
- *   clearReadForBook: (bid: string) => void
+ *   clearReadForBook: (bid: string) => void,
+ *   getReadKey: (bid: string, cid: string | number) => string
  * }}
  */
 export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
@@ -143,10 +151,33 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
   const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
 
-  const markRead = (bid, cid) => {
+  const markRead = (bid, cid, payload) => {
     if (enabledRef.current === false) return;
     const key = getReadKey(bid, cid);
-    if (!readItems[key]) setReadItems((prev) => ({ ...prev, [key]: true }));
+    const prev = readItems[key];
+    // Count-valued since 2026-08-03: `true` (legacy) reads as 1 via
+    // Number-coercion; every `!!readItems[key]` truthiness check is
+    // unaffected. A detector-fired completion INCREMENTS (re-reads are
+    // real data); a manual toggle only sets the first mark — tapping
+    // "mark read" twice is a UI bounce, not a second read-through.
+    if (payload) {
+      setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+      // The stats ledger records only DETECTOR-verified completions —
+      // payload carries the measured words + visibility-honest time.
+      // Manual toggles are a claim, not a measurement, and skip it.
+      if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
+        try {
+          ReadingStatsStore.recordCompletion({
+            key,
+            words: payload.words,
+            activeMs: payload.activeMs,
+            wasReadBefore: !!prev,
+          });
+        } catch (e) { console.warn('reading-stats record failed', e); }
+      }
+    } else if (!prev) {
+      setReadItems((p) => ({ ...p, [key]: 1 }));
+    }
   };
 
   const unmarkRead = (bid, cid) => {
@@ -166,5 +197,8 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     });
   };
 
-  return { readItems, isRead, markRead, unmarkRead, clearAllProgress, clearReadForBook };
+  // getReadKey is exported (2026-08-03) so routes can hand the SAME key to
+  // the read tracker (readTrackKey) that markRead's stats record will use —
+  // one key space, or the completion couldn't clear its own frontier.
+  return { readItems, isRead, markRead, unmarkRead, clearAllProgress, clearReadForBook, getReadKey };
 }

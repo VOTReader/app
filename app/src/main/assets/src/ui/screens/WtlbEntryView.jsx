@@ -13,7 +13,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
@@ -96,7 +96,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   };
 
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
-  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
 
   React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
 

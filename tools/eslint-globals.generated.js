@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 475 distinct identifiers.
+// Total: 480 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -194,6 +194,7 @@ export const projectGlobals = {
   ReactDOM: "readonly",
   ReadingChromeProvider: "readonly",
   ReadingDotContext: "readonly",
+  ReadingStatsStore: "readonly",
   ReadingStreakStore: "readonly",
   RecentNavStore: "readonly",
   Renderer: "readonly",
@@ -334,7 +335,9 @@ export const projectGlobals = {
   commitReadingNav: "readonly",
   computeEndTarget: "readonly",
   contentDocToNavItem: "readonly",
+  countItemWords: "readonly",
   countReadFor: "readonly",
+  countTextWords: "readonly",
   createAutoScroll: "readonly",
   createPressDrag: "readonly",
   data: "readonly",
@@ -405,6 +408,7 @@ export const projectGlobals = {
   readContainer: "readonly",
   readingFontById: "readonly",
   readingFontCss: "readonly",
+  readingMinutes: "readonly",
   relativeDate: "readonly",
   removeRecentSearch: "readonly",
   renderCommentaryCite: "readonly",
@@ -459,6 +463,7 @@ export const projectGlobals = {
   useNavigateToLink: "readonly",
   usePersistedState: "readonly",
   useReadProgress: "readonly",
+  useReadTracker: "readonly",
   useReadingChainNav: "readonly",
   useReadingDwell: "readonly",
   useReadingPositionNav: "readonly",

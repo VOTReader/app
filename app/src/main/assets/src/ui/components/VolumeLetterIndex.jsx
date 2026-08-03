@@ -9,6 +9,17 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
       currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
     }
   }, []);
+  // "~N min" estimate per row, at the user's measured pace when one exists
+  // (ReadingStatsStore, bundle-b) — 230-wpm default otherwise. Hidden when
+  // the counters are absent or the item shape yields no words. Single-column
+  // rows only: the two-col cards are centered compact stacks with no row end
+  // to pin a chip to.
+  const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
+  const minChip = (item) => {
+    if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
+    const m = readingMinutes(countItemWords(item), _wpm);
+    return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
+  };
   return (
     <div className="vol-index">
       <div className="vol-index-header">
@@ -36,6 +47,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
               <div className="chapter-card-label">Preface</div>
               <div className="chapter-card-title">{preface.title}</div>
             </div>
+            {minChip(preface)}
             {markAsReadEnabled && isRead(preface.id) && (
               <span className="read-check" style={{ marginLeft: '0.4rem' }}>{"✓"}</span>
             )}
@@ -72,6 +84,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
                 <div className="chapter-card-label">{letter.date}</div>
                 <div className="chapter-card-title">{letter.title}</div>
               </div>
+              {minChip(letter)}
               {markAsReadEnabled && isRead(letter.id) && (
                 <span className="read-check" style={{ marginLeft: '0.4rem' }}>{"✓"}</span>
               )}

@@ -25,6 +25,16 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // the legacy fallback for any call site that doesn't. One string feeds
   // BOTH the tooltip and the TalkBack label so they can never disagree.
   const backDest = backLabel || "Books";
+  // "~N min" estimate per chapter card, at the user's measured pace when
+  // one exists (ReadingStatsStore, bundle-b) — 230-wpm default otherwise.
+  // Counts the BASE book text (word-count.js contract); hidden when the
+  // counters are absent or the chapter shape yields no words.
+  const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
+  const minChip = (ch) => {
+    if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
+    const m = readingMinutes(countItemWords(ch), _wpm);
+    return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
+  };
   return (
     <ScreenLayout
       navChildren={LibraryNav({
@@ -63,6 +73,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                       : <div className="chapter-card-title untitled">Chapter {ch.num}</div>;
                   })()}
                 </div>
+                {minChip(ch)}
                 {markAsReadEnabled && isRead(ch.num) && <span className="read-check">✓</span>}
               </button>
             );

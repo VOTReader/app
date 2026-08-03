@@ -4,7 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -104,7 +104,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
   // An inert clone (a swipe peek) must never claim the single __onReadingComplete
   // hook or it would mark a merely-peeked letter as read.
-  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
 
   React.useEffect(() => {
     setHighlightedFn(null);

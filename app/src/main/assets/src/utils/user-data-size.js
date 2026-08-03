@@ -56,6 +56,7 @@ export const USER_DATA_STORES = [
   'vot-journal-index',
   'vot-journal-stats',
   'vot-reading-streak',
+  'vot-reading-stats',
   'vot-garden-pos',
   'vot-recent-nav',
   'vot-history',

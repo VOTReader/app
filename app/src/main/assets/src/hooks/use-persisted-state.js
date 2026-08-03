@@ -205,7 +205,7 @@ export function usePersistedState({
       window.removeEventListener('pagehide', flush);
       window.removeEventListener('beforeunload', flush);
       flushRef.current = null;
-      // Only clear the bridge if it's still mine (the __onDwellCommit
+      // Only clear the bridge if it's still mine (the guarded-cleanup
       // pattern) — a racing second registration must not be clobbered.
       if (window.__flushPersistState === flush) window.__flushPersistState = null;
       flush();   // App teardown never strands a pending union
