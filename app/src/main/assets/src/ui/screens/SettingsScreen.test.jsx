@@ -430,6 +430,39 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
   });
 
+  it('brackets the apply with the restore-inflight marker (a crash mid-apply must warn at next boot)', async () => {
+    localStorage.removeItem('vot-restore-inflight');
+    let flagDuringApply = null;
+    const applySpy = vi.fn(async () => {
+      flagDuringApply = localStorage.getItem('vot-restore-inflight');
+      return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
+    });
+    setupImport({ applyImportPayload: applySpy });
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+
+    await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
+    expect(flagDuringApply).not.toBeNull();   // set BEFORE the first mutation
+    // Cleared only once the apply durably completed (useRestoreGuard's cue).
+    await vi.waitFor(() => expect(localStorage.getItem('vot-restore-inflight')).toBeNull());
+  });
+
+  it('leaves the restore-inflight marker set when the apply throws (part-applied state)', async () => {
+    localStorage.removeItem('vot-restore-inflight');
+    const applySpy = vi.fn(async () => { throw new Error('corrupt payload'); });
+    setupImport({ applyImportPayload: applySpy });
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+
+    await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
+    // The marker survives a handled failure — the boot guard must warn, because
+    // a legacy apply may have part-landed before the throw.
+    await vi.waitFor(() => expect(localStorage.getItem('vot-restore-inflight')).not.toBeNull());
+    localStorage.removeItem('vot-restore-inflight');
+  });
+
   it('refuses import while any structured store is still pending hydration', async () => {
     const toastSpy = vi.fn();
     const pendingAnnotations = { ...globalThis.AnnotationStore, getState: () => 'pending' };

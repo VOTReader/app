@@ -106,6 +106,7 @@ import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
 import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
 import { useJournalMediaSweep } from '../hooks/use-journal-media-sweep.js';
+import { useRestoreGuard } from '../hooks/use-restore-guard.js';
 import { useBackupReminder } from '../hooks/use-backup-reminder.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
@@ -213,6 +214,7 @@ Object.assign(window, {
   useReadingChainNav,
   useSurprise,
   useJournalMediaSweep,
+  useRestoreGuard,
   useBackupReminder,
   useDomAnnotationSync,
   useKeyboardInset,

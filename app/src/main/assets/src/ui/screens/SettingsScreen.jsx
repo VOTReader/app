@@ -17,6 +17,20 @@ function clampFontScale(v) {
   return Number.isFinite(f) ? Math.min(3, Math.max(0.8, f)) : 1;
 }
 
+// Set immediately before an import applies; removed only when the apply
+// completes (or provably never started). A crash mid-restore leaves it behind,
+// and useRestoreGuard turns that into a loud boot prompt. Keep the literal in
+// sync with RESTORE_INFLIGHT_KEY in hooks/use-restore-guard.js (classic-script
+// seam — no import path from here; the lifecycle tests pin both sides).
+const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
+
+// Android's native import refuses a v3 manifest over MAX_V3_MANIFEST_SIZE
+// (16 MiB, StorageManager.kt). Warn at EXPORT time — while the data still
+// lives on this device — once the manifest crosses 75% of that, so an
+// unrestorable-on-phone backup is never first discovered on a wiped phone.
+// ~12 MiB of typed JSON is implausible for one human; this is a tripwire.
+const MANIFEST_WARN_BYTES = 12 * 1024 * 1024;
+
 function TextSizeSliderRow({ value, onChange }) {
   const v = clampFontScale(value);
   const pct = Math.round(v * 100);
@@ -699,7 +713,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         await writeContainer(built.manifest, built.mediaEntries, sink.write);
         await sink.close();
         hideToast(_TOAST_ID);
-        _showToast('Backup saved.');
+        if (built.manifestBytes > MANIFEST_WARN_BYTES) {
+          _showToast('Backup saved. Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).', 0);
+        } else {
+          _showToast('Backup saved.');
+        }
         return true;
       } catch (e) {
         hideToast(_TOAST_ID);
@@ -769,7 +787,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         mediaEntries: built.mediaEntries,
       });
       hideToast(_TOAST_ID);
-      _showToast('Backup saved.');
+      if (built.manifestBytes > MANIFEST_WARN_BYTES) {
+        _showToast('Backup saved. Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).', 0);
+      } else {
+        _showToast('Backup saved.');
+      }
       return true;
     } catch (e) {
       console.warn('android v3 export failed', e);
@@ -873,6 +895,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         return;
       }
 
+      // Restore-inflight marker: set BEFORE the first mutation, removed only on
+      // completion. If the process dies anywhere inside applyFn (crash, kill,
+      // power loss) the marker survives and useRestoreGuard warns on next boot.
+      // A handled failure below leaves it SET on purpose — writeFailures means
+      // data did not durably land, and an unknown throw may have part-applied.
+      try { localStorage.setItem(RESTORE_INFLIGHT_KEY, String(Date.now())); } catch (_e) { /* privacy mode */ }
+
       // Apply + WAIT for every write to durably land before reloading (U1
       // barrier). applyFn SKIPS any section that fails shape validation so a
       // corrupt section can't overwrite good data.
@@ -880,8 +909,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       try { applied = await applyFn(storesMap, flagMap); }
       catch (e) {
         // The apply paths hold a cross-tab Web Lock; contention gets its own
-        // message instead of the generic corrupt-file one downstream.
+        // message instead of the generic corrupt-file one downstream — and
+        // provably nothing ran, so the inflight marker comes straight off.
         if (/already in progress/.test(String(e && e.message))) {
+          try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
           hideToast(_TOAST_ID);
           _showToast('Another backup operation is running in a different tab. Please wait for it to finish.');
           return;
@@ -926,6 +957,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       } else {
         _showToast('Import complete. Reloading…', 0);
       }
+      // The apply is durable (writeFailures gate above) — the restore finished.
+      try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
       // A clean import reloads fast; problems get reading time first — a 600ms
       // reload used to wipe the warning toast before anyone could read it.
       backupReloadPendingRef.current = true;

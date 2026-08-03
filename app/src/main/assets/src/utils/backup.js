@@ -262,7 +262,7 @@ export async function buildExportPayload(ctx) {
  * tracked P5 cleanup (BACKUP-STREAMING-PLAN.txt), once v3 ships.
  *
  * @param {BuildExportCtx} ctx
- * @returns {Promise<{ ok:true, manifest:any, mediaEntries: Array<{id:string, blob:Blob}> }
+ * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}> }
  *   | { ok:false, reason:'read-failure', problems:string[] }>}
  */
 export async function buildV3Manifest(ctx) {
@@ -348,7 +348,12 @@ export async function buildV3Manifest(ctx) {
     stores: stores,
     media: mediaMeta,
   };
-  return { ok: true, manifest, mediaEntries };
+  // UTF-8 size of the manifest frame as it will be written. Android's native
+  // import refuses a manifest over StorageManager.MAX_V3_MANIFEST_SIZE (16 MiB);
+  // exposing the size lets the export UI warn while the data still lives on
+  // this device instead of at restore time on a wiped phone.
+  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest)).length;
+  return { ok: true, manifest, manifestBytes, mediaEntries };
 }
 
 /**

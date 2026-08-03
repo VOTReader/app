@@ -542,6 +542,10 @@ function App() {
      (2026-08-02 -- the one App() effect with zero closure deps). */
   useJournalMediaSweep();
 
+  /* Boot warning if the previous session died mid-restore ->
+     src/hooks/use-restore-guard.js (2026-08-03). */
+  useRestoreGuard();
+
   // Expose the home-button handler globally so <HomeBtn /> can call it
   // without prop drilling. Clears return-breadcrumbs so Home means Home.
   useEffect(() => {

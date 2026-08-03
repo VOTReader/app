@@ -247,6 +247,9 @@ describe('buildV3Manifest', () => {
     expect(res.mediaEntries.map((e) => e.id)).toEqual(['m1', 'm2']);
     expect(res.mediaEntries[0].blob).toBe(b1);
     expect(res.mediaEntries[1].blob).toBe(b2);
+    // manifestBytes = the exact UTF-8 size of the manifest frame — the number
+    // the export UI compares against Android's 16 MiB native import cap.
+    expect(res.manifestBytes).toBe(new TextEncoder().encode(JSON.stringify(res.manifest)).length);
   });
 
   it('uses the ACTUAL blob byte length for size (the container integrity contract)', async () => {
