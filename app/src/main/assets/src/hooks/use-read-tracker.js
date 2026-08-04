@@ -62,8 +62,11 @@
    indices (document order) flow throttled into
    ReadingStatsStore.recordProgress under window.__readTrackerMeta.key
    (set by useMarkAsRead; snapshotted locally so cleanup ordering can't
-   lose the final flush). That data powers resume-at-first-unread-
-   paragraph — and, later, the held per-letter skim indicator.
+   lose the final flush). That data feeds the reading record (and, later,
+   the held per-letter skim indicator). It does NOT move the viewport:
+   resume is use-scroll-memory's saved position, full stop — the
+   frontier-jump resume was retired 2026-08-04 (owner call) because a
+   post-restore jump overrides where the reader actually left off.
 
    The walk-away edge (screen left open on a fits-viewport page)
    credits the LEDGER by design — adjudicated with the owner
@@ -129,9 +132,7 @@ export function useReadTracker(scrollRef, inert, placeKey) {
     var lastTick = /** @type {number | null} */ (null);
     var lastReportAt = 0;
     var reportedCount = 0;
-    var frontierDone = false;
-    var frontierAttempts = 0;
-    var frontierBaseTop = /** @type {number | null} */ (null);
+    var restoreSettled = false;
     var trackKeySnapshot = /** @type {string | null} */ (null);
 
     // Current candidates in document order, excluding [inert] subtrees
@@ -154,42 +155,6 @@ export function useReadTracker(scrollRef, inert, placeKey) {
         out.push({ el: root, key: '__root' });
       }
       return out;
-    };
-
-    // ── Frontier resume (owner-directed 2026-08-03): smarter than scroll-
-    // position resume. If a PREVIOUS visit left a frontier (first segment
-    // never actually READ — e.g. the user flicked to the bottom, so scroll
-    // memory says "bottom" but the reading record says "paragraph 2"),
-    // jump there once, AFTER use-scroll-memory's restore settles. The
-    // saved exact position wins whenever the frontier is within one
-    // viewport of it.
-    var maybeFrontierResume = function(root, cands) {
-      if (frontierDone) return;
-      var meta = window.__readTrackerMeta;
-      if (!meta || !meta.key) { frontierDone = true; return; }
-      frontierAttempts += 1;
-      if (frontierAttempts > 12) { frontierDone = true; return; }
-      if (document.body && document.body.classList.contains('scroll-restoring')) return;
-      // Yank guard (review P2): once the USER has scrolled this visit, a
-      // late frontier jump is a rug-pull, not a resume. The baseline is
-      // captured on the first post-restore sweep (never mid-restore, which
-      // would read a scroll position still in flight); meaningful drift
-      // after that cancels the jump forever.
-      if (frontierBaseTop == null) { frontierBaseTop = root.scrollTop; return; }
-      if (Math.abs(root.scrollTop - frontierBaseTop) > 48) { frontierDone = true; return; }
-      frontierDone = true;
-      if (typeof ReadingStatsStore === 'undefined' || !ReadingStatsStore) return;
-      var idx = null;
-      try { idx = ReadingStatsStore.firstUnreadIndex(meta.key, cands.length); }
-      catch (_e) { return; }
-      if (idx == null || !cands[idx]) return;
-      var el = /** @type {HTMLElement} */ (cands[idx].el);
-      var top = el.offsetTop || 0;
-      var viewport = root.clientHeight || 0;
-      if (Math.abs(root.scrollTop - top) <= viewport) return; // already looking at it
-      var target = Math.max(0, top - Math.round(viewport * 0.1));
-      if (typeof root.scrollTo === 'function') root.scrollTo({ top: target, behavior: 'auto' });
-      else root.scrollTop = target;
     };
 
     var flushProgress = function(force, cands) {
@@ -239,11 +204,16 @@ export function useReadTracker(scrollRef, inert, placeKey) {
         }
       }
 
-      maybeFrontierResume(root, cands);
-      // Scroll memory may briefly place the viewport at an old/bad position
-      // before frontier resume corrects it. That transitional geometry is
-      // navigation, not reading: bank neither coverage nor active time.
-      if (!frontierDone) { lastTick = null; return; }
+      // use-scroll-memory writes this container's scrollTop for up to 90 rAF
+      // after mount (body.scroll-restoring). That transitional geometry is
+      // navigation, not reading: bank neither coverage nor active time until
+      // the restore has landed, plus one sweep for it to hold still.
+      if (!restoreSettled) {
+        if (document.body && document.body.classList.contains('scroll-restoring')) { lastTick = null; return; }
+        restoreSettled = true;
+        lastTick = null;
+        return;
+      }
       var now = performance.now();
       if (lastTick != null) activeMs += Math.min(now - lastTick, TICK_CAP_MS);
       lastTick = now;
@@ -294,9 +264,9 @@ export function useReadTracker(scrollRef, inert, placeKey) {
     return function() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVis);
-      // Leaving mid-read: persist the frontier so a later visit resumes at
-      // the first paragraph never actually read. (trackKeySnapshot, not the
-      // live meta — the view's own cleanup may have nulled the global first.)
+      // Leaving mid-read: persist the frontier (what was actually read this
+      // visit). (trackKeySnapshot, not the live meta — the view's own
+      // cleanup may have nulled the global first.)
       flushProgress(true, lastCands);
       // A COMPLETED read reports its true end-of-visit pace here — see the
       // header's pace-sampling note.

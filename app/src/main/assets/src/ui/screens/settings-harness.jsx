@@ -89,7 +89,6 @@ export function setupSettingsGlobals(overrides = {}) {
 
   // Render-time helpers.
   put('useStorageInfo', () => ({ usage: 0, quota: 0, persisted: false }));
-  put('useBackupReminder', () => {});
   put('buildProgressGroups', () => []);
   put('countReadFor', () => 0);
   put('READ_VERSION_ID', 'v1');

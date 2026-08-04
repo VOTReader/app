@@ -826,12 +826,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     // Both platforms now write the v3 STREAMING container (.votbak). Web streams
     // via openExportSink + writeContainer; Android via the native chunked bridge.
     // (The v2 buildExportPayload remains exported for rollback + the P5 fold.)
-    // Each driver returns true ONLY from its "Backup saved." tail — cancels
-    // and failures fall through undefined.
-    const ok = PlatformBridge.isAndroid ? await _exportV3Android() : await _exportV3Web();
-    // The ONE shared success stamp for both platforms: the backup-freshness
-    // clock useBackupReminder reads at boot (settings.lastExportAt).
-    if (ok) onSetting('lastExportAt', Date.now());
+    if (PlatformBridge.isAndroid) await _exportV3Android();
+    else await _exportV3Web();
   };
 
   const importPersonalData = async () => {
@@ -1698,12 +1694,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 <div className="settings-row-desc">{verifyReport.message}</div>
               </div>
             )}
-            <SettingsRow
-              label="Backup Reminder"
-              desc="On (default): if your last Export is more than 30 days old — or you've never exported — show a reminder at launch, at most once a week. Only fires once you have data worth protecting. Off: never remind."
-              checked={settings.backupReminder !== false}
-              onToggle={() => onToggle("backupReminder")}
-            />
             {/* Diagnostic-log status row. Renders only when entries exist
                 (Android: native BoundedLogTree merged with the JS DiagnosticLog;
                 web: the JS DiagnosticLog). Hidden on a clean session to reduce

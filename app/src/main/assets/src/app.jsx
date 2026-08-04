@@ -449,12 +449,6 @@ function App() {
     setJournalEntryId, setGardenPage,
   });
 
-  /* Backup-freshness boot check — toast + Settings deep link when the last
-     export is >30 days old on a non-trivial profile. Logic in
-     src/hooks/use-backup-reminder.js; called here because goSettings
-     (useNav, just above) is a param. */
-  useBackupReminder({ settings, updateSetting, goSettings });
-
   /* W1.5(b) — History API sync. Watches the per-active-tab nav-key tuple
      and pushes an empty-state history entry on every change. Required
      prerequisite for W1.5(d)'s popstate listener (without this layer

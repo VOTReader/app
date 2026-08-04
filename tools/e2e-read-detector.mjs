@@ -114,8 +114,10 @@ try {
 
   // PARTIAL READ: back to the index, open a multi-block letter, read only
   // the top, flick to the bottom for less than the 800ms credit floor, then
-  // navigate away. The saved scroll position says "bottom" while the honest
-  // reading frontier says "first unread block" — reopening must prefer it.
+  // navigate away. The honest reading frontier says "first unread block"
+  // while the saved scroll position says "bottom" — reopening must land at
+  // the SAVED POSITION (the frontier jump was retired 2026-08-04); the
+  // frontier data itself must still be recorded.
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || '')); if (b) b.click(); });
   await sleep(900);
   await page.evaluate(() => {
@@ -144,8 +146,8 @@ try {
     }
   }
 
-  // Reopen that same letter. Scroll memory restores the bottom first; the
-  // tracker then moves to the first unread block once restoration settles.
+  // Reopen that same letter. Scroll memory restores the bottom and NOTHING
+  // moves it afterwards.
   await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
     if (rows[3]) rows[3].click();
@@ -171,7 +173,7 @@ try {
       target,
     };
   }, key2, expectedUnread);
-  console.log('AFTER FRONTIER RESUME:', JSON.stringify(resume));
+  console.log('AFTER REOPEN (scroll-position resume):', JSON.stringify(resume));
 
   // Assertions
   const fails = [];
@@ -183,10 +185,12 @@ try {
   if (result2.progress[key2] && !(result2.progress[key2].w < result2.progress[key2].tw)) fails.push('word-weighted partial progress missing: ' + JSON.stringify(result2.progress[key2]));
   if (!(resume.firstUnread > 0)) fails.push('no useful first-unread index after reopen: ' + JSON.stringify(resume));
   // target === -1 means the expected block (or the scroller) could not be
-  // located — that must FAIL loudly, not degrade into |scrollTop+1| <= viewport
-  // passing for any first-viewport position.
+  // located — that must FAIL loudly, not degrade into a vacuous pass.
   if (resume.target < 0) fails.push('frontier target block not locatable (selector/expectedUnread broke): ' + JSON.stringify(resume));
-  else if (!(resume.maxTop > 0 && Math.abs(resume.scrollTop - resume.target) <= resume.viewport)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
+  // Non-vacuity: the saved bottom and the frontier block must be MORE than a
+  // viewport apart, or "landed at the saved position" proves nothing.
+  else if (!(resume.maxTop > resume.viewport && Math.abs(resume.maxTop - resume.target) > resume.viewport)) fails.push('fixture too short to distinguish scroll-restore from a frontier jump: ' + JSON.stringify(resume));
+  else if (!(Math.abs(resume.scrollTop - resume.maxTop) <= resume.viewport)) fails.push('reopen did not resume at the SAVED scroll position (frontier jump back?): ' + JSON.stringify(resume));
   if (result2.progress['v1:volume-one:a-word-of-warning']) fails.push('completed item still has a frontier (should be cleared)');
 
   if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }

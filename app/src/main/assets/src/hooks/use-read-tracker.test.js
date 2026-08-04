@@ -257,7 +257,7 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     expect(s.activeMs).toBeGreaterThan(25000);   // FINAL time, not the ~9s completion instant
   });
 
-  it('FRONTIER RESUME: jumps to the first unread paragraph when it is far from the restored position', () => {
+  it('NEVER moves the viewport — the saved scroll position owns resume (frontier jump retired)', () => {
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       recordProgress: vi.fn(),
       firstUnreadIndex: vi.fn(() => 3),
@@ -268,46 +268,13 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     const scrollTo = vi.fn();
     root.scrollTo = scrollTo;
     mount(root);
-    vi.advanceTimersByTime(1100);   // sweep 1 = post-restore baseline, sweep 2 = jump
-    expect(scrollTo).toHaveBeenCalledWith({ top: 2000 - 80, behavior: 'auto' });
-    expect(/** @type {any} */ (globalThis).ReadingStatsStore.firstUnreadIndex).toHaveBeenCalledWith('v1:test:item', 6);
-  });
-
-  it('FRONTIER RESUME: leaves the exact restored position alone when the frontier is within a viewport', () => {
-    /** @type {any} */ (globalThis).ReadingStatsStore = {
-      recordProgress: vi.fn(),
-      firstUnreadIndex: vi.fn(() => 3),
-    };
-    root = buildContent(6, 50);
-    root.scrollTop = 1700;                 // mid-read resume, already looking at paragraph 3
-    Object.defineProperty(root.children[3], 'offsetTop', { configurable: true, value: 2000 });
-    const scrollTo = vi.fn();
-    root.scrollTo = scrollTo;
-    mount(root);
-    vi.advanceTimersByTime(1100);
+    vi.advanceTimersByTime(60000);
     expect(scrollTo).not.toHaveBeenCalled();
+    expect(root.scrollTop).toBe(5000);
+    expect(/** @type {any} */ (globalThis).ReadingStatsStore.firstUnreadIndex).not.toHaveBeenCalled();
   });
 
-  it('FRONTIER RESUME: waits for the content-anchor restore to settle first', () => {
-    /** @type {any} */ (globalThis).ReadingStatsStore = {
-      recordProgress: vi.fn(),
-      firstUnreadIndex: vi.fn(() => 2),
-    };
-    root = buildContent(4, 50);
-    root.scrollTop = 5000;
-    Object.defineProperty(root.children[2], 'offsetTop', { configurable: true, value: 1000 });
-    const scrollTo = vi.fn();
-    root.scrollTo = scrollTo;
-    document.body.classList.add('scroll-restoring');
-    mount(root);
-    vi.advanceTimersByTime(1500);          // several sweeps while restoring
-    expect(scrollTo).not.toHaveBeenCalled();
-    document.body.classList.remove('scroll-restoring');
-    vi.advanceTimersByTime(1100);   // baseline sweep, then the jump
-    expect(scrollTo).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not credit the temporary scroll-memory viewport before frontier resume', () => {
+  it('does not credit the temporary scroll-memory viewport while the restore is in flight', () => {
     const recordProgress = vi.fn();
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       recordProgress,
@@ -315,12 +282,12 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     };
     root = buildContent(4, 50);
     paras(root).forEach(hide);
-    show(root.children[3]);                 // stale restore lands at the bottom
+    show(root.children[3]);                 // mid-restore the viewport sits at the bottom
     document.body.classList.add('scroll-restoring');
     const h = mount(root);
     vi.advanceTimersByTime(1000);
     document.body.classList.remove('scroll-restoring');
-    vi.advanceTimersByTime(600);            // baseline captured, jump not run yet
+    vi.advanceTimersByTime(600);            // settle sweep only — no credit banked yet
     h.unmount();
     expect(recordProgress).not.toHaveBeenCalled();
   });
