@@ -27,6 +27,12 @@ function renderSheet(overrides = {}) {
 }
 
 describe('TabActionSheet bulk-close confirm gates', () => {
+  it('is exposed as a labelled modal dialog', () => {
+    renderSheet();
+    const dialog = screen.getByRole('dialog', { name: 'Tab actions' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+  });
+
   it('"Close other tabs" asks first; the action fires only on Yes', () => {
     const p = renderSheet();
     fireEvent.click(screen.getByText('Close other tabs'));

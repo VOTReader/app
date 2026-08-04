@@ -25,7 +25,10 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
           role="button"
           tabIndex={0}
           onClick={() => scrollToBubble(num)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToBubble(num); } }}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToBubble(num); }
+          }}
           title={`Jump back to footnote ${num} in the body`}
         >
           <div className="footnote-list-num">{num}{"."}</div>

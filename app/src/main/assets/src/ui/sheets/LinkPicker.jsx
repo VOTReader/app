@@ -36,6 +36,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   // engine still preparing its index, [] / [...] = resolved rows.
   const [contentHits, setContentHits] = React.useState(/** @type {any} */ (null));
   const inputRef = React.useRef(null);
+  const trapRef = useFocusTrap(true);
   // Re-read RecentNavStore every render so newly-added picks float to the top
   // without remounting the picker. Cheap localStorage read; runs at most once
   // per render.
@@ -344,14 +345,15 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     { id: 'browse', label: 'Browse' },
     { id: 'recent', label: 'Recent' },
   ];
+  const dialogTitle = mode === 'card' ? 'Embed a Card' : mode === 'excerpt' ? 'Embed an Excerpt' : 'Create a Link';
 
   return (
     <div className="link-picker-overlay" onClick={onClose}>
-      <div className="link-picker-sheet navpick-sheet" onClick={e => e.stopPropagation()}>
+      <div className="link-picker-sheet navpick-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-picker-title" onClick={e => e.stopPropagation()}>
         {/* Header: title + neutral close (×). Close KEEPS any created link;
             undo lives in the success strip below, clearly separated. */}
         <div className="navpick-header">
-          <span className="navpick-title">{mode === 'card' ? "Embed a Card" : mode === 'excerpt' ? "Embed an Excerpt" : "Create a Link"}</span>
+          <span className="navpick-title" id="link-picker-title">{dialogTitle}</span>
           <button
             className="navpick-close"
             onClick={onClose}

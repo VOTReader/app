@@ -57,6 +57,16 @@ afterEach(() => {
 });
 
 describe('NotebookPickerSheet — buffered toggles', () => {
+  it('is a labelled modal and notebook rows work from the keyboard', () => {
+    setupStores();
+    render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);
+    const dialog = screen.getByRole('dialog', { name: 'Add to Notebook' });
+    const row = screen.getByRole('button', { name: /Psalms Study/ });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(row.className).toContain('checked');
+  });
+
   it('tapping a notebook row does NOT write to the store (buffered until Save)', () => {
     setupStores();
     const { container } = render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);

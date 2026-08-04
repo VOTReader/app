@@ -231,10 +231,20 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
             <span
               key={si}
               className="letter-link-ref"
+              role="link"
+              tabIndex={0}
               onClick={() => onInAppLink(
                 { collection: collection, letterTitle: title },
                 { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null }
               )}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                onInAppLink(
+                  { collection: collection, letterTitle: title },
+                  { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null }
+                );
+              }}
               title={'Open "' + title + '" in ' + collection}
             >
               {seg}
@@ -253,7 +263,15 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               key={si}
               className={`fn-ref${highlightedFn === n ? " active" : ""}`}
               data-fn-num={n}
+              role="button"
+              tabIndex={0}
               onClick={() => handleBubbleClick(ref, n)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleBubbleClick(ref, n);
+                }
+              }}
               title={`Footnote ${n}`}
             >
               {n}

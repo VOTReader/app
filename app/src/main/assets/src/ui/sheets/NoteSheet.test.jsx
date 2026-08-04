@@ -62,6 +62,13 @@ afterEach(() => {
 });
 
 describe('NoteSheet empty-note action', () => {
+  it('is exposed as a labelled modal dialog', () => {
+    setupStores({ body: 'Saved note' });
+    render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    const dialog = screen.getByRole('dialog', { name: 'Note' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+  });
+
   it('read mode on an EMPTY note renders the "Add note text" button', () => {
     setupStores({ body: '' });
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);

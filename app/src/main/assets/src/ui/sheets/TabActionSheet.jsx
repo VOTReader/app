@@ -35,10 +35,10 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
   return (
     <>
       <div className="select-sheet-backdrop open" onClick={onDismiss} />
-      <div className="select-sheet" ref={trapRef} onClick={(e) => e.stopPropagation()}>
+      <div className="select-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="tab-actions-title" onClick={(e) => e.stopPropagation()}>
         <SheetHandle onClose={onDismiss} />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>
-        <div className="select-sheet-title">Tab actions</div>
+        <div className="select-sheet-title" id="tab-actions-title">Tab actions</div>
         <div className="select-sheet-ornament">
           <div className="select-sheet-ornament-line" />
           <div className="select-sheet-ornament-diamond">{"✦"}</div>

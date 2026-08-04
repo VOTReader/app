@@ -3,6 +3,21 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Shared utility for rendering inline markup in p/h2/quote text. */
+function jrnInteractiveProps(activate, role) {
+  var semanticRole = role || 'button';
+  return {
+    role: semanticRole,
+    tabIndex: 0,
+    onClick: activate,
+    onKeyDown: function(e) {
+      if (e.target !== e.currentTarget) return;
+      if (e.key !== 'Enter' && !(semanticRole === 'button' && e.key === ' ')) return;
+      e.preventDefault();
+      activate(e);
+    },
+  };
+}
+
 export function jrnRenderInline(text, callbacks) {
   if (!text) return null;
   callbacks = callbacks || {};
@@ -44,7 +59,7 @@ export function jrnRenderInline(text, callbacks) {
             <span
               key={'i' + (keyCounter++)}
               className="jrn-inline-ref"
-              onClick={(function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(part.ref)}
+              {...jrnInteractiveProps((function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(part.ref), 'link')}
             >
               {body}
             </span>
@@ -62,7 +77,7 @@ export function jrnRenderInline(text, callbacks) {
           <span
             key={'i' + (keyCounter++)}
             className="jrn-inline-ref"
-            onClick={(function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(soleRef)}
+            {...jrnInteractiveProps((function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(soleRef), 'link')}
           >
             {ref}
           </span>
@@ -86,7 +101,7 @@ export function jrnRenderInline(text, callbacks) {
         <span
           key={'i' + (keyCounter++)}
           className={'jrn-inline-' + kind}
-          onClick={(function(k, d) { return function() { callbacks.onInlineLink && callbacks.onInlineLink(k, d); }; })(kind, data)}
+          {...jrnInteractiveProps((function(k, d) { return function() { callbacks.onInlineLink && callbacks.onInlineLink(k, d); }; })(kind, data), 'link')}
         >
           {label}
         </span>
@@ -132,14 +147,14 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'letter-card') {
     var lc = JournalHelpers.resolveLetterCard(b.volKey, b.letterId, b.excerpt);
     if (!lc) return (
-      <div className="jrn-embed-letter" onClick={function() { callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId); }}>
+      <div className="jrn-embed-letter" {...jrnInteractiveProps(function() { callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId); })}>
         <div className="jrn-emb-eyebrow">Letter</div>
         <h4 className="jrn-emb-title">{b.letterId}</h4>
         <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
     return (
-      <div className={'jrn-embed-letter' + (lc.isExcerpt ? ' is-excerpt' : '')} onClick={function() { callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId); }} role="button">
+      <div className={'jrn-embed-letter' + (lc.isExcerpt ? ' is-excerpt' : '')} {...jrnInteractiveProps(function() { callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId); })}>
         {lc.date && <div className="jrn-emb-date">{lc.date}</div>}
         <div className="jrn-emb-eyebrow">{lc.isExcerpt ? lc.eyebrow + ' · Excerpt' : lc.eyebrow}</div>
         <h4 className="jrn-emb-title">{lc.title}</h4>
@@ -151,7 +166,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'chapter-card') {
     var cc = JournalHelpers.resolveChapterCard(b.bookId, b.chapter);
     return (
-      <div className="jrn-embed-chapter" onClick={function() { callbacks.onChapterCard && callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy); }} role="button">
+      <div className="jrn-embed-chapter" {...jrnInteractiveProps(function() { callbacks.onChapterCard && callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy); })}>
         <div className="jrn-emb-eyebrow">{cc ? cc.eyebrow : 'Bible'}</div>
         <h4 className="jrn-emb-title">{cc ? cc.title : (b.bookId + ' ' + b.chapter)}</h4>
         <span className="jrn-emb-arrow" aria-hidden="true">›</span>
@@ -165,11 +180,10 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
     return (
       <div
         className={'jrn-embed-verse' + (isExcerpt ? ' is-excerpt' : '')}
-        onClick={function() {
+        {...(callbacks.onChapterCard && b.bookId != null ? jrnInteractiveProps(function() {
           if (!callbacks.onChapterCard || b.bookId == null || b.chapter == null) return;
           callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy, b.verse, b.verseEnd);
-        }}
-        role={callbacks.onChapterCard && b.bookId != null ? 'button' : null}
+        }) : {})}
         style={callbacks.onChapterCard && b.bookId != null ? { cursor: 'pointer' } : null}
       >
         <div className="jrn-emb-cite">{isExcerpt ? vb.cite + ' · Excerpt' : vb.cite}</div>
@@ -183,7 +197,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'bookmark-card') {
     var bc = JournalHelpers.resolveBookmarkCard(b.bookmarkId);
     return (
-      <div className="jrn-embed-bookmark" onClick={function() { callbacks.onBookmarkCard && callbacks.onBookmarkCard(b.bookmarkId); }} role="button">
+      <div className="jrn-embed-bookmark" {...jrnInteractiveProps(function() { callbacks.onBookmarkCard && callbacks.onBookmarkCard(b.bookmarkId); })}>
         <div className="jrn-emb-eyebrow">{bc ? bc.eyebrow : 'Bookmark'}</div>
         <h4 className="jrn-emb-title">{bc ? bc.title : 'Bookmark'}</h4>
         {bc && bc.body && <JrnExpandable text={bc.body} threshold={200} className="jrn-emb-body" />}
@@ -194,7 +208,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'note-card') {
     var nc = JournalHelpers.resolveNoteCard(b.noteGroupId);
     return (
-      <div className="jrn-embed-note" onClick={function() { callbacks.onNoteCard && callbacks.onNoteCard(b.noteGroupId); }} role="button">
+      <div className="jrn-embed-note" {...jrnInteractiveProps(function() { callbacks.onNoteCard && callbacks.onNoteCard(b.noteGroupId); })}>
         <div className="jrn-emb-eyebrow">{nc ? nc.eyebrow : 'Note'}</div>
         <h4 className="jrn-emb-title">{nc ? nc.title : 'Note'}</h4>
         {nc && nc.body && <JrnExpandable text={nc.body} threshold={200} className="jrn-emb-body" tapToToggle />}
@@ -206,7 +220,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
     var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(b.entryId) : null;
     var jcPreview = je ? JournalHelpers.previewText(je, 180) : '';
     return (
-      <div className="jrn-embed-journal" onClick={function() { callbacks.onJournalCard && callbacks.onJournalCard(b.entryId); }} role="button">
+      <div className="jrn-embed-journal" {...jrnInteractiveProps(function() { callbacks.onJournalCard && callbacks.onJournalCard(b.entryId); })}>
         <div className="jrn-emb-eyebrow">Linked Entry</div>
         <h4 className="jrn-emb-title">{je ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled') : '(Deleted)'}</h4>
         {/* A link card shows a 2-line teaser (CSS-clamped), not an expandable
@@ -221,8 +235,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
     return (
       <div
         className="jrn-embed-notebook"
-        role="button"
-        onClick={function() { callbacks.onNotebookCard && callbacks.onNotebookCard(b.notebookId); }}
+        {...jrnInteractiveProps(function() { callbacks.onNotebookCard && callbacks.onNotebookCard(b.notebookId); })}
       >
         <div className="jrn-emb-notebook-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -251,7 +264,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
     };
     return (
       <div className={'jrn-embed-journal-excerpt' + (b.originType === 'h2' ? ' is-heading' : '')}>
-        {srcTitle && <div className="jrn-emb-eyebrow jrn-excerpt-source" onClick={openSource} role="button">{'From: ' + srcTitle}</div>}
+        {srcTitle && <div className="jrn-emb-eyebrow jrn-excerpt-source" {...jrnInteractiveProps(openSource, 'link')}>{'From: ' + srcTitle}</div>}
         <JrnExpandable
           text={b.text || ''}
           threshold={240}
@@ -272,8 +285,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         {b.sourceJournalId && srcImg && (
           <div
             className="jrn-emb-eyebrow jrn-excerpt-source"
-            onClick={function() { if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId); }}
-            role="button"
+            {...jrnInteractiveProps(function() { if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId); }, 'link')}
           >
             {'From: ' + srcImg}
           </div>
@@ -293,8 +305,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         {b.sourceJournalId && srcAud && (
           <div
             className="jrn-emb-eyebrow jrn-excerpt-source"
-            onClick={function() { if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId); }}
-            role="button"
+            {...jrnInteractiveProps(function() { if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId); }, 'link')}
           >
             {'From: ' + srcAud}
           </div>
@@ -385,6 +396,23 @@ export function JournalAudioBlock(props) {
     }
   }
 
+  function seekFromKeyboard(e) {
+    if (!audioRef.current) return;
+    var total = duration || audioRef.current.duration || 0;
+    if (!(total > 0)) return;
+    var next = audioRef.current.currentTime || 0;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next -= 5;
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next += 5;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = total;
+    else return;
+    e.preventDefault();
+    next = Math.max(0, Math.min(total, next));
+    audioRef.current.currentTime = next;
+    setProgress(next / total);
+    setCurTime(next);
+  }
+
   var barCount = 40;
   var bars = [];
   for (var i = 0; i < barCount; i++) {
@@ -453,8 +481,14 @@ export function JournalAudioBlock(props) {
             <div
               className="jrn-aud-waveform"
               onClick={seekFromEvent}
+              onKeyDown={seekFromKeyboard}
               role="slider"
+              tabIndex={0}
               aria-label="Seek"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(dur)}
+              aria-valuenow={Math.round(curTime || 0)}
+              aria-valuetext={timeStr}
               style={{ cursor: 'pointer' }}
             >
               {bars}

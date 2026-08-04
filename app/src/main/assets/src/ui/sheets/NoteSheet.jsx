@@ -157,7 +157,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
 
   return (
     <div className="note-sheet-overlay" onClick={requestClose}>
-      <div className="note-sheet" ref={trapRef} onClick={e => e.stopPropagation()}>
+      <div className="note-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="note-sheet-title" onClick={e => e.stopPropagation()}>
         {/* Header: color dot (tappable) · "Note" · ⋯ menu (read mode only) */}
         <div className="note-sheet-header">
           <button
@@ -167,7 +167,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
             title="Change color"
             aria-label="Change note color"
           />
-          <div className="note-sheet-title">{mode === 'edit' ? (note.body ? 'Edit note' : 'New note') : 'Note'}</div>
+          <div className="note-sheet-title" id="note-sheet-title">{mode === 'edit' ? (note.body ? 'Edit note' : 'New note') : 'Note'}</div>
           {mode === 'read' && (
             <button
               className="note-sheet-menu-btn"

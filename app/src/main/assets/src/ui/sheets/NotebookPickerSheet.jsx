@@ -103,9 +103,9 @@ export function NotebookPickerSheet({ groupId, onClose }) {
 
   return (
     <div className="nb-picker-overlay" onClick={requestClose}>
-      <div className="nb-picker" ref={trapRef} onClick={e => e.stopPropagation()}>
+      <div className="nb-picker" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="notebook-picker-title" onClick={e => e.stopPropagation()}>
         <div className="nb-picker-header">
-          <span className="nb-picker-title">{storedIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
+          <span className="nb-picker-title" id="notebook-picker-title">{storedIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
           <button className="nb-picker-close" onClick={requestClose} aria-label="Close">×</button>
         </div>
         <div className="nb-picker-new">
@@ -145,7 +145,12 @@ export function NotebookPickerSheet({ groupId, onClose }) {
                     key={nb.id}
                     className={"nb-picker-row" + (checked ? ' checked' : '')}
                     onClick={() => toggle(nb.id)}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(nb.id); }
+                    }}
                     role="button"
+                    tabIndex={0}
                   >
                     <span className="nb-picker-check">
                       {checked && (

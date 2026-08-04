@@ -14,7 +14,7 @@
    effect cancels it. GoToRefButton already used this shape. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup } from '@testing-library/react';
 import { JournalViewerScreen } from './JournalViewerScreen.jsx';
 import { parseRefStr, splitCompoundRef } from '../../data/scripture-resolution.js';
 
@@ -108,6 +108,22 @@ describe('JournalViewerScreen — {{ref:}} retry does not outlive the screen', (
 
     expect(onNavigateToLink).toHaveBeenCalledTimes(1);
     expect(onNavigateToLink.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
+  });
+
+  it('exposes the scripture ref as a keyboard-operable link', () => {
+    const loaded = { value: true };
+    setupGlobals(loaded);
+    const onNavigateToLink = vi.fn();
+    const { container } = render(
+      <JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} onNavigateToLink={onNavigateToLink} />,
+    );
+
+    const link = refLink(container);
+    expect(link.getAttribute('role')).toBe('link');
+    expect(link.getAttribute('tabindex')).toBe('0');
+    fireEvent.keyDown(link, { key: 'Enter' });
+
+    expect(onNavigateToLink).toHaveBeenCalledTimes(1);
   });
 
   it('a resolved retry stops ticking (no repeat navigation for the rest of the window)', () => {

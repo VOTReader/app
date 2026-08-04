@@ -24,6 +24,17 @@ afterEach(() => {
 });
 
 describe('BookmarkCreateSheet — thought field removed', () => {
+  it('is exposed as a labelled modal dialog', () => {
+    render(
+      <BookmarkCreateSheet
+        pending={{ hlKey: 'bible:psalms:23:1', defaultLabel: 'Psalms 23:1' }}
+        onConfirm={() => {}} onCancel={() => {}}
+      />
+    );
+    const dialog = screen.getByRole('dialog', { name: 'New Bookmark' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+  });
+
   it('CREATE mode renders no thought textarea and no "A Thought" label', () => {
     const { container } = render(
       <BookmarkCreateSheet

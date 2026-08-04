@@ -22,6 +22,7 @@ export function JournalInsertSheet(props) {
   // Journal block-picker state: which entry the user drilled into.
   var _drilled = useState(null);
   var drilledEntry = _drilled[0]; var setDrilledEntry = _drilled[1];
+  var trapRef = useFocusTrap(true);
 
   function close() { try { onClose && onClose(); } catch (_e) { /* helper may throw on malformed data; treat as missing */ } }
 
@@ -557,12 +558,12 @@ export function JournalInsertSheet(props) {
 
   return (
     <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) close(); }}>
-      <div className="note-sheet jrn-insert-sheet" onClick={function(e) { e.stopPropagation(); }} style={{ maxWidth: '480px' }}>
+      <div className="note-sheet jrn-insert-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-insert-title" onClick={function(e) { e.stopPropagation(); }} style={{ maxWidth: '480px' }}>
         <div className="note-sheet-header">
           {mode !== 'menu' && (
             <button className="note-sheet-menu-btn" onClick={back} aria-label="Back" style={{ fontSize: '18px' }}>‹</button>
           )}
-          <span className="note-sheet-title" style={{ flex: 1 }}>{titleStr()}</span>
+          <span className="note-sheet-title" id="journal-insert-title" style={{ flex: 1 }}>{titleStr()}</span>
           <button className="note-sheet-menu-btn" onClick={close} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
         </div>
         {body()}

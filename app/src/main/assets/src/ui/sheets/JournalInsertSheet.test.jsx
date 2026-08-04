@@ -38,6 +38,13 @@ afterEach(() => {
 });
 
 describe('menu → direct block emission', () => {
+  it('exposes a labelled modal dialog and traps focus inside it', () => {
+    mountSheet();
+    const dialog = screen.getByRole('dialog', { name: 'Insert' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
   it('renders all four sections', () => {
     mountSheet();
     for (const h of ['From the Library', 'From Your Annotations', 'Capture', 'Text']) {

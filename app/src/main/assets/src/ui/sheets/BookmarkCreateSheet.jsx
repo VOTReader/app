@@ -13,6 +13,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
   var useRef = React.useRef;
 
   var labelRef = useRef(null);
+  var trapRef = useFocusTrap(!!pending);
   var isEditMode = !!(pending && pending.editId);
 
   var _label = useState(
@@ -117,6 +118,10 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     <div className="link-picker-overlay" onClick={onCancel}>
       <div
         className={'link-picker-sheet navpick-sheet bkm-create-sheet' + (isEditMode ? ' bkm-create-sheet-edit' : '')}
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bookmark-create-title"
         onClick={function(e) { e.stopPropagation(); }}
       >
         <div className="navpick-header">
@@ -125,7 +130,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
             onClick={onCancel}
             aria-label="Cancel"
           >×</button>
-          <span className="navpick-title">{title}</span>
+          <span className="navpick-title" id="bookmark-create-title">{title}</span>
           <button
             className="navpick-confirm-green"
             onClick={canSave ? commit : undefined}

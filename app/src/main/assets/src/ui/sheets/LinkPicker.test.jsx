@@ -36,6 +36,16 @@ const baseProps = {
   lastCreatedLink: null, onLinkCreated: () => {}, mode: null, onPickTarget: null,
 };
 
+describe('LinkPicker dialog semantics', () => {
+  it('is a labelled modal with focus contained inside the picker', () => {
+    stubGlobals();
+    render(<LinkPicker {...baseProps} />);
+    const dialog = screen.getByRole('dialog', { name: 'Create a Link' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+});
+
 describe('LinkPicker source context', () => {
   it('link mode shows the "Linking from" source strip', () => {
     stubGlobals();
