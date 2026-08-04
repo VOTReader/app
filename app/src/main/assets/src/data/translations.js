@@ -63,14 +63,14 @@ function _loadTranslationScript(code) {
     const script = document.createElement('script');
     script.src = 'src/data/bible-' + code + '.js';
     script.async = true;
-    script.onload = () => {_translationLoaded[code] = true;resolve();};
+    script.onload = () => {_translationLoaded[code] = true;resolve(undefined);};
     script.onerror = () => {
       // ERR2: don't cache the failure — clear the slot so a later open retries,
       // and trace it (the NKJV fallback is otherwise invisible: the user just
       // sees their chosen translation silently revert with no explanation).
       delete _translationPromises[code];
       try { if (window.DiagnosticLog) window.DiagnosticLog.warn('translation', 'failed to load ' + code); } catch (_e) {}
-      resolve();
+      resolve(undefined);
     };
     document.head.appendChild(script);
   });

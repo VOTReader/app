@@ -205,7 +205,7 @@ describe('BAK-INTEGRITY: v3AndroidImportEntries onDone verify callback', () => {
       onDone: () => { called = true; },
     });
     await gen.next();       // pull the (only) frame
-    await gen.return();     // abandon before the generator reaches its post-loop onDone
+    await gen.return(undefined); // abandon before the generator reaches its post-loop onDone
     expect(called).toBe(false);
   });
 });

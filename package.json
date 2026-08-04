@@ -42,14 +42,14 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.6.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.0",
     "lint-staged": "^17.0.5",
     "minisearch": "^7.2.0",
     "puppeteer": "^25.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "subset-font": "^2.5.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.7"
   },
   "lint-staged": {
