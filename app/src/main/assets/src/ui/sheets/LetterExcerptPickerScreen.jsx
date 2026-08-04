@@ -59,6 +59,11 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     return () => { window.__closeSheet = prev || null; };
   }, [onClose]);
 
+  // Full-screen picker over the still-mounted app — same dialog treatment as
+  // the sheets: contain Tab, restore focus on close (Escape already routes
+  // through AppShellSheets).
+  const trapRef = useFocusTrap(true);
+
   // Capture native selection. Two paths:
   //   captureSelectionSync — runs immediately, returns selInfo or null.
   //     Used as the fallback inside confirmLink so a fast user (select →
@@ -210,7 +215,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     : (returnTargetInsteadOfLink ? 'Insert the whole ' + entryNoun : 'Link the whole ' + entryNoun);
 
   return (
-    <div className="picker-screen">
+    <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select letter text">
       <div className="picker-header">
         <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
         <span className="picker-title">Select Text</span>

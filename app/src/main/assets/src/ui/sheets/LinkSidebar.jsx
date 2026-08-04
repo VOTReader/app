@@ -30,7 +30,7 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
   const countStr = links.length === 0 ? 'No links' : (links.length === 1 ? '1 link' : links.length + ' links');
   return (
     <>
-      <div className="link-sidebar-overlay" onClick={onClose} />
+      <div className="link-sidebar-overlay" aria-hidden="true" onClick={onClose} />
       <div className="link-sidebar" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-sidebar-title">
         {/* Close on the RIGHT, matching every other sheet in the app. */}
         <div className="link-sidebar-header">

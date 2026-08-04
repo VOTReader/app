@@ -451,7 +451,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {!inert && ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} aria-hidden="true" onClick={() => setScriptureRef(null)} />}
-        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scriptureRef ? "true" : undefined} aria-live={railMode && scriptureRef ? "polite" : undefined} aria-atomic={railMode && scriptureRef ? "true" : undefined} aria-hidden={!scriptureRef} inert={!scriptureRef ? true : undefined} aria-label={scriptureRef ? `Scripture ${scriptureRef}` : "Scripture"}>
+        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scriptureRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scriptureRef} inert={!scriptureRef ? true : undefined} aria-label={scriptureRef ? `Scripture ${scriptureRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScriptureRef(null)} />
           {scriptureRef && (
             <>

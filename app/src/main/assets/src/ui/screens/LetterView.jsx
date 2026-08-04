@@ -560,7 +560,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       {ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} aria-hidden="true" onClick={() => setScripRef(null)} />}
-        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scripRef ? "true" : undefined} aria-live={railMode && scripRef ? "polite" : undefined} aria-atomic={railMode && scripRef ? "true" : undefined} aria-hidden={!scripRef} inert={!scripRef ? true : undefined} aria-label={scripRef ? `Scripture ${scripRef}` : "Scripture"}>
+        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scripRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scripRef} inert={!scripRef ? true : undefined} aria-label={scripRef ? `Scripture ${scripRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScripRef(null)} />
           {scripRef && (
             <>

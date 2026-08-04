@@ -40,6 +40,11 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     return () => { window.__closeSheet = prev || null; };
   }, [onClose]);
 
+  // Full-screen picker over the still-mounted app — same dialog treatment as
+  // the sheets: contain Tab, restore focus on close (Escape already routes
+  // through AppShellSheets).
+  const trapRef = useFocusTrap(true);
+
   // captureSelectionSync — find the verse element(s) the user selected, build
   // a span descriptor with the actual selected text plus verse-level + char-
   // level offsets so downstream consumers (Journal excerpt, link overlay
@@ -243,7 +248,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     : 'Select a verse to continue';
 
   return (
-    <div className="picker-screen">
+    <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select scripture text">
       <div className="picker-header">
         <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
         <span className="picker-title">Select Text</span>

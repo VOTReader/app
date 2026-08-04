@@ -110,3 +110,22 @@ it('rail mode drops modality: complementary role, no aria-modal, no backdrop', (
     expect(document.querySelector('.fn-sheet-backdrop')).toBeNull();
   } finally { vi.unstubAllGlobals(); }
 });
+
+it('rail live region exists BEFORE content opens (closed panel keeps aria-live)', () => {
+  // A live region announces only mutations to an ALREADY-EXISTING region —
+  // creating aria-live in the same paint as the content it should announce
+  // is silent on most screen readers. Closed rail panel: live attrs present,
+  // content suppressed via aria-hidden/inert.
+  vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })));
+  try {
+    render(<Sheet num={null} fn={null} nkjv={{}} footnotes={{}} onClose={() => {}} />);
+    const panel = document.querySelector('.fn-sheet');
+    expect(panel.classList.contains('open')).toBe(false);
+    expect(panel.getAttribute('aria-live')).toBe('polite');
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
+  } finally { vi.unstubAllGlobals(); }
+});

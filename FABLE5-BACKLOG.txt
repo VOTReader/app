@@ -250,7 +250,7 @@ DONE LOG
   2026-07-28  [18] ARCHITECTURE.md — FlexSearch mentions retired + a Current-systems addendum (MiniSearch, 8 bundles, v3 container, modal registry/focus traps, pager peeks, thumbnails, frame pacing, themes).
   2026-07-30  [17] 200% zoom audit — DONE, PASSES. Unblocked by a session with the Browser pane. Done GEOMETRICALLY rather than visually (stronger for this question): 200% zoom halves the CSS layout viewport while px-pinned chrome keeps its size, so emulated as 640x400 (from 1280x800) STACKED with --font-scale:1.6, the documented worst case. DOM probe measured every visible element for horizontal overflow + content clipped by a non-scrolling fixed height across Home / Volumes / Volume One / Letter / History / Settings / Library / Scriptures / Tabs overview: clipped:[] and scrollWidth===640 everywhere. The one tall chrome piece, .sel-toolbar (no max-height, 157px after the ▲/▼ retirement), raised on real reading text: top 77 / bottom 234 in a 400px viewport = fully visible. hOverflow hits are all .pager-peek subtrees, parked ±one viewport BY DESIGN. CAVEAT: screenshots unavailable (pane must be displayed to composite), so this is layout geometry, not pixel polish — a visual pass is still worth doing if someone has the pane up.
   STILL OPEN (both need the owner, not model time): [19] golden-suite expansion — needs his real search vocabulary (ask him for 10-15 queries he actually uses, pin expected top-3s); [20] device-walk day — his time, tools/n1-smoke-walk.md.
-  ── BACKLOG IS OTHERWISE CLEARED: 18 of 20 items landed. ──
+  ── ORIGINAL [1]-[20] OTHERWISE CLEARED: 18 of 20 landed; measurement-track entries continue below. ──
   2026-08-03  [26] Smart-resume chips — index rows/cards show "N% · ~M min left" for in-progress items (frontier via progressKeyFor → ReadingStatsStore.getProgress); cold "~N min" otherwise (+2 tests). History rows skipped (different key namespace — do on ask).
   2026-08-03  Companion rail (Sol #4) — fn/scripture sheets dock as a NON-modal side panel in the right gutter at >=1640px; complementary role, no trap/backdrop/aria-modal; bottom sheets unchanged below; inline LetterView/WtlbEntryView sheets included. Live-verified at 2048px.
   2026-08-03  Brainstorm reconciliation — words-based collection bars (groupWordStats, idle) + lifetime Reading Time stat; strays filed as [27]-[30].
@@ -286,10 +286,11 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
 [25] TRANSLATION FACTS — DONE 2026-08-03. Seven non-NKJV picker descriptions
      now state the measured whole-canon length delta. Hardcoded by design:
      the shipped translation corpora are frozen, so the facts cannot drift.
-[26] SMART RESUME EVERYWHERE — extend frontier resume (currently: reading
-     views, >1-viewport-away rule) to the Continue Reading entry points
-     (reading dot, History rows): show "62% read · ~4 min left" on the
-     resume affordances using progress + words + measuredWpm.
+[26] SMART RESUME EVERYWHERE — PARTIAL 2026-08-03: index rows/cards ship
+     the "N% · ~M min left" chip (see DONE log). Remainder: History rows
+     only (different key namespace — needs the History→read-key mapping).
+     The original "reading dot" target was corrected by C2 recon 2026-08-03
+     (dot already resumes); do not re-add it here.
 
 [27] AUTOSCROLL SPEED IN WPM — let the user SET pace in wpm (converted
      to lines/min via measured words-per-line). Small; 08-03 recon stray.

@@ -4427,9 +4427,13 @@
        stuck to the left of an otherwise centered dashboard. */
     .prg-hero > .prg-stat:last-child:nth-child(4n + 1) { grid-column: 2 / span 2; }
     .prg-hero > .prg-stat:nth-last-child(2):nth-child(4n + 1) { grid-column: 2; }
+    /* 3-card remainder (7 stats): first of the trio spans 2 so the row fills
+       all 4 tracks instead of leaving a hole in column 4. */
+    .prg-hero > .prg-stat:nth-last-child(3):nth-child(4n + 1) { grid-column: 1 / span 2; }
     @media (max-width: 480px) {
       .prg-hero { grid-template-columns: repeat(2, 1fr); }
       .prg-hero > .prg-stat:nth-last-child(2):nth-child(4n + 1) { grid-column: auto; }
+      .prg-hero > .prg-stat:nth-last-child(3):nth-child(4n + 1) { grid-column: auto; }
       .prg-hero > .prg-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
     }
     .prg-stat {
@@ -5415,7 +5419,11 @@
     }
     /* The visual flag stays compact; the invisible halo supplies a 44px-high
        touch target without reintroducing the narrow-nav overflow above. */
-    .nav-bookmark-btn::before { content:''; position:absolute; inset:-7px -4px; }
+    /* Horizontal halo is -2px, NOT symmetric -7px: .top-nav gap is ~2px, and a
+       wider positioned halo paints over the statically-positioned neighbors and
+       steals their edge taps — same asymmetric-halo precedent as .nav-arrow-btn
+       and .tabs-nav-btn. */
+    .nav-bookmark-btn::before { content:''; position:absolute; inset:-7px -2px; }
     .nav-bookmark-btn:hover, .nav-bookmark-btn:active { color: var(--gold); transform: scale(1.08); }
     .nav-bookmark-btn-active { color: var(--gold); }
     .nav-bookmark-btn svg { width: 18px; height: 18px; display: block; }

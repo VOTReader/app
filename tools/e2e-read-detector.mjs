@@ -182,7 +182,11 @@ try {
   if (result2.progress[key2] && result2.progress[key2].c.length >= result2.progress[key2].b) fails.push('partial fixture credited every block; resume frontier is useless');
   if (result2.progress[key2] && !(result2.progress[key2].w < result2.progress[key2].tw)) fails.push('word-weighted partial progress missing: ' + JSON.stringify(result2.progress[key2]));
   if (!(resume.firstUnread > 0)) fails.push('no useful first-unread index after reopen: ' + JSON.stringify(resume));
-  if (!(resume.maxTop > 0 && Math.abs(resume.scrollTop - resume.target) <= resume.viewport)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
+  // target === -1 means the expected block (or the scroller) could not be
+  // located — that must FAIL loudly, not degrade into |scrollTop+1| <= viewport
+  // passing for any first-viewport position.
+  if (resume.target < 0) fails.push('frontier target block not locatable (selector/expectedUnread broke): ' + JSON.stringify(resume));
+  else if (!(resume.maxTop > 0 && Math.abs(resume.scrollTop - resume.target) <= resume.viewport)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
   if (result2.progress['v1:volume-one:a-word-of-warning']) fails.push('completed item still has a frontier (should be cleared)');
 
   if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }

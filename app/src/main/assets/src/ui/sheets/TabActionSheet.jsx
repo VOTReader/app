@@ -34,7 +34,7 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
   const rightCount = total - tabNum;
   return (
     <>
-      <div className="select-sheet-backdrop open" onClick={onDismiss} />
+      <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onDismiss} />
       <div className="select-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="tab-actions-title" onClick={(e) => e.stopPropagation()}>
         <SheetHandle onClose={onDismiss} />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>

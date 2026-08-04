@@ -263,7 +263,7 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
 
   return (
     <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 8800 }} onClick={onClose} />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 8800 }} aria-hidden="true" onClick={onClose} />
       <div
         className="bkm-popover"
         ref={trapRef}

@@ -53,7 +53,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
     : { left: fallbackLeft, top: fallbackTop, width: popW, maxHeight: Math.max(120, window.innerHeight - fallbackTop - 8), overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' };
   return (
     <>
-      <div className="multinote-overlay" onClick={onClose} />
+      <div className="multinote-overlay" aria-hidden="true" onClick={onClose} />
       <div ref={popRef} className="multinote-popover" role="dialog" aria-modal="true" aria-labelledby="multinote-title" style={style}>
         <div className="multinote-header" id="multinote-title">{notes.length} notes here</div>
         {notes.map(n => {

@@ -450,7 +450,9 @@ export function JournalAudioBlock(props) {
     </button>
   ) : null;
 
-  var dur = duration || 0;
+  // Same fallback chain as the seek handlers: a block with no persisted
+  // duration prop must not advertise aria-valuemax=0 while valuenow grows.
+  var dur = duration || (audioRef.current && audioRef.current.duration) || 0;
   var timeStr = JournalHelpers.formatDuration(curTime || 0) + ' / ' + JournalHelpers.formatDuration(dur);
 
   // When the user has tapped delete, the whole audio block collapses to a

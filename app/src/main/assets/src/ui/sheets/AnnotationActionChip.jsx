@@ -14,6 +14,10 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
       setMode('main');
     }
   }, [chip]);
+  // Same modal treatment its popover siblings got (MultiNotePopover,
+  // BookmarkPopover): scrim + Escape already existed; this adds the
+  // focus/semantics half. Must run before the early returns (hooks rule).
+  const trapRef = useFocusTrap(!!chip);
   if (!chip) return null;
   const { x, y, hlKey, groupId } = chip;
   const ann = (AnnotationStore.get(hlKey) || []).find(h => h.groupId === groupId);
@@ -73,11 +77,16 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
     <>
       <div
         style={{ position: 'fixed', inset: 0, zIndex: 2999 }}
+        aria-hidden="true"
         onClick={onClose}
         onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       />
       <div
         className="ann-chip"
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${kindLabel} actions`}
         style={{ position: 'fixed', left: cx, top: cy, zIndex: 3000 }}
         onClick={(e) => e.stopPropagation()}
       >
