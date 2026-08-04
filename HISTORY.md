@@ -4,9 +4,21 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
-## Detailed session log — 2026-06-12 → 2026-07-22 (moved from CLAUDE.md, 2026-07-24)
+## Detailed session log — 2026-06-12 → present (moved from CLAUDE.md, 2026-07-24)
 
-These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session’s context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
+These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
+
+### 2026-08-04 — Adversarial handoff review + whole-app improvement loop (`e4c9f2a`..`5abafe9`)
+
+**Scope:** reviewed the 15-commit `63562d0..4a6a7f3` handoff as a starting point, then walked outward through backup safety, reading measurement, progress displays, responsive navigation, desktop companion-rail behavior, and modal/keyboard accessibility. Three read-only Terra reviewers supplied leads; every landed finding was reproduced or source-verified locally. Browser QA covered onboarding, Home, Volumes, compact WTLB indexes, reading, scripture sheets, Settings, Library, and My Progress at 360×800 and 1920×1080.
+
+**Backup/data safety (`e4c9f2a`):** a malicious or corrupt v3 header could still declare a manifest larger than Android's 16 MiB decoder cap and force the web reader to allocate it; web import now enforces the same limit before allocation, and export refuses an oversized manifest on both paths. The restore-inflight localStorage flag is now ownership-tokened, so an older tab cannot clear a newer restore's boot guard. Legacy imports with a missing journal-media store are forced onto non-destructive merge instead of treating “store absent” as “empty store.” Regression tests cover each boundary.
+
+**Reading/progress correctness (`47b7762`, `fb50310`, `5e99d73`, `f73ee14`):** manual Mark as Read and completion now clear stale partial frontiers; word weights ignore annotation/control chrome and stay coherent when rendered geometry swaps; dwell cannot accrue before real content exists; scroll restoration pauses measurement; frontier resume is real-Chromium tested; compact two-column indexes retain time-left, percent, read, and re-read metadata instead of dropping it. My Progress's day bars now have a visible period label and odd card grids balance deliberately.
+
+**Accessibility + responsive UX (`a1f913b`, `82183a0`, `5abafe9`):** keyboard activation and focus containment were completed across journal cards, references, audio, action sheets, sidebars, popovers, Safari notices, and app-level confirms; modal semantics now sit on the actual dialog, while the desktop companion rail remains non-modal and announces updates politely. The 360px toolbar no longer clips Settings: History moves to its Home card at compact width, with a second priority step only below 340px. Bookmark state has a clearer selected halo. `smoke:ci` now pins both the desktop overflow contract and the 360×800 toolbar geometry, preventing this regression class.
+
+**Final gates:** 3,355 vitest / 188 files; 237 Kotlin tests / 12 files + JaCoCo; lint 0; TypeScript clean; production bundles/CSP/SW regenerated; `smoke:ci` PASS (desktop + compact nav, zero crashes/unreached/console errors/404s); `e2e:read` PASS (completion, ledger, day bucket, partial frontier, resume, frontier clear in compositing Chromium). No corpus change. Remaining work is product-choice/manual-device territory: owner vocabulary for [19], device/TalkBack walk [20], owner-held skim indicator [21], and optional feature tracks [22]–[30]. Five stale `.claude/worktrees/*` were deliberately not removed because they may be live sessions.
 
 ### 2026-08-03 (session 2) — The reading-measurement engine: word counts, the multi-vector read detector, ReadingStats ledger, frontier resume
 

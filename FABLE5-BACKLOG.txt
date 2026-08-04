@@ -258,8 +258,8 @@ DONE LOG
 
 MEASUREMENT TRACK (added 2026-08-03 — post-backlog; the reading-measurement
 engine landed that day: word counts, multi-vector read detector, ReadingStats
-ledger, frontier resume, wpm, My Progress surfaces. These are the DEFERRED
-follow-ons, each one-session-scoped.)
+ledger, frontier resume, wpm, My Progress surfaces. [25] is DONE and [26] is
+PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
 
 [21] PER-LETTER SKIM INDICATOR — ★ OWNER EXPLICITLY WANTS THIS, HOLD UNTIL
      HE ASKS ★ (2026-08-03: "the subtle per-letter skim indicator is also
@@ -283,10 +283,9 @@ follow-ons, each one-session-scoped.)
 [24] YEAR IN REVIEW screen — composed entirely from ReadingStatsStore +
      JournalStats + ReadingStreak data that already accrues. Seasonal;
      build near year-end.
-[25] TRANSLATION FACTS in the picker — per-translation word counts are
-     measured (YLT 794,063 … BSB 725,263, −9.5%); a one-line "runs ~9%
-     longer than NKJV" note per option in the translation SelectField.
-     Trivial session; data is in tools/word-count-baseline.json lineage.
+[25] TRANSLATION FACTS — DONE 2026-08-03. Seven non-NKJV picker descriptions
+     now state the measured whole-canon length delta. Hardcoded by design:
+     the shipped translation corpora are frozen, so the facts cannot drift.
 [26] SMART RESUME EVERYWHERE — extend frontier resume (currently: reading
      views, >1-viewport-away rule) to the Continue Reading entry points
      (reading dot, History rows): show "62% read · ~4 min left" on the
