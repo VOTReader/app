@@ -45,10 +45,23 @@ class FakeCaches {
   }
 }
 
+// Minimal Request stand-in: the SW wraps every precache URL in
+// `new Request(url, { cache: 'reload' })` (STALE-CACHE RESILIENCE), so the
+// script needs a Request constructor in scope AND the test needs to see the
+// cache mode it asked for. Keeps `.url` as the raw relative string so cache
+// keys stay identical to the plain-string era.
+class FakeRequest {
+  constructor(url, init) { this.url = typeof url === 'string' ? url : url.url; this.cache = (init && init.cache) || 'default'; }
+}
+
 function bootSW({ fail = [], fetchImpl = null } = {}) {
   const handlers = {};
-  const installFetch = async (url) =>
-    (fail.includes(url) ? { ok: false, status: 404 } : { ok: true, status: 200, clone: () => ({ body: url }) });
+  const cacheModes = [];   // every mode the install precache actually requested
+  const installFetch = async (req) => {
+    const url = typeof req === 'string' ? req : req.url;
+    if (req && req.cache) cacheModes.push(req.cache);
+    return fail.includes(url) ? { ok: false, status: 404 } : { ok: true, status: 200, clone: () => ({ body: url }) };
+  };
   // The SW's runtime `fetch` (coreFirst/corpusFirst) can be overridden per-test;
   // the FakeCaches' own fetch (for install cache.add) stays the install one.
   const fetchFn = fetchImpl || installFetch;
@@ -61,9 +74,9 @@ function bootSW({ fail = [], fetchImpl = null } = {}) {
     clients: { claim: async () => { claimed.count += 1; } },
   };
   // eslint-disable-next-line no-new-func
-  const run = new Function('self', 'caches', 'fetch', 'console', SW_SRC);
-  run(self, caches, fetchFn, { log() {}, warn() {}, error() {} });
-  return { handlers, caches, claimed };
+  const run = new Function('self', 'caches', 'fetch', 'console', 'Request', SW_SRC);
+  run(self, caches, fetchFn, { log() {}, warn() {}, error() {} }, FakeRequest);
+  return { handlers, caches, claimed, cacheModes };
 }
 
 // Drive the fetch handler: returns the promise passed to respondWith, or
@@ -114,6 +127,18 @@ describe('service-worker install (P1pwa / P2pwa)', () => {
   it('FAILS install when a CRITICAL asset 404s — all-or-nothing (P2pwa)', async () => {
     const sw = bootSW({ fail: ['./index.html'] });
     await expect(install(sw)).rejects.toBeTruthy();
+  });
+
+  /* STALE-CACHE RESILIENCE: cache.add()/addAll() may satisfy themselves from
+     the browser HTTP cache, which would fill a brand-new vot-core-<newhash>
+     bucket with the PREVIOUS deploy's bytes and pin them there until the NEXT
+     version bump — the exact "installed the PWA, got an old build" symptom.
+     Every precache fetch must therefore go out as cache:'reload'. */
+  it('precaches every asset with cache:reload — never from the HTTP cache', async () => {
+    const sw = bootSW();
+    await install(sw);
+    expect(sw.cacheModes.length).toBeGreaterThan(0);
+    expect(sw.cacheModes.every((m) => m === 'reload')).toBe(true);
   });
 
   it('registers install/activate/message/fetch handlers', () => {

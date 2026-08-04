@@ -6,12 +6,18 @@
  * WebView (assets are bundled in the APK; a SW would double-cache).
  *
  * Update lifecycle (fully automatic — no user prompt):
- *   1. The SW calls self.skipWaiting() on install, so a new SW takes over
+ *   1. register() runs on every app open — a PWA launch IS a fresh navigation —
+ *      and register() itself performs an update check, so "check on every
+ *      open" needs no extra machinery. updateViaCache:'none' makes that
+ *      explicit (the 'imports' default already bypasses the HTTP cache for the
+ *      top-level script; 'none' also covers any future importScripts and any
+ *      browser that reads the default loosely).
+ *   2. The SW calls self.skipWaiting() on install, so a new SW takes over
  *      immediately rather than waiting for all tabs to close.
- *   2. 'controllerchange' fires here → we reload the page onto the new build,
- *      but ONLY for a page that already had a controller (see below).
- *      Background tabs defer their reload until they become visible.
- *   3. Belt-and-suspenders: if a SW is already waiting when we register
+ *   3. 'controllerchange' fires here → we reload the page onto the new build,
+ *      but ONLY for a page that already had a controller (see below), and
+ *      only at a moment the user cannot see it (see INVISIBLE-RELOAD).
+ *   4. Belt-and-suspenders: if a SW is already waiting when we register
  *      (installed during a prior visit before this code ran), we post
  *      SKIP_WAITING immediately so it activates rather than sitting idle.
  */
@@ -35,8 +41,17 @@ export function registerServiceWorker() {
   // register() so claim() can't flip it first.
   const hadController = !!navigator.serviceWorker.controller;
 
-  // When the new SW takes over, reload onto the new build.
-  // Defer if the tab is hidden so we don't yank a backgrounded reader.
+  // INVISIBLE-RELOAD: a controllerchange reload is only invisible at two
+  // moments — while the app is still booting (the user is looking at the
+  // splash / first paint, so a reload reads as a slightly slower launch), or
+  // while it is backgrounded. Reloading a VISIBLE mid-session reader yanks
+  // them out of the letter they're reading, so that case waits for the next
+  // background instead. If they never background it, nothing is lost: the SW
+  // has already activated, so the next cold launch is a fresh navigation
+  // through it and serves the new build with no reload at all.
+  const BOOT_GRACE_MS = 12000;
+  const startedAt = Date.now();   // registerServiceWorker runs once, at boot
+
   let refreshing = false;
   const doReload = () => {
     if (refreshing) return;
@@ -45,20 +60,26 @@ export function registerServiceWorker() {
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController) return;   // first controller — nothing stale to reload onto
-    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+    if (typeof document === 'undefined'
+        || document.visibilityState === 'hidden'
+        || Date.now() - startedAt < BOOT_GRACE_MS) {
       doReload();
       return;
     }
-    const onVis = () => {
-      if (document.visibilityState === 'visible') {
-        document.removeEventListener('visibilitychange', onVis);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        document.removeEventListener('visibilitychange', onHidden);
         doReload();
       }
     };
-    document.addEventListener('visibilitychange', onVis);
+    document.addEventListener('visibilitychange', onHidden);
   });
 
-  navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+  // updateViaCache:'none' — never serve service-worker.js itself out of the
+  // HTTP cache. GitHub Pages sends max-age=600 on everything, so this is the
+  // difference between "checked for an update" and "reused a 10-minute-old
+  // copy, found it identical, skipped the update".
+  navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).then((reg) => {
     // Belt-and-suspenders: a SW may already be waiting from a prior visit
     // (installed before skipWaiting was adopted). Kick it immediately.
     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });

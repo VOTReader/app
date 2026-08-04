@@ -47,7 +47,7 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
   }
 
-  it('reloads immediately when the tab is visible', () => {
+  it('reloads immediately during the boot window (invisible — still first paint)', () => {
     setVisibility('visible');
     registerServiceWorker();
     expect(typeof controllerChangeHandler).toBe('function');
@@ -55,15 +55,34 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('defers the reload until visible when the tab is hidden', () => {
+  it('reloads immediately when the app is backgrounded (invisible)', () => {
     setVisibility('hidden');
     registerServiceWorker();
     controllerChangeHandler();
-    expect(reloadSpy).not.toHaveBeenCalled();
-    // background tab returns to the foreground → reload now
-    setVisibility('visible');
-    document.dispatchEvent(new Event('visibilitychange'));
     expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  /* INVISIBLE-RELOAD: past the boot window with the app in the foreground, the
+     user is mid-letter — reloading there yanks them out. Wait for the next
+     background instead; they come back to the new build. */
+  it('defers a mid-session VISIBLE reload until the app is backgrounded', () => {
+    vi.useFakeTimers();
+    try {
+      setVisibility('visible');
+      registerServiceWorker();
+      vi.advanceTimersByTime(60_000);         // well past BOOT_GRACE_MS
+      controllerChangeHandler();
+      expect(reloadSpy).not.toHaveBeenCalled();
+      // still visible → still no reload
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(reloadSpy).not.toHaveBeenCalled();
+      // user leaves the app → reload now, unseen
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not double-reload on a second controllerchange', () => {
@@ -87,13 +106,27 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     expect(reloadSpy).not.toHaveBeenCalled();
   });
 
-  it('still reloads a hidden tab that HAD a controller (a real update is not suppressed)', () => {
-    setVisibility('hidden');
-    registerServiceWorker();
-    controllerChangeHandler();
+  it('reloads a long-backgrounded app immediately (past the boot window, still hidden)', () => {
+    vi.useFakeTimers();
+    try {
+      setVisibility('hidden');
+      registerServiceWorker();
+      vi.advanceTimersByTime(60_000);
+      controllerChangeHandler();
+      expect(reloadSpy).toHaveBeenCalledTimes(1);   // a real update is never suppressed
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('registers with updateViaCache:none so the SW script is never HTTP-cached', () => {
+    const spy = vi.fn(() => Promise.resolve({
+      waiting: null, installing: null, addEventListener: () => {}, update: () => {},
+    }));
+    Object.defineProperty(navigator.serviceWorker, 'register', { configurable: true, value: spy });
     setVisibility('visible');
-    document.dispatchEvent(new Event('visibilitychange'));
-    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    registerServiceWorker();
+    expect(spy).toHaveBeenCalledWith('./service-worker.js', { updateViaCache: 'none' });
   });
 });
 
