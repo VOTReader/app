@@ -15,6 +15,8 @@
  * "Loading…") → inject smoke.js via page.evaluate (NOT addScriptTag: the U10
  * hashed CSP blocks inline-script injection, but CDP Runtime.evaluate is
  * CSP-exempt, same as DevTools) → run votSmoke() → exit 0 on PASS, 1 on FAIL.
+ * The same attempt finishes with a worst-case reading-toolbar geometry audit
+ * at 360x800 so overflow hidden by the app shell cannot silently clip controls.
  *
  * Local: `npm run smoke:ci`. CI: a step after `npm run build`.
  */
@@ -55,6 +57,59 @@ function startServer() {
     res.end(readFileSync(filePath));
   });
   return new Promise((res) => server.listen(0, '127.0.0.1', () => res(server)));
+}
+
+async function auditCompactReadingNav(page) {
+  await page.setViewport({ width: 360, height: 800 });
+  const clickButton = async (pattern) => {
+    const clicked = await page.evaluate((source) => {
+      const re = new RegExp(source, 'i');
+      const button = Array.from(document.querySelectorAll('button')).find((el) => re.test((el.textContent || '').trim()));
+      if (!button) return false;
+      button.click();
+      return true;
+    }, pattern.source);
+    if (!clicked) throw new Error(`compact-nav route button not found: ${pattern}`);
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 550));
+  };
+
+  const onHome = await page.evaluate(() => !!Array.from(document.querySelectorAll('button')).find((el) => /Prophetic Letters/i.test(el.textContent || '')));
+  if (!onHome) {
+    const clickedHome = await page.evaluate(() => {
+      const button = document.querySelector('button[title="Home"]');
+      if (!button) return false;
+      button.click();
+      return true;
+    });
+    if (!clickedHome) throw new Error('compact-nav Home button not found');
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 550));
+  }
+  await clickButton(/Prophetic Letters/);
+  await clickButton(/Words To Live By:\s*Part One/);
+  await clickButton(/^1\s*Introduction/);
+
+  return page.evaluate(() => {
+    const nav = document.querySelector('.top-nav');
+    if (!nav) return { ok: false, error: 'top nav missing' };
+    const bounds = nav.getBoundingClientRect();
+    const items = Array.from(nav.children).filter((el) => {
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }).map((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        label: el.getAttribute('aria-label') || el.getAttribute('title') || el.className || el.tagName,
+        left: Math.round(rect.left * 10) / 10,
+        right: Math.round(rect.right * 10) / 10,
+      };
+    });
+    const clipped = items.filter((item) => item.left < bounds.left - 1 || item.right > bounds.right + 1);
+    const labels = items.map((item) => item.label);
+    const hasBack = labels.some((label) => /Back to Index/i.test(String(label)));
+    const hasHome = labels.some((label) => /^Home$/i.test(String(label)));
+    return { ok: clipped.length === 0 && hasBack && hasHome, clipped, hasBack, hasHome, items };
+  });
 }
 
 // One full smoke attempt against a FRESH browser: load → wait for mount →
@@ -120,6 +175,19 @@ async function runAttempt(url) {
     if (overflowX > 1) {
       report.ok = false;
       report.summary += ` | HORIZONTAL OVERFLOW ${overflowX}px at 1920x1080`;
+    }
+    let compactNav;
+    try {
+      compactNav = await auditCompactReadingNav(page);
+    } catch (error) {
+      compactNav = { ok: false, error: (error && error.message) || String(error) };
+    }
+    report.compactReadingNav = compactNav;
+    if (!compactNav.ok) {
+      report.ok = false;
+      report.summary += ` | COMPACT NAV FAIL ${JSON.stringify(compactNav)}`;
+    } else {
+      report.summary += ' | compact nav ok at 360x800';
     }
     return { report, pageErrors };
   } finally {

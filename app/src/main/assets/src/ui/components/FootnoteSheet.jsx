@@ -33,7 +33,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   return ReactDOM.createPortal(
     <>
       {!rail && <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />}
-      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
+      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-live={rail && isOpen ? 'polite' : undefined} aria-atomic={rail && isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
         <SheetHandle onClose={onClose} />
         {fn && (
           <>

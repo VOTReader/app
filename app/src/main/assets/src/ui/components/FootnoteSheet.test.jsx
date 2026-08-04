@@ -105,6 +105,8 @@ it('rail mode drops modality: complementary role, no aria-modal, no backdrop', (
     expect(panel.classList.contains('rail')).toBe(true);
     expect(panel.getAttribute('role')).toBe('complementary');
     expect(panel.getAttribute('aria-modal')).toBeNull();
+    expect(panel.getAttribute('aria-live')).toBe('polite');
+    expect(panel.getAttribute('aria-atomic')).toBe('true');
     expect(document.querySelector('.fn-sheet-backdrop')).toBeNull();
   } finally { vi.unstubAllGlobals(); }
 });

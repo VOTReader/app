@@ -1577,7 +1577,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <SettingsGroup label="Top-Nav Buttons" sub="Icons in the reading bar" {...groupProps('topnav')}>
           <div className="settings-card">
-            <div className="settings-chip-note">Which icons appear in the top bar of chapter and letter views.</div>
+            <div className="settings-chip-note">Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px.</div>
             <div className="settings-chips">
               <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
               {/* Hidden (not greyed) while History itself is off — the chip

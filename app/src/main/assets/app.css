@@ -627,6 +627,16 @@
         background: rgba(0,0,0,0.97);
         border-bottom: 1px solid var(--gold-border);
       }
+      /* A fully-enabled reading bar has eight controls. Their 44px touch
+         targets cannot fit at 360px without clipping Back/Home. History is
+         already a first-class Home card, so keep it there on compact phones;
+         on the smallest supported tier Settings follows the same rule. */
+      @media (max-width: 380px) {
+        .top-nav .nav-search-btn[title="History"] { display: none; }
+      }
+      @media (max-width: 339px) {
+        .top-nav .settings-gear-btn { display: none; }
+      }
       .nav-home {
         font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.18em;
         text-transform: uppercase; color: var(--gold); background: none; border: none;
@@ -4413,8 +4423,14 @@
     }
     /* 4 stats: 4-up on wide screens, a 2×2 grid on phones so the
        labels/subs never crush below readable width. */
+    /* Balance the dynamic fifth/sixth metrics instead of leaving a lone card
+       stuck to the left of an otherwise centered dashboard. */
+    .prg-hero > .prg-stat:last-child:nth-child(4n + 1) { grid-column: 2 / span 2; }
+    .prg-hero > .prg-stat:nth-last-child(2):nth-child(4n + 1) { grid-column: 2; }
     @media (max-width: 480px) {
       .prg-hero { grid-template-columns: repeat(2, 1fr); }
+      .prg-hero > .prg-stat:nth-last-child(2):nth-child(4n + 1) { grid-column: auto; }
+      .prg-hero > .prg-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
     }
     .prg-stat {
       display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
@@ -4514,6 +4530,17 @@
       background: var(--bg2);
       border: 1px solid var(--gold-border);
       border-radius: 10px;
+    }
+    .prg-days-head {
+      display:flex; align-items:baseline; justify-content:space-between; gap:0.75rem;
+      margin-bottom:0.45rem;
+      color:var(--gold-dim);
+      font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.16em;
+      text-transform:uppercase;
+    }
+    .prg-days-head > :last-child {
+      color:var(--cream-muted); font-family:var(--font-body); font-size:0.68rem;
+      font-style:italic; letter-spacing:0; text-transform:none; white-space:nowrap;
     }
     .prg-days-bars {
       display: flex; align-items: flex-end; gap: 0.25rem;
@@ -5384,7 +5411,11 @@
       padding: 6px 8px;
       -webkit-tap-highlight-color: transparent;
       transition: color 0.15s, transform 0.15s;
+      position: relative;
     }
+    /* The visual flag stays compact; the invisible halo supplies a 44px-high
+       touch target without reintroducing the narrow-nav overflow above. */
+    .nav-bookmark-btn::before { content:''; position:absolute; inset:-7px -4px; }
     .nav-bookmark-btn:hover, .nav-bookmark-btn:active { color: var(--gold); transform: scale(1.08); }
     .nav-bookmark-btn-active { color: var(--gold); }
     .nav-bookmark-btn svg { width: 18px; height: 18px; display: block; }

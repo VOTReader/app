@@ -254,6 +254,10 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
               <span className="sr-only">
                 {wordDays.map((d) => `${d.date}: ${_fmtWords(d.words)} words`).join('; ')}
               </span>
+              <div className="prg-days-head" aria-hidden="true">
+                <span>Last 14 days</span>
+                <span>{_fmtWords(weekWords)} {weekWords === 1 ? 'word' : 'words'} this week</span>
+              </div>
               <div className="prg-days-bars" aria-hidden="true">
                 {wordDays.map((d) => (
                   <div

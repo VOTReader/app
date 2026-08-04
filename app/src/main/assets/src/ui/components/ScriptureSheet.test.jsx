@@ -87,6 +87,21 @@ it('removes the portaled sheet from <body> on unmount (no leak)', () => {
   expect(document.body.querySelector('.fn-sheet')).toBeNull();
 });
 
+it('announces the non-modal companion rail without stealing focus', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })));
+  try {
+    render(<Sheet activeRef={{ ref: '3:16', cite: 'John 3:16' }} onClose={() => {}} />);
+    const panel = screen.getByRole('complementary', { name: 'Scripture John 3:16' });
+    expect(panel.getAttribute('aria-live')).toBe('polite');
+    expect(panel.getAttribute('aria-atomic')).toBe('true');
+    expect(document.querySelector('.fn-sheet-backdrop')).toBeNull();
+  } finally { vi.unstubAllGlobals(); }
+});
+
 /* "Go to Scripture" — the study cite sheet gets the jump-to-verse action when
    the host wires onGoToRef; the CITE (full "Book C:V") threads through, and
    the action is absent when the host has no navigation to offer. */

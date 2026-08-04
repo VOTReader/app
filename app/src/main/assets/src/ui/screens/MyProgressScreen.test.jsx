@@ -160,6 +160,8 @@ describe('MyProgressScreen — last-14-days bars', () => {
     expect(summaries[0]).toBe('750 words this week');
     expect(summaries[1]).toContain('d12: 500 words');
     expect(summaries[1]).toContain('d13: 250 words');
+    expect(wrap.querySelector('.prg-days-head').textContent).toContain('Last 14 days');
+    expect(wrap.querySelector('.prg-days-head').textContent).toContain('750 words this week');
   });
 
   it('renders no bars at all when ReadingStatsStore is absent', () => {
