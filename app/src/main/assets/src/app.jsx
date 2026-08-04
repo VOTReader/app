@@ -44,15 +44,16 @@ function App() {
         3. useSheetOrchestration  ← nav state via tabField (2)
         4. useFromLetterStack     ← tabField (2)
         5. useSettings            ← saved
-        6. useHistory             ← settings.historyEnabled (5)
-        7. useThumbnails          ← tabs/activeTab (2), settings (5)
-        8. useScrollMemory        ← activeTab + updateActiveTab (2)
-        9. useReadingDwell        ← settings.dwellMs (5), saved.activeReadKey
-       10. useTabActions          ← tabState (2), cancelDwell (9), setTabThumbnails (7)
-       11. usePersistedState      ← tabs (2), activeReadKey (9), settings (5)
-       12. useNavigateToLink      ← closeLinkSidebar (3), pushFromLetter (4)
+        6. useFullscreenGesture   ← settings (5); disabled on GardenView
+        7. useHistory             ← settings.historyEnabled (5)
+        8. useThumbnails          ← tabs/activeTab (2), settings (5)
+        9. useScrollMemory        ← activeTab + updateActiveTab (2)
+       10. useReadingDwell        ← settings.dwellMs (5), saved.activeReadKey
+       11. useTabActions          ← tabState (2), cancelDwell (10), setTabThumbnails (8)
+       12. usePersistedState      ← tabs (2), activeReadKey (10), settings (5)
+       13. useNavigateToLink      ← closeLinkSidebar (3), pushFromLetter (4)
                                     + App-local: must follow setJournalEntryId.
-       13. useAndroidBack         ← cancelDwell (9), fromLetterRef (4), + every
+       14. useAndroidBack         ← cancelDwell (10), fromLetterRef (4), + every
                                     go* nav helper + App-local: HARD-LAST —
                                     must follow goStudiesHome, defined deep
                                     in App().
@@ -216,6 +217,13 @@ function App() {
   const { settings, setSettings, toggleSetting, updateSetting } = useSettings({
     savedSettings: saved.settings,
     theme,
+  });
+  // Fullscreen is a user-gesture-only browser API. GardenView owns its own
+  // always-on immersive view, so this shortcut never competes with it.
+  useFullscreenGesture({
+    enabled: settings.doubleTapFullscreen !== false && screen !== 'garden-view',
+    hintCount: settings.fullscreenHintCount,
+    onHintShown: (count) => updateSetting('fullscreenHintCount', count),
   });
 
   /* Mark-as-read state + helpers → src/hooks/useMarkAsRead.js (P7g

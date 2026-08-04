@@ -1535,6 +1535,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.keepScreenOn !== false}
               onToggle={() => onToggle("keepScreenOn")}
             />
+            <SettingsRow
+              label="Double-Tap / Click Fullscreen"
+              desc="Double-tap an open area on a phone or double-click one on a computer to switch between fullscreen and regular view. Buttons, links, fields, navigation, and other controls are ignored. Turn this off to disable the shortcut."
+              checked={settings.doubleTapFullscreen !== false}
+              onToggle={() => onToggle("doubleTapFullscreen")}
+            />
           </div>
         </SettingsGroup>
 

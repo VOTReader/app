@@ -621,6 +621,21 @@ class AppInterfaceTest {
         assertEquals(2, host.postedActions.size)
     }
 
+    @Test
+    fun `setImmersiveMode delegates the toggle to the host, in order`() {
+        // The Activity, not AppInterface, owns immersive mode: it must flip the
+        // flag its inset listener reads (cutout reservation) and re-dispatch
+        // insets. A bridge that only hid the bars left --inset-* stale, so the
+        // web layout never expanded into the reclaimed strip.
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        app.setImmersiveMode(true)
+        app.setImmersiveMode(false)
+
+        assertEquals(listOf(true, false), host.immersiveModeCalls)
+    }
+
     // ─── Smoke: AppInterface end-to-end without an Activity ──────────
 
     @Test

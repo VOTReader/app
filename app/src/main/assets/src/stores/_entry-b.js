@@ -87,6 +87,7 @@ import { useThumbnails } from '../hooks/use-thumbnails.js';
 import { useScrollMemory } from '../hooks/use-scroll-memory.js';
 import { useReadingDwell } from '../hooks/use-reading-dwell.js';
 import { useSettings } from '../hooks/use-settings.js';
+import { useFullscreenGesture } from '../hooks/use-fullscreen-gesture.js';
 import { useSheetOrchestration } from '../hooks/use-sheet-orchestration.js';
 import { useFromLetterStack } from '../hooks/use-from-letter-stack.js';
 import { useNavigateToLink } from '../hooks/use-navigate-to-link.js';
@@ -198,6 +199,7 @@ Object.assign(window, {
   useScrollMemory,
   useReadingDwell,
   useSettings,
+  useFullscreenGesture,
   useSheetOrchestration,
   useFromLetterStack,
   useNavigateToLink,

@@ -60,9 +60,16 @@ class FakeBridgeHost(
     /** Counts clearGardenCache() calls (NTV3). */
     var gardenCacheClearCount: Int = 0
 
+    /** Records every applyImmersiveMode(immersive) call, in order. */
+    val immersiveModeCalls: MutableList<Boolean> = mutableListOf()
+
     override fun postToUi(action: () -> Unit) {
         postedActions.add(action)
         if (executePostedImmediately) action()
+    }
+
+    override fun applyImmersiveMode(immersive: Boolean) {
+        immersiveModeCalls.add(immersive)
     }
 
     override fun launchFilePicker() {

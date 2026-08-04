@@ -700,6 +700,18 @@ describe('dependency-gated rows unmount with their dependency', () => {
   });
 });
 
+describe('fullscreen gesture setting', () => {
+  it('keeps the fullscreen shortcut enabled by default and wires its switch to the canonical key', () => {
+    const onToggle = vi.fn();
+    renderSettings({}, { onToggle });
+    const fullscreen = row('Double-Tap / Click Fullscreen');
+    expect(fullscreen).toBeTruthy();
+    expect(fullscreen.querySelector('input[role="switch"]').checked).toBe(true);
+    fireEvent.click(fullscreen.querySelector('input[role="switch"]'));
+    expect(onToggle).toHaveBeenCalledWith('doubleTapFullscreen');
+  });
+});
+
 /* Reading Font picker — integration through the real SettingsScreen wiring
    (component-level behavior is FontPickerRow.test.jsx). */
 describe('Reading Font picker wiring', () => {

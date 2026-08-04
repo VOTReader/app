@@ -58,6 +58,8 @@ describe('useSettings — defaults + migration', () => {
     expect(s.fontScale).toBe('1');
     expect(s.arrowLayout).toBe('off');
     expect(s.autoScroll).toBe(false);
+    expect(s.doubleTapFullscreen).toBe(true);
+    expect(s.fullscreenHintCount).toBe(0);
     expect(s.gardenTier).toBe(2); // GARDEN_DEFAULT_TIER global
     expect(s.showReadingDot).toBe(false);
   });

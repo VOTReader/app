@@ -13,7 +13,6 @@ import android.os.VibratorManager
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import androidx.annotation.RequiresApi
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import timber.log.Timber
 
@@ -520,15 +519,10 @@ class AppInterface(
 
     @JavascriptInterface
     fun setImmersiveMode(immersive: Boolean) {
-        host.postToUi {
-            val controller = WindowInsetsControllerCompat(host.activityWindow, host.activityWindow.decorView)
-            if (immersive) {
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                controller.show(WindowInsetsCompat.Type.systemBars())
-            }
-        }
+        // Delegated to the host: hiding the bars is only half the job (the
+        // Activity owns the immersive flag its inset listener reads, and must
+        // re-dispatch insets so the WebView's --inset-* actually change).
+        host.postToUi { host.applyImmersiveMode(immersive) }
     }
 
     /**

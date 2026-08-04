@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -46,6 +47,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
@@ -195,6 +197,20 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // NTV3: wipe the native Garden image disk cache from the JS "Clear All" flow.
     override fun clearGardenCache() { gardenCache.clear() }
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)
+    override fun applyImmersiveMode(immersive: Boolean) {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (immersive) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+        // THE fix for "fullscreen turns on but nothing expands": hiding the
+        // bars is not guaranteed to deliver a fresh inset dispatch to the
+        // WebView, so --inset-bottom kept the gesture-bar reservation and the
+        // layout never moved. Ask for the pass explicitly.
+        if (::webView.isInitialized) ViewCompat.requestApplyInsets(webView)
+    }
     override fun launchFilePicker() {
         filePickerLauncher.launch("application/json")
     }
@@ -436,6 +452,20 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
+        // cutout mode a window may lay out into the cutout only while that
+        // cutout is contained inside a system bar, so the moment the status
+        // bar hides Android letterboxes the window BELOW the cutout — content
+        // visibly jumps up and down across every fullscreen transition on any
+        // cutout device. Android's own guidance: "Use always, shortEdges or
+        // never cutout modes if your app needs to transition into and out of
+        // immersive mode." No-op while the bars are visible.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
         if (vm.keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Debug-only: let Chrome DevTools attach to the WebView via
@@ -890,11 +920,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // Include IME (soft-keyboard) in the bottom inset so floating
             // UI like the surprise FAB or NoteSheet anchor moves above the
             // keyboard instead of being hidden behind it.
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars()
-                    or WindowInsetsCompat.Type.displayCutout()
-                    or WindowInsetsCompat.Type.ime()
-            )
+            val bars = insets.getInsets(reservedInsetTypes())
             vm.savedTopInset = bars.top
             vm.savedBottomInset = bars.bottom
             injectInsets()
@@ -917,11 +943,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                     insets: WindowInsetsCompat,
                     runningAnimations: MutableList<WindowInsetsAnimationCompat>
                 ): WindowInsetsCompat {
-                    val bars = insets.getInsets(
-                        WindowInsetsCompat.Type.systemBars()
-                            or WindowInsetsCompat.Type.displayCutout()
-                            or WindowInsetsCompat.Type.ime()
-                    )
+                    val bars = insets.getInsets(reservedInsetTypes())
                     val density = resources.displayMetrics.density
                     val topDp = String.format(Locale.US, "%.2f", bars.top / density)
                     val bottomDp = String.format(Locale.US, "%.2f", bars.bottom / density)
@@ -1048,6 +1070,34 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         @Suppress("DEPRECATION")
         tv.post { tv.announceForAccessibility(message) }
     }
+
+    /**
+     * Which inset types the web layout reserves space for, as --inset-top /
+     * --inset-bottom. This is Compose's `safeDrawing` set, expressed for
+     * Views: system bars ∪ display cutout ∪ IME. Android's edge-to-edge
+     * guidance is explicitly to take "the logical or of the system bars and
+     * the display cutout types" and never to hardcode a bar or cutout size.
+     *
+     * Nothing here is per-device: every number comes from the live
+     * WindowInsets, per edge, so the same code yields the right answer on a
+     * notchless phone, a punch-hole, a waterfall edge, gesture nav, or
+     * 3-button nav. What fullscreen actually reclaims therefore VARIES BY
+     * DEVICE, which is correct:
+     *   - no cutout        → top inset falls to 0, the whole status-bar strip
+     *                        is reclaimed
+     *   - status bar taller than the cutout → the difference is reclaimed
+     *   - cutout taller than the status bar (Pixel 9 Pro: 68dp vs 48dp) →
+     *     nothing is free at the top; the camera, not the bar, was setting
+     *     --inset-top all along
+     * The cutout stays reserved in immersive mode for exactly that reason.
+     * Dropping it was tried and reverted: it does not reclaim space Android
+     * says is safe, it just moves the layout under the camera — on the test
+     * device it put the top-nav history button directly beneath the lens.
+     */
+    private fun reservedInsetTypes(): Int =
+        WindowInsetsCompat.Type.systemBars() or
+            WindowInsetsCompat.Type.displayCutout() or
+            WindowInsetsCompat.Type.ime()
 
     private fun injectInsets() {
         val density = resources.displayMetrics.density

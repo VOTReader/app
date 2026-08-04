@@ -114,6 +114,9 @@ export function useSettings({ savedSettings, theme }) {
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
       showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
+      // Fullscreen gesture is on by default. The hint count is deliberately
+      // persisted so the brief teaching toast stops after a few uses.
+      doubleTapFullscreen: true, fullscreenHintCount: 0,
       tabsEnabled: true,
       searchEnabled: true, historyEnabled: true,
       historyInNav: true,

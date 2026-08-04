@@ -50,6 +50,17 @@ interface BridgeHost {
     /** Hop to the UI thread. */
     fun postToUi(action: () -> Unit)
 
+    /**
+     * Show/hide the system bars for the fullscreen gesture (and GardenView).
+     *
+     * Lives on the host rather than inside AppInterface because hiding the
+     * bars is only half of it: the Activity must also request a fresh window
+     * inset dispatch, or the WebView keeps the old --inset-bottom and the web
+     * layout never expands into the reclaimed gesture-bar strip. Must be
+     * called on the UI thread.
+     */
+    fun applyImmersiveMode(immersive: Boolean)
+
     /** Launch the system JSON file picker (Settings import flow). */
     fun launchFilePicker()
 
