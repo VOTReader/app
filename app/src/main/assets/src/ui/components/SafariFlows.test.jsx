@@ -4,7 +4,7 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import { Safari7DayModal, IosPwaWelcomeCard } from './SafariFlows.jsx';
 
 let _listeners;
@@ -76,6 +76,9 @@ describe('Safari7DayModal', () => {
     var { container } = render(<Safari7DayModal />);
     expect(container.querySelector('.sh-modal-backdrop')).not.toBeNull();
     expect(container.querySelector('.sh-modal-title').textContent).toBe('Before you start saving');
+    const dialog = screen.getByRole('dialog', { name: 'Safari storage warning' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it('renders nothing when gate blocked but already dismissed', () => {
@@ -140,6 +143,9 @@ describe('IosPwaWelcomeCard', () => {
     var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
     expect(container.querySelector('.sh-welcome-card')).not.toBeNull();
     expect(container.querySelector('.sh-modal-title').textContent).toBe('Welcome to VOTReader!');
+    const dialog = screen.getByRole('dialog', { name: 'Welcome to VOTReader' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it('"skip" sets StateStore flag and hides card', () => {

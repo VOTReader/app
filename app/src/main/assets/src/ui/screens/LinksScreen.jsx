@@ -134,6 +134,7 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
   var _state = useState(false);
   var confirming = _state[0];
   var setConfirming = _state[1];
+  var trapRef = useFocusTrap(!!lnk);
 
   if (!lnk) return null;
 
@@ -145,7 +146,7 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
 
   return (
     <div className="link-action-overlay" onClick={onClose}>
-      <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
+      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Link actions" onClick={function(e) { e.stopPropagation(); }}>
         <SheetHandle onClose={onClose} />
         {!confirming && (
           <>

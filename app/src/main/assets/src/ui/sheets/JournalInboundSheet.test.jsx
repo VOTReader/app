@@ -4,7 +4,7 @@
    (tabIndex 0) and activate on Enter/Space. Reads bare globals, so we stub. */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { JournalInboundSheet } from './JournalInboundSheet.jsx';
 
 function stubGlobals() {
@@ -22,6 +22,14 @@ afterEach(() => {
 });
 
 describe('JournalInboundSheet keyboard a11y', () => {
+  it('is a labelled modal and contains initial focus', () => {
+    stubGlobals();
+    render(<JournalInboundSheet refKey="bible:john:3:16" resourceLabel="John 3:16" onClose={() => {}} onOpenEntry={() => {}} />);
+    const dialog = screen.getByRole('dialog', { name: '1 journal entry · John 3:16' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
   it('entry rows are focusable', () => {
     stubGlobals();
     const { container } = render(<JournalInboundSheet refKey="bible:john:3:16" resourceLabel="John 3:16" onClose={() => {}} onOpenEntry={() => {}} />);

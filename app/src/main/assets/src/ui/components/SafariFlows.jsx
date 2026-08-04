@@ -13,6 +13,7 @@ export function Safari7DayModal() {
   var report = StorageHealth.getReport();
 
   var visible = report.safariGateBlocked && !StorageHealth.isDismissed('safari-7day');
+  var trapRef = useFocusTrap(visible);
 
   useModalRegistry({ id: 'safari-7day-modal', dismiss: _dismiss, active: visible });
 
@@ -27,8 +28,8 @@ export function Safari7DayModal() {
   var isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || '');
 
   return (
-    <div className="sh-modal-backdrop" role="dialog" aria-modal="true" aria-label="Safari storage warning">
-      <div className="sh-modal">
+    <div className="sh-modal-backdrop">
+      <div className="sh-modal" ref={trapRef} role="dialog" aria-modal="true" aria-label="Safari storage warning">
         <h3 className="sh-modal-title">Before you start saving</h3>
         <p className="sh-modal-text">
           {"Safari may delete your saved notes and highlights if you don't visit for 7 days. "}
@@ -73,6 +74,7 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
   var alreadyWelcomed = (typeof StateStore !== 'undefined') && StateStore.get(flagKey);
 
   var visible = isIosPwa && !hasData && !alreadyWelcomed && !dismissed;
+  var trapRef = useFocusTrap(visible);
 
   useModalRegistry({ id: 'ios-pwa-welcome', dismiss: _skip, active: visible });
 
@@ -89,8 +91,8 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
   if (!visible) return null;
 
   return (
-    <div className="sh-modal-backdrop sh-welcome-card" role="dialog" aria-modal="true" aria-label="Welcome to VOTReader">
-      <div className="sh-modal">
+    <div className="sh-modal-backdrop sh-welcome-card">
+      <div className="sh-modal" ref={trapRef} role="dialog" aria-modal="true" aria-label="Welcome to VOTReader">
         <h3 className="sh-modal-title">Welcome to VOTReader!</h3>
         <p className="sh-modal-text">
           {"If you've been using VOTReader in Safari, your saved data "}

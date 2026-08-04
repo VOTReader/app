@@ -6,7 +6,7 @@
    empty body message already says so). Reads bare globals, so we stub. */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { LinkSidebar } from './LinkSidebar.jsx';
 
 function stubStore(links) {
@@ -30,6 +30,9 @@ describe('LinkSidebar chrome', () => {
     expect(titleIdx).toBeGreaterThanOrEqual(0);
     expect(closeIdx).toBeGreaterThan(titleIdx); // close is on the right
     expect(container.querySelector('.link-sidebar-close').getAttribute('aria-label')).toBe('Close links');
+    const dialog = screen.getByRole('dialog', { name: 'Links' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it('empty passage: no redundant count row, just the empty message', () => {

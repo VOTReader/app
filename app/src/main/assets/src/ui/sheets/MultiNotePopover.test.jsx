@@ -34,6 +34,9 @@ describe('MultiNotePopover rendering', () => {
     expect(screen.getByText('5 notes here')).toBeTruthy();
     expect(screen.getByText('Reflection 1')).toBeTruthy();
     expect(screen.getByText('Reflection 5')).toBeTruthy();
+    const dialog = screen.getByRole('dialog', { name: '5 notes here' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it('onPick fires with the tapped note groupId', () => {

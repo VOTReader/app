@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { BookmarkCreateSheet } from './BookmarkCreateSheet.jsx';
-import { BookmarkRowActionSheet } from '../screens/BookmarksScreen.jsx';
+import { BookmarkPopover, BookmarkRowActionSheet } from '../screens/BookmarksScreen.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 
 /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
@@ -119,5 +119,19 @@ describe('BookmarkRowActionSheet — thought actions removed', () => {
     expect(screen.getByText('Edit Label')).toBeTruthy();
     expect(screen.getByText('Delete Bookmark')).toBeTruthy();
     expect(screen.queryByText(/Thought/)).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Bookmark actions' }).getAttribute('aria-modal')).toBe('true');
+  });
+});
+
+describe('BookmarkPopover accessibility', () => {
+  it('uses modal popover semantics and contains focus', () => {
+    window.BookmarkStore = {
+      get: () => ({ id: 'b1', label: 'A bookmark', created: 1 }),
+      remove: vi.fn(),
+    };
+    render(<BookmarkPopover bkmIds={['b1']} x={100} y={100} onClose={() => {}} onNavigate={() => {}} onDeleteDone={() => {}} />);
+    const dialog = screen.getByRole('dialog', { name: 'Bookmark actions' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });

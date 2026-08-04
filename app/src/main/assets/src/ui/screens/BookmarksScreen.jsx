@@ -183,6 +183,7 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
   var _state = useState(false);
   var confirming = _state[0];
   var setConfirming = _state[1];
+  var trapRef = useFocusTrap(!!bkm);
 
   if (!bkm) return null;
 
@@ -194,7 +195,7 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
 
   return (
     <div className="link-action-overlay" onClick={onClose}>
-      <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
+      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Bookmark actions" onClick={function(e) { e.stopPropagation(); }}>
         <SheetHandle onClose={onClose} />
         {!confirming && (
           <>
@@ -242,9 +243,13 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
   var useState = React.useState;
   var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
 
-  if (!bkmIds || !bkmIds.length) return null;
-  var bookmarks = bkmIds.map(function(id) { return BookmarkStore.get(id); }).filter(Boolean);
-  if (!bookmarks.length) { onClose(); return null; }
+  var bookmarks = (bkmIds || []).map(function(id) { return BookmarkStore.get(id); }).filter(Boolean);
+  var popoverOpen = !!(bkmIds && bkmIds.length && bookmarks.length);
+  var trapRef = useFocusTrap(popoverOpen);
+  React.useEffect(function() {
+    if (bkmIds && bkmIds.length && bookmarks.length === 0) onClose();
+  }, [bkmIds, bookmarks.length, onClose]);
+  if (!popoverOpen) return null;
 
   function doDelete(bkm) {
     BookmarkStore.remove(bkm.id);
@@ -261,6 +266,10 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
       <div style={{ position: 'fixed', inset: 0, zIndex: 8800 }} onClick={onClose} />
       <div
         className="bkm-popover"
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Bookmark actions"
         style={{ left: popX, top: popY, zIndex: 8801 }}
         onClick={function(e) { e.stopPropagation(); }}
       >

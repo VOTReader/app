@@ -9,6 +9,7 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
     React.useCallback((cb) => LinkStore.subscribe(cb), []),
     () => LinkStore.getVersion()
   );
+  const trapRef = useFocusTrap(!!hlKey);
   // Letter/WTLB/Blessed/Holy-Days blocks anchor links by block-index, but
   // excerpts append ":start-end" to the stored endpoint key. Use prefix
   // matching for those scopes so the sidebar finds excerpt-scoped links from
@@ -30,10 +31,10 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
   return (
     <>
       <div className="link-sidebar-overlay" onClick={onClose} />
-      <div className="link-sidebar">
+      <div className="link-sidebar" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-sidebar-title">
         {/* Close on the RIGHT, matching every other sheet in the app. */}
         <div className="link-sidebar-header">
-          <span className="link-sidebar-title">Links</span>
+          <span className="link-sidebar-title" id="link-sidebar-title">Links</span>
           <button className="link-sidebar-close" onClick={onClose} aria-label="Close links" title="Close">×</button>
         </div>
         {/* Count only when there are links — the empty body message below

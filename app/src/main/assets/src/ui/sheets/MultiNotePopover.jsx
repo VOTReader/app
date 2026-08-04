@@ -5,7 +5,6 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
 export function MultiNotePopover({ payload, onClose, onPick }) {
-  const popRef = React.useRef(null);
   const popW = 320;
   const x = payload ? payload.x : 0;
   const y = payload ? payload.y : 0;
@@ -13,6 +12,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
     const gids = payload ? payload.groupIds : [];
     return gids.map(gid => NoteStore.get(gid)).filter(Boolean);
   }, [payload]);
+  const popRef = useFocusTrap(!!payload && notes.length > 0);
   // Computed placement — kept on-screen. The popover anchors below the tap
   // point by default, but flips ABOVE when it would overflow the bottom and
   // there is more room above, and caps its height with an internal scroll so
@@ -40,7 +40,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
       top = y + gap; maxHeight = spaceBelow;
     }
     setPos({ left, top, maxHeight });
-  }, [payload, x, y, notes.length]);
+  }, [payload, x, y, notes.length, popRef]);
 
   if (!payload) return null;
   if (notes.length === 0) return null;
@@ -54,8 +54,8 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
   return (
     <>
       <div className="multinote-overlay" onClick={onClose} />
-      <div ref={popRef} className="multinote-popover" style={style}>
-        <div className="multinote-header">{notes.length} notes here</div>
+      <div ref={popRef} className="multinote-popover" role="dialog" aria-modal="true" aria-labelledby="multinote-title" style={style}>
+        <div className="multinote-header" id="multinote-title">{notes.length} notes here</div>
         {notes.map(n => {
           const swatchBg = ({
             yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
