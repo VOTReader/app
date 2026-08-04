@@ -92,6 +92,7 @@ export function setupSettingsGlobals(overrides = {}) {
   put('useBackupReminder', () => {});
   put('buildProgressGroups', () => []);
   put('countReadFor', () => 0);
+  put('READ_VERSION_ID', 'v1');
   put('measureUserData', () => Promise.resolve({ bytes: 0, counts: {} }));
   put('formatBytes', (n) => `${n} B`);
   put('formatImportSpaceWarning', () => null);

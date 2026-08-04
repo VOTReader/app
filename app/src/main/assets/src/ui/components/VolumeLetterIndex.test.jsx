@@ -104,6 +104,16 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
 });
 
 describe('VolumeLetterIndex — smart-resume progress chip ([26])', () => {
+  it('weights the percentage and time-left by words, not paragraph count', () => {
+    /** @type {any} */ (globalThis).ReadingStatsStore = {
+      measuredWpm: () => null,
+      getProgress: () => ({ b: 4, c: [0, 1], w: 100, tw: 1000, t: 1 }),
+    };
+    setupCounters();
+    const { container } = renderIndex({ progressKeyFor: (id) => 'v1:vol:' + id });
+    expect(container.querySelector('.idx-min-chip').textContent).toBe('10% · ~4 min left');
+  });
+
   it('an in-progress letter shows "N% · ~M min left" instead of the cold total', () => {
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       measuredWpm: () => null,

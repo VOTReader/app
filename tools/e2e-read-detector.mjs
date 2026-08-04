@@ -112,17 +112,21 @@ try {
   });
   console.log('AFTER FULL READ:', JSON.stringify(result1));
 
-  // PARTIAL READ: back to the index, open letter row 2, read only the top,
-  // then navigate away → a frontier must persist.
+  // PARTIAL READ: back to the index, open a multi-block letter, read only
+  // the top, flick to the bottom for less than the 800ms credit floor, then
+  // navigate away. The saved scroll position says "bottom" while the honest
+  // reading frontier says "first unread block" — reopening must prefer it.
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || '')); if (b) b.click(); });
   await sleep(900);
   await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
-    if (rows[1]) rows[1].click();
+    if (rows[2]) rows[2].click();
   });
   await sleep(600);
   const key2 = await page.evaluate(() => window.__readTrackerMeta && window.__readTrackerMeta.key);
   await sleep(3000);  // read only the visible top — partial
+  await scrollStep(1000000);
+  await sleep(100);   // too brief to credit the bottom, but scroll memory sees it
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || '')); if (b) b.click(); });
   await sleep(1200);
 
@@ -132,12 +136,34 @@ try {
   });
   console.log('AFTER PARTIAL READ:', JSON.stringify({ key2, progressKeys: Object.keys(result2.progress), entry: result2.progress[key2] }));
 
+  // Reopen that same letter. Scroll memory restores the bottom first; the
+  // tracker then moves to the first unread block once restoration settles.
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
+    if (rows[2]) rows[2].click();
+  });
+  await sleep(2200);
+  const resume = await page.evaluate((key) => {
+    const sc = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 100 && e.clientHeight > 300);
+    const blocks = document.querySelectorAll('[data-hl-key]').length;
+    return {
+      firstUnread: ReadingStatsStore.firstUnreadIndex(key, blocks),
+      scrollTop: sc ? sc.scrollTop : -1,
+      maxTop: sc ? sc.scrollHeight - sc.clientHeight : -1,
+    };
+  }, key2);
+  console.log('AFTER FRONTIER RESUME:', JSON.stringify(resume));
+
   // Assertions
   const fails = [];
   if (!result1.readItems || result1.readItems['v1:volume-one:a-word-of-warning'] !== 1) fails.push('preface not marked read=1: ' + JSON.stringify(result1.readItems));
   if (!(result1.words > 50)) fails.push('totalWordsRead not recorded: ' + result1.words);
   if (result1.completions !== 1) fails.push('completions != 1: ' + result1.completions);
   if (!result2.progress[key2] || !result2.progress[key2].c || result2.progress[key2].c.length < 1) fails.push('no frontier recorded for partial read of ' + key2);
+  if (result2.progress[key2] && result2.progress[key2].c.length >= result2.progress[key2].b) fails.push('partial fixture credited every block; resume frontier is useless');
+  if (result2.progress[key2] && !(result2.progress[key2].w < result2.progress[key2].tw)) fails.push('word-weighted partial progress missing: ' + JSON.stringify(result2.progress[key2]));
+  if (!(resume.firstUnread > 0)) fails.push('no useful first-unread index after reopen: ' + JSON.stringify(resume));
+  if (!(resume.maxTop > 0 && resume.scrollTop < resume.maxTop * 0.75)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
   if (result2.progress['v1:volume-one:a-word-of-warning']) fails.push('completed item still has a frontier (should be cleared)');
 
   if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }

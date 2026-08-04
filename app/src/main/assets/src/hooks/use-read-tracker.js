@@ -92,9 +92,9 @@ var TALL_FILL_RATIO = 0.6;
  */
 
 /** Bare-global, typeof-guarded store calls (cluster-B idiom). */
-function _reportProgress(key, blocks, credited) {
+function _reportProgress(key, blocks, credited, segmentWords) {
   if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
-    try { ReadingStatsStore.recordProgress(key, blocks, credited); }
+    try { ReadingStatsStore.recordProgress(key, blocks, credited, segmentWords); }
     catch (e) { console.warn('read-tracker progress report failed', e); }
   }
 }
@@ -143,6 +143,11 @@ export function useReadTracker(scrollRef, inert, placeKey) {
       var out = [];
       for (var i = 0; i < nodes.length; i++) {
         if (nodes[i].closest && nodes[i].closest('[inert]')) continue;
+        // Annotation/bookmark icons can repeat their owner's data-hl-key.
+        // Only the outermost key-bearing node is reading content; nested
+        // chrome would otherwise change block indices as marks come and go.
+        var parent = nodes[i].parentElement && nodes[i].parentElement.closest('[data-hl-key]');
+        if (parent) continue;
         out.push({ el: nodes[i], key: String(nodes[i].getAttribute('data-hl-key')) });
       }
       if (out.length === 0 && countTextWords(root.textContent) > 0) {
@@ -200,7 +205,11 @@ export function useReadTracker(scrollRef, inert, placeKey) {
       if (!force && now - lastReportAt < PROGRESS_REPORT_MS) return;
       lastReportAt = now;
       reportedCount = credited.length;
-      _reportProgress(trackKeySnapshot, cands.length, credited);
+      var weights = cands.map(function(cand) {
+        var state = byKey.get(cand.key);
+        return state ? state.words : countTextWords(cand.el.textContent);
+      });
+      _reportProgress(trackKeySnapshot, cands.length, credited, weights);
     };
 
     var lastCands = /** @type {Array<{ el: Element, key: string }>} */ ([]);
@@ -215,16 +224,15 @@ export function useReadTracker(scrollRef, inert, placeKey) {
       var meta = window.__readTrackerMeta;
       if (!trackKeySnapshot && meta && meta.key) trackKeySnapshot = String(meta.key);
 
-      var now = performance.now();
-      if (lastTick != null) activeMs += Math.min(now - lastTick, TICK_CAP_MS);
-      lastTick = now;
-
       // Re-query every sweep: keys are stable across re-renders, so a
       // headings toggle or late corpus settle keeps credit and extends the
       // denominator instead of orphaning detached elements.
       var cands = candidates(root);
       lastCands = cands;
-      if (cands.length === 0) return;
+      if (cands.length === 0) { lastTick = null; return; }
+      var now = performance.now();
+      if (lastTick != null) activeMs += Math.min(now - lastTick, TICK_CAP_MS);
+      lastTick = now;
       for (var c = 0; c < cands.length; c++) {
         if (!byKey.has(cands[c].key)) {
           var w = countTextWords(cands[c].el.textContent);

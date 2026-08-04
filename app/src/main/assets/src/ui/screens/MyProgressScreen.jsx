@@ -154,6 +154,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     return Object.keys(seen).length;
   })();
   const groups = buildProgressGroups();
+  const groupShape = groups
+    .flatMap((g) => g.genres.flatMap((genre) => genre.books.map((b) => `${b.id}:${b.total}`)))
+    .join('|');
   // Words-based bars (2026-08-03): item counts lie by omission (a 16-word
   // verse and a 5,034-word letter both score 1), so the bar FILL weighs
   // words. The first full pass tokenizes the library — deferred to idle so
@@ -175,12 +178,11 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
       if (typeof cancelIdleCallback === 'function' && typeof tok === 'number') cancelIdleCallback(tok);
       else clearTimeout(/** @type {any} */ (tok));
     };
-    // readItems identity changes on every mark; groups length flips once per
-    // corpus load — both are the correct recompute triggers. `groups` itself
-    // is rebuilt every render (same content), so depending on its identity
-    // would re-tokenize the library per render.
+    // readItems identity changes on every mark; groupShape changes when a
+    // lazy corpus adds sources or items. `groups` itself is rebuilt every
+    // render, so depending on its identity would re-tokenize every time.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-  }, [groups.length, readItems]);
+  }, [groupShape, readItems]);
   const topSources = mostAnnotatedSources(annData, 5);
   const markAsReadOn = !settings || settings.markAsRead !== false;
 
@@ -249,6 +251,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
           return (
             <div className="prg-days-wrap" role="group" aria-label="Words read, last 14 days">
               <span className="sr-only">{_fmtWords(weekWords)} words this week</span>
+              <span className="sr-only">
+                {wordDays.map((d) => `${d.date}: ${_fmtWords(d.words)} words`).join('; ')}
+              </span>
               <div className="prg-days-bars" aria-hidden="true">
                 {wordDays.map((d) => (
                   <div

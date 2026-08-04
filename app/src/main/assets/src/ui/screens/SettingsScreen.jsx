@@ -321,7 +321,7 @@ function SectionClearBtn({ label, disabled, onClear }) {
   if (confirming) {
     return (
       <ConfirmStrip
-        question={`Clear all progress in "${label}"?`}
+        question={`Clear read marks and saved positions in "${label}"?`}
         yesLabel="Yes, clear"
         onCancel={() => setConfirming(false)}
         onConfirm={() => { onClear(); setConfirming(false); }}
@@ -337,7 +337,7 @@ function SectionClearBtn({ label, disabled, onClear }) {
   );
 }
 
-function AllProgressClearRow({ totalRead, totalItems, onClearAll }) {
+function AllProgressClearRow({ totalRead, totalItems, hasPartial, onClearAll }) {
   const [confirming, setConfirming] = React.useState(false);
   return (
     <>
@@ -347,14 +347,14 @@ function AllProgressClearRow({ totalRead, totalItems, onClearAll }) {
         {!confirming && (
           <button
             className="settings-clear-btn"
-            disabled={totalRead === 0}
+            disabled={totalRead === 0 && !hasPartial}
             onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
           >Clear All</button>
         )}
       </div>
       {confirming && (
         <ConfirmStrip
-          question="Clear all reading progress across every book?"
+          question="Clear all read marks and saved positions? Reading totals and streaks are kept."
           yesLabel="Yes, clear"
           onCancel={() => setConfirming(false)}
           onConfirm={() => { onClearAll(); setConfirming(false); }}
@@ -400,6 +400,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
+    () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
   );
   const [openSections, setOpenSections] = React.useState(new Set());
   // Accordion state for the top-level setting GROUPS (redesign 2026-07-31).
@@ -569,6 +573,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
      this screen when they land. */
   const PROGRESS_GROUPS = buildProgressGroups();
   const countFor = (bid) => countReadFor(readItems, bid);
+  const frontierData = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.get === 'function')
+    ? ReadingStatsStore.get()
+    : null;
+  const frontierKeys = Object.keys((frontierData && frontierData.progress) || {})
+    .filter((key) => key.indexOf(`${READ_VERSION_ID}:`) === 0);
+  const hasFrontierFor = (bid) => frontierKeys.some((key) => key.indexOf(`${READ_VERSION_ID}:${bid}:`) === 0);
   const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
   const totalRead = Object.keys(readItems).length;
   const totalItems = allBooks.reduce((s, b) => s + b.total, 0);
@@ -1837,7 +1847,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                       </button>
                       <SectionClearBtn
                         label={grp.label}
-                        disabled={sRead === 0}
+                        disabled={sRead === 0 && !sectionBooks(grp).some((b) => hasFrontierFor(b.id))}
                         onClear={() => sectionBooks(grp).forEach((b) => onClearBook(b.id))}
                       />
                     </div>
@@ -1856,6 +1866,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                               label={src.label}
                               total={src.total}
                               count={countFor(src.id)}
+                              hasPartial={hasFrontierFor(src.id)}
                               onClear={() => onClearBook(src.id)}
                             />
                           </div>
@@ -1866,7 +1877,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 );
               })}
               <div className="progress-divider" />
-              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} onClearAll={onClearAll} />
+              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} hasPartial={frontierKeys.length > 0} onClearAll={onClearAll} />
             </div>
           )}
         </SettingsGroup>

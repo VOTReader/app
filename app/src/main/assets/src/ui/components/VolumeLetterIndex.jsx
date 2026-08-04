@@ -40,8 +40,11 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
       let p = null;
       try { p = ReadingStatsStore.getProgress(progressKeyFor(itemId)); } catch (_e) { /* stats optional */ }
       if (p && p.b > 0 && p.c && p.c.length > 0 && p.c.length < p.b) {
-        const pct = Math.min(99, Math.round(p.c.length / p.b * 100));
-        const left = readingMinutes(Math.round(words * (1 - p.c.length / p.b)), _wpm);
+        const weighted = p.tw > 0 && p.w >= 0 && p.w < p.tw;
+        const fraction = weighted ? p.w / p.tw : p.c.length / p.b;
+        const pct = Math.min(99, Math.round(fraction * 100));
+        const leftWords = weighted ? p.tw - p.w : Math.round(words * (1 - fraction));
+        const left = readingMinutes(leftWords, _wpm);
         return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
       }
     }

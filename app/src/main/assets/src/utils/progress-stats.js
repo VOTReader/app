@@ -243,6 +243,19 @@ export function tallyGroup(readItems, group) {
  */
 export function bookItemsFor(bookId) {
   const L = (arr) => (arr || []).map((it) => ({ item: it, key: it.id }));
+  if (bookId === 'matthew') {
+    const matthew = (typeof _matthew === 'function') ? _matthew() : null;
+    return matthew && Array.isArray(matthew.chapters)
+      ? matthew.chapters.map((ch) => ({ item: ch, key: ch.num }))
+      : [];
+  }
+  if (bookId.indexOf('bible-study-') === 0) {
+    const slug = bookId.slice('bible-study-'.length);
+    const study = (typeof _studies === 'function')
+      ? _studies().find((s) => s && s.slug === slug)
+      : null;
+    return study && Array.isArray(study.chapters) ? L(study.chapters) : [];
+  }
   switch (bookId) {
     case 'volume-one':   return L(typeof LETTERS_V1 !== 'undefined' ? LETTERS_V1 : null);
     case 'volume-two':   return L(typeof LETTERS !== 'undefined' ? LETTERS : null);

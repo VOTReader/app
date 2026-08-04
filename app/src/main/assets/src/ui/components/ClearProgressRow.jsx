@@ -13,13 +13,14 @@
      label    Display label for the book / item.
      total    Total items in the group (denominator).
      count    Items already read (numerator).
+     hasPartial  Whether a saved partial-reading position also exists.
      onClear  Called when the user confirms the clear.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ClearProgressRow({ label, total, count, onClear }) {
+export function ClearProgressRow({ label, total, count, hasPartial, onClear }) {
   const [confirming, setConfirming] = React.useState(false);
 
-  if (count === 0) return (
+  if (count === 0 && !hasPartial) return (
     <div className="progress-row">
       <span className="progress-row-label">{label}</span>
       <span className="progress-row-tally">{"0 / "}{total}</span>
@@ -29,7 +30,7 @@ export function ClearProgressRow({ label, total, count, onClear }) {
 
   if (confirming) return (
     <ConfirmStrip
-      question={`Clear progress for “${label}”?`}
+      question={`Clear read marks and saved positions for “${label}”?`}
       yesLabel="Yes, clear"
       onCancel={() => setConfirming(false)}
       onConfirm={() => { onClear(); setConfirming(false); }}

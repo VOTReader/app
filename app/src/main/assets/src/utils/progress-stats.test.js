@@ -250,6 +250,8 @@ describe('groupWordStats — words-based progress (2026-08-03)', () => {
     delete /** @type {any} */ (globalThis).countItemWords;
     delete /** @type {any} */ (globalThis).LETTERS_V1;
     delete /** @type {any} */ (globalThis).BOOKS;
+    delete /** @type {any} */ (globalThis)._matthew;
+    delete /** @type {any} */ (globalThis)._studies;
   });
 
   it('weighs read items by words against the group word total', () => {
@@ -271,6 +273,22 @@ describe('groupWordStats — words-based progress (2026-08-03)', () => {
       { id: 'no-such-book', label: 'Ghost', total: 5 },
     ] }] };
     expect(groupWordStats({ 'v1:mark:2': true }, grp)).toEqual({ wordsRead: 30, wordsTotal: 40 });
+  });
+
+  it('includes Matthew and Bible Study chapters with their real read keys', () => {
+    /** @type {any} */ (globalThis).countItemWords = (it) => it.w;
+    /** @type {any} */ (globalThis)._matthew = () => ({ chapters: [{ num: 1, w: 100 }, { num: 2, w: 300 }] });
+    /** @type {any} */ (globalThis)._studies = () => [{
+      slug: 'faith', chapters: [{ id: 'faith-a', w: 500 }, { id: 'faith-b', w: 100 }],
+    }];
+    const grp = { id: 'studies', label: 'Studies', genres: [{ label: 'g', books: [
+      { id: 'matthew', label: 'Matthew Study Bible', total: 2 },
+      { id: 'bible-study-faith', label: 'Faith', total: 2 },
+    ] }] };
+    expect(groupWordStats({
+      'v1:matthew:2': 1,
+      'v1:bible-study-faith:faith-a': 1,
+    }, grp)).toEqual({ wordsRead: 800, wordsTotal: 1000 });
   });
 
   it('degrades to zeros without the counter global (guard path)', () => {

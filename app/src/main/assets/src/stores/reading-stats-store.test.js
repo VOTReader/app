@@ -142,6 +142,25 @@ describe('progress frontiers', () => {
     expect(ReadingStatsStore.getProgress('k').c).toEqual([0, 1, 2, 4, 5]);
   });
 
+  it('stores word-weighted progress for uneven segments', () => {
+    ReadingStatsStore.recordProgress('weighted', 3, [0, 1], [10, 90, 100]);
+    expect(ReadingStatsStore.getProgress('weighted')).toMatchObject({
+      b: 3, c: [0, 1], w: 100, tw: 200,
+    });
+  });
+
+  it('clears frontiers by precise prefix without touching the lifetime ledger', () => {
+    ReadingStatsStore.recordCompletion({ key: 'done', words: 500, activeMs: 60000 });
+    ReadingStatsStore.recordProgress('v1:matthew:1', 3, [0]);
+    ReadingStatsStore.recordProgress('v1:matthew-study:1', 3, [0]);
+    ReadingStatsStore.recordProgress('v1:mark:1', 3, [0]);
+    ReadingStatsStore.clearProgressByPrefix('v1:matthew:');
+    expect(ReadingStatsStore.getProgress('v1:matthew:1')).toBeNull();
+    expect(ReadingStatsStore.getProgress('v1:matthew-study:1')).not.toBeNull();
+    expect(ReadingStatsStore.getProgress('v1:mark:1')).not.toBeNull();
+    expect(ReadingStatsStore.get().totalWordsRead).toBe(500);
+  });
+
   it('resets credits when the segment count changes (stale indices are useless)', () => {
     ReadingStatsStore.recordProgress('k', 10, [0, 1, 2]);
     ReadingStatsStore.recordProgress('k', 12, [3]);

@@ -156,7 +156,10 @@ describe('MyProgressScreen — last-14-days bars', () => {
     expect(bars[12].style.height).toBe('100%');
     expect(bars[13].style.height).toBe('50%');
     expect(bars[0].style.height).toBe('');
-    expect(wrap.querySelector('.sr-only').textContent).toBe('750 words this week');
+    const summaries = [...wrap.querySelectorAll('.sr-only')].map((el) => el.textContent);
+    expect(summaries[0]).toBe('750 words this week');
+    expect(summaries[1]).toContain('d12: 500 words');
+    expect(summaries[1]).toContain('d13: 250 words');
   });
 
   it('renders no bars at all when ReadingStatsStore is absent', () => {

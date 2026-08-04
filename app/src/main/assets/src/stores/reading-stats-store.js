@@ -41,7 +41,8 @@ import { _jrnDateStr } from './journal-stats-store.js';
  *   rereads: number,
  *   wordsByDay: Record<string, number>,
  *   wpmSamples: Array<{ w: number, ms: number }>,
- *   progress: Record<string, { b: number, c: number[], t: number }>
+ *   progress: Record<string, { b: number, c: number[], t: number,
+ *                              w?: number, tw?: number }>
  * }} ReadingStatsData
  */
 
@@ -120,12 +121,18 @@ export var ReadingStatsStore = extendStore(
      * @param {string} key
      * @param {number} blockCount
      * @param {number[]} creditedIdx
+     * `segmentWords` lets display surfaces report word-weighted progress.
+     * Older callers may still pass `ts` as the fourth argument.
+     *
+     * @param {number[] | number} [segmentWords]
      * @param {number} [ts]
      * @returns {void}
      */
-    recordProgress(key, blockCount, creditedIdx, ts) {
-      if (this._shouldDefer('recordProgress', key, blockCount, creditedIdx, ts)) return;
+    recordProgress(key, blockCount, creditedIdx, segmentWords, ts) {
+      if (this._shouldDefer('recordProgress', key, blockCount, creditedIdx, segmentWords, ts)) return;
       if (!key || !blockCount) return;
+      var weights = Array.isArray(segmentWords) ? segmentWords : null;
+      var touchedAt = weights ? ts : /** @type {number | undefined} */ (segmentWords);
       var data = this._load();
       var map = data.progress || (data.progress = {});
       var prev = map[key];
@@ -137,7 +144,12 @@ export var ReadingStatsStore = extendStore(
       for (var i = 0; i < credited.length; i++) set[credited[i]] = true;
       for (var j = 0; j < (creditedIdx || []).length; j++) set[creditedIdx[j]] = true;
       var merged = Object.keys(set).map(Number).sort(function(a, b) { return a - b; });
-      map[key] = { b: blockCount, c: merged, t: ts || Date.now() };
+      var next = { b: blockCount, c: merged, t: touchedAt || Date.now() };
+      if (weights && weights.length === blockCount) {
+        next.tw = weights.reduce(function(sum, w) { return sum + Math.max(0, Number(w) || 0); }, 0);
+        next.w = merged.reduce(function(sum, idx) { return sum + Math.max(0, Number(weights[idx]) || 0); }, 0);
+      }
+      map[key] = next;
 
       var keys = Object.keys(map);
       if (keys.length > MAX_PROGRESS_ITEMS) {
@@ -150,7 +162,7 @@ export var ReadingStatsStore = extendStore(
     /**
      * In-progress data for one item, or null.
      * @param {string} key
-     * @returns {{ b: number, c: number[], t: number } | null}
+     * @returns {{ b: number, c: number[], t: number, w?: number, tw?: number } | null}
      */
     getProgress(key) {
       var map = this._load().progress;
@@ -190,6 +202,26 @@ export var ReadingStatsStore = extendStore(
         delete data.progress[key];
         this._save();
       }
+    },
+
+    /**
+     * Clear every in-progress frontier under one read-key prefix. Lifetime
+     * words/time/streak data is deliberately retained: clearing checkmarks
+     * resets navigation state, not the historical reading ledger.
+     * @param {string} prefix
+     * @returns {void}
+     */
+    clearProgressByPrefix(prefix) {
+      if (this._shouldDefer('clearProgressByPrefix', prefix)) return;
+      if (!prefix) return;
+      var data = this._load();
+      var map = data.progress;
+      if (!map) return;
+      var changed = false;
+      Object.keys(map).forEach(function(key) {
+        if (key.indexOf(prefix) === 0) { delete map[key]; changed = true; }
+      });
+      if (changed) this._save();
     },
 
     /**

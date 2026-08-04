@@ -127,6 +127,18 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
     renderIndex({ book: WORDY_BOOK });
     expect(document.querySelector('.idx-min-chip')).toBeNull();
   });
+
+  it('uses word-weighted frontier progress for percent and time left', () => {
+    setupGlobals();
+    globalThis.countItemWords = countItemWords;
+    globalThis.readingMinutes = readingMinutes;
+    globalThis.ReadingStatsStore = {
+      measuredWpm: () => null,
+      getProgress: () => ({ b: 4, c: [0, 1], w: 100, tw: 1000, t: 1 }),
+    };
+    renderIndex({ book: WORDY_BOOK, progressKeyFor: () => 'v1:psalms:1' });
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('10% · ~4 min left');
+  });
 });
 
 describe('chapterIndexCurrentChapter — reading-dot decouple (route helper)', () => {

@@ -151,6 +151,15 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
   const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
 
+  const clearFrontiers = (prefix) => {
+    if (typeof ReadingStatsStore === 'undefined' || !ReadingStatsStore) return;
+    try {
+      if (typeof ReadingStatsStore.clearProgressByPrefix === 'function') {
+        ReadingStatsStore.clearProgressByPrefix(prefix);
+      }
+    } catch (e) { console.warn('reading-stats frontier clear failed', e); }
+  };
+
   const markRead = (bid, cid, payload) => {
     if (enabledRef.current === false) return;
     const key = getReadKey(bid, cid);
@@ -187,6 +196,12 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
       }
     } else if (!prev) {
       setReadItems((p) => ({ ...p, [key]: 1 }));
+      // A manual "read" claim supersedes any partial-read resume marker.
+      // Without this, the index could show both a check and "60% left".
+      if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
+        try { ReadingStatsStore.clearProgress(key); }
+        catch (e) { console.warn('reading-stats frontier clear failed', e); }
+      }
     }
   };
 
@@ -195,7 +210,10 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     setReadItems((prev) => { const next = { ...prev }; delete next[key]; return next; });
   };
 
-  const clearAllProgress = () => setReadItems({});
+  const clearAllProgress = () => {
+    setReadItems({});
+    clearFrontiers(`${VERSION_ID}:`);
+  };
 
   // Folded in from the inline `onClearBook` arrow at the consumer site so
   // VERSION_ID stays internal to the hook.
@@ -205,6 +223,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
       Object.keys(next).forEach((k) => { if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k]; });
       return next;
     });
+    clearFrontiers(`${VERSION_ID}:${bid}:`);
   };
 
   // getReadKey is exported (2026-08-03) so routes can hand the SAME key to

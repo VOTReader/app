@@ -152,6 +152,20 @@ describe('useReadTracker — vectors', () => {
     vi.advanceTimersByTime(9000);          // finish the required dwell in the foreground
     expect(complete).toHaveBeenCalledTimes(1);
   });
+
+  it('does not bank dwell time before reading content mounts', () => {
+    root = document.createElement('div');
+    setRect(root, 0, VIEW_H);
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: VIEW_H });
+    document.body.appendChild(root);
+    mount(root);
+    vi.advanceTimersByTime(20000);         // loader/placeholder, no readable candidates
+    root.appendChild(makePara('late', 90));
+    vi.advanceTimersByTime(5000);
+    expect(complete).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(5000);          // 90 words needs ~9s after content appears
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useReadTracker — DOM churn resilience (review locks)', () => {
@@ -207,7 +221,22 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     vi.advanceTimersByTime(2000);          // both credit
     window.__readTrackerMeta = null;       // the view's cleanup ran first (review lock #6)
     h.unmount();
-    expect(recordProgress).toHaveBeenCalledWith('v1:test:item', 6, [0, 1]);
+    expect(recordProgress).toHaveBeenCalledWith('v1:test:item', 6, [0, 1], [50, 50, 50, 50, 50, 50]);
+  });
+
+  it('excludes nested annotation chrome from frontier indices and word weights', () => {
+    const recordProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordProgress };
+    root = buildContent(2, 50);
+    const icon = document.createElement('span');
+    icon.className = 'hl-note-icon';
+    icon.setAttribute('data-hl-key', 'seg0');
+    root.children[0].appendChild(icon);
+    hide(root.children[1]);
+    const h = mount(root);
+    vi.advanceTimersByTime(2000);
+    h.unmount();
+    expect(recordProgress).toHaveBeenCalledWith('v1:test:item', 2, [0], [50, 50]);
   });
 
   it('reports the end-of-visit pace sample for a COMPLETED read — not the completion instant', () => {

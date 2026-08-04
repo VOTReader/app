@@ -104,6 +104,29 @@ describe('mark-as-read section disclosure', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('Genesis')).toBeTruthy();
   });
+
+  it('lets a partial-only reader clear saved positions even with zero read marks', () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildProgressGroups: () => [{
+        id: 'scripture', label: 'Scriptures',
+        genres: [{ label: 'Books', books: [{ id: 'genesis', label: 'Genesis', total: 50 }] }],
+      }],
+      ReadingStatsStore: {
+        subscribe: () => () => {}, getVersion: () => 0,
+        get: () => ({ progress: { 'v1:genesis:1': { b: 3, c: [0], t: 1 } } }),
+      },
+    });
+    const onClearBook = vi.fn();
+    renderSettings({ markAsRead: true }, { onClearBook });
+    fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ }));
+    const clears = screen.getAllByRole('button', { name: 'Clear' });
+    expect(clears.every((button) => !button.disabled)).toBe(true);
+    fireEvent.click(clears[1]);
+    expect(screen.getByText('Clear read marks and saved positions for “Genesis”?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, clear' }));
+    expect(onClearBook).toHaveBeenCalledWith('genesis');
+  });
 });
 
 describe('auto-scroll controls', () => {

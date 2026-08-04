@@ -91,6 +91,16 @@ describe('useReadProgress — markRead', () => {
     } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
   });
 
+  it('a manual mark clears its stale partial-reading frontier', () => {
+    const clearProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { clearProgress };
+    try {
+      const { result } = setup();
+      act(() => { result.current.markRead('matthew', 5); });
+      expect(clearProgress).toHaveBeenCalledWith('v1:matthew:5');
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
+
   it('a detector completion records the reading DAY (streak coherence with the dwell path)', () => {
     // UX-walk regression 2026-08-03: two verified ~9s reads left the streak
     // at 0 because only the 20s dwell timer fed it. A completion is at
@@ -198,6 +208,16 @@ describe('useReadProgress — clearAllProgress', () => {
     act(() => { result.current.clearAllProgress(); });
     expect(result.current.readItems).toEqual({});
   });
+
+  it('also clears every v1 partial-reading frontier', () => {
+    const clearProgressByPrefix = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { clearProgressByPrefix };
+    try {
+      const { result } = setup();
+      act(() => { result.current.clearAllProgress(); });
+      expect(clearProgressByPrefix).toHaveBeenCalledWith('v1:');
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
 });
 
 describe('useReadProgress — clearReadForBook', () => {
@@ -214,6 +234,16 @@ describe('useReadProgress — clearReadForBook', () => {
       'v1:mark:1': true,
       'v1:matt:99': true,
     });
+  });
+
+  it('clears the matching book frontier with the same precise prefix', () => {
+    const clearProgressByPrefix = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { clearProgressByPrefix };
+    try {
+      const { result } = setup();
+      act(() => { result.current.clearReadForBook('matthew'); });
+      expect(clearProgressByPrefix).toHaveBeenCalledWith('v1:matthew:');
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
   });
 
   it('precision: clearReadForBook("matt") must NOT match v1:matthew:* (defensive)', () => {
