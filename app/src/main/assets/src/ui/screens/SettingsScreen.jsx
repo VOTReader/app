@@ -30,6 +30,7 @@ const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 // unrestorable-on-phone backup is never first discovered on a wiped phone.
 // ~12 MiB of typed JSON is implausible for one human; this is a tripwire.
 const MANIFEST_WARN_BYTES = 12 * 1024 * 1024;
+const MANIFEST_MAX_BYTES = 16 * 1024 * 1024;
 
 function TextSizeSliderRow({ value, onChange }) {
   const v = clampFontScale(value);
@@ -701,6 +702,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
         return;
       }
+      if (built.manifestBytes > MANIFEST_MAX_BYTES) {
+        hideToast(_TOAST_ID);
+        _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
+        return;
+      }
       const stamp = new Date().toISOString().slice(0, 10);
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
@@ -764,6 +770,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         // case: v3 streams, so there is no size cap.)
         hideToast(_TOAST_ID);
         _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        return;
+      }
+      if (built.manifestBytes > MANIFEST_MAX_BYTES) {
+        hideToast(_TOAST_ID);
+        _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
         return;
       }
       const stamp = new Date().toISOString().slice(0, 10);
@@ -901,7 +912,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // power loss) the marker survives and useRestoreGuard warns on next boot.
       // A handled failure below leaves it SET on purpose — writeFailures means
       // data did not durably land, and an unknown throw may have part-applied.
-      try { localStorage.setItem(RESTORE_INFLIGHT_KEY, String(Date.now())); } catch (_e) { /* privacy mode */ }
+      let restoreMarker = null;
+      try {
+        restoreMarker = {
+          previous: localStorage.getItem(RESTORE_INFLIGHT_KEY),
+          token: String(Date.now()) + ':' + String(Math.random()),
+        };
+        localStorage.setItem(RESTORE_INFLIGHT_KEY, restoreMarker.token);
+      } catch (_e) { restoreMarker = null; /* privacy mode */ }
 
       // Apply + WAIT for every write to durably land before reloading (U1
       // barrier). applyFn SKIPS any section that fails shape validation so a
@@ -910,10 +928,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       try { applied = await applyFn(storesMap, flagMap); }
       catch (e) {
         // The apply paths hold a cross-tab Web Lock; contention gets its own
-        // message instead of the generic corrupt-file one downstream — and
-        // provably nothing ran, so the inflight marker comes straight off.
+        // message instead of the generic corrupt-file one downstream. Nothing
+        // ran in this tab, so restore whichever marker was present beforehand.
         if (/already in progress/.test(String(e && e.message))) {
-          try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
+          // This tab never mutated anything. Restore the marker it displaced
+          // instead of deleting a concurrent import's crash warning.
+          try {
+            if (restoreMarker && localStorage.getItem(RESTORE_INFLIGHT_KEY) === restoreMarker.token) {
+              if (restoreMarker.previous == null) localStorage.removeItem(RESTORE_INFLIGHT_KEY);
+              else localStorage.setItem(RESTORE_INFLIGHT_KEY, restoreMarker.previous);
+            }
+          } catch (_e) { /* best-effort */ }
           hideToast(_TOAST_ID);
           _showToast('Another backup operation is running in a different tab. Please wait for it to finish.');
           return;
@@ -959,7 +984,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _showToast('Import complete. Reloading…', 0);
       }
       // The apply is durable (writeFailures gate above) — the restore finished.
-      try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
+      try {
+        if (!restoreMarker || localStorage.getItem(RESTORE_INFLIGHT_KEY) === restoreMarker.token) {
+          localStorage.removeItem(RESTORE_INFLIGHT_KEY);
+        }
+      } catch (_e) { /* best-effort */ }
       // A clean import reloads fast; problems get reading time first — a 600ms
       // reload used to wipe the warning toast before anyone could read it.
       backupReloadPendingRef.current = true;

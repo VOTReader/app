@@ -686,6 +686,20 @@ describe('applyV3', () => {
     expect(Object.keys(media._store)).toEqual(['old']); // nothing pruned
   });
 
+  it('an omitted journal store demotes media to merge so old attachments stay valid', async () => {
+    const journal = destStore('replaceAll');
+    const media = destMedia({ old: { id: 'old' } });
+    await applyV3(
+      manifest({}, []), [],
+      {
+        storesMap: { 'vot-journal': { store: journal, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: media, validateStorePayload: okValidate,
+      },
+    );
+    expect(journal.calls).toEqual([]);
+    expect(Object.keys(media._store)).toEqual(['old']);
+  });
+
   it('rejects a legacy import while a v3 import holds the cross-tab lock', async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks');
     let held = false;

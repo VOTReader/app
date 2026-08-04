@@ -230,6 +230,37 @@ describe('export/import copy names the real .votbak artifact', () => {
   });
 });
 
+describe('v3 export manifest limit', () => {
+  it('refuses to save a backup that no supported importer can restore', async () => {
+    const build = vi.fn(async () => ({
+      ok: true,
+      manifest: { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] },
+      manifestBytes: 16 * 1024 * 1024 + 1,
+      mediaEntries: [],
+    }));
+    const openExportSink = vi.fn(async () => ({ write: vi.fn(), close: vi.fn() }));
+    const toast = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildV3Manifest: build,
+      showToast: toast,
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+      },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
+    expect(openExportSink).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/over the 16 MiB restore limit/),
+    }));
+  });
+});
+
 describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
   beforeEach(() => modalRegistry._reset());
 
@@ -460,6 +491,19 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     // The marker survives a handled failure — the boot guard must warn, because
     // a legacy apply may have part-landed before the throw.
     await vi.waitFor(() => expect(localStorage.getItem('vot-restore-inflight')).not.toBeNull());
+    localStorage.removeItem('vot-restore-inflight');
+  });
+
+  it('does not erase another tab\'s restore marker when the import lock is busy', async () => {
+    localStorage.setItem('vot-restore-inflight', 'active-tab-marker');
+    setupImport({ applyImportPayload: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+
+    await vi.waitFor(() => {
+      expect(localStorage.getItem('vot-restore-inflight')).toBe('active-tab-marker');
+    });
     localStorage.removeItem('vot-restore-inflight');
   });
 

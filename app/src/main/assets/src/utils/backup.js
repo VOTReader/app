@@ -727,6 +727,11 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
     catch (_e) { violations = ['validation threw']; }
     if (violations.length) invalidStores.push(name);
   }
+  // Journal entries are the only structured records that reference journal
+  // media. If that recognized store is absent, Settings promises it will be
+  // left unchanged; replacing media would strand its old attachments.
+  const missingJournalStore = Object.prototype.hasOwnProperty.call(storesMap, 'vot-journal')
+    && !Object.prototype.hasOwnProperty.call(stores, 'vot-journal');
 
   // (1) Media FIRST (BAK1) — the media stream is the only step that can fail on
   // a truncated/corrupt container (the Android path reads frames straight off
@@ -793,7 +798,8 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
 
   const exactRestore = !streamBroken
     && mediaApplied === expectedMedia.length
-    && invalidStores.length === 0;
+    && invalidStores.length === 0
+    && !missingJournalStore;
   try {
     if (exactRestore) await mediaStore.commitImportReplace();
     else await mediaStore.commitImportMerge();

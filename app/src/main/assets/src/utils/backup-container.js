@@ -74,6 +74,9 @@ export function decodeUint64BE(bytes) {
 // Old readers already tolerate trailing bytes (see readContainer's trailing-byte
 // warning), so this is backward- AND forward-compatible with no magic bump.
 export const CONTAINER_CRC_LEN = 4;
+// Keep this aligned with StorageManager.MAX_V3_MANIFEST_SIZE. The manifest is
+// the only v3 frame read wholly into memory, so reject it before arrayBuffer().
+export const MAX_V3_MANIFEST_BYTES = 16 * 1024 * 1024;
 
 /** @type {Uint32Array | null} */
 let _crcTable = null;
@@ -178,6 +181,9 @@ export async function readContainer(blob) {
 
   const manifestLen = decodeUint64BE(await _sliceBytes(blob, off, off + 8));
   off += 8;
+  if (manifestLen > MAX_V3_MANIFEST_BYTES) {
+    throw new Error('backup-container: manifest exceeds the 16 MiB safety limit');
+  }
   if (off + manifestLen > blob.size) throw new Error('backup-container: truncated manifest');
   const manifestBytes = await blob.slice(off, off + manifestLen).arrayBuffer();
   off += manifestLen;

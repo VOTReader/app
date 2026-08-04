@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   writeContainer, readContainer, isContainerMagic,
   encodeUint64BE, decodeUint64BE, CONTAINER_MAGIC,
-  crc32, encodeCrc32BE, CONTAINER_CRC_LEN,
+  crc32, encodeCrc32BE, CONTAINER_CRC_LEN, MAX_V3_MANIFEST_BYTES,
 } from './backup-container.js';
 
 // Collect writeContainer's streamed chunks into one Blob (copy each chunk so a
@@ -154,6 +154,11 @@ describe('BAK-INTEGRITY: manifest CRC-32 (corruption detection)', () => {
 });
 
 describe('integrity + error detection (only-backup path — must fail loud)', () => {
+  it('rejects an oversized declared manifest before reading it into memory', async () => {
+    const blob = new Blob([CONTAINER_MAGIC, encodeUint64BE(MAX_V3_MANIFEST_BYTES + 1)]);
+    await expect(readContainer(blob)).rejects.toThrow(/manifest exceeds the 16 MiB safety limit/);
+  });
+
   it('throws on a truncated media frame', async () => {
     const m1 = pattern(500, 9);
     const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: m1.length }] };
