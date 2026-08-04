@@ -215,9 +215,30 @@ describe('mostAnnotatedSources', () => {
     };
     const out = mostAnnotatedSources(ann);
     expect(out).toEqual([
-      { key: 'bible:psalms', label: 'Psalms', collection: 'Scripture', count: 2 },
-      { key: 'letter:grafted-in', label: 'Grafted In', collection: 'Volume Three', count: 1 },
+      { key: 'bible:psalms', label: 'Psalms', collection: 'Scripture', count: 2, words: 0, per1k: 0 },
+      { key: 'letter:grafted-in', label: 'Grafted In', collection: 'Volume Three', count: 1, words: 0, per1k: 0 },
     ]);
+  });
+
+  it('[28] ranks by marks-per-1k-words when word counts resolve — length alone cannot win', () => {
+    // Long letter: 10 marks over 5000 words = 2.0/1k. Short entry: 3 marks
+    // over 300 words = 10.0/1k. Raw count says the long letter; density
+    // says the short entry the user marked far more intensively.
+    globalThis.findEntryContext = (id, kind) => {
+      if (kind === 'letter' && id === 'long-letter') return { title: 'Long Letter', collection: 'Volume One', entry: { id, w: 5000 } };
+      if (kind === 'wtlb' && id === 'short-entry') return { title: 'Short Entry', collection: 'WTLB', entry: { id, w: 300 } };
+      return null;
+    };
+    globalThis.countItemWords = (item) => (item && item.w) || 0;
+    try {
+      const ann = { 'letter:long-letter:0': [], 'wtlb:short-entry:0': [] };
+      for (let i = 0; i < 10; i++) ann['letter:long-letter:0'].push({ id: 'L' + i, groupId: 'L' + i });
+      for (let i = 0; i < 3; i++) ann['wtlb:short-entry:0'].push({ id: 'S' + i, groupId: 'S' + i });
+      const out = mostAnnotatedSources(ann);
+      expect(out.map((s) => s.key)).toEqual(['wtlb:short-entry', 'letter:long-letter']);
+      expect(out[0]).toMatchObject({ per1k: 10, words: 300, count: 3 });
+      expect(out[1]).toMatchObject({ per1k: 2, words: 5000, count: 10 });
+    } finally { delete globalThis.countItemWords; }
   });
 
   it('sorts by count desc, title asc on ties, and caps at the limit', () => {

@@ -361,14 +361,39 @@ export function annotationSourceForKey(hlKey) {
 }
 
 /**
+ * Word length of one Most-Annotated source document, or 0 when the corpus
+ * behind it isn't loaded yet. bible:/study: keys sum their chapters via
+ * bookItemsFor; letter-family keys count the single resolved entry.
+ * @param {string} srcKey
+ * @returns {number}
+ */
+function _sourceWords(srcKey) {
+  if (typeof countItemWords !== 'function') return 0;
+  const i = srcKey.indexOf(':');
+  const kind = srcKey.slice(0, i), id = srcKey.slice(i + 1);
+  if (kind === 'bible' || kind === 'study') {
+    let w = 0;
+    for (const { item } of bookItemsFor(id)) w += countItemWords(item);
+    return w;
+  }
+  const ctx = (typeof findEntryContext === 'function') ? findEntryContext(id, kind) : null;
+  return ctx && ctx.entry ? countItemWords(ctx.entry) : 0;
+}
+
+/**
  * The user's most-annotated books/letters: AnnotationStore's map grouped
  * by source document, counting DISTINCT annotation groups (a multi-verse
- * highlight spanning several keys counts once), sorted by count desc
- * (title asc on ties), capped at `limit`.
+ * highlight spanning several keys counts once), capped at `limit`.
+ *
+ * Ranking is DENSITY-normalized ([28]): marks per 1k words of the source,
+ * so a long letter can't win by length alone. Sources whose word count
+ * can't resolve yet (lazy corpus) carry per1k 0 and fall back to raw-count
+ * order among themselves; MyProgress pre-loads the corpora, so in practice
+ * the density order settles within a beat of opening the screen.
  *
  * @param {Record<string, { id: string, groupId?: string }[]> | null | undefined} annData
  * @param {number} [limit]
- * @returns {{ key: string, label: string, collection: string, count: number }[]}
+ * @returns {{ key: string, label: string, collection: string, count: number, words: number, per1k: number }[]}
  */
 export function mostAnnotatedSources(annData, limit = 5) {
   if (!annData || typeof annData !== 'object') return [];
@@ -387,7 +412,11 @@ export function mostAnnotatedSources(annData, limit = 5) {
     segs.forEach((a) => { if (a) g.ids.add(a.groupId || a.id); });
   });
   return [...groups.entries()]
-    .map(([key, g]) => ({ key, label: g.label, collection: g.collection, count: g.ids.size }))
-    .sort((a, b) => (b.count - a.count) || a.label.localeCompare(b.label))
+    .map(([key, g]) => {
+      const words = _sourceWords(key);
+      const per1k = words > 0 ? Math.round((g.ids.size / words) * 10000) / 10 : 0;
+      return { key, label: g.label, collection: g.collection, count: g.ids.size, words, per1k };
+    })
+    .sort((a, b) => (b.per1k - a.per1k) || (b.count - a.count) || a.label.localeCompare(b.label))
     .slice(0, limit);
 }

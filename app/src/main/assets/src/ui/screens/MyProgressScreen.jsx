@@ -357,7 +357,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
                     <span className="prg-src-title">{s.label}</span>
                     <span className="prg-src-col">{s.collection}</span>
                   </div>
-                  <span className="prg-row-tally">{s.count} {s.count === 1 ? 'mark' : 'marks'}</span>
+                  <span className="prg-row-tally">{s.count} {s.count === 1 ? 'mark' : 'marks'}{s.per1k > 0 ? ' · ' + s.per1k + '/1k words' : ''}</span>
                 </div>
               ))
             )}

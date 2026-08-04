@@ -255,6 +255,7 @@ DONE LOG
   2026-08-03  Companion rail (Sol #4) — fn/scripture sheets dock as a NON-modal side panel in the right gutter at >=1640px; complementary role, no trap/backdrop/aria-modal; bottom sheets unchanged below; inline LetterView/WtlbEntryView sheets included. Live-verified at 2048px.
   2026-08-03  Brainstorm reconciliation — words-based collection bars (groupWordStats, idle) + lifetime Reading Time stat; strays filed as [27]-[30].
   2026-08-03  [25] Translation facts — measured length deltas appended to 7 picker descs ("~3% longer than NKJV"; NKJV 770,492 words full canon, probe 2026-08-03). Hardcoded by design: corpus files are frozen, numbers can't drift.
+  2026-08-04  [27] Autoscroll wpm-first readout + [28] density-ranked Most Annotated (marks/1k words) — both RED-proven; see the item bodies below.
 
 MEASUREMENT TRACK (added 2026-08-03 — post-backlog; the reading-measurement
 engine landed that day: word counts, multi-vector read detector, ReadingStats
@@ -292,10 +293,15 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      The original "reading dot" target was corrected by C2 recon 2026-08-03
      (dot already resumes); do not re-add it here.
 
-[27] AUTOSCROLL SPEED IN WPM — let the user SET pace in wpm (converted
-     to lines/min via measured words-per-line). Small; 08-03 recon stray.
-[28] ANNOTATION DENSITY /1k WORDS — normalize "most annotated" by
-     countItemWords so long letters don't win by length alone. Small.
+[27] AUTOSCROLL SPEED IN WPM — DONE 2026-08-04. The pill readout leads
+     with the measured wpm ("~120 wpm · 30 lines/min") once the page is
+     measured, so ± tunes to a wpm target; lines/min stays the stored
+     unit (survives text resizing). Settings row stays lines/min — no
+     page there to measure, and the honest number needs the page.
+[28] ANNOTATION DENSITY /1k WORDS — DONE 2026-08-04. mostAnnotatedSources
+     ranks by marks-per-1k-words (countItemWords via bookItemsFor /
+     findEntryContext.entry); unresolved-corpus sources fall back to raw
+     count. My Progress tally shows "N marks · D/1k words".
 [29] DENSITY SURFACES — (a) Matthew Study commentary-weight badge
      (60,183 note-words vs 23,221 text); (b) search-hit depth. Niche.
 [30] STORAGE GROWTH SPARKLINE — trend user-data size in Settings

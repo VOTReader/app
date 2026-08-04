@@ -290,9 +290,12 @@ export function AutoScrollControl({ scrollRef, pager, placeKey }) {
           </button>
         ) : null}
         <span className="ascroll-readout" role="status" aria-live="polite">
+          {/* [27] wpm leads once measured: pace is a number people know in
+              words/min, so ± effectively SETS a wpm target. lines/min stays
+              the stored unit (it survives text resizing) and trails. */}
           {atEnd ? 'End of text'
             : running ? (fmtRemaining(remainingMs) || 'Reading')
-              : speed + ' lines/min' + (wpm > 0 ? ' · ~' + wpm + ' wpm' : '')}
+              : (wpm > 0 ? '~' + wpm + ' wpm · ' + speed + ' lines/min' : speed + ' lines/min')}
         </span>
       </React.Fragment>
     );

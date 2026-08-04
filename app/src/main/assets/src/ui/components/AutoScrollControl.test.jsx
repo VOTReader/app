@@ -180,11 +180,13 @@ describe('measured reading rate', () => {
     expect(measureWordsPerLine(null)).toBe(0);
   });
 
-  it('shows words/min on the pill once the page has been measured', async () => {
+  it('[27] leads with wpm on the pill once the page has been measured — the user tunes to a wpm target', async () => {
     // 8 words over 2 lines = 4 words/line; at 20 lines/min that is 80 wpm.
+    // wpm FIRST: pace is something people know in words/min; lines/min stays
+    // as the stored unit (it survives text resizing) and the secondary label.
     mount(makeCfg({ speedLpm: 20 }), { spans: [['a b c d e f g h', 2]] });
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toBe('20 lines/min · ~80 wpm');
+      expect(screen.getByRole('status').textContent).toBe('~80 wpm · 20 lines/min');
     });
   });
 
@@ -196,7 +198,7 @@ describe('measured reading rate', () => {
         <AutoScrollControl scrollRef={scrollRef} pager={PAGER} placeKey="psalms-23" />
       </AutoScrollContext.Provider>
     );
-    expect(screen.getByRole('status').textContent).toBe('30 lines/min · ~120 wpm');
+    expect(screen.getByRole('status').textContent).toBe('~120 wpm · 30 lines/min');
   });
 });
 
