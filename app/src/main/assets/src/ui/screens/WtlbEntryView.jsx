@@ -98,6 +98,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
+  const scripTrapRef = useFocusTrap(!!scriptureRef && !railMode);  // dialog semantics — see LetterView
 
   React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
 
@@ -432,7 +433,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {!inert && ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />}
-        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`}>
+        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scriptureRef ? "true" : undefined} aria-hidden={!scriptureRef} inert={!scriptureRef ? true : undefined} aria-label={scriptureRef ? `Scripture ${scriptureRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScriptureRef(null)} />
           {scriptureRef && (
             <>

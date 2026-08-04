@@ -104,6 +104,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // hook or it would mark a merely-peeked letter as read.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
+  // Dialog semantics for the inline scripture sheet (2026-08-03 cycle 4 —
+  // the rail work exposed that this sheet predated the a11y batch: no role,
+  // no modality, no trap). Mirrors FootnoteSheet exactly; rail mode is
+  // non-modal by design. Consolidating onto ScriptureSheet is an on-churn
+  // candidate (different text-resolution contracts today).
 
   React.useEffect(() => {
     setHighlightedFn(null);
@@ -158,6 +163,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   };
 
   const [scripRef, setScripRef] = React.useState(null);
+  const scripTrapRef = useFocusTrap(!!scripRef && !railMode);
   const handleScripClick = (ref) => {
     setScripRef(ref);
   };
@@ -554,7 +560,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       {ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} onClick={() => setScripRef(null)} />}
-        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`}>
+        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scripRef ? "true" : undefined} aria-hidden={!scripRef} inert={!scripRef ? true : undefined} aria-label={scripRef ? `Scripture ${scripRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScripRef(null)} />
           {scripRef && (
             <>
