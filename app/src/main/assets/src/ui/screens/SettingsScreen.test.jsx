@@ -661,17 +661,11 @@ describe('Reading Font picker wiring', () => {
   });
 });
 
-/* [10] True Black — an OLED modifier on the DARK theme; the row collapses
-   (unmounts) in the light theme, same disclosure discipline as auto-scroll. */
-describe('True Black (OLED) disclosure', () => {
-  it('renders in the dark theme and toggles settings.trueBlack', () => {
-    const onToggle = vi.fn();
-    renderSettings({}, { theme: 'dark', onToggle });
-    expect(row('True Black (OLED)')).toBeTruthy();
-  });
-
-  it('is UNMOUNTED in the light theme', () => {
-    renderSettings({}, { theme: 'light' });
+/* [10] True Black toggle RETIRED 2026-08-03 (owner: default now — pure-black
+   surfaces are the dark theme's own tokens). The row must stay gone. */
+describe('True Black (OLED) — retired', () => {
+  it('TOMBSTONE: no True Black row in any theme', () => {
+    renderSettings({}, { theme: 'dark' });
     expect(row('True Black (OLED)')).toBeUndefined();
   });
 });

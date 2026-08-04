@@ -111,11 +111,11 @@ describe('useSettings — body-class mirror', () => {
     expect(cls().contains('light')).toBe(true);
   });
 
-  it('.amoled is a DARK-theme modifier only — trueBlack under light theme stays off', () => {
+  it('TOMBSTONE: .amoled is never applied — True Black IS the dark theme (owner call 2026-08-03)', () => {
+    // The [10] trueBlack modifier was retired: pure-black surfaces are the
+    // dark theme's own tokens now. A persisted trueBlack key must be an
+    // ignored orphan — no body class, ever.
     mount({ savedSettings: { trueBlack: true }, theme: 'dark' });
-    expect(cls().contains('amoled')).toBe(true);
-    document.body.className = '';
-    mount({ savedSettings: { trueBlack: true }, theme: 'light' });
     expect(cls().contains('amoled')).toBe(false);
   });
 

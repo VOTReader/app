@@ -289,8 +289,12 @@
 
       :root {
         --bg:          #000000;
-        --bg2:         #06060e;
-        --bg3:         #0c0c16;
+        /* True Black IS the dark theme (owner call 2026-08-03; was the [10]
+           settings.trueBlack modifier): raised surfaces sit at pure black /
+           a hair above, so OLED pixels shut off and hairline borders still
+           read. Text, gold, highlight colors untouched. */
+        --bg2:         #000000;
+        --bg3:         #070707;
         --gold:        #e8c050;
         --gold-bright: #f5d86a;
         --gold-dim:    #d0a838;
@@ -345,14 +349,6 @@
         --white:            #ffffff;       /* pure white (theme-agnostic) */
       }
       /* ── LIGHT THEME OVERRIDES ── */
-      /* [10] True Black (OLED) — a DARK-theme modifier: only the raised
-         surfaces move (cards/sheets to pure black, the deepest layer to a
-         hair above so hairline borders still read). Text, gold, highlight,
-         and annotation colors are untouched — contrast only improves. */
-      body.amoled {
-        --bg2: #000000;
-        --bg3: #070707;
-      }
       body.light {
         --bg:          #f7f2e8;
         --bg2:         #ede7d8;
@@ -2318,10 +2314,17 @@
        fix as .settings-row-head — the tally + Clear button wrap under the
        label instead of running off a 375px screen. Inert at normal sizes. */
     .progress-row { display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem; row-gap:8px; padding:0.8rem 1.2rem; border-bottom:1px solid var(--gold-border); }
-    .progress-section-toggle { display:flex; align-items:center; gap:0.75rem; flex:1 1 auto; min-width:0; padding:0; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
+    .progress-section-toggle { display:flex; align-items:center; gap:0.75rem; flex:1 1 0; min-width:0; padding:0; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
     .progress-row:last-child { border-bottom:none; }
-    .progress-row-label { font-family:'Cinzel',serif; font-size:0.78rem; letter-spacing:0.06em; color:var(--cream); flex:1; }
-    .progress-row-tally { font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.1em; color:var(--gold-dim); white-space:nowrap; min-width:4.5rem; text-align:right; }
+    /* Table discipline (2026-08-03, owner phone screenshot): the label
+       SHRINKS (ellipsis) instead of shoving the tally + Clear onto a ragged
+       second line — every row reads label · tally · button on ONE line.
+       flex-wrap stays on .progress-row as the extreme-font-scale escape. */
+    .progress-row-label { font-family:'Cinzel',serif; font-size:0.78rem; letter-spacing:0.06em; color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .progress-row-tally { font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.1em; color:var(--gold-dim); white-space:nowrap; min-width:4.5rem; text-align:right; flex-shrink:0; }
+    /* Per-row Clear buttons sit in a 60+-row table — lighter than the
+       standalone action buttons so the table reads as a table. */
+    .progress-row .settings-clear-btn { padding:0.3rem 0.6rem; font-size:0.55rem; flex-shrink:0; }
     .progress-divider { height:1px; background:var(--gold-border); margin:0; }
     .total-row { background:rgba(200,164,86,0.04); }
     .total-row .progress-row-label { color:var(--gold); }
