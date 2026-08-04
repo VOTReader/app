@@ -72,6 +72,7 @@ afterEach(() => {
   window.__onReadingComplete = null;
   window.__readTrackerMeta = null;
   delete /** @type {any} */ (globalThis).ReadingStatsStore;
+  document.body.classList.remove('scroll-restoring');
   if (root) { root.remove(); root = null; }
 });
 
@@ -304,6 +305,24 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     document.body.classList.remove('scroll-restoring');
     vi.advanceTimersByTime(1100);   // baseline sweep, then the jump
     expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not credit the temporary scroll-memory viewport before frontier resume', () => {
+    const recordProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = {
+      recordProgress,
+      firstUnreadIndex: vi.fn(() => 2),
+    };
+    root = buildContent(4, 50);
+    paras(root).forEach(hide);
+    show(root.children[3]);                 // stale restore lands at the bottom
+    document.body.classList.add('scroll-restoring');
+    const h = mount(root);
+    vi.advanceTimersByTime(1000);
+    document.body.classList.remove('scroll-restoring');
+    vi.advanceTimersByTime(600);            // baseline captured, jump not run yet
+    h.unmount();
+    expect(recordProgress).not.toHaveBeenCalled();
   });
 
   it('does nothing when inert (a swipe peek must never track)', () => {

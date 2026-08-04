@@ -230,9 +230,6 @@ export function useReadTracker(scrollRef, inert, placeKey) {
       var cands = candidates(root);
       lastCands = cands;
       if (cands.length === 0) { lastTick = null; return; }
-      var now = performance.now();
-      if (lastTick != null) activeMs += Math.min(now - lastTick, TICK_CAP_MS);
-      lastTick = now;
       for (var c = 0; c < cands.length; c++) {
         if (!byKey.has(cands[c].key)) {
           var w = countTextWords(cands[c].el.textContent);
@@ -243,6 +240,13 @@ export function useReadTracker(scrollRef, inert, placeKey) {
       }
 
       maybeFrontierResume(root, cands);
+      // Scroll memory may briefly place the viewport at an old/bad position
+      // before frontier resume corrects it. That transitional geometry is
+      // navigation, not reading: bank neither coverage nor active time.
+      if (!frontierDone) { lastTick = null; return; }
+      var now = performance.now();
+      if (lastTick != null) activeMs += Math.min(now - lastTick, TICK_CAP_MS);
+      lastTick = now;
 
       // One batched read-only geometry pass: the root rect once, then each
       // UNCREDITED present segment's rect. Fresh root height every sweep —
