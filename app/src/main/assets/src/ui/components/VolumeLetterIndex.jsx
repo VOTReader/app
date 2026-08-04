@@ -7,7 +7,7 @@
 export function ReadCheck({ count }) {
   if (!count) return null;
   return (
-    <span className="read-check" style={{ marginLeft: '0.4rem' }} aria-label={count > 1 ? `Read ${count} times` : 'Read'}>
+    <span className="read-check" aria-label={count > 1 ? `Read ${count} times` : 'Read'}>
       {"✓"}
       {count > 1 && <span className="read-check-count" aria-hidden="true">{"×" + count}</span>}
     </span>
@@ -23,9 +23,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
   }, []);
   // "~N min" estimate per row, at the user's measured pace when one exists
   // (ReadingStatsStore, bundle-b) — 230-wpm default otherwise. Hidden when
-  // the counters are absent or the item shape yields no words. Single-column
-  // rows only: the two-col cards are centered compact stacks with no row end
-  // to pin a chip to.
+  // the counters are absent or the item shape yields no words.
   const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
   // Smart-resume chip ([26], 2026-08-03): an IN-PROGRESS item (the tracker
   // left a frontier) shows how far in and what remains — "62% · ~2 min left" —
@@ -51,6 +49,14 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
     const m = readingMinutes(words, _wpm);
     return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
   };
+  const compactMeta = (item, itemId) => {
+    const chip = minChip(item, itemId);
+    const read = markAsReadEnabled && isRead(itemId)
+      ? <ReadCheck count={readCount ? readCount(itemId) : 1} />
+      : null;
+    if (!chip && !read) return null;
+    return <div className="two-col-meta">{chip}{read}</div>;
+  };
   return (
     <div className="vol-index">
       <div className="vol-index-header">
@@ -68,6 +74,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
             <div className="two-col-inner">
               <div className="two-col-num">0</div>
               <div className="two-col-title">{preface.title}</div>
+              {compactMeta(preface, preface.id)}
             </div>
           </button>
         ) : (
@@ -98,6 +105,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
                 <div className="two-col-inner">
                   <div className="two-col-num">{letter.num}</div>
                   <div className="two-col-title">{letter.title}</div>
+                  {compactMeta(letter, letter.id)}
                 </div>
               </button>
             );

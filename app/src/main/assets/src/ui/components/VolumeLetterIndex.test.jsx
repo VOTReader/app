@@ -74,11 +74,11 @@ describe('VolumeLetterIndex — "~N min" reading-time chip', () => {
     expect(document.querySelector('.idx-min-chip')).toBeNull();
   });
 
-  it('never chips the two-col compact cards', () => {
+  it('keeps the time estimate in the two-col compact cards', () => {
     setupCounters();
     renderIndex({ letters: [ENTRY_B], columns: 2 });
     expect(document.querySelector('.two-col-inner')).not.toBeNull();
-    expect(document.querySelector('.idx-min-chip')).toBeNull();
+    expect(document.querySelector('.two-col-meta .idx-min-chip').textContent).toBe('~1 min');
   });
 });
 
@@ -100,6 +100,11 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true });
     expect(container.querySelector('.read-check')).not.toBeNull();
     expect(container.querySelector('.read-check-count')).toBeNull();
+  });
+
+  it('keeps the re-read count in the two-col compact cards', () => {
+    const { container } = renderIndex({ columns: 2, markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
+    expect(container.querySelector('.two-col-meta .read-check').getAttribute('aria-label')).toBe('Read 3 times');
   });
 });
 
