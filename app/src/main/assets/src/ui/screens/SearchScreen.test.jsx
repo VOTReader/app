@@ -278,4 +278,65 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(/** @type {any} */ (window).removeRecentSearch).not.toHaveBeenCalled();
     expect(screen.getByText('mercy')).toBeTruthy();
   });
+
+  it('a slow older query resolving late cannot overwrite the newer results (stale guard)', async () => {
+    vi.useFakeTimers();
+    // Per-query controllable promises: "mercy" is held open, "grace" resolves
+    // first — the engine yields the main thread mid-search, so this ordering
+    // is reachable in production, not synthetic.
+    const pending = {};
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(
+      (q) => new Promise((res) => { pending[q] = res; }),
+    );
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="mercy" />);
+    act(() => { vi.advanceTimersByTime(200); }); // "mercy" now in flight
+    rerender(<SearchScreen {...props} query="grace" />);
+    act(() => { vi.advanceTimersByTime(200); }); // "grace" in flight too
+    await act(async () => {
+      pending.grace({ parsed: null, results: [{ score: 1, doc: { kind: 'verse', ref: 'Eph 2:8', text: 'grace' } }], parsedTerms: [] });
+      await Promise.resolve();
+    });
+    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('1 match');
+    await act(async () => {
+      pending.mercy({ parsed: null, results: [], parsedTerms: [] });
+      await Promise.resolve();
+    });
+    // The stale "mercy" resolution (0 results) must NOT clobber grace's hit.
+    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('1 match');
+    vi.useRealTimers();
+  });
+
+  it('unmounting mid-build and mid-search leaves no dangling setState (back out of Search)', async () => {
+    vi.useFakeTimers();
+    let progressCb = null;
+    let resolveInit;
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn((opts) => {
+      progressCb = opts && opts.onProgress;
+      return new Promise((res) => { resolveInit = res; });
+    });
+    let resolveSearch;
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(
+      () => new Promise((res) => { resolveSearch = res; }),
+    );
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const props = baseProps();
+    const { unmount } = render(<SearchScreen {...props} />);
+    await act(async () => { await Promise.resolve(); }); // corpus loads settle → init starts
+    expect(/** @type {any} */ (window).VotSearchMini.init).toHaveBeenCalled();
+    unmount();
+    // Late build progress + completion after unmount: guarded no-ops.
+    await act(async () => {
+      if (progressCb) progressCb(5, 10);
+      resolveInit();
+      if (resolveSearch) resolveSearch({ parsed: null, results: [], parsedTerms: [] });
+      await Promise.resolve();
+    });
+    // The guards drop both late callbacks: no thrown error, no React noise.
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+    vi.useRealTimers();
+  });
 });

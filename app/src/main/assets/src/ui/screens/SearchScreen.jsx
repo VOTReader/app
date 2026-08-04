@@ -109,19 +109,24 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!E) {
       // Wave-0: was "…Check browser console." — dev-speak facing the user.
       setBuildInfo({ ready: false, building: false, progress: null, error: "Search couldn't start. Try closing and reopening the app — your data is safe." });
-      return;
+      return undefined;
     }
-    if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return;}
+    if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return undefined;}
+    // A cold build runs ~10s; backing out of Search mid-build must not keep
+    // reporting progress into an unmounted screen. The build itself continues
+    // (the engine caches it for the next open) — only the setState stops.
+    let cancelled = false;
     setBuildInfo({ ready: false, building: true, progress: null });
     const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
     Promise.all([loadBible, loadMatthew, loadVot])
       .then(() => E.init({
-        onProgress: (done, total) => setBuildInfo((b) => ({ ...b, progress: { done, total } }))
+        onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
       }))
-      .then(() => setBuildInfo({ ready: true, building: false, progress: null }))
-      .catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
+      .then(() => { if (!cancelled) setBuildInfo({ ready: true, building: false, progress: null }); })
+      .catch((err) => { if (!cancelled) setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }); });
+    return () => { cancelled = true; };
   }, []);
 
   // Focus input on mount
@@ -154,6 +159,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // before the full search; the suggest box (above) still reacts at 1 char.
     if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Stale-query guard: the engine yields the main thread mid-search, so a
+    // slow older query can resolve AFTER a newer one and silently overwrite
+    // its results (and after unmount, setState into a dead screen). The
+    // cleanup runs on every dep change, marking this effect's in-flight
+    // promise stale — only the latest query's resolution commits.
+    let stale = false;
     debounceRef.current = setTimeout(() => {
       // W0 (micro-gap c): mark the search in-flight so the UI shows a
       // live-region indicator until the engine resolves. Prior results stay
@@ -167,6 +178,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         corpus: settings.searchCorpus || 'all',
         limit: SEARCH_LIMIT
       }).then((r) => {
+        if (stale) return;
         // SRCH4: include the matched synonyms (when synonym search is on) so the
         // snippet highlights the word that actually surfaced the verse.
         const terms = expandSnippetTerms(
@@ -176,10 +188,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         );
         setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length });
       }).catch((err) => {
+        if (stale) return;
         setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0 });
       });
     }, 140);
-    return () => {if (debounceRef.current) clearTimeout(debounceRef.current);};
+    return () => {
+      stale = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
 
   // Handle command-kind parsed results

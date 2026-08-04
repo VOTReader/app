@@ -86,8 +86,15 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     start = snapped.start;
     return { blockKey, start, end, text: fullText.slice(start, end) };
   }, []);
+  // Deferred-capture timer is cleared on unmount — closing the picker within
+  // 150ms of a lift must not commit selection state into a dead component
+  // (the sibling selectionchange effect below already clears its own timer).
+  const captureTimerRef = React.useRef(/** @type {any} */ (null));
+  React.useEffect(() => () => { if (captureTimerRef.current) clearTimeout(captureTimerRef.current); }, []);
   const captureSelection = React.useCallback(() => {
-    setTimeout(function() {
+    if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+    captureTimerRef.current = setTimeout(function() {
+      captureTimerRef.current = null;
       const info = captureSelectionSync();
       if (info) setSelInfo(info);
     }, 150);
