@@ -120,7 +120,7 @@ try {
   await sleep(900);
   await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
-    if (rows[2]) rows[2].click();
+    if (rows[3]) rows[3].click();
   });
   await sleep(600);
   const key2 = await page.evaluate(() => window.__readTrackerMeta && window.__readTrackerMeta.key);
@@ -135,23 +135,42 @@ try {
     return { progress: s.progress || {} };
   });
   console.log('AFTER PARTIAL READ:', JSON.stringify({ key2, progressKeys: Object.keys(result2.progress), entry: result2.progress[key2] }));
+  const partialEntry = result2.progress[key2];
+  const partialCredited = new Set((partialEntry && partialEntry.c) || []);
+  let expectedUnread = null;
+  if (partialEntry) {
+    for (let i = 0; i < partialEntry.b; i++) {
+      if (!partialCredited.has(i)) { expectedUnread = i; break; }
+    }
+  }
 
   // Reopen that same letter. Scroll memory restores the bottom first; the
   // tracker then moves to the first unread block once restoration settles.
   await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
-    if (rows[2]) rows[2].click();
+    if (rows[3]) rows[3].click();
   });
   await sleep(2200);
-  const resume = await page.evaluate((key) => {
-    const sc = [...document.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 100 && e.clientHeight > 300);
-    const blocks = document.querySelectorAll('[data-hl-key]').length;
+  const resume = await page.evaluate((key, expected) => {
+    const sc = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll');
+    const cands = sc ? [...sc.querySelectorAll('[data-hl-key]')].filter((el) => !el.parentElement?.closest('[data-hl-key]')) : [];
+    const blocks = cands.length;
+    const firstUnread = ReadingStatsStore.firstUnreadIndex(key, blocks);
+    const target = expected != null && cands[expected] && sc
+      ? (cands[expected].getBoundingClientRect().top - sc.getBoundingClientRect().top) + sc.scrollTop
+      : -1;
     return {
-      firstUnread: ReadingStatsStore.firstUnreadIndex(key, blocks),
+      keyNow: window.__readTrackerMeta && window.__readTrackerMeta.key,
+      blocks,
+      firstUnread,
+      expectedUnread: expected,
+      progress: ReadingStatsStore.getProgress(key),
       scrollTop: sc ? sc.scrollTop : -1,
       maxTop: sc ? sc.scrollHeight - sc.clientHeight : -1,
+      viewport: sc ? sc.clientHeight : -1,
+      target,
     };
-  }, key2);
+  }, key2, expectedUnread);
   console.log('AFTER FRONTIER RESUME:', JSON.stringify(resume));
 
   // Assertions
@@ -163,7 +182,7 @@ try {
   if (result2.progress[key2] && result2.progress[key2].c.length >= result2.progress[key2].b) fails.push('partial fixture credited every block; resume frontier is useless');
   if (result2.progress[key2] && !(result2.progress[key2].w < result2.progress[key2].tw)) fails.push('word-weighted partial progress missing: ' + JSON.stringify(result2.progress[key2]));
   if (!(resume.firstUnread > 0)) fails.push('no useful first-unread index after reopen: ' + JSON.stringify(resume));
-  if (!(resume.maxTop > 0 && resume.scrollTop < resume.maxTop * 0.75)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
+  if (!(resume.maxTop > 0 && Math.abs(resume.scrollTop - resume.target) <= resume.viewport)) fails.push('frontier did not override bottom scroll restore: ' + JSON.stringify(resume));
   if (result2.progress['v1:volume-one:a-word-of-warning']) fails.push('completed item still has a frontier (should be cleared)');
 
   if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }
