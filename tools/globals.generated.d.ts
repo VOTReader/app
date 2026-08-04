@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 480 distinct identifiers.
+// Total: 484 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -187,6 +187,7 @@ declare const ProphecyCard: any;
 declare const ProphecyCardsStore: any;
 declare const ProphecyExpandToggle: any;
 declare const ProphecyGroup: any;
+declare const RAIL_MIN_WIDTH_PX: any;
 declare const READING_CHAIN: any;
 declare const READING_FONTS: any;
 declare const READING_SCREENS: any;
@@ -317,6 +318,7 @@ declare const bibleHlKey: any;
 declare const bkmId: any;
 declare const blockBoundaryOffsets: any;
 declare const bookCategory: any;
+declare const bookItemsFor: any;
 declare const buildExportPayload: any;
 declare const buildNavIndex: any;
 declare const buildNavTree: any;
@@ -363,6 +365,7 @@ declare const getGardenTier: any;
 declare const getNotesForVerse: any;
 declare const getRecentSearches: any;
 declare const groupBooks: any;
+declare const groupWordStats: any;
 declare const hasAnyPendingStores: any;
 declare const hideToast: any;
 declare const highlightExcerptInDom: any;
@@ -463,6 +466,7 @@ declare const useNav: any;
 declare const useNavHistoryTracking: any;
 declare const useNavigateToLink: any;
 declare const usePersistedState: any;
+declare const useRailMode: any;
 declare const useReadProgress: any;
 declare const useReadTracker: any;
 declare const useReadingChainNav: any;

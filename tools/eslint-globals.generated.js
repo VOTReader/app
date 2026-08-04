@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 480 distinct identifiers.
+// Total: 484 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -186,6 +186,7 @@ export const projectGlobals = {
   ProphecyCardsStore: "readonly",
   ProphecyExpandToggle: "readonly",
   ProphecyGroup: "readonly",
+  RAIL_MIN_WIDTH_PX: "readonly",
   READING_CHAIN: "readonly",
   READING_FONTS: "readonly",
   READING_SCREENS: "readonly",
@@ -316,6 +317,7 @@ export const projectGlobals = {
   bkmId: "readonly",
   blockBoundaryOffsets: "readonly",
   bookCategory: "readonly",
+  bookItemsFor: "readonly",
   buildExportPayload: "readonly",
   buildNavIndex: "readonly",
   buildNavTree: "readonly",
@@ -362,6 +364,7 @@ export const projectGlobals = {
   getNotesForVerse: "readonly",
   getRecentSearches: "readonly",
   groupBooks: "readonly",
+  groupWordStats: "readonly",
   hasAnyPendingStores: "readonly",
   hideToast: "readonly",
   highlightExcerptInDom: "readonly",
@@ -462,6 +465,7 @@ export const projectGlobals = {
   useNavHistoryTracking: "readonly",
   useNavigateToLink: "readonly",
   usePersistedState: "readonly",
+  useRailMode: "readonly",
   useReadProgress: "readonly",
   useReadTracker: "readonly",
   useReadingChainNav: "readonly",

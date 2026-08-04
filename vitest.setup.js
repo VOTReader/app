@@ -27,6 +27,7 @@ import * as React from 'react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
 import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker.js';
+import { useRailMode } from './app/src/main/assets/src/hooks/use-rail-mode.js';
 import { SheetHandle } from './app/src/main/assets/src/ui/components/SheetHandle.jsx';
 
 // (1) React as a global.
@@ -53,6 +54,11 @@ globalThis.SheetHandle = SheetHandle;
 //      wants the detector live just sets the bridge + fake timers
 //      (use-read-tracker.test.js drives it via direct import).
 globalThis.useReadTracker = useReadTracker;
+// (1f) useRailMode — FootnoteSheet/ScriptureSheet call it as a free variable
+//      (2026-08-03 companion rail). The REAL hook: without matchMedia
+//      (jsdom default) it returns false, so every existing sheet test keeps
+//      bottom-sheet modality; rail tests stub matchMedia wide.
+globalThis.useRailMode = useRailMode;
 
 // (2) window.__* bridges. Stub each as a no-op so hook bodies that touch
 //     them at attach time (window.__closeSheet = onClose, etc.) don't

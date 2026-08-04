@@ -109,6 +109,7 @@ import { useSurprise } from '../hooks/use-surprise.js';
 import { useJournalMediaSweep } from '../hooks/use-journal-media-sweep.js';
 import { useRestoreGuard } from '../hooks/use-restore-guard.js';
 import { useReadTracker } from '../hooks/use-read-tracker.js';
+import { useRailMode, RAIL_MIN_WIDTH_PX } from '../hooks/use-rail-mode.js';
 import { useBackupReminder } from '../hooks/use-backup-reminder.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
@@ -219,6 +220,7 @@ Object.assign(window, {
   useJournalMediaSweep,
   useRestoreGuard,
   useReadTracker,
+  useRailMode, RAIL_MIN_WIDTH_PX,
   useBackupReminder,
   useDomAnnotationSync,
   useKeyboardInset,

@@ -1432,6 +1432,35 @@
     .fn-sheet::-webkit-scrollbar-track { background:transparent; }
     .fn-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
     .fn-sheet.open { transform:translateY(0); }
+    /* ── Companion rail (2026-08-03, Sol #4) ──
+       On wide viewports the footnote/scripture sheet docks in the right
+       GUTTER beside the reading column — a non-modal side panel (the JSX
+       drops dialog/aria-modal/backdrop/trap in rail mode; this block only
+       moves the box). Threshold pairs with RAIL_MIN_WIDTH_PX in
+       hooks/use-rail-mode.js (test-pinned) — change BOTH or neither.
+       Placed directly after the base .fn-sheet rules on purpose: same
+       cascade-position discipline as .link-sidebar's column pin. */
+    @media (min-width: 1640px) {
+      .fn-sheet.rail {
+        left: calc(50vw + var(--col-max) / 2 + 16px);
+        right: 16px;
+        max-width: 420px;
+        bottom: auto;
+        top: calc(var(--inset-top, 0px) + 76px);
+        max-height: calc(100vh - var(--inset-top, 0px) - 140px);
+        border: 1px solid var(--gold-border);
+        border-radius: 10px;
+        padding-bottom: 1.25rem;
+        transform: translateX(16px);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s ease, opacity 0.25s ease;
+      }
+      .fn-sheet.rail.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+      /* The grabber pill is a bottom-sheet affordance; the ‹ close button
+         (sheet-handle-back, the single AT stop) carries close in the rail. */
+      .fn-sheet.rail .sheet-handle-grab { display: none; }
+    }
     /* ── SheetHandle (SheetHandle.jsx) — THE shared sheet grabber ──
        (.fn-sheet-handle / .select-sheet-handle / .link-action-handle are
        RETIRED 2026-08-02 — three duplicated cosmetic divs consolidated into
@@ -4469,6 +4498,7 @@
     /* 14-day words-read mini bars — a hero-matching card tucked directly
        under the stat grid. Bars are purely decorative (aria-hidden); the
        accessible summary is the sr-only sentence beside them. */
+    .prg-words-note { color:var(--cream-muted); font-size:0.6rem; letter-spacing:0.04em; }
     .prg-days-wrap {
       width: 100%; max-width: 32.5rem;
       margin: -0.9rem 0 1.8rem;

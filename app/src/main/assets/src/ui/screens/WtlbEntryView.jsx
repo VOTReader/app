@@ -97,6 +97,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
+  const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
 
   React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
 
@@ -430,8 +431,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           (see ScriptureSheet for the full rationale). */}
       {!inert && ReactDOM.createPortal(
       <>
-        <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />
-        <div className={`fn-sheet${scriptureRef ? " open" : ""}`}>
+        {!railMode && <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />}
+        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`}>
           <SheetHandle onClose={() => setScriptureRef(null)} />
           {scriptureRef && (
             <>

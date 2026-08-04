@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
   countReadFor, groupBooks, tallyGroup,
-  annotationSourceForKey, mostAnnotatedSources,
+  annotationSourceForKey, mostAnnotatedSources, groupWordStats,
 } from './progress-stats.js';
 
 /* Every Bible book id the group table dereferences on BOOKS. */
@@ -242,5 +242,39 @@ describe('mostAnnotatedSources', () => {
     };
     expect(mostAnnotatedSources(ann)).toEqual([]);
     expect(mostAnnotatedSources(null)).toEqual([]);
+  });
+});
+
+describe('groupWordStats — words-based progress (2026-08-03)', () => {
+  afterEach(() => {
+    delete /** @type {any} */ (globalThis).countItemWords;
+    delete /** @type {any} */ (globalThis).LETTERS_V1;
+    delete /** @type {any} */ (globalThis).BOOKS;
+  });
+
+  it('weighs read items by words against the group word total', () => {
+    /** @type {any} */ (globalThis).countItemWords = (it) => it.w;
+    /** @type {any} */ (globalThis).LETTERS_V1 = [
+      { id: 'a', w: 100 }, { id: 'b', w: 900 },
+    ];
+    const grp = { id: 'vot', label: 'VOT', genres: [{ label: 'g', books: [{ id: 'volume-one', label: 'Volume One', total: 2 }] }] };
+    // Only the SHORT letter is read: item-count says 50%, words say 10%.
+    const out = groupWordStats({ 'v1:volume-one:a': 1 }, grp);
+    expect(out).toEqual({ wordsRead: 100, wordsTotal: 1000 });
+  });
+
+  it('bible books key chapters by num; unknown books contribute nothing', () => {
+    /** @type {any} */ (globalThis).countItemWords = (it) => it.w;
+    /** @type {any} */ (globalThis).BOOKS = { mark: { chapters: [{ num: 1, w: 10 }, { num: 2, w: 30 }] } };
+    const grp = { id: 'nt', label: 'NT', genres: [{ label: 'g', books: [
+      { id: 'mark', label: 'Mark', total: 2 },
+      { id: 'no-such-book', label: 'Ghost', total: 5 },
+    ] }] };
+    expect(groupWordStats({ 'v1:mark:2': true }, grp)).toEqual({ wordsRead: 30, wordsTotal: 40 });
+  });
+
+  it('degrades to zeros without the counter global (guard path)', () => {
+    const grp = { id: 'x', label: 'X', genres: [{ label: 'g', books: [{ id: 'volume-one', label: 'V1', total: 1 }] }] };
+    expect(groupWordStats({}, grp)).toEqual({ wordsRead: 0, wordsTotal: 0 });
   });
 });

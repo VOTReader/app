@@ -61,7 +61,7 @@ import {
 import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments } from '../utils/note-source.js';
 import {
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
-  countReadFor, groupBooks, tallyGroup,
+  countReadFor, groupBooks, tallyGroup, groupWordStats, bookItemsFor,
   annotationSourceForKey, mostAnnotatedSources,
 } from '../utils/progress-stats.js';
 import { bookCategory } from '../utils/book-category.js';
@@ -212,7 +212,7 @@ Object.assign(window, {
   contentDocToNavItem, buildNavTree,
   _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments,
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
-  countReadFor, groupBooks, tallyGroup,
+  countReadFor, groupBooks, tallyGroup, groupWordStats, bookItemsFor,
   annotationSourceForKey, mostAnnotatedSources,
   bookCategory,
   firstVerseOfRef, parseRefRanges, lastVerseOfFirstRange, echoVersesForRef,

@@ -103,6 +103,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // An inert clone (a swipe peek) must never claim the single __onReadingComplete
   // hook or it would mark a merely-peeked letter as read.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
+  const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
 
   React.useEffect(() => {
     setHighlightedFn(null);
@@ -552,8 +553,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           (see ScriptureSheet for the full rationale). */}
       {ReactDOM.createPortal(
       <>
-        <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} onClick={() => setScripRef(null)} />
-        <div className={`fn-sheet${scripRef ? " open" : ""}`}>
+        {!railMode && <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} onClick={() => setScripRef(null)} />}
+        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`}>
           <SheetHandle onClose={() => setScripRef(null)} />
           {scripRef && (
             <>

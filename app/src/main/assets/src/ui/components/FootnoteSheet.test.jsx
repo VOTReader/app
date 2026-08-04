@@ -88,3 +88,23 @@ it('omits the Go-to-Scripture action when no onGoToRef handler is provided', () 
   render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
   expect(document.querySelector('[data-testid="goto"]')).toBeNull();
 });
+
+/* Companion rail (2026-08-03): on wide viewports the sheet is a NON-modal
+   side panel — complementary role, no aria-modal, no backdrop. The trap +
+   dialog semantics below the threshold are covered by the tests above. */
+it('rail mode drops modality: complementary role, no aria-modal, no backdrop', () => {
+  const listeners = new Set();
+  vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: true,
+    addEventListener: (_t, cb) => listeners.add(cb),
+    removeEventListener: (_t, cb) => listeners.delete(cb),
+  })));
+  try {
+    render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+    const panel = document.querySelector('.fn-sheet');
+    expect(panel.classList.contains('rail')).toBe(true);
+    expect(panel.getAttribute('role')).toBe('complementary');
+    expect(panel.getAttribute('aria-modal')).toBeNull();
+    expect(document.querySelector('.fn-sheet-backdrop')).toBeNull();
+  } finally { vi.unstubAllGlobals(); }
+});

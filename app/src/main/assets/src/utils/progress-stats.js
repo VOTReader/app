@@ -225,6 +225,77 @@ export function tallyGroup(readItems, group) {
   };
 }
 
+/* ── Words-based progress (2026-08-03, brainstorm reconciliation) ─────
+   Item-count progress lies by omission: a 16-word WTLB verse and a
+   5,034-word letter both score 1. These helpers weigh the same groups by
+   WORDS via countItemWords (word-count.js — the app's single counting
+   definition). The item lists mirror buildProgressGroups' sources and the
+   readItems key space (`v1:<bookId>:<letter.id | chapter.num>`). Cost:
+   the first full pass tokenizes the whole library (memoized WeakMap
+   thereafter) — callers MUST run it off the interaction path
+   (requestIdleCallback; see MyProgressScreen). */
+
+/**
+ * The corpus items behind one ProgressBook id, paired with the id each
+ * item uses inside readItems keys. Empty for unknown/unloaded ids.
+ * @param {string} bookId
+ * @returns {Array<{ item: any, key: string | number }>}
+ */
+export function bookItemsFor(bookId) {
+  const L = (arr) => (arr || []).map((it) => ({ item: it, key: it.id }));
+  switch (bookId) {
+    case 'volume-one':   return L(typeof LETTERS_V1 !== 'undefined' ? LETTERS_V1 : null);
+    case 'volume-two':   return L(typeof LETTERS !== 'undefined' ? LETTERS : null);
+    case 'volume-three': return L(typeof LETTERS_V3 !== 'undefined' ? LETTERS_V3 : null);
+    case 'volume-four':  return L(typeof LETTERS_V4 !== 'undefined' ? LETTERS_V4 : null);
+    case 'volume-five':  return L(typeof LETTERS_V5 !== 'undefined' ? LETTERS_V5 : null);
+    case 'volume-six':   return L(typeof LETTERS_V6 !== 'undefined' ? LETTERS_V6 : null);
+    case 'volume-seven': return L(typeof LETTERS_V7 !== 'undefined' ? LETTERS_V7 : null);
+    case 'letters-timothy': return L(typeof LETTERS_TIMOTHY !== 'undefined' ? LETTERS_TIMOTHY : null);
+    case 'little-flock': {
+      const arr = L(typeof LETTERS_FLOCK !== 'undefined' ? LETTERS_FLOCK : null);
+      if (typeof LETTERS_FLOCK_PREFACE !== 'undefined' && LETTERS_FLOCK_PREFACE) arr.push({ item: LETTERS_FLOCK_PREFACE, key: LETTERS_FLOCK_PREFACE.id });
+      return arr;
+    }
+    case 'lords-rebuke': {
+      const arr = L(typeof LETTERS_REBUKE !== 'undefined' ? LETTERS_REBUKE : null);
+      if (typeof LETTERS_REBUKE_PREFACE !== 'undefined' && LETTERS_REBUKE_PREFACE) arr.push({ item: LETTERS_REBUKE_PREFACE, key: LETTERS_REBUKE_PREFACE.id });
+      return arr;
+    }
+    case 'wtlb-one':  return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('wtlb1')) : null);
+    case 'wtlb-two':  return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('wtlb2')) : null);
+    case 'the-blessed': return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('blessed')) : null);
+    case 'holy-days': return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('holydays')) : null);
+    default: {
+      // Bible-book ids (incl. matthew-plain): chapters keyed by num.
+      const book = (typeof BOOKS !== 'undefined' && BOOKS) ? BOOKS[bookId] : null;
+      if (book && Array.isArray(book.chapters)) return book.chapters.map((ch) => ({ item: ch, key: ch.num }));
+      return [];
+    }
+  }
+}
+
+/**
+ * Words read / words total for one progress group. Heavy on FIRST call
+ * (full-library tokenization) — run via requestIdleCallback.
+ *
+ * @param {Record<string, any> | null | undefined} readItems
+ * @param {ProgressGroup} group
+ * @returns {{ wordsRead: number, wordsTotal: number }}
+ */
+export function groupWordStats(readItems, group) {
+  if (typeof countItemWords !== 'function') return { wordsRead: 0, wordsTotal: 0 };
+  let wordsRead = 0, wordsTotal = 0;
+  for (const b of groupBooks(group)) {
+    for (const { item, key } of bookItemsFor(b.id)) {
+      const w = countItemWords(item);
+      wordsTotal += w;
+      if (readItems && readItems[`${READ_VERSION_ID}:${b.id}:${key}`]) wordsRead += w;
+    }
+  }
+  return { wordsRead, wordsTotal };
+}
+
 /**
  * True when the id belongs to Hidden Manna — the one collection that
  * must never surface in a public list (owner policy). Registry-driven:

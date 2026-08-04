@@ -4,7 +4,11 @@
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;
-  const trapRef = useFocusTrap(isOpen);
+  // Companion rail (2026-08-03): on wide viewports the sheet docks in the
+  // right gutter as a NON-modal panel — no trap, no backdrop, complementary
+  // role. Bottom-sheet modality is unchanged below the rail threshold.
+  const rail = useRailMode();
+  const trapRef = useFocusTrap(isOpen && !rail);
   // SC5: fall back to the global BOOKS corpus when this letter's own nkjv dict
   // doesn't carry the ref — the inline ref sheet (LetterView) already does this;
   // the data gate is a backstop, not the sole source.
@@ -28,8 +32,8 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   // ScriptureSheet for the full rationale).
   return ReactDOM.createPortal(
     <>
-      <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />
-      <div className={`fn-sheet${isOpen ? ' open' : ''}`} ref={trapRef} role="dialog" aria-modal={isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
+      {!rail && <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />}
+      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
         <SheetHandle onClose={onClose} />
         {fn && (
           <>

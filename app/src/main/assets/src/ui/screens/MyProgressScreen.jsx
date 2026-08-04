@@ -32,6 +32,13 @@ export function _fmtWords(n) {
   return v.toLocaleString('en-US');
 }
 
+/** "3h 24m" / "48 min" — lifetime reading-time display. @param {number} ms */
+export function _fmtDuration(ms) {
+  const min = Math.round(Math.max(0, ms || 0) / 60000);
+  if (min < 60) return min + ' min';
+  return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
+}
+
 export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
   // The reading table + most-annotated titles read the lazy corpora
   // (BOOKS for NT/OT totals, VOT for volume totals + letter titles,
@@ -147,6 +154,33 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     return Object.keys(seen).length;
   })();
   const groups = buildProgressGroups();
+  // Words-based bars (2026-08-03): item counts lie by omission (a 16-word
+  // verse and a 5,034-word letter both score 1), so the bar FILL weighs
+  // words. The first full pass tokenizes the library — deferred to idle so
+  // opening Progress never janks; bars upgrade in place when ready.
+  const [wordStats, setWordStats] = React.useState(/** @type {any} */ (null));
+  React.useEffect(() => {
+    if (groups.length === 0 || typeof groupWordStats !== 'function') return undefined;
+    let cancelled = false;
+    const compute = () => {
+      const out = {};
+      for (const g of groups) { out[g.id] = groupWordStats(readItems, g); }
+      if (!cancelled) setWordStats(out);
+    };
+    const tok = (typeof requestIdleCallback === 'function')
+      ? requestIdleCallback(compute, { timeout: 3000 })
+      : setTimeout(compute, 50);
+    return () => {
+      cancelled = true;
+      if (typeof cancelIdleCallback === 'function' && typeof tok === 'number') cancelIdleCallback(tok);
+      else clearTimeout(/** @type {any} */ (tok));
+    };
+    // readItems identity changes on every mark; groups length flips once per
+    // corpus load — both are the correct recompute triggers. `groups` itself
+    // is rebuilt every render (same content), so depending on its identity
+    // would re-tokenize the library per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [groups.length, readItems]);
   const topSources = mostAnnotatedSources(annData, 5);
   const markAsReadOn = !settings || settings.markAsRead !== false;
 
@@ -179,6 +213,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     // Re-reads only appear once one exists — a zero here would just be noise.
     ...(readingStats && readingStats.rereads > 0
       ? [{ num: readingStats.rereads, label: 'Re-reads', sub: readingStats.rereads === 1 ? 'letter or chapter revisited' : 'letters & chapters revisited' }] : []),
+    // Lifetime reading time — the ledger's visibility-honest activeMs sum.
+    ...(readingStats && readingStats.totalActiveMs > 60000
+      ? [{ num: _fmtDuration(readingStats.totalActiveMs), label: 'Reading Time', sub: 'time actually spent reading' }] : []),
   ];
   const libraryRows = [
     { label: 'Notes', count: noteCount },
@@ -236,12 +273,20 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
               groups.map((grp) => {
                 const t = tallyGroup(readItems, grp);
                 if (t.total === 0) return null;
-                const pct = Math.min(100, Math.round((t.read / t.total) * 100));
+                const w = wordStats && wordStats[grp.id];
+                // Bar fill weighs WORDS once computed; item fraction until then.
+                const frac = (w && w.wordsTotal > 0) ? w.wordsRead / w.wordsTotal : t.read / t.total;
+                const pct = Math.min(100, Math.round(frac * 100));
                 return (
                   <div key={grp.id} className="prg-row">
                     <div className="prg-row-head">
                       <span className="prg-row-label">{grp.label}</span>
-                      <span className="prg-row-tally">{t.read} / {t.total}</span>
+                      <span className="prg-row-tally">
+                        {t.read} / {t.total}
+                        {w && w.wordsTotal > 0 && (
+                          <span className="prg-words-note">{' · '}{_fmtWords(w.wordsRead)} / {_fmtWords(w.wordsTotal)} words</span>
+                        )}
+                      </span>
                     </div>
                     <div className="prg-bar" aria-hidden="true">
                       <div className="prg-bar-fill" style={{ width: pct + '%' }} />
