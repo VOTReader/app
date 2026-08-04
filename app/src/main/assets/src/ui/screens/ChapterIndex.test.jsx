@@ -13,7 +13,7 @@
        decoupling is pinned here.
 */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { ChapterIndex } from './ChapterIndex.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
@@ -39,6 +39,7 @@ function setupGlobals() {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   GLOBALS.forEach((k) => { delete globalThis[k]; });
 });
 
@@ -94,6 +95,17 @@ describe('ChapterIndex — current-chapter marker', () => {
     expect(cards[1].className).toContain('is-current');
     expect(cards[0].className).not.toContain('is-current');
     expect(cards[2].className).not.toContain('is-current');
+  });
+
+  it('cancels the delayed current-card scroll when navigation unmounts the index', () => {
+    vi.useFakeTimers();
+    setupGlobals();
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const view = renderIndex({ currentChapter: 2 });
+    view.unmount();
+    expect(() => vi.runAllTimers()).not.toThrow();
+    expect(scrollSpy).not.toHaveBeenCalled();
+    scrollSpy.mockRestore();
   });
 });
 

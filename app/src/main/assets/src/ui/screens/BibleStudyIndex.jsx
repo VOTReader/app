@@ -17,9 +17,11 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
 
   // Scroll current chapter into view after expand
   React.useEffect(() => {
-    if (currentRef.current) {
-      setTimeout(() => currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" }), 180);
-    }
+    if (!currentRef.current) return undefined;
+    const timer = setTimeout(() => {
+      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => clearTimeout(timer);
   }, [expandedPart]);
 
   const resolveChapter = (cid) => (study.chapters || []).find((c) => c.id === cid);

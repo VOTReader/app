@@ -5,9 +5,11 @@
 export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
-    if (currentRef.current) {
-      setTimeout(() => currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
-    }
+    if (!currentRef.current) return undefined;
+    const timer = setTimeout(() => {
+      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(timer);
   }, []);
   // Restored-Name chrome lookup for the chapter cards. When restoredNames
   // is on, show the restored chapter title; otherwise fall back to the
