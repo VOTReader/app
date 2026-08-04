@@ -2496,6 +2496,7 @@
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* Estimated reading time — quiet, right-aligned, never wraps or
        pushes the title (info is flex:1; the chip pins to the row end). */
+    .idx-min-chip.in-progress { color:var(--gold); opacity:0.9; }
     .idx-min-chip {
       margin-left:auto; flex-shrink:0; white-space:nowrap; align-self:center;
       font-family:var(--font-body); font-style:italic;

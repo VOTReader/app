@@ -14,7 +14,7 @@ export function ReadCheck({ count }) {
   );
 }
 
-export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, markAsReadEnabled, columns }) {
+export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -27,9 +27,25 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
   // rows only: the two-col cards are centered compact stacks with no row end
   // to pin a chip to.
   const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
-  const minChip = (item) => {
+  // Smart-resume chip ([26], 2026-08-03): an IN-PROGRESS item (the tracker
+  // left a frontier) shows how far in and what remains — "62% · ~2 min left" —
+  // instead of the cold total. progressKeyFor threads the SAME v1:<bid>:<cid>
+  // key the tracker records under; absent (legacy caller) → cold chip only.
+  const minChip = (item, itemId) => {
     if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
-    const m = readingMinutes(countItemWords(item), _wpm);
+    const words = countItemWords(item);
+    if (words <= 0) return null;
+    if (itemId != null && progressKeyFor
+        && typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.getProgress === 'function') {
+      let p = null;
+      try { p = ReadingStatsStore.getProgress(progressKeyFor(itemId)); } catch (_e) { /* stats optional */ }
+      if (p && p.b > 0 && p.c && p.c.length > 0 && p.c.length < p.b) {
+        const pct = Math.min(99, Math.round(p.c.length / p.b * 100));
+        const left = readingMinutes(Math.round(words * (1 - p.c.length / p.b)), _wpm);
+        return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
+      }
+    }
+    const m = readingMinutes(words, _wpm);
     return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
   };
   return (
@@ -59,7 +75,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
               <div className="chapter-card-label">Preface</div>
               <div className="chapter-card-title">{preface.title}</div>
             </div>
-            {minChip(preface)}
+            {minChip(preface, preface.id)}
             {markAsReadEnabled && isRead(preface.id) && (
               <ReadCheck count={readCount ? readCount(preface.id) : 1} />
             )}
@@ -96,7 +112,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
                 <div className="chapter-card-label">{letter.date}</div>
                 <div className="chapter-card-title">{letter.title}</div>
               </div>
-              {minChip(letter)}
+              {minChip(letter, letter.id)}
               {markAsReadEnabled && isRead(letter.id) && (
                 <ReadCheck count={readCount ? readCount(letter.id) : 1} />
               )}

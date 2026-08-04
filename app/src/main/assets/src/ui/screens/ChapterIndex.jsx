@@ -2,7 +2,7 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, restoredNames, showChapterTitle }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -30,9 +30,22 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // Counts the BASE book text (word-count.js contract); hidden when the
   // counters are absent or the chapter shape yields no words.
   const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
+  // Smart-resume ([26]): an in-progress chapter shows "N% · ~M min left"
+  // (frontier via progressKeyFor — the tracker's v1:<bid>:<cid> key space).
   const minChip = (ch) => {
     if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
-    const m = readingMinutes(countItemWords(ch), _wpm);
+    const words = countItemWords(ch);
+    if (words <= 0) return null;
+    if (progressKeyFor && typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.getProgress === 'function') {
+      let p = null;
+      try { p = ReadingStatsStore.getProgress(progressKeyFor(ch.num)); } catch (_e) { /* stats optional */ }
+      if (p && p.b > 0 && p.c && p.c.length > 0 && p.c.length < p.b) {
+        const pct = Math.min(99, Math.round(p.c.length / p.b * 100));
+        const left = readingMinutes(Math.round(words * (1 - p.c.length / p.b)), _wpm);
+        return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
+      }
+    }
+    const m = readingMinutes(words, _wpm);
     return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
   };
   return (
