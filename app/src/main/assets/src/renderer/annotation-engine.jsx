@@ -28,6 +28,11 @@
      single-block prose React owns.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Same-cluster ES import (esbuild bundles cluster C from _entry.js). Every
+   CROSS-cluster dep here is still a bare global by design; this one is
+   internal to the renderer, so it stays a real import. */
+import { resolveAnchor } from './anchor-resolve.js';
+
 /* Snap an annotation's range to whole WORDS — so a highlight/underline/note never
    lands mid-word, and never swallows the trailing comma/colon/period the drag
    overshot. Both endpoints are treated symmetrically:
@@ -216,6 +221,11 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
     else if (kind === 'squiggle') cls += ' hl-squiggle';
   }
   cls += (!suppress && color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
+  // An annotation whose exact words aren't in THIS translation, kept over the
+  // whole verse so the reader's note stays reachable (see HighlightableText).
+  // A dotted hairline says "your note is anchored somewhere in this verse"
+  // without pretending to be the highlight they actually drew.
+  if (ann._approx) cls += ' hl-approx';
   if (hasNote) {
     cls += ' hl-note';
     if (isFirst) cls += ' first-segment';
@@ -313,10 +323,40 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
   if (!annotations || annotations.length === 0) {
     return <span data-hl-key={hlKey}>{text}</span>;
   }
-  // Clamp ranges to text bounds and drop empties
+  // Re-anchor onto the text that is actually on screen, THEN clamp.
+  //
+  // A verse's hlKey says nothing about which rendering was marked: the text
+  // under it changes with settings.translation and settings.restoredNames,
+  // while the annotation holds character offsets into whatever was on screen
+  // when the reader made it. Painting stored offsets blind puts the mark on
+  // the wrong words — measured live: a highlight of "should not perish" in
+  // NKJV John 3:16 paints "him should not pe" under KJV and "who is
+  // believing " under YLT. resolveAnchor finds the recorded text again
+  // (verify → exact → punctuation-insensitive) and returns null when this
+  // rendering genuinely doesn't contain it, in which case the mark is SKIPPED
+  // rather than painted somewhere false. The stored record is never modified,
+  // so switching back restores it exactly. See renderer/anchor-resolve.js.
   const valid = annotations
-    .map(a => ({ ann: a, s: Math.max(0, Math.min(a.start, text.length)), e: Math.max(0, Math.min(a.end, text.length)) }))
-    .filter(v => v.s < v.e);
+    .map(a => {
+      const at = resolveAnchor(text, a);
+      if (at) return { ann: a, s: Math.max(0, Math.min(at.start, text.length)), e: Math.max(0, Math.min(at.end, text.length)) };
+      // Not placeable in THIS rendering. A bare highlight has nothing to lose,
+      // so it is skipped rather than painted over words the reader never
+      // marked. A mark carrying the reader's own NOTE is different: dropping
+      // it would take the note icon with it and leave text the user wrote
+      // unreachable until they found the original translation again. Keep
+      // those anchored to the whole verse with the paint blanked — same
+      // primitive the overlap-suppression path uses — so the icon still
+      // renders and the note stays one tap away.
+      const hasNote = a.kind === 'note' ||
+        (typeof NoteStore !== 'undefined' && !!NoteStore.get(a.groupId));
+      if (!hasNote) return null;
+      // color:'blank' also keeps the overlap model coherent for free —
+      // annVisible() is false for blank, so this whole-verse band can never
+      // suppress a real annotation underneath it.
+      return { ann: { ...a, kind: 'highlight', color: 'blank', _approx: 1 }, s: 0, e: text.length };
+    })
+    .filter(v => v && v.s < v.e);
   if (valid.length === 0) {
     return <span data-hl-key={hlKey}>{text}</span>;
   }

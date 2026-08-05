@@ -31,6 +31,14 @@
    Day semantics reuse _jrnDateStr (local-timezone calendar dates),
    matching JournalStats + ReadingStreak so all three "day" concepts
    agree across midnight.
+
+   EVERY mutation calls _save() AND _bump() (CachedStore's contract).
+   Until 2026-08-04 only replaceAll bumped, so getVersion() sat frozen
+   through completions, pace samples and frontier writes — and both
+   subscribers (MyProgressScreen.jsx:118, SettingsScreen.jsx:405) read
+   this store through useSyncExternalStore(subscribe, getVersion). An open
+   stats screen therefore showed stale numbers no matter how much the
+   reader read; you only saw the truth by navigating away and back.
    ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -160,6 +168,7 @@ export var ReadingStatsStore = extendStore(
         delete data.progress[args.key];
       }
       this._save();
+      this._bump();
     },
 
     /**
@@ -208,6 +217,7 @@ export var ReadingStatsStore = extendStore(
         for (var k = 0; k < keys.length - MAX_PROGRESS_ITEMS; k++) delete map[keys[k]];
       }
       this._save();
+      this._bump();
     },
 
     /**
@@ -252,6 +262,7 @@ export var ReadingStatsStore = extendStore(
       if (data.progress && data.progress[key]) {
         delete data.progress[key];
         this._save();
+        this._bump();
       }
     },
 
@@ -272,7 +283,7 @@ export var ReadingStatsStore = extendStore(
       Object.keys(map).forEach(function(key) {
         if (key.indexOf(prefix) === 0) { delete map[key]; changed = true; }
       });
-      if (changed) this._save();
+      if (changed) { this._save(); this._bump(); }
     },
 
     /**
@@ -317,6 +328,7 @@ export var ReadingStatsStore = extendStore(
       samples.push({ w: words, ms: ms });
       if (samples.length > MAX_WPM_SAMPLES) samples.splice(0, samples.length - MAX_WPM_SAMPLES);
       this._save();
+      this._bump();
     },
 
     /**

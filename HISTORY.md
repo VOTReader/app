@@ -65,6 +65,32 @@ The race class is the one the History bug belonged to: an **effect that reads a 
 
 **Verdict on lazy loading: keep it — measured, not assumed.** Boot path (a+b+c+d) is **960 KB → DOMContentLoaded at 65 ms**; `bundle-a-vot` (2,144 KB) starts at 79 ms and `bundle-a-bible` (4,878 KB) at 123 ms, i.e. *after* interactive; `bundle-a-matthew` (481 KB) only on demand. Laziness keeps ~7.5 MB off the first-paint path and costs ~60 ms of deferral on desktop — and a mid-range Android WebView parses several times slower, which is the environment the boot budget exists for. Worth naming honestly: `HomeScreen` pre-warms the Bible corpus for Surprise, so this is **deferral, not avoidance** — the win is the paint, not the traffic.
 
+### 2026-08-04 (session 5) — Highlights survive a translation change
+
+**The defect (owner-raised via Luna's "same-key content identity" risk, then measured live).** A Bible verse annotation is anchored by `bibleHlKey(bookId, chapter, verse)` — which says nothing about WHICH rendering was marked — while the record itself is character offsets `{start, end}` into whatever text was on screen. The text under that key changes with `settings.translation` (10 options). So the offsets silently describe different words. Measured in the running app, NKJV John 3:16, a highlight of **"should not perish"** at offsets 92–109:
+
+| rendering | painted at the stored offsets |
+|---|---|
+| NKJV | `should not perish` ✓ |
+| KJV | `him should not pe` — shifted 4, cut mid-word |
+| YLT | `who is believing ` — unrelated text entirely |
+
+The subtlest case is the restored-Name editions this app's reader has every reason to choose: NKJV-R renders 1 Corinthians 12:3 as "…calls **YahuShua**…" instead of "…calls **Jesus**…" — six characters longer, twice in the verse, so everything after shifts by six or twelve.
+
+**Scope, verified rather than assumed** (a recon agent corrected my first reading here): `settings.restoredNames` is **not** part of this — it swaps chapter titles and section headings only, never verse text (`BibleChapterView.jsx:12-19`). Link and bookmark icons are key-only, no offsets (`LinkIcon.jsx`, `BookmarkIcon.jsx`), so they were never exposed. Letters/WTLB/journal go through the imperative DOM path over text that does not vary. **Verse highlights, underlines and notes were the whole blast radius.**
+
+**The fix — `src/renderer/anchor-resolve.js`.** Every annotation already stores `text`, the exact string the reader selected (`SelectionToolbar`'s `hlDisplayText`), which is enough to find the passage again. `resolveAnchor(text, ann)` works in three tiers: **verify** (`text.slice(start,end) === ann.text` → stored offsets still good; one compare, the only cost on a normal render), **exact** (search the stored text; on a repeat, take the occurrence nearest the original offset), **loose** (search again ignoring case, punctuation and whitespace runs — this is what absorbs a translation's added commas — then map back to raw offsets). No tier matches ⇒ `null`, and the mark is **skipped rather than painted somewhere false**.
+
+**The stored record is never rewritten.** Those offsets are correct for the translation they were made in; rewriting them to match whatever is on screen would corrupt the original anchor. Resolution happens at render only, so switching back is byte-exact.
+
+**Notes are treated differently, deliberately.** A bare highlight that cannot be anchored has nothing to lose, so it is dropped. A mark carrying the reader's own NOTE would take its icon with it and leave text the user *wrote* unreachable — so those are kept over the whole verse with the paint blanked, reusing the same `hl-blank` primitive the overlap-suppression path already uses. The icon still renders; the note stays one tap away.
+
+**Verified end to end in the running app**, driving the real Settings picker: seed a highlight on John 3:16 in NKJV → paints `should not perish`; switch to **KJV** → text becomes "the world**,** that **he** gave **his**…" and the highlight still paints `should not perish`; switch to **YLT** → text restructures and the mark paints **nothing** rather than landing on "who is believing "; switch back to **NKJV** → `should not perish` again. 14 unit tests use those exact measured strings as fixtures.
+
+**Also fixed — a live defect recon turned up on the way.** `reading-stats-store.js` called `_save()` at six sites but `_bump()` at only one (`replaceAll`). CachedStore's contract is "`_bump()` AFTER `_save()`", and **both** subscribers — `MyProgressScreen.jsx:118` and `SettingsScreen.jsx:405` — read the store through `useSyncExternalStore(subscribe, getVersion)`. So `getVersion()` sat frozen through completions, pace samples and frontier writes: an open stats screen showed stale numbers no matter how much the reader read, and only told the truth after navigating away and back. RED-proven, then fixed at all six sites (the conditional one only bumps when it actually saved).
+
+**Gates:** 3,382 vitest / 189 files, lint 0, tsc, build (SW `v1.0.2-52e4148cbc`), smoke:ci desktop + 360×800.
+
 ### 2026-08-04 (session 3) — Owner retirements: backup reminder + frontier resume
 
 **Scope:** two owner-directed removals. Both features were built to spec earlier; the owner used them and didn't want them. Removed at the root, not disabled behind a flag.

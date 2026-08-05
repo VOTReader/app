@@ -3179,6 +3179,13 @@
     .hl-squiggle.hl-brown   { text-decoration-color: var(--hl-brown); }
     .hl-squiggle.hl-gray    { text-decoration-color: var(--hl-gray); }
     .hl-squiggle.hl-cyan    { text-decoration-color: var(--hl-teal); }
+    /* An annotation carrying the reader's own NOTE whose exact words don't
+       exist in the translation now on screen. The mark is kept over the whole
+       verse (paint blanked) so the note icon still renders and the note stays
+       one tap away; this hairline makes that state visible instead of leaving
+       an invisible tap target. Sits on an .hl-blank mark, so there is no
+       background to fight and no !important needed. */
+    .hl-approx { text-decoration: underline dotted var(--gold-dim); text-decoration-thickness: 1px; text-underline-offset: 3px; }
     .verse-text { position: relative; }
 
     /* ══════════════════════════════════════════════════════════════

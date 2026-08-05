@@ -170,6 +170,29 @@ describe('replaceAll (backup restore path)', () => {
     expect(p.nanBlocks).toBeUndefined();
   });
 
+  /* Every subscriber (MyProgressScreen.jsx:118, SettingsScreen.jsx:405) reads
+     this store through useSyncExternalStore(subscribe, getVersion). CachedStore's
+     contract is "_bump() AFTER _save()" — a mutation that saves without bumping
+     leaves getVersion() frozen, so an open stats screen keeps showing stale
+     numbers no matter how much the reader reads. */
+  it('bumps the version on every mutation, so subscribed screens re-render', () => {
+    const v0 = ReadingStatsStore.getVersion();
+    ReadingStatsStore.recordCompletion({ words: 100, activeMs: 60000, key: 'k1' });
+    const v1 = ReadingStatsStore.getVersion();
+    expect(v1).toBeGreaterThan(v0);
+
+    ReadingStatsStore.recordPaceSample({ words: 500, activeMs: 120000, requiredMs: 50000 });
+    const v2 = ReadingStatsStore.getVersion();
+    expect(v2).toBeGreaterThan(v1);
+
+    ReadingStatsStore.recordProgress('k2', 4, [0, 1], [10, 10, 10, 10]);
+    const v3 = ReadingStatsStore.getVersion();
+    expect(v3).toBeGreaterThan(v2);
+
+    ReadingStatsStore.clearProgress('k2');
+    expect(ReadingStatsStore.getVersion()).toBeGreaterThan(v3);
+  });
+
   it('survives garbage payloads (null, arrays, wrong types)', () => {
     ReadingStatsStore.replaceAll(null);
     expect(ReadingStatsStore.get().totalWordsRead).toBe(0);
