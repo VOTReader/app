@@ -94,7 +94,15 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
-      placeKey={(book && book.id) + '-' + (chapter && chapter.num)}
+      /* placeKey is the VISIT identity: useReadTracker resets its whole
+         measurement on a change, and AutoScrollControl re-measures
+         words-per-line. Translation and restored-names both swap the verse
+         text under identical data-hl-keys while the chapter stays mounted
+         (Settings is reachable without leaving), so leaving them out left
+         required dwell, coverage weights, frontier weights, and the displayed
+         WPM describing the PREVIOUS translation. They are part of the
+         identity of what is on screen. */
+      placeKey={(book && book.id) + '-' + (chapter && chapter.num) + '-' + (translation || 'nkjv') + (restoredNames ? '-r' : '')}
       stickyNav={<StickyChapterNav
         onPrev={goPrevCh}
         onNext={goNextCh}

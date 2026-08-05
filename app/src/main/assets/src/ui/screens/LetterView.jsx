@@ -304,11 +304,16 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
         {letter.sectionIntro && letter.sectionIntro.length > 0 && (
           <div className="section-intro-quote">
+            {/* data-read-seg (NOT data-hl-key): this prose renders in the
+                reading flow and countItemWords counts it, so the read
+                detector has to see it — but it is not annotatable, and
+                giving it an annotation key would silently widen that
+                surface. See use-read-tracker.js's candidates(). */}
             {letter.sectionIntro.map((block, si) => {
-              if (block.type === "heading") return <h3 key={si} className="section-intro-heading">{block.text}</h3>;
+              if (block.type === "heading") return <h3 key={si} className="section-intro-heading" data-read-seg={"intro-h:" + si}>{block.text}</h3>;
               if (!block.segments) return null;
               return (
-                <p key={si} className="section-intro-text">
+                <p key={si} className="section-intro-text" data-read-seg={"intro-p:" + si}>
                   <Segments segments={block.segments} {...fnProps} />
                 </p>
               );

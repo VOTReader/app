@@ -208,6 +208,15 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   const unmarkRead = (bid, cid) => {
     const key = getReadKey(bid, cid);
     setReadItems((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    // Symmetric with markRead's manual claim, which clears the frontier:
+    // "I haven't read this" must not leave a stale partial-read record
+    // behind for the same key. Every other reset path (clearAllProgress,
+    // clearReadForBook, a verified completion) already clears one; this
+    // was the single hole.
+    if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
+      try { ReadingStatsStore.clearProgress(key); }
+      catch (e) { console.warn('reading-stats frontier clear failed', e); }
+    }
   };
 
   const clearAllProgress = () => {

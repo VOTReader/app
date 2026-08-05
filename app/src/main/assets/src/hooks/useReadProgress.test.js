@@ -185,6 +185,30 @@ describe('useReadProgress — unmarkRead', () => {
     expect(result.current.readItems).toEqual({});
   });
 
+  it('clears the matching reading frontier too (symmetric with a manual mark)', () => {
+    /* Every other reset path already clears one; unmark was the hole, so
+       "I haven't read this" could leave a stale partial-read record behind
+       for the same key. */
+    const clearProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { clearProgress };
+    const { result } = setup({ savedReadItems: { 'v1:matthew:5': 1 } });
+    act(() => { result.current.unmarkRead('matthew', 5); });
+    expect(clearProgress).toHaveBeenCalledWith('v1:matthew:5');
+    delete (/** @type {any} */ (globalThis).ReadingStatsStore);
+  });
+
+  it('survives a ReadingStatsStore that throws (unmark still removes the key)', () => {
+    /** @type {any} */ (globalThis).ReadingStatsStore = {
+      clearProgress: () => { throw new Error('idb down'); },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { result } = setup({ savedReadItems: { 'v1:matthew:5': 1 } });
+    act(() => { result.current.unmarkRead('matthew', 5); });
+    expect(result.current.isRead('matthew', 5)).toBe(false);
+    warn.mockRestore();
+    delete (/** @type {any} */ (globalThis).ReadingStatsStore);
+  });
+
   it('produces a new object reference (immutable update)', () => {
     const { result } = setup({ savedReadItems: { 'v1:matthew:5': true } });
     const before = result.current.readItems;

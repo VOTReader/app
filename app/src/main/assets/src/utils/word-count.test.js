@@ -47,6 +47,21 @@ describe('countItemWords — Format A (letters)', () => {
   it('includes sectionIntro prose when present', () => {
     expect(countItemWords({ blocks: [], sectionIntro: 'a dream of a coming storm' })).toBe(6);
   });
+  /* PRODUCTION shape: every real sectionIntro in the corpus (volume-seven
+     "Recompense" + 14 bible-studies chapters) is an ARRAY of blocks, not a
+     string. String-coercing it counted the two words of "[object Object]"
+     instead of the prose — thousands of words missing from the minute chips,
+     word-weighted progress, and the corpus baseline. */
+  it('counts an ARRAY sectionIntro as blocks — the shape the corpus actually uses', () => {
+    expect(countItemWords({
+      blocks: [],
+      sectionIntro: [
+        { type: 'heading', text: 'A Dream of a Coming Storm' },        // 6
+        { type: 'para', segments: [{ t: 'text', v: 'I saw a storm coming' }] }, // 5
+        { type: 'para', segments: [{ t: 'text', v: 'then three tornadoes' }, { t: 'fn', v: '1' }] }, // 3
+      ],
+    })).toBe(14);
+  });
 });
 
 describe('countItemWords — Format B (WTLB/Blessed)', () => {
@@ -59,11 +74,16 @@ describe('countItemWords — Format B (WTLB/Blessed)', () => {
 });
 
 describe('countItemWords — bible chapters', () => {
-  it('sums verses + section headings (nested Format C)', () => {
+  /* Section headings are CHROME, not reading content: the reader can switch
+     them off (settings.showSectionHeadings) or tap to hide them, and they
+     carry no data-hl-key so the read detector never measures them. Counting
+     them here would make this data-derived total permanently disagree with
+     the DOM-derived one, in a way the data side cannot resolve. */
+  it('sums verses and EXCLUDES section headings (nested Format C)', () => {
     expect(countItemWords({ num: 1, sections: [
-      { heading: 'The Beatitudes', verses: [{ n: 1, text: 'Blessed are the poor' }] }, // 2 + 4
+      { heading: 'The Beatitudes', verses: [{ n: 1, text: 'Blessed are the poor' }] }, // 4 (heading not counted)
       { verses: [{ n: 2, text: 'for theirs is' }] },                                    // 3
-    ] })).toBe(9);
+    ] })).toBe(7);
   });
   it('sums flat Matthew-shape verses', () => {
     expect(countItemWords({ num: 1, verses: [{ n: 1, text: 'The book of' }, { n: 2, text: 'the genealogy' }] })).toBe(5);

@@ -432,6 +432,26 @@ describe('end of page', () => {
     ctrl.destroy();
   });
 
+  it('applies the minimum time-on-page to the FIRST page too (clock not at zero)', () => {
+    /* start() runs through beginRunning(), which used to leave pageStartedAt
+       at its 0 initializer while resetForPage() stamped it for every
+       auto-advanced page. armDwell() then measured the floor's remainder from
+       epoch zero — hugely negative — so page ONE skipped MIN_PAGE_MS entirely
+       and a short/unscrollable first page chained onward instantly at dwell 0.
+       Every other test starts the fake clock at 0, which hides it. */
+    const { io, state } = makeIo();
+    state.t = 5000;                 // a real session's clock is never at zero
+    state.autoNext = true;
+    state.endDwell = 0;             // no dwell — only the 4s floor can hold it
+    state.el = makeEl({ scrollHeight: 400, clientHeight: 800, endTop: 200 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 5);
+    expect(ctrl.getState().state).toBe('enddwell');
+    expect(ctrl.getState().advanceAt).toBe(5000 + 4000);
+    ctrl.destroy();
+  });
+
   it('ignores a dwell change when no countdown is armed', () => {
     const { io, state } = makeIo();
     const ctrl = createAutoScroll(io);

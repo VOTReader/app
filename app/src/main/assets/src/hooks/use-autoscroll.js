@@ -357,6 +357,14 @@ export function createAutoScroll(io) {
     lastWritten = pos;
     lastTs = null;
     refreshMetrics(el, true);
+    // The FIRST page needs its clock started here too. resetForPage() stamps
+    // this for every auto-advanced page, but start() comes through
+    // beginRunning(), which left pageStartedAt at its 0 initializer — so
+    // armDwell()'s minimum-page-time remainder was measured from epoch zero
+    // (hugely negative) and the MIN_PAGE_MS floor silently didn't apply to
+    // page one. A short/unscrollable first page could chain onward
+    // immediately at dwell 0.
+    pageStartedAt = io.now();
     gainTarget = 1;
     if (io.reducedMotion()) gain = 1;
     setState('running');

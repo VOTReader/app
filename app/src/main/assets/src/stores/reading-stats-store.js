@@ -20,10 +20,13 @@
        display surfaces use instead of a 230-wpm guess.
      - progress — readKey → { b: blockCount, c: credited segment
        indices, t: last-touch ts }. The per-item reading FRONTIER for
-       in-progress items: powers resume-at-first-unread-paragraph
-       (and, later, the held per-letter skim indicator). LRU-bounded
-       to 50 in-progress items; an item's entry is DELETED the moment
-       it completes (the frontier of a finished read is meaningless).
+       in-progress items. RECORDING-ONLY since 2026-08-04: it does NOT
+       move the viewport — the frontier jump was retired by owner call
+       and use-scroll-memory's saved position owns reopening. The data
+       feeds the reading record and the held per-letter skim indicator
+       (BACKLOG [21]). LRU-bounded to 50 in-progress items; an item's
+       entry is DELETED the moment it completes (the frontier of a
+       finished read is meaningless).
 
    Day semantics reuse _jrnDateStr (local-timezone calendar dates),
    matching JournalStats + ReadingStreak so all three "day" concepts
@@ -56,6 +59,54 @@ var WPM_MIN = 30;
 var WPM_MAX = 1500;
 // A measured pace is only shown once it rests on this many samples.
 var WPM_MIN_SAMPLES = 5;
+
+/**
+ * Coerce an imported `progress` map into exactly the shape recordProgress
+ * writes, dropping anything that can't be made sense of, and keep only the
+ * most-recently-touched MAX_PROGRESS_ITEMS. Import validation checks the
+ * envelope's top level only, so this is where nested reading stats get their
+ * type + bounds check.
+ *
+ * @param {any} raw
+ * @returns {Record<string, { b: number, c: number[], t: number, w?: number, tw?: number }>}
+ */
+function _normalizeProgress(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  /** @type {Record<string, any>} */
+  var out = {};
+  var keys = Object.keys(raw);
+  for (var i = 0; i < keys.length; i++) {
+    var v = raw[keys[i]];
+    if (!v || typeof v !== 'object') continue;
+    var b = Math.max(0, Math.floor(Number(v.b) || 0));
+    if (!b) continue;                                   // no block count = unusable
+    var c = [];
+    if (Array.isArray(v.c)) {
+      var seen = {};
+      for (var j = 0; j < v.c.length; j++) {
+        var idx = Math.floor(Number(v.c[j]));
+        // In-range, integral, de-duplicated — the invariants the readers
+        // (and the frontier math) assume of a locally-written entry.
+        if (!isFinite(idx) || idx < 0 || idx >= b || seen[idx]) continue;
+        seen[idx] = true;
+        c.push(idx);
+      }
+      c.sort(function(a, z) { return a - z; });
+    }
+    /** @type {any} */
+    var entry = { b: b, c: c, t: Math.max(0, Math.floor(Number(v.t) || 0)) };
+    var tw = Number(v.tw), w = Number(v.w);
+    if (isFinite(tw) && tw > 0) entry.tw = tw;
+    if (isFinite(w) && w >= 0) entry.w = entry.tw ? Math.min(w, entry.tw) : w;
+    out[keys[i]] = entry;
+  }
+  var outKeys = Object.keys(out);
+  if (outKeys.length > MAX_PROGRESS_ITEMS) {
+    outKeys.sort(function(a, z) { return (out[a].t || 0) - (out[z].t || 0); });
+    for (var k = 0; k < outKeys.length - MAX_PROGRESS_ITEMS; k++) delete out[outKeys[k]];
+  }
+  return out;
+}
 
 export var ReadingStatsStore = extendStore(
   CachedStore('vot-reading-stats', /** @type {ReadingStatsData} */ ({
@@ -283,8 +334,15 @@ export var ReadingStatsStore = extendStore(
         totalCompletions: d.totalCompletions || 0,
         rereads: d.rereads || 0,
         wordsByDay: (d.wordsByDay && typeof d.wordsByDay === 'object') ? d.wordsByDay : {},
-        wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples : [],
-        progress: (d.progress && typeof d.progress === 'object') ? d.progress : {}
+        wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples.slice(-MAX_WPM_SAMPLES) : [],
+        // Import is a TRUST BOUNDARY: the envelope validator checks the
+        // top-level shape only, so nested per-item progress arrived
+        // unchecked and unbounded — a hand-edited or corrupt .votbak could
+        // seed thousands of entries with garbage members, breaking the
+        // LRU-50 invariant every writer assumes and feeding NaN into the
+        // word-weighted progress math. Normalize to the same shape
+        // recordProgress writes, then apply the same bound.
+        progress: _normalizeProgress(d.progress)
       });
       this._save();
       this._bump();
@@ -299,9 +357,15 @@ export var ReadingStatsStore = extendStore(
     wordsForDays(n) {
       var byDay = this._load().wordsByDay || {};
       var out = [];
-      var now = Date.now();
+      // Walk LOCAL CALENDAR dates, not fixed 24-hour steps. Subtracting
+      // i * 86400000 skips a day across a DST spring-forward: just after
+      // midnight on the day after the transition, "24 hours ago" lands two
+      // local dates back, so one bar silently vanished and another repeated.
+      // new Date(y, m, d - i) normalizes into the correct calendar day.
+      var today = new Date();
       for (var i = n - 1; i >= 0; i--) {
-        var d = _jrnDateStr(now - i * 86400000);
+        var day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+        var d = _jrnDateStr(day.getTime());
         out.push({ date: d, words: byDay[d] || 0 });
       }
       return out;

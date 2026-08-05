@@ -138,8 +138,19 @@ export function useReadTracker(scrollRef, inert, placeKey) {
     // Current candidates in document order, excluding [inert] subtrees
     // (portaled peek clones must never contribute). Falls back to the
     // whole container as one segment for any future view shape.
+    //
+    // TWO attributes, because reading content and ANNOTATABLE content are
+    // not the same set. data-hl-key is the annotation anchor; prose that
+    // renders in the reading flow but was never annotatable (a letter's
+    // sectionIntro, a Bible section heading) carries data-read-seg instead.
+    // Before 2026-08-04 the detector saw only the first, so a reader could
+    // scroll past visibly-rendered intro prose and still satisfy coverage —
+    // and the detector's word total disagreed with countItemWords, which
+    // does count that prose. data-read-seg closes the gap without widening
+    // the annotation surface.
+    var SEG_SEL = '[data-hl-key],[data-read-seg]';
     var candidates = function(root) {
-      var nodes = root.querySelectorAll('[data-hl-key]');
+      var nodes = root.querySelectorAll(SEG_SEL);
       /** @type {Array<{ el: Element, key: string }>} */
       var out = [];
       for (var i = 0; i < nodes.length; i++) {
@@ -147,9 +158,12 @@ export function useReadTracker(scrollRef, inert, placeKey) {
         // Annotation/bookmark icons can repeat their owner's data-hl-key.
         // Only the outermost key-bearing node is reading content; nested
         // chrome would otherwise change block indices as marks come and go.
-        var parent = nodes[i].parentElement && nodes[i].parentElement.closest('[data-hl-key]');
+        var parent = nodes[i].parentElement && nodes[i].parentElement.closest(SEG_SEL);
         if (parent) continue;
-        out.push({ el: nodes[i], key: String(nodes[i].getAttribute('data-hl-key')) });
+        var hlKey = nodes[i].getAttribute('data-hl-key');
+        // Read-only segments get a namespaced key so they can never collide
+        // with an annotation key (which is what the frontier records under).
+        out.push({ el: nodes[i], key: hlKey != null ? String(hlKey) : 'seg:' + String(nodes[i].getAttribute('data-read-seg')) });
       }
       if (out.length === 0 && countTextWords(root.textContent) > 0) {
         out.push({ el: root, key: '__root' });

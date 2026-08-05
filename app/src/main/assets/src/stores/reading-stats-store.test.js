@@ -127,6 +127,49 @@ describe('replaceAll (backup restore path)', () => {
     expect(ReadingStatsStore.wordsForDays(3)).toHaveLength(3);
   });
 
+  /* wordsForDays walks LOCAL CALENDAR dates. The old fixed 24-hour arithmetic
+     (now - i * 86400000) skipped a day across DST spring-forward: run this
+     suite with TZ=America/Denver just after midnight on 2026-03-09 and the
+     bars read 03-06, 03-07, 03-09. Timezone-independent assertion: the
+     returned dates are always N consecutive calendar days ending today. */
+  it('returns N consecutive local calendar days ending today (DST-safe)', () => {
+    const days = ReadingStatsStore.wordsForDays(5);
+    expect(days).toHaveLength(5);
+    const seen = days.map((d) => d.date);
+    expect(new Set(seen).size).toBe(5);                    // no duplicated bar
+    const today = new Date();
+    for (let i = 0; i < 5; i++) {
+      const want = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (4 - i));
+      const pad = (v) => String(v).padStart(2, '0');
+      expect(seen[i]).toBe(`${want.getFullYear()}-${pad(want.getMonth() + 1)}-${pad(want.getDate())}`);
+    }
+  });
+
+  it('normalizes imported progress: types, ranges, dedup, and the LRU bound', () => {
+    /* Import is a trust boundary — the envelope validator checks the top
+       level only, so a hand-edited or corrupt .votbak used to seed nested
+       reading stats unchecked and unbounded. */
+    const many = {};
+    for (let i = 0; i < 70; i++) many['k' + i] = { b: 4, c: [0], t: 1000 + i };
+    ReadingStatsStore.replaceAll({
+      progress: {
+        ...many,
+        good: { b: 5, c: [2, 0, 0, 9, -1, 1.5], t: 99999, tw: 100, w: 500 },
+        noBlocks: { b: 0, c: [1], t: 5 },
+        junkEntry: /** @type {any} */ ('not an object'),
+        nanBlocks: /** @type {any} */ ({ b: 'abc', c: [1], t: 5 }),
+      },
+    });
+    const p = ReadingStatsStore.get().progress;
+    expect(Object.keys(p).length).toBe(50);          // LRU bound applied
+    expect(p.good).toBeTruthy();                     // newest survives the prune
+    expect(p.good.c).toEqual([0, 1, 2]);             // in-range, integral, deduped, sorted
+    expect(p.good.w).toBe(100);                      // credited words can't exceed the total
+    expect(p.noBlocks).toBeUndefined();
+    expect(p.junkEntry).toBeUndefined();
+    expect(p.nanBlocks).toBeUndefined();
+  });
+
   it('survives garbage payloads (null, arrays, wrong types)', () => {
     ReadingStatsStore.replaceAll(null);
     expect(ReadingStatsStore.get().totalWordsRead).toBe(0);

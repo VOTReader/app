@@ -307,3 +307,52 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     expect(complete).not.toHaveBeenCalled();
   });
 });
+
+describe('useReadTracker — data-read-seg (rendered prose that is not annotatable)', () => {
+  /* A letter's sectionIntro and a Bible section heading render in the reading
+     flow but carry no data-hl-key (they are not annotatable). Before the
+     detector unioned data-read-seg, a reader could scroll past visible intro
+     prose and still satisfy coverage, and the detector's word total disagreed
+     with countItemWords, which does count that prose. */
+  const makeSeg = (segId, words) => {
+    const p = document.createElement('p');
+    p.setAttribute('data-read-seg', segId);
+    p.textContent = Array.from({ length: words }, (_, w) => 'w' + w).join(' ');
+    setRect(p, 100, 50);
+    return p;
+  };
+
+  it('an UNREAD intro segment holds completion back', () => {
+    root = buildContent(1, 50);            // one annotatable body block, visible
+    const intro = makeSeg('intro-p:0', 50);
+    hide(intro);                            // reader never scrolled the intro
+    root.insertBefore(intro, root.firstChild);
+    renderHook(() => useReadTracker({ current: root }, false, 'k'));
+    vi.advanceTimersByTime(60000);
+    expect(complete).not.toHaveBeenCalled(); // 50/100 words = 50% coverage
+  });
+
+  it('completes once the intro segment is read too', () => {
+    root = buildContent(1, 50);
+    const intro = makeSeg('intro-p:0', 50);
+    root.insertBefore(intro, root.firstChild);   // both visible
+    renderHook(() => useReadTracker({ current: root }, false, 'k'));
+    vi.advanceTimersByTime(60000);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete.mock.calls[0][0].words).toBe(100);  // intro words counted
+  });
+
+  it('namespaces read-seg keys so they cannot collide with annotation keys', () => {
+    const recordProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordProgress, recordPaceSample: vi.fn() };
+    root = buildContent(1, 20);
+    root.insertBefore(makeSeg('seg0', 20), root.firstChild);  // same raw id as body key 'seg0'
+    const h = renderHook(() => useReadTracker({ current: root }, false, 'k'));
+    vi.advanceTimersByTime(3000);
+    h.unmount();
+    // 2 distinct segments credited — not 1 collapsed by a key collision.
+    const call = recordProgress.mock.calls[recordProgress.mock.calls.length - 1];
+    expect(call[1]).toBe(2);
+    expect(call[2]).toEqual([0, 1]);
+  });
+});

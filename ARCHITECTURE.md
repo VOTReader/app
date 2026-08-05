@@ -17,7 +17,7 @@ The sections below this one predate several landed systems. This addendum is the
 - **Android frame pacing**: MainActivity votes the WebView at panel peak refresh (View + window votes, API 35+); Battery Saver's system 60 Hz cap outranks them by design. `backdrop-filter` is banned on chrome that overlays live scrolling content (alpha-bumped instead).
 - **Theme**: dark-first `:root` tokens, `body.light` full swap, `body.amoled` True-Black surface modifier on dark ([10], `settings.trueBlack`, boot pre-paint applies all classes).
 - **Auto-scroll reading transport** (`hooks/use-autoscroll.js` + `ui/components/AutoScrollControl.jsx`): lines/min over a MEASURED line height, the scrollTop lease, `.reading-end` reading-zone stop, dwell + auto-advance via the pager's own boundary policy. Full map in **§20**.
-- **Reading-measurement engine** (2026-08-03: `utils/word-count.js` + `hooks/use-read-tracker.js` + `stores/reading-stats-store.js`): ONE word-count definition shared by app + the corpus baseline gate; the geometry-sweep read detector (NOT IntersectionObserver — deliberate, see **§21**); count-valued readItems; ReadingStatsStore ledger (IDB v8) + per-item frontiers → resume-at-first-unread. Full map in **§21**.
+- **Reading-measurement engine** (2026-08-03: `utils/word-count.js` + `hooks/use-read-tracker.js` + `stores/reading-stats-store.js`): ONE word-count definition shared by app + the corpus baseline gate; the geometry-sweep read detector (NOT IntersectionObserver — deliberate, see **§21**); count-valued readItems; ReadingStatsStore ledger (IDB v8) + per-item frontiers (recording-only since 2026-08-04 — **scroll-position resume owns reopening**; the frontier jump was retired). Full map in **§21**.
 - **One shared top-nav**: `ui/components/LibraryNav.jsx` renders every screen's nav (2026-07-30; SearchScreen + GardenView are the two documented exceptions). Full map, and its selector/measurement couplings, in **§18.10b**.
 
 ---
@@ -974,8 +974,12 @@ before editing — this section is the map, not the contract):
   Ledger (words/time/completions/rereads/wordsByDay) + wpm samples (median;
   sampled at VISIT END, never the completion instant — that instant is pinned
   to the 600wpm floor by construction) + per-item frontiers (credited segment
-  indices; LRU 50; cleared on completion) → resume-at-first-unread-paragraph
-  (>1-viewport jump guard). ★ Adding ANY new CachedStore requires
+  indices; LRU 50; cleared on completion). **Frontiers are RECORDING-ONLY as
+  of 2026-08-04**: the frontier jump that used to move the viewport to the
+  first unread paragraph was retired by owner call — `use-scroll-memory`'s
+  saved position owns reopening, full stop. The data still accumulates for the
+  reading record and the held skim indicator (BACKLOG [21]). ★ Adding ANY new
+  CachedStore requires
   `IDBAdapter.STORE_NAMES` + a DB version bump, or it hydrates `'degraded'`
   and queues writes silently forever — with a 100%-green unit suite. ★
 - readItems is COUNT-valued (`useMarkAsRead.js`; legacy `true` reads as 1, no

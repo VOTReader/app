@@ -29,9 +29,11 @@
                                        expand/collapse state map for
                                        prophecy cards (keyed by
                                        chapterId:blockIndex:cardType).
-                                       Hydrated from localStorage on
-                                       first read (lazy-init).
-     - saveProphecyCardStates()        Persists the ref to localStorage.
+                                       Hydrated from ProphecyCardsStore
+                                       (IDB, W2.3b) on first read
+                                       (lazy-init) — NOT localStorage.
+     - saveProphecyCardStates()        Flushes the ref through
+                                       ProphecyCardsStore.setAll().
                                        useCallback'd (mount-only deps)
                                        so the bridge effect that calls
                                        it has a stable identity.

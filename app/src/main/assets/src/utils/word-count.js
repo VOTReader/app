@@ -50,7 +50,15 @@ function segWords(seg) {
   return countTextWords(seg.v);
 }
 
-/** @param {any} block  Format-A block */
+/**
+ * @param {any} block  Format-A block
+ *
+ * Does NOT descend into `prophecy-group` blocks — prophecy cards are
+ * supplemental reference, not canonical reading content (~129k words across
+ * 132 collapsible groups). The read detector agrees by never keying them;
+ * see the contract note atop ui/components/ProphecyCard.jsx. The two sides
+ * must be changed together or not at all.
+ */
 function blockWords(block) {
   if (!block || typeof block !== 'object') return 0;
   let n = 0;
@@ -79,7 +87,14 @@ function _countItemWords(item) {
   if (Array.isArray(item.blocks)) {
     let n = 0;
     for (const b of item.blocks) n += blockWords(b);
-    n += countTextWords(item.sectionIntro);
+    // sectionIntro is an ARRAY of blocks in every case the corpus actually
+    // has (volume-seven "Recompense" + 14 bible-studies chapters); the bare
+    // string form is only a legacy/simple shape. String-coercing the array
+    // counted the two words of "[object Object]" per block instead of the
+    // prose, so ~2.4k words of rendered intro never reached the minute
+    // chips, the word-weighted progress bars, or the corpus baseline.
+    if (Array.isArray(item.sectionIntro)) for (const b of item.sectionIntro) n += blockWords(b);
+    else n += countTextWords(item.sectionIntro);
     return n;
   }
 
@@ -91,11 +106,17 @@ function _countItemWords(item) {
   }
 
   // Bible chapter (books.js nested): { sections: [{ heading, verses: [{ text }] }] }
+  // Section headings are CHROME, not reading content (2026-08-04): they are
+  // editorial labels the reader can switch off (settings.showSectionHeadings)
+  // and tap to hide, and they carry no data-hl-key, so the read detector never
+  // measures them. Counting them here made this data-derived total disagree
+  // with the DOM-derived one — and unfixably so, since the data cannot know
+  // whether the reader has headings on. 2,732 headings / 11,638 words ≈ 1% of
+  // the corpus; consistency is worth more than the 1%.
   if (Array.isArray(item.sections)) {
     let n = 0;
     for (const s of item.sections) {
       if (!s || typeof s !== 'object') continue;
-      n += countTextWords(s.heading);
       if (Array.isArray(s.verses)) for (const v of s.verses) n += countTextWords(v && v.text);
     }
     return n;
