@@ -1735,11 +1735,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                       <div className="note-sheet-header">
                         <div className="note-sheet-title" id="settings-wipe-title">Delete All Personal Data</div>
                       </div>
-                      <div style={{ color: "var(--cream)", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "14px" }}>
+                      <div style={{ color: "var(--cream)", fontSize: "var(--fs-14)", lineHeight: "1.5", marginBottom: "14px" }}>
                         This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults.{' '}
                         <strong style={{ color: "#c0392b" }}>This cannot be undone.</strong> Export your data first if you want a backup.
                       </div>
-                      <div style={{ color: "var(--cream-muted)", fontSize: "0.78rem", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                      <div style={{ color: "var(--cream-muted)", fontSize: "var(--fs-12)", letterSpacing: "0.04em", marginBottom: "8px" }}>
                         Type <strong style={{ color: "var(--gold)", letterSpacing: "0.15em" }}>DELETE</strong> to confirm.
                       </div>
                       <input
@@ -1756,7 +1756,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
                         style={{
                           width: "100%", boxSizing: "border-box", textAlign: "center",
-                          fontFamily: "'Cinzel', serif", fontSize: "1rem", letterSpacing: "0.22em",
+                          fontFamily: "'Cinzel', serif", fontSize: "var(--fs-16)", letterSpacing: "0.22em",
                           textTransform: "uppercase", color: "var(--cream)",
                           background: "var(--bg)", border: "1px solid var(--gold-border)",
                           borderRadius: "6px", padding: "0.7rem 0.5rem", outline: "none", marginBottom: "18px"
@@ -1789,7 +1789,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                       <div className="note-sheet-header">
                         <div className="note-sheet-title" id="settings-import-title">Import from Backup</div>
                       </div>
-                      <div style={{ color: "var(--cream)", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "18px", whiteSpace: "pre-line" }}>
+                      <div style={{ color: "var(--cream)", fontSize: "var(--fs-14)", lineHeight: "1.5", marginBottom: "18px", whiteSpace: "pre-line" }}>
                         {importConfirm.message}
                       </div>
                       <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
@@ -1835,7 +1835,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         aria-expanded={isOpen}
                         onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); }}
                       >
-                        <span aria-hidden="true" style={{ color: "var(--gold-dim)", fontSize: "0.75rem", minWidth: "0.75rem" }}>
+                        <span aria-hidden="true" style={{ color: "var(--gold-dim)", fontSize: "var(--fs-12)", minWidth: "0.75rem" }}>
                           {isOpen ? "▾" : "▸"}
                         </span>
                         <span className="progress-row-label" style={{ color: "var(--gold)" }}>{grp.label}</span>
@@ -1851,7 +1851,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     {isOpen && grp.genres.map((genre) => (
                       <React.Fragment key={genre.label}>
                         <div className="progress-row" style={{ background: "var(--bg2)", paddingTop: "0.45rem", paddingBottom: "0.45rem", paddingLeft: "2rem" }}>
-                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 }}>
+                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 }}>
                             {genre.label}
                           </span>
                         </div>

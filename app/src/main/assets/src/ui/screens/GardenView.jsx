@@ -405,12 +405,12 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
             {error ? (
               // Error surface mirrors the StudiesHome lazy-corpus convention:
               // human copy + a pill "Try again" — never a dead-end.
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "var(--fs-14)" }}>
                 <div>Failed to load — check your connection</div>
                 <button type="button" onClick={retryImage} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
               </div>
             ) : (
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
+              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "var(--fs-14)" }}>
                 {`Loading page ${page}...`}
               </div>
             )}

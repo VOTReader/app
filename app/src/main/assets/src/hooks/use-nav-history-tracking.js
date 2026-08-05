@@ -94,16 +94,49 @@ export function useNavHistoryTracking({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   addToHistory, _findLetter, getStudyById, getStudyChapter,
 }) {
+  /* The nav position this hook has already written a history entry for.
+     Set ONLY on a successful record, which is what makes the retry below
+     safe: an unrecorded position keeps re-evaluating on later renders, a
+     recorded one is skipped until the user navigates somewhere else (and
+     back — revisiting the same chapter is a new visit and records again,
+     exactly as the old deps-array version did). */
+  const recordedKeyRef = React.useRef(/** @type {string | null} */ (null));
+
+  /* NO DEPENDENCY ARRAY, deliberately (2026-08-04, owner-reported: Bible
+     chapters and study chapters were missing from History).
+
+     Every branch below depends on data that can arrive LATER than the nav
+     state: BOOKS / MATTHEW are lazy corpora, and getStudyById /
+     getStudyChapter resolve out of one. On a cold boot into a saved tab —
+     or any deep link — this effect used to fire once, find the corpus
+     absent, `return`, and never run again: its deps were the six nav
+     values, and a corpus landing changes none of them. The visit was
+     silently dropped. (The old comment claimed "a subsequent effect re-run
+     after corpus arrival picks it up" — nothing re-ran it.)
+
+     Running on every render and guarding with recordedKeyRef turns that
+     into a retry: the first render where the lookups resolve records the
+     entry, and the ref keeps it to exactly one record per visit. The body
+     is a couple of string joins plus a Map.get on the miss path, and it
+     short-circuits at the ref check on the hit path — cheaper than the
+     corpus-version plumbing the alternative would need, and it keeps the
+     four helper params free to change identity every render (which they
+     do). */
   React.useEffect(() => {
+    const navKey = [screen, bookId, chapterNum, letterId, studyId, studyChapterId].join('|');
+    if (recordedKeyRef.current === navKey) return;
+    /** Mark this position recorded — called only where an entry was written. */
+    const done = () => { recordedKeyRef.current = navKey; };
+
     if (screen === 'matthew-ch' && chapterNum) {
-      // Q8.2: MATTHEW is lazy-loaded. If the user lands directly on
-      // matthew-ch via saved tab state, this effect fires BEFORE the
-      // corpus loads. Skip the history record; a subsequent effect
-      // re-run after corpus arrival picks it up correctly.
+      // Q8.2: MATTHEW is lazy-loaded. Landing here via saved tab state runs
+      // this before the corpus arrives — leave the position unrecorded and
+      // the next render retries (see the no-deps note above).
       const _MATTHEW = (typeof window !== 'undefined') ? window.MATTHEW : undefined;
       if (!_MATTHEW) return;
       const ch = _MATTHEW.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum, chapterTitle: ch?.title || null });
+      done();
     } else if (screen === 'bible-ch' && bookId && chapterNum) {
       // Q8: BOOKS is lazy-loaded; if the user lands directly on bible-ch via
       // saved tab state, this effect fires BEFORE the corpus loads. Use
@@ -115,14 +148,21 @@ export function useNavHistoryTracking({
       const book = _BOOKS[bookId];
       const ch = book?.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId, bookTitle: book?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
+      done();
     } else if (letterId) {
       var _hcol = COL_BY_LETTER_SC.get(screen);
-      if (_hcol) { var _he = _findLetter(_hcol.volKey); if (_he) addToHistory({ type: 'letter', letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen }); }
+      // The VOT corpus is lazy too: an unresolved letter leaves the position
+      // unrecorded so a later render can retry it.
+      if (_hcol) { var _he = _findLetter(_hcol.volKey); if (_he) { addToHistory({ type: 'letter', letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen }); done(); } }
     } else if (screen === 'bible-study-chapter' && studyId && studyChapterId) {
       const study = getStudyById(studyId);
       const ch = getStudyChapter(study, studyChapterId);
-      if (study && ch) addToHistory({ type: 'study-chapter', studyId, studyChapterId, studyTitle: study.title, studySlug: study.slug, chapterTitle: ch.title, chapterNum: ch.num });
+      if (study && ch) { addToHistory({ type: 'study-chapter', studyId, studyChapterId, studyTitle: study.title, studySlug: study.slug, chapterTitle: ch.title, chapterNum: ch.num }); done(); }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav-change-only fire is the contract. The 4 helper params (addToHistory, _findLetter, getStudyById, getStudyChapter) are stable-by-behavior but NOT stable-by-identity: addToHistory closes over useHistory's enabledRef + setReadHistory (new closure each render); _findLetter, getStudyById, getStudyChapter are App()-local arrow/function helpers recreated each render. All four read closure-captured state (App()'s letterId / module-global COLLECTIONS / module-global BIBLE_STUDIES) — their bodies behave identically every render, so adding them to deps would force an every-render fire and lose the "trigger on nav change" intent. The 6 nav-state values ARE in deps; together they fully characterize the entry the effect would record.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
+    // No deps array: recordedKeyRef IS the fire-once-per-visit guard, and the
+    // retry it enables is the point (see the note above the effect). The four
+    // helper params change identity every render and always did — that was the
+    // reason they were excluded from the old deps array, and it costs nothing
+    // now that the ref, not the array, decides when an entry is written.
+  });
 }

@@ -561,10 +561,10 @@ export function JournalInsertSheet(props) {
       <div className="note-sheet jrn-insert-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-insert-title" onClick={function(e) { e.stopPropagation(); }} style={{ maxWidth: '480px' }}>
         <div className="note-sheet-header">
           {mode !== 'menu' && (
-            <button className="note-sheet-menu-btn" onClick={back} aria-label="Back" style={{ fontSize: '18px' }}>‹</button>
+            <button className="note-sheet-menu-btn" onClick={back} aria-label="Back" style={{ fontSize: 'var(--fsc-18)' }}>‹</button>
           )}
           <span className="note-sheet-title" id="journal-insert-title" style={{ flex: 1 }}>{titleStr()}</span>
-          <button className="note-sheet-menu-btn" onClick={close} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
+          <button className="note-sheet-menu-btn" onClick={close} aria-label="Close" style={{ fontSize: 'var(--fsc-18)' }}>×</button>
         </div>
         {body()}
       </div>

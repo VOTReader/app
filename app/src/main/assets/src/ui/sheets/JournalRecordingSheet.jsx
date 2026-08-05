@@ -647,7 +647,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         <div className="note-sheet-header">
           <span className="note-sheet-title" id="journal-recording-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
           {stage !== 'preview' && (
-            <button className="note-sheet-menu-btn" onClick={requestDiscard} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
+            <button className="note-sheet-menu-btn" onClick={requestDiscard} aria-label="Close" style={{ fontSize: 'var(--fsc-18)' }}>×</button>
           )}
         </div>
         {renderContent()}

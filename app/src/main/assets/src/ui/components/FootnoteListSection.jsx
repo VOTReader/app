@@ -55,7 +55,7 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
                 )}
                 {fn.seeAlso && (
                   <div style={{ marginTop: "0.5rem" }}>
-                    <span style={{ fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>
+                    <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>
                     <span style={{ fontStyle: "italic" }}>{fn.seeAlso.label || fn.seeAlso.letterTitle}</span>
                     <InAppLinkButton compact={true} link={{ collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt }} onActivate={onInAppLink} />
                   </div>

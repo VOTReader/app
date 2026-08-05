@@ -19,7 +19,7 @@ export function FontPickerRow({ value, onSelect }) {
     label: def.label,
     desc: def.sub,
     // 'classic' has no family — the system serif IS its own preview.
-    labelStyle: { fontFamily: def.css || 'serif', fontSize: '1.08rem', letterSpacing: 0 },
+    labelStyle: { fontFamily: def.css || 'serif', fontSize: 'var(--fs-18)', letterSpacing: 0 },
   }));
   return (
     <SelectField
@@ -30,7 +30,7 @@ export function FontPickerRow({ value, onSelect }) {
       value={current.id}
       options={options}
       onChange={(id) => { if (id !== value && readingFontById(id)) onSelect(id); }}
-      valueStyle={{ fontFamily: current.css || 'serif', fontSize: '1rem', fontStyle: 'normal' }}
+      valueStyle={{ fontFamily: current.css || 'serif', fontSize: 'var(--fs-16)', fontStyle: 'normal' }}
     />
   );
 }

@@ -280,7 +280,7 @@ export function jrnShowMilestoneToast(milestone) {
   showToast({
     id: 'jrn-milestone-toast',
     className: 'jrn-milestone-toast',
-    html: '<span style="font-size:14px">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>',
+    html: '<span style="font-size:var(--fsc-14)">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>',
     durationMs: 3000,
   });
 }

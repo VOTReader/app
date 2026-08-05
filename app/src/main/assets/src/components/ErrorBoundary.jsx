@@ -78,7 +78,7 @@ export class ErrorBoundary extends React.Component {
     return (
       <div style={{ padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" }}>
         <h2 style={{ marginBottom: "1rem" }}>Something went wrong</h2>
-        <p style={{ color: "#b0a080", fontSize: "0.85rem", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
+        <p style={{ color: "#b0a080", fontSize: "var(--fs-14)", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
           {/* Wave-0: was String(this.state.error) — raw stack text facing the
               user. The technical detail is already in DiagnosticLog
               (componentDidCatch); the panel speaks human. */}
@@ -101,7 +101,7 @@ export class ErrorBoundary extends React.Component {
           )}
         </div>
         {looping && (
-          <p style={{ color: "#8a7a55", fontSize: "0.72rem", maxWidth: "360px", margin: "1rem auto 0" }}>
+          <p style={{ color: "#8a7a55", fontSize: "var(--fs-12)", maxWidth: "360px", margin: "1rem auto 0" }}>
             This screen keeps failing. Use Reset to Home to return to the home screen — your saved notes and data are not affected.
           </p>
         )}

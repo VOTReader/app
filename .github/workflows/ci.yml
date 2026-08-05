@@ -172,6 +172,12 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify the type scale (one ladder, no literal font-sizes)
+        # Every font-size must name a --fs-N / --fsc-N token defined once in
+        # app.css :root, so Settings -> Text Size moves ALL type together and
+        # nothing renders below the 10px floor. Literals fail the build.
+        run: node tools/check-type-scale.js
+
       - name: Syntax-check every src/ module
         run: |
           # .js — Node's own parser. node --check cannot parse JSX, so

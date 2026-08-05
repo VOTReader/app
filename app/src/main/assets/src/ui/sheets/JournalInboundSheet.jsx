@@ -19,7 +19,7 @@ export function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntr
       <div className="note-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-inbound-title" onClick={(e) => { e.stopPropagation(); }} style={{ maxWidth: '480px' }}>
         <div className="note-sheet-header">
           <span className="note-sheet-title" id="journal-inbound-title" style={{ flex: 1 }}>{headerText}{resourceLabel ? ' · ' + resourceLabel : ''}</span>
-          <button className="note-sheet-menu-btn" onClick={onClose} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
+          <button className="note-sheet-menu-btn" onClick={onClose} aria-label="Close" style={{ fontSize: 'var(--fsc-18)' }}>×</button>
         </div>
         {entries.length === 0
           ? <div style={{ padding: '40px 20px', textAlign: 'center', fontStyle: 'italic', color: 'var(--cream-dim)', fontFamily: 'var(--font-body)' }}>No journal entries reference this yet.</div>

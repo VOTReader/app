@@ -28,7 +28,8 @@
     "check:footnotes": "node tools/audit-footnotes.js --check",
     "check:app-size": "node tools/check-app-size.js",
     "check:corpus": "node tools/check-corpus-version.js",
-    "check:apk-assets": "node tools/check-apk-assets.js"
+    "check:apk-assets": "node tools/check-apk-assets.js",
+    "check:type-scale": "node tools/check-type-scale.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

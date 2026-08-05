@@ -494,3 +494,60 @@ describe('useNavHistoryTracking — branch precedence (only one branch fires per
     );
   });
 });
+
+describe('useNavHistoryTracking — late-arriving lazy corpus (RED)', () => {
+  it('records the bible chapter once BOOKS finishes loading under a stable nav state', () => {
+    const addToHistory = vi.fn();
+    const props = {
+      ...baseProps(), addToHistory,
+      screen: 'bible-ch', bookId: 'genesis', chapterNum: 1,
+    };
+    const saved = window.BOOKS;
+    window.BOOKS = undefined;             // cold boot: saved-tab restore beats the corpus
+    const { rerender } = renderHook((p) => useNavHistoryTracking(p), { initialProps: props });
+    expect(addToHistory).not.toHaveBeenCalled();
+
+    window.BOOKS = saved;                 // corpus lands; App re-renders (corpus version bump)
+    rerender({ ...props });
+    expect(addToHistory).toHaveBeenCalledWith({
+      type: 'chapter', bookId: 'genesis', bookTitle: 'Genesis', chapterNum: 1, chapterTitle: 'In the Beginning',
+    });
+  });
+
+  it('records the Matthew chapter once MATTHEW finishes loading under a stable nav state', () => {
+    const addToHistory = vi.fn();
+    const props = { ...baseProps(), addToHistory, screen: 'matthew-ch', chapterNum: 5 };
+    const saved = window.MATTHEW;
+    window.MATTHEW = undefined;
+    const { rerender } = renderHook((p) => useNavHistoryTracking(p), { initialProps: props });
+    expect(addToHistory).not.toHaveBeenCalled();
+
+    window.MATTHEW = saved;
+    rerender({ ...props });
+    expect(addToHistory).toHaveBeenCalledWith({
+      type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum: 5, chapterTitle: 'The Sermon on the Mount',
+    });
+  });
+
+  it('records the study chapter once the STUDIES lookups start resolving', () => {
+    const addToHistory = vi.fn();
+    const getStudyById = vi.fn(() => null);      // corpus not up yet
+    const getStudyChapter = vi.fn(() => null);
+    const props = {
+      ...baseProps(), addToHistory, getStudyById, getStudyChapter,
+      screen: 'bible-study-chapter', studyId: 's1', studyChapterId: 'c1',
+    };
+    const { rerender } = renderHook((p) => useNavHistoryTracking(p), { initialProps: props });
+    expect(addToHistory).not.toHaveBeenCalled();
+
+    rerender({
+      ...props,
+      getStudyById: vi.fn(() => ({ title: 'Lamb of God', slug: 'lamb-of-god' })),
+      getStudyChapter: vi.fn(() => ({ title: 'The Passover', num: 3 })),
+    });
+    expect(addToHistory).toHaveBeenCalledWith({
+      type: 'study-chapter', studyId: 's1', studyChapterId: 'c1',
+      studyTitle: 'Lamb of God', studySlug: 'lamb-of-god', chapterTitle: 'The Passover', chapterNum: 3,
+    });
+  });
+});

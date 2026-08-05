@@ -46,7 +46,7 @@ export function ExpandableVerse({ text, refStr }) {
             display: "inline-block", marginLeft: "0.5em",
             background: "none", border: "none", cursor: "pointer",
             color: "var(--gold)", fontFamily: "'Cinzel', serif",
-            fontSize: "0.72rem", letterSpacing: "0.1em",
+            fontSize: "var(--fs-12)", letterSpacing: "0.1em",
             textTransform: "uppercase", padding: "0",
             verticalAlign: "middle", lineHeight: 1
           }}

@@ -82,7 +82,7 @@ function _ensureToast() {
     'border-radius:24px',
     'padding:10px 18px',
     "font-family:'Cinzel',serif",
-    'font-size:0.72rem',
+    'font-size:var(--fs-12)',
     'letter-spacing:0.08em',
     'text-transform:uppercase',
     'box-shadow:0 6px 24px rgba(0,0,0,0.45)',

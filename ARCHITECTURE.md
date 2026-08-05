@@ -1151,8 +1151,24 @@ The user's first batch of screenshots revealed these *categories* of data corrup
 
 ---
 
+## Type scale (2026-08-04) — one ladder, one setting
+
+Every font-size in the app names a token from a single 13-step ladder declared once in `app.css :root`. Before this, 590 declarations across 15 files used **103 distinct hand-picked values** — ten of them between 8.8px and 10.9px, in two unrelated families (decimal in `app.css`, 16ths-based in the injected journal styles). A reader who raised Text Size for a letter still met 8.8px type in Settings.
+
+| family | form | scales with Text Size? | use |
+|---|---|---|---|
+| `--fs-10` … `--fs-48` | rem | **yes** (root `--font-scale`) | all content + UI type |
+| `--fsc-10` … `--fsc-48` | px | no | nav / floating chrome + glyph icons |
+
+Steps: 10, 11, 12, 13, 14, 15, 16, 18, 20, 24, 30, 36, 48. **The number is the px size at scale 1**, so ordering is obvious in a diff. `--fs-16` is the body/reading anchor. **`--fs-10` is a hard floor** — nothing renders below 10px at scale 1 (the owner's audience is older readers; that floor was the one snap that moved type *up*).
+
+- **`--fsc-N` are the chrome twins of `--fs-N`.** The chrome-pin block at the END of `app.css` re-states nav/floating chrome in px so Text Size can't balloon the top nav or the ‹ › pagers (owner: "must NOT expand icons"). That block used to restate hand-computed decimals (`0.56rem` here, `8.96px` there) which could silently drift; both sides now name the same step.
+- **Exceptions, deliberate:** `em` font-sizes (verse sups, the external-link ↗ marker, inline refs — parent-relative BY DESIGN so they follow whatever they sit in) and the three `clamp()` fluid headings (ends are tokens; the vw term between them is the point).
+- **Enforced:** `tools/check-type-scale.js` (npm `check:type-scale`, pre-commit + CI) fails on any literal rem/px font-size outside the ladder's own declaration. Need a size that doesn't exist? Add the step — and its `--fsc-` twin — in `:root`.
+
 ## CSS variables reference
 
+- `--fs-10` … `--fs-48` / `--fsc-10` … `--fsc-48` (the type scale — see above; never inline a literal font-size)
 - `--gold`, `--gold-bright`, `--gold-dim`, `--gold-border`, `--gold-faint`, `--gold-glow`
 - `--cream-dim`, `--bg`, `--bg3`
 - `--tap-ref`, `--tap-ref-sub`, `--tap-ref-active` (inline scripture ref colors)

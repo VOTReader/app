@@ -8,6 +8,24 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
 
+### 2026-08-04 (session 4) — One type scale + history-tracking race + layout-cycler pulse
+
+**Scope:** owner-reported inconsistency — *"some places are smaller than others… troubling older folk needing to increase/decrease size depending if they are reading notebook entries, buttons, journal, settings screen items, or an actual letter/chapter."* Measured first: **590 font-size declarations, 103 distinct values, 15 files**, in two unrelated families (decimal in `app.css`, 16ths-based in the injected journal styles), with **ten distinct sizes between 8.8px and 10.9px**.
+
+**The ladder.** 13 steps declared once in `app.css :root`: `--fs-10 … --fs-48` (rem — scale with the one Text Size setting) plus `--fsc-10 … --fsc-48` (px twins for pinned chrome). The number in each name IS its px size at scale 1. All 578 literal declarations were snapped to their nearest step by script (explicit map, every change printed and reviewed), ties rounding DOWN so the 10px **floor** is the only deliberate upward force. `em` sizes (verse sups, ↗ marker, inline refs — parent-relative by design) and the three `clamp()` fluid headings (ends now tokens) are documented exceptions. Full reference: ARCHITECTURE.md § Type scale.
+
+**The chrome-pin sync trap, closed.** The block at the end of `app.css` freezes nav/floating chrome in px so Text Size can't balloon icons (owner's prior directive). It restated hand-computed decimals — `0.56rem` in one place, `8.96px` in another — that could drift apart silently. Each pin now names the `--fsc-N` twin of its rule's `--fs-N`.
+
+**Enforced, not just tidied:** `tools/check-type-scale.js` (npm `check:type-scale`) fails on any literal rem/px font-size outside the ladder's own declaration; wired into pre-commit and CI. Without it this decays back to 103 values one commit at a time.
+
+**Verification** (live, both viewports, against a baseline worktree at the pre-migration HEAD served side by side): Settings at 300% text went from **19 distinct sizes / 76 off-ladder** to **9 / 0**; container clipping at 300% was pre-existing (87 clipped before, 91 after, `docOverflow: 0` in both — the page never scrolls horizontally). At scale 1 every walked screen (Home, Volumes, Volume One index, a letter, Settings, desktop) reported 0 off-ladder and 0 unintended clipping. Zero console errors.
+
+**History-tracking race — owner-reported, RED-proven, root-caused.** *"Make sure bible/letter studies properly record in history."* `useNavHistoryTracking` fired once per nav change with the six nav values as deps. Every branch reads data that can arrive LATER: `BOOKS`/`MATTHEW` are lazy corpora and the study lookups resolve out of one. On a cold boot into a saved tab — or any deep link — the effect ran, found the corpus absent, `return`ed, and **never ran again**, because a corpus landing changes none of its deps. The visit was silently dropped. (The old comment claimed a later re-run would pick it up; nothing re-ran it.) Three RED tests proved it for the Bible, Matthew, and study-chapter branches. Fix: the effect drops its deps array and guards on a `recordedKeyRef` holding the nav position it has already written — so an unrecorded position retries on later renders while a recorded one is skipped until the user navigates away and back. All four branches now `done()` only after an entry is actually written. 26/26 green, including the pre-existing "does NOT re-fire when only helper identities change" contract.
+
+**Also:** the Scriptures-home layout cycler now pulses gently (2.6s opacity+color, no transform so it can't shift the 44px target under a finger, stops on hover/press, collapsed by the global `prefers-reduced-motion` block) — owner request; nobody was finding that control.
+
+**Gates:** 3,355 vitest / 188 files, lint 0, tsc, type-scale gate, build (8 bundles, SW `v1.0.2-06b2c86596`), smoke:ci desktop + 360×800.
+
 ### 2026-08-04 (session 3) — Owner retirements: backup reminder + frontier resume
 
 **Scope:** two owner-directed removals. Both features were built to spec earlier; the owner used them and didn't want them. Removed at the root, not disabled behind a flag.

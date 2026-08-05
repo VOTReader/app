@@ -164,7 +164,7 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
             { label: "New Testament", genres: SCRIPTURE_GENRES.nt }
           ].map((section) => (
             <React.Fragment key={section.label}>
-              <div className="compact-list-header" style={{ fontSize: "0.65rem", color: "var(--gold)", marginTop: "0.8rem" }}>{section.label}</div>
+              <div className="compact-list-header" style={{ fontSize: "var(--fs-10)", color: "var(--gold)", marginTop: "0.8rem" }}>{section.label}</div>
               {section.genres.map((g) => (
                 <div key={g.id} className="compact-list-group">
                   <div className="compact-list-header">{g.label}</div>
