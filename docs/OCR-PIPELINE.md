@@ -287,6 +287,60 @@ none at all) are excluded; 18 of 20 books keep a trusted series.
 
 A number that is quietly wrong is worse than no number, because everything downstream believes it.
 
+### Verdict 12 — line counting is the weakest of the four signals, and it is kept anyway
+
+Final structural agreement, 95 pages across 19 books:
+
+| signal | agreement |
+|---|---|
+| first line | 92/95 — **96.84%** |
+| last line | 89/95 — **93.68%** |
+| no missing element | 91/95 — **95.79%** |
+| line count | 81/95 — **85.26%** |
+| **all four** | 76/95 — **80.00%** |
+
+Line count is the outlier and the reason is structural: it asks the reader to do *arithmetic
+over* the page rather than *read* it. The error is noise, not bias — the vision leg over-counts
+on 41 pages, under-counts on 32 and is exact on 22. **11 of the 19 remaining disagreements are
+line-count-only**, on pages where first line, last line and every non-prose element agree, i.e.
+where the two readers demonstrably hold the same words.
+
+It is kept regardless, at its measured accuracy, for one reason: it is one of the signals that
+exposed the `letters-vol6` shift. A weak signal that is honest about being weak still
+contributes to a conjunction; the mistake would be to widen its tolerance until it stopped
+disagreeing, which would buy a prettier headline number and destroy the only thing it is for.
+
+The five `New_Testament_Study_Bible-Matthew` last-line disagreements are all verdict 10's
+stream-versus-page inversion, adjudicated against the page images: every element the vision leg
+reported is present in the text layer, in a different position in the stream. No content is
+missing from any of them.
+
+### Verdict 13 — the anchor fix, proven RED to GREEN
+
+Verdict 9's remedy was re-run against the same five `letters-vol6` pages, this time with the
+reader told to read the printed page number off each page first and warned that carry-over
+between pages was the failure being guarded against.
+
+**Folio agreement 5/5 against the extractor's independently recorded folios.** Page 21 came back
+with 0 header elements and page 31 with 5 — exactly matching the page images, and exactly
+reversing the earlier misattribution. first line, last line and elements now all pass for that
+book. The fix is proven, not assumed.
+
+### Verdict 14 — the whole-document leg, and a three-way structural agreement
+
+`gpt-5.6-luna` through the Codex CLI is the only reader here that can hold a whole book at once,
+so it gets the ask no page-at-a-time reader can attempt: *how many letters does this book
+contain, and list them all*, with the count asked separately from the list as the tripwire.
+
+On Volume Six it answered **31**, listed 31 titles, and its self-check agreed. The repo's own
+independently audited app corpus (`volume-six.js`) carries **31** letters numbered contiguously
+1–31. Three sources — a different lab's model reading the PDF text layer, that model's own
+count tripwire, and this project's separately built data files — agree exactly.
+
+Operational note worth keeping: `codex exec` **blocks on stdin** when run non-interactively.
+The first invocation produced nothing for many minutes and looked like a slow model; it was
+waiting on input. Always redirect `< /dev/null`.
+
 ---
 
 ## What the parser learned (durable)
@@ -306,6 +360,7 @@ the session that found it. All live in `tools/vot-pdf-extract.py` unless noted.
 | Compare token windows, not single lines | `judge()` (adjudicate) | scoring typesetting differences as content loss |
 | Folio as page-identity anchor | `misaligned_with_page` (adjudicate) | a reader's records shifted onto the wrong pages |
 | Bare page numbers aren't missing elements | `judge()` (adjudicate) | the checker flagging its own documented behaviour |
+| Multi-page vision asks read the folio first | the ask itself (verdict 13) | per-page records silently shifting onto the wrong page |
 
 Two rules of thumb earned the hard way, worth keeping at the top of any future run:
 
