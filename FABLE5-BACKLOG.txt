@@ -310,8 +310,19 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      ranks by marks-per-1k-words (countItemWords via bookItemsFor /
      findEntryContext.entry); unresolved-corpus sources fall back to raw
      count. My Progress tally shows "N marks · D/1k words".
-[29] DENSITY SURFACES — (a) Matthew Study commentary-weight badge
-     (60,183 note-words vs 23,221 text); (b) search-hit depth. Niche.
+[29] DENSITY SURFACES — (b) DROPPED 2026-08-04, with reason: 31,102 of
+     31,751 index docs are single-verse docs where "depth" is always 1,
+     group-level counts already ship (SrchGroup), and positional depth is
+     unmappable because index-builder flattens a letter to one string with
+     no block offsets. Investigating (b) DID surface a live P1 — the
+     Matthew Study Bible contributed ZERO search documents (fixed; see
+     HISTORY 08-04 s6) — which was worth more than both halves.
+     (a) Matthew commentary-weight badge STILL OPEN. Measured for real:
+     verse text 23,221 words / 1,071 verses vs votNotes 49,752 words / 627
+     notes = 2.14x commentary, ranging 0.00x (ch 2) to 8.43x (ch 24). Note
+     the contract: study panels are supplemental and excluded from
+     countItemWords by design (same call as the prophecy cards), so a badge
+     must be a SEPARATE signal, not a change to the ~N min chip.
 [30] STORAGE GROWTH SPARKLINE — DONE 2026-08-04. Settings → Your Data →
      "Growth": a sentence (the actual feature) + aria-hidden div bars.
      Samples ride the already-registered `meta` IDB store — no new

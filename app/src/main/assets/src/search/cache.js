@@ -29,7 +29,11 @@ const STORE = 'idx';
 const KEY = 'index';
 
 /** Bump on any index-builder doc-shape OR search-config change (busts all caches). */
-export const MS_INDEX_VERSION = 'm1';
+/* m2 (2026-08-04): the Matthew Study Bible's 1,071 verses now reach the
+   index — the builder had been looping over a `sections` key matthew.js
+   never had, so every cached index built before this is missing them and
+   MUST be discarded rather than reused. */
+export const MS_INDEX_VERSION = 'm2';
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */

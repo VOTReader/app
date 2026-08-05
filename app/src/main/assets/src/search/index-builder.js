@@ -180,6 +180,20 @@ export function buildDocs(options) {
   if (typeof MATTHEW !== 'undefined' && MATTHEW.chapters) {
     for (let ci = 0; ci < MATTHEW.chapters.length; ci++) {
       const mCh = MATTHEW.chapters[ci];
+      // matthew.js chapters expose `verses` DIRECTLY — the file has no
+      // `sections` key anywhere (28 chapters, 0 sections, 1,071 verses in the
+      // shipped corpus). Until 2026-08-04 this loop read `mCh.sections || []`
+      // and therefore contributed ZERO documents: the Matthew Study Bible was
+      // entirely unsearchable, and the unit fixture hid it by carrying a
+      // `sections` wrapper production never had. The sections branch is kept
+      // as a fallback for the Format-C nested shape, but verses-first is the
+      // real path.
+      if (Array.isArray(mCh.verses) && mCh.verses.length) {
+        for (let vi = 0; vi < mCh.verses.length; vi++) {
+          pushVerse('volumes', 'matthew', 'Matthew', mCh.num, mCh.verses[vi].n, mCh.verses[vi].text, mCh.title || '');
+        }
+        continue;
+      }
       const mSections = mCh.sections || [];
       for (let si = 0; si < mSections.length; si++) {
         const mSec = mSections[si];

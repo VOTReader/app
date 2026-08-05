@@ -27,10 +27,16 @@ const GLOBALS = {
       ] }] }],
     },
   },
+  // PRODUCTION SHAPE: matthew.js chapters expose `verses` DIRECTLY — the file
+  // contains no `sections` key at all (verified against the shipped corpus:
+  // 28 chapters, 0 sections, 1,071 verses). This fixture used to carry a
+  // `sections` wrapper that production never had, which is precisely why the
+  // builder's `mCh.sections || []` loop looked correct in tests while
+  // contributing ZERO Matthew documents to the real index.
   MATTHEW: {
-    chapters: [{ num: 5, title: 'Chapter 5', sections: [{ heading: 'Sermon on the Mount', verses: [
+    chapters: [{ num: 5, title: 'Chapter 5', verses: [
       { n: 3, text: 'Blessed are the poor in spirit, restored reading.' },
-    ] }] }],
+    ] }],
   },
   LETTERS_V1_PREFACE: { id: 'v1-preface', num: 0, title: 'A Word of Warning', blocks: [{ segments: [{ v: 'Hear the word of warning.' }] }] },
   LETTERS_V1: [{ id: 'the-wide-path', num: 1, title: 'The Wide Path', blocks: [{ segments: [{ v: 'Broad is the way that leads to destruction.' }] }] }],
@@ -124,5 +130,41 @@ describe('buildDocs (narrow index scope)', () => {
     expect(study).toMatchObject({ letterId: 'study-faith', chapterNum: 1, volumeId: 'bible-studies' });
     expect(study.title).toBe('On Faith — Beginnings');
     expect(study.text).toContain('Faith is the substance');
+  });
+});
+
+/* ── Matthew Study Bible reaches the index (2026-08-04) ──────────────────
+   The builder looped over `mCh.sections`, a key matthew.js does not have,
+   so the Study Bible contributed ZERO documents and was unsearchable. The
+   old fixture carried a sections wrapper production never had, which is
+   exactly why a green suite reported nothing. These lock the real shape. */
+describe('Matthew Study Bible indexing', () => {
+  let prevData;
+  beforeAll(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
+  });
+  afterAll(() => {
+    window.VotSearchData = prevData;
+    for (const k of Object.keys(GLOBALS)) delete globalThis[k];
+  });
+
+  it('indexes chapters whose verses hang directly off the chapter', () => {
+    const docs = buildDocs({ translation: 'nkjv' });
+    const mt = docs.filter((d) => d.corpus === 'volumes' && d.bookId === 'matthew');
+    expect(mt.length).toBeGreaterThan(0);
+    expect(mt[0].text).toContain('restored reading');
+  });
+
+  it('still handles the nested sections shape if a corpus ever uses it', () => {
+    const prev = /** @type {any} */ (globalThis).MATTHEW;
+    /** @type {any} */ (globalThis).MATTHEW = {
+      chapters: [{ num: 9, title: 'Ch 9', sections: [{ heading: 'H', verses: [{ n: 1, text: 'nested shape verse' }] }] }],
+    };
+    const docs = buildDocs({ translation: 'nkjv' });
+    const mt = docs.filter((d) => d.corpus === 'volumes' && d.bookId === 'matthew');
+    expect(mt.some((d) => d.text.includes('nested shape verse'))).toBe(true);
+    /** @type {any} */ (globalThis).MATTHEW = prev;
   });
 });
