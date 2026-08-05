@@ -40,18 +40,56 @@ EDGE_LINES = 2
 THIN_RATIO = 0.25  # of this book's median page
 
 
-def clean(text: str) -> str:
+EDGE_BAND = 0.08      # top/bottom 8% of the page height is where chrome lives
+RUNHEAD_MIN_SHARE = 0.30   # a string must recur in that band on 30% of pages to be chrome
+
+
+def edge_lines(page) -> list:
+    """Short text lines physically sitting in the top or bottom band of the page.
+
+    Position in the extracted text STREAM is not position on the PAGE — this corpus proved it.
+    The Matthew study bible emits its running footer ("MATTHEW", the folio, "CHAPTER 9") as the
+    FIRST lines of the text layer even though they are printed at the FOOT of the page, so an
+    edge heuristic counting lines from the start or end of the stream identifies the wrong ones.
+    Geometry is the honest signal: ask where the ink actually is.
+    """
+    h = page.rect.height
+    out = []
+    for blk in page.get_text("dict").get("blocks", []):
+        for line in blk.get("lines", []):
+            y = line["bbox"][1]
+            if y > h * EDGE_BAND and y < h * (1 - EDGE_BAND):
+                continue
+            s = "".join(sp.get("text", "") for sp in line.get("spans", [])).strip()
+            if s and len(s) <= 60:
+                out.append(s)
+    return out
+
+
+def clean(text: str):
+    """Return (cleaned_text, folio) — and never silently discard the folio.
+
+    Stripping the printed page number is right for the body text and wrong to do quietly. The
+    folio is the one piece of a page that identifies *which page it is*, independent of its
+    content, so it is the natural anchor for checking that any other reader was looking at the
+    page it claims. It is returned, recorded per page in inventory.json, and used by
+    vot-pdf-adjudicate.py both to reconcile line counts and to catch a reader whose per-page
+    records have slipped out of alignment. (Learned 2026-08-05: a vision batch misattributed
+    every record by one page, and the folio is what makes that detectable for free.)
+    """
     for bad, good in LIGATURES.items():
         text = text.replace(bad, good)
     text = text.replace("­", "")  # soft hyphen
     lines = text.split("\n")
-    keep = []
+    keep, folio = [], None
     for i, ln in enumerate(lines):
         s = ln.strip()
         if BARE_NUMBER.match(s) and (i < EDGE_LINES or i >= len(lines) - EDGE_LINES):
+            if folio is None:
+                folio = s
             continue
         keep.append(ln.rstrip())
-    return "\n".join(keep).strip()
+    return "\n".join(keep).strip(), folio
 
 
 def headings(doc) -> list:
@@ -83,17 +121,51 @@ def extract(pdf: pathlib.Path) -> dict:
     dest.mkdir(parents=True, exist_ok=True)
     doc = fitz.open(pdf)
 
+    # Pass 1: what sits in the page's edge bands, and how often. A string is a running head
+    # only if it RECURS there across the book — frequency is content-independent, so it cannot
+    # mistake a one-off line of text that happens to fall near the page edge for chrome.
+    edge_seen, edge_per_page = {}, []
+    for page in doc:
+        e = edge_lines(page)
+        edge_per_page.append(e)
+        for s in set(e):
+            edge_seen[s] = edge_seen.get(s, 0) + 1
+    threshold = max(3, doc.page_count * RUNHEAD_MIN_SHARE)
+    running_heads = sorted(s for s, c in edge_seen.items() if c >= threshold and not s.isdigit())
+
     pages, page_meta = [], []
     for i, page in enumerate(doc):
         raw = page.get_text()
-        body = clean(raw)
+        body, folio = clean(raw)
+        # Geometry beats stream position: if the stream-order heuristic missed the folio, take
+        # the bare number sitting in the page's edge band instead.
+        if not folio:
+            for s in edge_per_page[i]:
+                if s.isdigit() and len(s) <= 4:
+                    folio = s
+                    break
+        if not folio:
+            # A folio is not always alone on its line. The Matthew study bible prints
+            # "MATTHEW   36   CHAPTER 9" as one composite footer, so the number has to be
+            # picked out of a short chrome line rather than matched against the whole line.
+            for s in edge_per_page[i]:
+                parts = s.split()
+                if len(parts) > 6:
+                    continue
+                nums = [p for p in parts if p.isdigit() and len(p) <= 4]
+                if len(nums) == 1:
+                    folio = nums[0]
+                    break
         (dest / f"page_{i:04d}.txt").write_text(body, encoding="utf-8")
         pages.append(body)
         page_meta.append({
             "page": i + 1,
             "label": page.get_label() or "",
+            "folio": folio or "",
+            "running_heads": [s for s in edge_per_page[i] if s in running_heads],
             "chars": len(body),
             "words": len(body.split()),
+            "lines": len([ln for ln in body.split("\n") if ln.strip()]),
             "images": len(page.get_images(full=True)),
         })
 
@@ -111,6 +183,36 @@ def extract(pdf: pathlib.Path) -> dict:
         "imageonly_pages": [m["page"] for m in page_meta
                             if m["chars"] == 0 and m["images"] > 0],
     }
+    # Folio continuity: consecutive pages that both print a folio should differ by exactly 1.
+    # This is content-independent and catches a page map that has gone wrong — a page extracted
+    # twice, a page missed, or a PDF whose physical order does not match its printed order.
+    folio_breaks = []
+    prev_page, prev_folio = None, None
+    for m in page_meta:
+        if not m["folio"].isdigit():
+            continue
+        f = int(m["folio"])
+        if prev_folio is not None and m["page"] == prev_page + 1 and f != prev_folio + 1:
+            folio_breaks.append({"page": m["page"], "folio": f, "prev_folio": prev_folio})
+        prev_page, prev_folio = m["page"], f
+    # A folio series is only useful if it actually counts. When the extracted numbers do not
+    # advance by one across most of the book, the heuristic has picked up something that is not
+    # a page number (the Matthew study bible prints "MATTHEW 36 CHAPTER 9" in its footer, and a
+    # naive read takes the chapter number), so the honest move is to declare the series
+    # untrustworthy and drop it rather than to guess harder. A validator that reports its own
+    # unreliability is worth more than a heuristic that quietly emits plausible wrong numbers.
+    folio_count = sum(1 for m in page_meta if m["folio"])
+    trustworthy = folio_count > 0 and len(folio_breaks) <= max(3, folio_count * 0.05)
+    if not trustworthy:
+        for m in page_meta:
+            m["folio"] = ""
+    flags["running_heads"] = running_heads[:20]
+    flags["folio_pages"] = folio_count if trustworthy else 0
+    flags["folio_pages_rejected"] = 0 if trustworthy else folio_count
+    flags["folio_trustworthy"] = trustworthy
+    flags["folio_breaks"] = folio_breaks[:20]
+    flags["folio_break_count"] = len(folio_breaks)
+
     toc = headings(doc)
     shaped = heading_shaped(pages)
     flags["outline_headings"] = len(toc)
