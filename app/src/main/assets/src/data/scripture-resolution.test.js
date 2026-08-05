@@ -257,6 +257,35 @@ describe('splitCompoundRef', () => {
       .toEqual(['2 Kings 2:11', 'Jude 1:9', 'Revelation 11:3-7']);
     expect(refs('Psalm 65:7; 89:9; 107:29')).toEqual(['Psalm 65:7', 'Psalm 89:9', 'Psalm 107:29']);
   });
+  it('a comma tail that spells out its OWN book gets its own part', () => {
+    /* The owner's report: "if 3 different passages from revelation fall under
+       one footnote ref, there must be a tap-through link for each one." A
+       corpus audit found 35 of 66 compound refs lossy this way — 56 passages
+       with no tap target at all — because the comma-tail branch only handled
+       BOOKLESS numeric tails. Every string below ships today. */
+    expect(refs('Matthew 22:32, Mark 12:27')).toEqual(['Matthew 22:32', 'Mark 12:27']);
+    expect(refs('Revelation 12:17, Revelation 14:12')).toEqual(['Revelation 12:17', 'Revelation 14:12']);
+    expect(refs('1 John 2:4, Revelation 12:17, Revelation 14:12'))
+      .toEqual(['1 John 2:4', 'Revelation 12:17', 'Revelation 14:12']);
+    expect(refs('Revelation 1:4, Revelation 1:8, Revelation 11:17'))
+      .toEqual(['Revelation 1:4', 'Revelation 1:8', 'Revelation 11:17']);
+    expect(refs('Deuteronomy 4:2, Deuteronomy 12:32, Proverbs 30:6, Revelation 22:18'))
+      .toEqual(['Deuteronomy 4:2', 'Deuteronomy 12:32', 'Proverbs 30:6', 'Revelation 22:18']);
+    expect(refs('2 Peter 2:6, Jude 1:7')).toEqual(['2 Peter 2:6', 'Jude 1:7']);
+    expect(refs('Isaiah 42:16, Isaiah 45:2 (NKJV)')).toEqual(['Isaiah 42:16', 'Isaiah 45:2']);
+  });
+  it('a book named by a comma tail becomes what LATER bookless tails inherit', () => {
+    expect(refs('Matthew 22:32, Mark 12:27, 13:1'))
+      .toEqual(['Matthew 22:32', 'Mark 12:27', 'Mark 13:1']);
+  });
+  it('prose that merely contains commas still yields NO parts', () => {
+    /* parseRefStr's loose book-prefix fallback will happily read "through the
+       144" (out of "…the 144,000…") as a reference, so a lettered tail must
+       carry an explicit chapter:verse before it is parsed standalone. This
+       exact string ships in matthew.js. */
+    expect(refs('These verses have a two-fold fulfillment: First through John the Baptist (Matthew 11:14); then in the Day of The Lord, through the 144,000 (The Volumes of Truth, Volume Three, “The Last Trump”)')).toEqual([]);
+    expect(refs('Isaiah 12:2, and later that day')).toEqual(['Isaiah 12:2']);
+  });
   it('handles a mixed compound (semicolons AND commas, with carry-forward)', () => {
     expect(refs('Matthew 5:3-4, 7; John 3:16')).toEqual(['Matthew 5:3-4', 'Matthew 5:7', 'John 3:16']);
     expect(refs('Daniel 9:27, 30; 11:31')).toEqual(['Daniel 9:27', 'Daniel 9:30', 'Daniel 11:31']);
@@ -399,12 +428,19 @@ describe('lookupVersesFromBooks', () => {
       '16. For God so loved the world 17. For God did not send His Son to condemn 18. He who believes is not condemned'
     );
   });
-  it('SCRIP-3: resolves a compound ";"-joined ref by resolving each part', () => {
+  it('SCRIP-3: resolves a compound ref part-by-part, through the SHARED splitter', () => {
     expect(lookupVersesFromBooks('Genesis 1:1; Psalms 23:1')).toBe('In the beginning The Lord is my shepherd');
     // a single ref is unchanged
     expect(lookupVersesFromBooks('John 3:16')).toBe('For God so loved the world');
-    // a COMMA list stays one ref's verse list (NOT split into distinct refs — parseRefStr owns it)
-    expect(lookupVersesFromBooks('1 Corinthians 13:4,5')).toBe('Love suffers long');
+    /* COMMA compounds now resolve part-by-part too (2026-08-04). This used to
+       assert 'Love suffers long' — verse 5's text was simply invisible,
+       because a comma list fell through to parseRefStr, which reads the head
+       and drops the tail. Decomposition now goes through splitCompoundRef,
+       the same splitter the tap targets use, so the buttons and the verse
+       text can no longer disagree about what a reference contains. */
+    expect(lookupVersesFromBooks('1 Corinthians 13:4,5')).toBe('Love suffers long does not behave rudely');
+    // …and the shape the owner reported: a comma tail naming its own book.
+    expect(lookupVersesFromBooks('Genesis 1:1, Psalms 23:1')).toBe('In the beginning The Lord is my shepherd');
   });
 });
 

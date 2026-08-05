@@ -140,6 +140,10 @@ export function parseRefStr(str) {
    verse — the reader lands at the top of the passage and reads on. ZERO refs of
    this shape ship in the corpus today; this is robustness, not a live fix. */
 const _CROSS_CHAPTER_TAIL = /:(\d+)\s*-\s*\d+\s*:\s*\d+\s*$/;
+/* A comma tail that spells out its own book: at least one letter AND an
+   explicit chapter:verse ("Mark 12:27", "Isaiah 45:2 (NKJV)"). The
+   chapter:verse requirement is the prose guard — see splitCompoundRef. */
+const _TAIL_WITH_BOOK = /[A-Za-z].*\d+\s*:\s*\d+/;
 
 /** Canonical single-range ref string rebuilt from parsed parts (drops "(TAG)"). */
 function _partRef(p) {
@@ -193,15 +197,33 @@ export function splitCompoundRef(refStr) {
       if (i === 0) {
         parsed = parseRefStr(base);
         if ((!parsed || !parsed.chapter) && carryBook) parsed = parseRefStr(carryBook + ' ' + base);
-      } else if (segBook && segChapter != null && /^\d/.test(base)) {
-        // A comma tail inherits the book, and the chapter too UNLESS it names
-        // its own ("Exodus 20:12, 21:17" — matthew.js ships exactly this).
-        parsed = parseRefStr(/^\d+\s*:/.test(base)
-          ? segBook + ' ' + base
-          : segBook + ' ' + segChapter + ':' + base);
+      } else {
+        // A comma tail can name its OWN book — "Matthew 22:32, Mark 12:27",
+        // "1 John 2:4, Revelation 12:17, Revelation 14:12". Try it standalone
+        // FIRST. Until 2026-08-04 this branch only handled bookless numeric
+        // tails, so every tail that spelled out a book was silently dropped
+        // and those passages had no tap target at all: 35 of the corpus's 66
+        // compound refs, 56 passages in total. parseRefStr is strict enough
+        // that a prose chunk ("then in the Day of The Lord") still parses to
+        // nothing, so this cannot invent targets out of commas in sentences.
+        // Require an explicit chapter:verse before trying a lettered tail
+        // standalone. parseRefStr's loose book-prefix fallback is happy to
+        // read "through the 144" (out of "…the 144,000…") as a reference, so
+        // prose that merely contains commas would otherwise sprout a bogus
+        // tap target. Every real compound tail in the corpus is Book C:V.
+        if (_TAIL_WITH_BOOK.test(base)) parsed = parseRefStr(base);
+        if ((!parsed || !parsed.chapter) && segBook && segChapter != null && /^\d/.test(base)) {
+          // Bookless tail: inherit the book, and the chapter too UNLESS it
+          // names its own ("Exodus 20:12, 21:17" — matthew.js ships this).
+          parsed = parseRefStr(/^\d+\s*:/.test(base)
+            ? segBook + ' ' + base
+            : segBook + ' ' + segChapter + ':' + base);
+        }
       }
       if (!parsed || !parsed.chapter) return;
-      if (i === 0) { segBook = parsed.rawBook; segChapter = parsed.chapter; carryBook = parsed.rawBook; }
+      // Whichever chunk supplied a book becomes what later bookless chunks
+      // inherit — "Matthew 22:32, Mark 12:27, 13:1" ends at Mark 13:1.
+      if (i === 0 || _TAIL_WITH_BOOK.test(base)) { segBook = parsed.rawBook; segChapter = parsed.chapter; carryBook = parsed.rawBook; }
       out.push({ ref: _partRef(parsed), index, parsed });
     });
   });
@@ -408,15 +430,21 @@ export function findEntryContext(id, kindHint) {
  * @returns {string | null}
  */
 export function lookupVersesFromBooks(ref) {
-  // SCRIP-3: a compound ref ("Isaiah 40:13; Romans 11:34") holds multiple DISTINCT
-  // references joined by ';'. Resolve each and join, so a compound token resolves from
-  // the BOOKS corpus without depending on a hardcoded combined-key entry in a letter's
-  // scriptures dict. (Commas are NOT split — parseRefStr already treats "3:16,17" as a
-  // single ref's verse list.)
-  if (typeof ref === 'string' && ref.indexOf(';') >= 0) {
-    const parts = ref.split(';').map((r) => r.trim()).filter(Boolean);
+  // SCRIP-3: a compound ref holds multiple DISTINCT passages. Resolve each and
+  // join, so a compound resolves from the BOOKS corpus without depending on a
+  // hardcoded combined-key entry in a letter's scriptures dict.
+  //
+  // Decomposition goes through splitCompoundRef (2026-08-04) — the SAME
+  // splitter the tap targets use. It used to split on ';' alone, so a
+  // comma-joined compound ("Matthew 22:32, Mark 12:27") fell through to
+  // parseRefStr, which reads the head and drops the tail: the sheet offered a
+  // button for each passage but showed the verse text of only the first. One
+  // splitter means navigation and text can no longer disagree about what the
+  // parts of a reference are.
+  if (typeof ref === 'string' && /[;,]/.test(ref)) {
+    const parts = splitCompoundRef(ref);
     if (parts.length > 1) {
-      const texts = parts.map((r) => lookupVersesFromBooks(r)).filter(Boolean);
+      const texts = parts.map((p) => lookupVersesFromBooks(p.ref)).filter(Boolean);
       return texts.length ? texts.join(' ') : null;
     }
   }

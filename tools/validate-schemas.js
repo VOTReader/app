@@ -24,7 +24,7 @@ import { createContext, runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
-import { COLLECTIONS, parseRefStr, findBook } from '../app/src/main/assets/src/data/scripture-resolution.js';
+import { COLLECTIONS, parseRefStr, findBook, splitCompoundRef } from '../app/src/main/assets/src/data/scripture-resolution.js';
 import { splitFormatBInline } from '../app/src/main/assets/src/utils/format-b-inline.js';
 // The SAME counting module the app ships (word-count.js) — the baseline gate
 // and every in-app display derive from one definition, so they cannot drift.
@@ -62,6 +62,35 @@ function isBareScriptureRef(text) {
   const t = String(text || '').trim();
   if (!t || t.length > 45 || !BARE_REF_SHAPE.test(t)) return false;
   return !!parseRefStr(t);
+}
+
+// ── Compound-ref completeness (the 2026-08-04 owner report) ──────
+// "If 3 different passages from Revelation fall under one footnote ref, there
+// must be a tap-through link for each one." Every surface that makes a ref
+// tappable per-passage decomposes it with splitCompoundRef, so a chunk the
+// splitter drops is a passage the reader cannot reach. An audit found 35 of
+// the corpus's 66 compound refs lossy this way — 56 unreachable passages —
+// because comma tails that spelled out their own book were never parsed.
+// This gate keeps that closed: every `;`/`,` chunk that is ENTIRELY a
+// reference (BARE_REF_SHAPE — so prose containing commas is not checked, and
+// bookless numeric tails like ", 7" are covered by the splitter's own tests)
+// must show up in the splitter's output.
+const _norm = (s) => String(s).replace(/\s*\([^)]*\)\s*$/, '').replace(/\s+/g, ' ').trim();
+function compoundRefGaps(ref) {
+  if (typeof ref !== 'string' || !/[;,]/.test(ref)) return [];
+  const parts = splitCompoundRef(ref).map((p) => _norm(p.ref));
+  const gaps = [];
+  for (const raw of ref.replace(/[–—]/g, '-').split(';').flatMap((s) => s.split(','))) {
+    const chunk = raw.trim();
+    // Entirely-a-reference AND carrying an explicit chapter:verse. The colon
+    // requirement is the prose guard: BARE_REF_SHAPE alone also matches a
+    // chapter-only phrase like "through the 144" (out of "…the 144,000…"),
+    // which would flag a sentence as an unreachable passage. Every real
+    // compound tail in the corpus is Book C:V.
+    if (!chunk || !BARE_REF_SHAPE.test(chunk) || !/\d+\s*:\s*\d+/.test(chunk)) continue;
+    if (!parts.includes(_norm(chunk))) gaps.push(chunk);
+  }
+  return gaps;
 }
 
 // ── CORP-2: cross-reference resolution ───────────────────────────
@@ -1972,10 +2001,16 @@ function runCli() {
           console.error(`  ERROR: [${where}] ${kind} "${ref}" has no dict text and does not resolve in the Bible corpus — renders a BLANK sheet.`);
           refErrors++;
         };
+        const failCompound = (ref, kind, gaps) => {
+          console.error(`  ERROR: [${where}] ${kind} "${ref}" — no tap target for: ${gaps.join(' | ')} (splitCompoundRef drops them).`);
+          refErrors++;
+        };
         for (const fn of Object.values(owner.footnotes || {})) {
           if (fn && fn.type === 'scripture' && typeof fn.ref === 'string' && fn.ref) {
             checked++;
             if (!dictText(fn.ref) && !resolvesInBible(fn.ref)) fail(fn.ref, 'scripture footnote');
+            const gaps = compoundRefGaps(fn.ref);
+            if (gaps.length) failCompound(fn.ref, 'scripture footnote', gaps);
           }
         }
         // inline {{ref:…}} anywhere in the owner's rendered content (block
@@ -1989,6 +2024,8 @@ function runCli() {
               const ref = m[1].trim();
               checked++;
               if (!dictText(ref) && !resolvesInBible(ref)) fail(ref, 'inline {{ref}}');
+              const gaps = compoundRefGaps(ref);
+              if (gaps.length) failCompound(ref, 'inline {{ref}}', gaps);
             }
             return;
           }

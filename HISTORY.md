@@ -45,6 +45,20 @@ These are the dated “Current state / Previous state” narrative entries that 
 
 **Gates after the audit batch:** 3,364 vitest / 188 files, lint 0, tsc, type-scale, schema validate (3,120 items, 0 errors), build (SW `v1.0.2-cb26eb2989`), smoke:ci ×2, e2e:read PASS.
 
+**Then: compound footnote refs — every passage is now reachable.** Owner report: *"if 3 different passages from revelation fall under one footnote ref, there must be a tap-through link for each one. This will need a comprehensive audit of all compound/special footnote refs in the app."*
+
+Audited by running **every** compound ref in the corpus through the shared `splitCompoundRef` and diffing against its `;`/`,` chunks: **35 of 66 compound refs were lossy — 56 passages with no tap target at all.** Root cause: the comma-tail branch only handled *bookless numeric* tails (`"Matthew 5:3-4, 7"`, `"Exodus 20:12, 21:17"`). A tail that spelled out its own book — `"Matthew 22:32, Mark 12:27"`, `"1 John 2:4, Revelation 12:17, Revelation 14:12"` — was never parsed, so everything after the first passage was silently dropped. (An earlier pass over-counted at 102/108 because matthew.js's `"ref"` is a *local verse anchor* and its references live in `"cite"`; re-scanned with the right fields before touching anything.)
+
+Fixed at the splitter, so all four surfaces inherit it (footnote sheet, scripture sheet, end-of-letter footnote list, journal `{{ref:}}` chips): a comma tail is now parsed standalone first, falling back to book/chapter inheritance, and whichever chunk supplied a book becomes what later bookless tails inherit (`"Matthew 22:32, Mark 12:27, 13:1"` ends at Mark 13:1). A first attempt regressed prose — `parseRefStr`'s loose book-prefix fallback happily reads `"through the 144"` out of `"…the 144,000…"` — so a lettered tail must now carry an explicit chapter:verse before it is parsed standalone.
+
+**The verse TEXT had the same split.** `lookupVersesFromBooks` decomposed on `;` only, so a comma compound fell through to `parseRefStr`, which reads the head and drops the tail: the sheet would offer a button per passage but show the text of only the first. It now decomposes through the same `splitCompoundRef`. One splitter means navigation and text can no longer disagree about what a reference contains. (A pinned test asserted the old lossy result for `"1 Corinthians 13:4,5"` — verse 5's text was simply invisible; updated with the reason.)
+
+**Gated permanently:** `validate-schemas.js` now fails any footnote ref or inline `{{ref}}` whose `;`/`,` chunks include a complete reference the splitter drops. RED-proven non-vacuous — reverting the splitter fix makes it flag **49** footnote refs, including the owner's exact case; with the fix, 0. Prose is excluded by requiring an explicit chapter:verse, so a sentence with commas can't be mistaken for an unreachable passage.
+
+**Live proof:** Volume One → "Remember The Sabbath…" → its 7-passage footnote renders **7 separate "Go to Scripture" buttons** (`1 John 2:3-4 | 1 John 3:22-24 | 1 John 5:2-3 | 2 John 1:6 | Revelation 12:17 | Revelation 14:12 | Revelation 22:14`) in the running app. It rendered one before.
+
+**Gates:** 3,367 vitest / 188 files, lint 0, tsc, schema validate 3,120 items / 0 errors, build (SW `v1.0.2-47d81c123e`).
+
 ### 2026-08-04 (session 3) — Owner retirements: backup reminder + frontier resume
 
 **Scope:** two owner-directed removals. Both features were built to spec earlier; the owner used them and didn't want them. Removed at the root, not disabled behind a flag.
