@@ -110,3 +110,7 @@ quality-uplift-plan.txt
 # one-shot audit intermediates (regenerate via tools/_audit-extract-html.py + _audit-dump-app.mjs)
 tools/_audit-app.json
 tools/_audit-html.json
+
+# ─── VOT source PDFs (780 MB, re-downloadable via tools/vot-pdf-fetch.py) ──
+# MANIFEST.json is tracked so the exact set + sha256 of every PDF is in git.
+source-pdfs/*.pdf
