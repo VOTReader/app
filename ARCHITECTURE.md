@@ -1084,6 +1084,25 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 
 ---
 
+## Lazy corpora — the contract, the one race class, and why it stays (2026-08-04)
+
+Four lazy loaders hang off `window`: `__bibleCorpus`/`__loadBibleCorpus` (BOOKS), `__matthewCorpus` (MATTHEW), `__votCorpus` (the letter corpora), `__screensE` (Settings/Search/Garden). Each is idempotent and **async-notify-only** — it never bumps state synchronously, which is what makes the render-phase kick inside `_corpusView` safe.
+
+**The rule.** `useLazyBundles` subscribes App() to all four versions, so anything read **during render** self-heals when a corpus lands. The one shape that does NOT self-heal is an **effect that reads a corpus and has a dependency array not containing a corpus signal**: it fires once, finds the global absent, returns, and never runs again — a corpus arriving changes none of its deps. That is precisely how Bible/Matthew/study visits were being dropped from History before this session.
+
+So: **any effect that reads a lazy corpus (directly, or through `_findLetter` / `getStudyById` / `findEntryContext` / `_allBooks` / `_matthew`) must either have no dependency array or carry its own retry.** As of 2026-08-04 exactly three effects read one, and all three are dep-less: `use-android-back.js` (registers a handler that reads at event time), `use-nav-history-tracking.js` (dep-less + a `recordedKeyRef` fire-once guard), `use-reading-position-nav.js`. No `useMemo`/`useState` initializer captures a corpus. `SearchScreen` `Promise.all`s all three corpora before `E.init()`, so the index can never be built against a partial corpus.
+
+**Is lazy loading still warranted?** Measured, not assumed (desktop Chrome, local server, current build):
+
+| | bytes | starts at |
+|---|---|---|
+| boot path: bundle-a + b + c + d | **960 KB** | 29–53 ms → **DOMContentLoaded 65 ms** |
+| `bundle-a-vot` | 2,144 KB | 79 ms (after interactive) |
+| `bundle-a-bible` | 4,878 KB | 123 ms (after interactive) |
+| `bundle-a-matthew` | 481 KB | only when a Matthew surface asks |
+
+**Keep it.** Laziness removes ~7.5 MB from the first-paint path while still delivering the corpora within ~60 ms of interactive — and a mid-range Android WebView parses JS several times slower than this desktop measurement, which is the environment the boot budget actually exists for (the Q8 work that created these bundles took bundle-a from 11.7 MB to ~816 KB). Note what it is *not*: `HomeScreen` pre-warms the Bible corpus for Surprise, so this is **deferral, not avoidance** — the bytes still arrive on almost every session. The win is the paint, not the traffic. Making the corpora eager would buy nothing and put 7.5 MB back in front of the first frame.
+
 ## Section 6 — Critical rendering paths
 
 ### 6.1 Footnote tap behavior

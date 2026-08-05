@@ -59,6 +59,12 @@ Fixed at the splitter, so all four surfaces inherit it (footnote sheet, scriptur
 
 **Gates:** 3,367 vitest / 188 files, lint 0, tsc, schema validate 3,120 items / 0 errors, build (SW `v1.0.2-47d81c123e`).
 
+**Finally: a lazy-loading race sweep + a verdict on lazy loading itself** (owner: *"Make sure there's no race conditions, particularly involving lazy loading. Evaluate app as a whole, is lazy loading even needed in general for this application?"*).
+
+The race class is the one the History bug belonged to: an **effect that reads a lazy corpus with a dependency array that contains no corpus signal** fires once, finds the global absent, and never runs again. Swept all 34 lazy-global read sites plus every indirect reader (`_findLetter` / `getStudyById` / `findEntryContext` / `_allBooks` / `_matthew`): exactly **three** effects read a corpus and **all three are dep-less** (`use-android-back` registers a handler that reads at event time; `use-nav-history-tracking` after today's fix; `use-reading-position-nav`). No `useMemo`/`useState` initializer captures one. Everything else reads during render, where `useLazyBundles`' four `useSyncExternalStore` subscriptions re-run it on the version bump. `SearchScreen` `Promise.all`s all three corpora before `E.init()`, so the search index can't be built against a partial corpus. **Class closed**, and the rule is now written into ARCHITECTURE.md so it can't be reintroduced silently.
+
+**Verdict on lazy loading: keep it — measured, not assumed.** Boot path (a+b+c+d) is **960 KB → DOMContentLoaded at 65 ms**; `bundle-a-vot` (2,144 KB) starts at 79 ms and `bundle-a-bible` (4,878 KB) at 123 ms, i.e. *after* interactive; `bundle-a-matthew` (481 KB) only on demand. Laziness keeps ~7.5 MB off the first-paint path and costs ~60 ms of deferral on desktop — and a mid-range Android WebView parses several times slower, which is the environment the boot budget exists for. Worth naming honestly: `HomeScreen` pre-warms the Bible corpus for Surprise, so this is **deferral, not avoidance** — the win is the paint, not the traffic.
+
 ### 2026-08-04 (session 3) — Owner retirements: backup reminder + frontier resume
 
 **Scope:** two owner-directed removals. Both features were built to spec earlier; the owner used them and didn't want them. Removed at the root, not disabled behind a flag.
