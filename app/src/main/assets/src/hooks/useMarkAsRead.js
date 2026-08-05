@@ -176,12 +176,22 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
       // Manual toggles are a claim, not a measurement, and skip it.
       if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
         try {
-          ReadingStatsStore.recordCompletion({
+          const newlyUnlocked = ReadingStatsStore.recordCompletion({
             key,
             words: payload.words,
             activeMs: payload.activeMs,
             wasReadBefore: !!prev,
           });
+          // BACKLOG [23]: reading milestones reuse the journal's toast, so
+          // a reader who hits both on the same day gets one consistent
+          // treatment rather than two. Only the FIRST is shown — several
+          // can cross at once (a long read can trip a words and an items
+          // threshold together) and stacking toasts would cover the text
+          // the reader just finished.
+          if (Array.isArray(newlyUnlocked) && newlyUnlocked.length &&
+              typeof jrnShowMilestoneToast === 'function') {
+            jrnShowMilestoneToast(newlyUnlocked[0]);
+          }
         } catch (e) { console.warn('reading-stats record failed', e); }
       }
       // Streak coherence (2026-08-03 UX walk): a VERIFIED completed read is

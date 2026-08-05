@@ -244,6 +244,44 @@ function DataInfoRow({ label, value = null, children = null }) {
   );
 }
 
+/* StorageTrendValue — BACKLOG [30]. How the reader's own data has grown,
+   from the samples recorded on each Settings visit (utils/user-data-size.js).
+
+   The SENTENCE is the feature; the bars are decoration. A sparkline scaled
+   to its own max flattens exactly the case that matters (steady slow growth
+   looks identical to a spike), and it is unreadable to a screen reader — so
+   the trend is stated in words first, the bars are aria-hidden, and the
+   per-sample figures are exposed to assistive tech as an sr-only list.
+
+   Day one shows text only: a single bar is noise, and a one-point line
+   draws nothing. */
+function StorageTrendValue({ samples }) {
+  if (!samples || samples.length === 0) return null;
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  const delta = last.b - first.b;
+  const sentence = samples.length === 1
+    ? `First measurement recorded — ${formatBytes(last.b)}. The trend appears the next day you open Settings.`
+    : `Your data has ${delta > 0 ? 'grown' : delta < 0 ? 'shrunk' : 'stayed level'}${delta === 0 ? '' : ' by ' + formatBytes(Math.abs(delta))} across ${samples.length} measurements since ${first.d} — now ${formatBytes(last.b)}.`;
+  const max = samples.reduce((m, s) => (s.b > m ? s.b : m), 0);
+  return (
+    <div className="settings-trend" role="group" aria-label="Your data size over time">
+      <span>{sentence}</span>
+      {samples.length > 1 && (
+        <>
+          <span className="sr-only">{samples.map((s) => `${s.d}: ${formatBytes(s.b)}`).join('. ')}</span>
+          <div className="settings-trend-bars" aria-hidden="true">
+            {samples.map((s) => (
+              <div key={s.d} className="settings-trend-bar"
+                style={max > 0 ? { height: Math.max(2, Math.round((s.b / max) * 24)) + 'px' } : undefined} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* DataActionRow — label + ⓘ-revealed description + action button. */
 function DataActionRow({ label, desc = null, children = null, className = '' }) {
   const [showDesc, setShowDesc] = React.useState(false);
@@ -443,9 +481,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // the Garden images. Garden is app data, never user data. Re-measured
   // when the screen mounts (cheap — JSON byte-length + blob sizes).
   const [userData, setUserData] = React.useState(/** @type {null | {total:number,structured:number,media:number,mediaCount:number}} */ (null));
+  // BACKLOG [30]: the same measurement also feeds the growth series. Sampling
+  // rides this existing effect deliberately — one sample per Settings mount,
+  // never a timer and never at boot (this screen is in the lazy bundle-e), so
+  // the trend costs nothing beyond what the "Your data" row already spends.
+  const [dataSamples, setDataSamples] = React.useState(/** @type {Array<{d:string,b:number}>} */ ([]));
   React.useEffect(() => {
     let alive = true;
-    measureUserData().then((r) => { if (alive) setUserData(r); }).catch(() => {});
+    measureUserData().then((r) => {
+      if (!alive) return;
+      setUserData(r);
+      return recordUserDataSample(r.total).then((series) => { if (alive) setDataSamples(series); });
+    }).catch(() => {});
     return () => { alive = false; };
   }, []);
   const appDataDisplayText = (() => {
@@ -1658,6 +1705,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />
             <DataInfoRow label="Your data" value={userDataDisplayText} />
+            {dataSamples.length > 0 && (
+              <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />
+            )}
             <DataInfoRow label="Protection" value={protectionDisplayText}>
               {showProtectButton && (
                 <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); storageInfo.requestPersist(); }}>Protect now</button>

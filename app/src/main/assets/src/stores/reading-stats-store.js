@@ -53,9 +53,39 @@ import { _jrnDateStr } from './journal-stats-store.js';
  *   wordsByDay: Record<string, number>,
  *   wpmSamples: Array<{ w: number, ms: number }>,
  *   progress: Record<string, { b: number, c: number[], t: number,
- *                              w?: number, tw?: number }>
+ *                              w?: number, tw?: number }>,
+ *   milestonesUnlocked: string[]
  * }} ReadingStatsData
  */
+
+/**
+ * Reading milestones (BACKLOG [23]). Same shape and semantics as
+ * JournalStatsStore's MILESTONE_DEFS, so the two milestone systems stay
+ * one pattern rather than two: a static table, a persisted list of
+ * unlocked keys, and a check that runs where the number changes.
+ *
+ * Every threshold is measured against data this store ALREADY accrues —
+ * no new collection. `words` reads totalWordsRead, `items` reads
+ * totalCompletions, `rereads` reads rereads. The word thresholds are set
+ * against the corpus's own scale (the whole VOT + Bible corpus measures
+ * ~1.09M words), so "100k words" is a real fraction of the library rather
+ * than an arbitrary round number.
+ *
+ * @typedef {{ key: string, type: 'words'|'items'|'rereads', threshold: number, label: string }} ReadingMilestoneDef
+ * @type {ReadingMilestoneDef[]}
+ */
+export var READING_MILESTONE_DEFS = [
+  { key: 'read-first',    type: 'items',   threshold: 1,       label: 'First reading finished' },
+  { key: 'read-10',       type: 'items',   threshold: 10,      label: '10 readings finished' },
+  { key: 'read-50',       type: 'items',   threshold: 50,      label: '50 readings finished' },
+  { key: 'read-200',      type: 'items',   threshold: 200,     label: '200 readings finished' },
+  { key: 'words-10k',     type: 'words',   threshold: 10000,   label: '10,000 words read' },
+  { key: 'words-100k',    type: 'words',   threshold: 100000,  label: '100,000 words read' },
+  { key: 'words-500k',    type: 'words',   threshold: 500000,  label: '500,000 words read' },
+  { key: 'words-1m',      type: 'words',   threshold: 1000000, label: 'One million words read' },
+  { key: 'reread-first',  type: 'rereads', threshold: 1,       label: 'Returned to a reading' },
+  { key: 'reread-25',     type: 'rereads', threshold: 25,      label: '25 re-readings' }
+];
 
 var MAX_DAY_KEYS = 400;
 var MAX_WPM_SAMPLES = 50;
@@ -124,7 +154,8 @@ export var ReadingStatsStore = extendStore(
     rereads: 0,
     wordsByDay: {},
     wpmSamples: [],
-    progress: {}
+    progress: {},
+    milestonesUnlocked: []
   }), { idb: true }),
   {
     /** @returns {ReadingStatsData} */
@@ -135,13 +166,17 @@ export var ReadingStatsStore = extendStore(
      *
      * @param {{ key: string, words: number, activeMs: number,
      *           wasReadBefore?: boolean, ts?: number }} args
-     * @returns {void}
+     * @returns {ReadingMilestoneDef[]} milestones unlocked BY THIS call —
+     *   always an array, including on the deferred and no-words paths, so
+     *   the caller can read `.length` without a guard.
      */
     recordCompletion(args) {
-      if (this._shouldDefer('recordCompletion', args)) return;
+      // Returns the newly-unlocked milestones, so the deferred path must
+      // return an ARRAY too — the caller does `newly.length` on it.
+      if (this._shouldDefer('recordCompletion', args)) return [];
       var words = Math.max(0, Math.round((args && args.words) || 0));
       var ms = Math.max(0, Math.round((args && args.activeMs) || 0));
-      if (!words) return;
+      if (!words) return [];
       var data = this._load();
       data.totalWordsRead = (data.totalWordsRead || 0) + words;
       data.totalActiveMs = (data.totalActiveMs || 0) + ms;
@@ -167,8 +202,10 @@ export var ReadingStatsStore = extendStore(
       if (args && args.key && data.progress && data.progress[args.key]) {
         delete data.progress[args.key];
       }
+      var newlyUnlocked = this._checkMilestones(data);
       this._save();
       this._bump();
+      return newlyUnlocked;
     },
 
     /**
@@ -332,6 +369,47 @@ export var ReadingStatsStore = extendStore(
     },
 
     /**
+     * Every milestone def paired with its unlocked flag, in table order —
+     * the shape My Progress renders. Mirrors JournalStatsStore.milestones().
+     *
+     * @returns {Array<ReadingMilestoneDef & { unlocked: boolean }>}
+     */
+    milestones() {
+      var data = this._load();
+      var u = data.milestonesUnlocked || [];
+      return READING_MILESTONE_DEFS.map(function(m) {
+        return { key: m.key, type: m.type, threshold: m.threshold, label: m.label,
+                 unlocked: u.indexOf(m.key) >= 0 };
+      });
+    },
+
+    /**
+     * Unlock any milestone whose threshold `data` has just crossed, and
+     * return the newly-unlocked ones so the caller can toast. Mutates
+     * `data.milestonesUnlocked` in place; the caller saves.
+     *
+     * A milestone unlocks exactly ONCE: the persisted key list is the
+     * guard, so re-crossing a threshold (or a restore that already carries
+     * the key) never re-fires the toast.
+     *
+     * @param {ReadingStatsData} data
+     * @returns {ReadingMilestoneDef[]}
+     */
+    _checkMilestones(data) {
+      var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
+      /** @type {ReadingMilestoneDef[]} */
+      var newly = [];
+      READING_MILESTONE_DEFS.forEach(function(m) {
+        if (u.indexOf(m.key) >= 0) return;
+        var n = m.type === 'words' ? (data.totalWordsRead || 0)
+              : m.type === 'rereads' ? (data.rereads || 0)
+              : (data.totalCompletions || 0);
+        if (n >= m.threshold) { u.push(m.key); newly.push(m); }
+      });
+      return newly;
+    },
+
+    /**
      * Replace the entire stats object (import path). Defaults fill in any
      * missing fields so a partial payload doesn't break readers.
      * @param {Partial<ReadingStatsData> | null | undefined} data
@@ -354,7 +432,12 @@ export var ReadingStatsStore = extendStore(
         // LRU-50 invariant every writer assumes and feeding NaN into the
         // word-weighted progress math. Normalize to the same shape
         // recordProgress writes, then apply the same bound.
-        progress: _normalizeProgress(d.progress)
+        progress: _normalizeProgress(d.progress),
+        // Must be listed HERE: replaceAll rebuilds _cache from an explicit
+        // field list, so a field omitted is a field a .votbak restore wipes.
+        milestonesUnlocked: Array.isArray(d.milestonesUnlocked)
+          ? d.milestonesUnlocked.filter(function(k) { return typeof k === 'string'; })
+          : []
       });
       this._save();
       this._bump();

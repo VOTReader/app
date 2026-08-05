@@ -277,7 +277,14 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      applyDOMHighlights) already maps offsets → DOM. Word-by-word highlight
      reuses the highlight painter. TTS playback time counts as read-tracker
      dwell; completion = coverage. Big feature; own session(s).
-[23] READING MILESTONES + words/day streak-calendar depth — JournalStats'
+[23] READING MILESTONES — DONE 2026-08-04 (milestones half). Ten
+     READING_MILESTONE_DEFS (items/words/rereads) unlock inside
+     recordCompletion, which now RETURNS the newly-unlocked defs so
+     useMarkAsRead can toast via the existing jrnShowMilestoneToast;
+     My Progress gained a Milestones section (locked rows shown dim).
+     REMAINING: the full month streak calendar — the 14-day strip still
+     ships. Original spec follows.
+     READING MILESTONES + words/day streak-calendar depth — JournalStats'
      milestone pattern applied to ReadingStatsStore (100k/500k/1M words,
      "read Psalm 119", full-volume completions); upgrade the streak display
      with wordsForDays() bar depth (a 14-day strip shipped 2026-08-03;
@@ -305,6 +312,11 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      count. My Progress tally shows "N marks · D/1k words".
 [29] DENSITY SURFACES — (a) Matthew Study commentary-weight badge
      (60,183 note-words vs 23,221 text); (b) search-hit depth. Niche.
-[30] STORAGE GROWTH SPARKLINE — trend user-data size in Settings
-     (StorageHealth snapshots; tiny samples store).
+[30] STORAGE GROWTH SPARKLINE — DONE 2026-08-04. Settings → Your Data →
+     "Growth": a sentence (the actual feature) + aria-hidden div bars.
+     Samples ride the already-registered `meta` IDB store — no new
+     CachedStore, no DB_VERSION bump, and `meta` is excluded from
+     USER_DATA_STORES so the series can never inflate the number it
+     trends. One sample per Settings mount (where measureUserData already
+     runs), same-day overwrite, capped at 60.
 ═══════════════════════════════════════════════════════════════════════════

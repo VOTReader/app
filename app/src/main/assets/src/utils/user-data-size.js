@@ -131,3 +131,72 @@ export async function measureUserData() {
 
   return { total: structured + media, structured: structured, media: media, mediaCount: mediaCount };
 }
+
+/* ── Storage-growth series (BACKLOG [30]) ────────────────────────────────
+   A tiny time series of measureUserData().total so Settings can show
+   whether the reader's own data is growing, and how fast.
+
+   WHY IT RIDES THE `meta` STORE instead of getting its own CachedStore:
+   a new store would need BOTH an IDBAdapter.STORE_NAMES entry AND a
+   DB_VERSION bump, or it hydrates 'degraded' and queues writes forever
+   with a fully green unit suite. `meta` is already registered, and — the
+   load-bearing part — it is deliberately NOT in USER_DATA_STORES, so the
+   series can never inflate the very number it is trending. A new user-data
+   store would have measured itself.
+
+   Sampling happens only where measureUserData ALREADY runs: the Settings
+   mount effect, which lives in the lazily-loaded bundle-e. Zero boot cost,
+   no timer, at most one sample per day (a same-day revisit overwrites, so
+   the point stays fresh rather than duplicating). */
+
+/** IDB `meta` key holding the series. */
+var SAMPLES_KEY = 'user-data-samples';
+/** Roughly two months of daily points — bounded so this can never grow. */
+var MAX_SAMPLES = 60;
+
+/** Local calendar day, mirroring _jrnDateStr (inlined: this module has no imports). */
+function _sampleDayKey(ts) {
+  var d = new Date(ts);
+  var m = d.getMonth() + 1;
+  var day = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+}
+
+/**
+ * The recorded series, oldest first. Always an array — IDBAdapter REJECTS
+ * on failure (unlike CachedStore, which absorbs it), so this swallows.
+ *
+ * @returns {Promise<Array<{ d: string, b: number }>>}
+ */
+export async function getUserDataSamples() {
+  try {
+    var raw = await IDBAdapter.get('meta', SAMPLES_KEY);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(function (s) {
+      return s && typeof s.d === 'string' && typeof s.b === 'number' && isFinite(s.b);
+    });
+  } catch (_e) {
+    return [];
+  }
+}
+
+/**
+ * Record today's total. Overwrites today's point if one exists, so opening
+ * Settings twice in a day keeps one (current) sample rather than two.
+ *
+ * @param {number} totalBytes
+ * @returns {Promise<Array<{ d: string, b: number }>>} the updated series
+ */
+export async function recordUserDataSample(totalBytes) {
+  var bytes = Math.max(0, Math.round(Number(totalBytes) || 0));
+  if (!isFinite(bytes)) return [];
+  var series = await getUserDataSamples();
+  var today = _sampleDayKey(Date.now());
+  var last = series.length ? series[series.length - 1] : null;
+  if (last && last.d === today) last.b = bytes;
+  else series.push({ d: today, b: bytes });
+  if (series.length > MAX_SAMPLES) series.splice(0, series.length - MAX_SAMPLES);
+  try { await IDBAdapter.put('meta', SAMPLES_KEY, series); }
+  catch (_e) { /* best-effort — a trend is never worth failing Settings over */ }
+  return series;
+}

@@ -93,6 +93,8 @@ export function setupSettingsGlobals(overrides = {}) {
   put('countReadFor', () => 0);
   put('READ_VERSION_ID', 'v1');
   put('measureUserData', () => Promise.resolve({ bytes: 0, counts: {} }));
+  put('recordUserDataSample', () => Promise.resolve([]));
+  put('getUserDataSamples', () => Promise.resolve([]));
   put('formatBytes', (n) => `${n} B`);
   put('formatImportSpaceWarning', () => null);
 

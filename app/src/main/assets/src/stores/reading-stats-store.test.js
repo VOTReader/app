@@ -15,7 +15,7 @@
 */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ReadingStatsStore } from './reading-stats-store.js';
+import { ReadingStatsStore, READING_MILESTONE_DEFS } from './reading-stats-store.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -256,5 +256,60 @@ describe('progress frontiers', () => {
     expect(Object.keys(map)).toHaveLength(50);
     expect(map['p0']).toBeUndefined();   // oldest touch pruned
     expect(map['p54']).toBeDefined();
+  });
+});
+
+/* ── Reading milestones (BACKLOG [23]) ───────────────────────────────────
+   Same contract as the journal's: a static table, a persisted key list, and
+   a check that runs where the number changes. The property that matters is
+   FIRE-ONCE — a toast that repeats every completion past a threshold would
+   be worse than no toast at all. */
+describe('reading milestones', () => {
+  it('unlocks on the crossing completion and returns it for the toast', () => {
+    const newly = ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
+    const keys = newly.map((m) => m.key);
+    expect(keys).toContain('read-first');
+  });
+
+  it('fires ONCE — a later completion past the same threshold returns nothing new', () => {
+    ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
+    const again = ReadingStatsStore.recordCompletion({ key: 'b', words: 50, activeMs: 9000 });
+    expect(again.map((m) => m.key)).not.toContain('read-first');
+  });
+
+  it('crosses a WORDS threshold on the completion that reaches it', () => {
+    const first = ReadingStatsStore.recordCompletion({ key: 'a', words: 9999, activeMs: 60000 });
+    expect(first.map((m) => m.key)).not.toContain('words-10k');
+    const second = ReadingStatsStore.recordCompletion({ key: 'b', words: 2, activeMs: 60000 });
+    expect(second.map((m) => m.key)).toContain('words-10k');
+  });
+
+  it('reports every def with its unlocked flag, in table order', () => {
+    ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
+    const ms = ReadingStatsStore.milestones();
+    expect(ms.length).toBe(READING_MILESTONE_DEFS.length);
+    expect(ms[0].key).toBe(READING_MILESTONE_DEFS[0].key);
+    expect(ms.find((m) => m.key === 'read-first').unlocked).toBe(true);
+    expect(ms.find((m) => m.key === 'words-1m').unlocked).toBe(false);
+  });
+
+  it('ALWAYS returns an array — including the no-words path the caller reads .length on', () => {
+    expect(ReadingStatsStore.recordCompletion({ key: 'x', words: 0, activeMs: 0 })).toEqual([]);
+  });
+
+  it('survives a backup restore: replaceAll carries milestonesUnlocked', () => {
+    ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
+    const saved = ReadingStatsStore.get();
+    expect(saved.milestonesUnlocked).toContain('read-first');
+    ReadingStatsStore.replaceAll(saved);
+    expect(ReadingStatsStore.get().milestonesUnlocked).toContain('read-first');
+    // …and a restore must not re-fire the toast for something already unlocked.
+    const after = ReadingStatsStore.recordCompletion({ key: 'c', words: 10, activeMs: 9000 });
+    expect(after.map((m) => m.key)).not.toContain('read-first');
+  });
+
+  it('drops non-string junk from an imported milestone list', () => {
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({ milestonesUnlocked: ['read-first', 42, null, { k: 1 }] }));
+    expect(ReadingStatsStore.get().milestonesUnlocked).toEqual(['read-first']);
   });
 });

@@ -271,6 +271,31 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
           );
         })() : null}
 
+        {/* BACKLOG [23] — reading milestones. Same table-driven pattern as the
+            journal's, reading only numbers this store already accrues. Locked
+            rows are shown too: a milestone you cannot see is not a goal. */}
+        {(() => {
+          const ms = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.milestones === 'function')
+            ? ReadingStatsStore.milestones() : null;
+          if (!ms || ms.length === 0) return null;
+          const unlocked = ms.filter((m) => m.unlocked);
+          return (
+            <div className="settings-section prg-section">
+              <div className="settings-section-label">Milestones</div>
+              <span className="sr-only">{unlocked.length} of {ms.length} reading milestones reached.</span>
+              <div className="prg-milestones">
+                {ms.map((m) => (
+                  <div key={m.key} className={'prg-milestone' + (m.unlocked ? ' is-unlocked' : '')}>
+                    <span className="prg-milestone-mark" aria-hidden="true">{m.unlocked ? '✦' : '·'}</span>
+                    <span className="prg-milestone-label">{m.label}</span>
+                    <span className="sr-only">{m.unlocked ? ' — reached' : ' — not yet reached'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="settings-section prg-section">
           <div className="settings-section-label">Reading</div>
           <div className="settings-card">

@@ -4625,6 +4625,35 @@
       border-radius: 2px 2px 0 0;
       background: var(--gold-dim);
     }
+    /* My Progress → Milestones (BACKLOG [23]). Locked rows stay visible but
+       recede; an unattainable-looking list is a worse motivator than a dim
+       one. Gold mark + full-strength text on unlock. */
+    .prg-milestones { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.2rem 0 0.1rem; }
+    .prg-milestone {
+      display: flex; align-items: baseline; gap: 0.5rem;
+      font-size: var(--fs-13); color: var(--cream-muted); opacity: 0.55;
+      padding: 0.15rem 0;
+    }
+    .prg-milestone.is-unlocked { color: var(--cream); opacity: 1; }
+    .prg-milestone-mark { color: var(--gold-dim); width: 1em; flex-shrink: 0; text-align: center; }
+    .prg-milestone.is-unlocked .prg-milestone-mark { color: var(--gold); }
+    .prg-milestone-label { min-width: 0; }
+
+    /* Settings → Your Data → Growth. Same div-bar idiom as the reading-day
+       strip above (no SVG, no dependency, theme-aware through --gold-dim),
+       just shorter because it sits inside a settings row rather than a
+       dashboard panel. The bars are aria-hidden; the sentence beside them
+       is what actually conveys the trend. */
+    .settings-trend-bars {
+      display: flex; align-items: flex-end; gap: 2px;
+      height: 1.5rem; margin-top: 0.35rem;
+    }
+    .settings-trend-bar {
+      flex: 1; min-width: 0;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: var(--gold-dim);
+    }
 
     /* ══════════════════════════════════════════════════════════════
        NOTES INDEX SCREEN — list of every note with search, filter,

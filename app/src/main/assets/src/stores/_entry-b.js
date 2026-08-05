@@ -61,7 +61,7 @@ import {
   JournalStatsStore, jrnShowMilestoneToast,
 } from './journal-stats-store.js';
 import { ReadingStreakStore } from './reading-streak-store.js';
-import { ReadingStatsStore } from './reading-stats-store.js';
+import { ReadingStatsStore, READING_MILESTONE_DEFS } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
@@ -120,7 +120,7 @@ import { useDesktopKeyboard } from '../hooks/use-desktop-keyboard.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
-import { measureUserData, USER_DATA_STORES } from '../utils/user-data-size.js';
+import { measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSample } from '../utils/user-data-size.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
@@ -181,7 +181,7 @@ Object.assign(window, {
   _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
   JournalStatsStore, jrnShowMilestoneToast,
   ReadingStreakStore,
-  ReadingStatsStore,
+  ReadingStatsStore, READING_MILESTONE_DEFS,
   GardenPosStore,
   JournalIndexStore,
   jrnId, JournalStore, JournalNotebookStore,
@@ -231,7 +231,7 @@ Object.assign(window, {
   useStorageInfo,
   formatBytes,
   StorageHealth,
-  measureUserData, USER_DATA_STORES,
+  measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSample,
   DiagnosticLog,
   validateStorePayload, validateImportEnvelope, validateMediaRecord,
   // Data
