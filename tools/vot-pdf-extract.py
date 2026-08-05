@@ -66,6 +66,42 @@ def edge_lines(page) -> list:
     return out
 
 
+def column_text(page):
+    """Re-emit a multi-column page in COLUMN order, or return None if it is single-column.
+
+    Found by the fidelity audit (2026-08-05): the study books set prophecy/fulfilment pages in
+    two columns, and PyMuPDF's default stream order emitted the RIGHT column's heading before
+    the left column's body. Every word was present — the audit's order-insensitive content score
+    was 100% on those pages — but the reading order was wrong, which for this app means a
+    prophecy and its fulfilment render interleaved.
+
+    Detection is deliberately conservative: a page is only treated as two-column when its text
+    blocks fall into two clean x-clusters that do not overlap and both carry real text. Anything
+    ambiguous keeps the default order, because reordering a single-column page would be a much
+    worse defect than leaving a rare two-column page alone.
+    """
+    blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
+    if len(blocks) < 4:
+        return None
+    mid = page.rect.width / 2
+    left = [b for b in blocks if b[2] <= mid + 5]        # ends before the midline
+    right = [b for b in blocks if b[0] >= mid - 5]       # starts after the midline
+    spanning = [b for b in blocks if b[0] < mid - 5 and b[2] > mid + 5]
+    if len(left) < 2 or len(right) < 2:
+        return None
+    # every column block must sit wholly on its side, or the page is not cleanly two-column
+    if len(left) + len(right) + len(spanning) != len(blocks):
+        return None
+
+    def dump(bs):
+        return "\n".join(b[4].strip() for b in sorted(bs, key=lambda b: (round(b[1], 1), b[0])))
+
+    # spanning blocks (title, intro paragraph) belong above the columns
+    parts = [dump(spanning)] if spanning else []
+    parts += [dump(left), dump(right)]
+    return "\n".join(p for p in parts if p)
+
+
 def clean(text: str):
     """Return (cleaned_text, folio) — and never silently discard the folio.
 
@@ -133,9 +169,12 @@ def extract(pdf: pathlib.Path) -> dict:
     threshold = max(3, doc.page_count * RUNHEAD_MIN_SHARE)
     running_heads = sorted(s for s, c in edge_seen.items() if c >= threshold and not s.isdigit())
 
-    pages, page_meta = [], []
+    pages, page_meta, multicol = [], [], []
     for i, page in enumerate(doc):
-        raw = page.get_text()
+        col = column_text(page)
+        if col is not None:
+            multicol.append(i + 1)
+        raw = col if col is not None else page.get_text()
         body, folio = clean(raw)
         # Geometry beats stream position: if the stream-order heuristic missed the folio, take
         # the bare number sitting in the page's edge band instead.
@@ -206,6 +245,8 @@ def extract(pdf: pathlib.Path) -> dict:
     if not trustworthy:
         for m in page_meta:
             m["folio"] = ""
+    flags["multicolumn_pages"] = len(multicol)
+    flags["multicolumn_sample"] = multicol[:20]
     flags["running_heads"] = running_heads[:20]
     flags["folio_pages"] = folio_count if trustworthy else 0
     flags["folio_pages_rejected"] = 0 if trustworthy else folio_count

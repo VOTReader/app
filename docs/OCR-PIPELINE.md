@@ -180,7 +180,9 @@ concerned.
 11 Haiku subagents read all 113 image-only pages plus the 5 the extractor called blank, each
 asked to transcribe any words it could see. **Result: 118 of 118 confirmed textless.** Garden
 alternates full-bleed photographs with text-over-photograph pages, and the text pages extract
-verbatim-exact (checked against the page image directly). The text layer told the truth.
+verbatim-exact **on the one page checked against its image at the time** (n=1 — an anecdote, not
+a measurement; the real number is the fidelity audit below). The text layer told the truth about
+which pages carry words.
 
 ### Verdict 4 — words drawn as artwork are invisible to the extractor (2026-08-05)
 
@@ -342,6 +344,80 @@ count tripwire, and this project's separately built data files — agree exactly
 Operational note worth keeping: `codex exec` **blocks on stdin** when run non-interactively.
 The first invocation produced nothing for many minutes and looked like a slow model; it was
 waiting on input. Always redirect `< /dev/null`.
+
+### Verdict 15 — the fidelity audit that had not been done, and what it found
+
+Everything above measures STRUCTURE. None of it compares a sentence character for character,
+and the edition cross-check *cannot*: two editions sharing one extractor bug agree at 100.000%
+while both being wrong. Asked directly whether OCR fidelity had been verified, the honest answer
+was no. `tools/vot-pdf-fidelity.py` is that missing measurement.
+
+Design, chosen so the number is honest rather than flattering:
+
+- **Random**, seeded (`--seed 20260805`), over all 4,140 text-bearing pages — no minimum length,
+  no filtering. The earlier structural sample took every Nth page filtered to >300 chars, which
+  quietly excluded thin pages, poetry, contents pages and decorative titles: exactly where the
+  known defects live. *A sample that avoids the hard pages measures the easy ones.*
+- The reader transcribing each page has **not seen the text layer**, and scoring is done locally
+  by `difflib`, so no reader grades its own work.
+
+40 pages, 13 books, first run:
+
+| metric | result |
+|---|---|
+| character agreement (length-weighted) | 96.041% |
+| word agreement (length-weighted) | 94.951% |
+| **content agreement, order-insensitive** | **99.840%** |
+| pages identical after whitespace/glyph normalisation | 22/40 |
+
+The gap between 94.95% and 99.84% is the whole finding: on **7 pages every single word matched
+and only the ORDER differed** — identical word multisets, nothing lost, nothing invented. A raw
+sequence score conflates *wrong words* with *right words in the wrong place*, which are entirely
+different defects. Both numbers are now reported.
+
+### Verdict 16 — order disagreements had two opposite causes, and only the page settles it
+
+Each order-only page was escalated to the image personally. They did not share a cause:
+
+- **`Volumes1_7_LARGE_PRINT` p51** (14.10% word sequence, 100% content): the extractor's line
+  order matches the printed page **exactly**. The page is 32 near-identical lines of the same
+  grammatical form, and the *vision reader* shuffled them. Here the deterministic reader is
+  right and the model is wrong — so the headline 96% understates extraction fidelity, because
+  part of the disagreement is the auditor's own error.
+- **`YAHUSHUA_MoreThanaMan` p44** (47.08%, 100% content): a genuine **two-column** page
+  (Old Testament prophecy | fulfilled in the New Testament), and the extractor emitted the right
+  column's heading before the left column's body. Here the *extractor* is wrong. For this app
+  that is a real defect: a prophecy and its fulfilment would render interleaved.
+
+Neither could have been resolved from the score alone. **A disagreement is a question, not a
+verdict** — the number tells you where to look, the page tells you who was right.
+
+### Verdict 17 — multi-column pages, detected and fixed
+
+`column_text()` re-emits a page in column order, deliberately conservatively: only when the text
+blocks fall into two clean non-overlapping x-clusters that both carry real text, with spanning
+blocks (title, intro) placed above. Anything ambiguous keeps the default order, because
+reordering a single-column page would be a far worse defect than leaving a rare two-column page
+alone.
+
+**214 multi-column pages found corpus-wide — 213 of them in `YAHUSHUA_MoreThanaMan`, nearly half
+that book**, plus one in the Lamb of God study. After the fix:
+
+| metric | before | after |
+|---|---|---|
+| character agreement | 96.041% | **98.498%** |
+| word agreement | 94.951% | **97.471%** |
+| pages ≥99% char agreement | 31/40 | **33/40** |
+| `YAHUSHUA` p44 alone | 47.08% | **98.70%** |
+
+Content agreement was 99.840% before and after, exactly as it should be: no words changed, only
+their order. The residual order-only pages are the vision reader's own shuffling on repetitive
+pages, not extraction defects.
+
+**Standing caveat, stated plainly: fidelity is 98.5% character agreement on a 40-page random
+sample, not 100%, and it has never been claimed as 100%.** The sample gives a corpus estimate,
+not a guarantee about any specific page. Anything being promoted into the app should be read
+against its page image first.
 
 ---
 
