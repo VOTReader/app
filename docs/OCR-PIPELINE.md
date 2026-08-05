@@ -34,7 +34,9 @@ in-page link lists are the enumeration.
 | Pages | 4,439 |
 | Words recovered from the text layer | 1,078,128 |
 | Download size | ~780 MB (`Garden.pdf` alone is 700 MB) |
-| Born-digital with a usable text layer | 19 of 20 |
+| Born-digital, text layer carries the prose | 20 of 20 |
+| Books needing the vision leg at scale | 1 (`Garden.pdf`: 96 text pages, 113 illustrations) |
+| Image-only pages corpus-wide | 124 (113 of them in `Garden.pdf`) |
 
 The library is deliberately redundant: the seven per-volume PDFs also exist as one combined
 volume, as a large-print reflow, and inside a complete-edition book. That redundancy is not a
