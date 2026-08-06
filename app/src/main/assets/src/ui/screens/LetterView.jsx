@@ -3,6 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -278,6 +280,21 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             <div className="hero-ornament-diamond" />
             <div className="hero-ornament-line r" />
           </div>
+          {/* Streaming audio letter (2026-08-05). Presence + reader come from
+              the AUDIO_MANIFEST lazy-corpus global (same bundle as the letter
+              corpus, so it's loaded whenever a letter renders); a study-shim
+              volKey simply misses the manifest and the pill self-hides. An
+              inert peek KEEPS the pill — the swipe preview must stay
+              pixel-identical to the committed page (it can't fire: the peek
+              is pointer-events:none + HTML inert). */}
+          {!studyMode && AudioPlayer.hasAudio(volKey, letter.id) && (
+            <div className="hero-play-row">
+              <AudioPlayButton
+                readerCode={AudioPlayer.firstReaderCode(volKey, letter.id)}
+                onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || 'Volume Two' })}
+              />
+            </div>
+          )}
         </div>
       </header>
 

@@ -27,6 +27,11 @@ class BridgeContractTest {
     private val expectedContract = mapOf(
         "setLightStatusBar" to 1,
         "setKeepScreenOn" to 1,
+        // setAudioActive is called DIRECTLY (guarded window.AndroidBridge) by
+        // src/utils/audio-player.js, not via platform-bridge.js — PlatformBridge
+        // module state must not be duplicated into bundle-d. So androidImpl
+        // intentionally has no mirror for it.
+        "setAudioActive" to 1,
         "onAppReady" to 0,
         "setImmersiveMode" to 1,
         "setZoomEnabled" to 1,

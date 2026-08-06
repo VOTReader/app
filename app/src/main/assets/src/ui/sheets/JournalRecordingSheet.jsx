@@ -235,6 +235,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         }
       }
 
+      // A streaming audio letter must not keep reading over the memo (or fight
+      // the recorder for audio focus). AudioPlayer is a Cluster-D global
+      // (window-exposed by _entry-d) — guarded: this sheet is Cluster B.
+      var _audioPlayer = typeof window !== 'undefined' ? /** @type {any} */ (window).AudioPlayer : null;
+      if (_audioPlayer) {
+        try { _audioPlayer.pauseIfPlaying(); } catch (_e) { /* playback is best-effort chrome */ }
+      }
       var res;
       try {
         // Android acquires focus/routing atomically inside nativeRecordStart so

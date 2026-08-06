@@ -104,6 +104,19 @@ class AppInterface(
         }
     }
 
+    /**
+     * Streaming audio-letter keep-alive: JS flips this on playback start/stop
+     * (audio-player.js calls window.AndroidBridge.setAudioActive directly —
+     * deliberately NOT via PlatformBridge, whose module state must not be
+     * duplicated across esbuild bundles). MainActivity.onPause() consults
+     * [MainViewModel.streamAudioActive] to keep the WebView's media alive
+     * while a letter is playing. No UI work — safe inline on the binder thread.
+     */
+    @JavascriptInterface
+    fun setAudioActive(active: Boolean) {
+        vm.streamAudioActive = active
+    }
+
     @JavascriptInterface
     fun setKeepScreenOn(enabled: Boolean) {
         host.postToUi {

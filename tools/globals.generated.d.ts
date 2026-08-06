@@ -7,10 +7,12 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 488 distinct identifiers.
+// Total: 495 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
+declare const AUDIO_MANIFEST: any;
+declare const AUDIO_SECTIONS: any;
 declare const AboutScreen: any;
 declare const AboutSeenFlagStore: any;
 declare const AnnHintDismissedFlagStore: any;
@@ -20,6 +22,10 @@ declare const AnnotationStore: any;
 declare const App: any;
 declare const AppShellOverlays: any;
 declare const AppShellSheets: any;
+declare const AudioPlayButton: any;
+declare const AudioPlayer: any;
+declare const AudioPlayerBar: any;
+declare const AudioSectionChips: any;
 declare const AutoScrollContext: any;
 declare const AutoScrollControl: any;
 declare const BIBLE_ASV: any;
@@ -316,6 +322,7 @@ declare const applyDOMLinks: any;
 declare const applyImportPayload: any;
 declare const applyNoteIcons: any;
 declare const applyV3: any;
+declare const audioTrackUrl: any;
 declare const bibleHlKey: any;
 declare const bkmId: any;
 declare const blockBoundaryOffsets: any;

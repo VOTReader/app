@@ -45,6 +45,7 @@ const BUNDLES = [
       'letters-timothy.js', 'letters-flock.js', 'lords-rebuke.js',
       'wtlb-one.js', 'wtlb-two.js', 'wtlb-scriptures.js',
       'the-blessed.js', 'holy-days.js', 'hidden-manna.js',
+      'audio-manifest.js',
     ],
   },
 ];

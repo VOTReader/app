@@ -115,3 +115,6 @@ tools/_audit-html.json
 # MANIFEST.json is tracked so the exact set + sha256 of every PDF is in git.
 source-pdfs/*.pdf
 _ocr_out/spanish/
+
+# Audio-manifest pipeline: regenerable Drive listing (fetch-drive-audio.py output)
+tools/_audio-drive-listing.json

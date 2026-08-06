@@ -554,6 +554,24 @@ class AppInterfaceTest {
         verify { host.activityWindow.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
+    // ─── Streaming-audio keep-alive flag ──────────────────────────────
+
+    @Test
+    fun `setAudioActive true and false write the vm flag inline`() {
+        val host = FakeBridgeHost()
+        val vm = mockk<MainViewModel>(relaxed = true)
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.setAudioActive(true)
+        verify { vm.streamAudioActive = true }
+
+        app.setAudioActive(false)
+        verify { vm.streamAudioActive = false }
+
+        // No UI hop — onPause() reads the @Volatile flag directly.
+        assertTrue(host.postedActions.isEmpty())
+    }
+
     // ─── Mic permission flow ──────────────────────────────────────────
 
     @Test

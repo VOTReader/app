@@ -512,7 +512,10 @@
       // Entry cards concat number + title (e.g. "1Introduction"). Match
       // anywhere in the text, not anchored — clickByText already has a
       // length<80 guard so we won't accidentally match a big paragraph.
-      clickByText(/Introduction|Intro\b/i); await sleep(600);
+      // FULL word only: the index header's audio section chips (2026-08-05)
+      // carry labels like "Part 1 · Intro–19" that a bare /Intro\b/ matched
+      // first — clicking a chip starts playback instead of opening the entry.
+      clickByText(/Introduction/i); await sleep(600);
 
       var afterOpen = {
         crashed: isCrashed(),

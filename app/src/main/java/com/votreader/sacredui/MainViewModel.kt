@@ -41,6 +41,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var keepScreenOnEnabled: Boolean = true
     @Volatile var splashHolding: Boolean = true
 
+    // Streaming audio-letter playback keep-alive (2026-08-05): while HTML5
+    // <audio> is playing, MainActivity.onPause() skips webView.onPause() so a
+    // screen-off / brief background moment doesn't halt playback (pausing the
+    // WebView halts its media). @Volatile — written from the binder thread
+    // (AppInterface.setAudioActive), read on the UI thread in onPause().
+    @Volatile var streamAudioActive: Boolean = false
+
     // ---- Audio session ----
     var previousAudioMode: Int = AudioManager.MODE_NORMAL
 

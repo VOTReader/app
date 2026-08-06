@@ -78,6 +78,10 @@ export function AppShellOverlays({
       <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
       <Safari7DayModal />
       <IosPwaWelcomeCard onNavigateSettings={() => setScreen('settings')} />
+      {/* Streaming audio mini-player — self-subscribed to AudioPlayer, renders
+          null while idle. Mounted here so it survives every screen change
+          (free-variable global, same convention as StorageHealthBanner). */}
+      <AudioPlayerBar />
 
       {settings.tabsEnabled && tabsOverviewOpen && (
         <div className="tabs-overview-layer">

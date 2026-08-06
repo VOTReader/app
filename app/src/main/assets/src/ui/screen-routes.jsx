@@ -40,6 +40,8 @@
    in the top nav (app.jsx → ReadingChromeProvider dotEnabled). Extracted
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
+import { AudioPlayer } from '../utils/audio-player.js';
+
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
 }
@@ -275,7 +277,7 @@ export function buildScreenRoutes({
   const colIdxProps = (volKey) => {
     const col = COL_BY_KEY.get(volKey);
     const nav = (id) => { setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); setScreen(col.letterScreen); };
-    return {
+    const props = {
       onSelect: nav,
       onSelectPreface: col.prefaceGlobal ? nav : undefined,
       currentLetter: settings.showReadingDot && activeReadKey === ('vol:' + volKey) ? lastReadLetterMap[volKey] || null : null,
@@ -284,6 +286,23 @@ export function buildScreenRoutes({
       progressKeyFor: (id) => getReadKey(col.readKey, id),
       markAsReadEnabled: settings.markAsRead,
     };
+    // Streaming audio (2026-08-05): whole-collection queue, Bandcamp-album
+    // style. Props stay absent until the lazy VOT corpus (which carries
+    // AUDIO_MANIFEST) lands — the index re-renders with them once it does.
+    // WTLB parts ALSO ship dedicated range-compilation tracks → chips.
+    if (AudioPlayer.collectionHasAudio(volKey)) {
+      props.onPlayAll = () => {
+        const pref = colPreface(col);
+        const arr = colLetterArr(col);
+        AudioPlayer.playCollection({ volKey, items: pref ? [pref, ...arr] : arr, collectionLabel: col.label });
+      };
+      const secs = AudioPlayer.sectionsFor(volKey);
+      if (secs) {
+        props.sections = secs;
+        props.onPlaySection = (i) => AudioPlayer.playSection(volKey, i, col.label);
+      }
+    }
+    return props;
   };
   // Shared nav for the 14 volume/WTLB/Blessed/Holy-Days index screens. Was a
   // hand-rolled TEXT back button ("← Volumes") that never adopted the 2026-07-14

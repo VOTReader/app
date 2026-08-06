@@ -864,7 +864,135 @@
         font-size: var(--fs-12); color: var(--cream-dim); font-style: italic; letter-spacing: 0.04em;
       }
 
-    
+      /* ── AUDIO PLAYER — streaming letters (bar + pills + chips) ── */
+      /* The mini-player (AudioPlayerBar) is PINNED CHROME: fixed to the
+         bottom, mounted once, above every screen but UNDER the bottom sheets
+         (z 200/201) and toasts (9998) — a sheet must always cover it, hence
+         z-index 150. Two consequences for the rules below:
+           - type inside .audio-bar names the --fsc-* px twins, like .top-nav.
+             Chrome must NOT grow with Settings → Text Size (the --fs-* rem
+             steps do). The in-flow pills and chips further down DO use --fs-*.
+           - no backdrop-filter. The bar covers scrolling content, and blur on
+             scroll-covering chrome was purged for perf.
+         Colors are plain theme vars, so light mode needs no override except
+         the drop shadow (a dark halo reads as grime on cream — same tweak
+         .ascroll-pill makes). */
+      .audio-bar {
+        position: fixed; left: 8px; right: 8px; bottom: 0; z-index: 150;
+        margin: 0 auto; max-width: 720px;
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 0.6rem calc(max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) + 0.5rem);
+        background: var(--bg3);
+        border: 1px solid var(--gold-border); border-bottom: 0;
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -6px 22px rgba(0,0,0,0.45);
+      }
+      body.light .audio-bar { box-shadow: 0 -6px 22px rgba(0,0,0,0.18); }
+      .audio-bar-play {
+        flex-shrink: 0; width: 44px; height: 44px; padding: 0; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--gold-faint); border: 1px solid var(--gold-border);
+        color: var(--gold); cursor: pointer;
+      }
+      .audio-bar-play svg { width: 20px; height: 20px; }
+      @media (hover: hover) { .audio-bar-play:hover { border-color: var(--gold); } }
+      /* Buffering pulses the button in place rather than swapping in a
+         spinner — the tap target never moves under a finger already on it. */
+      .audio-bar-play.is-loading { animation: audio-bar-pulse 1.1s ease-in-out infinite; }
+      @keyframes audio-bar-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+      .audio-bar-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .audio-bar-title {
+        font-size: var(--fsc-13); color: var(--cream); line-height: 1.25;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .audio-bar-part { color: var(--cream-muted); }
+      .audio-bar-sub {
+        display: flex; align-items: baseline; gap: 0.5rem;
+        font-size: var(--fsc-11); color: var(--cream-muted); line-height: 1.3;
+      }
+      .audio-bar-src { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .audio-bar-time { flex-shrink: 0; color: var(--cream-dim); font-variant-numeric: tabular-nums; }
+      /* Native range input, themed for BOTH engines: the Android WebView /
+         Chrome side needs -webkit-slider-*, a desktop-PWA Firefox the
+         -moz-range-* twins. appearance:none drops the platform track in each;
+         the thumb's -5px margin centers a 14px circle on the 4px track
+         (webkit only — Firefox centers the thumb itself). */
+      .audio-bar-seek {
+        -webkit-appearance: none; appearance: none;
+        width: 100%; height: 14px; margin: 0; padding: 0;
+        background: transparent; cursor: pointer;
+      }
+      .audio-bar-seek:disabled { opacity: 0.4; cursor: default; }
+      .audio-bar-seek:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .audio-bar-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--gold-border); }
+      .audio-bar-seek::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: var(--gold); border: 0; margin-top: -5px;
+      }
+      .audio-bar-seek::-moz-range-track { height: 4px; border-radius: 2px; background: var(--gold-border); }
+      .audio-bar-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 0; }
+      .audio-bar-nav, .audio-bar-close {
+        flex-shrink: 0; width: 40px; height: 40px; padding: 0; border-radius: 999px;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; cursor: pointer; color: var(--gold-dim);
+      }
+      .audio-bar-close { color: var(--cream-muted); }
+      .audio-bar-nav svg, .audio-bar-close svg { width: 20px; height: 20px; }
+      @media (hover: hover) { .audio-bar-nav:hover, .audio-bar-close:hover { color: var(--gold); } }
+      .audio-bar-nav:active, .audio-bar-close:active { background: var(--gold-faint); }
+      /* Room for the bar: .screen-scroll is the ONE scroll container per
+         screen, so padding there clears the last paragraph and the bottom-nav
+         cards. The inset term tracks the bar's own safe-area padding. */
+      body.audio-bar-open .screen-scroll {
+        padding-bottom: calc(92px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
+      }
+      /* The auto-scroll transport is fixed and bottom-anchored (its transform
+         is doing the left:50% centering, so it must not be touched) — the lift
+         restates .ascroll-pill's own bottom expression plus the bar. */
+      body.audio-bar-open .ascroll-pill {
+        bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 72px);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        /* The global W10-lite block near-zeros the duration, which would park
+           the pulse at an arbitrary opacity; state it statically instead. */
+        .audio-bar-play.is-loading { animation: none; opacity: 0.55; }
+      }
+
+      /* Listen / Play All pill (AudioPlayButton). In-flow content, so --fs-*:
+         these SHOULD scale with Text Size. Same faint-gold gradient plate as
+         .hd-playlist-btn, so both themes fall out of the vars. */
+      .hero-play-pill {
+        display: inline-flex; align-items: center; gap: 0.5em;
+        padding: 0.45em 1.1em; border-radius: 999px;
+        background: linear-gradient(180deg, var(--gold-faint), transparent);
+        border: 1px solid var(--gold-border); color: var(--gold); cursor: pointer;
+        font-family: 'Cinzel', serif; font-size: var(--fs-11);
+        letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.2;
+        transition: border-color 0.18s, transform 0.18s;
+      }
+      .hero-play-pill svg { width: 1.15em; height: 1.15em; flex-shrink: 0; }
+      @media (hover: hover) { .hero-play-pill:hover { border-color: var(--gold); transform: translateY(-1px); } }
+      .hero-play-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      .audio-sec-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+      .audio-sec-chip {
+        display: inline-flex; align-items: center; gap: 0.4em;
+        padding: 0.35em 0.7em; border-radius: 8px;
+        background: linear-gradient(180deg, var(--gold-faint), transparent);
+        border: 1px solid var(--gold-border); color: var(--gold); cursor: pointer;
+        font-family: 'Cinzel', serif; font-size: var(--fs-11);
+        letter-spacing: 0.08em; line-height: 1.2;
+        transition: border-color 0.18s, background 0.18s;
+      }
+      .audio-sec-chip svg { width: 1.05em; height: 1.05em; flex-shrink: 0; }
+      @media (hover: hover) { .audio-sec-chip:hover { border-color: var(--gold); } }
+      .audio-sec-chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      /* Placement rows: the pill sits under the hero ornament, or under a
+         collection index header with its chips wrapping below. */
+      .hero-play-row { margin-top: 1.1rem; display: flex; justify-content: center; }
+      .vol-index-play-row { margin-top: 1.4rem; display: flex; justify-content: center; }
+      .vol-index-play-row + .audio-sec-chips { margin-top: 0.8rem; }
+
       /* ── HERO ── */
       .hero {
         position: relative; overflow: hidden;

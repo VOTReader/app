@@ -4,6 +4,8 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -351,6 +353,17 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
             <div className="hero-ornament-diamond" />
             <div className="hero-ornament-line r" />
           </div>
+          {/* Streaming audio entry — see LetterView's hero pill note (manifest
+              rides the same lazy corpus bundle; inert peeks keep the pill for
+              pixel parity, it can never fire there). */}
+          {AudioPlayer.hasAudio(volKey, entry.id) && (
+            <div className="hero-play-row">
+              <AudioPlayButton
+                readerCode={AudioPlayer.firstReaderCode(volKey, entry.id)}
+                onClick={() => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null })}
+              />
+            </div>
+          )}
         </div>
       </header>
 

@@ -77,6 +77,7 @@ import { countTextWords, countItemWords, readingMinutes } from '../utils/word-co
 import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
 import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
+import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
@@ -135,6 +136,8 @@ import { LinkCard } from './components/LinkCard.jsx';
 import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
+import { AudioPlayerBar } from './components/AudioPlayerBar.jsx';
+import { AudioPlayButton, AudioSectionChips } from './components/AudioPlayButton.jsx';
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
@@ -226,6 +229,7 @@ Object.assign(window, {
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
+  AudioPlayer, audioTrackUrl,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll,
@@ -249,6 +253,7 @@ Object.assign(window, {
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, FontPickerRow, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
+  AudioPlayerBar, AudioPlayButton, AudioSectionChips,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync,
   buildScreenRoutes,

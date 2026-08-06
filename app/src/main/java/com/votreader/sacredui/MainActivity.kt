@@ -1247,7 +1247,12 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
     override fun onPause() {
         super.onPause()
-        webView.onPause()
+        // Streaming audio keep-alive: WebView.onPause() halts HTML5 media, so
+        // while an audio letter is playing (vm.streamAudioActive, set via the
+        // setAudioActive bridge) skip it — screen-off / brief backgrounding
+        // keeps the letter reading aloud. Everything else pauses as before;
+        // onResume()'s webView.onResume() is a safe no-op when we never paused.
+        if (!vm.streamAudioActive) webView.onPause()
     }
 
     /**

@@ -2,6 +2,8 @@
    VolumeLetterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { AudioPlayButton, AudioSectionChips } from './AudioPlayButton.jsx';
+
 /* Read marks are COUNT-aware (2026-08-03): a re-read letter shows ✓ ×N.
    Rendered as one shared element so every index surface stays identical. */
 export function ReadCheck({ count }) {
@@ -14,7 +16,7 @@ export function ReadCheck({ count }) {
   );
 }
 
-export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns }) {
+export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns, onPlayAll, sections, onPlaySection }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -67,6 +69,18 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
           <div className="vol-index-ornament-diamond" />
           <div className="vol-index-ornament-line r" />
         </div>
+        {/* Streaming audio (2026-08-05): queue the whole collection like a
+            Bandcamp album; WTLB additionally offers its Part/Section range
+            compilations as chips. Props come from screen-routes' colIdxProps
+            and are absent when the collection has no tracks. */}
+        {onPlayAll && (
+          <div className="vol-index-play-row">
+            <AudioPlayButton variant="playall" label="Play All" onClick={onPlayAll} />
+          </div>
+        )}
+        {sections && onPlaySection && (
+          <AudioSectionChips sections={sections} onPlay={onPlaySection} />
+        )}
       </div>
       <div className={`chapter-cards${columns === 2 ? " two-col" : ""}`}>
         {preface && (columns === 2 ? (
