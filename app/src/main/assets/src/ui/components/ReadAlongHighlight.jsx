@@ -66,8 +66,9 @@ const HL_NAME = 'vot-reading';
  * @param {string} props.volKey
  * @param {string} props.letterId
  * @param {{ current: HTMLElement | null }} props.mainRef - the .letter-body ref
+ * @param {(id: string, i: number) => string} props.hlKeyFn - letterHlKey / wtlbHlKey
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
@@ -79,7 +80,15 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef }) {
     const g = /** @type {any} */ (globalThis);
     const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
     if (!supported) return undefined;
-    const frags = active ? _syncFor(key) : null;
+    let frags = active ? _syncFor(key) : null;
+    if (frags && frags.length) {
+      // Multi-part letters: keep only the fragments of the PART now playing
+      // (tuple[4]; absent = part 0). Part index = position of the current
+      // queue item within this letter's same-key run.
+      let part = 0;
+      for (let j = st.qi - 1; j >= 0 && st.queue[j] && st.queue[j].key === key; j--) part++;
+      frags = frags.filter((f) => (f[4] || 0) === part);
+    }
     if (!active || !frags || !frags.length || !mainRef.current) {
       /** @type {any} */ (CSS).highlights.delete(HL_NAME);
       lastFrag.current = -1;
@@ -90,9 +99,16 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef }) {
     lastFrag.current = i;
     if (i < 0) { /** @type {any} */ (CSS).highlights.delete(HL_NAME); return undefined; }
     const [, bi, cs, ce] = frags[i];
-    const blockEl = mainRef.current.querySelector('[data-hl-key="' + letterHlKey(letterId, bi) + '"]');
+    const blockEl = mainRef.current.querySelector('[data-hl-key="' + hlKeyFn(letterId, bi) + '"]');
     if (!blockEl) return undefined;
-    const range = _rangeIn(blockEl, cs, ce);
+    let range;
+    if (ce === -1) {
+      // Format B sentinel — paint the whole paragraph block.
+      range = blockEl.ownerDocument.createRange();
+      try { range.selectNodeContents(blockEl); } catch (_e) { return undefined; }
+    } else {
+      range = _rangeIn(blockEl, cs, ce);
+    }
     if (!range) return undefined;
     const H = g.Highlight;
     if (typeof H !== 'function') return undefined;

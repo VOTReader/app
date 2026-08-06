@@ -124,3 +124,4 @@ tools/_audio-mirror-staging/
 tools/_mirror-run*.log
 tools/_mirror-run*.err.log
 tools/_align-proof/
+tools/_align-work/

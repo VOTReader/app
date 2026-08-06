@@ -6,6 +6,8 @@ import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../compo
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
+import { wtlbHlKey } from '../../utils/hl-keys.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -458,6 +460,10 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           </main>
         </div>
       </div>
+
+      {/* Read-along: paragraph-level wash for Format B (see ReadAlongHighlight —
+          char offsets shift with footnotesMode, so B paints whole paragraphs). */}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the
