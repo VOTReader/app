@@ -80,6 +80,9 @@ def main():
     if "--limit" in sys.argv:
         limit = int(sys.argv[sys.argv.index("--limit") + 1])
     dry = "--dry" in sys.argv
+    reverse = "--reverse" in sys.argv  # second worker walks from the far end;
+    # the two meet in the middle with only crossover-window duplicate attempts
+    # (a duplicate upload 422s and is counted, not fatal).
 
     ids = manifest_ids()
     print(f"manifest ids: {len(ids)}")
@@ -101,6 +104,8 @@ def main():
     print(f"release has: {len(have)} assets")
 
     todo = [i for i in ids if (i + ".mp3") not in have]
+    if reverse:
+        todo.reverse()
     if limit:
         todo = todo[:limit]
     print(f"to mirror: {len(todo)}{' (dry run)' if dry else ''}")

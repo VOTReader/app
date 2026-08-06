@@ -205,7 +205,12 @@ function _ensureEl() {
   el.addEventListener('waiting', () => _setStatus('loading'));
   // Only downgrade a genuinely-playing element: our own stop()/track-switch
   // pauses fire this too, and they've already set the status they want.
-  el.addEventListener('pause', () => { if (_state.status === 'playing') _setStatus('paused'); });
+  el.addEventListener('pause', () => {
+    if (_state.status === 'playing') {
+      _setStatus('paused');
+      _persist();   // durable resume — a pause is the likeliest walk-away point
+    }
+  });
   el.addEventListener('durationchange', () => {
     _state.duration = el.duration || 0;
     _notify();
@@ -216,7 +221,13 @@ function _ensureEl() {
     // timeupdate fires ~4x/second. Only re-render subscribers when the
     // displayed (whole-second) clock actually changes.
     const sec = Math.floor(_state.time);
-    if (sec !== _lastTick) { _lastTick = sec; _notify(); }
+    if (sec !== _lastTick) {
+      _lastTick = sec;
+      _notify();
+      // Durable resume: snapshot every ~5s of playback (and on the pause
+      // below). Cheap — ~300 bytes to localStorage.
+      if (sec - _lastPersistSec >= 5 || sec < _lastPersistSec) { _lastPersistSec = sec; _persist(); }
+    }
   });
   el.addEventListener('ended', () => next());
   el.addEventListener('error', _onError);
@@ -373,6 +384,130 @@ function _tracksFor(volKey, item, collectionLabel) {
   }));
 }
 
+/* ── position persistence (owner directive 2026-08-06) ────────────────────
+   Playback position survives app close AND phone restart. A tiny throttled
+   localStorage snapshot (~300 bytes) records HOW the queue was built (its
+   source descriptor) + the current track's display fields + the clock; on
+   the next boot the bar reappears PAUSED at that position with zero network
+   and zero corpus loading — the full queue is rebuilt lazily from the
+   manifest on the first transport tap (the VOT corpus is a lazy bundle; the
+   snapshot's display fields are what let the bar render before it loads).
+   stop() (the ✕) and finishing the queue both CLEAR the snapshot. */
+
+const PERSIST_KEY = 'vot-audio-pos';
+/** How the current queue was built — replayed to rebuild it after a boot.
+ * @type {{ mode: 'letter'|'collection'|'section', volKey: string, label: string|null } | null} */
+let _source = null;
+/** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
+let _pendingRestore = /** @type {any} */ (null);
+/** Last persisted whole-second, so the 1 Hz tick writes every ~5s, not 1 Hz. */
+let _lastPersistSec = -1;
+
+function _persist() {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const src = _pendingRestore || _source;
+    const track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+    if (!src || !track) return;
+    localStorage.setItem(PERSIST_KEY, JSON.stringify({
+      v: 1,
+      mode: src.mode, volKey: src.volKey, label: src.label,
+      qi: _pendingRestore ? _pendingRestore.qi : _state.qi,
+      key: track.key,
+      time: Math.floor(_state.time || 0),
+      track: { title: track.title, sub: track.sub, readerCode: track.readerCode, partLabel: track.partLabel, url: track.url, key: track.key },
+    }));
+  } catch (_e) { /* storage full/blocked — resume is best-effort */ }
+}
+
+function _clearPersist() {
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(PERSIST_KEY); } catch (_e) { /* ditto */ }
+}
+
+/**
+ * Boot-time restore: show the bar paused at the saved position. Pure display
+ * state — one placeholder queue entry from the snapshot; the real queue is
+ * rebuilt by _rebuildRestoredQueue() on the first transport tap.
+ * @returns {void}
+ */
+function _restoreFromSaved() {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1 || !s.track || !s.track.url) return;
+    _pendingRestore = { mode: s.mode, volKey: s.volKey, label: s.label, qi: s.qi || 0, key: s.key || null, time: s.time || 0 };
+    _state.queue = [{ key: s.track.key || null, title: s.track.title || '', sub: s.track.sub || null, url: s.track.url, readerCode: s.track.readerCode || '', partLabel: s.track.partLabel || null }];
+    _state.qi = 0;
+    _state.time = s.time || 0;
+    _state.duration = 0;
+    _state.status = 'paused';
+    _notify();
+  } catch (_e) { _pendingRestore = null; }
+}
+
+/**
+ * Rebuild the full queue a _restoreFromSaved() bar stands in for, then start
+ * at the saved track + position. Loads the lazy VOT corpus first when needed
+ * (index.html's __loadVotCorpus is idempotent).
+ * @returns {Promise<void>}
+ */
+async function _rebuildRestoredQueue() {
+  const r = _pendingRestore;
+  if (!r) return;
+  if (_offline()) { _toast(OFFLINE_MSG); return; }
+  _pendingRestore = null;
+  const g = _g();
+  try {
+    if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
+  } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+  /** @type {Track[]} */
+  let queue = [];
+  if (r.mode === 'section') {
+    const sections = sectionsFor(r.volKey) || [];
+    queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
+  } else {
+    const col = (typeof g.COL_BY_KEY !== 'undefined') ? g.COL_BY_KEY.get(r.volKey) : null;
+    const pref = (col && typeof g.colPreface === 'function') ? g.colPreface(col) : null;
+    const arr = (col && typeof g.colLetterArr === 'function') ? g.colLetterArr(col) : [];
+    const items = r.mode === 'letter'
+      ? [pref, ...arr].filter((i) => i && (r.key === r.volKey + ':' + i.id))
+      : (pref ? [pref, ...arr] : arr);
+    for (const item of items) {
+      for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
+    }
+  }
+  const resumeAt = r.time || 0;
+  if (!queue.length) {
+    // Corpus/manifest unavailable (or the letter vanished) — play the
+    // placeholder track the bar is already showing; it has a real URL.
+    queue = _state.queue.slice();
+  }
+  let qi = 0;
+  if (r.key) {
+    const hits = queue.map((t, i) => ({ t, i })).filter((x) => x.t.key === r.key);
+    if (hits.length) {
+      // Multi-part letters share a key; land on the saved part when possible.
+      const withinKey = Math.max(0, Math.min(hits.length - 1, (r.qi || 0) - hits[0].i));
+      qi = hits[withinKey].i;
+    }
+  } else {
+    qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
+  }
+  _source = { mode: r.mode, volKey: r.volKey, label: r.label };
+  _state.queue = queue;
+  _state.qi = qi;
+  _start();
+  // Seek once the element can honor it; loadedmetadata is the earliest safe
+  // moment (currentTime assignment before that is ignored or throws).
+  if (resumeAt > 0 && _el) {
+    _el.addEventListener('loadedmetadata', () => {
+      try { /** @type {HTMLAudioElement} */ (_el).currentTime = resumeAt; } catch (_e) { /* unseekable — start over */ }
+    }, { once: true });
+  }
+}
+
 /* ── playback entry points ────────────────────────────────────────────── */
 
 /**
@@ -387,6 +522,8 @@ function playLetter(opts) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
   if (!queue.length) return;
+  _pendingRestore = null;
+  _source = { mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null };
   _state.queue = queue;
   _state.qi = 0;
   _start();
@@ -417,6 +554,8 @@ function playCollection(opts) {
     const at = queue.findIndex((t) => t.key === wanted);
     if (at >= 0) qi = at;
   }
+  _pendingRestore = null;
+  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null };
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -435,6 +574,8 @@ function playSection(volKey, index, collectionLabel) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const sections = sectionsFor(volKey);
   if (!sections || !sections.length) return;
+  _pendingRestore = null;
+  _source = { mode: 'section', volKey, label: collectionLabel || null };
   _state.queue = sections.map((s) => ({
     key: null,
     title: s[0] || '',
@@ -455,7 +596,11 @@ function playSection(volKey, index, collectionLabel) {
  * @returns {void}
  */
 function toggle() {
-  if (_state.status === 'idle' || !_el) return;
+  if (_state.status === 'idle') return;
+  // A restored bar has no live element yet — the first tap rebuilds the real
+  // queue from the persisted descriptor and starts at the saved position.
+  if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  if (!_el) return;
   // Anything that isn't 'paused' is a live element — pause it and let the
   // 'pause' listener own the status flip (one source of truth).
   if (_state.status !== 'paused') { _el.pause(); return; }
@@ -483,9 +628,12 @@ function toggle() {
  */
 function next() {
   if (!_state.queue.length) return;
+  if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   if (_state.qi + 1 >= _state.queue.length) { stop(); return; }
   _state.qi++;
   _start();
+  _lastPersistSec = -1;
+  _persist();   // track boundary — remember the new position immediately
 }
 
 /**
@@ -496,6 +644,7 @@ function next() {
  */
 function prev() {
   if (!_state.queue.length) return;
+  if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   if (_el && (_el.currentTime || 0) > PREV_RESTART_SEC) { seek(0); return; }
   _state.qi = Math.max(0, _state.qi - 1);
   _start();
@@ -515,6 +664,10 @@ function seek(seconds) {
   _state.time = t;
   _lastTick = Math.floor(t);
   _notify();
+  // A paused seek is a deliberate reposition — snapshot it now, or closing
+  // the app right after would resume at the pre-seek position.
+  _lastPersistSec = _lastTick;
+  _persist();
 }
 
 /**
@@ -525,6 +678,10 @@ function seek(seconds) {
  */
 function stop() {
   const wasActive = _state.status !== 'idle';
+  // The ✕ means "I'm done with this" — a later boot must not resurrect it.
+  _pendingRestore = null;
+  _source = null;
+  _clearPersist();
   if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
@@ -579,6 +736,11 @@ function getVersion() { return _version; }
  * @returns {AudioPlayerState}
  */
 function getState() { return _state; }
+
+// Boot-time durable-resume: if a prior session left a position snapshot, put
+// the bar up PAUSED at that spot (display-only state; no network, no corpus).
+// Runs at module eval — deliberately touches only localStorage + _state.
+_restoreFromSaved();
 
 /** The singleton audio player store. */
 export const AudioPlayer = {

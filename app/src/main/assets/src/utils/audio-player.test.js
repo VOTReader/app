@@ -85,6 +85,7 @@ beforeEach(async () => {
   globalThis.Audio = FakeAudio;
   globalThis.AUDIO_MANIFEST = MANIFEST;
   globalThis.AUDIO_SECTIONS = SECTIONS;
+  localStorage.removeItem('vot-audio-pos');   // no cross-test resume state
   setOnline(true);
   bridge = { setAudioActive: vi.fn() };
   window.AndroidBridge = bridge;
@@ -473,5 +474,83 @@ describe('audio-player — Media Session', () => {
       delete window.navigator.mediaSession;
       delete globalThis.MediaMetadata;
     }
+  });
+});
+
+describe('audio-player — durable resume (position survives restart)', () => {
+  const tick = (t) => {
+    el().currentTime = t;
+    el().dispatchEvent(new Event('timeupdate'));
+  };
+  const saved = () => JSON.parse(localStorage.getItem('vot-audio-pos'));
+
+  it('persists position on pause and ~every 5s of playback', async () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    tick(1);
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null); // 1s in — still under the 5s throttle
+    tick(6);
+    expect(saved()).toBeTruthy();
+    expect(saved().time).toBe(6);
+    expect(saved().mode).toBe('collection');
+    expect(saved().volKey).toBe('vol1');
+    tick(8);
+    expect(saved().time).toBe(6); // throttled
+    el().pause();                 // walk-away point writes immediately
+    expect(saved().time).toBe(8);
+    expect(saved().track.title).toBe('Preface');
+  });
+
+  it('boot restore: bar comes back paused at the saved spot, no element created', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 1, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 2, key: 'vol1:letter-a', time: 123,
+      track: { title: 'Letter A', sub: 'Volume One', readerCode: 'B', partLabel: 'Part 2', url: URL_OF('idA2'), key: 'vol1:letter-a' },
+    }));
+    await load();
+    const st = AudioPlayer.getState();
+    expect(st.status).toBe('paused');
+    expect(st.time).toBe(123);
+    expect(st.queue.length).toBe(1);
+    expect(st.queue[0].title).toBe('Letter A');
+    expect(st.queue[0].partLabel).toBe('Part 2');
+    expect(FakeAudio.last).toBe(null); // display-only: no media element yet
+  });
+
+  it('toggle() after a boot restore rebuilds the real queue and resumes at the saved position', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 1, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 2, key: 'vol1:letter-a', time: 123,
+      track: { title: 'Letter A', sub: 'Volume One', readerCode: 'B', partLabel: 'Part 2', url: URL_OF('idA2'), key: 'vol1:letter-a' },
+    }));
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      await load();
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue.length).toBe(4);            // preface + A1 + A2 + C
+      expect(st.qi).toBe(2);                      // saved part of the multi-part letter
+      expect(st.queue[st.qi].url).toBe(URL_OF('idA2'));
+      expect(el().played).toBe(true);
+      el().duration = 500;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(123);          // seek-back once seekable
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
+  it('close (stop) clears the snapshot — the next boot stays idle', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    tick(10);
+    expect(saved()).toBeTruthy();
+    AudioPlayer.stop();
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);
+    await load();
+    expect(AudioPlayer.getState().status).toBe('idle');
   });
 });
