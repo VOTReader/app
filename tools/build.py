@@ -142,6 +142,8 @@ A_VOT = [
     # tools/gen-audio-manifest.mjs. Rides the VOT corpus: every screen that can
     # show a play button has this bundle loaded by definition.
     'src/data/audio-manifest.js',
+    # Read-along sentence timings (forced-alignment pipeline output).
+    'src/data/audio-sync.js',
 ]
 
 # Cluster B — stores + components + hooks + journal subsystem + scripture-resolution

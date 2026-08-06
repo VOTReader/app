@@ -5,6 +5,7 @@
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -584,6 +585,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           </main>
         </div>
       </div>
+
+      {/* Read-along: gold wash on the sentence being read + follow-scroll.
+          Live pane only — a peek must not fight over the ONE global
+          ::highlight(vot-reading) registration. */}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

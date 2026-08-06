@@ -1851,6 +1851,10 @@
        standalone "Says The Lord." closing), the list's own top border would
        stack a second line under the ornament — drop it and tighten up. */
     .ornament-divider + .footnote-list { border-top:none; padding-top:0; margin-top:1.5rem; }
+    /* Read-along: the sentence currently being read aloud (CSS Custom
+       Highlight API — no DOM mutation; only these properties apply). */
+    ::highlight(vot-reading) { background-color: rgba(232,192,80,0.20); }
+    body.light ::highlight(vot-reading) { background-color: rgba(122,92,16,0.16); }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }
