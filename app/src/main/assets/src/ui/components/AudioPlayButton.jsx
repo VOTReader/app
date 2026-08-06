@@ -7,32 +7,27 @@
 
    Three variants, one component because they differ only in text, glyph
    and box:
-     'listen'  — letter / WTLB hero pill ("Listen", + reader tag)
+     'listen'  — letter / WTLB hero pill (always exactly "▶ Listen" —
+                 owner directive 2026-08-06; the player bar carries the
+                 reader attribution)
      'playall' — collection index header pill ("Play All")
      'chip'    — the small per-section chips under a WTLB index
-
-   A reader tag rides along ONLY for the two human readers: text-to-speech
-   is the default voice, not a selling point, so V/M render bare.
    ═══════════════════════════════════════════════════════════════════════ */
-
-const READER_TAG = { B: 'Benjamin', T: 'Timothy' };
 
 /**
  * @param {object} props
  * @param {'listen'|'playall'|'chip'} [props.variant]
  * @param {string} [props.label] chip text; on the pills, an aria-label override
- * @param {string} [props.readerCode] 'B' | 'T' → tiny reader tag ('listen' only)
  * @param {() => void} [props.onClick]
  * @param {string} [props.className]
  * @param {string|number} [props.key] list key — declared because this repo's
  *   `React` is a global `any`, so JSX adds no React.Attributes of its own and
  *   an undeclared `key=` fails `npm run typecheck`.
  */
-export function AudioPlayButton({ variant = 'listen', label, readerCode, onClick, className }) {
+export function AudioPlayButton({ variant = 'listen', label, onClick, className }) {
   const chip = variant === 'chip';
   const playAll = variant === 'playall';
   const text = chip ? (label || 'Play') : playAll ? 'Play All' : 'Listen';
-  const tag = !chip && !playAll && READER_TAG[readerCode] ? ' · ' + READER_TAG[readerCode] : '';
 
   return (
     <button
@@ -54,7 +49,7 @@ export function AudioPlayButton({ variant = 'listen', label, readerCode, onClick
           <path d="M8 5v14l11-7z" />
         </svg>
       )}
-      <span>{text + tag}</span>
+      <span>{text}</span>
     </button>
   );
 }

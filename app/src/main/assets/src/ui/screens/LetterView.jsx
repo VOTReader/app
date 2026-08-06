@@ -301,10 +301,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               is pointer-events:none + HTML inert). */}
           {!studyMode && AudioPlayer.hasAudio(volKey, letter.id) && (
             <div className="hero-play-row">
-              <AudioPlayButton
-                readerCode={AudioPlayer.firstReaderCode(volKey, letter.id)}
-                onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || 'Volume Two' })}
-              />
+              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || 'Volume Two' })} />
             </div>
           )}
         </div>

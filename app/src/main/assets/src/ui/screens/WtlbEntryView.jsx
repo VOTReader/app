@@ -364,10 +364,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               pixel parity, it can never fire there). */}
           {AudioPlayer.hasAudio(volKey, entry.id) && (
             <div className="hero-play-row">
-              <AudioPlayButton
-                readerCode={AudioPlayer.firstReaderCode(volKey, entry.id)}
-                onClick={() => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null })}
-              />
+              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null })} />
             </div>
           )}
         </div>
