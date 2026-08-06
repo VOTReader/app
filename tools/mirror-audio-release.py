@@ -13,7 +13,12 @@ trackUrl() points at the release.
 Usage:
   python tools/fetch-drive-audio.py               # refresh Drive listing
   node tools/gen-audio-manifest.mjs               # refresh manifest
-  python tools/mirror-audio-release.py [--limit N] [--dry]
+  python tools/mirror-audio-release.py [--limit N] [--dry] [--reverse] [--until-done]
+
+--until-done: loop passes (20 min apart) until every manifest id is on the
+release. Drive rate-limits anonymous bulk downloads after a few dozen files
+(per-IP cooldown, "Failed to retrieve file url"); each pass grinds through
+whatever the current quota window allows and the loop outlasts the wall.
 
 Idempotent + additive: skips assets already on the release, so a re-run
 after the flock uploads new tracks only transfers the new files. Assets
@@ -141,7 +146,8 @@ def main():
                 if os.path.exists(dst):
                     os.remove(dst)
                 continue
-        time.sleep(1.0)  # be gentle with Drive across a 700-file run
+        time.sleep(2.5)  # be gentle with Drive across a 700-file run — the
+        # anonymous-download quota trips fast and costs far more than pacing
         r = upload_asset(rid, dst, fid + ".mp3")
         if r.returncode != 0:
             print(f"  [{n}/{len(todo)}] UPLOAD FAILED {fid}: {r.stderr.strip()[:160]}")
@@ -155,5 +161,18 @@ def main():
     return 2 if fail else 0
 
 
+def until_done():
+    passes = 0
+    while True:
+        passes += 1
+        print(f"===== pass {passes} =====")
+        rc = main()
+        if rc == 0:
+            print("ALL MIRRORED.")
+            return 0
+        print("pass incomplete (quota wall or transient failures) — next pass in 20 min")
+        time.sleep(1200)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(until_done() if "--until-done" in sys.argv else main())
