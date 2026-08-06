@@ -150,6 +150,10 @@ def main():
     reverse = "--reverse" in sys.argv  # second worker walks from the far end;
     # the two meet in the middle with only crossover-window duplicate attempts
     # (a duplicate upload 422s and is counted, not fatal).
+    shard = None  # "--shard i/n": disjoint hash partition — N workers, zero overlap
+    if "--shard" in sys.argv:
+        i, n_ = sys.argv[sys.argv.index("--shard") + 1].split("/")
+        shard = (int(i), int(n_))
 
     ids = manifest_ids()
     print(f"manifest ids: {len(ids)}")
@@ -171,6 +175,10 @@ def main():
     print(f"release has: {len(have)} assets")
 
     todo = [i for i in ids if (i + ".mp3") not in have]
+    if shard:
+        si, sn = shard
+        todo = [f for f in todo if (sum(f.encode()) % sn) == si]
+        print(f"shard {si}/{sn}: {len(todo)} ids")
     if reverse:
         todo.reverse()
     if limit:
