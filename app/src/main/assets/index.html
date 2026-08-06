@@ -59,6 +59,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <link rel="manifest" href="manifest.json" />
+  <!-- Audio-letter stream hosts: warm DNS+TCP+TLS at boot so the first tap on
+       a Listen pill doesn't pay two cold handshakes (github.com 302s to
+       release-assets). No crossorigin attr — media fetches are no-cors, and a
+       crossorigin preconnect would warm the WRONG connection pool. -->
+  <link rel="preconnect" href="https://github.com" />
+  <link rel="preconnect" href="https://release-assets.githubusercontent.com" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png" />

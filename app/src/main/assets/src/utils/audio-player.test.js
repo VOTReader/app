@@ -554,3 +554,47 @@ describe('audio-player — durable resume (position survives restart)', () => {
     expect(AudioPlayer.getState().status).toBe('idle');
   });
 });
+
+describe('audio-player — prewarm (instant-tap pipe warming)', () => {
+  it('points the idle element at the letter’s first track without changing state', () => {
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(el()).not.toBe(null);
+    expect(el().src).toBe(URL_OF('idA1'));
+    expect(el().preload).toBe('metadata');
+    expect(el().played).toBe(false);
+  });
+
+  it('playLetter after prewarm reuses the buffered element (no src reassignment)', () => {
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    const assignsBefore = el().srcHistory.length;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    expect(el().srcHistory.length).toBe(assignsBefore); // same src kept
+    expect(el().played).toBe(true);
+  });
+
+  it('never disturbs active playback, offline, or a restored bar; repeats are no-ops', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    const src = el().src;
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(el().src).toBe(src);                          // playing — untouched
+
+    AudioPlayer.stop();
+    setOnline(false);
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(el().src).toBe('');                           // offline — untouched
+    setOnline(true);
+
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    const assigns = el().srcHistory.length;
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(el().srcHistory.length).toBe(assigns);        // repeat — no-op
+  });
+
+  it('prewarm of a DIFFERENT letter than the one played still plays the right track', () => {
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    expect(el().src).toBe(URL_OF('idC'));
+    expect(el().played).toBe(true);
+  });
+});

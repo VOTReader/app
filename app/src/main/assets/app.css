@@ -1846,6 +1846,11 @@
     @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
     /* ── FOOTNOTE LIST ── */
     .footnote-list { margin-top:2.5rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
+    /* The ✦ ornament IS the finishing rule (owner directive 2026-08-06): when
+       the footnote list sits directly under it (letters that END on a
+       standalone "Says The Lord." closing), the list's own top border would
+       stack a second line under the ornament — drop it and tighten up. */
+    .ornament-divider + .footnote-list { border-top:none; padding-top:0; margin-top:1.5rem; }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }

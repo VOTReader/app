@@ -90,6 +90,9 @@ let _errorTime = 0;
 /** One-shot cold-start watchdog (see _start) — timer id + per-track flag. */
 let _stallTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 let _stallRetried = false;
+/** Letter key whose first track is pre-warmed in the idle element (prewarm). */
+let _prewarmKey = /** @type {string | null} */ (null);
+let _prewarmUrl = /** @type {string | null} */ (null);
 /** volKey → has-any-audio. The manifest is immutable once loaded. */
 const _volHasAudio = new Map();
 
@@ -212,6 +215,7 @@ function _ensureEl() {
     }
   });
   el.addEventListener('durationchange', () => {
+    if (_state.status === 'idle') return;   // prewarm fetch — nothing to show
     _state.duration = el.duration || 0;
     _notify();
   });
@@ -252,10 +256,14 @@ function _start() {
   if (!track) { stop(); return; }
   const el = _ensureEl();
   _state.time = 0;
-  _state.duration = 0;
+  _state.duration = el.src === track.url ? (el.duration || 0) : 0;
   _lastTick = -1;
   _errorTime = 0;
-  el.src = track.url;
+  // A prewarm(…) already pointed the element at THIS url and buffered its
+  // head — reassigning src would throw that away and restart the fetch.
+  if (el.src !== track.url) el.src = track.url;
+  _prewarmKey = null;
+  _prewarmUrl = null;
   // Assign directly rather than via _setStatus: queue/qi changed too, so this
   // must notify even when the previous track was already 'loading'.
   _state.status = 'loading';
@@ -283,6 +291,33 @@ function _start() {
 }
 
 /* ── manifest queries ─────────────────────────────────────────────────── */
+
+/**
+ * Warm the pipe for a letter the reader just opened: point the idle element
+ * at the letter's first track with preload='metadata', so the tap on Listen
+ * starts from a live connection with the redirect resolved and headers in
+ * hand instead of two cold TLS handshakes (~1-2s on mobile). Costs a few
+ * hundred KB at most; NEVER runs while something is playing/paused/restored,
+ * and re-warming the same letter is a no-op.
+ *
+ * @param {string} volKey
+ * @param {string} letterId
+ * @returns {void}
+ */
+function prewarm(volKey, letterId) {
+  if (_state.status !== 'idle' || _pendingRestore) return;
+  if (_offline()) return;
+  const m = _manifest();
+  const parts = m && m[volKey + ':' + letterId];
+  if (!parts || !parts.length) return;
+  const key = volKey + ':' + letterId;
+  if (_prewarmKey === key) return;
+  const el = _ensureEl();
+  el.preload = 'metadata';
+  el.src = trackUrl(parts[0][0]);
+  _prewarmKey = key;
+  _prewarmUrl = el.src;
+}
 
 /**
  * Does this letter have a recording?
@@ -695,6 +730,8 @@ function stop() {
   _state.status = 'idle';
   _lastTick = -1;
   _errorTime = 0;
+  _prewarmKey = null;
+  _prewarmUrl = null;
   _clearMediaSession();
   if (wasActive) _setAudioActive(false);
   _notify();
@@ -748,6 +785,7 @@ export const AudioPlayer = {
   getVersion,
   getState,
   hasAudio,
+  prewarm,
   firstReaderCode,
   collectionHasAudio,
   sectionsFor,

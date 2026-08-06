@@ -105,6 +105,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // An inert clone (a swipe peek) must never claim the single __onReadingComplete
   // hook or it would mark a merely-peeked letter as read.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
+
+  // Warm the stream pipe for this letter's track the moment it opens, so the
+  // Listen tap is Bandcamp-instant (no-op while anything is playing, offline,
+  // or in an inert peek). Store-side guards make repeats free.
+  React.useEffect(() => {
+    if (!inert && !studyMode) AudioPlayer.prewarm(volKey, letter.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- letter.id is the identity; volKey/studyMode/inert are fixed per mount site
+  }, [letter.id]);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
   // Dialog semantics for the inline scripture sheet (2026-08-03 cycle 4 —
   // the rail work exposed that this sheet predated the a11y batch: no role,

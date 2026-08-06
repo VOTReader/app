@@ -99,6 +99,12 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
+
+  // Warm the stream pipe for this entry's track (see LetterView's prewarm note).
+  React.useEffect(() => {
+    if (!inert) AudioPlayer.prewarm(volKey, entry.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.id is the identity; volKey/inert are fixed per mount site
+  }, [entry.id]);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
   const scripTrapRef = useFocusTrap(!!scriptureRef && !railMode);  // dialog semantics — see LetterView
 
