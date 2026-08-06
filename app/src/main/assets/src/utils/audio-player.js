@@ -55,14 +55,23 @@ const LOAD_FAIL_MSG = 'Couldn’t load this track.';
 const PREV_RESTART_SEC = 3;
 
 /**
- * Drive stream URL for a file id. Verified to serve audio/mpeg with HTTP 206
- * range support, which is what makes seeking work without a full download.
+ * Stream URL for a track. The manifest stores Google Drive file ids, but the
+ * app does NOT stream from Drive: drive.usercontent.google.com returns 403 to
+ * any request whose Sec-Fetch-Site is `cross-site` (hard anti-hotlinking —
+ * verified identically from desktop Chrome, headless, and the on-device
+ * WebView; plain curl passes only because it sends no sec-fetch headers).
+ * The tracks are mirrored to a GitHub release (tools/mirror-audio-release.py,
+ * same host family as the Garden images) with each asset named
+ * `<driveFileId>.mp3` and an explicit audio/mpeg content type (the release
+ * CDN sends `X-Content-Type-Options: nosniff`, under which Chromium media
+ * elements refuse application/octet-stream). Verified: HTTP 206 range
+ * support, cross-site sec-fetch allowed.
  *
- * @param {string} id - Google Drive file id
+ * @param {string} id - Google Drive file id (doubles as the release asset name)
  * @returns {string}
  */
 export function trackUrl(id) {
-  return 'https://drive.usercontent.google.com/download?id=' + id + '&export=download';
+  return 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
 }
 
 /* ── module state (singleton) ─────────────────────────────────────────── */
@@ -78,6 +87,9 @@ const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0 };
 let _lastTick = -1;
 /** Position to resume from after a load error (see toggle()). */
 let _errorTime = 0;
+/** One-shot cold-start watchdog (see _start) — timer id + per-track flag. */
+let _stallTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
+let _stallRetried = false;
 /** volKey → has-any-audio. The manifest is immutable once loaded. */
 const _volHasAudio = new Map();
 
@@ -184,6 +196,10 @@ function _ensureEl() {
   if (_el) return _el;
   const el = new Audio();
   el.preload = 'none';
+  // Plain no-cors embed, DELIBERATELY no crossOrigin: the GitHub release
+  // hosts send no Cross-Origin-Resource-Policy (so no-cors media is allowed)
+  // and don't guarantee Access-Control-Allow-Origin (so CORS mode could be
+  // rejected). no-cors is the mode that always works here.
 
   el.addEventListener('playing', () => _setStatus('playing'));
   el.addEventListener('waiting', () => _setStatus('loading'));
@@ -238,6 +254,21 @@ function _start() {
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
   // the user-visible message, so this just stops an unhandled rejection.
   if (p && typeof p.catch === 'function') p.catch(() => {});
+  // Cold-start stall watchdog (observed on-device 2026-08-06): the very first
+  // request of a session can hang inside the WebView network stack — no
+  // 'error', no progress, 'loading' forever — while an immediate retry
+  // streams instantly. If NOTHING has arrived after 20s, re-arm the src ONCE;
+  // a genuinely dead network then surfaces through the normal error path.
+  if (_stallTimer) clearTimeout(_stallTimer);
+  _stallRetried = false;
+  _stallTimer = setTimeout(() => {
+    if (_stallRetried || _state.status !== 'loading' || !_el) return;
+    if ((_el.currentTime || 0) > 0 || _el.readyState > 0) return; // data arrived
+    _stallRetried = true;
+    _el.src = track.url;
+    const p2 = _el.play();
+    if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+  }, 20000);
 }
 
 /* ── manifest queries ─────────────────────────────────────────────────── */
@@ -494,6 +525,7 @@ function seek(seconds) {
  */
 function stop() {
   const wasActive = _state.status !== 'idle';
+  if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';

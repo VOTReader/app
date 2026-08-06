@@ -226,6 +226,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     }
   }, [sheetFn, highlightedFn, letter.id]);
   const hasFn = letter.footnotes ? Object.keys(letter.footnotes).length > 0 : false;
+  // "Says The Lord." standing alone as the letter's final block (closing /
+  // closing-fn) — drives where the ✦ ornament-divider renders (see below).
+  const _lastBlock = letter.blocks.length > 0 ? letter.blocks[letter.blocks.length - 1] : null;
+  const closingEndsBody = !!_lastBlock && (_lastBlock.type === 'closing' || _lastBlock.type === 'closing-fn');
 
   return (
     <ScreenLayout
@@ -435,13 +439,29 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             {/* Reading-end sentinel: positioned at the actual end of body text. */}
             <div className="reading-end" />
 
+            {/* Ornament placement (owner directive 2026-08-05): when the letter
+                ENDS on a standalone closing block ("Says The Lord."), the ✦
+                belongs directly under it — not pushed below the footnote list.
+                A letter whose last block is ordinary text (closing phrase
+                inline mid-paragraph, or no closing at all) keeps the divider in
+                its old spot between footnotes and the prev/next cards. */}
+            {closingEndsBody && (
+              <div className="ornament-divider">
+                <div className="ornament-divider-line" />
+                <div className="ornament-divider-symbol">✦</div>
+                <div className="ornament-divider-line" />
+              </div>
+            )}
+
             {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} highlightedFn={highlightedFn} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} />}
 
-            <div className="ornament-divider">
-              <div className="ornament-divider-line" />
-              <div className="ornament-divider-symbol">✦</div>
-              <div className="ornament-divider-line" />
-            </div>
+            {!closingEndsBody && (
+              <div className="ornament-divider">
+                <div className="ornament-divider-line" />
+                <div className="ornament-divider-symbol">✦</div>
+                <div className="ornament-divider-line" />
+              </div>
+            )}
 
             <div className="bottom-nav">
               {letter.prevLetter ? (

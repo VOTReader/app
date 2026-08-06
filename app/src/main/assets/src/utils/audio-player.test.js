@@ -55,7 +55,7 @@ const ITEMS = [
   { id: 'letter-c', title: 'Letter C' },
 ];
 
-const URL_OF = (id) => 'https://drive.usercontent.google.com/download?id=' + id + '&export=download';
+const URL_OF = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
 
 let AudioPlayer;
 let AUDIO_TOAST_ID;
@@ -101,8 +101,8 @@ afterEach(() => {
 });
 
 describe('audio-player — trackUrl + readerLabel', () => {
-  it('builds the Drive usercontent stream URL', () => {
-    expect(trackUrl('abc123')).toBe('https://drive.usercontent.google.com/download?id=abc123&export=download');
+  it('builds the GitHub release stream URL (Drive id = asset name)', () => {
+    expect(trackUrl('abc123')).toBe('https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/abc123.mp3');
   });
 
   it('maps every reader code, null for unknown', () => {
