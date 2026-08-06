@@ -30,6 +30,7 @@ Needs: gdown (pip) + gh CLI authed as VOTReader.
 import json, os, re, subprocess, sys, time
 
 import gdown
+import requests
 
 REPO = "VOTReader/votreader-assets"
 TAG = "audio-v1"
@@ -38,6 +39,67 @@ ROOT = os.path.dirname(HERE)
 MANIFEST = os.path.join(ROOT, "app", "src", "main", "assets", "src", "data", "audio-manifest.js")
 STAGING = os.path.join(HERE, "_audio-mirror-staging")
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
+COOKIES = os.path.join(HERE, "_drive-cookies.json")  # from tools/drive-login.mjs
+# rclone with the owner's OAuth grant (2026-08-06, drive.readonly scope, remote
+# "gdrive") — `backend copyid` fetches by file id on the ACCOUNT's quota, which
+# is what finally beat Drive's anonymous per-IP download wall. NOTE: uses
+# rclone's shared client_id (retires during 2026) — fine for this mirror; make
+# a personal client_id if this pipeline is still pulling from Drive by then.
+RCLONE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages",
+                      "Rclone.Rclone_Microsoft.Winget.Source_8wekyb3d8bbwe",
+                      "rclone-v1.75.0-windows-amd64", "rclone.exe")
+
+
+def _rclone_batch(fids):
+    """Download a batch of file ids into STAGING via one rclone invocation.
+    Returns the subset that landed with bytes."""
+    args = [RCLONE, "backend", "copyid", "gdrive:"]
+    for fid in fids:
+        args += [fid, os.path.join(STAGING, fid + ".mp3")]
+    r = subprocess.run(args, capture_output=True, text=True)
+    if r.returncode != 0:
+        print("  rclone batch stderr: " + (r.stderr or "").strip().splitlines()[-1][:160] if r.stderr else "  rclone batch failed")
+    got = []
+    for fid in fids:
+        dst = os.path.join(STAGING, fid + ".mp3")
+        if os.path.exists(dst) and os.path.getsize(dst) > 0:
+            got.append(fid)
+    return got
+
+
+def _cookie_session():
+    """Authenticated requests session when drive-login.mjs has run (uses the
+    owner's own download quota — the anonymous per-IP wall doesn't apply).
+    Returns None when no cookie file exists (anonymous gdown path)."""
+    if not os.path.exists(COOKIES):
+        return None
+    s = requests.Session()
+    for c in json.load(open(COOKIES, encoding="utf-8")):
+        s.cookies.set(c["name"], c["value"], domain=c.get("domain", ".google.com"), path=c.get("path", "/"))
+    s.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36"
+    return s
+
+
+def _download_authed(session, fid, dst):
+    """Server-side download (no sec-fetch headers, so no hotlink gate) with
+    the signed-in cookies. Handles the interstitial confirm page for large
+    files by re-posting the form params."""
+    url = "https://drive.usercontent.google.com/download"
+    r = session.get(url, params={"id": fid, "export": "download"}, stream=True, timeout=120)
+    ct = r.headers.get("Content-Type", "")
+    if ct.startswith("text/html"):
+        # Virus-scan/quota interstitial — harvest the confirm form fields.
+        html = r.text
+        params = dict(re.findall(r'name="([^"]+)"\s+value="([^"]*)"', html))
+        if not params.get("id"):
+            return False
+        r = session.get(url, params=params, stream=True, timeout=120)
+        if r.headers.get("Content-Type", "").startswith("text/html"):
+            return False
+    with open(dst, "wb") as f:
+        for chunk in r.iter_content(1 << 18):
+            f.write(chunk)
+    return os.path.getsize(dst) > 0
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -121,42 +183,54 @@ def main():
 
     os.makedirs(STAGING, exist_ok=True)
     rid = release_id()
+    use_rclone = os.path.exists(RCLONE)
+    session = None if use_rclone else _cookie_session()
+    print("downloader: " + ("rclone (owner OAuth)" if use_rclone else "authed cookies" if session else "anonymous gdown"))
     ok = fail = 0
-    for n, fid in enumerate(todo, 1):
-        dst = os.path.join(STAGING, fid + ".mp3")
-        if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
-            got = None
-            # gdown RAISES on quota/permission walls (it doesn't just return
-            # None), and bulk runs do trip Drive's rate limiting — so catch,
-            # back off harder each attempt, and keep the run alive. A file
-            # that stays stuck is reported and retried by the NEXT run
-            # (the script is additive/idempotent).
-            for attempt in (1, 2, 3):
-                try:
-                    got = gdown.download(id=fid, output=dst, quiet=True)
-                except Exception as e:
-                    print(f"  [{n}/{len(todo)}] gdown error {fid} (attempt {attempt}): {str(e).splitlines()[0][:120]}")
-                    got = None
-                if got:
-                    break
-                time.sleep(10 * attempt)
-            if not got or not os.path.exists(dst) or os.path.getsize(dst) == 0:
-                print(f"  [{n}/{len(todo)}] DOWNLOAD FAILED {fid}")
+    n = 0
+    BATCH = 10
+    for b in range(0, len(todo), BATCH):
+        batch = todo[b:b + BATCH]
+        if use_rclone:
+            _rclone_batch([f for f in batch
+                           if not os.path.exists(os.path.join(STAGING, f + ".mp3"))])
+        for fid in batch:
+            n += 1
+            dst = os.path.join(STAGING, fid + ".mp3")
+            if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
+                # rclone missed it (or non-rclone path) — per-file fallback.
+                got = None
+                for attempt in (1, 2, 3):
+                    try:
+                        if use_rclone:
+                            got = _rclone_batch([fid]) and dst
+                        elif session:
+                            got = _download_authed(session, fid, dst) and dst
+                        else:
+                            got = gdown.download(id=fid, output=dst, quiet=True)
+                    except Exception as e:
+                        print(f"  [{n}/{len(todo)}] download error {fid} (attempt {attempt}): {str(e).splitlines()[0][:120]}")
+                        got = None
+                    if got and os.path.exists(dst) and os.path.getsize(dst) > 0:
+                        break
+                    time.sleep(5 * attempt)
+                if not os.path.exists(dst) or os.path.getsize(dst) == 0:
+                    print(f"  [{n}/{len(todo)}] DOWNLOAD FAILED {fid}")
+                    fail += 1
+                    if os.path.exists(dst):
+                        os.remove(dst)
+                    continue
+            r = upload_asset(rid, dst, fid + ".mp3")
+            if r.returncode != 0:
+                print(f"  [{n}/{len(todo)}] UPLOAD FAILED {fid}: {r.stderr.strip()[:160]}")
                 fail += 1
-                if os.path.exists(dst):
-                    os.remove(dst)
                 continue
-        time.sleep(2.5)  # be gentle with Drive across a 700-file run — the
-        # anonymous-download quota trips fast and costs far more than pacing
-        r = upload_asset(rid, dst, fid + ".mp3")
-        if r.returncode != 0:
-            print(f"  [{n}/{len(todo)}] UPLOAD FAILED {fid}: {r.stderr.strip()[:160]}")
-            fail += 1
-            continue
-        os.remove(dst)  # keep staging lean; the release is the mirror
-        ok += 1
-        if n % 10 == 0 or n == len(todo):
-            print(f"  [{n}/{len(todo)}] ok={ok} fail={fail}")
+            os.remove(dst)  # keep staging lean; the release is the mirror
+            ok += 1
+            if n % 10 == 0 or n == len(todo):
+                print(f"  [{n}/{len(todo)}] ok={ok} fail={fail}")
+        if not use_rclone:
+            time.sleep(2.5)  # anonymous pacing only; the OAuth path uses the account quota
     print(f"DONE ok={ok} fail={fail}")
     return 2 if fail else 0
 
@@ -169,6 +243,13 @@ def until_done():
         rc = main()
         if rc == 0:
             print("ALL MIRRORED.")
+            # The sign-in cookie file has served its purpose — remove it.
+            try:
+                if os.path.exists(COOKIES):
+                    os.remove(COOKIES)
+                    print("(auth cookies deleted)")
+            except OSError:
+                print("WARNING: could not delete tools/_drive-cookies.json — remove it manually.")
             return 0
         print("pass incomplete (quota wall or transient failures) — next pass in 20 min")
         time.sleep(1200)
