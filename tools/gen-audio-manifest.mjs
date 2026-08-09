@@ -270,9 +270,13 @@ files.sort((a, b) => (a.fill === b.fill ? 0 : a.fill ? 1 : -1));
  *   sections: Map(section -> {id, reader})             (used if no full)
  *   parts:    Map(part -> {id, reader})                (multi-part letters)
  *   addenda:  [{id, reader}]                           (appended last)
+ *   cand:     [{kind, n, id, reader}]                  (EVERY candidate, for alternates)
  * }
  * Reader rank decides collisions everywhere (B > T > V > M) — Benjamin's
  * rank-3 IS the "Benjamin supersedes" rule, wherever his file lives.
+ * `cand` records every non-compilation candidate untouched by that battle,
+ * so a second pass can compose per-reader ALTERNATE renditions (owner
+ * directive 2026-08-09: the listener may choose which reader to hear).
  */
 const acc = new Map();
 const problems = [];
@@ -324,8 +328,9 @@ for (const f of files) {
   if (f.fill && acc.has(key)) continue;
 
   let e = acc.get(key);
-  if (!e) { e = { full: null, sections: new Map(), parts: new Map(), addenda: [], comps: new Map() }; acc.set(key, e); }
+  if (!e) { e = { full: null, sections: new Map(), parts: new Map(), addenda: [], comps: new Map(), cand: [] }; acc.set(key, e); }
   matched++;
+  if (shape.kind !== 'compilation') e.cand.push({ kind: shape.kind, n: shape.n ?? 0, id: track.id, reader: track.reader });
   if (shape.kind === 'compilation') {
     const cur = e.comps.get(track.n);
     if (better(cur, track)) e.comps.set(track.n, track);
@@ -342,9 +347,51 @@ for (const f of files) {
   }
 }
 
+/**
+ * Compose reader R's own standalone rendition of a letter from its candidate
+ * pool: same precedence as the primary flatten (full > sections > parts, one
+ * addendum last), restricted to R's files, first-seen per slot (which is what
+ * silently drops same-reader duplicate uploads). Returns
+ * { kind: 'full'|'sections'|'parts', rows: [{id, label}] } — empty rows when
+ * R recorded nothing usable.
+ */
+function renditionFor(cands, reader) {
+  const seen = new Set();
+  const firsts = [];
+  for (const c of cands) {
+    if (c.reader !== reader) continue;
+    const slot = c.kind + ':' + c.n;
+    if (seen.has(slot)) continue;
+    seen.add(slot);
+    firsts.push(c);
+  }
+  const full = firsts.find((c) => c.kind === 'full');
+  let kind = 'full';
+  let list = [];
+  if (full) {
+    list = [{ id: full.id, label: null }];
+  } else {
+    const secs = firsts.filter((c) => c.kind === 'section').sort((a, b) => a.n - b.n);
+    if (secs.length) {
+      kind = 'sections';
+      list = secs.map((c) => ({ id: c.id, label: `Section ${c.n}` }));
+    } else {
+      kind = 'parts';
+      const parts = firsts.filter((c) => c.kind === 'part').sort((a, b) => a.n - b.n);
+      list = parts.map((c, i, arr) => ({ id: c.id, label: arr.length > 1 ? `Part ${i + 1}` : null }));
+    }
+  }
+  if (!list.length) return { kind, rows: [] };   // an addendum alone is not a rendition
+  const add = firsts.find((c) => c.kind === 'addendum');
+  if (add) list.push({ id: add.id, label: 'Addendum' });
+  if (list.length === 1) list[0].label = null;
+  return { kind, rows: list };
+}
+
 // ── flatten to manifest entries ──────────────────────────────────────────
 const manifest = new Map();   // key -> [[id, reader, label?], ...]
 const sections = {};          // volKey -> [[label, id, reader], ...]
+const alternates = new Map(); // key -> [[reader, [[id, label?], ...]], ...] rank-ordered
 for (const [key, e] of acc) {
   if (key.startsWith('__sections:')) {
     const volKey = key.split(':')[1];
@@ -367,6 +414,27 @@ for (const [key, e] of acc) {
   if (list.length === 0) continue;
   if (list.length === 1) list[0].label = null;
   manifest.set(key, list.map((t) => t.label ? [t.id, t.reader, t.label] : [t.id, t.reader]));
+
+  // Alternate renditions: any OTHER reader whose own composition of this
+  // letter brings at least one recording the primary list doesn't carry.
+  // A sections/parts rendition with fewer main tracks than the primary's is
+  // an incomplete fragment, not an alternative — skipped. (A single full-
+  // letter recording is always a complete alternative, whatever the primary
+  // is split into.)
+  const primaryIds = new Set(list.map((t) => t.id));
+  const primaryMain = list.filter((t) => t.label !== 'Addendum').length;
+  const readers = [...new Set(e.cand.map((c) => c.reader))]
+    .sort((a, b) => READER_RANK[b] - READER_RANK[a]);
+  const pairs = [];
+  for (const reader of readers) {
+    const r = renditionFor(e.cand, reader);
+    if (!r.rows.length) continue;
+    if (r.rows.every((row) => primaryIds.has(row.id))) continue;   // already the primary (or a subset of it)
+    const mainRows = r.rows.filter((row) => row.label !== 'Addendum').length;
+    if (r.kind !== 'full' && primaryMain > 1 && mainRows < primaryMain) continue;
+    pairs.push([reader, r.rows.map((row) => row.label ? [row.id, row.label] : [row.id])]);
+  }
+  if (pairs.length) alternates.set(key, pairs);
 }
 
 // ── emit ─────────────────────────────────────────────────────────────────
@@ -374,21 +442,42 @@ const keys = [...manifest.keys()].sort();
 const lines = keys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(manifest.get(k)));
 const secKeys = Object.keys(sections).sort();
 const secLines = secKeys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(sections[k]));
+const altKeys = [...alternates.keys()].sort();
+const altLines = altKeys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(alternates.get(k)));
 const body = '/* AUDIO MANIFEST — auto-generated by tools/gen-audio-manifest.mjs. DO NOT EDIT.\n' +
   '   AUDIO_MANIFEST: "volKey:letterId" -> [[driveFileId, readerCode, partLabel?], ...]\n' +
   '   AUDIO_SECTIONS: volKey -> [[label, driveFileId, readerCode], ...] (range compilations)\n' +
+  '   AUDIO_ALTERNATES: "volKey:letterId" -> [[readerCode, [[driveFileId, partLabel?], ...]], ...]\n' +
+  '     — complete standalone renditions by OTHER readers, rank-ordered; lets\n' +
+  '     the listener choose who reads a letter. Assets live on audio-v1 too.\n' +
   '   Reader codes: B=Benjamin, T=Timothy, V=text-to-speech, M=AI with music.\n' +
   '   Streams from Google Drive (public, link-shared). Regenerate:\n' +
   '     python tools/fetch-drive-audio.py && node tools/gen-audio-manifest.mjs\n' +
   '   then bump CORPUS_VERSION (this file rides bundle-a-vot). */\n' +
   'var AUDIO_MANIFEST = {\n' + lines.join(',\n') + '\n};\n' +
-  'var AUDIO_SECTIONS = {\n' + secLines.join(',\n') + '\n};\n';
+  'var AUDIO_SECTIONS = {\n' + secLines.join(',\n') + '\n};\n' +
+  'var AUDIO_ALTERNATES = {\n' + altLines.join(',\n') + '\n};\n';
 writeFileSync(OUT, body);
 
 // ── report ───────────────────────────────────────────────────────────────
 const perCol = new Map(COLS.map((c) => [c.volKey, { have: 0, total: (c.preface ? 1 : 0) + c.letters.length }]));
 for (const key of keys) perCol.get(key.split(':')[0]).have++;
 console.log(`audio-manifest: ${keys.length} letters with audio (${matched} files used, ${skipped} non-letter files excluded)`);
+{
+  // Alternates summary + the id set a mirror run must cover.
+  const altIds = new Set();
+  const byReader = {};
+  for (const pairs of alternates.values()) {
+    for (const [reader, rows] of pairs) {
+      byReader[reader] = (byReader[reader] || 0) + rows.length;
+      for (const row of rows) altIds.add(row[0]);
+    }
+  }
+  const primIds = new Set([...manifest.values()].flat().map((r) => r[0]));
+  const overlap = [...altIds].filter((id) => primIds.has(id));
+  console.log(`  alternates: ${altKeys.length} letters offer a reader choice (${altIds.size} extra assets: ${Object.entries(byReader).map(([r, n]) => `${r}×${n}`).join(', ') || 'none'})`);
+  if (overlap.length) console.log(`  WARNING: ${overlap.length} alternate ids also appear as primaries — mirror/emit logic needs review: ${overlap.slice(0, 5).join(', ')}`);
+}
 for (const [k, v] of perCol) {
   const missing = v.total - v.have;
   console.log(`  ${k.padEnd(9)} ${String(v.have).padStart(3)}/${v.total}${missing ? '   MISSING ' + missing : ''}`);

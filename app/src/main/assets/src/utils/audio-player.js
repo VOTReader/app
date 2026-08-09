@@ -45,6 +45,12 @@ import {
  */
 
 /**
+ * @typedef {Object} Rendition
+ * @property {string} reader   - reader code the WHOLE rendition is read by
+ * @property {Track[]} tracks  - the complete letter as that reader recorded it
+ */
+
+/**
  * @typedef {Object} AudioPlayerState
  * @property {'idle'|'loading'|'playing'|'paused'} status
  * @property {Track[]} queue
@@ -114,6 +120,11 @@ const _library = () => _g().AudioLibraryStore || null;
 const _manifest = () => _g().AUDIO_MANIFEST || null;
 /** @returns {Record<string, Array<any[]>> | null} */
 const _sections = () => _g().AUDIO_SECTIONS || null;
+/** Cross-reader alternate renditions, ordered by reader rank. Same lazy
+ *  corpus + same call-time read as the manifest above. Only the ~42 letters
+ *  with a genuine second reading appear.
+ *  @returns {Record<string, Array<any[]>> | null} */
+const _alternates = () => _g().AUDIO_ALTERNATES || null;
 /** Bible-edition manifest — rides bundle-a (critical path), so it exists from boot. */
 const _bibleManifest = () => _g().BIBLE_AUDIO_MANIFEST || null;
 /** 'bible-*' volKeys stream whole-book audiobooks from the audio-bible release. */
@@ -694,6 +705,63 @@ function _tracksFor(volKey, item, collectionLabel) {
   }));
 }
 
+/**
+ * Every rendition of one letter, PRIMARY first. The manifest holds the single
+ * reading the app picked (Benjamin supersedes, then reader rank); AUDIO_ALTERNATES
+ * carries the other complete readings of the same letter so a listener can
+ * choose a voice. Each entry is a standalone queue — never interleaved with
+ * another reader's parts. Empty when the letter has no audio at all; Bible
+ * editions have exactly one voice, so they return the primary alone.
+ *
+ * @param {string} volKey
+ * @param {{ id?: string, title?: string } | null | undefined} item
+ * @param {string | null | undefined} collectionLabel
+ * @returns {Rendition[]}
+ */
+function renditionsFor(volKey, item, collectionLabel) {
+  const primary = _tracksFor(volKey, item, collectionLabel);
+  if (!primary.length) return [];
+  /** @type {Rendition[]} */
+  const out = [{ reader: primary[0].readerCode || '', tracks: primary }];
+  if (_isBibleVol(volKey)) return out;
+  const alternates = _alternates();
+  const key = volKey + ':' + (item && item.id);
+  const pairs = alternates && item && item.id ? alternates[key] : null;
+  if (!Array.isArray(pairs)) return out;
+  for (const pair of pairs) {
+    const reader = pair && pair[0];
+    const rows = pair && pair[1];
+    if (!reader || !Array.isArray(rows) || !rows.length) continue;
+    out.push({
+      reader,
+      tracks: rows.map((row) => ({
+        key,
+        title: (item && item.title) || '',
+        sub: collectionLabel || null,
+        url: trackUrl(row[0]),
+        readerCode: reader,
+        partLabel: row[1] || null,
+      })),
+    });
+  }
+  return out;
+}
+
+/**
+ * The rendition a listener asked for, or null when this letter has no reading
+ * by that reader. Kept separate so every caller resolves a reader the same way.
+ *
+ * @param {string} volKey
+ * @param {{ id?: string, title?: string } | null | undefined} item
+ * @param {string | null | undefined} collectionLabel
+ * @param {string | null | undefined} reader
+ * @returns {Rendition | null}
+ */
+function _renditionByReader(volKey, item, collectionLabel, reader) {
+  if (!reader) return null;
+  return renditionsFor(volKey, item, collectionLabel).find((r) => r.reader === reader) || null;
+}
+
 /* ── position persistence (owner directive 2026-08-06) ────────────────────
    Playback position survives app close AND phone restart. A tiny throttled
    localStorage snapshot (~300 bytes) records HOW the queue was built (its
@@ -709,8 +777,10 @@ const PERSIST_KEY = 'vot-audio-pos';
  * `custom` persists a user-edited queue rather than rebuilding corpus order.
  * `startKey`/`startIndex` record the queue's forward-only horizon (where the
  * listener chose to begin), so a rebuilt queue never regrows the tracks that
- * were deliberately left behind it.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null } | null} */
+ * were deliberately left behind it. `startReader` records the voice chosen for
+ * the start letter, so the rebuild resumes on that rendition and not the
+ * manifest's primary one.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -740,6 +810,7 @@ function _persist() {
       customQueue,
       startKey: src.startKey || undefined,
       startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
+      startReader: src.startReader || undefined,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
 }
@@ -781,6 +852,7 @@ function _restoreFromSaved() {
       queue: customQueue,
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
+      startReader: typeof s.startReader === 'string' ? s.startReader : null,
     };
     _state.queue = [track];
     _state.qi = 0;
@@ -789,6 +861,36 @@ function _restoreFromSaved() {
     _state.status = 'paused';
     _notify();
   } catch (_e) { _pendingRestore = null; }
+}
+
+/**
+ * Reader-alternate restore fidelity. `saved` is the placeholder track the bar
+ * is already showing, which carries the reader when the snapshot predates the
+ * startReader field. Every lookup that doesn't line up returns the queue
+ * untouched, so a missing corpus or a retired alternate simply resumes on the
+ * primary rendition rather than losing the position.
+ *
+ * @param {any} restore - the pending-restore descriptor
+ * @param {Track[]} queue
+ * @param {Track | undefined} saved
+ * @returns {Track[]}
+ */
+function _withRestoredAlternate(restore, queue, saved) {
+  try {
+    const reader = restore.startReader || (saved && saved.readerCode) || '';
+    if (!reader || !restore.key || !restore.url) return queue;
+    const at = queue.findIndex((t) => t.key === restore.key);
+    if (at < 0) return queue;
+    const divider = restore.key.indexOf(':');
+    if (divider <= 0) return queue;
+    const item = { id: restore.key.slice(divider + 1), title: queue[at].title };
+    const rendition = renditionsFor(restore.volKey, item, restore.label)
+      .find((rd) => rd.reader === reader && rd.tracks.some((t) => t.url === restore.url));
+    if (!rendition) return queue;
+    let end = at;
+    while (end < queue.length && queue[end].key === restore.key) end++;
+    return queue.slice(0, at).concat(rendition.tracks, queue.slice(end));
+  } catch (_e) { return queue; }
 }
 
 /**
@@ -856,6 +958,13 @@ async function _rebuildRestoredQueue() {
   }
   let qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
   if (qi < 0 && r.key) {
+    // A rebuilt queue always holds each letter's PRIMARY rendition, so a
+    // listener resuming an alternate reader finds no url match. Swap that one
+    // letter for the rendition that actually contains the saved track.
+    queue = _withRestoredAlternate(r, queue, _state.queue[0]);
+    qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
+  }
+  if (qi < 0 && r.key) {
     const hits = queue.map((t, i) => ({ t, i })).filter((x) => x.t.key === r.key);
     if (hits.length) {
       // Multi-part letters share a key; land on the saved part when possible.
@@ -865,7 +974,7 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _source = { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex };
+  _source = { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null };
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -881,16 +990,33 @@ async function _rebuildRestoredQueue() {
 /* ── playback entry points ────────────────────────────────────────────── */
 
 /**
- * Play one letter (all of its parts, in order). No-op when the letter has no
+ * One listening decision = one lifetime play (the Milestones tier reads this).
+ * Deliberately NOT in _start(): auto-advance, next/prev, playAt and a resume
+ * rebuild all start tracks nobody asked for individually, and counting those
+ * would credit a whole queue to a single tap on Play All. recordPlayed still
+ * fires per track — the recent shelf wants every start.
+ *
+ * @returns {void}
+ */
+function _countPlay() {
+  try {
+    const library = _library();
+    if (library && typeof library.countPlay === 'function') library.countPlay();
+  } catch (_e) { /* the milestones counter must never stand between a tap and audio */ }
+}
+
+/**
+ * Play one letter (all of its parts, in order). `reader` picks a cross-reader
+ * alternate rendition when the letter has one. No-op when the letter has no
  * audio; leaves state untouched and toasts when offline.
  *
- * @param {{ volKey: string, letter: { id?: string, title?: string }, collectionLabel?: string }} opts
+ * @param {{ volKey: string, letter: { id?: string, title?: string }, collectionLabel?: string, reader?: string }} opts
  * @returns {void}
  */
 function playLetter(opts) {
   const o = opts || /** @type {any} */ ({});
   if (_offline()) { _toast(OFFLINE_MSG); return; }
-  const queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
+  let queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
   if (!queue.length) return;
   // Album behavior (owner directive 2026-08-08): a hero Listen queues the
   // WHOLE collection positioned at this letter, so the bar's prev/next walk
@@ -904,14 +1030,17 @@ function playLetter(opts) {
     const arr = g.colLetterArr(col) || [];
     const items = pref ? [pref, ...arr] : arr;
     if (items.some((item) => item && item.id === o.letter.id)) {
-      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id });
+      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: o.reader });
       return;
     }
   }
+  const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, o.reader);
+  if (rendition) queue = rendition.tracks;
   _pendingRestore = null;
   _source = { mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null };
   _state.queue = queue;
   _state.qi = 0;
+  _countPlay();
   _start();
 }
 
@@ -922,9 +1051,11 @@ function playLetter(opts) {
  * (owner directive 2026-08-09) sets a FORWARD-ONLY horizon: the queue holds
  * the chosen letter and what follows it, never the letters behind it. A
  * reader stepping backward past where they began is disorienting; prev()
- * simply clamps at the chosen start.
+ * simply clamps at the chosen start. `startReader` swaps the START letter (and
+ * only that letter) for another reader's complete rendition of it — the rest
+ * of the collection keeps the manifest's primary reading.
  *
- * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string }} opts
+ * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string }} opts
  * @returns {void}
  */
 function playCollection(opts) {
@@ -947,10 +1078,22 @@ function playCollection(opts) {
       queue = queue.slice(at);
     }
   }
+  let startReader = null;
+  if (startKey && o.startReader) {
+    const startItem = items.find((item) => item && item.id === o.startId);
+    const rendition = _renditionByReader(o.volKey, startItem, o.collectionLabel, o.startReader);
+    if (rendition) {
+      let end = 0;
+      while (end < queue.length && queue[end].key === startKey) end++;
+      queue = rendition.tracks.concat(queue.slice(end));
+      startReader = o.startReader;
+    }
+  }
   _pendingRestore = null;
-  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey };
+  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader };
   _state.queue = queue;
   _state.qi = 0;
+  _countPlay();
   _start();
 }
 
@@ -980,6 +1123,7 @@ function playSection(volKey, index, collectionLabel) {
     partLabel: null,
   }));
   _state.qi = 0;
+  _countPlay();
   _start();
 }
 
@@ -999,6 +1143,7 @@ function playTrack(track) {
   _source = { mode: 'custom', volKey: '', label: normalized.sub };
   _state.queue = [normalized];
   _state.qi = 0;
+  _countPlay();
   _start();
 }
 
@@ -1326,6 +1471,7 @@ export const AudioPlayer = {
   collectionHasAudio,
   sectionsFor,
   readerLabel,
+  renditionsFor,
   playLetter,
   playCollection,
   playSection,

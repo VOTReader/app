@@ -190,7 +190,9 @@ export const AudioLibraryStore = extendStore(
     /**
      * Put a playback start at the top of the bounded recent list. A repeat of
      * the same release asset moves its one row forward instead of creating
-     * noise in the library.
+     * noise in the library. The shelf answers "what was I listening to", so
+     * every track start belongs here — the lifetime counter does NOT (see
+     * countPlay).
      *
      * @param {unknown} track
      * @returns {void}
@@ -203,13 +205,30 @@ export const AudioLibraryStore = extendStore(
       data.recent = data.recent.filter((item) => item.url !== normalized.url);
       data.recent.unshift({ ...normalized, savedAt: 0, playedAt: Date.now() });
       data.recent = data.recent.slice(0, MAX_RECENT_AUDIO_TRACKS);
-      data.plays += 1;
       this._cache = data;
       this._save();
       this._bump();
     },
 
-    /** Lifetime recordings-started count (milestones). @returns {number} */
+    /**
+     * Count one user-initiated play. Deliberately separate from recordPlayed:
+     * the player starts a track on every auto-advance, prev/next and resume
+     * rebuild, so counting starts would credit a whole queue's worth of
+     * listening to a single tap on Play All.
+     *
+     * @returns {number} the lifetime count after this play
+     */
+    countPlay() {
+      if (this._shouldDefer('countPlay')) return this.get().plays;
+      const data = _writeableData(this);
+      data.plays = Math.min(10000000, data.plays + 1);
+      this._cache = data;
+      this._save();
+      this._bump();
+      return data.plays;
+    },
+
+    /** Lifetime recordings-played count (milestones). @returns {number} */
     getPlays() { return this.get().plays; },
 
     /** @returns {void} */

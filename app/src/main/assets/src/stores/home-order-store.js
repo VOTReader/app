@@ -15,18 +15,25 @@
    onupgradeneeded.
 
    Shape: string[] (6 home-tile ids in display order). The validation
-   logic — "saved array must have exactly DEFAULT_ORDER.length entries
-   AND every DEFAULT_ORDER id must appear in saved" — used to live in
-   HomeScreen; it moves here as part of get() so the store enforces
-   the schema invariant on read. If the schema ever grows a new tile,
-   any stale saved order missing that tile is rejected and the
-   consumer falls back to DEFAULT_ORDER.
+   logic used to live in HomeScreen and demanded an exact match —
+   "saved array must have exactly DEFAULT_ORDER.length entries AND
+   every DEFAULT_ORDER id must appear in saved" — which meant one
+   schema move cost every user their hand-arranged home screen. get()
+   now MERGES against the current defaults instead, in both
+   directions: ids no longer in DEFAULT_ORDER (a retired tile, or a
+   foreign id from an import payload) are dropped in place, and every
+   default id the save is missing (a tile that shipped after the save)
+   is appended at the end in default order. The result can never carry
+   an unknown id or omit a real tile — the invariant the strict check
+   was guarding — while the user's arrangement survives the schema
+   change. Only a value that isn't an array of strings is untrustworthy
+   enough to fall back to DEFAULT_ORDER wholesale.
 
    DEFAULT_ORDER is also re-exported so HomeScreen (the one consumer)
    doesn't keep its own copy.
 
    API:
-     HomeOrderStore.get()        → string[]  (saved order or DEFAULT_ORDER)
+     HomeOrderStore.get()        → string[]  (merged saved order, or DEFAULT_ORDER)
      HomeOrderStore.set(order)   → void
      HomeOrderStore.DEFAULT_ORDER → readonly string[]
    ═══════════════════════════════════════════════════════════════════════ */
@@ -42,25 +49,30 @@ export const HomeOrderStore = extendStore(
   CachedStore('vot-home-order', /** @type {string[]} */ ([]), { idb: true }),
   {
     /**
-     * Saved order if it passes the schema check (exact length match +
-     * every default id present); otherwise DEFAULT_HOME_ORDER. Returns
-     * a defensive read — callers must not mutate the returned array.
+     * Saved order merged against the current defaults (deduped, with
+     * ids no longer in DEFAULT_HOME_ORDER dropped in place and any
+     * default ids the save predates appended at the end); a save that
+     * isn't an array of strings falls back to DEFAULT_HOME_ORDER.
+     * Returns a defensive read — callers must not mutate the returned
+     * array.
      * @returns {string[]}
      */
     get() {
       const saved = this._load();
-      if (Array.isArray(saved) &&
-          saved.length === DEFAULT_HOME_ORDER.length &&
-          DEFAULT_HOME_ORDER.every((id) => saved.includes(id))) {
-        return /** @type {string[]} */ (saved);
+      if (!Array.isArray(saved) || !saved.every((id) => typeof id === 'string')) {
+        return /** @type {string[]} */ (DEFAULT_HOME_ORDER);
       }
-      return /** @type {string[]} */ (DEFAULT_HOME_ORDER);
+      const seen = new Set();
+      const clean = saved.filter((id) =>
+        DEFAULT_HOME_ORDER.includes(id) && !seen.has(id) && seen.add(id));
+      const missing = DEFAULT_HOME_ORDER.filter((id) => !seen.has(id));
+      return /** @type {string[]} */ (clean.concat(missing));
     },
 
     /**
-     * Replace the saved order. Empty array or schema-mismatched arrays
-     * are persisted as-is — the next get() will fall back to
-     * DEFAULT_HOME_ORDER until set() is called with a valid order.
+     * Replace the saved order. Empty or partial arrays are persisted
+     * as-is — the next get() merges them against DEFAULT_HOME_ORDER
+     * rather than rejecting them.
      * @param {string[]} order
      * @returns {void}
      */

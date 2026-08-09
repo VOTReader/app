@@ -35,12 +35,23 @@ describe('AudioLibraryStore — normalized metadata', () => {
     expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0 });
   });
 
-  it('counts lifetime plays, including repeats of the same recording', () => {
+  it('recordPlayed keeps the recent shelf without crediting a lifetime play', () => {
     AudioLibraryStore.recordPlayed(track(1));
     AudioLibraryStore.recordPlayed(track(1));
     AudioLibraryStore.recordPlayed(track(2));
+    expect(AudioLibraryStore.recent()).toHaveLength(2);   // history dedupes
+    // The player starts a track on every auto-advance; only the tap counts.
+    expect(AudioLibraryStore.getPlays()).toBe(0);
+  });
+
+  it('countPlay counts one play at a time and stays bounded', () => {
+    expect(AudioLibraryStore.countPlay()).toBe(1);
+    AudioLibraryStore.countPlay();
+    AudioLibraryStore.countPlay();
     expect(AudioLibraryStore.getPlays()).toBe(3);
-    expect(AudioLibraryStore.recent()).toHaveLength(2);   // history dedupes; plays do not
+
+    AudioLibraryStore.replaceAll({ plays: 10000000 });
+    expect(AudioLibraryStore.countPlay()).toBe(10000000);
   });
 
   it('saves once by release URL, then toggles that save off', () => {

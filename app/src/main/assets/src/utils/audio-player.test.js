@@ -47,6 +47,13 @@ const MANIFEST = {
   'vol2:solo': [['idSolo', 'M']],
 };
 
+/* Cross-reader alternates: a complete second reading of the same letter,
+   ordered by reader rank. Only letters with a genuine alternate appear. */
+const ALTERNATES = {
+  'vol1:letter-c': [['V', [['idCv']]]],
+  'vol1:letter-a': [['V', [['idA1v', 'Part 1'], ['idA2v', 'Part 2']]]],
+};
+
 const SECTIONS = {
   wtlb1: [
     ['Part 1 · Intro–19', 'sec1', 'V'],
@@ -92,6 +99,7 @@ beforeEach(async () => {
   globalThis.Audio = FakeAudio;
   globalThis.AUDIO_MANIFEST = MANIFEST;
   globalThis.AUDIO_SECTIONS = SECTIONS;
+  globalThis.AUDIO_ALTERNATES = ALTERNATES;
   localStorage.removeItem('vot-audio-pos');   // no cross-test resume state
   setOnline(true);
   bridge = { setAudioActive: vi.fn() };
@@ -105,6 +113,7 @@ afterEach(() => {
   if (typeof arbiter === 'function') document.removeEventListener('play', arbiter, true);
   delete globalThis.AUDIO_MANIFEST;
   delete globalThis.AUDIO_SECTIONS;
+  delete globalThis.AUDIO_ALTERNATES;
   delete globalThis.AudioLibraryStore;
   delete globalThis.__votAudioArbiter;
   delete globalThis.Audio;
@@ -508,6 +517,120 @@ describe('audio-player — listen completion counts', () => {
       expect(listened).not.toHaveBeenCalled();
     } finally {
       delete globalThis.__votAudioListened;
+    }
+  });
+});
+
+describe('audio-player — honest play counting', () => {
+  /** Only the transport methods the player touches; countPlay is the thing under test. */
+  const fakeLibrary = () => ({ countPlay: vi.fn(), recordPlayed: vi.fn() });
+
+  it('counts a Play All ONCE — not once per track the queue starts', () => {
+    const library = fakeLibrary();
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('ended'));   // preface → Letter A part 1
+    el().dispatchEvent(new Event('ended'));   // → part 2
+    el().currentTime = 1;                     // under the restart threshold
+    AudioPlayer.prev();                       // → back to part 1
+    expect(AudioPlayer.getState().qi).toBe(1);
+    // The recent shelf still sees every start; the lifetime counter sees one tap.
+    expect(library.recordPlayed).toHaveBeenCalledTimes(4);
+    expect(library.countPlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts playSection and playTrack once each; resuming a snapshot counts none', async () => {
+    const library = fakeLibrary();
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playSection('wtlb1', 0, 'Words To Live By');
+    AudioPlayer.playTrack({
+      key: 'vol2:solo', title: 'Solo', sub: 'Volume Two', url: URL_OF('idSolo'), readerCode: 'M', partLabel: null,
+    });
+    expect(library.countPlay).toHaveBeenCalledTimes(2);
+
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 30,
+      track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+    }));
+    await load();
+    library.countPlay.mockClear();
+    AudioPlayer.toggle();                     // the resume rebuild
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el().played).toBe(true);
+    expect(library.countPlay).not.toHaveBeenCalled();
+  });
+});
+
+describe('audio-player — reader-alternate renditions', () => {
+  it('lists the primary rendition first, then one entry per alternate reader', () => {
+    const list = AudioPlayer.renditionsFor('vol1', { id: 'letter-a', title: 'Letter A' }, 'Volume One');
+    expect(list.map((r) => r.reader)).toEqual(['B', 'V']);
+    expect(list[0].tracks.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2')]);
+    expect(list[1].tracks).toEqual([
+      { key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA1v'), readerCode: 'V', partLabel: 'Part 1' },
+      { key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA2v'), readerCode: 'V', partLabel: 'Part 2' },
+    ]);
+  });
+
+  it('is the primary alone without alternates, and empty when the letter has no audio', () => {
+    const preface = AudioPlayer.renditionsFor('vol1', { id: 'preface', title: 'Preface' }, 'Volume One');
+    expect(preface.map((r) => r.reader)).toEqual(['B']);
+    expect(preface[0].tracks.map((t) => t.url)).toEqual([URL_OF('idPreface')]);
+    expect(AudioPlayer.renditionsFor('vol1', { id: 'letter-b', title: 'Letter B' }, null)).toEqual([]);
+    expect(AudioPlayer.renditionsFor('vol1', null, null)).toEqual([]);
+  });
+
+  it('playCollection startReader swaps only the start letter; the next keeps its primary', () => {
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a', startReader: 'V',
+    });
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idC')]);
+    expect(s.queue.map((t) => t.readerCode)).toEqual(['V', 'V', 'T']);
+    expect(el().src).toBe(URL_OF('idA1v'));
+  });
+
+  it('falls back to the primary rendition when that reader has none', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, startId: 'letter-a', startReader: 'M' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+  });
+
+  it('playLetter with a reader uses that rendition even without the collection registry', () => {
+    AudioPlayer.playLetter({
+      volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One', reader: 'V',
+    });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idCv')]);
+    expect(el().src).toBe(URL_OF('idCv'));
+  });
+
+  it('persists the chosen reader and resumes on that rendition after a reboot', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playCollection({
+        volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a', startReader: 'V',
+      });
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 10;
+      el().dispatchEvent(new Event('timeupdate'));
+      const snapshot = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(snapshot.startReader).toBe('V');
+      expect(snapshot.track.url).toBe(URL_OF('idA1v'));
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // The rebuilt default queue holds Letter A's PRIMARY tracks; the saved
+      // reader's rendition takes their place so the position survives.
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idC')]);
+      expect(st.qi).toBe(0);
+      expect(el().src).toBe(URL_OF('idA1v'));
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
     }
   });
 });
@@ -970,6 +1093,13 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     // Bar next walks the FOLLOWING books; Genesis stays behind the horizon.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(BURL('brm-kjv_revelation'));
+  });
+
+  it('never offers reader alternates — a whole-book edition has one voice', () => {
+    globalThis.AUDIO_ALTERNATES = { 'bible-brm-kjv:exodus': [['V', [['brm-tts_exodus']]]] };
+    const list = AudioPlayer.renditionsFor('bible-brm-kjv', { id: 'exodus', title: 'Exodus' }, null);
+    expect(list).toHaveLength(1);
+    expect(list[0].tracks.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus')]);
   });
 
   it('never prefetch-warms whole-book Bible tracks (a warm = a full audiobook download)', () => {

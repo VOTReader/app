@@ -1,11 +1,15 @@
-/* LibraryOrderStore — growth-tolerant schema validation on read.
+/* LibraryOrderStore — schema-tolerant merge on read.
    ───────────────────────────────────────────────────────────────
    get() must (a) keep a user's custom arrangement when the default
    tile set GROWS (a saved order from before a new tile shipped keeps
    its order, new tiles appended — proven twice now: the 'progress'
-   tile, then the 'audio'+'milestones' pair on 2026-08-09), while (b)
-   still rejecting saves that carry foreign ids — the same
-   import-payload safety HomeOrderStore enforces ([[user-data-paramount]]). */
+   tile, then the 'audio'+'milestones' pair on 2026-08-09), and (b)
+   keep it just as intact when the set SHRINKS — a saved id that is
+   no longer a default tile is dropped in place instead of rejecting
+   the whole save. Per [[user-data-paramount]] a schema change must
+   never cost a user their arrangement, and that includes the
+   removal direction and the foreign ids an import payload can carry.
+   Only a value that isn't an array of strings falls back wholesale. */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LibraryOrderStore, DEFAULT_LIBRARY_ORDER } from './library-order-store.js';
@@ -25,7 +29,7 @@ describe('LibraryOrderStore — DEFAULT_LIBRARY_ORDER constant', () => {
   });
 });
 
-describe('LibraryOrderStore — get() schema validation', () => {
+describe('LibraryOrderStore — get() schema merge', () => {
   it('returns DEFAULT_LIBRARY_ORDER when no saved data exists', () => {
     expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
   });
@@ -51,16 +55,34 @@ describe('LibraryOrderStore — get() schema validation', () => {
       ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'audio', 'milestones']);
   });
 
-  it('falls back to DEFAULT when the save carries a foreign id', () => {
+  it('SHRINKS: a retired id is dropped in place, the rest of the arrangement survives', () => {
+    // The shape every install has on the day a tile is REMOVED — the
+    // saved order still names it. The other eight keep their custom
+    // arrangement and nothing is appended.
     /** @type {any} */ (LibraryOrderStore)._cache =
-      ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'foreign-id'];
-    expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
+      ['milestones', 'audio', 'retired-tile', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes'];
+    expect(LibraryOrderStore.get()).toEqual(
+      ['milestones', 'audio', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes']);
   });
 
-  it('falls back to DEFAULT when the save is empty or not an array', () => {
+  it('drops a foreign id from an import payload the same way', () => {
+    /** @type {any} */ (LibraryOrderStore)._cache =
+      ['highlights', 'foreign-id', 'notes'];
+    expect(LibraryOrderStore.get()).toEqual(
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'audio', 'milestones']);
+  });
+
+  it('returns the full default order for an empty save, and falls back when it is not an array', () => {
     /** @type {any} */ (LibraryOrderStore)._cache = [];
     expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
     /** @type {any} */ (LibraryOrderStore)._cache = { not: 'an array' };
+    expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
+  });
+
+  it('falls back to DEFAULT when the saved array holds non-strings', () => {
+    /** @type {any} */ (LibraryOrderStore)._cache = ['notes', 7, 'journal'];
+    expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
+    /** @type {any} */ (LibraryOrderStore)._cache = [{ id: 'notes' }, null];
     expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
   });
 
