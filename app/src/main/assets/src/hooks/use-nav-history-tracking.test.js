@@ -490,6 +490,26 @@ describe('useNavHistoryTracking — nav-change re-fire contract', () => {
       expect.objectContaining({ chapterNum: 5 })
     );
   });
+
+  it('records a return to the same study after leaving it', () => {
+    const addToHistory = vi.fn();
+    const study = { title: 'Purity', slug: 'purity' };
+    const chapter = { title: 'Part One', num: 1 };
+    const shared = {
+      ...baseProps(), addToHistory,
+      getStudyById: vi.fn(() => study), getStudyChapter: vi.fn(() => chapter),
+    };
+    const visit = { ...shared, screen: 'bible-study-chapter', studyId: 'purity', studyChapterId: 'part-1' };
+    const { rerender } = renderHook((p) => useNavHistoryTracking(p), { initialProps: visit });
+    expect(addToHistory).toHaveBeenCalledTimes(1);
+
+    // The index is a distinct nav position; returning to the same study is a
+    // new visit, not a stale re-render of the original one.
+    rerender({ ...shared, screen: 'bible-study-index', studyId: 'purity' });
+    rerender(visit);
+    expect(addToHistory).toHaveBeenCalledTimes(2);
+    expect(addToHistory).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'study-chapter', studyChapterId: 'part-1' }));
+  });
 });
 
 describe('useNavHistoryTracking — branch precedence (only one branch fires per render)', () => {

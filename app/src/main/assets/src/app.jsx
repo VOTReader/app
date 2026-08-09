@@ -505,7 +505,7 @@ function App() {
   };
   const goNavOrigin = () => {
     const o = navOriginRef.current;
-    setNavOrigin(null);
+    setNavOrigin(o && o.returnOrigin ? o.returnOrigin : null);
     if (o) {setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);if (o.studyId !== undefined) setStudyId(o.studyId);if (o.studyChapterId !== undefined) setStudyChapterId(o.studyChapterId);} else
     goHome();
   };
@@ -676,7 +676,7 @@ function App() {
     markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
     activeLetter, activeVolKey,
     book, chapter,
-    goHome, goNavOrigin, goSearch, goHistory, goSettings, goAbout,
+    goHome, goNavOrigin, navOrigin, goSearch, goHistory, goSettings, goAbout,
     goVolumesHome, goScripturesHome, goScriptureGenre, goBibleIdx, goMatthewIdx,
     goStudiesHome,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
@@ -757,7 +757,13 @@ function App() {
           E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
           no drift) so the app is always navigable. */}
       <ErrorBoundary key={screen}>{(ROUTES[screen] || ROUTES.home)?.() ?? null}</ErrorBoundary>
-      <AnnotationDomSync screen={screen} letterId={letterId} noteSheetTarget={noteSheetTarget} setNoteSheetTarget={setNoteSheetTarget} />
+      <AnnotationDomSync
+        screen={screen}
+        letterId={letterId}
+        placeKey={[screen, bookId, chapterNum, letterId, studyId, studyChapterId].join('|')}
+        noteSheetTarget={noteSheetTarget}
+        setNoteSheetTarget={setNoteSheetTarget}
+      />
 
 
       {/* ── 12 annotation / link / journal / bookmark sheets and popovers

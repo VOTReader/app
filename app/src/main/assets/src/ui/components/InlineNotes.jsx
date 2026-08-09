@@ -21,7 +21,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
             <span className="inline-note-chevron">{"›"}</span>
           </button>
         ) : (
-          <div key={`s${i}`} className="inline-note-scripture inline-note-plain" {...ann('s' + i)}>
+          <div key={hlKeyBase ? hlKeyBase + '-s' + i : `s${i}`} className="inline-note-scripture inline-note-plain" {...ann('s' + i)}>
             <StaticSubtree>
               <span className="inline-note-tag">{s.ref}</span>
               <span className="inline-note-cite">{renderCommentaryCite(s.cite)}</span>
@@ -59,7 +59,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
             {inner}
           </button>
         ) : (
-          <div key={`v${i}`} className="inline-vot-note" {...ann('v' + i)}>
+          <div key={hlKeyBase ? hlKeyBase + '-v' + i : `v${i}`} className="inline-vot-note" {...ann('v' + i)}>
             <StaticSubtree>{inner}</StaticSubtree>
           </div>
         );

@@ -65,6 +65,11 @@ describe('HistoryStore — add()', () => {
     expect(HistoryStore.list()[0].key).toBe('lt:the-wide-path');
   });
 
+  it('uses study identity, not a reused chapter number, for study-chapter entries', () => {
+    HistoryStore.add({ type: 'study-chapter', studyId: 'more-than-a-man', studyChapterId: 'part-1', chapterNum: 1 });
+    expect(HistoryStore.list()[0].key).toBe('st:more-than-a-man:part-1');
+  });
+
   it('prepends newest first (LIFO list order)', () => {
     HistoryStore.add({ type: 'chapter', bookId: 'matthew', chapterNum: 5 });
     HistoryStore.add({ type: 'chapter', bookId: 'mark', chapterNum: 1 });
@@ -192,6 +197,25 @@ describe('HistoryStore — pruneDay() — within-day dedup', () => {
     expect(list.length).toBe(2);
     const keys = list.map(e => e.key).sort();
     expect(keys).toEqual(['ch:matthew:5', 'ch:matthew:6']);
+  });
+
+  it('keeps distinct study chapters that share a visible part number', () => {
+    // Legacy records used `ch:undefined:1` for BOTH of these. Their durable
+    // study identities must survive the same-day compaction independently.
+    /** @type {any[]} */
+    const seed = [
+      { type: 'study-chapter', studyId: 'more-than-a-man', studyChapterId: 'part-1', chapterNum: 1, key: 'ch:undefined:1', ts: _ts(2026, 0, 15, 10) },
+      { type: 'study-chapter', studyId: 'lamb-of-god', studyChapterId: 'part-1', chapterNum: 1, key: 'ch:undefined:1', ts: _ts(2026, 0, 15, 9) },
+    ];
+    HistoryStore._cache = seed;
+    HistoryStore._save();
+
+    HistoryStore.pruneDay(2026, 0, 15);
+
+    expect(HistoryStore.list().map((e) => e.key).sort()).toEqual([
+      'st:lamb-of-god:part-1',
+      'st:more-than-a-man:part-1',
+    ]);
   });
 
   it('preserves entries OUTSIDE the pruned day (multi-day independence)', () => {
@@ -348,6 +372,15 @@ describe('HistoryStore — setAll()', () => {
     expect(list.length).toBe(2);
     expect(list[0].letterId).toBe('a');
     expect(list[1].letterId).toBe('b');
+  });
+
+  it('normalizes a legacy imported study key without changing its row', () => {
+    HistoryStore.setAll([
+      { type: 'study-chapter', studyId: 'purity', studyChapterId: 'ch1', chapterNum: 1, key: 'ch:undefined:1', ts: 1_700_000_000_000 },
+    ]);
+    expect(HistoryStore.list()).toEqual([
+      expect.objectContaining({ type: 'study-chapter', studyId: 'purity', studyChapterId: 'ch1', key: 'st:purity:ch1' }),
+    ]);
   });
 
   it('enforces 2000 cap on import (slice from the head)', () => {

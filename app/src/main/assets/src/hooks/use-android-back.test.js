@@ -106,7 +106,7 @@ describe('useAndroidBack — UX2 search-anchor clear', () => {
 });
 
 describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => {
-  for (const idx of ['notes-index', 'links-index', 'bookmarks-index', 'highlights-index', 'journal-home']) {
+  for (const idx of ['notes-index', 'links-index', 'bookmarks-index', 'highlights-index', 'journal-home', 'audio-library', 'milestones']) {
     it(`back from ${idx} restores navOrigin (not a hardcoded Library)`, () => {
       const props = baseProps({ screen: idx });
       renderHook(() => useAndroidBack(props));

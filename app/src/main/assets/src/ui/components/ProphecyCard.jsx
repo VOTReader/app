@@ -63,7 +63,7 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
         {label && <div className="prophecy-card-sublabel">{label}</div>}
         {blocks.map((block, bi) => {
           if (block.type === "para") return (
-            <p key={bi} className="letter-para" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
+            <p key={letterHlKey(stateKey, bi)} className="letter-para" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
               <StaticSubtree>
                 <Segments {..._extends({ segments: block.segments }, cardFnProps)} />
               </StaticSubtree>
@@ -71,7 +71,7 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
           );
 
           if (block.type === "poetry") return (
-            <div key={bi} className="letter-poetry" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
+            <div key={letterHlKey(stateKey, bi)} className="letter-poetry" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
               <StaticSubtree>
                 {block.lines.map((line, li) => (
                   <div key={li} className="poetry-line">

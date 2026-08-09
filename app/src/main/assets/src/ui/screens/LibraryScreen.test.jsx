@@ -9,11 +9,12 @@
 */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { act, render, cleanup } from '@testing-library/react';
 import { LibraryScreen } from './LibraryScreen.jsx';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'NoteStore', 'LinkStore', 'BookmarkStore',
-  'JournalStore', 'AnnotationStore', 'LibraryOrderStore', 'createPressDrag'];
+  'JournalStore', 'AnnotationStore', 'ReadingStatsStore', 'ReadingStreakStore',
+  'JournalStatsStore', 'AudioLibraryStore', 'LibraryOrderStore', 'createPressDrag'];
 
 const fakeStore = (extra = {}) => ({
   subscribe: () => () => {}, getVersion: () => 0, all: () => ({}), count: () => 0,
@@ -30,9 +31,15 @@ function setupGlobals(over = {}) {
   globalThis.BookmarkStore = over.BookmarkStore || fakeStore();
   globalThis.JournalStore = over.JournalStore || fakeStore();
   globalThis.AnnotationStore = over.AnnotationStore || fakeStore();
-  globalThis.LibraryOrderStore = {
-    get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress'],
+  globalThis.ReadingStatsStore = over.ReadingStatsStore || fakeStore({ get: () => ({}) });
+  globalThis.ReadingStreakStore = over.ReadingStreakStore || fakeStore({ get: () => ({}) });
+  globalThis.JournalStatsStore = over.JournalStatsStore || fakeStore({ get: () => ({}) });
+  globalThis.AudioLibraryStore = over.AudioLibraryStore || fakeStore({ saved: () => [], getPlays: () => 0 });
+  globalThis.LibraryOrderStore = over.LibraryOrderStore || {
+    get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'audio', 'milestones'],
     set: () => {},
+    subscribe: () => () => {},
+    getVersion: () => 0,
   };
   // The shared press-drag lifecycle — inert here; no gesture is simulated.
   globalThis.createPressDrag = () => ({
@@ -54,7 +61,10 @@ const renderLibrary = (props = {}) => render(
     onOpenJournal={() => {}}
     onOpenHighlights={() => {}}
     onOpenProgress={() => {}}
+    onOpenAudio={() => {}}
+    onOpenMilestones={() => {}}
     totalReadCount={0}
+    readItems={{}}
     theme="dark"
     onThemeChange={() => {}}
     onSearch={() => {}}
@@ -73,7 +83,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     setupGlobals();
     renderLibrary();
     const guides = [...document.querySelectorAll('.library-tile-guide')];
-    expect(guides).toHaveLength(6);
+    expect(guides).toHaveLength(8);
     guides.forEach((g) => expect(g.textContent.length).toBeGreaterThan(10));
     // Spot-pin the voice/accuracy of each caption against the destination
     // screens' own empty-state copy.
@@ -83,6 +93,8 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Bookmarks').querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
     expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
     expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
+    expect(tileEl('Listening Library').querySelector('.library-tile-guide').textContent).toMatch(/Save/i);
+    expect(tileEl('Milestones').querySelector('.library-tile-guide').textContent).toMatch(/listening/i);
   });
 
   it('a tile with real content drops its caption', () => {
@@ -90,14 +102,59 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     renderLibrary();
     expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeNull();
     expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
-    // The other five tiles are still empty and keep their captions.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(5);
+    // A first note also earns the matching milestone, so those two tiles now
+    // have real content; the remaining six still keep their captions.
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(6);
   });
 
   it('the Progress tile drops its caption once anything is read', () => {
     setupGlobals();
     renderLibrary({ totalReadCount: 7 });
     expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(5);
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(7);
+  });
+
+  it('updates the Milestones tile while Library stays open', () => {
+    let version = 0;
+    let plays = 0;
+    const listeners = new Set();
+    const audio = fakeStore({
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+      getVersion: () => version,
+      getPlays: () => plays,
+      saved: () => [],
+    });
+    setupGlobals({ AudioLibraryStore: audio });
+    renderLibrary();
+    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent).toBe('None reached yet');
+
+    act(() => {
+      plays = 1;
+      version++;
+      listeners.forEach((cb) => cb());
+    });
+    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent).toBe('1 of 84 reached');
+  });
+
+  it('adopts a restored custom tile order after asynchronous hydration', () => {
+    let version = 0;
+    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'audio', 'milestones'];
+    let listener = null;
+    const orderStore = {
+      get: () => order,
+      set: () => {},
+      getVersion: () => version,
+      subscribe: (cb) => { listener = cb; return () => { listener = null; }; },
+    };
+    setupGlobals({ LibraryOrderStore: orderStore });
+    renderLibrary();
+    expect(tileEl('Notes')).toBe(document.querySelector('.library-tile'));
+
+    act(() => {
+      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'audio', 'milestones'];
+      version++;
+      listener();
+    });
+    expect(tileEl('Progress')).toBe(document.querySelector('.library-tile'));
   });
 });

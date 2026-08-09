@@ -57,12 +57,13 @@
  * @param {{
  *   screen: string,
  *   letterId: string | null,
+ *   placeKey: string,
  *   noteSheetTarget: { groupId: string } | null,
  *   setNoteSheetTarget: (v: any) => void
  * }} args
  * @returns {void}
  */
-export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
+export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarget, setNoteSheetTarget }) {
   // Reactive versions of the four stores the DOM layer paints from. Any
   // store's _bump() (fired by its own mutation methods) changes its version,
   // re-renders App, and re-runs the apply pass below — the W7.3 replacement
@@ -157,7 +158,7 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).
-  }, [annV, noteV, linkV, bkmV, nbV, screen, letterId, bibleCorpusV, matthewCorpusV, votCorpusV]);
+  }, [annV, noteV, linkV, bkmV, nbV, screen, letterId, placeKey, bibleCorpusV, matthewCorpusV, votCorpusV]);
 
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).

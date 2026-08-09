@@ -129,14 +129,14 @@ describe('useHistory — addToHistory (the gate)', () => {
     act(() => {
       result.current.addToHistory({ type: 'chapter', bookId: 'matthew', chapterNum: 5 });
       result.current.addToHistory({ type: 'letter', letterId: 'the-wide-path' });
-      result.current.addToHistory({ type: 'study-chapter', bookId: 'matthew', chapterNum: 22 });
+      result.current.addToHistory({ type: 'study-chapter', studyId: 'more-than-a-man', studyChapterId: 'part-1', chapterNum: 1 });
     });
 
-    // chapter / study-chapter both use the 'ch:' shape.
+    // Each entity type uses its own collision-free key shape.
     const byType = Object.fromEntries(result.current.readHistory.map(e => [e.type, e.key]));
     expect(byType.chapter).toBe('ch:matthew:5');
     expect(byType.letter).toBe('lt:the-wide-path');
-    expect(byType['study-chapter']).toBe('ch:matthew:22');
+    expect(byType['study-chapter']).toBe('st:more-than-a-man:part-1');
   });
 
   it('does NOT dedup — every visit is recorded (per spec)', () => {

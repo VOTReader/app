@@ -44,17 +44,41 @@ import { CachedStore, extendStore } from './cached-store.js';
  */
 
 /**
- * Compute the dedup key for an entry — matches the addToHistory
- * implementation in use-history.js exactly so pruneDay's dedup
- * semantics carry over unchanged.
+ * Compute the dedup key for an entry. Study chapters are deliberately
+ * identified by their study + chapter ids, never by a chapter number: chapter
+ * numbers recur across studies and old `ch:undefined:<num>` keys caused a
+ * same-day prune to discard unrelated study visits.
  *
  * @param {HistoryEntry} entry
  * @returns {string}
  */
 function _historyKey(entry) {
-  return entry.type === 'letter'
-    ? 'lt:' + entry.letterId
-    : 'ch:' + entry.bookId + ':' + entry.chapterNum;
+  if (entry.type === 'letter') return entry.letterId != null ? 'lt:' + entry.letterId : (entry.key || 'lt:');
+  if (entry.type === 'study-chapter') {
+    return entry.studyId != null && entry.studyChapterId != null
+      ? 'st:' + entry.studyId + ':' + entry.studyChapterId
+      : (entry.key || 'st:');
+  }
+  return entry.bookId != null && entry.chapterNum != null
+    ? 'ch:' + entry.bookId + ':' + entry.chapterNum
+    : (entry.key || 'ch:');
+}
+
+/**
+ * Stamp imported or legacy entries with the current dedup key. The history
+ * payload is intentionally permissive, so retain malformed/unknown rows for
+ * display rather than dropping user history; only known entry types are
+ * normalized.
+ * @param {HistoryEntry[]} entries
+ * @returns {HistoryEntry[]}
+ */
+function _normalizeEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries.slice(0, 2000).map((entry) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    if (entry.type !== 'chapter' && entry.type !== 'letter' && entry.type !== 'study-chapter') return entry;
+    return { ...entry, key: _historyKey(entry) };
+  });
 }
 
 export const HistoryStore = extendStore(
@@ -113,13 +137,17 @@ export const HistoryStore = extendStore(
       /** @type {HistoryEntry[]} */
       const out = [];
       for (const e of this._load()) {
+        const key = (e && typeof e === 'object') ? _historyKey(e) : String(e);
         const ts = e.ts || 0;
         const inDay = ts >= dayStart && ts < dayEnd;
         if (inDay) {
-          if (seen.has(e.key)) continue;
-          seen.add(e.key);
+          if (seen.has(key)) continue;
+          seen.add(key);
         }
-        out.push(e);
+        // This also repairs a legacy `ch:undefined:<num>` key the first time
+        // its day is pruned, without requiring a destructive whole-store
+        // migration.
+        out.push((e && typeof e === 'object') ? { ...e, key } : e);
       }
       this._cache = out;
       this._save();
@@ -133,7 +161,7 @@ export const HistoryStore = extendStore(
      */
     setAll(entries) {
       if (this._shouldDefer('setAll', entries)) return;
-      this._cache = Array.isArray(entries) ? entries.slice(0, 2000) : [];
+      this._cache = _normalizeEntries(entries);
       this._save();
       this._bump();
     },

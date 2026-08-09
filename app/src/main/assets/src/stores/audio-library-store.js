@@ -35,7 +35,8 @@ export const MAX_RECENT_AUDIO_TRACKS = 30;
 /** @returns {AudioLibraryData} */
 function _empty() {
   // `plays` (2026-08-09): lifetime recordings-started counter for the
-  // milestones system. Additive to v1 — old records normalize to 0.
+  // milestones system. Additive to v1 — older records retain the conservative
+  // lower bound already present in their recent-history shelf.
   return { v: 1, saved: [], recent: [], rate: 1, plays: 0 };
 }
 
@@ -107,13 +108,17 @@ export function normalizeAudioLibrary(value) {
   const saved = /** @type {SavedAudioTrack[]} */ (_sortedUniqueTracks(raw.saved, 'savedAt', MAX_SAVED_AUDIO_TRACKS));
   const recent = /** @type {RecentAudioTrack[]} */ (_sortedUniqueTracks(raw.recent, 'playedAt', MAX_RECENT_AUDIO_TRACKS));
 
+  const hasLifetimePlayCount = Object.prototype.hasOwnProperty.call(raw, 'plays');
+  const normalizedPlays = Math.max(0, Math.min(10000000, Math.floor(Number(raw.plays) || 0)));
   return {
     v: 1,
     saved,
     recent,
     rate: normalizeAudioRate(raw.rate),
-    // Bounded so a corrupted import can't overflow the milestones math.
-    plays: Math.max(0, Math.min(10000000, Math.floor(Number(raw.plays) || 0))),
+    // Pre-counter libraries still prove one prior start for each distinct
+    // recent release. It is a conservative lower bound, never a guess at
+    // playback events that were not retained.
+    plays: hasLifetimePlayCount ? normalizedPlays : Math.max(normalizedPlays, recent.length),
   };
 }
 

@@ -96,11 +96,12 @@ export function useNavHistoryTracking({
 }) {
   /* The nav position this hook has already written a history entry for.
      Set ONLY on a successful record, which is what makes the retry below
-     safe: an unrecorded position keeps re-evaluating on later renders, a
-     recorded one is skipped until the user navigates somewhere else (and
-     back — revisiting the same chapter is a new visit and records again,
-     exactly as the old deps-array version did). */
+     safe: an unrecorded position keeps re-evaluating on later renders. */
   const recordedKeyRef = React.useRef(/** @type {string | null} */ (null));
+  // A visit is delimited by leaving its nav position, not by component
+  // lifetime. Without this, study → index → that same study could never
+  // record its return visit because `recordedKeyRef` retained the old key.
+  const lastNavKeyRef = React.useRef(/** @type {string | null} */ (null));
 
   /* NO DEPENDENCY ARRAY, deliberately (2026-08-04, owner-reported: Bible
      chapters and study chapters were missing from History).
@@ -124,6 +125,10 @@ export function useNavHistoryTracking({
      do). */
   React.useEffect(() => {
     const navKey = [screen, bookId, chapterNum, letterId, studyId, studyChapterId].join('|');
+    if (lastNavKeyRef.current !== navKey) {
+      recordedKeyRef.current = null;
+      lastNavKeyRef.current = navKey;
+    }
     if (recordedKeyRef.current === navKey) return;
     /** Mark this position recorded — called only where an entry was written. */
     const done = () => { recordedKeyRef.current = navKey; };

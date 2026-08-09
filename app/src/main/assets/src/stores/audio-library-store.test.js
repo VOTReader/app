@@ -104,6 +104,17 @@ describe('normalizeAudioLibrary — import boundary', () => {
     expect(normalizeAudioLibrary({ plays: 99999999999 }).plays).toBe(10000000);
   });
 
+  it('keeps a conservative listening lower bound for pre-counter libraries', () => {
+    const legacy = normalizeAudioLibrary({
+      recent: [
+        { ...track(1), playedAt: 11 },
+        { ...track(2), playedAt: 10 },
+      ],
+    });
+    expect(legacy.plays).toBe(2);
+    expect(normalizeAudioLibrary({ ...legacy, plays: 0 }).plays).toBe(0);
+  });
+
   it('deduplicates by immutable URL, sorts newest first, and bounds imported lists', () => {
     const saved = Array.from({ length: MAX_SAVED_AUDIO_TRACKS + 4 }, (_unused, i) => ({ ...track(i), savedAt: i }));
     const recent = Array.from({ length: MAX_RECENT_AUDIO_TRACKS + 4 }, (_unused, i) => ({ ...track(i + 200), playedAt: i }));

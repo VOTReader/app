@@ -8,12 +8,7 @@
    My Progress keeps its compact 10-row strip; this is the fleshed-out view
    reachable from Library. */
 
-import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
-
-const CONTRIBUTING_STORES = [
-  'ReadingStatsStore', 'ReadingStreakStore', 'AnnotationStore', 'NoteStore',
-  'BookmarkStore', 'LinkStore', 'JournalStore', 'JournalStatsStore', 'AudioLibraryStore',
-];
+import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 
 /** Subscribe to one cross-bundle store by name (absent store = inert). */
 function useStoreVersion(name) {
@@ -24,21 +19,21 @@ function useStoreVersion(name) {
   );
 }
 
-export function MilestonesScreen({ onBack, readItems, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  CONTRIBUTING_STORES.forEach(useStoreVersion);   // fixed list — stable hook order
+export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
 
   const built = buildAchievements(collectAchievementSnapshot(readItems));
   const pct = built.total ? Math.round((built.earned / built.total) * 100) : 0;
 
   return (
     <ScreenLayout
-      navChildren={LibraryNav({ onBack, backLabel: 'Library', showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}
+      navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}
     >
       <div className="milestones-screen">
         <div className="milestones-eyebrow">Your journey</div>
         <h1>Milestones</h1>
         <p className="milestones-intro">
-          Every mark here is computed from your own reading, listening, and study — nothing to enroll in, nothing to lose.
+          Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.
         </p>
 
         <section className="milestones-summary" aria-label="Overall progress">

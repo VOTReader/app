@@ -12,7 +12,7 @@ const APPLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'appl
 const DEFERRED_ONLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'applyNoteIcons'];
 
 const baseProps = (over) => ({
-  screen: 'home', letterId: null,
+  screen: 'home', letterId: null, placeKey: 'home',
   noteSheetTarget: null, setNoteSheetTarget: vi.fn(),
   ...over,
 });
@@ -132,6 +132,30 @@ describe('useDomAnnotationSync — apply pass', () => {
     act(() => { window.__votCorpus.bump(); });
     act(() => { vi.advanceTimersByTime(0); });
     expect(window.applyDOMHighlights).toHaveBeenCalledTimes(base + 2);
+  });
+
+  it('re-applies when a chapter changes without changing the screen or letter id', () => {
+    const props = baseProps({ screen: 'matthew-ch', placeKey: 'matthew-ch|matthew|1|||' });
+    const { rerender } = renderHook((p) => useDomAnnotationSync(p), { initialProps: props });
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(window.applyDOMHighlights).toHaveBeenCalledTimes(1);
+
+    rerender({ ...props, placeKey: 'matthew-ch|matthew|2|||' });
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(window.applyDOMHighlights).toHaveBeenCalledTimes(2);
+    expect(window.applyDOMBookmarks).toHaveBeenCalledTimes(2);
+    expect(window.applyNoteIcons).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-applies when a Bible Study part changes on the same route', () => {
+    const props = baseProps({ screen: 'bible-study-chapter', placeKey: 'bible-study-chapter||||study-a|part-1' });
+    const { rerender } = renderHook((p) => useDomAnnotationSync(p), { initialProps: props });
+    act(() => { vi.advanceTimersByTime(0); });
+
+    rerender({ ...props, placeKey: 'bible-study-chapter||||study-a|part-2' });
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(window.applyDOMHighlights).toHaveBeenCalledTimes(2);
+    expect(window.applyDOMLinks).toHaveBeenCalledTimes(2);
   });
 
   it('takes pendingScrollHlKey and scrolls the matching mark into view', () => {

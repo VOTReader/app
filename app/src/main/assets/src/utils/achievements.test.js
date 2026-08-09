@@ -18,6 +18,7 @@ afterEach(() => {
   delete window.JournalStore;
   delete window.JournalStatsStore;
   delete window.AudioLibraryStore;
+  delete window.COL_BY_READ_KEY;
 });
 
 describe('achievements — definitions', () => {
@@ -87,6 +88,10 @@ describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
   });
 
   it('splits readItems into Scripture chapters (numeric cid) vs letters (slug cid)', () => {
+    window.COL_BY_READ_KEY = new Map([
+      ['volume-two', { cardId: 'volume-two' }],
+      ['wtlb-one', { cardId: 'words-to-live-by-1' }],
+    ]);
     const s = collectAchievementSnapshot({
       'v1:genesis:1': 1,
       'v1:genesis:2': 2,          // count > 1 still ONE distinct chapter
@@ -97,6 +102,19 @@ describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
     });
     expect(s.chapterReads).toBe(3);
     expect(s.letterReads).toBe(2);
+  });
+
+  it('does not count Bible Study or Hidden Manna slugs toward public letters', () => {
+    window.COL_BY_READ_KEY = new Map([
+      ['volume-two', { cardId: 'volume-two' }],
+      ['hidden-manna', { cardId: null }],
+    ]);
+    const s = collectAchievementSnapshot({
+      'v1:volume-two:the-seventh-day': 1,
+      'v1:bible-study-matthew:the-sabbath': 1,
+      'v1:hidden-manna:the-hidden-word': 1,
+    });
+    expect(s.letterReads).toBe(1);
   });
 
   it('reads the ledger, streak, and listening stores when present', () => {

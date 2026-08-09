@@ -415,7 +415,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
               if (block.type === "prophecy-group") return (
                 <ProphecyGroup
-                  key={bi}
+                  key={letter.id + ":" + bi}
                   block={block}
                   fnProps={fnProps}
                   expandSignal={expandSignal}
@@ -426,13 +426,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               );
 
               if (block.type === "cover-image") return (
-                <div key={bi} className="study-cover-inline">
+                <div key={letter.id + ":" + bi} className="study-cover-inline">
                   <img src={block.src} alt="Study cover" />
                 </div>
               );
 
               if (block.type === "study-image") return (
-                <div key={bi}>
+                <div key={letter.id + ":" + bi}>
                   <div className="study-image-block">
                     <img src={block.src} alt={block.alt || "Study diagram"} />
                   </div>

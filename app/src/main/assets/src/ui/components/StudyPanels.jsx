@@ -29,7 +29,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                   <span className="scripture-ref-chevron">{"›"}</span>
                 </button>
               ) : (
-                <div key={i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>
+                <div key={hlKeyBase ? hlKeyBase + '-s' + i : i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>
                   <StaticSubtree>
                     <span className="scripture-ref-tag">{s.ref}</span>
                     <span className="scripture-ref-text">{renderCommentaryCite(s.cite)}</span>
@@ -68,7 +68,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
               return canTap ? (
                 <button key={i} className="vot-note vot-note-tappable" onClick={() => onVotLetterClick(n.vol, n.letter, n.excerpt)}>{inner}</button>
               ) : (
-                <div key={i} className="vot-note" {...ann('v' + i)}>
+                <div key={hlKeyBase ? hlKeyBase + '-v' + i : i} className="vot-note" {...ann('v' + i)}>
                   <StaticSubtree>{inner}</StaticSubtree>
                 </div>
               );

@@ -27,12 +27,13 @@
  * @param {{
  *   screen: string,
  *   letterId: string | null,
+ *   placeKey: string,
  *   noteSheetTarget: { groupId: string } | null,
  *   setNoteSheetTarget: (v: any) => void
  * }} props
  * @returns {null}
  */
-export function AnnotationDomSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
-  useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget });
+export function AnnotationDomSync({ screen, letterId, placeKey, noteSheetTarget, setNoteSheetTarget }) {
+  useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarget, setNoteSheetTarget });
   return null;
 }

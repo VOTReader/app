@@ -261,6 +261,8 @@ export function useAndroidBack({
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
       if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else
+      if (s === "audio-library") {goNavOrigin();return "true";} else
+      if (s === "milestones") {goNavOrigin();return "true";} else
       // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)
       // back through goNavOrigin — to the reading screen the user opened them from,
       // not a hardcoded Library. (goNavOrigin restores the captured origin, or

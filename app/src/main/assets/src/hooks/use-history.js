@@ -39,8 +39,9 @@
        ts: Date.now() at record time }
 
    THE KEY HELPER:
-     entry.type === 'letter'  → 'lt:' + entry.letterId
-     other                    → 'ch:' + entry.bookId + ':' + entry.chapterNum
+     entry.type === 'letter'        → 'lt:' + entry.letterId
+     entry.type === 'study-chapter' → 'st:' + entry.studyId + ':' + entry.studyChapterId
+     entry.type === 'chapter'       → 'ch:' + entry.bookId + ':' + entry.chapterNum
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -56,7 +57,8 @@ const _getHistorySnapshot = () => HistoryStore.list();
  * One reading-history entry. The `key` field is computed at add() time
  * and used by pruneHistoryDay for per-calendar-day dedup. `ts` is the
  * visit timestamp. Other fields are type-specific:
- *   - 'chapter' / 'study-chapter' carry bookId/chapterNum/... title fields
+ *   - 'chapter' carries bookId/chapterNum/... title fields
+ *   - 'study-chapter' carries studyId/studyChapterId/... title fields
  *   - 'letter' carries letterId/letterTitle/letterNum/volumeScreen
  *
  * @typedef {{

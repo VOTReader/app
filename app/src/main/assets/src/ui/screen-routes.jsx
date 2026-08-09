@@ -44,7 +44,6 @@ import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
-import { buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -114,6 +113,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} chapter
  * @property {*} goHome
  * @property {*} goNavOrigin
+ * @property {*} navOrigin
  * @property {*} goSearch
  * @property {*} goHistory
  * @property {*} goSettings
@@ -215,7 +215,7 @@ export function buildScreenRoutes({
   activeLetter, activeVolKey,
   book, chapter,
   // ── Nav helpers ──
-  goHome, goNavOrigin, goSearch, goHistory, goSettings, goAbout,
+  goHome, goNavOrigin, navOrigin, goSearch, goHistory, goSettings, goAbout,
   goVolumesHome, goScripturesHome, goScriptureGenre, goBibleIdx, goMatthewIdx,
   goStudiesHome,
   goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
@@ -547,9 +547,13 @@ export function buildScreenRoutes({
           // History; only the visible pill is suppressed.
           if (entry.type === 'study-chapter') {
             const study = getStudyById(entry.studyId);
-            if (!study) return;
+            // Do not make a saved History row depend on the lazy study corpus
+            // already being resident. navigateToLink can set the destination
+            // state immediately; App's bible-study-chapter route then owns the
+            // idempotent corpus kick + loading surface.
+            const slug = (study && study.slug) || entry.studySlug || entry.studyId;
             setGenreId(null);
-            setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
+            setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: entry.studyChapterId })));
             navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
           } else if (entry.type === 'letter') {
             var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
@@ -569,10 +573,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'library': () => _kickVot((() => {
-      // Tile chip only: earned/total across the full achievements table.
-      const _ms = buildAchievements(collectAchievementSnapshot(readItems));
-      return (
+    'library': () => _kickVot(
         <LibraryScreen
           onBack={goHome}
           onOpenNotes={goNotesIndex}
@@ -581,22 +582,21 @@ export function buildScreenRoutes({
           onOpenJournal={goJournalHub}
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
-          onOpenAudio={() => setScreen('audio-library')}
-          onOpenMilestones={() => setScreen('milestones')}
-          milestonesEarned={_ms.earned}
-          milestonesTotal={_ms.total}
-          totalReadCount={Object.keys(readItems).length}
+          onOpenAudio={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
+          onOpenMilestones={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
+          totalReadCount={Object.keys(readItems || {}).length}
+          readItems={readItems || {}}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
           historyEnabled={settings.historyEnabled !== false}
           theme={theme} onThemeChange={setTheme}
         />
-      );
-    })()),
+    ),
     'milestones': () => (
       <MilestonesScreen
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
+        backLabel={navOrigin && navOrigin.screen === 'my-progress' ? 'Progress' : 'Library'}
         readItems={readItems}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -610,7 +610,7 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
-        onOpenMilestones={() => setScreen('milestones')}
+        onOpenMilestones={() => { setNavOrigin({ screen: 'my-progress', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
         settings={settings}
         readItems={readItems}
         historyCount={readHistory.length}
@@ -786,7 +786,7 @@ export function buildScreenRoutes({
     'volumes-home': () => (
       <VolumesHome
         onSelect={handleVolumeSelect}
-        onOpenAudio={() => setScreen('audio-library')}
+        onOpenAudio={() => { setNavOrigin({ screen: 'volumes-home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -796,7 +796,8 @@ export function buildScreenRoutes({
     ),
     'audio-library': () => (
       <AudioLibraryScreen
-        onBack={goVolumesHome}
+        onBack={goNavOrigin}
+        backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library' : 'Volumes'}
         onOpenCollection={handleVolumeSelect}
         onOpenTrack={(track) => {
           const key = track && typeof track.key === 'string' ? track.key : '';
@@ -808,6 +809,11 @@ export function buildScreenRoutes({
           // Same wiring as colIdxProps' nav — the reading dot / last-read
           // tracking must not distinguish a Library open from an index open.
           const id = key.slice(divider + 1);
+          pushFromLetter({
+            sourceScreen: 'audio-library',
+            sourceLetterTitle: 'Listening Library',
+            destSnapshot: { screen: collection.letterScreen, letterId: id },
+          });
           setLetterId(id);
           setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
           setScreen(collection.letterScreen);

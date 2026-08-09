@@ -199,6 +199,18 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // Streaming audio: anchor the process in a mediaPlayback foreground service
     // for as long as JS reports playback. Never throws (see setActive's KDoc).
     override fun setAudioKeepAlive(active: Boolean) = AudioKeepAliveService.setActive(this, active)
+
+    /**
+     * The WebView is no longer capable of playing once it is torn down. Keep
+     * the ViewModel flag and foreground-service notification in lockstep so a
+     * renderer crash or Activity recreation cannot strand a silent “Playing
+     * audio” service or make a fresh WebView skip its normal pause path.
+     */
+    private fun stopStreamingAudio() {
+        vm.streamAudioActive = false
+        AudioKeepAliveService.setActive(this, false)
+    }
+
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)
     override fun applyImmersiveMode(immersive: Boolean) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -894,6 +906,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 fileChooserCallback?.let { try { it.onReceiveValue(null) } catch (_: Exception) {} }
                 fileChooserCallback = null
 
+                // The renderer owned the HTML <audio> element, so it is
+                // already silent. Stop its native keep-alive before replacing
+                // the WebView; the new renderer boots into a paused UI state.
+                stopStreamingAudio()
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
 
@@ -1290,7 +1306,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // playback is over whether or not JS got to say setAudioActive(false).
         // Without this an ongoing "Playing audio" notification would outlive the
         // audio — and an ongoing notification can't be swiped away.
-        AudioKeepAliveService.setActive(this, false)
+        stopStreamingAudio()
         // NTV1: share the recorder/session lifecycle lock with nativeRecordStart().
         appInterface.stopAudioCaptureForTeardown()
         // Resolve any in-flight WebView resource requests before the WebView

@@ -14,6 +14,8 @@
    React re-renders so the useEffect-only path leaves the refs stale.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
+
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
 function _libDragTrace(msg) {
@@ -25,28 +27,17 @@ function _libDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenAudio, onOpenMilestones, totalReadCount, milestonesEarned, milestonesTotal, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-  // Subscribe to all 5 stores so tile counts re-render on any mutation.
+/** Subscribe to one cross-bundle store by name (absent store = inert). */
+function useStoreVersion(name) {
+  const store = /** @type {any} */ (globalThis)[name];
   React.useSyncExternalStore(
-    React.useCallback((cb) => NoteStore.subscribe(cb), []),
-    () => NoteStore.getVersion()
+    React.useCallback((cb) => (store && typeof store.subscribe === 'function') ? store.subscribe(cb) : () => {}, [store]),
+    () => (store && typeof store.getVersion === 'function') ? store.getVersion() : 0
   );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => LinkStore.subscribe(cb), []),
-    () => LinkStore.getVersion()
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
-    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof JournalStore !== 'undefined') ? JournalStore.subscribe(cb) : () => {}, []),
-    () => (typeof JournalStore !== 'undefined') ? JournalStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
-    () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
-  );
+}
+
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenAudio, onOpenMilestones, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
 
   // AudioLibraryStore is a bundle-b global reached at call time (the same
   // rule the audio player follows — importing it here would fork the
@@ -57,6 +48,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     () => (_audioLib && typeof _audioLib.getVersion === 'function') ? _audioLib.getVersion() : 0
   );
   const savedAudioCount = (_audioLib && typeof _audioLib.saved === 'function') ? _audioLib.saved().length : 0;
+  const milestones = buildAchievements(collectAchievementSnapshot(readItems));
 
   const noteCount      = NoteStore.count();
   const linkCount      = LinkStore.all().length;
@@ -170,8 +162,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     },
     milestones: {
       id: 'milestones', eyebrow: 'My Journey', title: 'Milestones',
-      detail: !milestonesEarned ? 'None reached yet' : (milestonesEarned + ' of ' + milestonesTotal + ' reached'),
-      guide: !milestonesEarned ? 'Reading, listening, and study all count toward these.' : null,
+      detail: !milestones.earned ? 'None reached yet' : (milestones.earned + ' of ' + milestones.total + ' reached'),
+      guide: !milestones.earned ? 'Reading, listening, and study all count toward these.' : null,
       onClick: onOpenMilestones,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -184,7 +176,12 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   /* ── Drag-to-reorder — the SHARED pointer-events lifecycle ────────────
      (utils/press-drag.js — createPressDrag, extracted from the tabs v2
      redesign). This screen owns only the 2D grid geometry + visuals. */
+  const libraryOrderVersion = React.useSyncExternalStore(
+    React.useCallback((cb) => LibraryOrderStore.subscribe(cb), []),
+    () => LibraryOrderStore.getVersion()
+  );
   const [order, setOrder] = React.useState(() => LibraryOrderStore.get());
+  React.useEffect(() => { setOrder(LibraryOrderStore.get()); }, [libraryOrderVersion]);
   const [pressingIdx, setPressingIdx] = React.useState(-1);
   const [dragIdx, setDragIdx] = React.useState(-1);
 

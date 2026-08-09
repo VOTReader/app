@@ -23,10 +23,11 @@
    The older 10-entry ReadingStatsStore milestone table keeps its unlock
    toasts; this module is the full display surface built on top.
 
-   readItems key space: 'v1:<readKey>:<cid>' where a NUMERIC cid is a
-   Scripture chapter (bible books + Matthew) and a slug cid is a letter /
-   entry. That split is what lets chapters and letters progress
-   independently below.
+   readItems key space: 'v1:<readKey>:<cid>'. A NUMERIC cid is a Scripture
+   chapter (Bible books + Matthew). A slug counts as a public letter/entry
+   only when its middle readKey resolves to a public collection; Bible Study
+   and Hidden Manna records also use slugs, but are not part of the 729-item
+   public recording corpus.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -68,6 +69,13 @@
 
 /** Corpus-scale constants the top thresholds are set against. */
 const BIBLE_CHAPTER_TOTAL = 1189;   // every chapter, Genesis to Revelation
+
+/** Every live store that can change an achievement. Shared by the full screen
+ * and the Library summary tile so their subscriptions cannot drift apart. */
+export const ACHIEVEMENT_STORE_NAMES = Object.freeze([
+  'ReadingStatsStore', 'ReadingStreakStore', 'AnnotationStore', 'NoteStore',
+  'BookmarkStore', 'LinkStore', 'JournalStore', 'JournalStatsStore', 'AudioLibraryStore',
+]);
 const LETTER_TOTAL = 729;           // every letter/preface/entry with a recording
 
 /** @param {number} n @returns {string} */
@@ -285,15 +293,25 @@ export function collectAchievementSnapshot(readItems) {
     }
   } catch (_e) { /* ledger optional */ }
 
-  // Distinct chapters vs letters from the count-valued readItems map.
+  // Distinct chapters vs public letters from the count-valued readItems map.
+  // The final cid alone is insufficient: Bible Study chapter IDs and Hidden
+  // Manna entries are slugs too, but neither belongs in the 729 public
+  // recording-backed letter/entry total.
   let chapterReads = 0, letterReads = 0;
   const items = readItems && typeof readItems === 'object' ? readItems : {};
+  const collectionsByReadKey = g.COL_BY_READ_KEY instanceof Map ? g.COL_BY_READ_KEY : null;
   for (const key of Object.keys(items)) {
     if (!items[key]) continue;
     const lastSep = key.lastIndexOf(':');
     if (lastSep < 0) continue;
     const cid = key.slice(lastSep + 1);
-    if (/^\d+$/.test(cid)) chapterReads++; else letterReads++;
+    if (/^\d+$/.test(cid)) {
+      chapterReads++;
+      continue;
+    }
+    const readKey = key.slice(3, lastSep); // v1:<readKey>:<cid>
+    const collection = collectionsByReadKey && collectionsByReadKey.get(readKey);
+    if (collection && collection.cardId) letterReads++;
   }
 
   // Streak
