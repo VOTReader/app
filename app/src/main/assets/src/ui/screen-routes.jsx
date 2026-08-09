@@ -43,6 +43,7 @@
 import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
+import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
@@ -835,8 +836,24 @@ export function buildScreenRoutes({
           : navOrigin && navOrigin.screen === 'volumes-home' ? 'Volumes'
           : 'Home'}
         onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
+        onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'audio-library-volumes': () => (
+      <AudioVolumesScreen
+        onBack={goNavOrigin}
+        backLabel="Listening Library"
+        onOpenCollection={(vk) => {
+          setAudioColKey(vk);
+          setNavOrigin({ screen: 'audio-library-volumes', returnOrigin: navOrigin || null });
+          setScreen('audio-library-collection');
+        }}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
@@ -847,7 +864,7 @@ export function buildScreenRoutes({
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes' : 'Listening Library'}
         onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
         onSearch={goSearch}
         onHistory={goHistory}

@@ -369,8 +369,15 @@
       await goHome();
       clickByText(/Audio Readings/); await sleep(360);
       const body = document.body.textContent || '';
-      // The hub's own furniture: the saved doorway + both browse groups.
-      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /The Holy Bible/.test(body);
+      // The hub's own furniture: the saved doorway + one doorway per source.
+      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /Biblical Restoration Ministries/.test(body);
+    });
+    await step('Listening → The Volumes', async function () {
+      await goHome();
+      clickByText(/Audio Readings/); await sleep(360);
+      clickByText(/The Volumes of Truth/); await sleep(400);
+      // The collection list lives one level in, not splayed across the hub.
+      return /Volume One/.test(document.body.textContent || '') && /Collections/.test(document.body.textContent || '');
     });
     await step('Library → Notes', async function () { return lib(/My Notes/, /My Notes/); });
     await step('Library → Bookmarks', async function () { return lib(/My Bookmarks/, /My Bookmarks/); });

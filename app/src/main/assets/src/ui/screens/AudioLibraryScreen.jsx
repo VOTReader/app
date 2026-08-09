@@ -45,12 +45,6 @@ function writeRecentOpen(open) {
   } catch (_e) { /* the disclosure still works for this session */ }
 }
 
-/** The VOT audio manifest rides the lazy corpus — until it lands, no VOT
- *  collection can honestly claim to have (or lack) recordings. */
-function votAudioReady() {
-  return typeof AUDIO_MANIFEST !== 'undefined' && !!AUDIO_MANIFEST;
-}
-
 /** Books this Bible edition actually ships, counted off the manifest rather
  *  than assumed to be 66 — a partial edition must not overstate itself. */
 function bibleBookCount(volKey) {
@@ -68,6 +62,7 @@ function bibleBookCount(volKey) {
  *   onBack: () => void,
  *   backLabel?: string,
  *   onOpenCollection: (volKey: string) => void,
+ *   onOpenVolumes: () => void,
  *   onOpenSaved: () => void,
  *   onOpenTrack: (track: any) => void,
  *   onSearch: () => void,
@@ -77,7 +72,7 @@ function bibleBookCount(volKey) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollection, onOpenSaved, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -106,7 +101,6 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
   const recent = library && typeof library.recent === 'function' ? library.recent() : [];
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];
   const editions = Object.values(BIBLE_AUDIO_EDITIONS);
-  const votReady = votAudioReady();
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
@@ -223,25 +217,17 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
         <section className="audio-library-section audio-library-browse" aria-labelledby="audio-library-browse">
           <div className="audio-library-section-head"><div><span>Explore the source</span><h2 id="audio-library-browse">Browse the recordings</h2><p>Open a source to hear it letter by letter, or book by book.</p></div></div>
 
-          <h3 className="audio-library-group">The Volumes of Truth</h3>
+          {/* One doorway per source family (owner directive): the fourteen
+              collections live one level in, the way the Scriptures do. */}
           <div className="audio-library-shelf">
-            {collections.map((collection) => {
-              const available = votReady && AudioPlayer.collectionHasAudio(collection.volKey);
-              return (
-                <button key={collection.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(collection.volKey)}>
-                  <span className="audio-library-shelf-mark" aria-hidden="true">{available ? '♪' : '○'}</span>
-                  <span className="audio-library-shelf-copy">
-                    <strong>{collection.label}</strong>
-                    <small>{!votReady ? 'Loading recordings…' : available ? 'Recordings available' : 'No recordings yet'}</small>
-                  </span>
-                  <span className="audio-library-shelf-tail"><ArrowIcon /></span>
-                </button>
-              );
-            })}
-          </div>
-
-          <h3 className="audio-library-group">The Holy Bible</h3>
-          <div className="audio-library-shelf">
+            <button type="button" className="audio-library-shelf-row" onClick={() => onOpenVolumes()}>
+              <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
+              <span className="audio-library-shelf-copy">
+                <strong>The Volumes of Truth</strong>
+                <small>{collections.length ? collections.length + ' collections · the Letters read aloud' : 'The Letters read aloud'}</small>
+              </span>
+              <span className="audio-library-shelf-tail"><ArrowIcon /></span>
+            </button>
             {editions.map((edition) => {
               const books = bibleBookCount(edition.volKey);
               return (

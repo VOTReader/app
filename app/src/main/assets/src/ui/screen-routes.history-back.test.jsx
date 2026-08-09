@@ -301,6 +301,28 @@ describe('screen-routes — Listening Library and Milestones return to their act
     expect(collection.props.backLabel).toBe('Listening Library');
   });
 
+  it('hub → The Volumes → collection is a four-deep chain that still unwinds level by level', () => {
+    const hubOrigin = { screen: 'home', returnOrigin: null };
+    const { routes, props } = makeRoutes({ navOrigin: hubOrigin });
+    routes['audio-library']().props.onOpenVolumes();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: hubOrigin });
+    expect(props.setScreen).toHaveBeenCalledWith('audio-library-volumes');
+
+    const volumesOrigin = { screen: 'audio-library', returnOrigin: hubOrigin };
+    const { routes: volRoutes, props: volProps } = makeRoutes({ navOrigin: volumesOrigin });
+    const volumes = volRoutes['audio-library-volumes']();
+    expect(volumes.props.onBack).toBe(volProps.goNavOrigin);
+    expect(volumes.props.backLabel).toBe('Listening Library');
+    volumes.props.onOpenCollection('two');
+    expect(volProps.setAudioColKey).toHaveBeenCalledWith('two');
+    expect(volProps.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library-volumes', returnOrigin: volumesOrigin });
+    expect(volProps.setScreen).toHaveBeenCalledWith('audio-library-collection');
+
+    // The collection's pill names the volumes list it came from.
+    const { routes: colRoutes } = makeRoutes({ navOrigin: { screen: 'audio-library-volumes', returnOrigin: volumesOrigin } });
+    expect(colRoutes['audio-library-collection']().props.backLabel).toBe('The Volumes');
+  });
+
   it('hub → saved shelf takes the same chain, and its Text taps name their own screen', () => {
     const { routes, props } = makeRoutes({ navOrigin: { screen: 'volumes-home' } });
     routes['audio-library']().props.onOpenSaved();

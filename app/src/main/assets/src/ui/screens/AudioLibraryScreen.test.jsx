@@ -58,7 +58,7 @@ function installGlobals({ saved = [savedTrack], recent = [recentTrack], activeSa
 function renderScreen(overrides = {}) {
   return render(
     <AudioLibraryScreen
-      onBack={() => {}} onOpenCollection={() => {}} onOpenSaved={() => {}} onOpenTrack={() => {}}
+      onBack={() => {}} onOpenCollection={() => {}} onOpenVolumes={() => {}} onOpenSaved={() => {}} onOpenTrack={() => {}}
       onSearch={() => {}} onHistory={() => {}} onSettings={() => {}}
       theme="dark" onThemeChange={() => {}}
       {...overrides}
@@ -86,8 +86,8 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(screen.getByRole('heading', { name: 'Listening Library' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Resume last' })).toBeTruthy();
     expect(screen.getByText('The Narrow Path')).toBeTruthy();     // recent, open by default
-    expect(screen.getByRole('heading', { name: 'The Volumes of Truth' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'The Holy Bible' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /The Volumes of Truth/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Biblical Restoration Ministries/ })).toBeTruthy();
 
     // The saved shelf is a doorway now, not an inline list.
     expect(screen.queryByText('The Wide Path')).toBeNull();
@@ -115,15 +115,20 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
   });
 
-  it('browse rows hand over the volKey, and Bible editions never wait for the VOT corpus', () => {
+  it('browse offers one doorway per source family — the Volumes together, each Bible edition', () => {
     installGlobals({ votManifest: false });                       // lazy corpus not yet landed
     const onOpenCollection = vi.fn();
-    renderScreen({ onOpenCollection });
+    const onOpenVolumes = vi.fn();
+    renderScreen({ onOpenCollection, onOpenVolumes });
 
-    const volRow = screen.getByRole('button', { name: /Volume One/ });
-    expect(volRow.textContent).toContain('Loading recordings…');  // honest pre-corpus state
-    fireEvent.click(volRow);
-    expect(onOpenCollection).toHaveBeenCalledWith('one');
+    // The fourteen collections do NOT splay across the hub (owner directive) —
+    // one doorway carries them all, like the Scriptures'.
+    expect(screen.queryByRole('button', { name: /^♪?\s*Volume One/ })).toBeNull();
+    const volumesRow = screen.getByRole('button', { name: /The Volumes of Truth/ });
+    expect(volumesRow.textContent).toContain('1 collections');    // the fixture registry has one
+    fireEvent.click(volumesRow);
+    expect(onOpenVolumes).toHaveBeenCalledTimes(1);
+    expect(onOpenCollection).not.toHaveBeenCalled();
 
     const bibleRow = screen.getByRole('button', { name: /Biblical Restoration Ministries/ });
     expect(bibleRow.textContent).toContain('2 books');            // counted off its own manifest
