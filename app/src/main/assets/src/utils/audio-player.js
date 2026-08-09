@@ -706,9 +706,11 @@ function _tracksFor(volKey, item, collectionLabel) {
 
 const PERSIST_KEY = 'vot-audio-pos';
 /** How the current queue was built — replayed to rebuild it after a boot.
- * @type {{ mode: 'letter'|'collection'|'section', volKey: string, label: string|null } | null} */
-/** `custom` persists a user-edited queue rather than rebuilding corpus order. */
-/** @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null } | null} */
+ * `custom` persists a user-edited queue rather than rebuilding corpus order.
+ * `startKey`/`startIndex` record the queue's forward-only horizon (where the
+ * listener chose to begin), so a rebuilt queue never regrows the tracks that
+ * were deliberately left behind it.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -736,6 +738,8 @@ function _persist() {
       time: Math.floor(_state.time || 0),
       track: savedTrack,
       customQueue,
+      startKey: src.startKey || undefined,
+      startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
 }
@@ -775,6 +779,8 @@ function _restoreFromSaved() {
       url: track.url,
       time: Math.max(0, Math.floor(Number(s.time) || 0)),
       queue: customQueue,
+      startKey: typeof s.startKey === 'string' ? s.startKey : null,
+      startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
     };
     _state.queue = [track];
     _state.qi = 0;
@@ -809,7 +815,8 @@ async function _rebuildRestoredQueue() {
   if (r.mode === 'custom') {
     queue = Array.isArray(r.queue) ? r.queue.map(normalizeAudioTrack).filter(Boolean) : [];
   } else if (r.mode === 'section') {
-    const sections = sectionsFor(r.volKey) || [];
+    // Forward-only horizon: rebuild only from the section the listener chose.
+    const sections = (sectionsFor(r.volKey) || []).slice(r.startIndex || 0);
     queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
   } else if (_isBibleVol(r.volKey)) {
     // Bible editions have no COL_BY_KEY registry — canonical book order ships
@@ -833,6 +840,14 @@ async function _rebuildRestoredQueue() {
       for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
     }
   }
+  // Forward-only horizon (owner directive 2026-08-09): a queue that began at
+  // a chosen letter must rebuild from that letter, never regrowing the tracks
+  // deliberately left behind it. Legacy snapshots without a startKey keep the
+  // full rebuilt queue (a one-time transition; the next fresh queue records it).
+  if (r.startKey && r.mode !== 'custom' && r.mode !== 'section') {
+    const horizon = queue.findIndex((item) => item.key === r.startKey);
+    if (horizon > 0) queue = queue.slice(horizon);
+  }
   const resumeAt = r.time || 0;
   if (!queue.length) {
     // Corpus/manifest unavailable (or the letter vanished) — play the
@@ -850,7 +865,7 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _source = { mode: r.mode, volKey: r.volKey, label: r.label };
+  _source = { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex };
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -903,7 +918,11 @@ function playLetter(opts) {
 /**
  * Play a whole collection. `items` is caller-ordered (preface first where one
  * exists); items without a manifest entry are skipped, multi-part letters are
- * expanded in order. `startId` picks the starting track when present.
+ * expanded in order. `startId` picks the starting track when present — and
+ * (owner directive 2026-08-09) sets a FORWARD-ONLY horizon: the queue holds
+ * the chosen letter and what follows it, never the letters behind it. A
+ * reader stepping backward past where they began is disorienting; prev()
+ * simply clamps at the chosen start.
  *
  * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string }} opts
  * @returns {void}
@@ -913,28 +932,32 @@ function playCollection(opts) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const items = Array.isArray(o.items) ? o.items : [];
   /** @type {Track[]} */
-  const queue = [];
+  let queue = [];
   for (const item of items) {
     const tracks = _tracksFor(o.volKey, item, o.collectionLabel);
     for (const t of tracks) queue.push(t);
   }
   if (!queue.length) return;
-  let qi = 0;
+  let startKey = null;
   if (o.startId) {
     const wanted = o.volKey + ':' + o.startId;
     const at = queue.findIndex((t) => t.key === wanted);
-    if (at >= 0) qi = at;
+    if (at >= 0) {
+      startKey = wanted;
+      queue = queue.slice(at);
+    }
   }
   _pendingRestore = null;
-  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null };
+  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey };
   _state.queue = queue;
-  _state.qi = qi;
+  _state.qi = 0;
   _start();
 }
 
 /**
- * Play a range-compilation section. The whole section list is queued so
- * next()/prev() walk between parts; `index` selects the starting one.
+ * Play a range-compilation section. The chosen section and the ones that
+ * FOLLOW it are queued (the same forward-only horizon as playCollection);
+ * next()/prev() walk between the remaining parts.
  *
  * @param {string} volKey
  * @param {number} index
@@ -945,9 +968,10 @@ function playSection(volKey, index, collectionLabel) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const sections = sectionsFor(volKey);
   if (!sections || !sections.length) return;
+  const startIndex = Math.max(0, Math.min(index || 0, sections.length - 1));
   _pendingRestore = null;
-  _source = { mode: 'section', volKey, label: collectionLabel || null };
-  _state.queue = sections.map((s) => ({
+  _source = { mode: 'section', volKey, label: collectionLabel || null, startIndex };
+  _state.queue = sections.slice(startIndex).map((s) => ({
     key: null,
     title: s[0] || '',
     sub: collectionLabel || null,
@@ -955,7 +979,7 @@ function playSection(volKey, index, collectionLabel) {
     readerCode: s[2] || '',
     partLabel: null,
   }));
-  _state.qi = Math.max(0, Math.min(index || 0, _state.queue.length - 1));
+  _state.qi = 0;
   _start();
 }
 

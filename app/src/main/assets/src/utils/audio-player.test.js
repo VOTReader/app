@@ -205,23 +205,26 @@ describe('audio-player — playLetter', () => {
     expect(el()).toBe(null); // never even constructed the element
   });
 
-  it('queues the whole collection positioned at the letter when the registry is present', () => {
+  it('queues the collection FROM the letter onward when the registry is present', () => {
     // index.html registry globals — present in the real app, absent above so
     // the single-letter fallback tests stay honest.
     globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
     globalThis.colPreface = () => ITEMS[0];
     globalThis.colLetterArr = () => ITEMS.slice(1);
     try {
-      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
       const s = AudioPlayer.getState();
-      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
-      expect(s.qi).toBe(3);                       // starts AT the letter, not the preface
+      // Forward-only: Letter A's parts + Letter C follow; the preface stays behind.
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(s.qi).toBe(0);
+      expect(el().src).toBe(URL_OF('idA1'));
+      AudioPlayer.next();
+      AudioPlayer.next();                          // walks forward into the neighboring letter
       expect(el().src).toBe(URL_OF('idC'));
-      AudioPlayer.prev();                          // walks into the neighboring letter
-      expect(AudioPlayer.getState().qi).toBe(2);
-      expect(el().src).toBe(URL_OF('idA2'));
       // Persisted as a collection source so a restart rebuilds the same queue.
-      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).mode).toBe('collection');
+      const snapshot = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(snapshot.mode).toBe('collection');
+      expect(snapshot.startKey).toBe('vol1:letter-a');
     } finally {
       delete globalThis.COL_BY_KEY;
       delete globalThis.colPreface;
@@ -239,15 +242,26 @@ describe('audio-player — playCollection', () => {
     expect(AudioPlayer.getState().qi).toBe(0);
   });
 
-  it('honors startId by pointing qi at that letter’s first track', () => {
+  it('startId sets a forward-only horizon — the letters behind it are not queued', () => {
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, startId: 'letter-a' });
-    expect(AudioPlayer.getState().qi).toBe(1);
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(0);
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
     expect(el().src).toBe(URL_OF('idA1'));
   });
 
-  it('falls back to qi 0 when startId has no audio', () => {
+  it('prev at the chosen start clamps — it never walks into the letters behind it', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, startId: 'letter-a' });
+    el().currentTime = 1.0;   // under the restart threshold
+    AudioPlayer.prev();
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(el().src).toBe(URL_OF('idA1'));   // still Letter A, not the preface
+  });
+
+  it('falls back to the full queue when startId has no audio', () => {
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, startId: 'letter-b' });
     expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().queue).toHaveLength(4);
   });
 
   it('is a no-op when nothing in the collection has audio', () => {
@@ -258,21 +272,23 @@ describe('audio-player — playCollection', () => {
 });
 
 describe('audio-player — playSection', () => {
-  it('queues ALL sections with qi at the requested index', () => {
-    AudioPlayer.playSection('wtlb1', 2, 'Words To Live By');
+  it('queues the chosen section and the ones after it (forward-only)', () => {
+    AudioPlayer.playSection('wtlb1', 1, 'Words To Live By');
     const s = AudioPlayer.getState();
-    expect(s.queue).toHaveLength(3);
-    expect(s.qi).toBe(2);
-    expect(s.queue[2]).toEqual({
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('sec2'), URL_OF('sec3')]);
+    expect(s.qi).toBe(0);
+    expect(s.queue[1]).toEqual({
       key: null, title: 'Part 3 · 40–59', sub: 'Words To Live By',
       url: URL_OF('sec3'), readerCode: 'V', partLabel: null,
     });
-    expect(el().src).toBe(URL_OF('sec3'));
+    expect(el().src).toBe(URL_OF('sec2'));
   });
 
   it('clamps an out-of-range index and no-ops for a collection with no sections', () => {
     AudioPlayer.playSection('wtlb1', 99);
-    expect(AudioPlayer.getState().qi).toBe(2);
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().queue).toHaveLength(1);   // clamped to the last section
+    expect(el().src).toBe(URL_OF('sec3'));
     AudioPlayer.stop();
     AudioPlayer.playSection('wtlb2', 0);
     expect(AudioPlayer.getState().queue).toHaveLength(0);
@@ -823,6 +839,45 @@ describe('audio-player — durable resume (position survives restart)', () => {
     expect(el().src).toBe(URL_OF('idC'));
   });
 
+  it('a startId queue persists its horizon and rebuilds forward-only after a reboot', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+      el().dispatchEvent(new Event('playing'));
+      tick(10);
+      expect(saved().startKey).toBe('vol1:letter-a');
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // The preface stays behind the horizon — only Letter A's parts + Letter C.
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(st.qi).toBe(0);
+      expect(st.queue[st.qi].url).toBe(URL_OF('idA1'));
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
+  it('a mid-list section queue rebuilds from its chosen section after a reboot', async () => {
+    AudioPlayer.playSection('wtlb1', 1, 'Words To Live By');
+    el().dispatchEvent(new Event('playing'));
+    tick(10);
+    expect(saved().startIndex).toBe(1);
+
+    await load();
+    AudioPlayer.toggle();
+    await new Promise((r) => setTimeout(r, 0));
+    const st = AudioPlayer.getState();
+    expect(st.queue.map((t) => t.url)).toEqual([URL_OF('sec2'), URL_OF('sec3')]);
+    expect(st.qi).toBe(0);
+  });
+
   it('close (stop) clears the snapshot — the next boot stays idle', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
     el().dispatchEvent(new Event('playing'));
@@ -904,16 +959,15 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     expect(AudioPlayer.collectionHasAudio('bible-brm-kjv')).toBe(true);
   });
 
-  it('playBibleBook queues the whole edition positioned at the tapped book, streaming from audio-bible-v1', () => {
+  it('playBibleBook queues the tapped book and the books after it (forward-only), streaming from audio-bible-v1', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'exodus', label: 'KJV · Biblical Restoration Ministries' });
     const s = AudioPlayer.getState();
-    expect(s.queue.length).toBe(3);
-    expect(s.qi).toBe(1);
-    expect(s.queue[1].url).toBe(BURL('brm-kjv_exodus'));
-    expect(s.queue[1].title).toBe('Exodus');
-    expect(s.queue[1].sub).toBe('KJV · Biblical Restoration Ministries');
+    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus'), BURL('brm-kjv_revelation')]);
+    expect(s.qi).toBe(0);
+    expect(s.queue[0].title).toBe('Exodus');
+    expect(s.queue[0].sub).toBe('KJV · Biblical Restoration Ministries');
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
-    // Bar prev/next walk neighboring books.
+    // Bar next walks the FOLLOWING books; Genesis stays behind the horizon.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(BURL('brm-kjv_revelation'));
   });
