@@ -212,3 +212,87 @@ var BIBLE_AUDIO_CHAPTERS = {
 "bible-brm-kjv:jude":[0],
 "bible-brm-kjv:revelation":[4,218,487,706,828,983,1145,1320,1447,1625,1730,1929,2093,2264,2487,2574,2761,3005,3315,3540,3706,3997]
 };
+/* The Word of Promise (dramatized NKJV) — PER-CHAPTER tracks, one manifest
+   part per chapter ("Chapter N" partLabel), expanded here instead of written
+   out (1,189 rows). Asset names wop<testament>_<bookId>_<NNN>; the testament
+   digit picks the release tag (audio-wop-v1 OT / audio-wop-v2 NT) in
+   bibleAudioAssetUrl — 1,189 assets exceed one release's 1,000-asset cap. */
+(function () {
+  var wopBooks = [
+["genesis",1,50],
+["exodus",1,40],
+["leviticus",1,27],
+["numbers",1,36],
+["deuteronomy",1,34],
+["joshua",1,24],
+["judges",1,21],
+["ruth",1,4],
+["1samuel",1,31],
+["2samuel",1,24],
+["1kings",1,22],
+["2kings",1,25],
+["1chronicles",1,29],
+["2chronicles",1,36],
+["ezra",1,10],
+["nehemiah",1,13],
+["esther",1,10],
+["job",1,42],
+["psalms",1,150],
+["proverbs",1,31],
+["ecclesiastes",1,12],
+["songofsolomon",1,8],
+["isaiah",1,66],
+["jeremiah",1,52],
+["lamentations",1,5],
+["ezekiel",1,48],
+["daniel",1,12],
+["hosea",1,14],
+["joel",1,3],
+["amos",1,9],
+["obadiah",1,1],
+["jonah",1,4],
+["micah",1,7],
+["nahum",1,3],
+["habakkuk",1,3],
+["zephaniah",1,3],
+["haggai",1,2],
+["zechariah",1,14],
+["malachi",1,4],
+["matthew",2,28],
+["mark",2,16],
+["luke",2,24],
+["john",2,21],
+["acts",2,28],
+["romans",2,16],
+["1corinthians",2,16],
+["2corinthians",2,13],
+["galatians",2,6],
+["ephesians",2,6],
+["philippians",2,4],
+["colossians",2,4],
+["1thessalonians",2,5],
+["2thessalonians",2,3],
+["1timothy",2,6],
+["2timothy",2,4],
+["titus",2,3],
+["philemon",2,1],
+["hebrews",2,13],
+["james",2,5],
+["1peter",2,5],
+["2peter",2,3],
+["1john",2,5],
+["2john",2,1],
+["3john",2,1],
+["jude",2,1],
+["revelation",2,22]
+  ];
+  for (var b = 0; b < wopBooks.length; b++) {
+    var id = wopBooks[b][0], testament = wopBooks[b][1], count = wopBooks[b][2];
+    var parts = [];
+    for (var c = 1; c <= count; c++) {
+      var num = c < 10 ? '00' + c : c < 100 ? '0' + c : '' + c;
+      parts.push(['wop' + testament + '_' + id + '_' + num, '', 'Chapter ' + c]);
+    }
+    BIBLE_AUDIO_MANIFEST['bible-wop-nkjv:' + id] = parts;
+  }
+})();

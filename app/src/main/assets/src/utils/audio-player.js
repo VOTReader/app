@@ -652,11 +652,19 @@ function playBibleBook(opts) {
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
   const items = books.map((b) => ({ id: b[0], title: b[1] }));
   if (!items.length) return;
-  playCollection({ volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId });
-  // Chapter-level entry into the whole-book track: the recording is ONE file
-  // per book, so "play chapter N" is a seek to its announced start offset
-  // (BIBLE_AUDIO_CHAPTERS). Same loadedmetadata timing contract as the
-  // boot-restore resume seek — currentTime before that point is ignored.
+  // Two edition shapes: PER-CHAPTER editions (WOP) carry one manifest part
+  // per chapter, so "play chapter N" is a queue POSITION; whole-book editions
+  // (BRM) carry one part per book, so it's a SEEK into the book track via
+  // BIBLE_AUDIO_CHAPTERS (loadedmetadata timing — the restore contract).
+  const m = _mapFor(o.volKey);
+  const parts = (m && m[o.volKey + ':' + o.bookId]) || [];
+  const perChapter = parts.length > 1;
+  const n = Number(o.chapterNum);
+  playCollection({
+    volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId,
+    startPartIndex: perChapter && Number.isInteger(n) && n >= 2 ? Math.min(n - 1, parts.length - 1) : 0,
+  });
+  if (perChapter) return;
   const at = bibleChapterStart(o.volKey, o.bookId, o.chapterNum);
   if (at > 0 && _el) {
     _el.addEventListener('loadedmetadata', () => {
@@ -1083,7 +1091,11 @@ function playLetter(opts) {
  * only that letter) for another reader's complete rendition of it — the rest
  * of the collection keeps the manifest's primary reading.
  *
- * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string }} opts
+ * `startPartIndex` advances the horizon INTO the start item's parts (a
+ * per-chapter Bible edition choosing chapter N) — same forward-only rule,
+ * chapter-grained.
+ *
+ * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string, startPartIndex?: number }} opts
  * @returns {void}
  */
 function playCollection(opts) {
@@ -1104,6 +1116,12 @@ function playCollection(opts) {
     if (at >= 0) {
       startKey = wanted;
       queue = queue.slice(at);
+      const spi = Math.floor(Number(o.startPartIndex) || 0);
+      if (spi > 0) {
+        let run = 0;
+        while (run < queue.length && queue[run].key === startKey) run++;
+        queue = queue.slice(Math.min(spi, run - 1));
+      }
     }
   }
   let startReader = null;

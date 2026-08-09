@@ -10,6 +10,8 @@ import { describe, it, expect } from 'vitest';
 import {
   AUDIO_RELEASE_PREFIX,
   AUDIO_BIBLE_RELEASE_PREFIX,
+  AUDIO_WOP_OT_PREFIX,
+  AUDIO_WOP_NT_PREFIX,
   BIBLE_AUDIO_EDITIONS,
   audioAssetUrl,
   bibleAudioAssetUrl,
@@ -72,5 +74,25 @@ describe('audio-track — Bible edition registry', () => {
     for (const ed of Object.values(BIBLE_AUDIO_EDITIONS)) {
       expect(ed.volKey.startsWith('bible-')).toBe(true);
     }
+  });
+});
+
+describe('audio-track — Word of Promise release routing', () => {
+  it('routes wop1_/wop2_ assets to their testament tags, everything else to audio-bible-v1', () => {
+    expect(bibleAudioAssetUrl('wop1_jeremiah_013')).toBe(AUDIO_WOP_OT_PREFIX + 'wop1_jeremiah_013.mp3');
+    expect(bibleAudioAssetUrl('wop2_matthew_001')).toBe(AUDIO_WOP_NT_PREFIX + 'wop2_matthew_001.mp3');
+    expect(bibleAudioAssetUrl('brm-kjv_genesis')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
+  });
+
+  it('accepts both wop release prefixes in the trust boundary', () => {
+    expect(isVotAudioUrl(AUDIO_WOP_OT_PREFIX + 'wop1_jonah_001.mp3')).toBe(true);
+    expect(isVotAudioUrl(AUDIO_WOP_NT_PREFIX + 'wop2_jude_001.mp3')).toBe(true);
+    expect(isVotAudioUrl('https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v3/x.mp3')).toBe(false);
+  });
+
+  it('wop-nkjv edition resolves from settings', () => {
+    const ed = bibleAudioEdition('wop-nkjv');
+    expect(ed.volKey).toBe('bible-wop-nkjv');
+    expect(ed.translation).toBe('nkjv');
   });
 });

@@ -17,16 +17,36 @@ export const AUDIO_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-asse
  *  already carries ~729 letter tracks; Bible editions get their own bucket. */
 export const AUDIO_BIBLE_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/';
 
+/** The Word of Promise per-chapter releases. 1,189 chapter files exceed the
+ *  1,000-asset/release cap, so the edition spans two tags — the testament is
+ *  encoded in the asset name ('wop1_' OT / 'wop2_' NT) and picks the tag. */
+export const AUDIO_WOP_OT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/';
+export const AUDIO_WOP_NT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v2/';
+
+/** Every release prefix a stored/played track may point at — the whole trust
+ *  boundary. Anything else is rejected. */
+const RELEASE_PREFIXES = Object.freeze([
+  AUDIO_RELEASE_PREFIX,
+  AUDIO_BIBLE_RELEASE_PREFIX,
+  AUDIO_WOP_OT_PREFIX,
+  AUDIO_WOP_NT_PREFIX,
+]);
+
 /** Recorded Bible editions the app knows how to stream. Registry lives here
  *  (not in the lazy manifest) so Settings can list editions before the Bible
  *  corpus loads. `volKey` prefixes every BIBLE_AUDIO_MANIFEST key; anything
- *  starting with 'bible-' routes to the audio-bible release. Future voices:
+ *  starting with 'bible-' routes to a Bible release. Future voices:
  *  add an entry + manifest rows + release assets — nothing else. */
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
     translation: 'kjv',
     volKey: 'bible-brm-kjv',
+  }),
+  'wop-nkjv': Object.freeze({
+    label: 'NKJV · The Word of Promise (Dramatized)',
+    translation: 'nkjv',
+    volKey: 'bible-wop-nkjv',
   }),
 });
 
@@ -62,29 +82,33 @@ export function audioAssetUrl(id) {
 }
 
 /**
- * Canonical stream URL for a Bible-edition asset (audio-bible-v1 release).
- * Same id policy as audioAssetUrl — invalid ids become ''.
+ * Canonical stream URL for a Bible-edition asset. The asset name picks its
+ * release: 'wop1_'/'wop2_' route to the Word of Promise OT/NT tags, anything
+ * else to audio-bible-v1. Same id policy as audioAssetUrl — invalid ids
+ * become ''.
  *
  * @param {unknown} id
  * @returns {string}
  */
 export function bibleAudioAssetUrl(id) {
   const asset = typeof id === 'string' ? id.trim() : '';
-  return /^[A-Za-z0-9_-]+$/.test(asset) ? AUDIO_BIBLE_RELEASE_PREFIX + asset + '.mp3' : '';
+  if (!/^[A-Za-z0-9_-]+$/.test(asset)) return '';
+  const prefix = asset.lastIndexOf('wop1_', 0) === 0 ? AUDIO_WOP_OT_PREFIX
+    : asset.lastIndexOf('wop2_', 0) === 0 ? AUDIO_WOP_NT_PREFIX
+    : AUDIO_BIBLE_RELEASE_PREFIX;
+  return prefix + asset + '.mp3';
 }
 
 /**
- * Is this exactly one of VOT's immutable release audio assets? Either the
- * letter release or the Bible-edition release qualifies — nothing else.
+ * Is this exactly one of VOT's immutable release audio assets? The
+ * RELEASE_PREFIXES list IS the boundary — nothing else qualifies.
  *
  * @param {unknown} url
  * @returns {boolean}
  */
 export function isVotAudioUrl(url) {
   if (typeof url !== 'string') return false;
-  const prefix = url.indexOf(AUDIO_RELEASE_PREFIX) === 0 ? AUDIO_RELEASE_PREFIX
-    : url.indexOf(AUDIO_BIBLE_RELEASE_PREFIX) === 0 ? AUDIO_BIBLE_RELEASE_PREFIX
-    : null;
+  const prefix = RELEASE_PREFIXES.find((p) => url.indexOf(p) === 0);
   return !!prefix && ASSET_NAME.test(url.slice(prefix.length));
 }
 

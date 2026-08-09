@@ -1172,3 +1172,51 @@ describe('audio-player — Bible chapter seek (whole-book track + offset index)'
     expect(el().currentTime).toBe(0);
   });
 });
+
+describe('audio-player — per-chapter Bible edition (Word of Promise)', () => {
+  const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/' + id + '.mp3';
+  const mkParts = (book, t, n) => Array.from({ length: n }, (_v, i) => {
+    const c = String(i + 1).padStart(3, '0');
+    return ['wop' + t + '_' + book + '_' + c, '', 'Chapter ' + (i + 1)];
+  });
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-wop-nkjv:jonah': mkParts('jonah', 1, 4),
+      'bible-wop-nkjv:micah': mkParts('micah', 1, 7),
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah'], ['micah', 'Micah']];
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+  });
+
+  it('chapters are queue TRACKS with partLabels, streaming from the wop release', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: 'NKJV · The Word of Promise' });
+    const s = AudioPlayer.getState();
+    expect(s.queue.length).toBe(11);                       // 4 Jonah + 7 Micah, forward-only from Jonah
+    expect(s.queue[0].url).toBe(OT('wop1_jonah_001'));
+    expect(s.queue[0].partLabel).toBe('Chapter 1');
+    expect(s.qi).toBe(0);
+  });
+
+  it('choosing chapter N positions the queue at that chapter track (no seek)', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: null, chapterNum: 3 });
+    const s = AudioPlayer.getState();
+    expect(s.queue[0].url).toBe(OT('wop1_jonah_003'));     // horizon starts AT the chapter
+    expect(s.queue[0].partLabel).toBe('Chapter 3');
+    expect(s.qi).toBe(0);
+    expect(el().src).toBe(OT('wop1_jonah_003'));
+    // next() walks to chapter 4, then into the next book's chapter 1.
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_jonah_004'));
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_micah_001'));
+  });
+
+  it('a chapterNum past the book clamps to its last chapter', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: null, chapterNum: 99 });
+    expect(AudioPlayer.getState().queue[0].url).toBe(OT('wop1_jonah_004'));
+  });
+});
