@@ -1132,3 +1132,43 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
   });
 });
+
+describe('audio-player — Bible chapter seek (whole-book track + offset index)', () => {
+  const BURL = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/' + id + '.mp3';
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jeremiah': [['brm-kjv_jeremiah', '']] };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jeremiah', 'Jeremiah']];
+    globalThis.BIBLE_AUDIO_CHAPTERS = { 'bible-brm-kjv:jeremiah': [0, 184, 552, 1000, 1200, 1500, 1755] };
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+    delete globalThis.BIBLE_AUDIO_CHAPTERS;
+  });
+
+  it('bibleChapterStart maps chapters to offsets, 0 for ch1/unknown/uncovered', () => {
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'jeremiah', 7)).toBe(1755);
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'jeremiah', 2)).toBe(184);
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'jeremiah', 1)).toBe(0);   // book start keeps the intro
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'jeremiah', 99)).toBe(0);  // beyond the index
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'genesis', 5)).toBe(0);    // no row
+    expect(AudioPlayer.bibleChapterStart('bible-brm-kjv', 'jeremiah', null)).toBe(0);
+  });
+
+  it('playBibleBook with chapterNum seeks once metadata arrives', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jeremiah', label: 'KJV', chapterNum: 7 });
+    expect(el().src).toBe(BURL('brm-kjv_jeremiah'));
+    expect(el().currentTime).toBe(0);            // pre-metadata: seek deferred
+    el().duration = 13414;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(1755);
+  });
+
+  it('chapter 1 and books without a chapter row start from the book head', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jeremiah', label: 'KJV', chapterNum: 1 });
+    el().duration = 13414;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(0);
+  });
+});

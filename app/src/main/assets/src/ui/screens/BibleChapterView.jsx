@@ -172,13 +172,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 <div className="hero-ornament-line r" />
               </div>
               {/* Whole-book audiobook (2026-08-09): the recording is one track
-                  per BOOK (no per-chapter splits exist), so this pill starts
-                  the book — the mini-player then rides along while reading.
-                  Mirrors the letter hero pill; inert peeks keep it (same
-                  pointer-events:none contract as LetterView's). */}
+                  per BOOK, so this pill starts the book positioned at THIS
+                  chapter — a seek into the book track via the announcement-
+                  scanned BIBLE_AUDIO_CHAPTERS index (books without a chapter
+                  row just start at the book). Mirrors the letter hero pill;
+                  inert peeks keep it (same pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
                 <div className="hero-play-row">
-                  <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} />
+                  <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} />
                 </div>
               )}
             </div>

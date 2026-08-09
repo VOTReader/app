@@ -643,7 +643,7 @@ function collectionHasAudio(volKey) {
  * come from BIBLE_AUDIO_BOOKS, which ships in the same lazy bundle as the
  * Bible corpus — any screen showing a Listen pill has it by construction.
  *
- * @param {{ volKey: string, bookId: string, label?: string | null }} opts
+ * @param {{ volKey: string, bookId: string, label?: string | null, chapterNum?: number | null }} opts
  * @returns {void}
  */
 function playBibleBook(opts) {
@@ -653,6 +653,34 @@ function playBibleBook(opts) {
   const items = books.map((b) => ({ id: b[0], title: b[1] }));
   if (!items.length) return;
   playCollection({ volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId });
+  // Chapter-level entry into the whole-book track: the recording is ONE file
+  // per book, so "play chapter N" is a seek to its announced start offset
+  // (BIBLE_AUDIO_CHAPTERS). Same loadedmetadata timing contract as the
+  // boot-restore resume seek — currentTime before that point is ignored.
+  const at = bibleChapterStart(o.volKey, o.bookId, o.chapterNum);
+  if (at > 0 && _el) {
+    _el.addEventListener('loadedmetadata', () => {
+      try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — book start */ }
+    }, { once: true });
+  }
+}
+
+/**
+ * Chapter-start offset (seconds) into a book's whole-book track, or 0 when
+ * the chapter index doesn't cover it (chapter 1, unknown book, no scan row).
+ *
+ * @param {string} volKey
+ * @param {string} bookId
+ * @param {number | null | undefined} chapterNum
+ * @returns {number}
+ */
+function bibleChapterStart(volKey, bookId, chapterNum) {
+  const n = Number(chapterNum);
+  if (!Number.isInteger(n) || n < 2) return 0;   // ch1 = book start (keep the book intro)
+  const map = _g().BIBLE_AUDIO_CHAPTERS;
+  const secs = map && map[volKey + ':' + bookId];
+  const at = Array.isArray(secs) ? Number(secs[n - 1]) : NaN;
+  return Number.isFinite(at) && at > 0 ? at : 0;
 }
 
 /**
@@ -1476,6 +1504,7 @@ export const AudioPlayer = {
   playCollection,
   playSection,
   playBibleBook,
+  bibleChapterStart,
   playTrack,
   toggle,
   next,
