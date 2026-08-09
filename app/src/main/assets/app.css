@@ -910,11 +910,24 @@
         display: flex; align-items: center; gap: 6px;
       }
       .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      /* The up-chevron tells the reader the title area opens the listening
-         desk — the bar's one non-obvious tap target. */
-      .audio-bar-more { flex: 0 0 auto; width: 15px; height: 15px; color: var(--gold-dim); }
       .audio-bar-summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-      @media (hover: hover) { .audio-bar-summary:hover .audio-bar-title { color: var(--gold-bright); } .audio-bar-summary:hover .audio-bar-more { color: var(--gold); } }
+      @media (hover: hover) { .audio-bar-summary:hover .audio-bar-title { color: var(--gold-bright); } }
+      /* Pull-tab notch: joined to the middle of the bar's upper boundary —
+         same plate and border as the bar, no bottom edge, overlapping the
+         bar's top hairline by 2px so the join is seamless. Decorative twin
+         of the labeled summary button (tabIndex -1, aria-hidden). */
+      .audio-bar-pull {
+        position: absolute; top: 0; left: 50%;
+        transform: translate(-50%, calc(-100% + 2px));
+        width: 76px; height: 26px; padding: 0 0 2px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg3);
+        border: 1px solid var(--gold-border); border-bottom: 0;
+        border-radius: 12px 12px 0 0;
+        color: var(--gold); cursor: pointer;
+      }
+      .audio-bar-pull svg { width: 22px; height: 22px; }
+      @media (hover: hover) { .audio-bar-pull:hover { color: var(--gold-bright); border-color: var(--gold); } }
       .audio-bar-title {
         display: block; font-size: var(--fsc-13); color: var(--cream); line-height: 1.25;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

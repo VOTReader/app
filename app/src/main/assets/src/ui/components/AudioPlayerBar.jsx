@@ -70,6 +70,20 @@ export function AudioPlayerBar() {
   return (
     <>
     <div className="audio-bar" role="region" aria-label="Audio player">
+      {/* Pull-tab joined to the bar's top edge — the visible "there's more
+          here" handle. Redundant with the labeled summary button below, so
+          it stays out of the tab order and the accessibility tree. */}
+      <button
+        type="button"
+        className="audio-bar-pull"
+        onClick={() => setManagerOpen(true)}
+        tabIndex={-1}
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 14.5l6-5.5 6 5.5" />
+        </svg>
+      </button>
       <button
         type="button"
         className={'audio-bar-play' + (st.status === 'loading' ? ' is-loading' : '')}
@@ -102,10 +116,6 @@ export function AudioPlayerBar() {
               <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
             </span>
           </span>
-          {/* Disclosure cue: the title area opens the listening desk. */}
-          <svg className="audio-bar-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M7 14.5l5-5 5 5" />
-          </svg>
         </button>
         <input
           type="range"
