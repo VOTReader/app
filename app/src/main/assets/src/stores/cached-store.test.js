@@ -1018,11 +1018,37 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('LS_SKIP_LIST exports the one permanent LS exception (vot-state)', () => {
+  it('LS_SKIP_LIST exports the permanent LS exceptions (state + the two audio keys)', () => {
     expect(LS_SKIP_LIST).toContain('vot-state');
-    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');  // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(1);
+    expect(LS_SKIP_LIST).toContain('vot-audio-pos');            // audio-player.js PERSIST_KEY
+    expect(LS_SKIP_LIST).toContain('vot-audio-recent-open');    // AudioLibraryScreen RECENT_OPEN_KEY
+    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
+    expect(LS_SKIP_LIST.length).toBe(3);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
+  });
+
+  it('LIVE audio LS keys survive the cleanup (resume position + recently-played state)', async () => {
+    // These two are not pre-W2.4 leftovers — they are the audio player's live
+    // storage, written every few seconds while a recording plays. clearLegacyLs
+    // is one-shot via the meta flag, but the flag is only set AFTER a successful
+    // meta write; a quota failure leaves it unset and the NEXT boot retries,
+    // by which time playback has already written 'vot-audio-pos'. Skipping them
+    // is what keeps that retry from eating the reader's place in a 90-minute track.
+    const resume = JSON.stringify({ trackId: 'brm-kjv:jeremiah', t: 4211.5, mode: 'collection' });
+    localStorage.setItem('vot-audio-pos', resume);
+    localStorage.setItem('vot-audio-recent-open', '1');
+    localStorage.setItem('vot-audio-stale-example', 'legacy');  // control: a vot-* key NOT skipped
+
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (_s, k, v) => { idbMeta[String(k)] = v; });
+
+    await clearLegacyLs();
+
+    expect(localStorage.getItem('vot-audio-pos')).toBe(resume);
+    expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
+    expect(localStorage.getItem('vot-audio-stale-example')).toBeNull();  // control cleared
   });
 
   it('first run: clears vot-* LS keys except skip-list AND sets the flag', async () => {

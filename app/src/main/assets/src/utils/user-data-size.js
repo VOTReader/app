@@ -43,6 +43,13 @@
  * keys — i.e. exactly what the backup includes — so "Your Data" size and
  * "Export" cover the same set. If a store is added to the export, add it
  * here too (and vice-versa).
+ *
+ * That "add it here too" instruction is no longer on anyone's memory:
+ * `user-data-parity.test.js` asserts this list, the SettingsScreen export
+ * map, and import-validators' STORE_SHAPES name the same stores, and fails
+ * naming whichever leg is short. It was written because this list had gone
+ * a release without `vot-audio-library` — exported and restored, but
+ * invisible to the "Your Data" number.
  * @type {string[]}
  */
 export const USER_DATA_STORES = [
@@ -63,6 +70,7 @@ export const USER_DATA_STORES = [
   'vot-prophecy-cards',
   'vot-home-order',
   'vot-state',           // includes readItems (marked-as-read) + tabs + settings
+  'vot-audio-library',   // saved recordings + recent listening + play counts (IDB v9)
   'vot-welcomed',
   'vot-about-seen',
   'vot-garden-warning-acked',

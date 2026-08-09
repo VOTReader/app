@@ -1,6 +1,20 @@
 # VOTReader reader audit ledger
 
-> Live, read-only investigation notes for compaction survival. The application and generated assets are not to be changed.
+> **CLOSED — 2026-08-04. Every finding below was adjudicated: 8 fixed, 2 dismissed with
+> evidence.** Kept as the evidence record for that pass, not as a work queue. Do not
+> pick items out of it and re-fix them; the fixes shipped, and the two dismissals were
+> dismissed on measurement, not on preference. See HISTORY.md (2026-08-04 s4) for the
+> per-finding disposition and the RED proofs.
+>
+> Dismissed, so they stay dismissed: the "1.5s" `startRestore` cap (it is 90 *frames*,
+> and the pixel fallback re-applies every frame) and the "IDB warning flood" (zero in a
+> full run). Ruled chrome, deliberately: Bible section headings are excluded from the
+> word counter (2,732 headings / 11,638 words).
+
+> Historical status line, true only while the audit was running: these were live,
+> read-only investigation notes for compaction survival, and the application and
+> generated assets were not to be changed. That embargo ended when the ledger closed —
+> the app has since been changed, by this ledger.
 
 ## Scope / baseline
 

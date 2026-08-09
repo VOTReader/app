@@ -271,12 +271,31 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      whose middle segments were never credited ("you skimmed the middle"),
      probably in the index row or letter header. Design taste matters —
      subtle, not shaming. Depends on nothing further.
-[22] TTS (text-to-speech) with word highlighting — SpeechSynthesisUtterance
-     boundary events give charIndex into the flattened textContent; the
-     annotation engine's offset space (blockBoundaryOffsets /
-     applyDOMHighlights) already maps offsets → DOM. Word-by-word highlight
-     reuses the highlight painter. TTS playback time counts as read-tracker
-     dwell; completion = coverage. Big feature; own session(s).
+[22] TTS (text-to-speech) with word highlighting — OPEN, BUT RE-SCOPED
+     2026-08-09. The headline half of this item SHIPPED, and better than
+     specified: read-along already paints the sentence being spoken, in a
+     REAL HUMAN VOICE rather than a synthetic one (ReadAlongHighlight.jsx +
+     data/audio-sync.js, timings forced-aligned offline by
+     tools/align-audio.py). It paints through the CSS Custom Highlight API
+     over a Range — no DOM mutation at all — which is strictly better than
+     the "reuse the highlight painter" plan sketched below: annotations,
+     live selection, and the read detector are untouched by it.
+
+     So do NOT build this as written. What is actually left is the FALLBACK
+     leg, and it is worth having: alignment data exists for 230 of the 729
+     tracks in AUDIO_MANIFEST (measured 2026-08-09), so ~499 letters and
+     entries play with no read-along at all, and letters with no recording
+     have neither voice nor highlight. Remaining value = TTS as the
+     degraded path where forced alignment is absent — SpeechSynthesisUtterance
+     boundary events give charIndex into the flattened textContent, which
+     lands in the same offset domain audio-sync.js already uses, so it can
+     drive the EXISTING ReadAlongHighlight painter instead of a second one.
+
+     Decide before building: whether a synthetic voice is wanted at all on
+     a corpus whose recordings are part of its character (owner call), and
+     whether TTS playback should count as read-tracker dwell the way real
+     playback does. Cheaper than the original item now that the painter,
+     the offset domain, and the player plumbing all exist.
 [23] READING MILESTONES — DONE 2026-08-04 (milestones half). Ten
      READING_MILESTONE_DEFS (items/words/rereads) unlock inside
      recordCompletion, which now RETURNS the newly-unlocked defs so

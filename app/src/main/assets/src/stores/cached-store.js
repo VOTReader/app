@@ -1047,17 +1047,36 @@ export function _resetStoreRegistry() {
    would null those reads and produce empty IDB stores for pre-W2.4
    users (catastrophic — looks like a wipe).
 
-   SKIP_LIST: one key stays in LS permanently:
-     'vot-state'  — reduced theme+fontStyle shim for the sync boot-script
-                    read at index.html:73. Cannot wait on async IDB.
-   (W7.1 retired the second exception, 'vot-ann-migrated' — its only reader,
+   SKIP_LIST: keys that stay in LS permanently — they are LIVE storage,
+   not pre-W2.4 leftovers, so "legacy cleanup" must never see them:
+     'vot-state'             — reduced theme+fontStyle shim for the sync
+                               boot-script read at index.html:73. Cannot
+                               wait on async IDB.
+     'vot-audio-pos'         — the audio player's resume snapshot
+                               (utils/audio-player.js PERSIST_KEY): current
+                               track, position, queue, forward-only horizon.
+                               Written every few seconds while playing.
+     'vot-audio-recent-open' — the Listening Library's recently-played
+                               disclosure state (ui/screens/AudioLibraryScreen.jsx
+                               RECENT_OPEN_KEY).
+   Both audio keys post-date W2.4 and are deliberately LS (sync reads on the
+   player's hot path). The flag makes cleanup one-shot, but it is only set
+   AFTER a successful meta write — a quota failure leaves the flag unset and
+   the next boot retries, by which time a prior session's playback has
+   written 'vot-audio-pos'. Without the skip, that retry silently eats the
+   reader's place in a 90-minute recording.
+   (W7.1 retired an earlier exception, 'vot-ann-migrated' — its only reader,
    the pre-W2 annotation bootstrap migration, was deleted, so W2.4 now
    clears the orphaned flag like any other legacy vot-* key.)
    ═══════════════════════════════════════════════════════════════════ */
 
 /** localStorage keys NOT cleared by W2.4. Frozen + exported so tests
  *  + the Settings export path can reference the canonical list. */
-export const LS_SKIP_LIST = Object.freeze(['vot-state']);
+export const LS_SKIP_LIST = Object.freeze([
+  'vot-state',
+  'vot-audio-pos',
+  'vot-audio-recent-open',
+]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
 const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
