@@ -92,14 +92,20 @@ export function AudioPlayerBar() {
           aria-label="Open listening controls"
           aria-expanded={managerOpen}
         >
-          <span className="audio-bar-title">
-            {track.title || ''}
-            {track.partLabel ? <span className="audio-bar-part">{' · ' + track.partLabel}</span> : null}
+          <span className="audio-bar-summary-text">
+            <span className="audio-bar-title">
+              {track.title || ''}
+              {track.partLabel ? <span className="audio-bar-part">{' · ' + track.partLabel}</span> : null}
+            </span>
+            <span className="audio-bar-sub">
+              <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
+              <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
+            </span>
           </span>
-          <span className="audio-bar-sub">
-            <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
-            <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
-          </span>
+          {/* Disclosure cue: the title area opens the listening desk. */}
+          <svg className="audio-bar-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M7 14.5l5-5 5 5" />
+          </svg>
         </button>
         <input
           type="range"

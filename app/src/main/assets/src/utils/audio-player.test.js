@@ -201,6 +201,30 @@ describe('audio-player — playLetter', () => {
     expect(AudioPlayer.getState().queue).toHaveLength(0);
     expect(el()).toBe(null); // never even constructed the element
   });
+
+  it('queues the whole collection positioned at the letter when the registry is present', () => {
+    // index.html registry globals — present in the real app, absent above so
+    // the single-letter fallback tests stay honest.
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(s.qi).toBe(3);                       // starts AT the letter, not the preface
+      expect(el().src).toBe(URL_OF('idC'));
+      AudioPlayer.prev();                          // walks into the neighboring letter
+      expect(AudioPlayer.getState().qi).toBe(2);
+      expect(el().src).toBe(URL_OF('idA2'));
+      // Persisted as a collection source so a restart rebuilds the same queue.
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).mode).toBe('collection');
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
 });
 
 describe('audio-player — playCollection', () => {

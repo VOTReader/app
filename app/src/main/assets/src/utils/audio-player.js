@@ -714,6 +714,22 @@ function playLetter(opts) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
   if (!queue.length) return;
+  // Album behavior (owner directive 2026-08-08): a hero Listen queues the
+  // WHOLE collection positioned at this letter, so the bar's prev/next walk
+  // neighboring letters and playback continues past the letter's end. The
+  // registry globals live in index.html; when absent (tests, stripped
+  // harnesses) the letter still plays alone.
+  const g = _g();
+  const col = typeof g.COL_BY_KEY !== 'undefined' && g.COL_BY_KEY ? g.COL_BY_KEY.get(o.volKey) : null;
+  if (col && typeof g.colLetterArr === 'function' && o.letter && o.letter.id) {
+    const pref = typeof g.colPreface === 'function' ? g.colPreface(col) : null;
+    const arr = g.colLetterArr(col) || [];
+    const items = pref ? [pref, ...arr] : arr;
+    if (items.some((item) => item && item.id === o.letter.id)) {
+      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id });
+      return;
+    }
+  }
   _pendingRestore = null;
   _source = { mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null };
   _state.queue = queue;

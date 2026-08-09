@@ -907,9 +907,14 @@
       .audio-bar-summary {
         min-width: 0; padding: 0; border: 0; background: none; color: inherit;
         text-align: left; cursor: pointer; border-radius: 4px;
+        display: flex; align-items: center; gap: 6px;
       }
+      .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      /* The up-chevron tells the reader the title area opens the listening
+         desk — the bar's one non-obvious tap target. */
+      .audio-bar-more { flex: 0 0 auto; width: 15px; height: 15px; color: var(--gold-dim); }
       .audio-bar-summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-      @media (hover: hover) { .audio-bar-summary:hover .audio-bar-title { color: var(--gold-bright); } }
+      @media (hover: hover) { .audio-bar-summary:hover .audio-bar-title { color: var(--gold-bright); } .audio-bar-summary:hover .audio-bar-more { color: var(--gold); } }
       .audio-bar-title {
         display: block; font-size: var(--fsc-13); color: var(--cream); line-height: 1.25;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
