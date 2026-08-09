@@ -1577,6 +1577,25 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />
+            {/* Read-along. Parked in Reading for now — a later commit moves
+                both rows into a new "Listening" group with the audio settings. */}
+            <SettingsRow
+              label="Read-Along Highlight"
+              desc="While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don't have them simply play as before."
+              checked={settings.readAlongHighlight !== false}
+              onToggle={() => onToggle("readAlongHighlight")}
+            />
+            {/* Dependent row: with no wash there is nothing to follow, so the
+                scroll toggle is UNMOUNTED rather than greyed (the disclosure
+                discipline the whole screen follows). */}
+            {settings.readAlongHighlight !== false && (
+              <SettingsRow
+                label="Follow the Voice"
+                desc="Let the page scroll a little on its own to keep the sentence being read inside the middle of the screen. It stands down the moment you scroll by hand, and never scrolls while auto-scroll is running."
+                checked={settings.readAlongFollow !== false}
+                onToggle={() => onToggle("readAlongFollow")}
+              />
+            )}
             <SelectField
               eyebrow="Reading"
               title="Reading Streak Dwell Time"

@@ -8,7 +8,7 @@ import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -595,8 +595,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
       {/* Read-along: gold wash on the sentence being read + follow-scroll.
           Live pane only — a peek must not fight over the ONE global
-          ::highlight(vot-reading) registration. */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} />}
+          ::highlight(vot-reading) registration, and must never write the
+          live container's scrollTop. Both halves are separately gated in
+          Settings → Reading. */}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

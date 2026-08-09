@@ -17,7 +17,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
@@ -462,8 +462,9 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       </div>
 
       {/* Read-along: paragraph-level wash for Format B (see ReadAlongHighlight —
-          char offsets shift with footnotesMode, so B paints whole paragraphs). */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} />}
+          char offsets shift with footnotesMode, so B paints whole paragraphs).
+          Both halves are separately gated in Settings → Reading. */}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

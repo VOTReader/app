@@ -335,6 +335,12 @@ export function buildScreenRoutes({
     onLinkOpen: openLinkSidebar,
     onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
     markAsReadEnabled: settings.markAsRead,
+    // Read-along (ui/components/ReadAlongHighlight.jsx). Two independent
+    // gates: the sentence wash, and the follow-scroll that writes scrollTop
+    // under the lease. Both default ON — an absent key must not silently
+    // retire the feature for a reader restoring an older backup.
+    readAlongOn: settings.readAlongHighlight !== false,
+    readAlongFollow: settings.readAlongFollow !== false,
   };
   // {{nav:bookId:chapter}} inside a WTLB/Blessed/Holy-Days entry. Routed
   // through navigateToLink so it raises the same "‹ Back to <entry>" pill

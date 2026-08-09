@@ -87,6 +87,42 @@ describe('auto-scroll settings disclosure', () => {
   });
 });
 
+/* Read-along. Two keys, both default ON, and the SAME disclosure discipline:
+   with no sentence wash there is nothing to follow, so the scroll row is
+   unmounted rather than greyed. Behaviour lives in
+   ui/components/ReadAlongHighlight.jsx (+ its own suite). */
+describe('read-along settings disclosure', () => {
+  it('shows both rows checked when the settings have never been touched', () => {
+    renderSettings();
+    expect(row('Read-Along Highlight')).toBeTruthy();
+    expect(row('Follow the Voice')).toBeTruthy();
+    for (const label of ['Read-Along Highlight', 'Follow the Voice']) {
+      expect(within(row(label)).getByRole('switch').getAttribute('aria-checked')).toBe('true');
+    }
+  });
+
+  it('COLLAPSES the follow row while the wash is off — even if follow was saved on', () => {
+    renderSettings({ readAlongHighlight: false, readAlongFollow: true });
+    expect(row('Read-Along Highlight')).toBeTruthy();
+    expect(row('Follow the Voice')).toBeUndefined();
+  });
+
+  it('keeps the wash while only the follow-scroll is switched off', () => {
+    renderSettings({ readAlongHighlight: true, readAlongFollow: false });
+    expect(within(row('Read-Along Highlight')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
+    expect(within(row('Follow the Voice')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('writes through the settings keys the reading views read', () => {
+    const onToggle = vi.fn();
+    renderSettings({}, { onToggle });
+    fireEvent.click(within(row('Follow the Voice')).getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith('readAlongFollow');
+    fireEvent.click(within(row('Read-Along Highlight')).getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith('readAlongHighlight');
+  });
+});
+
 describe('mark-as-read section disclosure', () => {
   it('uses a keyboard-native disclosure button beside the separate Clear action', () => {
     teardownSettingsGlobals();

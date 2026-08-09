@@ -318,6 +318,45 @@
       clickByText(/A Word of Warning|Chosen by God/); await sleep(200);
       return /letter-body|letter-para|letter-intro/.test(document.body.innerHTML);
     });
+    await step('Read-along wiring', async function () {
+      // Mount a letter that HAS forced-alignment rows and check the read-along
+      // contract WITHOUT playing anything (the walk stays silent and needs no
+      // network). Three things, all of which fail SILENTLY in production —
+      // nothing ever paints, and no console.error is emitted:
+      //   1. the AUDIO_SYNC corpus is actually wired into bundle-a-vot;
+      //   2. every block a fragment names exists in the DOM under the exact
+      //      hl-key ReadAlongHighlight builds (letter:<id>:<blockIndex>) —
+      //      i.e. the alignment rows and the renderer still agree;
+      //   3. the CSS Custom Highlight API path works end to end, or is
+      //      cleanly ABSENT — in which case the component bails before
+      //      touching it, which is a skip and not a failure.
+      clickByText(/Prophetic Letters/); await sleep(320);
+      clickByText(/^Volume One/); await sleep(320);
+      clickByText(/A Word of Warning|Chosen by God/); await sleep(260);
+      var body = document.querySelector('.letter-body');
+      if (!body) return false;
+      // The id comes from the rendered blocks, so a title edit can't silently
+      // retarget this step at some other letter.
+      var firstBlock = body.querySelector('[data-hl-key^="letter:"]');
+      if (!firstBlock) return false;
+      var letterId = firstBlock.getAttribute('data-hl-key').split(':')[1];
+      var sync = resolve('AUDIO_SYNC');
+      var rows = sync && sync['one:' + letterId];
+      if (!rows || !rows.length) return false;
+      var missing = rows.filter(function (r) {
+        return !body.querySelector('[data-hl-key="letter:' + letterId + ':' + r[1] + '"]');
+      }).length;
+      if (missing) return false;
+      // typeof guards: `Highlight` is an undeclared identifier below the API's
+      // support floor, so a bare reference would throw rather than skip.
+      if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight !== 'function') return true;
+      var probe = document.createRange();
+      probe.selectNodeContents(body.querySelector('[data-hl-key="letter:' + letterId + ':' + rows[0][1] + '"]'));
+      CSS.highlights.set('vot-reading', new Highlight(probe));
+      var painted = CSS.highlights.has('vot-reading');
+      CSS.highlights.delete('vot-reading');   // leave the live app unpainted
+      return painted;
+    });
     await step('Scriptures browser', async function () {
       clickByText(/Holy Bible|The Scriptures/); await sleep(320);
       return /Scriptures of Truth|Genesis|Old Testament/.test(document.body.textContent || '');

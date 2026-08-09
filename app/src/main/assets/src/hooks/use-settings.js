@@ -136,6 +136,15 @@ export function useSettings({ savedSettings, theme }) {
       autoScrollLpm: "16",
       autoScrollNext: false,
       autoScrollEndMs: "2500",
+      // Read-along (ui/components/ReadAlongHighlight.jsx). TWO keys, both ON
+      // by default, because they are two different kinds of thing: the wash
+      // is a passive paint through the CSS Custom Highlight API, while the
+      // follow-scroll is a scrollTop WRITER under the lease documented in
+      // hooks/use-autoscroll.js. A reader who wants the wash without the
+      // motion turns off exactly that half; readAlongHighlight off takes both
+      // (no paint, nothing to follow).
+      readAlongHighlight: true,
+      readAlongFollow: true,
       ...savedS,
       ...migrated // migration wins over stale saved values
     };
