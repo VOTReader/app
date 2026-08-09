@@ -40,9 +40,11 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 
-/** Canonical default home-tile order. */
+/** Canonical default home-tile order. 'listening' joined 2026-08-09 (the
+ *  Listening Library moved home from the Library + Volumes entry points);
+ *  existing saved orders keep their arrangement and gain it at the end. */
 export const DEFAULT_HOME_ORDER = Object.freeze([
-  'volumes', 'scriptures', 'studies', 'library', 'settings', 'history',
+  'volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history',
 ]);
 
 export const HomeOrderStore = extendStore(

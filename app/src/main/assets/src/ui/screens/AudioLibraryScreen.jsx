@@ -1,15 +1,26 @@
 /*
-   AudioLibraryScreen -- the personal home for saved and recent recordings.
+   AudioLibraryScreen -- the Listening Library hub.
 
-   The surface deliberately owns only discovery and lightweight actions. The
+   The surface owns discovery and lightweight actions only: what is playing
+   now, the two personal shelves (saved -> its own screen, recent -> in
+   place), and the way in to every source that has recordings. The
    AudioPlayer remains the single source of truth for transport and queues;
    screen-routes remains the source of truth for text destinations.
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
+import {
+  ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
+  audioLibraryStore, hasTextDestination, trackMeta, trackName,
+} from '../components/AudioShelf.jsx';
 
-/** @returns {any | null} */
-function libraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
+/** Recent list disclosure state. Deliberately localStorage, not the tab state:
+ *  it is a shelf preference, not a place the reader navigated to. */
+const RECENT_OPEN_KEY = 'vot-audio-recent-open';
+/** Rows shown before "Show all" — enough to recognize the trail, short enough
+ *  that Browse stays reachable without a long scroll. */
+const RECENT_PREVIEW = 8;
 
 /** @param {number} value @returns {string} */
 function clock(value) {
@@ -19,68 +30,45 @@ function clock(value) {
   return mins + ':' + (rest < 10 ? '0' : '') + rest;
 }
 
-/** @param {number} stamp @returns {string} */
-function relativePlayedAt(stamp) {
-  const delta = Math.max(0, Date.now() - (Number(stamp) || 0));
-  const minutes = Math.floor(delta / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return minutes + ' min ago';
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
-  const days = Math.floor(hours / 24);
-  return days + (days === 1 ? ' day ago' : ' days ago');
+/** @returns {boolean} */
+function readRecentOpen() {
+  try {
+    if (typeof localStorage === 'undefined') return true;
+    return localStorage.getItem(RECENT_OPEN_KEY) !== '0';
+  } catch (_e) { return true; }   // private mode / blocked storage — default open
 }
 
-/** @param {any} track @returns {string} */
-function trackName(track) { return (track && track.title) || 'Untitled recording'; }
-
-/** @param {any} track @returns {string} */
-function trackMeta(track) {
-  return [track && track.sub, track && track.partLabel].filter(Boolean).join(' \u00b7 ') || 'The Volumes of Truth';
+/** @param {boolean} open @returns {void} */
+function writeRecentOpen(open) {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(RECENT_OPEN_KEY, open ? '1' : '0');
+  } catch (_e) { /* the disclosure still works for this session */ }
 }
 
-/** @param {any} track @returns {string} */
-function trackSearchText(track) {
-  return [trackName(track), track && track.sub, track && track.partLabel, track && track.readerCode]
-    .filter(Boolean).join(' ').toLocaleLowerCase();
+/** The VOT audio manifest rides the lazy corpus — until it lands, no VOT
+ *  collection can honestly claim to have (or lack) recordings. */
+function votAudioReady() {
+  return typeof AUDIO_MANIFEST !== 'undefined' && !!AUDIO_MANIFEST;
 }
 
-/** A text destination only exists for VOT collection tracks, not Bible audio. */
-function hasTextDestination(track) {
-  const key = track && typeof track.key === 'string' ? track.key : '';
-  const divider = key.indexOf(':');
-  return divider > 0 && typeof COL_BY_KEY !== 'undefined' && !!COL_BY_KEY.get(key.slice(0, divider));
-}
-
-function PlayIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7.2 4.4v15.2L19.4 12 7.2 4.4z" /></svg>;
-}
-
-function PauseIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.6 4.5h4.2v15H6.6zM13.2 4.5h4.2v15h-4.2z" /></svg>;
-}
-
-function StarIcon({ filled = false }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" /></svg>;
-}
-
-function TextIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5.5h14v13H5z" /><path d="M8.5 9h7M8.5 12h7M8.5 15h4.5" /></svg>;
-}
-
-function SearchIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="5.8" /><path d="M15.2 15.2L20 20" /></svg>;
-}
-
-function ArrowIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>;
+/** Books this Bible edition actually ships, counted off the manifest rather
+ *  than assumed to be 66 — a partial edition must not overstate itself. */
+function bibleBookCount(volKey) {
+  if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return 0;
+  const prefix = volKey + ':';
+  let count = 0;
+  for (const key in BIBLE_AUDIO_MANIFEST) {
+    if (key.lastIndexOf(prefix, 0) === 0) count++;
+  }
+  return count;
 }
 
 /**
  * @param {{
  *   onBack: () => void,
  *   backLabel?: string,
- *   onOpenCollection: (cardId: string) => void,
+ *   onOpenCollection: (volKey: string) => void,
+ *   onOpenSaved: () => void,
  *   onOpenTrack: (track: any) => void,
  *   onSearch: () => void,
  *   onHistory: () => void,
@@ -89,16 +77,17 @@ function ArrowIcon() {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollection, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  const library = libraryStore();
+export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollection, onOpenSaved, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+  const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
 
-  // The registry and manifest are lazy. Warming them here lets the collection
-  // shelf name real available recordings without duplicating a catalog.
+  // The VOT registry and manifest are lazy. Warming them here lets the browse
+  // shelf name real available recordings without duplicating a catalog. The
+  // Bible editions ride bundle-a and are NEVER gated behind this.
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, []);
@@ -107,67 +96,33 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
   );
 
+  const [recentOpen, setRecentOpen] = React.useState(readRecentOpen);
+  const [recentAll, setRecentAll] = React.useState(false);
+
   const state = AudioPlayer.getState();
   const queue = Array.isArray(state.queue) ? state.queue : [];
   const current = queue[state.qi] || null;
   const saved = library && typeof library.saved === 'function' ? library.saved() : [];
   const recent = library && typeof library.recent === 'function' ? library.recent() : [];
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];
-  const [query, setQuery] = React.useState('');
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const matchesQuery = React.useCallback((track) => !normalizedQuery || trackSearchText(track).includes(normalizedQuery), [normalizedQuery]);
-  const shownSaved = normalizedQuery ? saved.filter(matchesQuery) : saved;
-  const shownRecent = normalizedQuery ? recent.filter(matchesQuery) : recent;
+  const editions = Object.values(BIBLE_AUDIO_EDITIONS);
+  const votReady = votAudioReady();
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
   const status = isPlaying ? 'Playing now' : isLoading ? 'Connecting...' : 'Paused';
   const currentSaved = !!(current && library && typeof library.isSaved === 'function' && library.isSaved(current));
   const progress = current && state.duration > 0 ? Math.min(100, Math.max(0, (state.time / state.duration) * 100)) : 0;
+  const shownRecent = recentAll ? recent : recent.slice(0, RECENT_PREVIEW);
 
-  const playTrack = (track) => {
-    if (current && current.url === track.url) AudioPlayer.toggle();
-    else AudioPlayer.playTrack(track);
+  const toggleRecent = () => {
+    const next = !recentOpen;
+    setRecentOpen(next);
+    writeRecentOpen(next);
   };
   const scrollToBrowse = () => {
     const target = typeof document !== 'undefined' ? document.getElementById('audio-library-browse') : null;
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-  const renderRow = (track, source) => {
-    const isCurrent = !!(current && current.url === track.url);
-    const rowPlaying = isCurrent && active;
-    const isSaved = source === 'saved' || !!(library && typeof library.isSaved === 'function' && library.isSaved(track));
-    return (
-      <article key={track.url} className={'audio-library-row' + (isCurrent ? ' is-current' : '')}>
-        <button
-          type="button"
-          className={'audio-library-row-play' + (rowPlaying ? ' is-playing' : '')}
-          onClick={() => playTrack(track)}
-          aria-label={(rowPlaying ? 'Pause ' : 'Play ') + trackName(track)}
-          aria-pressed={rowPlaying}
-        >
-          {rowPlaying ? <PauseIcon /> : <PlayIcon />}
-        </button>
-        <div className="audio-library-row-copy">
-          <strong>{trackName(track)}</strong>
-          <small>{trackMeta(track)}</small>
-        </div>
-        <div className="audio-library-row-actions">
-          {source === 'recent' ? <span title={new Date(track.playedAt).toLocaleString()}>{relativePlayedAt(track.playedAt)}</span> : <span>{isSaved ? 'Saved' : ''}</span>}
-          {hasTextDestination(track) ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(track)} aria-label={'Open text for ' + trackName(track)} title="Open text"><TextIcon /></button> : null}
-          <button
-            type="button"
-            className={'audio-library-icon-button audio-library-save-button' + (isSaved ? ' is-saved' : '')}
-            onClick={() => library && library.toggleSaved(track)}
-            aria-label={isSaved ? 'Remove ' + trackName(track) + ' from saved recordings' : 'Save ' + trackName(track)}
-            aria-pressed={isSaved}
-            title={isSaved ? 'Remove from saved recordings' : 'Save recording'}
-          >
-            <StarIcon filled={isSaved} />
-          </button>
-        </div>
-      </article>
-    );
   };
 
   return (
@@ -177,24 +132,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
       <div className="audio-library-screen">
         <header className="audio-library-hero">
           <div className="audio-library-eyebrow">Your listening shelf</div>
-          <div className="audio-library-title-row">
-            <div>
-              <h1>Listening Library</h1>
-              <p className="audio-library-intro">A quiet place for the recordings you return to, the ones you just heard, and every Volume waiting to be explored.</p>
-            </div>
-            <div className="audio-library-summary" aria-label="Listening Library summary">
-              <span><b>{saved.length}</b> saved</span>
-              <span><b>{recent.length}</b> recent</span>
-            </div>
-          </div>
-          <div className="audio-library-search">
-            <SearchIcon />
-            <label>
-              <span className="sr-only">Search saved and recent recordings</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a recording" />
-            </label>
-            {query ? <button type="button" onClick={() => setQuery('')} aria-label="Clear recording search">Clear</button> : null}
-          </div>
+          <h1>Listening Library</h1>
+          <p className="audio-library-intro">A quiet place for the recordings you return to, the ones you just heard, and every source waiting to be explored.</p>
         </header>
 
         {current ? (
@@ -223,7 +162,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
             <div className="audio-library-now-copy">
               <span>Ready when you are</span>
               <h2 id="audio-library-empty-title">Choose your next recording</h2>
-              <small>{recent[0] ? 'Your last recording is ready to pick up again.' : 'Save a favorite or browse a collection to begin.'}</small>
+              <small>{recent[0] ? 'Your last recording is ready to pick up again.' : 'Save a favorite or browse a source to begin.'}</small>
             </div>
             <div className="audio-library-now-actions">
               <button type="button" className="audio-library-primary-action" onClick={() => recent[0] ? AudioPlayer.playTrack(recent[0]) : scrollToBrowse()}>{recent[0] ? <><PlayIcon /><span>Resume last</span></> : <><ArrowIcon /><span>Browse</span></>}</button>
@@ -231,32 +170,88 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Volumes', onOpenCollec
           </section>
         )}
 
-        <section className="audio-library-section" aria-labelledby="audio-library-saved">
-          <div className="audio-library-section-head">
-            <div><span>Keep close</span><h2 id="audio-library-saved">Saved recordings</h2><p>{saved.length ? 'The recordings you chose to keep.' : 'Your favorites will wait here.'}</p></div>
-            <strong aria-label={saved.length + ' saved recordings'}>{shownSaved.length}{normalizedQuery && shownSaved.length !== saved.length ? <small> of {saved.length}</small> : null}</strong>
+        <section className="audio-library-section audio-library-saved-row" aria-label="Saved recordings">
+          <div className="audio-library-shelf">
+            <button type="button" className="audio-library-shelf-row" onClick={() => onOpenSaved()}>
+              <span className="audio-library-shelf-mark" aria-hidden="true"><StarIcon filled={saved.length > 0} /></span>
+              <span className="audio-library-shelf-copy">
+                <strong>Saved recordings</strong>
+                <small>{saved.length ? saved.length + ' kept · travels with your backup' : 'Tap the star beside any recording to keep it'}</small>
+              </span>
+              <span className="audio-library-shelf-tail">
+                <b>{saved.length}</b>
+                <ArrowIcon />
+              </span>
+            </button>
           </div>
-          {shownSaved.length ? <div className="audio-library-list">{shownSaved.map((track) => renderRow(track, 'saved'))}</div> : <div className="audio-library-empty">{normalizedQuery ? <>No saved recordings match <b>&ldquo;{query.trim()}&rdquo;</b>.</> : <>Use the star beside any recording to keep it here. Saved recordings travel with your VOTReader backup.</>}</div>}
         </section>
 
         <section className="audio-library-section" aria-labelledby="audio-library-recent">
           <div className="audio-library-section-head">
             <div><span>Pick up again</span><h2 id="audio-library-recent">Recently played</h2><p>{recent.length ? 'Your latest starts, newest first.' : 'Your listening trail will appear here.'}</p></div>
-            {recent.length ? <button type="button" className="audio-library-clear" onClick={() => library && library.clearRecent()}>Clear history</button> : null}
+            <div className="audio-library-section-tail">
+              <strong aria-label={recent.length + ' recent recordings'}>{recent.length}</strong>
+              {recent.length ? <button type="button" className="audio-library-clear" onClick={() => library && library.clearRecent()}>Clear history</button> : null}
+              <button
+                type="button"
+                className={'audio-library-disclosure' + (recentOpen ? ' is-open' : '')}
+                onClick={toggleRecent}
+                aria-expanded={recentOpen}
+                aria-controls="audio-library-recent-list"
+                aria-label={recentOpen ? 'Collapse recently played' : 'Expand recently played'}
+              >
+                <ChevronIcon />
+              </button>
+            </div>
           </div>
-          {shownRecent.length ? <div className="audio-library-list">{shownRecent.map((track) => renderRow(track, 'recent'))}</div> : <div className="audio-library-empty">{normalizedQuery ? <>No recent recordings match <b>&ldquo;{query.trim()}&rdquo;</b>.</> : <>Start a recording and it will appear here, ready for an easy return.</>}</div>}
+          <div id="audio-library-recent-list">
+            {recentOpen ? (
+              shownRecent.length ? (
+                <>
+                  <div className="audio-library-list">{shownRecent.map((track) => <AudioShelfRow key={track.url} track={track} source="recent" onOpenTrack={onOpenTrack} />)}</div>
+                  {recent.length > shownRecent.length ? (
+                    <button type="button" className="audio-library-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
+                  ) : null}
+                </>
+              ) : (
+                <div className="audio-library-empty">Start a recording and it will appear here, ready for an easy return.</div>
+              )
+            ) : null}
+          </div>
         </section>
 
         <section className="audio-library-section audio-library-browse" aria-labelledby="audio-library-browse">
-          <div className="audio-library-section-head"><div><span>Explore the source</span><h2 id="audio-library-browse">Choose a collection</h2><p>Open a Volume to see every available recording in context.</p></div></div>
-          <div className="audio-library-collections">
+          <div className="audio-library-section-head"><div><span>Explore the source</span><h2 id="audio-library-browse">Browse the recordings</h2><p>Open a source to hear it letter by letter, or book by book.</p></div></div>
+
+          <h3 className="audio-library-group">The Volumes of Truth</h3>
+          <div className="audio-library-shelf">
             {collections.map((collection) => {
-              const available = AudioPlayer.collectionHasAudio(collection.volKey);
+              const available = votReady && AudioPlayer.collectionHasAudio(collection.volKey);
               return (
-                <button key={collection.volKey} type="button" onClick={() => onOpenCollection(collection.cardId)}>
-                  <span className="audio-library-collection-mark" aria-hidden="true">{available ? '♪' : '○'}</span>
-                  <span className="audio-library-collection-copy"><strong>{collection.label}</strong><small>{available ? 'Recordings available' : 'Open collection'}</small></span>
-                  <b aria-hidden="true"><ArrowIcon /></b>
+                <button key={collection.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(collection.volKey)}>
+                  <span className="audio-library-shelf-mark" aria-hidden="true">{available ? '♪' : '○'}</span>
+                  <span className="audio-library-shelf-copy">
+                    <strong>{collection.label}</strong>
+                    <small>{!votReady ? 'Loading recordings…' : available ? 'Recordings available' : 'No recordings yet'}</small>
+                  </span>
+                  <span className="audio-library-shelf-tail"><ArrowIcon /></span>
+                </button>
+              );
+            })}
+          </div>
+
+          <h3 className="audio-library-group">The Holy Bible</h3>
+          <div className="audio-library-shelf">
+            {editions.map((edition) => {
+              const books = bibleBookCount(edition.volKey);
+              return (
+                <button key={edition.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(edition.volKey)}>
+                  <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
+                  <span className="audio-library-shelf-copy">
+                    <strong>{edition.label}</strong>
+                    <small>{books ? books + ' books · whole-book audiobooks' : 'Whole-book audiobooks'}</small>
+                  </span>
+                  <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>
               );
             })}

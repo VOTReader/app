@@ -58,14 +58,20 @@ export function AudioPlayerBar() {
   /** @type {Partial<import('../../utils/audio-player.js').Track>} */
   const track = queue[st.qi] || {};
   const reader = AudioPlayer.readerLabel(track.readerCode);
-  const playing = st.status === 'playing';
+  // Buffering is an ACTIVE session: toggle() on a loading element pauses it,
+  // so the button must promise Pause — the same rule AudioManagerSheet
+  // applies. Splitting them told a screen reader the opposite of the truth
+  // for the whole cold start.
+  const active = st.status === 'playing' || st.status === 'loading';
 
   // A slider must never advertise max=0 while its value grows — the same
   // a11y defect class already fixed once in JournalAudioBlock. Duration is 0
   // until metadata lands, so the range is floored at 1 and disabled instead.
   const dur = Math.max(0, Math.floor(st.duration || 0));
   const max = Math.max(1, dur);
-  const pos = Math.min(max, Math.max(0, Math.floor(st.time || 0)));
+  // Unknown length ⇒ an empty track, not a full one: clamping a real elapsed
+  // time into the floored max=1 painted the disabled slider at 100%.
+  const pos = dur === 0 ? 0 : Math.min(max, Math.max(0, Math.floor(st.time || 0)));
 
   return (
     <>
@@ -88,11 +94,11 @@ export function AudioPlayerBar() {
         type="button"
         className={'audio-bar-play' + (st.status === 'loading' ? ' is-loading' : '')}
         onClick={() => AudioPlayer.toggle()}
-        aria-label={playing ? 'Pause' : 'Play'}
+        aria-label={active ? 'Pause' : 'Play'}
         aria-busy={st.status === 'loading'}
       >
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          {playing
+          {active
             ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
             : <path d="M6 3v18l16-9z" />}
         </svg>
@@ -113,7 +119,8 @@ export function AudioPlayerBar() {
             </span>
             <span className="audio-bar-sub">
               <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
-              <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
+              {/* Until metadata lands the total is unknown, not 0:00. */}
+              <span className="audio-bar-time">{dur ? fmt(st.time) + ' / ' + fmt(dur) : fmt(st.time)}</span>
             </span>
           </span>
         </button>

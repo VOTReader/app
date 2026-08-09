@@ -78,6 +78,7 @@ export const DEFAULT_TAB = {
   bookId: null, chapterNum: null, letterId: null,
   studyId: null, studyChapterId: null,
   fromStudies: false, genreId: null,
+  audioColKey: null,
   mode: 'pdf', showStudy: true,
   surpriseAnchor: null,
   fromLetterStack: [],

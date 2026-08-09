@@ -2,7 +2,7 @@
    VolumesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function VolumesHome({ onSelect, onOpenAudio, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.3: VOT corpus is lazy. Subscribe + pre-fire on mount so the
   // letter-count details fill in once bundle-a-vot.js loads. Use
   // colLetterArr (lazy-safe) for all collections — returns [] when
@@ -86,16 +86,6 @@ export function VolumesHome({ onSelect, onOpenAudio, onBack, onSearch, onHistory
               </button>
             ))}
           </div>
-          {onOpenAudio ? (
-            <button
-              type="button"
-              className="genre-tile genre-full-width volumes-listening-library"
-              onClick={onOpenAudio}
-            >
-              <div className="genre-tile-title">Listening Library</div>
-              <div className="genre-tile-sub">Saved recordings · Recent listening · Queue controls</div>
-            </button>
-          ) : null}
           <button
             className="genre-tile genre-full-width"
             style={{ textAlign: "center", padding: "1.4rem 1rem" }}

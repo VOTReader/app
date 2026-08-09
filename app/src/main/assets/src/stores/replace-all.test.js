@@ -646,7 +646,7 @@ describe('ProphecyCardsStore.setAll', () => {
    ═══════════════════════════════════════════════════════════════ */
 describe('HomeOrderStore.set', () => {
   it('persists a valid order', () => {
-    const customOrder = ['settings', 'library', 'history', 'volumes', 'scriptures', 'studies'];
+    const customOrder = ['settings', 'library', 'history', 'listening', 'volumes', 'scriptures', 'studies'];
     HomeOrderStore.set(customOrder);
     expect(HomeOrderStore.get()).toEqual(customOrder);
   });

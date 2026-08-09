@@ -36,18 +36,11 @@ function useStoreVersion(name) {
   );
 }
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenAudio, onOpenMilestones, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
+  // (AudioLibraryStore is in that list — the milestones chip counts listening.
+  // The Listening Library itself moved to a HOME card on 2026-08-09.)
 
-  // AudioLibraryStore is a bundle-b global reached at call time (the same
-  // rule the audio player follows — importing it here would fork the
-  // singleton across bundles).
-  const _audioLib = /** @type {any} */ (globalThis).AudioLibraryStore || null;
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (_audioLib && typeof _audioLib.subscribe === 'function') ? _audioLib.subscribe(cb) : () => {}, [_audioLib]),
-    () => (_audioLib && typeof _audioLib.getVersion === 'function') ? _audioLib.getVersion() : 0
-  );
-  const savedAudioCount = (_audioLib && typeof _audioLib.saved === 'function') ? _audioLib.saved().length : 0;
   const milestones = buildAchievements(collectAchievementSnapshot(readItems));
 
   const noteCount      = NoteStore.count();
@@ -145,18 +138,6 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
           <line x1="12" y1="20" x2="12" y2="9" />
           <line x1="18" y1="20" x2="18" y2="4" />
           <path d="M3 20h18" />
-        </svg>
-      ),
-    },
-    audio: {
-      id: 'audio', eyebrow: 'My Listening', title: 'Listening Library',
-      detail: savedAudioCount === 0 ? 'No saved recordings yet' : (savedAudioCount + (savedAudioCount === 1 ? ' saved recording' : ' saved recordings')),
-      guide: savedAudioCount === 0 ? 'Tap Save in the listening controls to keep a recording.' : null,
-      onClick: onOpenAudio,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
         </svg>
       ),
     },

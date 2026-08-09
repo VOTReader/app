@@ -37,8 +37,14 @@ function sleepLabel(seconds) {
  * @param {{ open: boolean, state: import('../../utils/audio-player.js').AudioPlayerState, onClose: () => void }} props
  */
 export function AudioManagerSheet({ open, state, onClose }) {
-  const trapRef = useFocusTrap(open);
-  useModalRegistry({ id: 'audio-manager-sheet', dismiss: onClose, active: open });
+  // A sheet that will render nothing (no current track) must not claim the
+  // modal registry or the close-sheet bridge — an invisible topmost modal
+  // would swallow Escape/back. Hooks stay unconditional; only `active` and
+  // the bridge effect gate on actually having something to show.
+  const hasCurrent = !!(Array.isArray(state.queue) && state.queue[state.qi]);
+  const renders = open && hasCurrent;
+  const trapRef = useFocusTrap(renders);
+  useModalRegistry({ id: 'audio-manager-sheet', dismiss: onClose, active: renders });
 
   // AudioLibraryStore belongs to bundle-b. Resolve it at render time instead
   // of importing that bundle's source here, which would duplicate its singleton
@@ -50,11 +56,11 @@ export function AudioManagerSheet({ open, state, onClose }) {
   );
 
   React.useEffect(() => {
-    if (!open || typeof window === 'undefined') return undefined;
+    if (!renders || typeof window === 'undefined') return undefined;
     const previous = window.__closeSheet;
     window.__closeSheet = onClose;
     return () => { window.__closeSheet = previous || null; };
-  }, [open, onClose]);
+  }, [renders, onClose]);
 
   // While paused, no playback tick re-renders the sheet — an armed sleep
   // timer would show a frozen countdown. One coarse tick keeps it honest.

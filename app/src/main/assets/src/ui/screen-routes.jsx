@@ -43,6 +43,8 @@
 import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
+import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
+import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
@@ -79,6 +81,8 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} setShowStudy
  * @property {*} genreId
  * @property {*} setGenreId
+ * @property {*} audioColKey
+ * @property {*} setAudioColKey
  * @property {*} surpriseAnchor
  * @property {*} setSurpriseAnchor
  * @property {*} theme
@@ -200,6 +204,7 @@ export function buildScreenRoutes({
   fromSearch, setFromSearch,
   mode, setMode, showStudy, setShowStudy,
   genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
+  audioColKey, setAudioColKey,
   // ── Theme + settings + display ──
   theme, setTheme,
   settings, setSettings, toggleSetting, updateSetting,
@@ -339,6 +344,36 @@ export function buildScreenRoutes({
   const _navToChapter = (bid, ch, srcTitle) => {
     setFromWtlb(screen);
     navigateToLink({ type: 'bible', bookId: bid, chapter: ch }, { sourceLetterTitle: srcTitle || null });
+  };
+
+  // The Text affordance on any Listening Library row. A track's key is
+  // "volKey:letterId", so only a VOT collection that declares a letterScreen
+  // has a destination — Bible audiobooks and Hidden Manna have none, and the
+  // screens gate their icon on the same rule so the tap is never dead.
+  const _openAudioText = (track, sourceScreen) => {
+    const key = track && typeof track.key === 'string' ? track.key : '';
+    const divider = key.indexOf(':');
+    if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
+    const volKey = key.slice(0, divider);
+    const collection = COL_BY_KEY.get(volKey);
+    if (!collection || !collection.letterScreen) return;
+    // Same wiring as colIdxProps' nav — the reading dot / last-read tracking
+    // must not distinguish a Library open from an index open.
+    const id = key.slice(divider + 1);
+    pushFromLetter({
+      sourceScreen,
+      sourceLetterTitle: 'Listening Library',
+      destSnapshot: { screen: collection.letterScreen, letterId: id },
+    });
+    setLetterId(id);
+    setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
+    setScreen(collection.letterScreen);
+  };
+  // Entering a Listening Library sub-screen chains the origin so backing out
+  // lands on the hub, and the hub's own back still returns to Library/Volumes.
+  const _enterAudioSub = (destination) => {
+    setNavOrigin({ screen: 'audio-library', returnOrigin: navOrigin || null });
+    setScreen(destination);
   };
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
@@ -509,6 +544,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         onSearch={goSearch}
         onHistory={goHistory}
+        onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         historyEnabled={settings.historyEnabled !== false}
         onAbout={goAbout}
         history={readHistory}
@@ -582,7 +618,6 @@ export function buildScreenRoutes({
           onOpenJournal={goJournalHub}
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
-          onOpenAudio={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
           onOpenMilestones={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
           totalReadCount={Object.keys(readItems || {}).length}
           readItems={readItems || {}}
@@ -786,7 +821,6 @@ export function buildScreenRoutes({
     'volumes-home': () => (
       <VolumesHome
         onSelect={handleVolumeSelect}
-        onOpenAudio={() => { setNavOrigin({ screen: 'volumes-home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -797,27 +831,35 @@ export function buildScreenRoutes({
     'audio-library': () => (
       <AudioLibraryScreen
         onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library' : 'Volumes'}
-        onOpenCollection={handleVolumeSelect}
-        onOpenTrack={(track) => {
-          const key = track && typeof track.key === 'string' ? track.key : '';
-          const divider = key.indexOf(':');
-          if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
-          const volKey = key.slice(0, divider);
-          const collection = COL_BY_KEY.get(volKey);
-          if (!collection || !collection.letterScreen) return;
-          // Same wiring as colIdxProps' nav — the reading dot / last-read
-          // tracking must not distinguish a Library open from an index open.
-          const id = key.slice(divider + 1);
-          pushFromLetter({
-            sourceScreen: 'audio-library',
-            sourceLetterTitle: 'Listening Library',
-            destSnapshot: { screen: collection.letterScreen, letterId: id },
-          });
-          setLetterId(id);
-          setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
-          setScreen(collection.letterScreen);
-        }}
+        backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library'
+          : navOrigin && navOrigin.screen === 'volumes-home' ? 'Volumes'
+          : 'Home'}
+        onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
+        onOpenSaved={() => _enterAudioSub('audio-library-saved')}
+        onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'audio-library-collection': () => (
+      <AudioCollectionScreen
+        volKey={audioColKey}
+        onBack={goNavOrigin}
+        backLabel="Listening Library"
+        onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'audio-library-saved': () => (
+      <AudioSavedScreen
+        onBack={goNavOrigin}
+        backLabel="Listening Library"
+        onOpenTrack={(track) => _openAudioText(track, 'audio-library-saved')}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

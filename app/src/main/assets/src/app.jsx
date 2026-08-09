@@ -86,6 +86,7 @@ function App() {
   const [showStudy, setShowStudy] = tabField('showStudy');
   const [genreId, setGenreId] = tabField('genreId');
   const [surpriseAnchor, setSurpriseAnchor] = tabField('surpriseAnchor');
+  const [audioColKey, setAudioColKey] = tabField('audioColKey');
 
   // App-global
   const [theme, setTheme] = useState(saved.theme || "dark");
@@ -665,6 +666,7 @@ function App() {
     fromSearch, setFromSearch, // Wave 0 (P1-13): index onBack props consume it
     mode, setMode, showStudy, setShowStudy,
     genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
+    audioColKey, setAudioColKey,
     theme, setTheme,
     settings, setSettings, toggleSetting, updateSetting,
     titleFocusHidden, setTitleFocusHidden,

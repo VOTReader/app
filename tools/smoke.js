@@ -304,7 +304,8 @@
       if (st.crashed) await goHome();
     }
     async function lib(tileRe) {
-      clickByText(/Personal Study|Library/); await sleep(320);
+      // Eyebrow-precise: a bare /Library/ would hit the Listening Library card.
+      clickByText(/Personal Study/); await sleep(320);
       clickByText(tileRe); await sleep(340);
     }
 
@@ -359,8 +360,17 @@
       return passed;
     });
     await step('Library hub', async function () {
-      clickByText(/Personal Study|Library/); await sleep(320);
+      // "Personal Study" (the card's eyebrow) — a bare /Library/ would match
+      // the Listening Library card that now sits before it on Home.
+      clickByText(/Personal Study/); await sleep(320);
       return /My Notes|My Bookmarks|My Journal/.test(document.body.textContent || '');
+    });
+    await step('Listening Library', async function () {
+      await goHome();
+      clickByText(/Audio Readings/); await sleep(360);
+      const body = document.body.textContent || '';
+      // The hub's own furniture: the saved doorway + both browse groups.
+      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /The Holy Bible/.test(body);
     });
     await step('Library → Notes', async function () { return lib(/My Notes/, /My Notes/); });
     await step('Library → Bookmarks', async function () { return lib(/My Bookmarks/, /My Bookmarks/); });

@@ -38,6 +38,7 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).HistoryScreen = () => null;
   /** @type {any} */ (globalThis).ChapterIndex = () => null;
   /** @type {any} */ (globalThis).LibraryScreen = () => null;
+  /** @type {any} */ (globalThis).HomeScreen = () => null;
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
   /** @type {any} */ (globalThis).MATTHEW = { title: 'Matthew', chapters: [{ num: 1 }] };
   /** @type {any} */ (globalThis).COL_BY_INDEX_SC = new Map([
@@ -54,6 +55,7 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).HistoryScreen;
   delete /** @type {any} */ (globalThis).ChapterIndex;
   delete /** @type {any} */ (globalThis).LibraryScreen;
+  delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
   delete /** @type {any} */ (globalThis).MATTHEW;
   delete /** @type {any} */ (globalThis).COL_BY_INDEX_SC;
@@ -84,6 +86,7 @@ function makeRoutes(overrides = {}) {
     fromSearch: false, setFromSearch: vi.fn(),
     fromStudies: false, setFromStudies: vi.fn(),
     genreId: null, setSurpriseAnchor: vi.fn(),
+    audioColKey: null, setAudioColKey: vi.fn(),
     goStudiesHome: vi.fn(), goScripturesHome: vi.fn(), goHome: vi.fn(),
     selectMatthewCh: vi.fn(), selectBibleCh: vi.fn(),
     activeReadKey: null, lastReadChapters: {},
@@ -239,23 +242,25 @@ describe('screen-routes — bible-idx onBack consumes fromSearch', () => {
 });
 
 describe('screen-routes — Listening Library and Milestones return to their actual origin', () => {
-  it('Library → Listening Library carries Library as the visible and hardware-back origin', () => {
+  it('Home → Listening Library carries Home as the visible and hardware-back origin', () => {
     const { routes, props } = makeRoutes();
-    routes.library().props.onOpenAudio();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'library', returnOrigin: null });
+    routes.home().props.onOpenAudio();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
     expect(props.setScreen).toHaveBeenCalledWith('audio-library');
 
     // The state update causes App to rebuild this factory on the next render;
     // label parity is asserted with that rebuilt nav state below.
     const audio = routes['audio-library']();
     expect(audio.props.onBack).toBe(props.goNavOrigin);
+    expect(audio.props.backLabel).toBe('Home');
   });
 
-  it('uses a Library back label when the Listening Library was opened there', () => {
+  it('keeps origin-true back labels for legacy Library/Volumes origins', () => {
     const { routes, props } = makeRoutes({ navOrigin: { screen: 'library' } });
     const audio = routes['audio-library']();
     expect(audio.props.onBack).toBe(props.goNavOrigin);
     expect(audio.props.backLabel).toBe('Library');
+    expect(makeRoutes({ navOrigin: { screen: 'volumes-home' } }).routes['audio-library']().props.backLabel).toBe('Volumes');
   });
 
   it('My Progress → Milestones preserves Progress and its previous origin', () => {
@@ -279,5 +284,46 @@ describe('screen-routes — Listening Library and Milestones return to their act
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
     });
     expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
+  });
+
+  it('hub → collection chains the hub (and ITS origin) so back unwinds level by level', () => {
+    // Library → hub already chained; opening a collection pushes a third link.
+    const hubOrigin = { screen: 'library', returnOrigin: null };
+    const { routes, props } = makeRoutes({ navOrigin: hubOrigin });
+    routes['audio-library']().props.onOpenCollection('one');
+    expect(props.setAudioColKey).toHaveBeenCalledWith('one');
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: hubOrigin });
+    expect(props.setScreen).toHaveBeenCalledWith('audio-library-collection');
+
+    const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'audio-library', returnOrigin: hubOrigin } });
+    const collection = nextRoutes['audio-library-collection']();
+    expect(collection.props.onBack).toBe(nextProps.goNavOrigin);
+    expect(collection.props.backLabel).toBe('Listening Library');
+  });
+
+  it('hub → saved shelf takes the same chain, and its Text taps name their own screen', () => {
+    const { routes, props } = makeRoutes({ navOrigin: { screen: 'volumes-home' } });
+    routes['audio-library']().props.onOpenSaved();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: { screen: 'volumes-home' } });
+    expect(props.setScreen).toHaveBeenCalledWith('audio-library-saved');
+
+    const { routes: nextRoutes, props: nextProps } = makeRoutes();
+    const saved = nextRoutes['audio-library-saved']();
+    expect(saved.props.onBack).toBe(nextProps.goNavOrigin);
+    expect(saved.props.backLabel).toBe('Listening Library');
+    saved.props.onOpenTrack({ key: 'one:wide-path' });
+    expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
+      sourceScreen: 'audio-library-saved',
+      sourceLetterTitle: 'Listening Library',
+      destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+    });
+
+    const collection = nextRoutes['audio-library-collection']();
+    collection.props.onOpenText({ key: 'one:wide-path' });
+    expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
+      sourceScreen: 'audio-library-collection',
+      sourceLetterTitle: 'Listening Library',
+      destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+    });
   });
 });

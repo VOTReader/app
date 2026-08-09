@@ -36,7 +36,7 @@ function setupGlobals(over = {}) {
   globalThis.JournalStatsStore = over.JournalStatsStore || fakeStore({ get: () => ({}) });
   globalThis.AudioLibraryStore = over.AudioLibraryStore || fakeStore({ saved: () => [], getPlays: () => 0 });
   globalThis.LibraryOrderStore = over.LibraryOrderStore || {
-    get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'audio', 'milestones'],
+    get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones'],
     set: () => {},
     subscribe: () => () => {},
     getVersion: () => 0,
@@ -83,7 +83,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     setupGlobals();
     renderLibrary();
     const guides = [...document.querySelectorAll('.library-tile-guide')];
-    expect(guides).toHaveLength(8);
+    expect(guides).toHaveLength(7);
     guides.forEach((g) => expect(g.textContent.length).toBeGreaterThan(10));
     // Spot-pin the voice/accuracy of each caption against the destination
     // screens' own empty-state copy.
@@ -93,7 +93,6 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Bookmarks').querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
     expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
     expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
-    expect(tileEl('Listening Library').querySelector('.library-tile-guide').textContent).toMatch(/Save/i);
     expect(tileEl('Milestones').querySelector('.library-tile-guide').textContent).toMatch(/listening/i);
   });
 
@@ -103,15 +102,15 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeNull();
     expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
     // A first note also earns the matching milestone, so those two tiles now
-    // have real content; the remaining six still keep their captions.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(6);
+    // have real content; the remaining five still keep their captions.
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(5);
   });
 
   it('the Progress tile drops its caption once anything is read', () => {
     setupGlobals();
     renderLibrary({ totalReadCount: 7 });
     expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(7);
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(6);
   });
 
   it('updates the Milestones tile while Library stays open', () => {
@@ -138,7 +137,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
 
   it('adopts a restored custom tile order after asynchronous hydration', () => {
     let version = 0;
-    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'audio', 'milestones'];
+    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones'];
     let listener = null;
     const orderStore = {
       get: () => order,
@@ -151,7 +150,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Notes')).toBe(document.querySelector('.library-tile'));
 
     act(() => {
-      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'audio', 'milestones'];
+      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones'];
       version++;
       listener();
     });

@@ -36,13 +36,13 @@ describe('HomeOrderStore — DEFAULT_HOME_ORDER constant', () => {
     expect(Object.isFrozen(DEFAULT_HOME_ORDER)).toBe(true);
   });
 
-  it('has exactly 6 entries (the canonical tile count)', () => {
-    expect(DEFAULT_HOME_ORDER.length).toBe(6);
+  it('has exactly 7 entries (the canonical tile count)', () => {
+    expect(DEFAULT_HOME_ORDER.length).toBe(7);
   });
 
   it('contains the canonical tile ids', () => {
     expect(new Set(DEFAULT_HOME_ORDER)).toEqual(new Set([
-      'volumes', 'scriptures', 'studies', 'library', 'settings', 'history',
+      'volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history',
     ]));
   });
 });
@@ -58,7 +58,7 @@ describe('HomeOrderStore — get() schema merge', () => {
 
   it('returns a full valid permutation as-is', () => {
     // Same length, same id set, different order.
-    const customOrder = ['settings', 'library', 'history', 'volumes', 'scriptures', 'studies'];
+    const customOrder = ['settings', 'library', 'history', 'listening', 'volumes', 'scriptures', 'studies'];
     HomeOrderStore.set(customOrder);
 
     const order = HomeOrderStore.get();
@@ -68,14 +68,14 @@ describe('HomeOrderStore — get() schema merge', () => {
   it('GROWS: a save predating a new tile keeps its arrangement, new tile appended', () => {
     // The shape every install has on the day a tile is ADDED: the save
     // is a custom arrangement of the ids that existed then, and knows
-    // nothing about the newcomer ('studies' stands in for the 7th tile
-    // landing later today).
+    // nothing about the newcomer — exactly how every install met the
+    // 'listening' tile on 2026-08-09.
     /** @type {any} */ (HomeOrderStore)._cache = [
-      'settings', 'library', 'history', 'volumes', 'scriptures',
+      'settings', 'library', 'history', 'volumes', 'scriptures', 'studies',
     ];
 
     expect(HomeOrderStore.get()).toEqual(
-      ['settings', 'library', 'history', 'volumes', 'scriptures', 'studies']);
+      ['settings', 'library', 'history', 'volumes', 'scriptures', 'studies', 'listening']);
   });
 
   it('SHRINKS: a retired id is dropped in place, the rest of the arrangement survives', () => {
@@ -83,28 +83,28 @@ describe('HomeOrderStore — get() schema merge', () => {
     // saved order still names it. Dropping it must not cost the user
     // the other five, and must not append anything.
     /** @type {any} */ (HomeOrderStore)._cache = [
-      'settings', 'retired-tile', 'library', 'history', 'volumes', 'scriptures', 'studies',
+      'settings', 'retired-tile', 'library', 'history', 'listening', 'volumes', 'scriptures', 'studies',
     ];
 
     expect(HomeOrderStore.get()).toEqual(
-      ['settings', 'library', 'history', 'volumes', 'scriptures', 'studies']);
+      ['settings', 'library', 'history', 'listening', 'volumes', 'scriptures', 'studies']);
   });
 
   it('drops a foreign id from an import payload the same way', () => {
     /** @type {any} */ (HomeOrderStore)._cache = [
-      'history', 'settings', 'library', 'studies', 'scriptures', 'foreign-id',
+      'history', 'settings', 'library', 'listening', 'studies', 'scriptures', 'foreign-id',
     ];
 
     // 'volumes' was never in the save, so it lands at the end.
     expect(HomeOrderStore.get()).toEqual(
-      ['history', 'settings', 'library', 'studies', 'scriptures', 'volumes']);
+      ['history', 'settings', 'library', 'listening', 'studies', 'scriptures', 'volumes']);
   });
 
   it('dedupes a corrupted save and restores the missing ids at the end', () => {
     /** @type {any} */ (HomeOrderStore)._cache = ['volumes', 'volumes', 'history'];
 
     expect(HomeOrderStore.get()).toEqual(
-      ['volumes', 'history', 'scriptures', 'studies', 'library', 'settings']);
+      ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings']);
   });
 
   it('falls back to DEFAULT when saved value is not an array', () => {
@@ -128,7 +128,7 @@ describe('HomeOrderStore — get() schema merge', () => {
 
 describe('HomeOrderStore — set()', () => {
   it('persists a valid order', () => {
-    const customOrder = ['history', 'settings', 'library', 'studies', 'scriptures', 'volumes'];
+    const customOrder = ['history', 'settings', 'library', 'listening', 'studies', 'scriptures', 'volumes'];
     HomeOrderStore.set(customOrder);
 
     expect(HomeOrderStore.get()).toEqual(customOrder);
@@ -136,7 +136,7 @@ describe('HomeOrderStore — set()', () => {
 
   it('persists a defensive COPY — caller cannot mutate the cache by mutating its input', () => {
     /** @type {any} */
-    const input = ['volumes', 'scriptures', 'studies', 'library', 'settings', 'history'];
+    const input = ['volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history'];
     HomeOrderStore.set(input);
 
     // Mutate the caller's array — the saved data should not change.
@@ -145,7 +145,7 @@ describe('HomeOrderStore — set()', () => {
     const stored = HomeOrderStore.get();
     // The stored order is still 6 entries and matches DEFAULT_HOME_ORDER
     // (the input's mutation didn't bleed in).
-    expect(stored.length).toBe(6);
+    expect(stored.length).toBe(7);
     expect(stored).toEqual([...DEFAULT_HOME_ORDER]);
   });
 
