@@ -1498,6 +1498,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}
             />
+            <SelectField
+              eyebrow="Reading"
+              title="Bible Audio"
+              label="Bible Audio"
+              desc="Recorded voice for the whole-book Listen button on Bible chapter indexes. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
+              value={settings.bibleAudio || "brm-kjv"}
+              options={[
+                /* Registry source of truth: utils/audio-track.js
+                   (BIBLE_AUDIO_EDITIONS, published as a global for this
+                   classic-globals screen). 'Off' is appended locally. */
+                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => ({
+                  id, label: /** @type {any} */ (ed).label,
+                  desc: 'Whole-book audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
+                })),
+                { id: "off", label: "Off", desc: "Hide the Bible Listen button" },
+              ]}
+              onChange={(v) => onSetting("bibleAudio", v)}
+            />
             <SettingsRow
               label="Chapter Titles"
               desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."

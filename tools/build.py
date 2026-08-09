@@ -73,6 +73,11 @@ A = [
     # derefs (InlineNotes/ScriptureSheet/StudyPanels) on the VOT letter path.
     'react.min.js', 'react-dom.min.js',
     'src/data/matthew-nkjv.js',
+    # Bible-edition audio manifest (~4 KB minified): whole-book audiobook rows
+    # keyed "bible-<edition>:<bookId>". Rides the CRITICAL path deliberately —
+    # the Listen pill + boot resume must work on matthew-idx (bundle-a-matthew)
+    # and Settings (bundle-e) without forcing the 5 MB a-bible load.
+    'src/data/bible-audio-manifest.js',
     # search-data.js = the SHARED window.VotSearchData index source (books/
     # display names/synonyms) consumed by the MiniSearch engine (bundle-e) +
     # SearchScreen. The Classic engine (search.js) + its flexsearch.min.js
@@ -93,6 +98,7 @@ A = [
 # bundles), so this needs no CORPUS_VERSION bump; the SW content-hash auto-busts.
 MINIFY_A = {
     'src/data/matthew-nkjv.js',
+    'src/data/bible-audio-manifest.js',
 }
 
 # Cluster A-bible — the 66-book NKJV corpus. Loaded ON DEMAND via

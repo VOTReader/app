@@ -26,7 +26,9 @@
 
 import { showToast } from './toast.js';
 import {
+  AUDIO_BIBLE_RELEASE_PREFIX,
   audioAssetUrl,
+  bibleAudioAssetUrl,
   isVotAudioUrl,
   normalizeAudioRate,
   normalizeAudioTrack,
@@ -112,6 +114,14 @@ const _library = () => _g().AudioLibraryStore || null;
 const _manifest = () => _g().AUDIO_MANIFEST || null;
 /** @returns {Record<string, Array<any[]>> | null} */
 const _sections = () => _g().AUDIO_SECTIONS || null;
+/** Bible-edition manifest — rides bundle-a (critical path), so it exists from boot. */
+const _bibleManifest = () => _g().BIBLE_AUDIO_MANIFEST || null;
+/** 'bible-*' volKeys stream whole-book audiobooks from the audio-bible release. */
+const _isBibleVol = (volKey) => typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
+/** The manifest a volKey's entries live in. */
+const _mapFor = (volKey) => (_isBibleVol(volKey) ? _bibleManifest() : _manifest());
+/** Release-aware asset → stream URL for a volKey's tracks. */
+const _assetUrlFor = (volKey, id) => (_isBibleVol(volKey) ? bibleAudioAssetUrl(id) : trackUrl(id));
 
 /** The watchdog is valid only while playback is actively loading. */
 function _clearStallWatchdog() {
@@ -396,7 +406,9 @@ function _warmTargets() {
   const limit = Math.min(_state.queue.length, _state.qi + 1 + PREFETCH_AHEAD);
   for (let i = _state.qi + 1; i < limit; i++) {
     const url = _state.queue[i] && _state.queue[i].url;
-    if (url && !_warmedUrls.has(url)) out.push(url);
+    // Whole-book Bible tracks are 30–260 MB each — "warming" one is a full
+    // audiobook download, not a head-of-file cache fill. Letters only.
+    if (url && !_warmedUrls.has(url) && url.lastIndexOf(AUDIO_BIBLE_RELEASE_PREFIX, 0) !== 0) out.push(url);
   }
   return out;
 }
@@ -551,14 +563,14 @@ function prewarm(volKey, letterId) {
   if (_offline()) return;
   const connection = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).connection : null;
   if (connection && connection.saveData) return;
-  const m = _manifest();
+  const m = _mapFor(volKey);
   const parts = m && m[volKey + ':' + letterId];
   if (!parts || !parts.length) return;
   const key = volKey + ':' + letterId;
   if (_prewarmKey === key) return;
   const el = _ensureEl();
   el.preload = 'metadata';
-  const url = trackUrl(parts[0][0]);
+  const url = _assetUrlFor(volKey, parts[0][0]);
   if (!url) return;
   el.src = url;
   _prewarmKey = key;
@@ -572,7 +584,7 @@ function prewarm(volKey, letterId) {
  * @returns {boolean}
  */
 function hasAudio(volKey, letterId) {
-  const m = _manifest();
+  const m = _mapFor(volKey);
   return !!(m && m[volKey + ':' + letterId]);
 }
 
@@ -586,7 +598,7 @@ function hasAudio(volKey, letterId) {
  * @returns {string | null}
  */
 function firstReaderCode(volKey, letterId) {
-  const m = _manifest();
+  const m = _mapFor(volKey);
   const parts = m && m[volKey + ':' + letterId];
   return (parts && parts[0] && parts[0][1]) || null;
 }
@@ -601,7 +613,7 @@ function firstReaderCode(volKey, letterId) {
  */
 function collectionHasAudio(volKey) {
   if (_volHasAudio.has(volKey)) return _volHasAudio.get(volKey);
-  const m = _manifest();
+  const m = _mapFor(volKey);
   // Do NOT cache a pre-corpus "no": the manifest arrives lazily, and a poisoned
   // false would hide the play button for the rest of the session.
   if (!m) return false;
@@ -612,6 +624,24 @@ function collectionHasAudio(volKey) {
   }
   _volHasAudio.set(volKey, found);
   return found;
+}
+
+/**
+ * Play a whole-book Bible audiobook, queueing the ENTIRE edition positioned
+ * at this book (the letters' album behavior, book-sized). Book order + titles
+ * come from BIBLE_AUDIO_BOOKS, which ships in the same lazy bundle as the
+ * Bible corpus — any screen showing a Listen pill has it by construction.
+ *
+ * @param {{ volKey: string, bookId: string, label?: string | null }} opts
+ * @returns {void}
+ */
+function playBibleBook(opts) {
+  const o = opts || /** @type {any} */ ({});
+  if (_offline()) { _toast(OFFLINE_MSG); return; }
+  const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
+  const items = books.map((b) => ({ id: b[0], title: b[1] }));
+  if (!items.length) return;
+  playCollection({ volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId });
 }
 
 /**
@@ -649,7 +679,7 @@ function readerLabel(code) {
  * @returns {Track[]}
  */
 function _tracksFor(volKey, item, collectionLabel) {
-  const m = _manifest();
+  const m = _mapFor(volKey);
   if (!m || !item || !item.id) return [];
   const key = volKey + ':' + item.id;
   const parts = m[key];
@@ -658,7 +688,7 @@ function _tracksFor(volKey, item, collectionLabel) {
     key,
     title: item.title || '',
     sub: collectionLabel || null,
-    url: trackUrl(p[0]),
+    url: _assetUrlFor(volKey, p[0]),
     readerCode: p[1] || '',
     partLabel: p[2] || null,
   }));
@@ -769,7 +799,9 @@ async function _rebuildRestoredQueue() {
   const g = _g();
   if (r.mode !== 'custom') {
     try {
-    if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
+    if (_isBibleVol(r.volKey)) {
+      if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
+    } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
   } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
   }
   /** @type {Track[]} */
@@ -779,6 +811,17 @@ async function _rebuildRestoredQueue() {
   } else if (r.mode === 'section') {
     const sections = sectionsFor(r.volKey) || [];
     queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
+  } else if (_isBibleVol(r.volKey)) {
+    // Bible editions have no COL_BY_KEY registry — canonical book order ships
+    // in the manifest bundle as BIBLE_AUDIO_BOOKS [[id, title], …].
+    const books = Array.isArray(g.BIBLE_AUDIO_BOOKS) ? g.BIBLE_AUDIO_BOOKS : [];
+    const all = books.map((b) => ({ id: b[0], title: b[1] }));
+    const items = r.mode === 'letter'
+      ? all.filter((i) => r.key === r.volKey + ':' + i.id)
+      : all;
+    for (const item of items) {
+      for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
+    }
   } else {
     const col = (typeof g.COL_BY_KEY !== 'undefined') ? g.COL_BY_KEY.get(r.volKey) : null;
     const pref = (col && typeof g.colPreface === 'function') ? g.colPreface(col) : null;
@@ -1262,6 +1305,7 @@ export const AudioPlayer = {
   playLetter,
   playCollection,
   playSection,
+  playBibleBook,
   playTrack,
   toggle,
   next,

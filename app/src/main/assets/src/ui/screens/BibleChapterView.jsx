@@ -3,8 +3,10 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
   // books-restored.js has an entry for this chapter, swap the chrome.
@@ -169,6 +171,16 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 <div className="hero-ornament-diamond" />
                 <div className="hero-ornament-line r" />
               </div>
+              {/* Whole-book audiobook (2026-08-09): the recording is one track
+                  per BOOK (no per-chapter splits exist), so this pill starts
+                  the book — the mini-player then rides along while reading.
+                  Mirrors the letter hero pill; inert peeks keep it (same
+                  pointer-events:none contract as LetterView's). */}
+              {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+                <div className="hero-play-row">
+                  <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} />
+                </div>
+              )}
             </div>
           </header>
         );

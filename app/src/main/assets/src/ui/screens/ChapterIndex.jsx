@@ -2,7 +2,10 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor }) {
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null }) {
   const currentRef = React.useRef(null);
   // Chapter-level bookmark indicator (owner report 2026-08-09): a chapter
   // holding a bookmark — the whole-chapter bookmark or any verse bookmark
@@ -78,6 +81,16 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
           <div className="vol-index-eyebrow">Scriptures of Truth</div>
           <h1 className="vol-index-title">{book.title}</h1>
           <div className="vol-index-subtitle">{book.subtitle}</div>
+          {/* Whole-book audiobook (2026-08-09): one track per book, streamed
+              from the audio-bible release. The selected edition arrives via
+              bibleAudio (null = Settings 'Off' / unknown edition); a book the
+              edition's manifest doesn't carry self-hides the same way a
+              letter without a recording does. */}
+          {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+            <div className="hero-play-row">
+              <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} />
+            </div>
+          )}
           <div className="vol-index-ornament">
             <div className="vol-index-ornament-line" />
             <div className="vol-index-ornament-diamond" />

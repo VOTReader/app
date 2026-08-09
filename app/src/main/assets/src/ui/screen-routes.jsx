@@ -41,6 +41,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
+import { bibleAudioEdition } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
 import { buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
@@ -256,6 +257,11 @@ export function buildScreenRoutes({
   // matching volume, so each letter route stays guarded exactly as before
   // (a non-matching screen yields null → the route renders nothing).
   const actL = (k) => (activeVolKey === k ? activeLetter : null);
+  // Whole-book Bible audiobooks: the selected recorded edition (Settings →
+  // Reading → Bible Audio), or null when off/unknown — which hides every
+  // Bible Listen pill. Registry + policy live in utils/audio-track.js.
+  const _bibleAudioEd = bibleAudioEdition(settings.bibleAudio);
+  const bibleAudioProp = _bibleAudioEd ? { volKey: _bibleAudioEd.volKey, label: _bibleAudioEd.label } : null;
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
@@ -826,6 +832,7 @@ export function buildScreenRoutes({
       return (
         <ChapterIndex
           book={MATTHEW}
+          bibleAudio={bibleAudioProp}
           onSelect={selectMatthewCh}
           onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
@@ -877,6 +884,7 @@ export function buildScreenRoutes({
       if (book) return (
         <ChapterIndex
           book={book}
+          bibleAudio={bibleAudioProp}
           onSelect={selectBibleCh}
           onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
           backLabel={fromSearch ? 'Search' : _idxGenre ? _idxGenre.label : 'Scriptures'}
@@ -904,6 +912,7 @@ export function buildScreenRoutes({
       if (book && chapter) return (
       <BibleChapterView
         book={book} chapter={chapter}
+        bibleAudio={bibleAudioProp}
         onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}

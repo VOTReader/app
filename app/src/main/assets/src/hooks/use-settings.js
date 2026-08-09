@@ -111,6 +111,10 @@ export function useSettings({ savedSettings, theme }) {
       //  old vot-state blobs are simply unread.)
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
       showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
+      // Recorded Bible edition for the whole-book Listen pill ('off' hides it).
+      // Values are BIBLE_AUDIO_EDITIONS keys (utils/audio-track.js); an unknown
+      // persisted value acts as 'off' (bibleAudioEdition() returns null).
+      bibleAudio: "brm-kjv",
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
       // Fullscreen gesture is on by default. The hint count is deliberately
       // persisted so the brief teaching toast stops after a few uses.

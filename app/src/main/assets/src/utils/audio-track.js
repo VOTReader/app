@@ -12,6 +12,36 @@
 /** GitHub release location that owns every shipped VOT audio asset. */
 export const AUDIO_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/';
 
+/** Sibling release owning the whole-book Bible audiobooks (2026-08-09). A
+ *  SEPARATE tag: GitHub enforces 1,000 assets per release and audio-v1
+ *  already carries ~729 letter tracks; Bible editions get their own bucket. */
+export const AUDIO_BIBLE_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/';
+
+/** Recorded Bible editions the app knows how to stream. Registry lives here
+ *  (not in the lazy manifest) so Settings can list editions before the Bible
+ *  corpus loads. `volKey` prefixes every BIBLE_AUDIO_MANIFEST key; anything
+ *  starting with 'bible-' routes to the audio-bible release. Future voices:
+ *  add an entry + manifest rows + release assets — nothing else. */
+export const BIBLE_AUDIO_EDITIONS = Object.freeze({
+  'brm-kjv': Object.freeze({
+    label: 'KJV · Biblical Restoration Ministries',
+    translation: 'kjv',
+    volKey: 'bible-brm-kjv',
+  }),
+});
+
+/* SettingsScreen is a classic-globals module (no imports) — publish the
+   registry the same way AudioLibraryStore bridges across bundles. audio-track
+   rides bundles b + d, both booted before the lazy Settings screen loads. */
+if (typeof globalThis !== 'undefined') /** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS = BIBLE_AUDIO_EDITIONS;
+
+/** Registry entry for a settings.bibleAudio value, or null for 'off'/unknown. */
+export function bibleAudioEdition(setting) {
+  return (typeof setting === 'string' && Object.prototype.hasOwnProperty.call(BIBLE_AUDIO_EDITIONS, setting))
+    ? BIBLE_AUDIO_EDITIONS[/** @type {keyof typeof BIBLE_AUDIO_EDITIONS} */ (setting)]
+    : null;
+}
+
 const ASSET_NAME = /^[A-Za-z0-9_-]+\.mp3$/;
 const MAX_KEY = 240;
 const MAX_TITLE = 240;
@@ -32,15 +62,30 @@ export function audioAssetUrl(id) {
 }
 
 /**
- * Is this exactly one of VOT's immutable release audio assets?
+ * Canonical stream URL for a Bible-edition asset (audio-bible-v1 release).
+ * Same id policy as audioAssetUrl — invalid ids become ''.
+ *
+ * @param {unknown} id
+ * @returns {string}
+ */
+export function bibleAudioAssetUrl(id) {
+  const asset = typeof id === 'string' ? id.trim() : '';
+  return /^[A-Za-z0-9_-]+$/.test(asset) ? AUDIO_BIBLE_RELEASE_PREFIX + asset + '.mp3' : '';
+}
+
+/**
+ * Is this exactly one of VOT's immutable release audio assets? Either the
+ * letter release or the Bible-edition release qualifies — nothing else.
  *
  * @param {unknown} url
  * @returns {boolean}
  */
 export function isVotAudioUrl(url) {
-  return typeof url === 'string' &&
-    url.indexOf(AUDIO_RELEASE_PREFIX) === 0 &&
-    ASSET_NAME.test(url.slice(AUDIO_RELEASE_PREFIX.length));
+  if (typeof url !== 'string') return false;
+  const prefix = url.indexOf(AUDIO_RELEASE_PREFIX) === 0 ? AUDIO_RELEASE_PREFIX
+    : url.indexOf(AUDIO_BIBLE_RELEASE_PREFIX) === 0 ? AUDIO_BIBLE_RELEASE_PREFIX
+    : null;
+  return !!prefix && ASSET_NAME.test(url.slice(prefix.length));
 }
 
 /** @param {unknown} value @param {number} max @returns {string} */

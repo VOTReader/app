@@ -878,3 +878,73 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
     expect(el().played).toBe(true);
   });
 });
+
+describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () => {
+  const BURL = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/' + id + '.mp3';
+  const BIBLE_MANIFEST = {
+    'bible-brm-kjv:genesis': [['brm-kjv_genesis', '']],
+    'bible-brm-kjv:exodus': [['brm-kjv_exodus', '']],
+    'bible-brm-kjv:revelation': [['brm-kjv_revelation', '']],
+  };
+  const BIBLE_BOOKS = [['genesis', 'Genesis'], ['exodus', 'Exodus'], ['revelation', 'Revelation']];
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
+    globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+  });
+
+  it('hasAudio routes bible- volKeys to the Bible manifest without touching the letter map', () => {
+    expect(AudioPlayer.hasAudio('bible-brm-kjv', 'genesis')).toBe(true);
+    expect(AudioPlayer.hasAudio('bible-brm-kjv', 'psalms')).toBe(false);   // not in this fixture
+    expect(AudioPlayer.hasAudio('vol1', 'preface')).toBe(true);            // letters unaffected
+    expect(AudioPlayer.collectionHasAudio('bible-brm-kjv')).toBe(true);
+  });
+
+  it('playBibleBook queues the whole edition positioned at the tapped book, streaming from audio-bible-v1', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'exodus', label: 'KJV · Biblical Restoration Ministries' });
+    const s = AudioPlayer.getState();
+    expect(s.queue.length).toBe(3);
+    expect(s.qi).toBe(1);
+    expect(s.queue[1].url).toBe(BURL('brm-kjv_exodus'));
+    expect(s.queue[1].title).toBe('Exodus');
+    expect(s.queue[1].sub).toBe('KJV · Biblical Restoration Ministries');
+    expect(el().src).toBe(BURL('brm-kjv_exodus'));
+    // Bar prev/next walk neighboring books.
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(BURL('brm-kjv_revelation'));
+  });
+
+  it('never prefetch-warms whole-book Bible tracks (a warm = a full audiobook download)', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'genesis', label: null });
+    const main = FakeAudio.last;
+    main.dispatchEvent(new Event('playing'));
+    main.duration = 100;
+    main.buffered = { length: 1, end: () => 100 };   // fully buffered — letters would warm here
+    main.currentTime = 1;
+    main.dispatchEvent(new Event('timeupdate'));
+    expect(FakeAudio.last).toBe(main);               // no warmer element created
+  });
+
+  it('restores a persisted Bible collection across a reboot without any corpus load', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'bible-brm-kjv', label: 'KJV · Biblical Restoration Ministries',
+      qi: 1, key: 'bible-brm-kjv:exodus', time: 120,
+      track: { key: 'bible-brm-kjv:exodus', title: 'Exodus', sub: 'KJV · Biblical Restoration Ministries', url: BURL('brm-kjv_exodus'), readerCode: '' },
+    }));
+    await load();   // fresh module = the reboot
+    let s = AudioPlayer.getState();
+    expect(s.status).toBe('paused');                 // placeholder bar, zero network
+    expect(s.queue.length).toBe(1);
+    expect(s.queue[0].url).toBe(BURL('brm-kjv_exodus'));
+    AudioPlayer.toggle();                            // first transport tap rebuilds
+    await Promise.resolve(); await Promise.resolve();
+    s = AudioPlayer.getState();
+    expect(s.queue.length).toBe(3);                  // full edition rebuilt from BIBLE_AUDIO_BOOKS
+    expect(s.qi).toBe(1);
+    expect(el().src).toBe(BURL('brm-kjv_exodus'));
+  });
+});
