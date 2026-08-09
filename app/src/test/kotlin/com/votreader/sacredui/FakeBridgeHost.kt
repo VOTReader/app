@@ -63,6 +63,9 @@ class FakeBridgeHost(
     /** Records every applyImmersiveMode(immersive) call, in order. */
     val immersiveModeCalls: MutableList<Boolean> = mutableListOf()
 
+    /** Records every setAudioKeepAlive(active) call, in order. */
+    val audioKeepAliveCalls: MutableList<Boolean> = mutableListOf()
+
     override fun postToUi(action: () -> Unit) {
         postedActions.add(action)
         if (executePostedImmediately) action()
@@ -102,4 +105,6 @@ class FakeBridgeHost(
     }
 
     override fun clearGardenCache() { gardenCacheClearCount++ }
+
+    override fun setAudioKeepAlive(active: Boolean) { audioKeepAliveCalls.add(active) }
 }

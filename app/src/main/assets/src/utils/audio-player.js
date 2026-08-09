@@ -323,7 +323,7 @@ function _ensureEl() {
   // Fires while the CURRENT track buffers, including when paused — the last
   // one lands right as it finishes, which is exactly when warming may begin.
   el.addEventListener('progress', () => _maybePrefetchNext());
-  el.addEventListener('ended', () => next());
+  el.addEventListener('ended', () => { _notifyListened(); next(); });
   el.addEventListener('error', _onError);
 
   _el = el;
@@ -443,6 +443,27 @@ function _maybePrefetchNext() {
   _warmEl.src = targets[0];
   // Backstop: a wedged fetch never blocks the chain; URL stays retryable.
   _warmTimer = setTimeout(() => _finishWarm(false), 45000);
+}
+
+/**
+ * A letter finished playing to its end (owner directive 2026-08-09: a full
+ * listen counts like a full read — the item's read count increments). Fired
+ * from 'ended' BEFORE next() advances. Multi-part letters notify only when
+ * their LAST part ends; range-compilation sections carry key null and never
+ * notify. The App-side bridge (useReadProgress) owns the actual counting.
+ */
+function _notifyListened() {
+  try {
+    const track = _state.queue[_state.qi];
+    if (!track || !track.key) return;
+    const following = _state.queue[_state.qi + 1];
+    if (following && following.key === track.key) return;   // more parts remain
+    const g = _g();
+    if (typeof g.__votAudioListened !== 'function') return;
+    const divider = track.key.indexOf(':');
+    if (divider <= 0) return;
+    g.__votAudioListened(track.key.slice(0, divider), track.key.slice(divider + 1));
+  } catch (_e) { /* listen counting must never interfere with queue advance */ }
 }
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */

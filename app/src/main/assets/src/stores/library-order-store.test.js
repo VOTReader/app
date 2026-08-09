@@ -1,10 +1,11 @@
 /* LibraryOrderStore — growth-tolerant schema validation on read.
    ───────────────────────────────────────────────────────────────
    get() must (a) keep a user's custom arrangement when the default
-   tile set GROWS (a saved 5-tile order from before the 'progress'
-   tile shipped keeps its order, new tile appended), while (b) still
-   rejecting saves that carry foreign ids — the same import-payload
-   safety HomeOrderStore enforces ([[user-data-paramount]]). */
+   tile set GROWS (a saved order from before a new tile shipped keeps
+   its order, new tiles appended — proven twice now: the 'progress'
+   tile, then the 'audio'+'milestones' pair on 2026-08-09), while (b)
+   still rejecting saves that carry foreign ids — the same
+   import-payload safety HomeOrderStore enforces ([[user-data-paramount]]). */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LibraryOrderStore, DEFAULT_LIBRARY_ORDER } from './library-order-store.js';
@@ -15,10 +16,11 @@ beforeEach(() => {
 });
 
 describe('LibraryOrderStore — DEFAULT_LIBRARY_ORDER constant', () => {
-  it('is frozen and carries the 6 canonical tile ids', () => {
+  it('is frozen and carries the 8 canonical tile ids', () => {
     expect(Object.isFrozen(DEFAULT_LIBRARY_ORDER)).toBe(true);
     expect(new Set(DEFAULT_LIBRARY_ORDER)).toEqual(new Set([
       'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
+      'audio', 'milestones',
     ]));
   });
 });
@@ -29,17 +31,24 @@ describe('LibraryOrderStore — get() schema validation', () => {
   });
 
   it('returns a full valid permutation as-is', () => {
-    const custom = ['progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes'];
+    const custom = ['milestones', 'audio', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes'];
     LibraryOrderStore.set(custom);
     expect(LibraryOrderStore.get()).toEqual(custom);
   });
 
-  it('MIGRATES a pre-progress 5-tile save: order kept, new tile appended', () => {
-    // The exact shape every existing install has on disk.
+  it('MIGRATES a pre-audio/milestones 6-tile save: order kept, new tiles appended', () => {
+    // The exact shape every install from before 2026-08-09 has on disk.
+    /** @type {any} */ (LibraryOrderStore)._cache =
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress'];
+    expect(LibraryOrderStore.get()).toEqual(
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'audio', 'milestones']);
+  });
+
+  it('MIGRATES the older pre-progress 5-tile save the same way', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'notes', 'links', 'journal', 'bookmarks'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress']);
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'audio', 'milestones']);
   });
 
   it('falls back to DEFAULT when the save carries a foreign id', () => {
@@ -59,16 +68,16 @@ describe('LibraryOrderStore — get() schema validation', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['notes', 'notes', 'journal'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress']);
+      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress', 'audio', 'milestones']);
   });
 });
 
 describe('LibraryOrderStore — set()', () => {
   it('persists a defensive COPY of the caller array', () => {
-    const input = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights'];
+    const input = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'audio', 'milestones'];
     LibraryOrderStore.set(input);
     input.push('smuggled');
     expect(LibraryOrderStore.get()).toEqual(
-      ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights']);
+      ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'audio', 'milestones']);
   });
 });

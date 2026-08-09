@@ -452,6 +452,50 @@ describe('audio-player — listening controls + arbitration', () => {
   });
 });
 
+describe('audio-player — listen completion counts', () => {
+  it('notifies the read-count bridge when a letter plays to its end', () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));
+      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-c');
+    } finally {
+      delete globalThis.__votAudioListened;
+    }
+  });
+
+  it('multi-part letters count once — on the LAST part only', () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));      // Part 1 → Part 2, same key
+      expect(listened).not.toHaveBeenCalled();
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));      // Part 2 = the letter's end
+      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-a');
+    } finally {
+      delete globalThis.__votAudioListened;
+    }
+  });
+
+  it('range-compilation sections (key null) never notify', () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    try {
+      AudioPlayer.playSection('wtlb1', 0, 'WTLB One');
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));
+      expect(listened).not.toHaveBeenCalled();
+    } finally {
+      delete globalThis.__votAudioListened;
+    }
+  });
+});
+
 describe('audio-player — gentle queue prefetch', () => {
   /** Buffered stub covering [0, end). */
   const buffered = (end) => ({ length: 1, end: () => end });

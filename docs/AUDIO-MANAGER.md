@@ -33,7 +33,7 @@ it; the cache — not the app — owns eviction.
 | --- | --- |
 | Track URL policy and persisted track normalization | `app/src/main/assets/src/utils/audio-track.js` |
 | Playback, Media Session, durable position, queue editing, sleep timer, and audio arbitration | `app/src/main/assets/src/utils/audio-player.js` |
-| Saved recordings, recent history, and speed preference | `app/src/main/assets/src/stores/audio-library-store.js` |
+| Saved recordings, recent history, speed preference, and lifetime play count | `app/src/main/assets/src/stores/audio-library-store.js` |
 | Compact transport and expanded listening desk | `app/src/main/assets/src/ui/components/AudioPlayerBar.jsx`, `AudioManagerSheet.jsx` |
 | Saved/recent/browse screen | `app/src/main/assets/src/ui/screens/AudioLibraryScreen.jsx` |
 | IDB registration, import validation, and Settings backup mapping | `idb-adapter.js`, `import-validators.js`, `SettingsScreen.jsx` |

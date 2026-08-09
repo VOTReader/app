@@ -19,9 +19,12 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 
-/** Canonical default library-tile order. */
+/** Canonical default library-tile order. Growth-tolerant get() below means
+ *  adding ids here surfaces the new tiles (appended) on existing installs
+ *  without disturbing a saved arrangement. */
 export const DEFAULT_LIBRARY_ORDER = Object.freeze([
   'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
+  'audio', 'milestones',
 ]);
 
 export const LibraryOrderStore = extendStore(

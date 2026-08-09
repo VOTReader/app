@@ -572,6 +572,22 @@ class AppInterfaceTest {
         assertTrue(host.postedActions.isEmpty())
     }
 
+    @Test
+    fun `setAudioActive drives the foreground keep-alive service on the same edge`() {
+        // The vm flag alone only keeps the WebView's media element alive across
+        // onPause; the process still needed anchoring (AudioKeepAliveService).
+        // Both must move together — a start with no matching stop strands an
+        // ongoing notification, a stop with no start loses the anchor.
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host, vm = mockk(relaxed = true))
+
+        app.setAudioActive(true)
+        app.setAudioActive(false)
+        app.setAudioActive(true)
+
+        assertEquals(listOf(true, false, true), host.audioKeepAliveCalls)
+    }
+
     // ─── Mic permission flow ──────────────────────────────────────────
 
     @Test

@@ -117,7 +117,9 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           prevLabel: 'Previous chapter', nextLabel: 'Next chapter',
         },
         reading: true,
-        chapterBookmark: chapter ? { hlKey: 'study:matthew-' + chapter.num, label: 'Matthew ' + chapter.num + ' (Study)' } : null,
+        // Derive from book.id like the verse keys two blocks below — the old
+        // literal 'matthew-' would silently mis-key any future non-Matthew use.
+        chapterBookmark: (book && chapter) ? { hlKey: 'study:' + book.id + '-' + chapter.num, label: (book.title || 'Matthew') + ' ' + chapter.num + ' (Study)' } : null,
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
@@ -186,6 +188,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                   votNotes={chapter.votNotes || []}
                   onScriptureClick={setActiveScripRef}
                   onVotLetterClick={onVotLetterClick}
+                  hlKeyBase={studyHlKey(book.id + '-' + chapter.num, 'panel')}
                 />
               )}
             </>
@@ -206,7 +209,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                       <BookmarkIcon hlKey={vHlKey} />
                     </div>
                     {showStudy && (scriptures.length > 0 || votNotes.length > 0) && (
-                      <InlineNotes scriptures={scriptures} votNotes={votNotes} onScriptureClick={setActiveScripRef} onVotLetterClick={onVotLetterClick} />
+                      <InlineNotes scriptures={scriptures} votNotes={votNotes} onScriptureClick={setActiveScripRef} onVotLetterClick={onVotLetterClick} hlKeyBase={vHlKey} />
                     )}
                     {showStudy && hasEchoes && (
                       <InlineEcho scriptures={echoes.scriptures} votNotes={echoes.votNotes} />

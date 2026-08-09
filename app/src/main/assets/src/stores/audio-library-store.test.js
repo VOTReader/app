@@ -32,7 +32,15 @@ afterEach(() => vi.useRealTimers());
 
 describe('AudioLibraryStore — normalized metadata', () => {
   it('starts with a conservative empty library and normal playback speed', () => {
-    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1 });
+    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0 });
+  });
+
+  it('counts lifetime plays, including repeats of the same recording', () => {
+    AudioLibraryStore.recordPlayed(track(1));
+    AudioLibraryStore.recordPlayed(track(1));
+    AudioLibraryStore.recordPlayed(track(2));
+    expect(AudioLibraryStore.getPlays()).toBe(3);
+    expect(AudioLibraryStore.recent()).toHaveLength(2);   // history dedupes; plays do not
   });
 
   it('saves once by release URL, then toggles that save off', () => {
@@ -86,7 +94,14 @@ describe('normalizeAudioLibrary — import boundary', () => {
       recent: [{ ...track(2), url: 'javascript:alert(1)', playedAt: 30 }],
       rate: 2,
     });
-    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2 });
+    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0 });
+  });
+
+  it('bounds an imported plays counter', () => {
+    expect(normalizeAudioLibrary({ plays: 41 }).plays).toBe(41);
+    expect(normalizeAudioLibrary({ plays: -3 }).plays).toBe(0);
+    expect(normalizeAudioLibrary({ plays: 'lots' }).plays).toBe(0);
+    expect(normalizeAudioLibrary({ plays: 99999999999 }).plays).toBe(10000000);
   });
 
   it('deduplicates by immutable URL, sorts newest first, and bounds imported lists', () => {

@@ -111,10 +111,17 @@ class AppInterface(
      * duplicated across esbuild bundles). MainActivity.onPause() consults
      * [MainViewModel.streamAudioActive] to keep the WebView's media alive
      * while a letter is playing. No UI work — safe inline on the binder thread.
+     *
+     * The same edge also drives [AudioKeepAliveService] through the host: the
+     * onPause skip keeps the media ELEMENT alive, the foreground service keeps
+     * the PROCESS alive (a backgrounded activity is an ordinary kill candidate
+     * under memory pressure). The host call never throws, so a service that
+     * refuses to start costs nothing but a WARN — the WebView path is unchanged.
      */
     @JavascriptInterface
     fun setAudioActive(active: Boolean) {
         vm.streamAudioActive = active
+        host.setAudioKeepAlive(active)
     }
 
     @JavascriptInterface

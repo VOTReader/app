@@ -104,6 +104,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
                     <button
                       className={`part-group-card${isOpen ? " is-expanded" : ""}`}
                       onClick={() => setExpandedPart(isOpen ? null : part.num)}
+                      aria-expanded={isOpen}
                     >
                       <div className="part-group-info">
                         <div className="part-group-num">Part {part.num}</div>

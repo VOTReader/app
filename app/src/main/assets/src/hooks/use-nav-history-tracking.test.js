@@ -301,6 +301,44 @@ describe('useNavHistoryTracking — bible-study-chapter branch', () => {
     });
   });
 
+  it('records the study visit even when a STALE letterId lingers from a prior letter (owner report 2026-08-09)', () => {
+    // The real app never clears letterId on study navigation, so after any
+    // letter visit it is non-null forever. The old `else if (letterId)`
+    // branch ordering swallowed the study screen: COL_BY_LETTER_SC has no
+    // 'bible-study-chapter' entry, so NOTHING recorded and the study branch
+    // was unreachable. This is why "several attempts" (all aimed at lazy
+    // corpus timing) never fixed it.
+    const study = { id: 'purity', slug: 'purity', title: 'Purity', chapters: [] };
+    const chapter = { id: 'ch1', num: 1, title: 'Chapter One' };
+    const props = {
+      ...baseProps(),
+      screen: 'bible-study-chapter',
+      letterId: 'the-wide-path',        // stale from an earlier letter visit
+      studyId: 'purity',
+      studyChapterId: 'ch1',
+      getStudyById: vi.fn(() => study),
+      getStudyChapter: vi.fn(() => chapter),
+    };
+    renderHook(() => useNavHistoryTracking(props));
+
+    expect(props.addToHistory).toHaveBeenCalledTimes(1);
+    expect(props.addToHistory).toHaveBeenCalledWith(expect.objectContaining({ type: 'study-chapter', studyId: 'purity' }));
+  });
+
+  it('a stale studyId does not hijack a LETTER visit either (symmetric guard)', () => {
+    const props = {
+      ...baseProps(),
+      screen: 'vol-two-letter',
+      letterId: 'the-seventh-day',
+      studyId: 'purity',                 // stale from an earlier study visit
+      studyChapterId: 'ch1',
+      _findLetter: vi.fn(() => ({ title: 'The Seventh Day', num: 2 })),
+    };
+    renderHook(() => useNavHistoryTracking(props));
+    expect(props.addToHistory).toHaveBeenCalledTimes(1);
+    expect(props.addToHistory).toHaveBeenCalledWith(expect.objectContaining({ type: 'letter', letterId: 'the-seventh-day' }));
+  });
+
   it('does NOT record when getStudyById returns null', () => {
     const props = {
       ...baseProps(),

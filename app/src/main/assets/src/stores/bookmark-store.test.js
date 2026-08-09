@@ -198,15 +198,17 @@ describe('BookmarkStore — getForKeyPrefix()', () => {
     expect(results[0].id).toBe('b1');
   });
 
-  it('matches the "stored key is a prefix of the query" branch', () => {
-    // The `prefix.indexOf(k + ':') === 0` reverse branch — a bookmark
-    // stored at a coarser key (block-level) matches a finer query
-    // (block + range).
-    BookmarkStore.add({ id: 'b_block', hlKey: 'letter:the-wide-path:2', label: 'Block' });
+  it('does NOT match a coarser stored key against a finer query (chapter-flood guard)', () => {
+    // The old reverse branch (`prefix.indexOf(k + ':') === 0`) made one
+    // chapter-level bookmark (`bible:john:3`) match EVERY verse container
+    // beneath it (`bible:john:3:16`, …) — a flag icon on every verse
+    // (owner report 2026-08-09). Coarse bookmarks surface at their own
+    // level (chapter header button + chapter index indicator) instead.
+    BookmarkStore.add({ id: 'b_chapter', hlKey: 'bible:john:3', label: 'Chapter' });
 
-    const results = BookmarkStore.getForKeyPrefix('letter:the-wide-path:2:10-40');
-    expect(results).toHaveLength(1);
-    expect(results[0].id).toBe('b_block');
+    expect(BookmarkStore.getForKeyPrefix('bible:john:3:16')).toEqual([]);
+    // …while the chapter-level query still sees it, exact + descendants.
+    expect(BookmarkStore.getForKeyPrefix('bible:john:3').map((b) => b.id)).toEqual(['b_chapter']);
   });
 
   it('returns empty array when nothing matches', () => {

@@ -1,9 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════
    InlineNotes — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   Annotation contract mirrors StudyPanels (2026-08-09): non-interactive
+   study prose carries data-hl-key + data-hl-dom + StaticSubtree; tappable
+   rows stay navigation chrome. `hlKeyBase` is the verse's own study key
+   ('study:matthew-5:12') — suffixes keep these containers distinct from
+   the verse text container that owns the bare key. */
 
-export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
+export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   if (!scriptures.length && !votNotes.length) return null;
+  const ann = (suffix) => hlKeyBase ? { 'data-hl-key': hlKeyBase + '-' + suffix, 'data-hl-dom': true } : {};
   return (
     <div className="inline-notes">
       {scriptures.map((s, i) => {
@@ -15,9 +21,11 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
             <span className="inline-note-chevron">{"›"}</span>
           </button>
         ) : (
-          <div key={`s${i}`} className="inline-note-scripture inline-note-plain">
-            <span className="inline-note-tag">{s.ref}</span>
-            <span className="inline-note-cite">{renderCommentaryCite(s.cite)}</span>
+          <div key={`s${i}`} className="inline-note-scripture inline-note-plain" {...ann('s' + i)}>
+            <StaticSubtree>
+              <span className="inline-note-tag">{s.ref}</span>
+              <span className="inline-note-cite">{renderCommentaryCite(s.cite)}</span>
+            </StaticSubtree>
           </div>
         );
 
@@ -51,7 +59,9 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
             {inner}
           </button>
         ) : (
-          <div key={`v${i}`} className="inline-vot-note">{inner}</div>
+          <div key={`v${i}`} className="inline-vot-note" {...ann('v' + i)}>
+            <StaticSubtree>{inner}</StaticSubtree>
+          </div>
         );
 
       })}

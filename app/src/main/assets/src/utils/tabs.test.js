@@ -147,7 +147,7 @@ describe('describeTab', () => {
       // actual home tabs and unknown screens only. If a new route is added
       // without a describeTab case, this enumeration forces the oversight.
       const corpusIndependent = [
-        'scriptures-home', 'volumes-home', 'audio-library', 'studies-home', 'garden-view',
+        'scriptures-home', 'volumes-home', 'audio-library', 'milestones', 'studies-home', 'garden-view',
         'search', 'history', 'settings', 'about', 'library', 'my-progress',
         'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
         'links-index', 'bookmarks-index', 'highlights-index', 'home',

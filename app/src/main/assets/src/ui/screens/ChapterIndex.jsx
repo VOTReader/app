@@ -2,8 +2,21 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor }) {
   const currentRef = React.useRef(null);
+  // Chapter-level bookmark indicator (owner report 2026-08-09): a chapter
+  // holding a bookmark — the whole-chapter bookmark or any verse bookmark
+  // within it — shows a small flag on its card. Indicator only; managing
+  // the bookmark stays with the reading view's header button.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (bookmarkKeyFor && typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, [bookmarkKeyFor]),
+    () => (bookmarkKeyFor && typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
+  );
+  const hasBookmark = (num) => {
+    if (!bookmarkKeyFor || typeof BookmarkStore === 'undefined') return false;
+    try { return BookmarkStore.getForKeyPrefix(bookmarkKeyFor(num)).length > 0; }
+    catch (_e) { return false; }
+  };
   React.useEffect(() => {
     if (!currentRef.current) return undefined;
     const timer = setTimeout(() => {
@@ -91,6 +104,13 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                       : <div className="chapter-card-title untitled">Chapter {ch.num}</div>;
                   })()}
                 </div>
+                {hasBookmark(ch.num) && (
+                  <span className="chapter-card-bookmark" aria-label="Bookmarked" title="Bookmarked">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </span>
+                )}
                 {minChip(ch)}
                 {markAsReadEnabled && isRead(ch.num) && (
                   <span className="read-check" aria-label={(readCount && readCount(ch.num) > 1) ? `Read ${readCount(ch.num)} times` : 'Read'}>

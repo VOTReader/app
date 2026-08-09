@@ -1,11 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
    StudyPanels — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   Annotation (2026-08-09, owner directive — all study prose markable):
+   NON-interactive rows (commentary cites, un-tappable letter notes) carry
+   the imperative-path trio (data-hl-key + data-hl-dom + StaticSubtree), so
+   their prose highlights like any letter block. Tappable rows stay
+   navigation chrome — their tap target IS the row, and their excerpt text
+   is annotatable at the letter it opens. `hlKeyBase` comes from the owning
+   chapter; absent (legacy callers) the panels render exactly as before. */
 
-export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
+export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   const hasScriptures = scriptures && scriptures.length > 0;
   const hasVot = votNotes && votNotes.length > 0;
   if (!hasScriptures && !hasVot) return null;
+  const ann = (suffix) => hlKeyBase ? { 'data-hl-key': hlKeyBase + '-' + suffix, 'data-hl-dom': true } : {};
   return (
     <div className="study-panels">
       {hasScriptures && (
@@ -21,9 +29,11 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                   <span className="scripture-ref-chevron">{"›"}</span>
                 </button>
               ) : (
-                <div key={i} className="scripture-ref scripture-ref-note">
-                  <span className="scripture-ref-tag">{s.ref}</span>
-                  <span className="scripture-ref-text">{renderCommentaryCite(s.cite)}</span>
+                <div key={i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>
+                  <StaticSubtree>
+                    <span className="scripture-ref-tag">{s.ref}</span>
+                    <span className="scripture-ref-text">{renderCommentaryCite(s.cite)}</span>
+                  </StaticSubtree>
                 </div>
               );
             })}
@@ -58,7 +68,9 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
               return canTap ? (
                 <button key={i} className="vot-note vot-note-tappable" onClick={() => onVotLetterClick(n.vol, n.letter, n.excerpt)}>{inner}</button>
               ) : (
-                <div key={i} className="vot-note">{inner}</div>
+                <div key={i} className="vot-note" {...ann('v' + i)}>
+                  <StaticSubtree>{inner}</StaticSubtree>
+                </div>
               );
             })}
           </div>

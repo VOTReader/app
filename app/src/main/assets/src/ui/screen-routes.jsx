@@ -42,6 +42,8 @@
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
+import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+import { buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -561,20 +563,38 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'library': () => _kickVot(
-      <LibraryScreen
-        onBack={goHome}
-        onOpenNotes={goNotesIndex}
-        onOpenLinks={goLinksIndex}
-        onOpenBookmarks={goBookmarksIndex}
-        onOpenJournal={goJournalHub}
-        onOpenHighlights={goHighlightsIndex}
-        onOpenProgress={goProgress}
-        totalReadCount={Object.keys(readItems).length}
+    'library': () => _kickVot((() => {
+      // Tile chip only: earned/total across the full achievements table.
+      const _ms = buildAchievements(collectAchievementSnapshot(readItems));
+      return (
+        <LibraryScreen
+          onBack={goHome}
+          onOpenNotes={goNotesIndex}
+          onOpenLinks={goLinksIndex}
+          onOpenBookmarks={goBookmarksIndex}
+          onOpenJournal={goJournalHub}
+          onOpenHighlights={goHighlightsIndex}
+          onOpenProgress={goProgress}
+          onOpenAudio={() => setScreen('audio-library')}
+          onOpenMilestones={() => setScreen('milestones')}
+          milestonesEarned={_ms.earned}
+          milestonesTotal={_ms.total}
+          totalReadCount={Object.keys(readItems).length}
+          onSearch={goSearch}
+          onHistory={goHistory}
+          onSettings={goSettings}
+          historyEnabled={settings.historyEnabled !== false}
+          theme={theme} onThemeChange={setTheme}
+        />
+      );
+    })()),
+    'milestones': () => (
+      <MilestonesScreen
+        onBack={() => setScreen('library')}
+        readItems={readItems}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
-        historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -584,6 +604,7 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
+        onOpenMilestones={() => setScreen('milestones')}
         settings={settings}
         readItems={readItems}
         historyCount={readHistory.length}
@@ -818,6 +839,7 @@ export function buildScreenRoutes({
           readCount={(num) => Number(readItems[getReadKey('matthew', num)]) || 0}
           progressKeyFor={(num) => getReadKey('matthew', num)}
           markAsReadEnabled={settings.markAsRead}
+          bookmarkKeyFor={(num) => 'bible:matthew:' + num}
           theme={theme} onThemeChange={setTheme}
         />
       );
@@ -868,6 +890,7 @@ export function buildScreenRoutes({
           markAsReadEnabled={settings.markAsRead}
           restoredNames={settings.restoredNames}
           showChapterTitle={settings.showChapterTitle !== false}
+          bookmarkKeyFor={(num) => 'bible:' + bookId + ':' + num}
           theme={theme} onThemeChange={setTheme}
         />
       );

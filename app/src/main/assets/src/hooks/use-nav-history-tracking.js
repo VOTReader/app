@@ -149,11 +149,18 @@ export function useNavHistoryTracking({
       const ch = book?.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId, bookTitle: book?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
       done();
-    } else if (letterId) {
+    } else if (letterId && COL_BY_LETTER_SC.get(screen)) {
+      // Gate on the SCREEN being a letter screen, not merely on letterId:
+      // letterId is never cleared on study navigation, so a bare
+      // `else if (letterId)` swallowed every bible-study-chapter visit
+      // after any letter visit — the study branch below was unreachable
+      // and nothing recorded (owner report 2026-08-09; the earlier fixes
+      // here all chased lazy-corpus timing, which was a different hole).
       var _hcol = COL_BY_LETTER_SC.get(screen);
       // The VOT corpus is lazy too: an unresolved letter leaves the position
       // unrecorded so a later render can retry it.
-      if (_hcol) { var _he = _findLetter(_hcol.volKey); if (_he) { addToHistory({ type: 'letter', letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen }); done(); } }
+      var _he = _findLetter(_hcol.volKey);
+      if (_he) { addToHistory({ type: 'letter', letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen }); done(); }
     } else if (screen === 'bible-study-chapter' && studyId && studyChapterId) {
       const study = getStudyById(studyId);
       const ch = getStudyChapter(study, studyChapterId);

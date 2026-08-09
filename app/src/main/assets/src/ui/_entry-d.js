@@ -156,6 +156,7 @@ import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
+import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
 import { StudiesHome } from './screens/StudiesHome.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
@@ -262,7 +263,7 @@ Object.assign(window, {
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen, MyProgressScreen, NotesIndexScreen,
-  VolumesHome, AudioLibraryScreen, StudiesHome, HistoryScreen, AboutScreen,
+  VolumesHome, AudioLibraryScreen, MilestonesScreen, StudiesHome, HistoryScreen, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,

@@ -1144,6 +1144,41 @@
         .audio-library-collections { grid-template-columns: 1fr; }
       }
 
+      /* Milestones — the full achievements ledger. Same restrained shelf
+         language as the Listening Library screen; earned rows carry the ✦. */
+      .milestones-screen { width: 100%; max-width: 720px; margin: 0 auto; padding: 1.65rem min(1.35rem, 5vw) 2.5rem; }
+      .milestones-eyebrow { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.22em; text-transform: uppercase; }
+      .milestones-screen > h1 { margin: 0.28rem 0 0; color: var(--cream); font-family: 'Cinzel Decorative', serif; font-size: var(--fs-27); font-weight: 400; line-height: 1.2; }
+      .milestones-intro { max-width: 39rem; margin: 0.6rem 0 1.35rem; color: var(--cream-dim); font-size: var(--fs-13); font-style: italic; line-height: 1.55; }
+      .milestones-summary { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem; border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); background: rgba(200, 164, 86, 0.045); }
+      .milestones-summary-count { flex: 0 0 auto; display: flex; flex-direction: column; }
+      .milestones-summary-count strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-22); font-weight: 500; line-height: 1.1; }
+      .milestones-summary-count span { color: var(--cream-dim); font-size: var(--fs-11); }
+      .milestones-summary-bar { flex: 1; height: 6px; border-radius: 4px; background: rgba(200, 164, 86, 0.16); overflow: hidden; }
+      .milestones-summary-bar > div { height: 100%; border-radius: 4px; background: var(--gold); transition: width 0.3s ease; }
+      .milestones-cat { margin-top: 1.5rem; }
+      .milestones-cat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; padding: 0 0.1rem 0.5rem; border-bottom: 1px solid var(--gold-border); }
+      .milestones-cat-head div { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+      .milestones-cat-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.16em; text-transform: uppercase; }
+      .milestones-cat-head h2 { margin: 0; color: var(--cream); font-family: 'Cinzel', serif; font-size: var(--fs-16); font-weight: 500; }
+      .milestones-cat-head > strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-13); font-weight: 500; white-space: nowrap; }
+      .milestones-list { margin: 0; padding: 0; list-style: none; }
+      .milestones-list li { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0.35rem 0.15rem; border-top: 1px solid rgba(200, 164, 86, 0.12); }
+      .milestones-list li:first-child { border-top: 0; }
+      .milestones-mark { flex: 0 0 1.1rem; color: var(--gold-dim); font-size: var(--fs-13); text-align: center; }
+      .milestones-list li.is-earned .milestones-mark { color: var(--gold); }
+      .milestones-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.22rem; }
+      .milestones-label { color: var(--cream-muted); font-size: var(--fs-13); line-height: 1.3; }
+      .milestones-list li.is-earned .milestones-label { color: var(--cream); }
+      .milestones-bar { display: block; width: min(100%, 14rem); height: 3px; border-radius: 3px; background: rgba(200, 164, 86, 0.14); overflow: hidden; }
+      .milestones-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--gold-dim); }
+      .milestones-value { flex: 0 0 auto; color: var(--cream-dim); font-size: var(--fs-11); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .milestones-value.is-earned { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-11); }
+      @media (max-width: 460px) {
+        .milestones-screen { padding-left: 1rem; padding-right: 1rem; }
+        .milestones-value { max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; }
+      }
+
       /* Listen / Play All pill (AudioPlayButton). In-flow content, so --fs-*:
          these SHOULD scale with Text Size. Same faint-gold gradient plate as
          .hd-playlist-btn, so both themes fall out of the vars. */
@@ -2717,6 +2752,10 @@
     .settings-gear-btn svg { width:20px; height:20px; }
     /* ── Mark as Read ── */
     .read-check { font-size:var(--fs-12); color:var(--gold); opacity:0.7; flex-shrink:0; align-self:center; margin-left:0.5rem; }
+    /* Chapter index bookmark flag — indicator only; managing the bookmark
+       stays with the chapter header button inside the reading view. */
+    .chapter-card-bookmark { flex-shrink:0; align-self:center; display:inline-flex; color:var(--gold); opacity:0.85; }
+    .chapter-card-bookmark svg { width:13px; height:13px; }
     /* Re-read count (2026-08-03): ✓ ×N once the detector has credited a
        second full read. Dimmer + smaller than the check so a once-read row
        stays visually identical to before. */
@@ -2924,8 +2963,10 @@
     .chapter-card-btn.is-current .chapter-card-num { color:var(--gold-bright); }
     .chapter-card-divider { width:1px; align-self:stretch; background:var(--gold-border); flex-shrink:0; min-height:1.8rem; }
     .chapter-card-info { flex:1; min-width:0; }
-    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
-    .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; }
+    /* Long study/letter names must not eat the card (owner report 2026-08-09):
+       the eyebrow label ellipsizes on one line, the title clamps at two. */
+    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:var(--fs-14); }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
@@ -4953,6 +4994,8 @@
        recede; an unattainable-looking list is a worse motivator than a dim
        one. Gold mark + full-strength text on unlock. */
     .prg-milestones { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.2rem 0 0.1rem; }
+    .prg-milestones-all { align-self: flex-start; min-height: 40px; margin-top: 0.25rem; padding: 0.25rem 0.45rem; border: 0; border-radius: 5px; background: transparent; color: var(--gold-dim); cursor: pointer; font-size: var(--fs-12); }
+    @media (hover: hover) { .prg-milestones-all:hover { background: var(--gold-faint); color: var(--gold); } }
     .prg-milestone {
       display: flex; align-items: baseline; gap: 0.5rem;
       font-size: var(--fs-13); color: var(--cream-muted); opacity: 0.55;

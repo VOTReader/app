@@ -29,12 +29,14 @@ export const MAX_RECENT_AUDIO_TRACKS = 30;
 /** @typedef {SavedAudioTrack & { playedAt: number }} RecentAudioTrack */
 
 /**
- * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number }} AudioLibraryData
+ * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number }} AudioLibraryData
  */
 
 /** @returns {AudioLibraryData} */
 function _empty() {
-  return { v: 1, saved: [], recent: [], rate: 1 };
+  // `plays` (2026-08-09): lifetime recordings-started counter for the
+  // milestones system. Additive to v1 — old records normalize to 0.
+  return { v: 1, saved: [], recent: [], rate: 1, plays: 0 };
 }
 
 /** @param {unknown} value @returns {number} */
@@ -110,6 +112,8 @@ export function normalizeAudioLibrary(value) {
     saved,
     recent,
     rate: normalizeAudioRate(raw.rate),
+    // Bounded so a corrupted import can't overflow the milestones math.
+    plays: Math.max(0, Math.min(10000000, Math.floor(Number(raw.plays) || 0))),
   };
 }
 
@@ -194,10 +198,14 @@ export const AudioLibraryStore = extendStore(
       data.recent = data.recent.filter((item) => item.url !== normalized.url);
       data.recent.unshift({ ...normalized, savedAt: 0, playedAt: Date.now() });
       data.recent = data.recent.slice(0, MAX_RECENT_AUDIO_TRACKS);
+      data.plays += 1;
       this._cache = data;
       this._save();
       this._bump();
     },
+
+    /** Lifetime recordings-started count (milestones). @returns {number} */
+    getPlays() { return this.get().plays; },
 
     /** @returns {void} */
     clearRecent() {

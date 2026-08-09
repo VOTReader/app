@@ -102,7 +102,13 @@ export const BookmarkStore = extendStore(
     getForKeyPrefix(prefix) {
       return this._load().filter(function(b) {
         var k = b.hlKey;
-        return k === prefix || k.indexOf(prefix + ':') === 0 || prefix.indexOf(k + ':') === 0;
+        // Exact key or a DESCENDANT (finer) key only. The old reverse branch
+        // (stored key coarser than the query) made one chapter-level bookmark
+        // match every verse container beneath it, flooding the reading view
+        // with a flag icon per verse (owner report 2026-08-09). Coarse
+        // bookmarks surface at their own level: the chapter header button
+        // (getForKey) and the chapter index indicator.
+        return k === prefix || k.indexOf(prefix + ':') === 0;
       });
     },
 

@@ -196,6 +196,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override val audioSystemService: AudioManager? get() = audioManager
     // NTV3: wipe the native Garden image disk cache from the JS "Clear All" flow.
     override fun clearGardenCache() { gardenCache.clear() }
+    // Streaming audio: anchor the process in a mediaPlayback foreground service
+    // for as long as JS reports playback. Never throws (see setActive's KDoc).
+    override fun setAudioKeepAlive(active: Boolean) = AudioKeepAliveService.setActive(this, active)
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)
     override fun applyImmersiveMode(immersive: Boolean) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -1283,6 +1286,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // #3: drop the pending splash safety hatch — the Activity is gone, so
         // there's nothing left to release (and nothing to leak).
         mainHandler.removeCallbacks(splashSafetyHatch)
+        // The WebView (and with it the <audio> element) is destroyed below, so
+        // playback is over whether or not JS got to say setAudioActive(false).
+        // Without this an ongoing "Playing audio" notification would outlive the
+        // audio — and an ongoing notification can't be swiped away.
+        AudioKeepAliveService.setActive(this, false)
         // NTV1: share the recorder/session lifecycle lock with nativeRecordStart().
         appInterface.stopAudioCaptureForTeardown()
         // Resolve any in-flight WebView resource requests before the WebView

@@ -215,6 +215,33 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     }
   };
 
+  // A finished audio letter counts like a finished read (owner directive
+  // 2026-08-09): the item's count increments on EVERY complete listen, same
+  // as the detector's re-read increments. No stats-ledger record — the
+  // ledger holds measured READING (words + visibility-honest time), and a
+  // listen is neither. Respects the markAsRead gate like any new mark.
+  React.useEffect(() => {
+    window.__votAudioListened = (volKey, letterId) => {
+      if (enabledRef.current === false) return;
+      try {
+        const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY) ? COL_BY_KEY.get(volKey) : null;
+        const rk = col && col.readKey;
+        if (!rk || !letterId) return;
+        const key = getReadKey(rk, letterId);
+        setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+        // A full listen is as strong a "was here today" signal as a
+        // completed read — keep the streak coherent with it.
+        if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
+          try { ReadingStreakStore.recordReadingDay(Date.now()); }
+          catch (e) { console.warn('reading-streak record failed', e); }
+        }
+      } catch (e) { console.warn('listen count failed', e); }
+    };
+    return () => { window.__votAudioListened = null; };
+    // getReadKey/setReadItems are stable for the App lifetime; the mount-once
+    // registration mirrors the other window-bridge effects in this file.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const unmarkRead = (bid, cid) => {
     const key = getReadKey(bid, cid);
     setReadItems((prev) => { const next = { ...prev }; delete next[key]; return next; });

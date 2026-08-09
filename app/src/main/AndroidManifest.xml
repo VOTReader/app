@@ -20,6 +20,18 @@
          short vibrations on meaningful interactions (bookmark toggle,
          recording complete, etc.) to make the WebView UI feel native. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- FOREGROUND_SERVICE (+ the API 34 per-type twin) — "normal" (non-runtime)
+         permissions, granted at install. AudioKeepAliveService anchors the
+         PROCESS while an audio letter streams, so a backgrounded reader isn't an
+         ordinary kill candidate under memory pressure. FOREGROUND_SERVICE_MEDIA_-
+         PLAYBACK is required from targetSdk 34 for a mediaPlayback-typed service
+         and is ignored below it.
+         POST_NOTIFICATIONS is deliberately NOT declared: it is a runtime prompt,
+         the app has a no-nag policy, and it is not required for the service to
+         run — on Android 13+ without it the ongoing notification is simply
+         hidden while the process anchoring still works. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- usesCleartextTraffic="false" is DOCUMENTATION, not new hardening: with
@@ -51,6 +63,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Started (never bound) service, launched only from our own process by
+             AudioKeepAliveService.setActive — exported="false". -->
+        <service
+            android:name=".AudioKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
     </application>
 

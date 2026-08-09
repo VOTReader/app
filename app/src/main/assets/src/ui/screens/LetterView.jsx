@@ -436,7 +436,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   <div className="study-image-block">
                     <img src={block.src} alt={block.alt || "Study diagram"} />
                   </div>
-                  {block.caption && <p className="study-image-caption">{block.caption}</p>}
+                  {/* Captions are readable prose — annotatable like the
+                      paragraph beside them (2026-08-09 study-surface sweep). */}
+                  {block.caption && (
+                    <p className="study-image-caption" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
+                      <StaticSubtree>{block.caption}</StaticSubtree>
+                    </p>
+                  )}
                 </div>
               );
 

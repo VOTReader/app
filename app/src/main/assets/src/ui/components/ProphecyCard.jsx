@@ -10,12 +10,20 @@
 
    Both sides of the measurement engine already agree with that, and must
    keep agreeing: `word-count.js`'s blockWords does NOT descend into
-   `prophecy-group` blocks, and these blocks carry neither `data-hl-key` nor
-   `data-read-seg`, so `use-read-tracker.js` never measures them. Flipping
-   them to canonical means changing BOTH (plus a corpus-baseline regen) — it
-   is an owner decision, not a bug fix, because it would multiply every study
-   chapter's minute estimate.
-   ═══════════════════════════════════════════════════════════════════════ */
+   `prophecy-group` blocks, and these blocks carry no `data-read-seg`, so
+   `use-read-tracker.js` never measures them. Flipping them to canonical
+   means changing BOTH (plus a corpus-baseline regen) — it is an owner
+   decision, not a bug fix, because it would multiply every study chapter's
+   minute estimate.
+
+   ANNOTATION CONTRACT (2026-08-09, owner directive): measurement and
+   annotatability are SEPARATE concerns. The prose inside these cards is
+   readable study text, so its para/poetry blocks DO carry `data-hl-key` +
+   `data-hl-dom` (+ StaticSubtree, the imperative-path trio LetterView's own
+   blocks use) — highlights/notes/bookmarks work here like anywhere else.
+   Keys ride the letter: namespace via the card's stable stateKey:
+   `letter:<chapterId>:<groupIdx>:<ot|nt|vot|intro>:<blockIdx>`. Only
+   `data-read-seg` stays absent — annotation on, measurement off. */
 
 export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
   // Read initial state from persistent ref, default to expanded (true)
@@ -55,18 +63,22 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
         {label && <div className="prophecy-card-sublabel">{label}</div>}
         {blocks.map((block, bi) => {
           if (block.type === "para") return (
-            <p key={bi} className="letter-para">
-              <Segments {..._extends({ segments: block.segments }, cardFnProps)} />
+            <p key={bi} className="letter-para" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
+              <StaticSubtree>
+                <Segments {..._extends({ segments: block.segments }, cardFnProps)} />
+              </StaticSubtree>
             </p>
           );
 
           if (block.type === "poetry") return (
-            <div key={bi} className="letter-poetry">
-              {block.lines.map((line, li) => (
-                <div key={li} className="poetry-line">
-                  <Segments {..._extends({ segments: line }, fnProps)} />
-                </div>
-              ))}
+            <div key={bi} className="letter-poetry" data-hl-key={letterHlKey(stateKey, bi)} data-hl-dom={true}>
+              <StaticSubtree>
+                {block.lines.map((line, li) => (
+                  <div key={li} className="poetry-line">
+                    <Segments {..._extends({ segments: line }, fnProps)} />
+                  </div>
+                ))}
+              </StaticSubtree>
             </div>
           );
 

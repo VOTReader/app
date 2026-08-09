@@ -42,11 +42,14 @@ export function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + 
 export function wtlbHlKey(entryId, paraIdx) { return 'wtlb:' + entryId + ':' + paraIdx; }
 
 /**
- * Build the canonical hlKey for a Bible Study chapter block anchor.
+ * Build the canonical hlKey for a MATTHEW STUDY BIBLE anchor (ChapterView —
+ * verse numbers, plus suffixed study-note containers like `12-s0`). The
+ * letter-format Bible Studies (BibleStudyChapterView → LetterView shim) key
+ * their blocks with letterHlKey instead — two namespaces, one per surface.
  * Format: `study:<chapterId>:<blockIdx>`.
  *
  * @param {string} chapterId
- * @param {number} blockIdx
+ * @param {number | string} blockIdx
  * @returns {string}
  */
 export function studyHlKey(chapterId, blockIdx) { return 'study:' + chapterId + ':' + blockIdx; }

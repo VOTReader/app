@@ -39,7 +39,7 @@ export function _fmtDuration(ms) {
   return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
 }
 
-export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
+export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOpenMilestones, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
   // The reading table + most-annotated titles read the lazy corpora
   // (BOOKS for NT/OT totals, VOT for volume totals + letter titles,
   // MATTHEW + BIBLE_STUDIES for the Studies group). Pre-fire every
@@ -292,6 +292,13 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
                   </div>
                 ))}
               </div>
+              {/* The strip above is the compact classic 10; the full journey
+                  (chapters, letters, streaks, listening, …) lives one tap away. */}
+              {onOpenMilestones && (
+                <button type="button" className="prg-milestones-all" onClick={onOpenMilestones}>
+                  View all milestones ›
+                </button>
+              )}
             </div>
           );
         })()}
