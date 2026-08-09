@@ -75,6 +75,7 @@ const STORE_SHAPES = {
   'vot-reading-streak': 'object',          // {currentStreak, lastReadDate, …}
   'vot-reading-stats': 'object',           // {totalWordsRead, wordsByDay, progress, …}
   'vot-garden-pos': 'object',              // {lastPage}
+  'vot-audio-library': 'object',           // {saved, recent, rate}; store normalizes nested fields
   'vot-state': 'object',                   // {tabs?, settings?, …} — store does NOT coerce
   'vot-bookmarks': 'array',
   'vot-links': 'array',

@@ -15,6 +15,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 
 /**
  * m:ss — floored, zero-padded seconds. Minutes are uncapped on purpose:
@@ -32,6 +33,7 @@ export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   const st = AudioPlayer.getState();
   const open = st.status !== 'idle';
+  const [managerOpen, setManagerOpen] = React.useState(false);
 
   // The one side effect this component owns. Kept above the early return so
   // the hook order is stable, and it removes the class on unmount as well as
@@ -41,6 +43,13 @@ export function AudioPlayerBar() {
     if (typeof document === 'undefined' || !document.body) return undefined;
     document.body.classList.toggle('audio-bar-open', open);
     return () => document.body.classList.remove('audio-bar-open');
+  }, [open]);
+
+  // Closing playback also closes its controller. It avoids leaving a modal
+  // mounted around an intentionally discarded queue when stop() is invoked
+  // from a headset, a native callback, or the mini-player's close control.
+  React.useEffect(() => {
+    if (!open) setManagerOpen(false);
   }, [open]);
 
   if (!open) return null;
@@ -59,12 +68,14 @@ export function AudioPlayerBar() {
   const pos = Math.min(max, Math.max(0, Math.floor(st.time || 0)));
 
   return (
+    <>
     <div className="audio-bar" role="region" aria-label="Audio player">
       <button
         type="button"
         className={'audio-bar-play' + (st.status === 'loading' ? ' is-loading' : '')}
         onClick={() => AudioPlayer.toggle()}
         aria-label={playing ? 'Pause' : 'Play'}
+        aria-busy={st.status === 'loading'}
       >
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           {playing
@@ -74,14 +85,22 @@ export function AudioPlayerBar() {
       </button>
 
       <div className="audio-bar-main">
-        <div className="audio-bar-title">
-          {track.title || ''}
-          {track.partLabel ? <span className="audio-bar-part">{' · ' + track.partLabel}</span> : null}
-        </div>
-        <div className="audio-bar-sub">
-          <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
-          <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
-        </div>
+        <button
+          type="button"
+          className="audio-bar-summary"
+          onClick={() => setManagerOpen(true)}
+          aria-label="Open listening controls"
+          aria-expanded={managerOpen}
+        >
+          <span className="audio-bar-title">
+            {track.title || ''}
+            {track.partLabel ? <span className="audio-bar-part">{' · ' + track.partLabel}</span> : null}
+          </span>
+          <span className="audio-bar-sub">
+            <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
+            <span className="audio-bar-time">{fmt(st.time) + ' / ' + fmt(st.duration)}</span>
+          </span>
+        </button>
         <input
           type="range"
           className="audio-bar-seek"
@@ -91,6 +110,7 @@ export function AudioPlayerBar() {
           value={pos}
           disabled={dur === 0}
           aria-label="Seek"
+          aria-valuetext={fmt(st.time) + ' of ' + (dur ? fmt(dur) : 'unknown length')}
           onChange={(e) => AudioPlayer.seek(+e.target.value)}
         />
       </div>
@@ -116,5 +136,7 @@ export function AudioPlayerBar() {
         </svg>
       </button>
     </div>
+    <AudioManagerSheet open={managerOpen} state={st} onClose={() => setManagerOpen(false)} />
+    </>
   );
 }

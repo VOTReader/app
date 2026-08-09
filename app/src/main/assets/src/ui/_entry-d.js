@@ -137,6 +137,7 @@ import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
 import { AudioPlayerBar } from './components/AudioPlayerBar.jsx';
+import { AudioManagerSheet } from './components/AudioManagerSheet.jsx';
 import { AudioPlayButton, AudioSectionChips } from './components/AudioPlayButton.jsx';
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
@@ -154,6 +155,7 @@ import { LibraryScreen } from './screens/LibraryScreen.jsx';
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
+import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { StudiesHome } from './screens/StudiesHome.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
@@ -253,14 +255,14 @@ Object.assign(window, {
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, FontPickerRow, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
-  AudioPlayerBar, AudioPlayButton, AudioSectionChips,
+  AudioPlayerBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync,
   buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen, MyProgressScreen, NotesIndexScreen,
-  VolumesHome, StudiesHome, HistoryScreen, AboutScreen,
+  VolumesHome, AudioLibraryScreen, StudiesHome, HistoryScreen, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,

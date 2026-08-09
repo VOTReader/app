@@ -23,11 +23,15 @@ class FakeAudio extends EventTarget {
     this.preload = '';
     this.error = null;
     this.loadCalls = 0;
+    this.defaultPlaybackRate = 1;
+    this.playbackRate = 1;
   }
   // Assigning src resets the media element — real behavior, and it keeps the
   // prev()/next() tests honest about where currentTime stands after a switch.
+  // The load algorithm also resets playbackRate to defaultPlaybackRate, which
+  // is why _start() must apply the chosen rate AFTER pointing at the track.
   get src() { return this._src; }
-  set src(v) { this._src = v; this.srcHistory.push(v); this.currentTime = 0; }
+  set src(v) { this._src = v; this.srcHistory.push(v); this.currentTime = 0; this.playbackRate = this.defaultPlaybackRate; }
   play() { this.played = true; this.paused = false; return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() { this.loadCalls++; }
@@ -94,8 +98,12 @@ beforeEach(async () => {
 
 afterEach(() => {
   if (toastMod) toastMod._resetToasts();
+  const arbiter = globalThis.__votAudioArbiter;
+  if (typeof arbiter === 'function') document.removeEventListener('play', arbiter, true);
   delete globalThis.AUDIO_MANIFEST;
   delete globalThis.AUDIO_SECTIONS;
+  delete globalThis.AudioLibraryStore;
+  delete globalThis.__votAudioArbiter;
   delete globalThis.Audio;
   delete window.AndroidBridge;
   setOnline(true);
@@ -311,14 +319,109 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(el().played).toBe(true);
   });
 
-  it('pauseIfPlaying pauses only while playing', () => {
+  it('pauseIfPlaying pauses a loading track before it can bleed into a recording', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
-    AudioPlayer.pauseIfPlaying();           // status is 'loading' — no-op
-    expect(el().paused).toBe(false);
-    el().dispatchEvent(new Event('playing'));
     AudioPlayer.pauseIfPlaying();
     expect(el().paused).toBe(true);
     expect(AudioPlayer.getState().status).toBe('paused');
+  });
+
+  it('does not wedge or self-restart when paused during loading', () => {
+    vi.useFakeTimers();
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(AudioPlayer.getState().status).toBe('loading');
+      AudioPlayer.toggle();
+      expect(el().paused).toBe(true);
+      expect(AudioPlayer.getState().status).toBe('paused');
+      const srcAssignments = el().srcHistory.length;
+      vi.advanceTimersByTime(21000);
+      expect(el().srcHistory).toHaveLength(srcAssignments);
+
+      AudioPlayer.toggle();
+      el().dispatchEvent(new Event('playing'));
+      expect(AudioPlayer.getState().status).toBe('playing');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('audio-player — listening controls + arbitration', () => {
+  it('uses the saved speed preference, records a trusted direct play, and rejects arbitrary URLs', () => {
+    const library = {
+      getPlaybackRate: vi.fn(() => 1.5),
+      recordPlayed: vi.fn(),
+      setPlaybackRate: vi.fn(),
+    };
+    globalThis.AudioLibraryStore = library;
+    const direct = {
+      key: 'vol2:solo', title: 'Solo', sub: 'Volume Two', url: URL_OF('idSolo'), readerCode: 'M', partLabel: null,
+    };
+    AudioPlayer.playTrack(direct);
+    expect(AudioPlayer.getState().rate).toBe(1.5);
+    // Both must hold AFTER the src assignment's load-algorithm reset.
+    expect(el().playbackRate).toBe(1.5);
+    expect(el().defaultPlaybackRate).toBe(1.5);
+    expect(library.recordPlayed).toHaveBeenCalledWith(expect.objectContaining({ url: URL_OF('idSolo') }));
+
+    AudioPlayer.setPlaybackRate(1.25);
+    expect(el().playbackRate).toBe(1.25);
+    expect(el().defaultPlaybackRate).toBe(1.25);
+    expect(library.setPlaybackRate).toHaveBeenCalledWith(1.25);
+
+    AudioPlayer.stop();
+    AudioPlayer.playTrack({ ...direct, url: 'https://example.test/not-vot.mp3' });
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(AudioPlayer.getState().queue).toEqual([]);
+  });
+
+  it('pauses at the end of a session-only sleep timer without clearing the queue', () => {
+    vi.useFakeTimers();
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      el().dispatchEvent(new Event('playing'));
+      expect(AudioPlayer.setSleepTimer(15)).toBe(true);
+      expect(AudioPlayer.getSleepRemainingSeconds()).toBe(900);
+      vi.advanceTimersByTime(15 * 60000);
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(AudioPlayer.getState().queue).toHaveLength(1);
+      expect(AudioPlayer.getState().sleepEndsAt).toBe(0);
+      expect(el().paused).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('edits only future queue entries and persists an edited queue as a custom source', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    AudioPlayer.next(); // current = Letter A, part 1; keep it fixed while rearranging after it
+    expect(AudioPlayer.moveUpcoming(3, 2)).toBe(true);
+    expect(AudioPlayer.getState().queue.map((track) => track.url)).toEqual([
+      URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idC'), URL_OF('idA2'),
+    ]);
+    expect(AudioPlayer.removeUpcoming(3)).toBe(true);
+    expect(AudioPlayer.removeUpcoming(1)).toBe(false); // current track is protected
+
+    const snapshot = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(snapshot).toMatchObject({ v: 2, mode: 'custom', qi: 1 });
+    expect(snapshot.customQueue.map((track) => track.url)).toEqual([
+      URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idC'),
+    ]);
+  });
+
+  it('pauses the VOT stream when a journal or other DOM audio element starts', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    const memo = document.createElement('audio');
+    document.body.appendChild(memo);
+    try {
+      memo.dispatchEvent(new Event('play', { bubbles: true }));
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(el().paused).toBe(true);
+    } finally {
+      memo.remove();
+    }
   });
 });
 
@@ -456,7 +559,11 @@ describe('audio-player — Android keep-alive bridge', () => {
 
 describe('audio-player — Media Session', () => {
   it('publishes metadata for the starting track and clears handlers on stop', () => {
-    const session = { metadata: null, handlers: {}, setActionHandler(a, h) { this.handlers[a] = h; } };
+    const session = {
+      metadata: null, handlers: {}, position: null, playbackState: 'none',
+      setActionHandler(a, h) { this.handlers[a] = h; },
+      setPositionState(state) { this.position = state; },
+    };
     Object.defineProperty(window.navigator, 'mediaSession', { configurable: true, value: session });
     globalThis.MediaMetadata = class { constructor(o) { Object.assign(this, o); } };
     try {
@@ -465,11 +572,19 @@ describe('audio-player — Media Session', () => {
       expect(session.metadata.artist).toBe('The Volumes of Truth · Read by Benjamin');
       expect(session.metadata.album).toBe('Volume One');
       expect(typeof session.handlers.nexttrack).toBe('function');
+      el().duration = 60;
+      el().dispatchEvent(new Event('durationchange'));
+      el().currentTime = 12;
+      el().dispatchEvent(new Event('timeupdate'));
+      expect(session.position).toEqual({ duration: 60, position: 12, playbackRate: 1 });
+      el().dispatchEvent(new Event('playing'));
+      expect(session.playbackState).toBe('playing');
 
       AudioPlayer.stop();
       expect(session.metadata).toBe(null);
       expect(session.handlers.nexttrack).toBe(null);
       expect(session.handlers.seekto).toBe(null);
+      expect(session.playbackState).toBe('none');
     } finally {
       delete window.navigator.mediaSession;
       delete globalThis.MediaMetadata;
@@ -541,6 +656,23 @@ describe('audio-player — durable resume (position survives restart)', () => {
       delete globalThis.colPreface;
       delete globalThis.colLetterArr;
     }
+  });
+
+  it('restores a v2 custom queue without needing the lazy corpus', async () => {
+    const first = { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface') };
+    const second = { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC') };
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'custom', volKey: '', label: 'Volume One', qi: 1, key: second.key, time: 31,
+      track: second, customQueue: [first, second],
+    }));
+    await load();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().queue).toHaveLength(1); // display-only boot placeholder
+
+    AudioPlayer.toggle();
+    expect(AudioPlayer.getState().queue.map((track) => track.url)).toEqual([URL_OF('idPreface'), URL_OF('idC')]);
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(el().src).toBe(URL_OF('idC'));
   });
 
   it('close (stop) clears the snapshot — the next boot stays idle', async () => {

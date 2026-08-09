@@ -88,6 +88,7 @@ export function describeTab(tab) {
   const _idxCol = COL_BY_INDEX_SC.get(s);
   if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === 'letter' ? 'Letter index' : 'Entry index', resolved: true };
   if (s === 'volumes-home') return { title: 'Volumes', subtitle: 'The Volumes of Truth', resolved: true };
+  if (s === 'audio-library') return { title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true };
 
   // Studies
   if (s === 'studies-home') return { title: 'Studies', subtitle: 'Letter Studies · Matthew Study Bible', resolved: true };

@@ -41,6 +41,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
+import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -758,7 +759,32 @@ export function buildScreenRoutes({
     'volumes-home': () => (
       <VolumesHome
         onSelect={handleVolumeSelect}
+        onOpenAudio={() => setScreen('audio-library')}
         onBack={goHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'audio-library': () => (
+      <AudioLibraryScreen
+        onBack={goVolumesHome}
+        onOpenCollection={handleVolumeSelect}
+        onOpenTrack={(track) => {
+          const key = track && typeof track.key === 'string' ? track.key : '';
+          const divider = key.indexOf(':');
+          if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
+          const volKey = key.slice(0, divider);
+          const collection = COL_BY_KEY.get(volKey);
+          if (!collection || !collection.letterScreen) return;
+          // Same wiring as colIdxProps' nav — the reading dot / last-read
+          // tracking must not distinguish a Library open from an index open.
+          const id = key.slice(divider + 1);
+          setLetterId(id);
+          setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
+          setScreen(collection.letterScreen);
+        }}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

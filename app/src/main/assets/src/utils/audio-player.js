@@ -2,10 +2,10 @@
 /* ═══════════════════════════════════════════════════════════════════════
    audio-player — streaming audio-letter playback (singleton store)
    ═══════════════════════════════════════════════════════════════════════
-   Letters across the 14 VOT collections have mp3 recordings hosted on
-   public Google Drive. src/data/audio-manifest.js (auto-generated, rides
-   bundle-a-vot) maps corpus ids → Drive file ids; this module turns that
-   into a queue and drives ONE <audio> element.
+   Letters across the 14 VOT collections stream from immutable GitHub Release
+   assets. src/data/audio-manifest.js (auto-generated, rides bundle-a-vot)
+   maps corpus ids to asset ids; this module turns that into a queue and
+   drives ONE <audio> element.
 
    Store contract (the repo's useSyncExternalStore idiom):
      subscribe(cb) -> unsubscribe · getVersion() -> number · getState()
@@ -25,13 +25,19 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { showToast } from './toast.js';
+import {
+  audioAssetUrl,
+  isVotAudioUrl,
+  normalizeAudioRate,
+  normalizeAudioTrack,
+} from './audio-track.js';
 
 /**
  * @typedef {Object} Track
  * @property {string | null} key       - "volKey:letterId"; null for range-compilation sections
  * @property {string} title            - letter title, or the section's own label
  * @property {string | null} sub       - collection label (Media Session "album")
- * @property {string} url              - Drive stream URL
+ * @property {string} url              - immutable VOT release-asset stream URL
  * @property {string} readerCode       - 'B' | 'T' | 'V' | 'M'
  * @property {string | null} partLabel - "Part 2" / "Addendum" on multi-part letters
  */
@@ -43,6 +49,8 @@ import { showToast } from './toast.js';
  * @property {number} qi        - index of the playing track within queue
  * @property {number} time      - current position, seconds
  * @property {number} duration  - current track length, seconds (0 until known)
+ * @property {number} rate      - selected playback-rate preset
+ * @property {number} sleepEndsAt - epoch ms, 0 when no sleep timer is armed
  */
 
 /** Shared DOM id so every audio message replaces the previous one. */
@@ -71,7 +79,7 @@ const PREV_RESTART_SEC = 3;
  * @returns {string}
  */
 export function trackUrl(id) {
-  return 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
+  return audioAssetUrl(id);
 }
 
 /* ── module state (singleton) ─────────────────────────────────────────── */
@@ -82,7 +90,7 @@ let _el = null;
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0 };
+const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0 };
 /** Last whole second notified — the timeupdate re-render storm guard. */
 let _lastTick = -1;
 /** Position to resume from after a load error (see toggle()). */
@@ -90,17 +98,34 @@ let _errorTime = 0;
 /** One-shot cold-start watchdog (see _start) — timer id + per-track flag. */
 let _stallTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 let _stallRetried = false;
+/** Sleep timer — intentionally session-only: a closed app must never wake just to pause audio. */
+let _sleepTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 /** Letter key whose first track is pre-warmed in the idle element (prewarm). */
 let _prewarmKey = /** @type {string | null} */ (null);
-let _prewarmUrl = /** @type {string | null} */ (null);
 /** volKey → has-any-audio. The manifest is immutable once loaded. */
 const _volHasAudio = new Map();
 
 const _g = () => /** @type {any} */ (globalThis);
+/** AudioLibraryStore lives in bundle-b; resolve it at call time to avoid a second bundled singleton. */
+const _library = () => _g().AudioLibraryStore || null;
 /** @returns {Record<string, Array<any[]>> | null} */
 const _manifest = () => _g().AUDIO_MANIFEST || null;
 /** @returns {Record<string, Array<any[]>> | null} */
 const _sections = () => _g().AUDIO_SECTIONS || null;
+
+/** The watchdog is valid only while playback is actively loading. */
+function _clearStallWatchdog() {
+  if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
+}
+
+/** @returns {void} */
+function _clearSleepTimer(notify = true) {
+  if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  if (_state.sleepEndsAt) {
+    _state.sleepEndsAt = 0;
+    if (notify) _notify();
+  }
+}
 
 function _notify() {
   _version++;
@@ -116,11 +141,13 @@ function _notify() {
 function _setStatus(next) {
   if (_state.status === next) return;
   _state.status = next;
+  if (next === 'playing') _clearStallWatchdog();
   // Keep-alive tracks PLAYBACK, not buffering: 'loading' is a mid-stream stall
   // ('waiting'), and releasing the wake-lock there would let the OS kill the
   // very playback we're waiting on.
   if (next === 'playing') _setAudioActive(true);
   else if (next === 'paused' || next === 'idle') _setAudioActive(false);
+  _syncMediaSessionState(next);
   _notify();
 }
 
@@ -154,7 +181,38 @@ function _setAudioActive(active) {
 // jsdom and on older WebViews, and setActionHandler throws on actions a given
 // browser doesn't implement.
 
-/** @param {Track} track */
+/* One audible app-owned recording at a time. Journal memo <audio> elements
+   live outside this singleton, so a small document-level lease closes the
+   gap without creating another playback store or changing their components. */
+let _mediaArbiterInstalled = false;
+
+/** @param {HTMLMediaElement | null} except */
+function _pauseOtherDomAudio(except) {
+  if (typeof document === 'undefined' || !document.querySelectorAll) return;
+  for (const media of document.querySelectorAll('audio')) {
+    if (media === except || media.paused) continue;
+    try { media.pause(); } catch (_e) { /* another app-owned player may already be detaching */ }
+  }
+}
+
+function _installMediaArbiter() {
+  if (_mediaArbiterInstalled || typeof document === 'undefined' || !document.addEventListener) return;
+  const g = _g();
+  const previous = g.__votAudioArbiter;
+  if (typeof previous === 'function') document.removeEventListener('play', previous, true);
+  const handler = (event) => {
+    const media = /** @type {any} */ (event.target);
+    if (!media || typeof media.pause !== 'function') return;
+    _pauseOtherDomAudio(media);
+    // The singleton element is created with new Audio(), not mounted in the
+    // document, so a journal play event cannot be the player itself.
+    pauseIfPlaying();
+  };
+  g.__votAudioArbiter = handler;
+  _mediaArbiterInstalled = true;
+  document.addEventListener('play', handler, true);
+}
+
 function _mediaSession(track) {
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
@@ -173,7 +231,34 @@ function _mediaSession(track) {
     ms.setActionHandler('previoustrack', () => prev());
     ms.setActionHandler('nexttrack', () => next());
     ms.setActionHandler('seekto', (/** @type {any} */ d) => seek((d && d.seekTime) || 0));
+    _syncMediaSessionState(_state.status);
+    _syncMediaSessionPosition();
   } catch (_e) { /* unsupported action / no Media Session — cosmetic only */ }
+}
+
+/** Keep lock-screen scrubbers and Bluetooth displays in step with the player. */
+function _syncMediaSessionPosition() {
+  try {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = /** @type {any} */ (navigator).mediaSession;
+    const duration = Number(_state.duration);
+    if (typeof ms.setPositionState !== 'function' || !Number.isFinite(duration) || duration <= 0) return;
+    const position = Math.max(0, Math.min(Number(_state.time) || 0, duration));
+    ms.setPositionState({ duration, position, playbackRate: _state.rate });
+  } catch (_e) { /* a partially-supported Media Session must stay cosmetic */ }
+}
+
+/** @param {'idle'|'loading'|'playing'|'paused'} status */
+function _syncMediaSessionState(status) {
+  try {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = /** @type {any} */ (navigator).mediaSession;
+    // Buffering remains an active listening session. Reporting "playing" is
+    // less surprising on a headset than briefly flickering back to paused.
+    ms.playbackState = status === 'playing' || status === 'loading'
+      ? 'playing'
+      : status === 'paused' ? 'paused' : 'none';
+  } catch (_e) { /* playbackState is absent on some otherwise-valid hosts */ }
 }
 
 function _clearMediaSession() {
@@ -184,6 +269,7 @@ function _clearMediaSession() {
       ms.setActionHandler(a, null);
     }
     ms.metadata = null;
+    ms.playbackState = 'none';
   } catch (_e) { /* same guards as _mediaSession */ }
 }
 
@@ -198,6 +284,7 @@ function _clearMediaSession() {
 function _ensureEl() {
   if (_el) return _el;
   const el = new Audio();
+  _installMediaArbiter();
   el.preload = 'none';
   // Plain no-cors embed, DELIBERATELY no crossOrigin: the GitHub release
   // hosts send no Cross-Origin-Resource-Policy (so no-cors media is allowed)
@@ -209,14 +296,12 @@ function _ensureEl() {
   // Only downgrade a genuinely-playing element: our own stop()/track-switch
   // pauses fire this too, and they've already set the status they want.
   el.addEventListener('pause', () => {
-    if (_state.status === 'playing') {
-      _setStatus('paused');
-      _persist();   // durable resume — a pause is the likeliest walk-away point
-    }
+    _markPaused();
   });
   el.addEventListener('durationchange', () => {
     if (_state.status === 'idle') return;   // prewarm fetch — nothing to show
     _state.duration = el.duration || 0;
+    _syncMediaSessionPosition();
     _notify();
   });
   el.addEventListener('timeupdate', () => {
@@ -227,6 +312,7 @@ function _ensureEl() {
     const sec = Math.floor(_state.time);
     if (sec !== _lastTick) {
       _lastTick = sec;
+      _syncMediaSessionPosition();
       _notify();
       // Durable resume: snapshot every ~5s of playback (and on the pause
       // below). Cheap — ~300 bytes to localStorage.
@@ -240,13 +326,23 @@ function _ensureEl() {
   return el;
 }
 
+/** Move a live loading/playing element into one intentional paused state. */
+function _markPaused() {
+  if (_state.status !== 'playing' && _state.status !== 'loading') return;
+  _clearStallWatchdog();
+  _setStatus('paused');
+  _persist();
+}
+
 function _onError() {
   // stop() sets src='' + load(), which itself fires 'error' in real browsers.
   // Without this guard, every stop() would flash a failure toast.
   if (_state.status === 'idle' || !_state.queue.length) return;
+  _clearStallWatchdog();
   // Keep queue + qi + position: toggle() retries from here.
   _errorTime = _state.time;
   _setStatus('paused');
+  _persist();
   _toast(_offline() ? OFFLINE_MSG : LOAD_FAIL_MSG);
 }
 
@@ -254,7 +350,22 @@ function _onError() {
 function _start() {
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
+  if (!isVotAudioUrl(track.url)) {
+    stop();
+    _toast(LOAD_FAIL_MSG);
+    return;
+  }
   const el = _ensureEl();
+  _clearStallWatchdog();
+  // The preference store hydrates independently in bundle-b. Pull its latest
+  // value at a real playback boundary so a delayed IDB hydrate still affects
+  // the next recording without coupling the player to store internals.
+  try {
+    const library = _library();
+    if (library && typeof library.getPlaybackRate === 'function') {
+      _state.rate = normalizeAudioRate(library.getPlaybackRate());
+    }
+  } catch (_e) { /* library metadata is an enhancement, never a playback dependency */ }
   _state.time = 0;
   _state.duration = el.src === track.url ? (el.duration || 0) : 0;
   _lastTick = -1;
@@ -262,13 +373,24 @@ function _start() {
   // A prewarm(…) already pointed the element at THIS url and buffered its
   // head — reassigning src would throw that away and restart the fetch.
   if (el.src !== track.url) el.src = track.url;
+  // AFTER src: the media load algorithm resets playbackRate to
+  // defaultPlaybackRate, so a rate applied pre-assignment is silently lost.
+  // Setting default too keeps any internal reload at the chosen speed.
+  try { el.defaultPlaybackRate = _state.rate; el.playbackRate = _state.rate; } catch (_e) { /* older media engines can ignore rates */ }
+  // A pre-warm deliberately uses metadata; live playback should return the
+  // reusable singleton to its connection-conservative baseline afterwards.
+  el.preload = 'none';
   _prewarmKey = null;
-  _prewarmUrl = null;
   // Assign directly rather than via _setStatus: queue/qi changed too, so this
   // must notify even when the previous track was already 'loading'.
   _state.status = 'loading';
   _notify();
   _mediaSession(track);
+  try {
+    const library = _library();
+    if (library && typeof library.recordPlayed === 'function') library.recordPlayed(track);
+  } catch (_e) { /* recent-history failures must not interfere with listening */ }
+  _pauseOtherDomAudio(null);
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
   // the user-visible message, so this just stops an unhandled rejection.
@@ -278,9 +400,9 @@ function _start() {
   // 'error', no progress, 'loading' forever — while an immediate retry
   // streams instantly. If NOTHING has arrived after 20s, re-arm the src ONCE;
   // a genuinely dead network then surfaces through the normal error path.
-  if (_stallTimer) clearTimeout(_stallTimer);
   _stallRetried = false;
   _stallTimer = setTimeout(() => {
+    _stallTimer = null;
     if (_stallRetried || _state.status !== 'loading' || !_el) return;
     if ((_el.currentTime || 0) > 0 || _el.readyState > 0) return; // data arrived
     _stallRetried = true;
@@ -307,6 +429,8 @@ function _start() {
 function prewarm(volKey, letterId) {
   if (_state.status !== 'idle' || _pendingRestore) return;
   if (_offline()) return;
+  const connection = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).connection : null;
+  if (connection && connection.saveData) return;
   const m = _manifest();
   const parts = m && m[volKey + ':' + letterId];
   if (!parts || !parts.length) return;
@@ -314,9 +438,10 @@ function prewarm(volKey, letterId) {
   if (_prewarmKey === key) return;
   const el = _ensureEl();
   el.preload = 'metadata';
-  el.src = trackUrl(parts[0][0]);
+  const url = trackUrl(parts[0][0]);
+  if (!url) return;
+  el.src = url;
   _prewarmKey = key;
-  _prewarmUrl = el.src;
 }
 
 /**
@@ -432,6 +557,8 @@ function _tracksFor(volKey, item, collectionLabel) {
 const PERSIST_KEY = 'vot-audio-pos';
 /** How the current queue was built — replayed to rebuild it after a boot.
  * @type {{ mode: 'letter'|'collection'|'section', volKey: string, label: string|null } | null} */
+/** `custom` persists a user-edited queue rather than rebuilding corpus order. */
+/** @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -443,14 +570,22 @@ function _persist() {
     if (typeof localStorage === 'undefined') return;
     const src = _pendingRestore || _source;
     const track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
-    if (!src || !track) return;
+    const savedTrack = normalizeAudioTrack(track);
+    if (!src || !savedTrack) return;
+    const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
+      ? _pendingRestore.queue
+      : _state.queue;
+    const customQueue = src.mode === 'custom'
+      ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
+      : undefined;
     localStorage.setItem(PERSIST_KEY, JSON.stringify({
-      v: 1,
+      v: 2,
       mode: src.mode, volKey: src.volKey, label: src.label,
       qi: _pendingRestore ? _pendingRestore.qi : _state.qi,
-      key: track.key,
+      key: savedTrack.key,
       time: Math.floor(_state.time || 0),
-      track: { title: track.title, sub: track.sub, readerCode: track.readerCode, partLabel: track.partLabel, url: track.url, key: track.key },
+      track: savedTrack,
+      customQueue,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
 }
@@ -471,11 +606,29 @@ function _restoreFromSaved() {
     const raw = localStorage.getItem(PERSIST_KEY);
     if (!raw) return;
     const s = JSON.parse(raw);
-    if (!s || s.v !== 1 || !s.track || !s.track.url) return;
-    _pendingRestore = { mode: s.mode, volKey: s.volKey, label: s.label, qi: s.qi || 0, key: s.key || null, time: s.time || 0 };
-    _state.queue = [{ key: s.track.key || null, title: s.track.title || '', sub: s.track.sub || null, url: s.track.url, readerCode: s.track.readerCode || '', partLabel: s.track.partLabel || null }];
+    if (!s || (s.v !== 1 && s.v !== 2)) return;
+    const track = normalizeAudioTrack(s.track);
+    const mode = s.mode === 'letter' || s.mode === 'collection' || s.mode === 'section' || s.mode === 'custom'
+      ? s.mode
+      : null;
+    if (!track || !mode) return;
+    const customQueue = mode === 'custom' && Array.isArray(s.customQueue)
+      ? s.customQueue.map(normalizeAudioTrack).filter(Boolean)
+      : [];
+    if (mode === 'custom' && !customQueue.length) return;
+    _pendingRestore = {
+      mode,
+      volKey: typeof s.volKey === 'string' ? s.volKey : '',
+      label: typeof s.label === 'string' ? s.label : null,
+      qi: Math.max(0, Math.floor(Number(s.qi) || 0)),
+      key: typeof s.key === 'string' ? s.key : track.key,
+      url: track.url,
+      time: Math.max(0, Math.floor(Number(s.time) || 0)),
+      queue: customQueue,
+    };
+    _state.queue = [track];
     _state.qi = 0;
-    _state.time = s.time || 0;
+    _state.time = _pendingRestore.time;
     _state.duration = 0;
     _state.status = 'paused';
     _notify();
@@ -494,12 +647,16 @@ async function _rebuildRestoredQueue() {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   _pendingRestore = null;
   const g = _g();
-  try {
+  if (r.mode !== 'custom') {
+    try {
     if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
   } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+  }
   /** @type {Track[]} */
   let queue = [];
-  if (r.mode === 'section') {
+  if (r.mode === 'custom') {
+    queue = Array.isArray(r.queue) ? r.queue.map(normalizeAudioTrack).filter(Boolean) : [];
+  } else if (r.mode === 'section') {
     const sections = sectionsFor(r.volKey) || [];
     queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
   } else {
@@ -519,15 +676,15 @@ async function _rebuildRestoredQueue() {
     // placeholder track the bar is already showing; it has a real URL.
     queue = _state.queue.slice();
   }
-  let qi = 0;
-  if (r.key) {
+  let qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
+  if (qi < 0 && r.key) {
     const hits = queue.map((t, i) => ({ t, i })).filter((x) => x.t.key === r.key);
     if (hits.length) {
       // Multi-part letters share a key; land on the saved part when possible.
       const withinKey = Math.max(0, Math.min(hits.length - 1, (r.qi || 0) - hits[0].i));
       qi = hits[withinKey].i;
     }
-  } else {
+  } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
   _source = { mode: r.mode, volKey: r.volKey, label: r.label };
@@ -623,6 +780,25 @@ function playSection(volKey, index, collectionLabel) {
   _start();
 }
 
+/**
+ * Play one previously-saved or recently-played recording. Only normalized VOT
+ * release assets can become a standalone queue, including after a backup
+ * import, so this is not an arbitrary remote-audio loader.
+ *
+ * @param {unknown} track
+ * @returns {void}
+ */
+function playTrack(track) {
+  if (_offline()) { _toast(OFFLINE_MSG); return; }
+  const normalized = normalizeAudioTrack(track);
+  if (!normalized) return;
+  _pendingRestore = null;
+  _source = { mode: 'custom', volKey: '', label: normalized.sub };
+  _state.queue = [normalized];
+  _state.qi = 0;
+  _start();
+}
+
 /* ── transport ────────────────────────────────────────────────────────── */
 
 /**
@@ -638,7 +814,14 @@ function toggle() {
   if (!_el) return;
   // Anything that isn't 'paused' is a live element — pause it and let the
   // 'pause' listener own the status flip (one source of truth).
-  if (_state.status !== 'paused') { _el.pause(); return; }
+  if (_state.status !== 'paused') {
+    _el.pause();
+    // Some WebViews skip `pause` when a play request is still settling. The
+    // state transition is still intentional, so never leave transport stuck
+    // in loading while the element is already paused.
+    _markPaused();
+    return;
+  }
 
   const track = _state.queue[_state.qi];
   if (!track) return;
@@ -683,6 +866,8 @@ function prev() {
   if (_el && (_el.currentTime || 0) > PREV_RESTART_SEC) { seek(0); return; }
   _state.qi = Math.max(0, _state.qi - 1);
   _start();
+  _lastPersistSec = -1;
+  _persist();
 }
 
 /**
@@ -698,6 +883,7 @@ function seek(seconds) {
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }
   _state.time = t;
   _lastTick = Math.floor(t);
+  _syncMediaSessionPosition();
   _notify();
   // A paused seek is a deliberate reposition — snapshot it now, or closing
   // the app right after would resume at the pre-seek position.
@@ -706,8 +892,151 @@ function seek(seconds) {
 }
 
 /**
+ * Seek relative to the current clock. Used by the manager's deliberate
+ * short-jump controls instead of duplicating clamp logic in the UI.
+ *
+ * @param {number} seconds
+ * @returns {void}
+ */
+function skip(seconds) {
+  seek((_state.time || 0) + (Number(seconds) || 0));
+}
+
+/**
+ * Set the selected playback-rate preset and persist it in the Listening
+ * Library. Playback itself never depends on the metadata store succeeding.
+ *
+ * @param {unknown} rate
+ * @returns {number}
+ */
+function setPlaybackRate(rate) {
+  const next = normalizeAudioRate(rate);
+  const changed = _state.rate !== next;
+  _state.rate = next;
+  if (_el) {
+    // Default too: the next load algorithm resets playbackRate to default.
+    try { _el.defaultPlaybackRate = next; _el.playbackRate = next; } catch (_e) { /* unsupported engines retain normal speed */ }
+  }
+  _syncMediaSessionPosition();
+  try {
+    const library = _library();
+    if (library && typeof library.setPlaybackRate === 'function') library.setPlaybackRate(next);
+  } catch (_e) { /* metadata persistence is best-effort */ }
+  if (changed) _notify();
+  return next;
+}
+
+/**
+ * @returns {number} seconds remaining, rounded down; 0 means unarmed/expired.
+ */
+function getSleepRemainingSeconds() {
+  return _state.sleepEndsAt ? Math.max(0, Math.floor((_state.sleepEndsAt - Date.now()) / 1000)) : 0;
+}
+
+/**
+ * Arm a session-only timer that pauses—never stops—audio. Pausing preserves
+ * the normal resume snapshot, which is kinder than silently discarding a
+ * long recording's position at bedtime.
+ *
+ * @param {number} minutes
+ * @returns {boolean}
+ */
+function setSleepTimer(minutes) {
+  const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
+  if (_state.status === 'idle' || !_state.queue.length) return false;
+  if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _state.sleepEndsAt = Date.now() + mins * 60000;
+  _sleepTimer = setTimeout(() => {
+    _sleepTimer = null;
+    _state.sleepEndsAt = 0;
+    const wasLive = _state.status === 'playing' || _state.status === 'loading';
+    if (wasLive && _el) _el.pause();
+    _markPaused();
+    if (!wasLive) _notify();
+    if (wasLive) _toast('Sleep timer ended. Playback paused.');
+  }, mins * 60000);
+  _notify();
+  return true;
+}
+
+/** @returns {void} */
+function clearSleepTimer() { _clearSleepTimer(); }
+
+/**
+ * Jump directly to a queued track. Queue order remains intact, so a normal
+ * collection source can still be rebuilt on the next app launch.
+ *
+ * @param {number} index
+ * @returns {void}
+ */
+function playAt(index) {
+  if (_pendingRestore || !_state.queue.length) return;
+  const nextIndex = Math.floor(Number(index));
+  if (!Number.isFinite(nextIndex) || nextIndex < 0 || nextIndex >= _state.queue.length) return;
+  _state.qi = nextIndex;
+  _start();
+  _lastPersistSec = -1;
+  _persist();
+}
+
+/** @param {Track[]} queue */
+function _commitQueueEdit(queue) {
+  _state.queue = queue;
+  const current = queue[_state.qi];
+  _source = { mode: 'custom', volKey: '', label: current ? current.sub : null };
+  _persist();
+  _notify();
+}
+
+/**
+ * Remove one future item. The playing item is intentionally protected so a
+ * mistaken tap cannot tear down an active stream.
+ *
+ * @param {number} index
+ * @returns {boolean}
+ */
+function removeUpcoming(index) {
+  if (_pendingRestore) return false;
+  const at = Math.floor(Number(index));
+  if (!Number.isFinite(at) || at <= _state.qi || at >= _state.queue.length) return false;
+  const queue = _state.queue.slice();
+  queue.splice(at, 1);
+  _commitQueueEdit(queue);
+  return true;
+}
+
+/**
+ * Reorder only future items. Keeping the current track fixed makes the
+ * operation stable while a recording is streaming.
+ *
+ * @param {number} from
+ * @param {number} to
+ * @returns {boolean}
+ */
+function moveUpcoming(from, to) {
+  if (_pendingRestore) return false;
+  const fromIndex = Math.floor(Number(from));
+  const toIndex = Math.floor(Number(to));
+  if (!Number.isFinite(fromIndex) || !Number.isFinite(toIndex) ||
+      fromIndex <= _state.qi || fromIndex >= _state.queue.length ||
+      toIndex <= _state.qi || toIndex >= _state.queue.length || fromIndex === toIndex) return false;
+  const queue = _state.queue.slice();
+  const [track] = queue.splice(fromIndex, 1);
+  queue.splice(toIndex, 0, track);
+  _commitQueueEdit(queue);
+  return true;
+}
+
+/** @returns {boolean} */
+function clearUpcoming() {
+  if (_pendingRestore || _state.qi + 1 >= _state.queue.length) return false;
+  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1));
+  return true;
+}
+
+/**
  * Stop playback and clear the queue. Dropping `src` + load() tears down the
- * live Drive connection — a merely-paused element keeps streaming/holding it.
+ * live release-asset connection — a merely-paused element keeps holding it.
  *
  * @returns {void}
  */
@@ -717,7 +1046,8 @@ function stop() {
   _pendingRestore = null;
   _source = null;
   _clearPersist();
-  if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
+  _clearStallWatchdog();
+  _clearSleepTimer(false);
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';
@@ -731,7 +1061,6 @@ function stop() {
   _lastTick = -1;
   _errorTime = 0;
   _prewarmKey = null;
-  _prewarmUrl = null;
   _clearMediaSession();
   if (wasActive) _setAudioActive(false);
   _notify();
@@ -744,7 +1073,10 @@ function stop() {
  * @returns {void}
  */
 function pauseIfPlaying() {
-  if (_state.status === 'playing' && _el) _el.pause();
+  if ((_state.status === 'playing' || _state.status === 'loading') && _el) {
+    _el.pause();
+    _markPaused();
+  }
 }
 
 /* ── store contract ───────────────────────────────────────────────────── */
@@ -793,10 +1125,20 @@ export const AudioPlayer = {
   playLetter,
   playCollection,
   playSection,
+  playTrack,
   toggle,
   next,
   prev,
   seek,
+  skip,
+  setPlaybackRate,
+  getSleepRemainingSeconds,
+  setSleepTimer,
+  clearSleepTimer,
+  playAt,
+  removeUpcoming,
+  moveUpcoming,
+  clearUpcoming,
   stop,
   pauseIfPlaying,
 };

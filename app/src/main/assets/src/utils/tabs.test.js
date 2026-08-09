@@ -138,6 +138,7 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'library' })).toEqual({ title: 'Library', subtitle: 'Your saved content', resolved: true });
       expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'My Progress', subtitle: 'Reading progress', resolved: true });
       expect(describeTab({ screen: 'about' })).toEqual({ title: 'About', subtitle: 'VOTReader', resolved: true });
+      expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true });
     });
 
     it('enumerates EVERY corpus-independent route — none but home itself may label "Home"', () => {
@@ -146,7 +147,7 @@ describe('describeTab', () => {
       // actual home tabs and unknown screens only. If a new route is added
       // without a describeTab case, this enumeration forces the oversight.
       const corpusIndependent = [
-        'scriptures-home', 'volumes-home', 'studies-home', 'garden-view',
+        'scriptures-home', 'volumes-home', 'audio-library', 'studies-home', 'garden-view',
         'search', 'history', 'settings', 'about', 'library', 'my-progress',
         'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
         'links-index', 'bookmarks-index', 'highlights-index', 'home',

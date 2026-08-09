@@ -74,12 +74,13 @@ export const IDBAdapter = (function () {
   // NOT a version bump: fresh installs simply skip it; a pre-existing empty
   // store on older installs is orphaned + harmless (never accessed, since
   // STORE_SET no longer lists it).
-  const DB_VERSION = 8;
+  // 9 — added vot-audio-library (saved recordings, recent listening, and
+  // playback-rate preference). The onupgradeneeded guard keeps this additive.
+  const DB_VERSION = 9;
 
   /**
-   * The 17 vot-* localStorage keys that migrate into IDB, plus the
-   * `meta` store for migration bookkeeping (W2.4's "migrated-v1" flag
-   * and any future schema state).
+   * The persistent `vot-*` stores, plus the `meta` store for migration
+   * bookkeeping (W2.4's "migrated-v1" flag and any future schema state).
    *
    * vot-state is included even though it ALSO keeps a reduced
    * localStorage shim — the LS shim is for the synchronous boot-script
@@ -111,6 +112,7 @@ export const IDBAdapter = (function () {
     'vot-reading-stats',
     'vot-garden-pos',
     'vot-ann-hint-dismissed',
+    'vot-audio-library',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

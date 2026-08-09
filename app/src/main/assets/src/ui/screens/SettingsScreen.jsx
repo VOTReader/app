@@ -700,7 +700,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
    * primitives, `set` for single-value stores (StateStore, etc.),
    * `replaceAll` otherwise.
    */
-  const _exportableStores = () => ({
+  const _exportableStores = () => {
+    /** @type {Record<string, { store: any, method: string }>} */
+    const stores = {
     'vot-annotations':         { store: AnnotationStore,      method: 'replaceAll' },
     'vot-notes':               { store: NoteStore,            method: 'replaceAll' },
     'vot-bookmarks':           { store: BookmarkStore,        method: 'replaceAll' },
@@ -718,7 +720,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     'vot-prophecy-cards':      { store: ProphecyCardsStore,   method: 'setAll' },
     'vot-home-order':          { store: HomeOrderStore,       method: 'set' },
     'vot-state':               { store: StateStore,           method: 'set' },
-  });
+    };
+
+    // AudioLibraryStore belongs to bundle-b. Resolve its runtime bridge only
+    // when that bundle is present, so isolated UI/admin harnesses remain safe.
+    const audioLibraryStore = /** @type {any} */ (globalThis).AudioLibraryStore;
+    if (audioLibraryStore) {
+      stores['vot-audio-library'] = { store: audioLibraryStore, method: 'replaceAll' };
+    }
+    return stores;
+  };
   /**
    * Boolean flag stores keyed by IDB store name. Imported via set()
    * when value is truthy; clear() otherwise.
