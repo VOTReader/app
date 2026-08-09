@@ -35,6 +35,9 @@ class FakeAudio extends EventTarget {
   play() { this.played = true; this.paused = false; return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() { this.loadCalls++; }
+  // The queue warmer releases its connection via removeAttribute('src'),
+  // which real elements have and EventTarget doesn't.
+  removeAttribute(name) { if (name === 'src') this._src = ''; }
 }
 
 const MANIFEST = {
@@ -446,6 +449,83 @@ describe('audio-player — listening controls + arbitration', () => {
     } finally {
       memo.remove();
     }
+  });
+});
+
+describe('audio-player — gentle queue prefetch', () => {
+  /** Buffered stub covering [0, end). */
+  const buffered = (end) => ({ length: 1, end: () => end });
+
+  /** Start a collection, mark the current track fully buffered, tick 1s. */
+  function primeFullyBuffered() {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    const main = FakeAudio.last;
+    main.dispatchEvent(new Event('playing'));
+    main.duration = 100;
+    main.buffered = buffered(100);
+    main.currentTime = 1;
+    main.dispatchEvent(new Event('timeupdate'));
+    return main;
+  }
+
+  it('warms the next two queued tracks once the current one is fully buffered', () => {
+    const main = primeFullyBuffered();
+    const warm = FakeAudio.last;
+    expect(warm).not.toBe(main);            // a second, detached element
+    expect(warm.preload).toBe('auto');
+    expect(warm.played).toBe(false);        // a warmer, never a player
+    expect(warm.src).toBe(URL_OF('idA1'));  // first upcoming after the preface
+
+    warm.dispatchEvent(new Event('canplaythrough'));
+    expect(FakeAudio.last).toBe(warm);      // element reused for the chain
+    expect(warm.src).toBe(URL_OF('idA2')); // chain walked to the second target
+
+    warm.dispatchEvent(new Event('canplaythrough'));
+    expect(warm.src).toBe('');              // window exhausted — connection released
+    // Window is 2: the third upcoming track (idC) is NOT warmed yet.
+    expect(warm.srcHistory).not.toContain(URL_OF('idC'));
+
+    // Advancing shifts the window: idC becomes warm-eligible on the next tick.
+    AudioPlayer.next();
+    main.duration = 100;
+    main.buffered = buffered(100);
+    main.currentTime = 2;
+    main.dispatchEvent(new Event('timeupdate'));
+    expect(warm.src).toBe(URL_OF('idC'));
+  });
+
+  it('never warms while the current track is still buffering', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    const main = FakeAudio.last;
+    main.dispatchEvent(new Event('playing'));
+    main.duration = 100;
+    main.buffered = buffered(40);           // mid-download
+    main.currentTime = 1;
+    main.dispatchEvent(new Event('timeupdate'));
+    expect(FakeAudio.last).toBe(main);      // no warmer created
+  });
+
+  it('never spends speculative bytes under Save-Data', () => {
+    Object.defineProperty(window.navigator, 'connection', { configurable: true, value: { saveData: true } });
+    try {
+      const main = primeFullyBuffered();
+      expect(FakeAudio.last).toBe(main);
+    } finally {
+      delete window.navigator.connection;
+    }
+  });
+
+  it('a failed warm leaves the URL retryable and stop() releases the warmer', () => {
+    const main = primeFullyBuffered();
+    const warm = FakeAudio.last;
+    warm.dispatchEvent(new Event('error'));  // transient failure
+    expect(warm.src).toBe('');
+    main.dispatchEvent(new Event('progress'));   // healthy again → retry
+    expect(warm.src).toBe(URL_OF('idA1'));
+
+    AudioPlayer.stop();
+    expect(warm.src).toBe('');
+    expect(AudioPlayer.getState().status).toBe('idle');
   });
 });
 

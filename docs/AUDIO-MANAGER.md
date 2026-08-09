@@ -20,7 +20,12 @@ that engine rather than creating independent `<audio>` elements or queues.
   still resolves.
 
 Audio remains streaming-only. There is no local download manager, arbitrary
-remote URL loader, or second media player.
+remote URL loader, or second media player. One refinement rides the HTTP
+cache: when the current track is fully buffered on a healthy connection, the
+player quietly warms the next two queued tracks through a detached,
+never-playing element (`_maybePrefetchNext` in `audio-player.js`), so track
+boundaries start near-instantly. Save-Data or 2g-class connections disable
+it; the cache — not the app — owns eviction.
 
 ## Ownership and module boundaries
 
