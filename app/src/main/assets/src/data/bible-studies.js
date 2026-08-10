@@ -51333,6 +51333,11 @@ var BIBLE_STUDIES = [
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
           {
+            "type": "study-image",
+            "src": "study-lamb-supper.jpg",
+            "alt": "The Last Supper — YahuShua and His disciples at the Passover table"
+          },
+          {
             "type": "heading",
             "level": 2,
             "text": "Tuesday Night, Passover"
@@ -51534,6 +51539,11 @@ var BIBLE_STUDIES = [
         "title": "Late Tuesday Night / Early Wednesday Morning, Passover",
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
+          {
+            "type": "study-image",
+            "src": "study-lamb-gethsemane.jpg",
+            "alt": "YahuShua prays in the Garden of Gethsemane"
+          },
           {
             "type": "heading",
             "level": 3,
@@ -51757,6 +51767,11 @@ var BIBLE_STUDIES = [
         "title": "Wednesday Morning and Afternoon, Passover",
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
+          {
+            "type": "study-image",
+            "src": "study-lamb-thorns.jpg",
+            "alt": "YahuShua crowned with thorns"
+          },
           {
             "type": "heading",
             "level": 3,
@@ -52163,6 +52178,11 @@ var BIBLE_STUDIES = [
             ]
           },
           {
+            "type": "study-image",
+            "src": "study-lamb-crucifixion.jpg",
+            "alt": "YahuShua crucified — soldiers watch beneath the cross"
+          },
+          {
             "type": "poetry",
             "lines": [
               [
@@ -52290,6 +52310,11 @@ var BIBLE_STUDIES = [
         "title": "Wednesday Evening Near Sundown, Passover (The Burial)",
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
+          {
+            "type": "study-image",
+            "src": "study-lamb-burial.jpg",
+            "alt": "YahuShua is laid in the tomb by Joseph of Arimathea and Nicodemus"
+          },
           {
             "type": "heading",
             "level": 3,
@@ -52620,6 +52645,11 @@ var BIBLE_STUDIES = [
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
           {
+            "type": "study-image",
+            "src": "study-lamb-resurrection.jpg",
+            "alt": "The risen YahuShua leaves the empty tomb"
+          },
+          {
             "type": "heading",
             "level": 2,
             "text": "Early Sunday Morning — The Feast of Firstfruits"
@@ -52792,6 +52822,11 @@ var BIBLE_STUDIES = [
         "title": "Sunday, the Feast of Firstfruits (The Appearances)",
         "subtitle": "The True Chronology of The Messiah's Crucifixion and Resurrection",
         "blocks": [
+          {
+            "type": "study-image",
+            "src": "study-lamb-emmaus.jpg",
+            "alt": "The risen YahuShua walks with two disciples on the road to Emmaus"
+          },
           {
             "type": "heading",
             "level": 2,
