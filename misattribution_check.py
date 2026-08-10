@@ -7,9 +7,11 @@ import re
 from pathlib import Path
 from collections import defaultdict
 
-base = Path("C:/Users/corbi/OneDrive/Desktop/VOTReader-studio")
+# Script-relative + current data layout (assets/src/data since the module
+# split; the old hardcoded OneDrive path went stale — 2026-08-09 audit fix).
+base = Path(__file__).resolve().parent
 ocr = (base / "_ocr_out/mtam/all.txt").read_text(encoding="utf-8")
-data_text = (base / "app/src/main/assets/data/bible-studies.js").read_text(encoding="utf-8")
+data_text = (base / "app/src/main/assets/src/data/bible-studies.js").read_text(encoding="utf-8")
 
 def norm(s):
     s = re.sub(r"\s+", " ", s)

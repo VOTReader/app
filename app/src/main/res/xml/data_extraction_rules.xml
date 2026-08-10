@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ backup/transfer opt-out (2026-08-09 audit fix).
+
+     android:allowBackup="false" fully disables backup on Android 11 and
+     below, and still disables CLOUD backup on 12+ — but for apps targeting
+     SDK 31+ it no longer covers DEVICE-TO-DEVICE transfer (the new-phone
+     migration flow), which would copy the app's data dir (all IndexedDB /
+     DOM-storage user data lives there) without consulting allowBackup.
+     This file closes that gap so the manifest's local-only guarantee means
+     what it says on every Android version: the ONLY way user data leaves
+     the device is the user's own Settings → Your Data export.
+
+     Every domain is excluded explicitly (path "." = the domain root);
+     an empty <cloud-backup/> element would mean "no rules = include all",
+     not "exclude all". -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

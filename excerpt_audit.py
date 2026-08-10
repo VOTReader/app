@@ -4,8 +4,10 @@ letter-link exists in bible-studies.js for the same study.
 import re
 from pathlib import Path
 
-base = Path("C:/Users/corbi/OneDrive/Desktop/VOTReader-studio")
-data = (base / "app/src/main/assets/data/bible-studies.js").read_text(encoding='utf-8')
+# Script-relative + current data layout (assets/src/data since the module
+# split; the old hardcoded OneDrive path went stale — 2026-08-09 audit fix).
+base = Path(__file__).resolve().parent
+data = (base / "app/src/main/assets/src/data/bible-studies.js").read_text(encoding='utf-8')
 
 def audit(study_name, ocr_file):
     text = (base / ocr_file).read_text(encoding='utf-8')

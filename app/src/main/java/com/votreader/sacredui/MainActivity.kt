@@ -630,8 +630,18 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // static page still lets the panel idle down. API-gated: the View
         // frame-rate vote is Android 15+ (API 35); older devices keep today's
         // behavior. Never throws — a missing display just skips the vote.
+        //
+        // Context.getDisplay() is API 30 — on 26-29 the method doesn't exist and
+        // resolving it throws NoSuchMethodError, an Error the catch(Exception)
+        // below would NOT stop (found by lint NewApi, 2026-08-09). Those levels
+        // read the pre-30 WindowManager.getDefaultDisplay() instead, so an old
+        // high-refresh panel (e.g. a OnePlus 7 Pro on Android 10) still gets the
+        // window-level vote.
         try {
-            val peak = display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 0f
+            @Suppress("DEPRECATION") // defaultDisplay: the pre-API-30 path only
+            val disp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
+                       else windowManager.defaultDisplay
+            val peak = disp?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 0f
             if (peak > 60f) {
                 // View-level vote (API 35+). MEASURED INSUFFICIENT ALONE on the
                 // Pixel 9 Pro: framestats still showed a pure 16.7 ms vsync grid —

@@ -219,6 +219,13 @@ jobs:
         # NK2-NK5 fill it with real test cases.
         run: ./gradlew :app:testDebugUnitTest
 
+      - name: Android Lint (NewApi / manifest checks — any error fails CI)
+        # lintDebug aborts the build on any lint ERROR (warnings don't fail).
+        # Added 2026-08-09 after an external audit found 6 NewApi errors —
+        # one a real API 26-29 crash (MainActivity's Context.getDisplay) —
+        # that no existing gate saw: this job ran tests but never lint.
+        run: ./gradlew :app:lintDebug
+
       - name: Verify JaCoCo coverage floor (NK6)
         # Ratchet gate on the pure-JVM-tested classes (JsBridge,
         # BoundedLogTree). Floor lives in app/build.gradle.kts and only

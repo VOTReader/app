@@ -48,8 +48,15 @@ class VOTReaderApp : Application() {
         // "!= packageName", so a null / garbage / main process name can NEVER match:
         // setting a suffix on the MAIN process would orphan its WebView data dir —
         // i.e. all localStorage / DOM-storage USER DATA. Single-process → never fires.
+        // setDataDirectorySuffix itself is API 28 — resolving it on 26/27 throws
+        // NoSuchMethodError, an Error the catch(Exception) would NOT stop (lint
+        // NewApi, 2026-08-09). Below 28 there is no suffix API and no safeguard
+        // to apply — a second WebView process there would hit the platform's own
+        // data-dir collision either way, so skipping is the only option.
         val procName = currentProcessName()
-        if (procName != null && procName.startsWith("$packageName:")) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            procName != null && procName.startsWith("$packageName:")
+        ) {
             try {
                 WebView.setDataDirectorySuffix(safeSuffix(procName))
             } catch (e: Exception) {

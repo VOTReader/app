@@ -73,7 +73,9 @@ def gap_check(ocr_dir, data_file, study_name):
                 print(f"    - \"{m}...\"")
     print()
 
-base = Path("C:/Users/corbi/OneDrive/Desktop/VOTReader-studio")
-gap_check(base/"_ocr_out/mtam", base/"app/src/main/assets/data/bible-studies.js", "MTAM")
-gap_check(base/"_ocr_out/lamb-of-god", base/"app/src/main/assets/data/bible-studies.js", "Lamb of God")
-gap_check(base/"_ocr_out/matthew-sb", base/"app/src/main/assets/data/matthew.js", "Matthew Study Bible")
+# Script-relative + current data layout (assets/src/data since the module
+# split; the old hardcoded OneDrive path went stale — 2026-08-09 audit fix).
+base = Path(__file__).resolve().parent
+gap_check(base/"_ocr_out/mtam", base/"app/src/main/assets/src/data/bible-studies.js", "MTAM")
+gap_check(base/"_ocr_out/lamb-of-god", base/"app/src/main/assets/src/data/bible-studies.js", "Lamb of God")
+gap_check(base/"_ocr_out/matthew-sb", base/"app/src/main/assets/src/data/matthew.js", "Matthew Study Bible")

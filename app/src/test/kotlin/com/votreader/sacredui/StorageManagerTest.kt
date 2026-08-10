@@ -371,6 +371,24 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `writeTextToUri does NOT delete when the open itself throws`() {
+        // Review fix 2026-08-09: ACTION_CREATE_DOCUMENT can return a
+        // PRE-EXISTING document the user chose to overwrite. If the "wt"
+        // open THROWS (revoked permission, dead provider) the document was
+        // never truncated — deleting it would destroy intact user data the
+        // failure itself left untouched. Same contract as the null-stream
+        // case above, for the exception flavor of "never opened".
+        val uri = Uri.parse("content://test/open-throws")
+        every { cr.openOutputStream(uri, "wt") } throws SecurityException("permission revoked")
+
+        val result = storage.writeTextToUri(uri, "{}")
+        assertIs<StorageManager.Result.Failure>(result)
+        assertEquals("permission revoked", result.reason)
+        // The fail-clean delete must NOT fire — nothing was written.
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
+    }
+
+    @Test
     fun `writeTextToUri fails and deletes the partial when stream write throws`() {
         // WAVE-0 (fail-clean): a failed write leaves a possibly-truncated
         // document behind. Same contract finishV3Export applies on a failed

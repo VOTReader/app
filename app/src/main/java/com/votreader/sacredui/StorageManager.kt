@@ -92,12 +92,26 @@ class StorageManager(private val context: Context) {
      * needs no storage permission, so nothing is added to the manifest.
      */
     fun writeTextToUri(uri: Uri, content: String): Result<Unit> {
+        // Mode "wt" = write + truncate: the picker can hand back a URI
+        // whose document already holds bytes (the user chose an existing
+        // filename), so truncation must be explicit rather than left to
+        // the provider's default mode.
+        //
+        // The open sits OUTSIDE the delete-on-failure region below: an open
+        // that throws (revoked permission, dead provider) — like one that
+        // returns null — never touched the document, so a PRE-EXISTING user
+        // document behind the URI is intact and must stay that way. Only
+        // once "wt" has actually opened (= truncation happened) does the
+        // fail-clean delete apply. (Review fix 2026-08-09: the old single
+        // try/catch deleted on the open-throws path too.)
+        val stream = try {
+            context.contentResolver.openOutputStream(uri, "wt")
+                ?: return Result.Failure("no_output_stream")
+        } catch (e: Exception) {
+            Timber.w(e, "writeTextToUri open failed")
+            return Result.Failure(e.message ?: "no_output_stream")
+        }
         return try {
-            // Mode "wt" = write + truncate: the picker can hand back a URI
-            // whose document already holds bytes (the user chose an existing
-            // filename), so truncation must be explicit rather than left to
-            // the provider's default mode.
-            //
             // The stream is wrapped in a WRITER, not written as a one-shot
             // byte[]: the old stream.write(content.toByteArray(UTF_8))
             // materialized a SECOND full-size copy of the payload on the heap
@@ -106,18 +120,16 @@ class StorageManager(private val context: Context) {
             // notes-Markdown export could push into an OOM. The writer encodes
             // through an 8 KB buffer, so the file grows on disk while heap
             // stays flat. UTF-8 keeps the on-disk bytes identical.
-            context.contentResolver.openOutputStream(uri, "wt")
-                ?.writer(Charsets.UTF_8)?.use { w -> w.write(content) }
-                ?: return Result.Failure("no_output_stream")
+            stream.writer(Charsets.UTF_8).use { w -> w.write(content) }
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.w(e, "writeTextToUri failed")
             // A failed write/flush/close leaves a possibly-truncated document
             // behind — apply the same fail-clean contract finishV3Export uses
             // on a failed commit: delete the partial so it can't be mistaken
-            // for a complete export. (NOT on no_output_stream above: nothing
-            // was written there, so a pre-existing user document is intact
-            // and must stay that way.)
+            // for a complete export. The original bytes are already gone (the
+            // "wt" open truncated), so this destroys nothing the failure
+            // hadn't already destroyed.
             deleteDocumentQuietly(uri)
             Result.Failure(e.message ?: "write_failed")
         }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android-12 twin of data_extraction_rules.xml (2026-08-09 audit fix).
+
+     On Android 11 and below android:allowBackup="false" already disables
+     backup outright, so this file changes nothing today — it exists so the
+     exclude-everything rule is stated in BOTH schemas (lint
+     DataExtractionRules asks for the pair) and so a future accidental
+     allowBackup flip could still not export user data. -->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

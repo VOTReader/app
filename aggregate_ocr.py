@@ -6,7 +6,9 @@ Usage: python aggregate_ocr.py
 import os
 from pathlib import Path
 
-base = Path("C:/Users/corbi/OneDrive/Desktop/VOTReader-studio/_ocr_out")
+# Script-relative (the old hardcoded OneDrive checkout path went stale when
+# the working dir moved to D:\VOTReader-studio — 2026-08-09 audit fix).
+base = Path(__file__).resolve().parent / "_ocr_out"
 
 for study_dir in sorted(base.iterdir()):
     if not study_dir.is_dir():

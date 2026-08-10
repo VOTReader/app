@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import timber.log.Timber
@@ -176,7 +177,13 @@ class AudioKeepAliveService : Service() {
          * Extracted (rather than inlined into [onStartCommand]) so the branch is
          * exercised on the JVM without Robolectric — the Android callback around
          * it is not unit-testable, the decision is.
+         *
+         * @ChecksSdkIntAtLeast tells lint "true ⇒ running on Q+", which is what
+         * lets the typed startForeground call inside the guard pass the NewApi
+         * check. The claim holds because the one production call site passes
+         * Build.VERSION.SDK_INT — keep it that way.
          */
+        @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
         fun usesTypedForeground(sdkInt: Int): Boolean = sdkInt >= Build.VERSION_CODES.Q
 
         /**

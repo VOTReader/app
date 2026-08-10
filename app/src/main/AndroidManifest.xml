@@ -41,9 +41,15 @@
          targetSdk change can't quietly re-enable it. All app resources load
          from the APK or HTTPS; an http:// link in content leaves via an
          external intent, so it never rides this WebView. -->
+    <!-- dataExtractionRules: on Android 12+ (targetSdk 31+), allowBackup="false"
+         no longer blocks DEVICE-TO-DEVICE transfer — only cloud backup. The
+         rules file excludes every domain from both, so the local-only data
+         policy holds on every Android version. See res/xml/data_extraction_rules.xml. -->
     <application
         android:name=".VOTReaderApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/full_backup_content"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
