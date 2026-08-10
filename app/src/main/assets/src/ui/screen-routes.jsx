@@ -268,6 +268,11 @@ export function buildScreenRoutes({
   // Bible Listen pill. Registry + policy live in utils/audio-track.js.
   const _bibleAudioEd = bibleAudioEdition(settings.bibleAudio);
   const bibleAudioProp = _bibleAudioEd ? { volKey: _bibleAudioEd.volKey, label: _bibleAudioEd.label } : null;
+  // Default LETTER voice (Settings → Reading → Letter Voice). The player is a
+  // plain module — it can't read React state — so the preference is pushed to
+  // it, idempotently, from the same render that owns the setting. 'auto' and
+  // any unknown code both resolve to "use the manifest's primary reading".
+  AudioPlayer.setPreferredReader(settings.letterReader);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
@@ -397,6 +402,11 @@ export function buildScreenRoutes({
   // so it reaches the opener through this bridge — reassigned every build so
   // the closure always carries the CURRENT screen for the back pill.
   window.__openAudioText = (track) => _openAudioText(track, screen);
+  // Same bridge shape for the desk's Voice chips: switching Bible edition
+  // there has to move settings.bibleAudio too, or every Listen pill elsewhere
+  // would keep offering the edition the listener just left. Guarded on the
+  // registry so an unknown id can never be persisted.
+  window.__setBibleAudioEdition = (id) => { if (bibleAudioEdition(id)) updateSetting('bibleAudio', id); };
   // Entering a Listening Library sub-screen chains the origin so backing out
   // lands on the hub, and the hub's own back still returns to Library/Volumes.
   const _enterAudioSub = (destination) => {

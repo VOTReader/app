@@ -1521,6 +1521,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               ]}
               onChange={(v) => onSetting("bibleAudio", v)}
             />
+            <SelectField
+              eyebrow="Reading"
+              title="Letter Voice"
+              label="Letter Voice"
+              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader starts every letter THEY have recorded in their voice, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
+              value={settings.letterReader || "auto"}
+              options={[
+                { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },
+                /* Registry source of truth: utils/audio-track.js (AUDIO_READERS,
+                   published as a global for this classic-globals screen), in
+                   the app's reader rank. */
+                ...Object.entries(/** @type {any} */ (globalThis).AUDIO_READERS || {}).map(([id, label]) => ({
+                  id, label: String(label), desc: 'Prefer this reading wherever it exists',
+                })),
+              ]}
+              onChange={(v) => onSetting("letterReader", v)}
+            />
             <SettingsRow
               label="Chapter Titles"
               desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."

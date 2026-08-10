@@ -61,25 +61,58 @@ const RELEASE_PREFIXES = Object.freeze([
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
+    short: 'KJV · BRM',
     translation: 'kjv',
     volKey: 'bible-brm-kjv',
   }),
   'wop-nkjv': Object.freeze({
     label: 'NKJV · The Word of Promise (Dramatized)',
+    short: 'NKJV · Dramatized',
     translation: 'nkjv',
     volKey: 'bible-wop-nkjv',
   }),
   'web-ebible': Object.freeze({
     label: 'WEB · World English Bible',
+    short: 'WEB',
     translation: 'web',
     volKey: 'bible-web',
   }),
 });
 
+/** Reader code → the human name every surface prints. ONE registry: the
+ *  player's `readerLabel()` reads it, the listening desk's Voice chips render
+ *  it, and Settings builds the default-reader options from it — so a new
+ *  reader code is one line here, not four scattered string literals.
+ *
+ *  Order is the app's reader RANK (Benjamin supersedes, then Timothy, then the
+ *  synthesized readings), which is the order Settings offers them in. */
+export const AUDIO_READERS = Object.freeze({
+  B: 'Read by Benjamin',
+  T: 'Read by Timothy',
+  V: 'Text-to-speech',
+  M: 'AI reading with music',
+});
+
+/**
+ * Human label for a reader code, or null when unknown. `hasOwnProperty`, not a
+ * bare index: 'toString' is not a reader.
+ *
+ * @param {unknown} code
+ * @returns {string | null}
+ */
+export function audioReaderLabel(code) {
+  return (typeof code === 'string' && Object.prototype.hasOwnProperty.call(AUDIO_READERS, code))
+    ? AUDIO_READERS[/** @type {keyof typeof AUDIO_READERS} */ (code)]
+    : null;
+}
+
 /* SettingsScreen is a classic-globals module (no imports) — publish the
-   registry the same way AudioLibraryStore bridges across bundles. audio-track
+   registries the same way AudioLibraryStore bridges across bundles. audio-track
    rides bundles b + d, both booted before the lazy Settings screen loads. */
-if (typeof globalThis !== 'undefined') /** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS = BIBLE_AUDIO_EDITIONS;
+if (typeof globalThis !== 'undefined') {
+  /** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS = BIBLE_AUDIO_EDITIONS;
+  /** @type {any} */ (globalThis).AUDIO_READERS = AUDIO_READERS;
+}
 
 /** Registry entry for a settings.bibleAudio value, or null for 'off'/unknown. */
 export function bibleAudioEdition(setting) {

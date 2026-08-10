@@ -86,6 +86,23 @@ describe('AudioLibraryStore — normalized metadata', () => {
     expect(AudioLibraryStore.getPlaybackRate()).toBe(1);
   });
 
+  it('removeRecent drops exactly one row, by its immutable release URL', () => {
+    AudioLibraryStore.recordPlayed(track(1));
+    AudioLibraryStore.recordPlayed(track(2));
+    AudioLibraryStore.toggleSaved(track(1));
+
+    expect(AudioLibraryStore.removeRecent(track(1).url)).toBe(true);
+    expect(AudioLibraryStore.recent().map((item) => item.url)).toEqual([track(2).url]);
+    // A saved copy of the same recording is a different shelf and survives.
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(true);
+
+    // Nothing to remove, and nothing that could name an arbitrary URL.
+    expect(AudioLibraryStore.removeRecent(track(1).url)).toBe(false);
+    expect(AudioLibraryStore.removeRecent('')).toBe(false);
+    expect(AudioLibraryStore.removeRecent(null)).toBe(false);
+    expect(AudioLibraryStore.recent()).toHaveLength(1);
+  });
+
   it('clearRecent leaves saved recordings and speed intact', () => {
     AudioLibraryStore.toggleSaved(track(1));
     AudioLibraryStore.recordPlayed(track(2));

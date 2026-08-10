@@ -115,6 +115,12 @@ export function useSettings({ savedSettings, theme }) {
       // Values are BIBLE_AUDIO_EDITIONS keys (utils/audio-track.js); an unknown
       // persisted value acts as 'off' (bibleAudioEdition() returns null).
       bibleAudio: "brm-kjv",
+      // Default voice for the LETTER recordings ('auto' = the manifest's own
+      // pick — Benjamin supersedes, then reader rank). A reader code ('B'|'T'|
+      // 'V'|'M') starts every letter that HAS a reading by that reader with it;
+      // letters that don't keep the primary. AUDIO_READERS (utils/audio-track.js)
+      // is the registry; the player reads this through setPreferredReader.
+      letterReader: "auto",
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
       // Fullscreen gesture is on by default. The hint count is deliberately
       // persisted so the brief teaching toast stops after a few uses.

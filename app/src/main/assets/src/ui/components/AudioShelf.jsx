@@ -146,6 +146,10 @@ export function ArrowIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>;
 }
 
+export function CloseIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>;
+}
+
 /** Points down at rest; `.is-open` rotates it in CSS, so no second glyph. */
 export function ChevronIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9.5l6 6 6-6" /></svg>;
@@ -154,11 +158,13 @@ export function ChevronIcon() {
 /**
  * One saved-or-recent recording. `source` picks the trailing metadata only:
  * a recent row shows when it was played, a saved row shows its kept-ness.
+ * `onRemove` adds a per-row dismissal (the recent shelf's ×) — omitted where a
+ * list has no per-row removal, so no dead control is rendered.
  * (`key` is React's list identity — declared so mapped call sites typecheck.)
  *
- * @param {{ key?: any, track: any, source: 'saved' | 'recent', onOpenTrack?: (track: any) => void }} props
+ * @param {{ key?: any, track: any, source: 'saved' | 'recent', onOpenTrack?: (track: any) => void, onRemove?: (track: any) => void }} props
  */
-export function AudioShelfRow({ track, source, onOpenTrack }) {
+export function AudioShelfRow({ track, source, onOpenTrack, onRemove }) {
   const library = audioLibraryStore();
   const state = AudioPlayer.getState();
   const queue = Array.isArray(state.queue) ? state.queue : [];
@@ -203,6 +209,17 @@ export function AudioShelfRow({ track, source, onOpenTrack }) {
         >
           <StarIcon filled={isSaved} />
         </button>
+        {typeof onRemove === 'function' ? (
+          <button
+            type="button"
+            className="audio-library-icon-button audio-library-remove-button"
+            onClick={() => onRemove(track)}
+            aria-label={'Remove ' + trackName(track) + ' from recently played'}
+            title="Remove from recently played"
+          >
+            <CloseIcon />
+          </button>
+        ) : null}
       </div>
     </article>
   );

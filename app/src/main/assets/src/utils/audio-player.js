@@ -31,6 +31,7 @@ import {
   AUDIO_RESUME_MIN_SEC,
   AUDIO_RESUME_REWIND_SEC,
   audioAssetUrl,
+  audioReaderLabel,
   bibleAudioAssetUrl,
   isVotAudioUrl,
   normalizeAudioRate,
@@ -855,17 +856,50 @@ function sectionsFor(volKey) {
 }
 
 /**
- * Human label for a reader code, or null when unknown.
+ * Human label for a reader code, or null when unknown. The names live in
+ * audio-track.js's AUDIO_READERS registry — one source of truth shared with the
+ * listening desk's Voice chips and the Settings default-reader options.
  *
  * @param {string} code - 'B' | 'T' | 'V' | 'M'
  * @returns {string | null}
  */
 function readerLabel(code) {
-  if (code === 'B') return 'Read by Benjamin';
-  if (code === 'T') return 'Read by Timothy';
-  if (code === 'V') return 'Text-to-speech';
-  if (code === 'M') return 'AI reading with music';
-  return null;
+  return audioReaderLabel(code);
+}
+
+/* ── preferred reader (settings.letterReader) ─────────────────────────────
+   'auto' (the default) means the manifest's own choice — Benjamin supersedes,
+   then reader rank. A listener who prefers one voice sets it once in Settings
+   and every letter that HAS a reading by that reader starts with it; letters
+   that don't simply keep the primary. App keeps this in step through
+   AudioPlayer.setPreferredReader (screen-routes), so the player never reaches
+   into React state. */
+
+/** @type {string} '' = automatic. */
+let _preferredReader = '';
+
+/**
+ * @param {unknown} code - a reader code, or 'auto'/'' for the manifest primary
+ * @returns {void}
+ */
+function setPreferredReader(code) {
+  const next = typeof code === 'string' && code !== 'auto' && readerLabel(code) ? code : '';
+  _preferredReader = next;
+}
+
+/**
+ * The reader a start should use when the caller named none: the preference,
+ * but only when this item actually HAS a reading by that reader. Null means
+ * "leave the manifest's primary alone" — the one-line fallback.
+ *
+ * @param {string} volKey
+ * @param {{ id?: string, title?: string } | null | undefined} item
+ * @param {string | null | undefined} collectionLabel
+ * @returns {string | null}
+ */
+function _preferredReaderFor(volKey, item, collectionLabel) {
+  if (!_preferredReader || !item) return null;
+  return _renditionByReader(volKey, item, collectionLabel, _preferredReader) ? _preferredReader : null;
 }
 
 /**
@@ -1360,8 +1394,10 @@ function _countPlay() {
 
 /**
  * Play one letter (all of its parts, in order). `reader` picks a cross-reader
- * alternate rendition when the letter has one. No-op when the letter has no
- * audio; leaves state untouched and toasts when offline.
+ * alternate rendition when the letter has one; with none named, the listener's
+ * default voice (settings.letterReader) applies where this letter has a
+ * reading by it. No-op when the letter has no audio; leaves state untouched
+ * and toasts when offline.
  *
  * @param {{ volKey: string, letter: { id?: string, title?: string }, collectionLabel?: string, reader?: string }} opts
  * @returns {void}
@@ -1371,6 +1407,7 @@ function playLetter(opts) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   let queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
   if (!queue.length) return;
+  const reader = o.reader || _preferredReaderFor(o.volKey, o.letter, o.collectionLabel);
   // Album behavior (owner directive 2026-08-08): a hero Listen queues the
   // WHOLE collection positioned at this letter, so the bar's prev/next walk
   // neighboring letters and playback continues past the letter's end. The
@@ -1383,11 +1420,11 @@ function playLetter(opts) {
     const arr = g.colLetterArr(col) || [];
     const items = pref ? [pref, ...arr] : arr;
     if (items.some((item) => item && item.id === o.letter.id)) {
-      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: o.reader });
+      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader });
       return;
     }
   }
-  const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, o.reader);
+  const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, reader);
   if (rendition) queue = rendition.tracks;
   _pendingRestore = null;
   _source = { mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null };
@@ -1443,14 +1480,17 @@ function playCollection(opts) {
     }
   }
   let startReader = null;
-  if (startKey && o.startReader) {
+  if (startKey) {
     const startItem = items.find((item) => item && item.id === o.startId);
-    const rendition = _renditionByReader(o.volKey, startItem, o.collectionLabel, o.startReader);
+    // No explicit voice = the listener's default one, where this letter has a
+    // reading by it (settings.letterReader; 'auto' resolves to null here).
+    const wanted = o.startReader || _preferredReaderFor(o.volKey, startItem, o.collectionLabel);
+    const rendition = wanted ? _renditionByReader(o.volKey, startItem, o.collectionLabel, wanted) : null;
     if (rendition) {
       let end = 0;
       while (end < queue.length && queue[end].key === startKey) end++;
       queue = rendition.tracks.concat(queue.slice(end));
-      startReader = o.startReader;
+      startReader = wanted;
     }
   }
   _pendingRestore = null;
@@ -1882,6 +1922,7 @@ export const AudioPlayer = {
   sectionsFor,
   readerLabel,
   renditionsFor,
+  setPreferredReader,
   playLetter,
   playCollection,
   playSection,

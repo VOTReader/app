@@ -754,6 +754,54 @@ describe('audio-player — reader-alternate renditions', () => {
   });
 });
 
+/* settings.letterReader (owner directive 2026-08-09): one preferred voice for
+   the whole Letters corpus, consulted only where the caller named none. */
+describe('audio-player — the default letter reader', () => {
+  afterEach(() => AudioPlayer.setPreferredReader('auto'));
+
+  it('starts a collection on the preferred reader when that letter has one', () => {
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idC')]);
+    // …and it is recorded, so a reboot resumes on the same voice.
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 10;
+    el().dispatchEvent(new Event('timeupdate'));
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).startReader).toBe('V');
+  });
+
+  it('falls back to the manifest primary for a letter that reader never read', () => {
+    AudioPlayer.setPreferredReader('M');   // no alternate anywhere in the fixture
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+  });
+
+  it('applies to playLetter, and an explicit reader always outranks it', () => {
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idCv')]);
+
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One', reader: 'T' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idC')]);
+  });
+
+  it("'auto', an unknown code, and a non-string all mean the manifest's own pick", () => {
+    for (const value of ['auto', 'Z', '', null, 42]) {
+      AudioPlayer.setPreferredReader(value);
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+      expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    }
+  });
+
+  it('leaves Play All alone — the preference picks a START, not a whole queue', () => {
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url))
+      .toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+  });
+});
+
 describe('audio-player — gentle queue prefetch', () => {
   /** Buffered stub covering [0, end). */
   const buffered = (end) => ({ length: 1, end: () => end });

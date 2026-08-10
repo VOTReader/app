@@ -12,6 +12,9 @@ const { player, setPlayerState } = vi.hoisted(() => {
     readerLabel: () => null,
     toggle: vi.fn(),
     playTrack: vi.fn(),
+    prev: vi.fn(),
+    next: vi.fn(),
+    seek: vi.fn(),
   };
   return { player, setPlayerState: (next) => { playerState = next; } };
 });
@@ -51,7 +54,7 @@ function installGlobals({ saved = [savedTrack], recent = [recentTrack], activeSa
     subscribe: () => () => {}, getVersion: () => 0,
     saved: () => saved, recent: () => recent,
     isSaved: (track) => activeSaved && !!track && track.url === savedTrack.url,
-    toggleSaved: vi.fn(), clearRecent: vi.fn(),
+    toggleSaved: vi.fn(), clearRecent: vi.fn(), removeRecent: vi.fn(),
   };
 }
 
@@ -141,12 +144,44 @@ describe('AudioLibraryScreen -- the hub', () => {
     const openTrack = vi.fn();
     renderScreen({ onOpenTrack: openTrack });
     expect(screen.getByText('Playing now')).toBeTruthy();
-    expect(screen.getByRole('progressbar', { name: 'Playback progress' }).getAttribute('aria-valuenow')).toBe('40');
+    // The shared scrubber, not a painted div: a listener can MOVE this one.
+    const slider = screen.getByRole('slider', { name: 'Playback position' });
+    expect(slider.value).toBe('48');
+    expect(slider.max).toBe('120');
+    fireEvent.change(slider, { target: { value: '90' } });
+    expect(player.seek).toHaveBeenCalledWith(90);
+
     fireEvent.click(screen.getByRole('button', { name: 'Pause current recording' }));
     expect(player.toggle).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Open current recording text' }));
     expect(openTrack).toHaveBeenCalledWith(savedTrack);
     fireEvent.click(screen.getByRole('button', { name: 'Remove current recording from saved recordings' }));
     expect(globalThis.AudioLibraryStore.toggleSaved).toHaveBeenCalledWith(savedTrack);
+  });
+
+  it('carries the mini-player transport rules onto the hub card', () => {
+    // A queue of one: prev survives as a Restart, next is absent — the same
+    // conditional pair AudioPlayerBar renders.
+    setPlayerState({ queue: [savedTrack], qi: 0, status: 'playing', time: 10, duration: 120 });
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: 'Restart current recording' }));
+    expect(player.prev).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Next recording' })).toBeNull();
+
+    cleanup();
+    setPlayerState({ queue: [savedTrack, recentTrack], qi: 0, status: 'playing', time: 10, duration: 120 });
+    renderScreen();
+    expect(screen.queryByRole('button', { name: 'Restart current recording' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous recording' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next recording' }));
+    expect(player.prev).toHaveBeenCalledTimes(2);
+    expect(player.next).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops one recent row without clearing the whole trail', () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove The Narrow Path from recently played' }));
+    expect(globalThis.AudioLibraryStore.removeRecent).toHaveBeenCalledWith(recentTrack.url);
+    expect(globalThis.AudioLibraryStore.clearRecent).not.toHaveBeenCalled();
   });
 });

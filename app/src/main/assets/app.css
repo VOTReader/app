@@ -1124,6 +1124,25 @@
       .audio-manager-queue-main strong { overflow: hidden; color: var(--cream); font-size: var(--fs-13); font-weight: 400; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
       .audio-manager-queue-main small { overflow: hidden; color: var(--cream-dim); font-size: var(--fs-11); font-style: italic; text-overflow: ellipsis; white-space: nowrap; }
       @media (hover: hover) { .audio-manager-queue-main:hover strong { color: var(--gold-bright); } }
+      /* The queue is the WHOLE queue now (2026-08-09), which makes it the
+         chapter picker for a per-chapter Bible edition. Three row states:
+         played (dimmed but tappable — a chapter can be re-heard), current
+         (marked, and the one row with no edit controls), upcoming (unchanged). */
+      .audio-manager-queue li.is-played .audio-manager-queue-main strong { color: var(--cream-muted); }
+      .audio-manager-queue li.is-played .audio-manager-queue-number { opacity: 0.62; }
+      .audio-manager-queue li.is-current { background: var(--gold-faint); border-left: 2px solid var(--gold); }
+      .audio-manager-queue-main.is-current { cursor: default; }
+      .audio-manager-queue-main.is-current strong { color: var(--gold-bright); }
+      .audio-manager-queue-main.is-current .audio-manager-queue-number { color: var(--gold); }
+      /* Paging, not virtualization: a whole Bible edition is 1,189 rows, so the
+         desk renders a window around the current one and offers these. */
+      .audio-manager-queue-page {
+        width: 100%; min-height: 44px; margin: 0; padding: 0.35rem; border: 1px dashed var(--gold-border); border-radius: 6px;
+        background: transparent; color: var(--gold-dim); cursor: pointer; font-family: var(--font-body); font-size: var(--fs-11);
+      }
+      @media (hover: hover) { .audio-manager-queue-page:hover { border-color: var(--gold); color: var(--gold); } }
+      .audio-manager-queue-page:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .audio-manager-voice-note { margin: 0.45rem 0 0; color: var(--cream-dim); font-size: var(--fs-10); font-style: italic; line-height: 1.4; }
       .audio-manager-queue-actions { display: flex; align-items: center; }
       .audio-manager-queue-actions button { width: 42px; min-width: 42px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--gold-dim); cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-16); }
       @media (hover: hover) { .audio-manager-queue-actions button:not(:disabled):hover { background: var(--gold-faint); color: var(--gold); } }
@@ -1156,9 +1175,23 @@
       .audio-library-now.is-active .audio-library-now-art span { animation:audio-library-wave .8s ease-in-out infinite alternate; }.audio-library-now.is-active .audio-library-now-art span:nth-child(2) { animation-delay:-.23s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(3) { animation-delay:-.48s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(4) { animation-delay:-.12s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(5) { animation-delay:-.38s; }
       @keyframes audio-library-wave { from { transform:scaleY(.55); opacity:.52; } to { transform:scaleY(1.35); opacity:1; } }
       .audio-library-now-copy { position:relative; z-index:1; min-width:0; display:flex; flex-direction:column; gap:.16rem; }.audio-library-now-copy > span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.18em; text-transform:uppercase; }.audio-library-now-copy h2 { margin:0; overflow:hidden; color:var(--cream); font-family:'Cormorant Garamond',serif; font-size:clamp(var(--fs-18),3vw,var(--fs-20)); font-weight:600; line-height:1.1; text-overflow:ellipsis; white-space:nowrap; }.audio-library-now-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-11); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
-      .audio-library-now-actions { position:relative; z-index:1; display:flex; align-items:center; justify-content:flex-end; gap:.28rem; }.audio-library-primary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:var(--gold); color:#17130a; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }.audio-library-primary-action > span { color:#17130a; font-family:inherit; font-size:inherit; letter-spacing:inherit; text-transform:none; }.audio-library-primary-action svg { width:16px; height:16px; }.audio-library-primary-action[aria-busy="true"] { opacity:.75; }
+      /* wrap: the card gained prev/next (2026-08-09), so five controls can sit
+         here — at 360px they wrap onto a second line instead of overflowing. */
+      .audio-library-now-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.28rem; }.audio-library-primary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:var(--gold); color:#17130a; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }.audio-library-primary-action > span { color:#17130a; font-family:inherit; font-size:inherit; letter-spacing:inherit; text-transform:none; }.audio-library-primary-action svg { width:16px; height:16px; }.audio-library-primary-action[aria-busy="true"] { opacity:.75; }
       .audio-library-icon-button { width:44px; min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--gold-dim); cursor:pointer; }.audio-library-icon-button svg { width:18px; height:18px; }.audio-library-save-button.is-saved { color:var(--gold); background:rgba(200,164,86,.12); border-color:rgba(200,164,86,.28); }
-      .audio-library-progress-wrap { position:relative; z-index:1; grid-column:2 / -1; min-width:0; margin-top:-.24rem; }.audio-library-progress { height:4px; overflow:hidden; border-radius:999px; background:rgba(238,229,204,.16); }.audio-library-progress > span { display:block; height:100%; border-radius:inherit; background:var(--gold); transition:width .18s linear; }.audio-library-progress-time { display:flex; justify-content:space-between; margin-top:.34rem; color:var(--cream-dim); font-size:var(--fs-10); font-variant-numeric:tabular-nums; }
+      /* The hub's scrubber is the shared AudioSeekSlider (2026-08-09) — the
+         painted-div progressbar it replaces could be read but never moved.
+         Same --seek-pct fill contract as the bar's and the desk's. */
+      .audio-library-progress-wrap { position:relative; z-index:1; grid-column:2 / -1; min-width:0; margin-top:-.24rem; }.audio-library-progress-time { display:flex; justify-content:space-between; margin-top:.34rem; color:var(--cream-dim); font-size:var(--fs-10); font-variant-numeric:tabular-nums; }
+      .audio-library-seek { -webkit-appearance:none; appearance:none; width:100%; height:16px; margin:0; padding:0; background:transparent; cursor:pointer; }
+      .audio-library-seek:disabled { opacity:.5; cursor:default; }
+      .audio-library-seek::-webkit-slider-runnable-track { height:4px; border-radius:999px; background:linear-gradient(to right,var(--gold) var(--seek-pct,0%),rgba(238,229,204,.16) var(--seek-pct,0%)); }
+      .audio-library-seek::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; margin-top:-5px; border:0; border-radius:50%; background:var(--gold); }
+      .audio-library-seek::-moz-range-track { height:4px; border-radius:999px; background:linear-gradient(to right,var(--gold) var(--seek-pct,0%),rgba(238,229,204,.16) var(--seek-pct,0%)); }
+      .audio-library-seek::-moz-range-thumb { width:14px; height:14px; border:0; border-radius:50%; background:var(--gold); }
+      .audio-library-seek:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      /* Prev/next beside Resume — same conditional rules as the mini-player. */
+      .audio-library-step svg { width:20px; height:20px; }
       .audio-library-empty-now { grid-template-columns:64px minmax(0,1fr) auto; border-color:rgba(200,164,86,.23); background:linear-gradient(135deg,rgba(200,164,86,.06),transparent 70%); box-shadow:none; }.audio-library-empty-now .audio-library-now-art { opacity:.72; }
       .audio-library-section { margin-top:1.8rem; }
       .audio-library-saved-row { margin-top:1.15rem; }

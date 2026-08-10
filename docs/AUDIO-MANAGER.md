@@ -19,14 +19,43 @@ that engine rather than creating independent `<audio>` elements or queues.
   disabled (desk) when there is nothing to advance to.
 - See where they are in the queue: the bar's sub-line and the desk's head carry
   "N of M", counted within the QUEUE — not within the book or collection.
-- Save recordings, reopen recently played recordings, and clear recent history
-  from **Volumes → Listening Library**.
+- Switch the VOICE of whatever is playing, from the desk's **Voice** row. A
+  letter with more than one complete reading offers a chip per reader; a Bible
+  chapter offers a chip per recorded edition (short labels — `KJV · BRM`,
+  `NKJV · Dramatized`, `WEB`), and only for editions that actually ship that
+  book. One explicit rule either way: **choosing a voice restarts the
+  recording.** Position is deliberately not carried across — two readers never
+  reach the same words at the same second, so a "seamless" switch would drop
+  the listener mid-sentence. A recording with only one voice shows no row.
+  Switching Bible edition also moves `settings.bibleAudio`, so the Listen pills
+  on chapter indexes follow the choice instead of snapping back.
+- Set a DEFAULT voice for the Letters in **Settings → Reading → Letter Voice**.
+  `auto` (the default) uses each recording's primary reading; a reader code
+  starts every letter that reader has recorded in their voice, and letters they
+  never read keep the primary one. An explicit choice — a hero Listen with a
+  reader, a desk chip — always outranks it, and "Play all" is untouched: the
+  preference picks a START, not a whole queue.
+- Save recordings, reopen recently played recordings, remove one recent row
+  with its ×, and clear the whole recent history from **Volumes → Listening
+  Library**. The hub's now-playing card carries the same transport rules as the
+  mini-player (prev is a Restart on a queue of one; next is absent there) and
+  the same real scrubber.
 - Leave any recording and come back to it later. Every recording keeps its own
   place, so starting a second one does not forget the first; library rows say
   how much of a recording is left, and "Resume last" resumes for real.
-- Inspect and edit the future queue: play an item now, move it earlier/later,
-  remove it, or clear the remainder. The currently playing item is protected
-  from destructive queue actions.
+- Inspect and edit the WHOLE queue — heard, playing, and still ahead. Played
+  rows are dimmed but tappable, so a chapter can be heard again without
+  rebuilding the queue; the playing row is a marker with no controls at all
+  (the desk's own transport owns play/pause) and stays protected from
+  destructive queue actions; upcoming rows still move earlier/later, leave, or
+  clear as a block. With a per-chapter Bible edition this list IS the chapter
+  picker, so the desk centres the playing row when it opens.
+- Reach any position in a very long queue. A whole Bible edition queues 1,189
+  chapters, so the desk renders a WINDOW of current ± 40 rows with "Show N
+  earlier / later" expanders (`QUEUE_WINDOW_MIN` / `QUEUE_PAGE` in
+  `AudioManagerSheet.jsx`). Deliberately paged and dumb — no virtual scroller,
+  nothing to go wrong when the queue is edited underneath it. Anything shorter
+  than ~80 rows renders whole, with no expanders to discover.
 - Open the source text for saved/recent letter recordings when the corpus key
   still resolves.
 
@@ -42,7 +71,7 @@ it; the cache — not the app — owns eviction.
 
 | Responsibility | Owner |
 | --- | --- |
-| Track URL policy and persisted track normalization | `app/src/main/assets/src/utils/audio-track.js` |
+| Track URL policy, persisted track normalization, and the two display registries (`BIBLE_AUDIO_EDITIONS`, `AUDIO_READERS`) | `app/src/main/assets/src/utils/audio-track.js` |
 | Playback, Media Session, durable position, queue editing, sleep timer, and audio arbitration | `app/src/main/assets/src/utils/audio-player.js` |
 | Saved recordings, recent history, speed preference, and lifetime play count | `app/src/main/assets/src/stores/audio-library-store.js` |
 | Per-recording resume points (URL → position) | `app/src/main/assets/src/stores/audio-positions-store.js` |
@@ -50,6 +79,14 @@ it; the cache — not the app — owns eviction.
 | The one scrubber both of those render | `app/src/main/assets/src/ui/components/AudioSeekSlider.jsx` |
 | Saved/recent/browse screen | `app/src/main/assets/src/ui/screens/AudioLibraryScreen.jsx` |
 | IDB registration, import validation, and Settings backup mapping | `idb-adapter.js`, `import-validators.js`, `SettingsScreen.jsx` |
+
+Two settings reach the player, and neither is read from React state inside it:
+`settings.letterReader` is PUSHED in by `AudioPlayer.setPreferredReader(...)`
+from `buildScreenRoutes` (idempotent, once per render), and the desk's Bible
+voice chips write `settings.bibleAudio` back out through the
+`window.__setBibleAudioEdition` bridge that the same factory installs beside
+`window.__openAudioText`. Both directions are guarded by the registries, so an
+unknown reader code or edition id changes nothing.
 
 The player is in bundle D while `AudioLibraryStore` and `AudioPositionsStore`
 are in bundle B. D must use the `globalThis.AudioLibraryStore` /
@@ -76,7 +113,9 @@ Display strings are also bounded and copied before use.
 { v: 1, saved: [], recent: [], rate: 1 }
 ```
 
-- Saved recordings are capped at 100; recent recordings at 30.
+- Saved recordings are capped at 100; recent recordings at 30. `removeRecent(url)`
+  drops one recent row by its immutable release URL — an in-place mutator like
+  `clearRecent`, so no persisted shape and no schema version moves.
 - Both lists deduplicate by immutable release URL and retain the newest event.
 - The record participates in Settings export/import. Nested contents are
   normalized again on import, not merely trusted because the outer backup had
@@ -155,10 +194,15 @@ does not claim to provide a native foreground media service.
    Do not keep parallel queue state in React components.
 4. Keep the queue's current item immutable under editing controls. If a future
    feature needs deleting the active item, design an explicit stop/confirm
-   flow instead of weakening `removeUpcoming()`.
+   flow instead of weakening `removeUpcoming()`. The desk renders the whole
+   queue now, so this is enforced twice on purpose: the playing row renders no
+   controls, AND `removeUpcoming`/`moveUpcoming` still refuse any index at or
+   below `qi`.
 5. Keep bundle boundaries intact: pure helper modules can be shared directly;
    bundle-B stores are reached from bundle D by the runtime bridge.
-6. Seek from `AudioSeekSlider`, not from a second `<input type="range">`. A
+6. Seek from `AudioSeekSlider` on every surface that shows a position — the
+   mini-player, the desk, and the Listening Library hub — not from a second
+   `<input type="range">` and not from a painted progress div. A
    commit-per-drag-pixel scrubber writes a durable position per pixel; the
    shared slider previews locally and commits once on release (and immediately
    for the keyboard, which is the a11y half of that contract).
@@ -174,7 +218,16 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
+`AudioManagerSheet.test.jsx` drives the REAL player singleton through a fake
+media element, so the whole-queue picker (played/current/upcoming row states,
+re-picking a played recording, the centring scroll), the long-queue window and
+its expanders, and both voice shapes (reader chips restarting the letter into
+the s4 album queue; edition chips restarting the SAME chapter and moving
+`settings.bibleAudio`) are proven as behavior rather than wiring.
+
 The player tests cover loading-state pause safety, trusted direct playback,
+the default-reader preference (applied, one-line fallback to the primary,
+outranked by an explicit reader, and never applied to "Play all"),
 sleep-timer pause behavior (both modes), head-of-queue restart, custom-queue
 persistence/restore, audio arbitration, Media Session position reporting and
 queue-shape-dependent action registration, and the durable-resume rules (the

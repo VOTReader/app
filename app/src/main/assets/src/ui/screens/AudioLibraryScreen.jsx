@@ -10,6 +10,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
+import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
   audioLibraryStore, hasTextDestination, trackMeta, trackName, useAudioPositions,
@@ -107,7 +108,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   const active = isPlaying || isLoading;
   const status = isPlaying ? 'Playing now' : isLoading ? 'Connecting...' : 'Paused';
   const currentSaved = !!(current && library && typeof library.isSaved === 'function' && library.isSaved(current));
-  const progress = current && state.duration > 0 ? Math.min(100, Math.max(0, (state.time / state.duration) * 100)) : 0;
+  // Same rule the mini-player bar applies: a queue of one keeps a real restart
+  // control and hides next, rather than showing two dead skips.
+  const single = queue.length < 2;
   const shownRecent = recentAll ? recent : recent.slice(0, RECENT_PREVIEW);
 
   const toggleRecent = () => {
@@ -140,14 +143,27 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               <small>{trackMeta(current)}</small>
             </div>
             <div className="audio-library-now-actions">
+              {/* Transport, not just a play button: the hub is where a listener
+                  lands to pick something up, and stepping to the next chapter
+                  from here should not require opening the desk. */}
+              <button type="button" className="audio-library-icon-button audio-library-step" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart current recording' : 'Previous recording'} title={single ? 'Restart' : 'Previous'}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
+              </button>
               <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.toggle()} aria-label={active ? 'Pause current recording' : 'Resume current recording'} aria-busy={isLoading}>
                 {active ? <PauseIcon /> : <PlayIcon />}<span>{active ? 'Pause' : 'Resume'}</span>
               </button>
+              {single ? null : (
+                <button type="button" className="audio-library-icon-button audio-library-step" onClick={() => AudioPlayer.next()} aria-label="Next recording" title="Next">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
+                </button>
+              )}
               <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => library && library.toggleSaved(current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
               {hasTextDestination(current) ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(current)} aria-label="Open current recording text" title="Open text"><TextIcon /></button> : null}
             </div>
             <div className="audio-library-progress-wrap">
-              <div className="audio-library-progress" role="progressbar" aria-label="Playback progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{ width: progress + '%' }} /></div>
+              {/* The ONE scrubber (AUDIO-MANAGER.md rule 6). The decorative
+                  progressbar this replaces could be read but never moved. */}
+              <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
               <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
             </div>
           </section>
@@ -203,7 +219,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             {recentOpen ? (
               shownRecent.length ? (
                 <>
-                  <div className="audio-library-list">{shownRecent.map((track) => <AudioShelfRow key={track.url} track={track} source="recent" onOpenTrack={onOpenTrack} />)}</div>
+                  {/* Per-row × (owner directive 2026-08-09): one stray start no
+                      longer needs the whole history cleared to be tidied away. */}
+                  <div className="audio-library-list">{shownRecent.map((track) => <AudioShelfRow key={track.url} track={track} source="recent" onOpenTrack={onOpenTrack} onRemove={(item) => library && library.removeRecent(item.url)} />)}</div>
                   {recent.length > shownRecent.length ? (
                     <button type="button" className="audio-library-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
                   ) : null}

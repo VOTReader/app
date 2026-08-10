@@ -18,8 +18,10 @@ import {
   AUDIO_WEB_OT_PREFIX,
   AUDIO_WEB_NT_PREFIX,
   AUDIO_BRM_NT_PREFIX,
+  AUDIO_READERS,
   BIBLE_AUDIO_EDITIONS,
   audioAssetUrl,
+  audioReaderLabel,
   bibleAudioAssetUrl,
   bibleAudioEdition,
   isVotAudioUrl,
@@ -154,5 +156,36 @@ describe('audio-track — WEB (third edition) routing', () => {
     const ed = bibleAudioEdition('web-ebible');
     expect(ed.volKey).toBe('bible-web');
     expect(ed.translation).toBe('web');
+  });
+});
+
+/* The desk's Voice chips need a name short enough for a 44px chip row, and
+   Settings needs the reader names without importing the player. Both read
+   registries that live here, so neither surface carries its own string list. */
+describe('audio-track — display registries the listening UI renders from', () => {
+  it('every edition carries a short chip label led by its translation code', () => {
+    expect(BIBLE_AUDIO_EDITIONS['brm-kjv'].short).toBe('KJV · BRM');
+    expect(BIBLE_AUDIO_EDITIONS['wop-nkjv'].short).toBe('NKJV · Dramatized');
+    expect(BIBLE_AUDIO_EDITIONS['web-ebible'].short).toBe('WEB');
+    for (const ed of Object.values(BIBLE_AUDIO_EDITIONS)) {
+      expect(ed.short.length).toBeLessThanOrEqual(ed.label.length);
+      expect(ed.short.toUpperCase().indexOf(ed.translation.toUpperCase())).toBe(0);
+    }
+  });
+
+  it('names every reader code and refuses anything else', () => {
+    expect(Object.keys(AUDIO_READERS)).toEqual(['B', 'T', 'V', 'M']);
+    expect(audioReaderLabel('B')).toBe('Read by Benjamin');
+    expect(audioReaderLabel('M')).toBe('AI reading with music');
+    expect(audioReaderLabel('Z')).toBe(null);
+    expect(audioReaderLabel('')).toBe(null);
+    expect(audioReaderLabel(undefined)).toBe(null);
+    // Same rule as the edition registry: a prototype name is not a reader.
+    expect(audioReaderLabel('toString')).toBe(null);
+  });
+
+  it('publishes both registries as globals for the classic-script screens', () => {
+    expect(globalThis.BIBLE_AUDIO_EDITIONS).toBe(BIBLE_AUDIO_EDITIONS);
+    expect(globalThis.AUDIO_READERS).toBe(AUDIO_READERS);
   });
 });

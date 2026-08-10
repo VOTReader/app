@@ -231,6 +231,27 @@ export const AudioLibraryStore = extendStore(
     /** Lifetime recordings-played count (milestones). @returns {number} */
     getPlays() { return this.get().plays; },
 
+    /**
+     * Drop ONE recording from the recent shelf, by its immutable release URL —
+     * the same identity save/dedupe use. An in-place mutator like clearRecent:
+     * no persisted shape changes, so no schema version moves.
+     *
+     * @param {unknown} url
+     * @returns {boolean} true when a row was actually removed
+     */
+    removeRecent(url) {
+      if (typeof url !== 'string' || !url) return false;
+      if (this._shouldDefer('removeRecent', url)) return true;
+      const data = _writeableData(this);
+      const remaining = data.recent.filter((item) => item.url !== url);
+      if (remaining.length === data.recent.length) return false;
+      data.recent = remaining;
+      this._cache = data;
+      this._save();
+      this._bump();
+      return true;
+    },
+
     /** @returns {void} */
     clearRecent() {
       if (this._shouldDefer('clearRecent')) return;

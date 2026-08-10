@@ -156,6 +156,21 @@ describe('AudioCollectionScreen -- a VOT collection', () => {
     expect(screen.getByText('10:00 left')).toBeTruthy();
     expect(screen.getAllByText(/left$/)).toHaveLength(1);   // Letter A stays unannotated
   });
+
+  /* Played/unplayed marks: the SAME chip the shelf rows carry, from the same
+     positions store, under the same rule — a row the store knows nothing about
+     says nothing at all rather than claiming "unplayed". */
+  it('marks a row Finished at the tail, and leaves an unknown recording unmarked', () => {
+    globalThis.AudioPositionsStore = {
+      subscribe: () => () => {}, getVersion: () => 0,
+      getPosition: (track) => ((track && track.url) === URL_OF('idA') ? { t: 880, d: 900 } : null),
+    };
+    renderScreen('one');
+    // 880 / 900 is past the 97% tail: a place to start again, not to return to.
+    expect(screen.getByText('Finished')).toBeTruthy();
+    expect(screen.queryByText(/left$/)).toBeNull();
+    expect(document.querySelectorAll('.audio-library-remaining')).toHaveLength(1);
+  });
 });
 
 describe('AudioCollectionScreen -- a Bible edition', () => {
