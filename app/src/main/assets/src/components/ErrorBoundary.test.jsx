@@ -6,20 +6,32 @@
    error logging is suppressed.
 */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 function Boom() { throw new Error('kaboom'); }
 
+// NOISE-1 (2026-08-09): the Reset-to-Home / Reload-App handlers call
+// location.reload(), which jsdom logs as "Not implemented: navigation to
+// another Document". jsdom's own reload is non-configurable but the
+// window.location PROPERTY is (sw-register.test.js precedent), so a
+// whole-file stub keeps the click paths quiet AND lets the reset test
+// assert the reload actually fires. afterAll restores the real object.
+const REAL_LOCATION = window.location;
+
 let errSpy;
 beforeEach(() => {
   try { sessionStorage.clear(); } catch (_e) { /* jsdom always has it */ }
   errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  Object.defineProperty(window, 'location', { configurable: true, value: { reload: vi.fn() } });
 });
 afterEach(() => {
   cleanup();
   if (errSpy) errSpy.mockRestore();
+});
+afterAll(() => {
+  Object.defineProperty(window, 'location', { configurable: true, value: REAL_LOCATION });
 });
 
 describe('ErrorBoundary — E4 crash-loop guard', () => {
@@ -49,10 +61,11 @@ describe('ErrorBoundary — E4 crash-loop guard', () => {
     render(<ErrorBoundary><Boom /></ErrorBoundary>);
     cleanup();
     const { getByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
-    // sessionStorage.setItem runs before location.reload() in the handler, so
-    // the flag is observable even though jsdom's reload is a no-op.
+    // sessionStorage.setItem runs before location.reload() in the handler;
+    // with the file-level location stub, the reload itself is observable too.
     fireEvent.click(getByText('Reset to Home'));
     expect(sessionStorage.getItem('vot-crash-recover')).toBe('1');
+    expect(window.location.reload).toHaveBeenCalledTimes(1);
   });
 });
 

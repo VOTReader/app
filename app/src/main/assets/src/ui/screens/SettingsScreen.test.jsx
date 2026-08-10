@@ -233,17 +233,28 @@ describe('auto-scroll controls', () => {
    Wave-0 Settings fixes — P1-9 toggle names, .votbak copy, native-dialog
    removal, wipe-dialog registry. modalRegistry is a real global (vitest
    .setup installs it); _reset() between tests because it's a singleton.
-   window.location is replaced per-test where a flow ends in reload —
-   jsdom's own location.reload is non-configurable (sw-register.test.js
-   precedent).
+   window.location is replaced for the WHOLE FILE — jsdom's own
+   location.reload is non-configurable, but window.location itself is
+   (sw-register.test.js precedent).
+   FILE-LEVEL, not per-test, and NEVER RESTORED (NOISE-1 fix, 2026-08-09):
+   the import-success and clear-all flows schedule `setTimeout(reload,
+   600)`, and the tests that drive them don't await the timer — so any
+   restore (per-test afterEach OR a file-end afterAll) reinstates the
+   REAL Location while a reload deferral is still pending, and the timer
+   then fires jsdom's actual navigate() during a later test or the env
+   teardown (stack-traced to SettingsScreen.jsx's import-success timer;
+   the only symptom was jsdom's "Not implemented: navigation to another
+   Document" notice). A fresh stub per test keeps the reload-called
+   assertions exact; the real Location is deliberately never reinstated —
+   the file's jsdom environment is discarded after the last test, nothing
+   after it needs a live Location, and leaving the stub is the only state
+   in which a straggler timer is provably silent. SettingsScreen touches
+   location ONLY via reload() (verified by grep), so no test here needs
+   the real Location object either.
    ─────────────────────────────────────────────────────────────────────── */
-const REAL_LOCATION = window.location;
-const stubLocationReload = () => {
+beforeEach(() => {
   Object.defineProperty(window, 'location', { configurable: true, value: { reload: vi.fn() } });
-};
-const restoreLocation = () => {
-  Object.defineProperty(window, 'location', { configurable: true, value: REAL_LOCATION });
-};
+});
 
 describe('P1-9 — every settings toggle has an accessible name', () => {
   it('all mounted toggle rows expose a switch whose name matches their row label', () => {
@@ -354,24 +365,19 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
   it('reports a completed clear via toast, never the native alert()', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const toastSpy = vi.fn();
-    stubLocationReload();
-    try {
-      teardownSettingsGlobals();
-      setupSettingsGlobals({ showToast: toastSpy });
-      renderSettings();
-      fireEvent.click(screen.getByText('Clear All My Data'));
-      fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-      fireEvent.click(screen.getByText('Delete Everything'));
-      await vi.waitFor(() => {
-        expect(toastSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ text: 'All personal data cleared. Reloading…' })
-        );
-      });
-      expect(alertSpy).not.toHaveBeenCalled();
-      await vi.waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
-    } finally {
-      restoreLocation();
-    }
+    teardownSettingsGlobals();
+    setupSettingsGlobals({ showToast: toastSpy });
+    renderSettings();
+    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.click(screen.getByText('Delete Everything'));
+    await vi.waitFor(() => {
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'All personal data cleared. Reloading…' })
+      );
+    });
+    expect(alertSpy).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
   });
 
   it('reports a blocked personal-data deletion as failure and does not reload', async () => {
@@ -385,7 +391,6 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       return req;
     });
     localStorage.setItem('vot-clear-probe', 'keep-until-critical-deletes-finish');
-    stubLocationReload();
     try {
       teardownSettingsGlobals();
       setupSettingsGlobals({ showToast: toastSpy });
@@ -404,7 +409,6 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       expect(deleteSpy).toHaveBeenCalledWith('vot-journal-media');
     } finally {
       localStorage.removeItem('vot-clear-probe');
-      restoreLocation();
     }
   });
 });
@@ -427,7 +431,6 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
     const applySpy = vi.fn(async () => ({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] }));
     const pickImportFile = vi.fn(async () => fakeFile());
-    stubLocationReload();
     teardownSettingsGlobals();
     setupSettingsGlobals({
       PlatformBridge: {
@@ -444,7 +447,6 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     renderSettings();
     return { confirmSpy, applySpy, pickImportFile };
   };
-  afterEach(restoreLocation);
 
   /* The sheet's TEXT lands at commit, but useModalRegistry registers in a
      PASSIVE effect — and the setState that opens the sheet runs in an async
@@ -593,7 +595,6 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
    ─────────────────────────────────────────────────────────────────────── */
 describe('Android v3 import — native stream not closed until the confirm settles', () => {
   beforeEach(() => modalRegistry._reset());
-  afterEach(restoreLocation);
 
   const MANIFEST = { app: 'VOTReader', exportVersion: 3, exportDate: '2026-01-01T00:00:00.000Z', stores: {}, media: [] };
 
@@ -606,7 +607,6 @@ describe('Android v3 import — native stream not closed until the confirm settl
       for await (const _e of entries) { void _e; /* no media in this manifest */ }
       return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
     });
-    stubLocationReload();
     teardownSettingsGlobals();
     setupSettingsGlobals({
       PlatformBridge: {

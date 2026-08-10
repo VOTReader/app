@@ -92,6 +92,42 @@ for (const name of _bridgeStubs) {
   }
 }
 
+// (NOISE-1, 2026-08-09 external-audit follow-up) — quiet jsdom's
+// "Not implemented" environment-gap notices so REAL warnings stand out in
+// the run output. These are jsdomErrors piped straight to stderr, so
+// vitest's onConsoleLog can't filter them (verified: the filter never
+// fired); the fix is API-level shims with BYTE-IDENTICAL observable
+// behavior — only the log line disappears.
+//
+// (a) Canvas. jsdom without the optional `canvas` package logs
+//     "Not implemented: HTMLCanvasElement's getContext()/toDataURL()" and
+//     returns null / undefined. The shims return the SAME values silently,
+//     so platform-bridge's downscale + uniformity probe (and any thumbnail
+//     path) behave exactly as before — tests that stub their own canvases
+//     override per-instance and never reach these prototypes.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = function () { return null; };
+  HTMLCanvasElement.prototype.toDataURL = function () { return undefined; };
+}
+// (b) Download anchors. webSaveToFile / openExportSink's Blob fallback
+//     click a real `<a download href="blob:…">`; jsdom implements neither
+//     downloads nor navigation, so the click's default action logs
+//     "Not implemented: navigation to another Document". preventDefault on
+//     download-attributed anchors stops the navigation ATTEMPT — which was
+//     always a no-op — while a real (non-download) accidental navigation
+//     still logs. Capture phase so it runs before any test listeners.
+document.addEventListener('click', (e) => {
+  const t = /** @type {any} */ (e.target);
+  if (t && t.tagName === 'A' && t.hasAttribute && t.hasAttribute('download')) {
+    e.preventDefault();
+  }
+}, true);
+// Debug tip: when a stray jsdom "Not implemented" notice appears with no
+// obvious source, its Error carries the trigger STACK that vitest never
+// prints — attach `window._virtualConsole.on('jsdomError', e => console
+// .error(e.stack))` here temporarily to see exactly who navigated (this is
+// how the SettingsScreen leaked-reload-timer was found, 2026-08-09).
+
 // (3) navigator.locks shim (STORE-1). jsdom has no Web Locks API, but the
 //     cross-tab-safe store flush (cached-store.js _saveMerged) serializes its
 //     read-merge-write through navigator.locks.request(). A faithful minimal

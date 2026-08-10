@@ -25,6 +25,9 @@ export default defineConfig({
     ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'
     // when CI reporting needs structured output.
+    // (NOISE-1 lives in vitest.setup.js — jsdom's "Not implemented" notices
+    // are jsdomErrors piped straight to stderr, so onConsoleLog here never
+    // sees them; the setup file quiets them at the API-shim layer instead.)
 
     coverage: {
       provider: 'v8',
