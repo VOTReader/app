@@ -563,25 +563,33 @@ describe('audio-player — sleep at end of track', () => {
   });
 
   it('Clear cancels it, and the two sleep modes replace each other', () => {
-    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
-    el().dispatchEvent(new Event('playing'));
+    // Fake timers pin the clock: getSleepRemainingSeconds() reads Date.now(),
+    // and a >0.5s stall between arm and assert (seen under v8 coverage
+    // instrumentation in CI) rounds 1800 down to 1799.
+    vi.useFakeTimers();
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+      el().dispatchEvent(new Event('playing'));
 
-    AudioPlayer.setSleepAtTrackEnd();
-    AudioPlayer.clearSleepTimer();
-    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
-    el().dispatchEvent(new Event('ended'));
-    expect(AudioPlayer.getState().qi).toBe(1);               // disarmed — advanced
+      AudioPlayer.setSleepAtTrackEnd();
+      AudioPlayer.clearSleepTimer();
+      expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+      el().dispatchEvent(new Event('ended'));
+      expect(AudioPlayer.getState().qi).toBe(1);               // disarmed — advanced
 
-    // Arming a countdown drops the flag…
-    AudioPlayer.setSleepAtTrackEnd();
-    AudioPlayer.setSleepTimer(30);
-    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
-    expect(AudioPlayer.getSleepRemainingSeconds()).toBe(1800);
-    // …and arming the flag drops the countdown.
-    AudioPlayer.setSleepAtTrackEnd();
-    expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
-    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
-    AudioPlayer.clearSleepTimer();
+      // Arming a countdown drops the flag…
+      AudioPlayer.setSleepAtTrackEnd();
+      AudioPlayer.setSleepTimer(30);
+      expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+      expect(AudioPlayer.getSleepRemainingSeconds()).toBe(1800);
+      // …and arming the flag drops the countdown.
+      AudioPlayer.setSleepAtTrackEnd();
+      expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
+      expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+      AudioPlayer.clearSleepTimer();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('refuses to arm with nothing playing, and stop() disarms it', () => {
