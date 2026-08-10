@@ -119,7 +119,7 @@ describe('describeTab', () => {
     delete (/** @type {any} */ (globalThis)).OT_BOOK_IDS;
   });
   it('falls back to Home for an unknown screen', () => {
-    expect(describeTab({ screen: 'totally-unknown' })).toEqual({ title: 'Home', subtitle: 'VOT Study Bible', resolved: true });
+    expect(describeTab({ screen: 'totally-unknown' })).toEqual({ title: 'Home', subtitle: 'VOTReader', resolved: true });
   });
 
   // P1-8: every personal-content screen used to fall THROUGH to the Home
