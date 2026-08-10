@@ -4,7 +4,7 @@ Deep dives into annotation, navigation, state management, and rendering. Read wh
 
 ---
 
-## Current-systems addendum (2026-07-28 refresh — [18])
+## Current-systems addendum (2026-08-10 refresh — [18], audio added)
 
 The sections below this one predate several landed systems. This addendum is the CURRENT index of them; each system's full contract lives in its module header (the file IS the deep doc — read it before editing).
 
@@ -19,6 +19,8 @@ The sections below this one predate several landed systems. This addendum is the
 - **Auto-scroll reading transport** (`hooks/use-autoscroll.js` + `ui/components/AutoScrollControl.jsx`): lines/min over a MEASURED line height, the scrollTop lease, `.reading-end` reading-zone stop, dwell + auto-advance via the pager's own boundary policy. Full map in **§20**.
 - **Reading-measurement engine** (2026-08-03: `utils/word-count.js` + `hooks/use-read-tracker.js` + `stores/reading-stats-store.js`): ONE word-count definition shared by app + the corpus baseline gate; the geometry-sweep read detector (NOT IntersectionObserver — deliberate, see **§21**); count-valued readItems; ReadingStatsStore ledger (IDB v8) + per-item frontiers (recording-only since 2026-08-04 — **scroll-position resume owns reopening**; the frontier jump was retired). Full map in **§21**.
 - **One shared top-nav**: `ui/components/LibraryNav.jsx` renders every screen's nav (2026-07-30; SearchScreen + GardenView are the two documented exceptions). Full map, and its selector/measurement couplings, in **§18.10b**.
+- **Milestones = ONE engine** (2026-08-10 owner decision): `utils/achievements.js` owns every threshold. `MilestonesScreen` renders `buildAchievements(...).categories` (the full ~84); My Progress's compact strip renders `.featured`, the ten items that used to be a second table in `reading-stats-store` — the SAME item objects, so the two surfaces cannot disagree and featuring adds nothing to any total. The store keeps only the persisted once-ever unlock ledger for the toast, driven from `FEATURED_UNLOCK_DEFS` (legacy key space intact, so no saved unlock is invalidated). `achievements.js` is pure and rides bundles b + d, the arrangement `utils/audio-track.js` already has.
+- **Audio subsystem** (2026-08-05 → 08-10: `utils/audio-player.js` + `utils/audio-track.js` + two generated manifests + `AudioPositionsStore`/`AudioLibraryStore` + the native card): 729 letter recordings and three per-chapter Bible editions (1,189 chapters each) stream from immutable GitHub Release assets behind ONE frozen prefix list; forward-only queues, book-scoped Bible queues, durable per-recording resume, listening that earns read credit. Full map in **§23**.
 
 ---
 
@@ -1021,6 +1023,125 @@ Sorted by `startSec`. `charStart`/`charEnd` are offsets in the BLOCK's DOM `text
 **Settings** (`hooks/use-settings.js`, both default **ON**, in Settings → Listening — the group that also owns Bible Audio, Letter Voice and Default Speed): `readAlongHighlight` gates the paint — and with it everything, since there is nothing to follow — and `readAlongFollow` gates only the scroll, so a reader can keep the wash without the motion. They reach the two reading views through `sharedViewProps` (`readAlongOn` / `readAlongFollow`), the way every other settings-driven reading behaviour does.
 
 **Coverage:** `ReadAlongHighlight.test.jsx` drives the real `AudioPlayer` singleton through a fake media element, with a hand-drained frame source so the glide's timestamps are exact — the lease rules, both settings gates, the binary search at its boundaries, and the mapper's silent `null` are each RED-proven. `tools/smoke.js`'s **Read-along wiring** step checks the other half in the real app without playing anything: the corpus is wired, every block a fragment names exists under the hl-key the component builds, and the Highlight API round-trips (or is cleanly absent).
+
+---
+
+## Section 23 — Audio subsystem (streaming letters + recorded Bible)
+
+~4,200 lines across the player, the trust boundary, two IDB stores, two generated manifests and a native bridge. This is the reference map; each module header is still the deep doc for its own file. Line anchors are as of 2026-08-10 — verify with `grep -n` before trusting one.
+
+### 23.1 The trust boundary — what a URL is allowed to be
+
+Every played or persisted track points at an immutable GitHub Release asset, and `utils/audio-track.js` owns the whole rule. **`RELEASE_PREFIXES`** (`audio-track.js:45`) is a frozen eight-entry list — `audio-v1` (letters), `audio-bible-v1` (the retired whole-book Bible tracks), and the OT/NT tag PAIRS for the three per-chapter editions (`audio-wop-v1/v2`, `audio-brm-v1/v2`, `audio-web-v1/v2`). A release caps at 1,000 assets and each edition is 1,189 chapters, which is why an edition needs two tags at all.
+
+`isVotAudioUrl()` (`:178`) is the only membership test: prefix match against that list, then `ASSET_NAME` (`^[A-Za-z0-9_-]+\.mp3$`) on the remainder — so `…/audio-bible-v1/../escape.mp3` and `…/x.ogg` both fail. It gates `normalizeAudioTrack()` (`:197`, the import/restore boundary for saved recordings), `AudioPositionsStore`'s key check, and the player's own restore path. Widening this list is the one change in the subsystem that can turn the app into a generic remote loader.
+
+**Routing** is `bibleAudioAssetUrl()` (`:158`): the asset NAME picks the tag. `wop1_`/`wop2_`, `brm1_`/`brm2_`, `web1_`/`web2_` prefixes route to that edition's OT/NT release; everything else falls through to `audio-bible-v1`. The fall-through is load-bearing — legacy whole-book ids look like `brm-kjv_genesis`, which shares three characters with `brm1_` and must NOT be captured, or every saved recording's URL would change and stop resolving. Letters use the simpler `audioAssetUrl()` (`:141`) against `audio-v1`. The player picks between them per volKey: `_isBibleVol` / `_mapFor` / `_assetUrlFor` (`audio-player.js:153-157`) are the three lines where the two corpora diverge.
+
+**Why GitHub Releases at all:** Drive was the original host and 403s every request carrying `Sec-Fetch-Site: cross-site` (anti-hotlinking — curl passes only because it sends no sec-fetch headers). Never retarget back. R2 is the documented contingency.
+
+### 23.2 The manifests — two generated corpora, one expanded by loop
+
+**Letters** — `src/data/audio-manifest.js` (generated by `tools/gen-audio-manifest.mjs`), rides **bundle-a-vot** with the VOT corpus: `AUDIO_MANIFEST["volKey:letterId"] = [[assetId, readerCode, partLabel?], …]`, plus `AUDIO_SECTIONS` (WTLB range compilations) and `AUDIO_ALTERNATES` (the ~42 letters with a second complete reading). All three are classic-script `var` globals read at CALL time through `_manifest()`/`_sections()`/`_alternates()` (`audio-player.js:140-147`) — never at import time, because they are lazy.
+
+**Bible** — `src/data/bible-audio-manifest.js` (generated by `tools/gen-bible-audio-manifest.mjs`), rides **bundle-a** (critical path, ~4 KB minified) so Settings, the boot restore and `matthew-idx` work before the Bible corpus loads. Three globals:
+
+- `BIBLE_AUDIO_BOOKS` — canonical 66-book order, `[appBookId, title]`, titles taken from `books.js` so the audio book ids ARE the corpus book ids by construction (this is what lets the read-credit bridge write into the reader's own key space).
+- `BIBLE_AUDIO_MANIFEST` — declared EMPTY at `bible-audio-manifest.js:86` and filled by the **expansion IIFE** at `:155-241`: a `[bookId, testament, chapterCount]` table × a three-entry editions table `[['bible-brm-kjv','brm'], ['bible-wop-nkjv','wop'], ['bible-web','web']]`, emitting `<prefix><testament>_<bookId>_<NNN>` asset names with a `Chapter N` partLabel. 2,378 rows generated from ~1 KB of source instead of written out. A fourth edition of the same shape is ONE entry in that editions array plus a registry entry plus two prefixes.
+- `BIBLE_AUDIO_CHAPTERS` (`:87`) — `"volKey:bookId" → [sec, …]` chapter-start offsets into the RETIRED whole-book BRM track (1,189 rows, every boundary independently belt-verified). It survives as **resume-migration data**: a snapshot saved before the per-chapter switch holds a book-relative clock, and this index is what turns it into (chapter, offset-within-chapter). Retire after the next release.
+
+**Registry** — `BIBLE_AUDIO_EDITIONS` (`audio-track.js:61`) maps a `settings.bibleAudio` value to `{ label, short, translation, volKey }`; `bibleAudioEdition()` (`:121`) resolves it with a `hasOwnProperty` guard (settings values are import-restorable, so `'toString'` must not resolve). It lives in `audio-track.js`, not the lazy manifest, so Settings can list editions before any corpus lands, and is published on `globalThis` for the classic-globals Settings screen (`:116`). Every `volKey` starts `bible-`, which is the single prefix test the player branches on.
+
+### 23.3 playBibleBook — branching on SHAPE, never on edition id
+
+`playBibleBook()` (`audio-player.js:883`) takes `{ volKey, bookId, label, chapterNum, noResume }` and does two things:
+
+1. **Scope is THE BOOK** (owner directive 2026-08-10): `items` is filtered to the one book, so a chapter tap queues that book's remaining chapters and auto-advance ends where the book ends — never the rest of the Bible.
+2. **Shape decides how "chapter N" is honored.** `perChapter = parts.length > 1` (`:900`). Per-chapter → the chapter is a queue POSITION, passed as `startPartIndex` (`:904`, clamped inside the book). Whole-book → one part per book, so the chapter is a SEEK: `bibleChapterStart()` (`:923`) reads `BIBLE_AUDIO_CHAPTERS` and `_seekOnMetadata()` arms it (`:911`).
+
+The branch is on the SHAPE the manifest declares, never on an edition id, which is why WEB joined as a third voice with no player change at all. `bibleChapterStart` returns 0 for chapter 1, an unknown book or an uncovered row — an index gap degrades to "start at the book", never to a wrong offset.
+
+Consumers: the hero Listen pill on `ChapterIndex` (book index — no chapter named, so the book starts at chapter 1), `BibleChapterView` and `MatthewChapterView`/`ChapterView` (chapter named), the desk's edition chips (`AudioManagerSheet.jsx:123`, always with `noResume`), and `AudioCollectionScreen`'s per-book chapter disclosure.
+
+### 23.4 The forward-only horizon
+
+`playCollection()` (`audio-player.js:1648`) is the album engine both corpora share, and its contract is **forward-only** (owner directive 2026-08-09): `startId` slices the built queue at the chosen item, so nothing behind it is ever queued and `prev()` simply clamps at the start. A reader stepping backward past where they began is disorienting; the horizon persists, so it survives a reboot too.
+
+Three refinements sit on top, applied in this order inside the `startKey` block:
+
+- **`startReader`** swaps the START item for another reader's complete rendition (`:1665-1679`) — the rest of the collection keeps the manifest's primary reading. Renditions are never interleaved.
+- **`startPartIndex`** advances the horizon INTO the start item's parts (`:1682-1687`) — same rule, chapter/part-grained. It is applied **after** the voice swap (2026-08-10): the older order let the rendition swap re-grow the parts the index had just trimmed, so "Part 2, read by Timothy" rebuilt as Part 1.
+- **`noResume`** suppresses the durable resume for this start (`:1704`) — the desk's voice switch promises "starts this again", and a remembered position from a DIFFERENT recording's pacing would drop the listener mid-sentence.
+
+`_rememberOutgoingPosition()` fires first (`:1692`): a new queue replacing the old one is a boundary like a track change, or the outgoing recording loses up to the throttle window.
+
+`_tracksFor()` (`:999`) is what expands a manifest row into Tracks, and owns one display rule: a per-chapter Bible book (`_isBibleVol && parts.length > 1`) titles each track by its CHAPTER ("Psalms 117") while keeping the `Chapter N` partLabel — 150 rows that all read "Psalms" named nothing. `displayPartLabel()` (`audio-track.js:236`) then suppresses the resulting echo on the bar and the desk head, and only there.
+
+### 23.5 The `loadedmetadata` seek contract
+
+`_seekOnMetadata(at)` (`audio-player.js:1246`) is the ONE deferred-seek primitive: a `currentTime` assignment before `loadedmetadata` is ignored or throws, so every seek that must survive a `src` assignment goes through it, `{ once: true }`. Boot restore, durable resume, the whole-book chapter offset and the whole-book→per-chapter migration all use it.
+
+Ordering matters and is deliberate: `playBibleBook` arms the resume seek first (inside `playCollection`) and then adds its own chapter seek SECOND, so the chapter the reader actually tapped wins the assignment over a remembered position. `noResume` is the only way to skip the first.
+
+### 23.6 `vot-audio-positions` — durable per-recording resume (IDB v10)
+
+`stores/audio-positions-store.js`. The player's `vot-audio-pos` localStorage snapshot is ONE slot (it remembers the last thing playing); this store is the per-recording memory beside it.
+
+- **Shape**: `url → { t, d, at }` — seconds in, length, last-touch epoch. Three numbers, no media.
+- **Keys are URLs**, re-checked through `isVotAudioUrl` on every read and write (`_url()`, `:71`), so no arbitrary address can enter the map.
+- **LRU capped at `MAX_AUDIO_POSITIONS = 200`** (`:21`) by last touch. **Key insertion order IS the LRU order** — writes delete before re-inserting — so pruning costs no sort and an oversized import truncates to the FRESHEST 200 rather than an arbitrary 200.
+- Clocks are clamped to `MAX_POSITION_SECONDS` (100 h) and rounded to a tenth of a second, the player's own resolution.
+
+**Write rules** (`audio-player.js:1169` `_rememberPosition`): a ≥1/s throttle with a `force` bypass at deliberate boundaries, and a **uniform 30 s floor** (`AUDIO_RESUME_MIN_SEC`) applied on the WRITE path since 2026-08-10 — including the forced stop/pause writes. A position under 30 s can never resume, so storing one files a row that means exactly what no row means while spending an LRU slot; skipping chapters through a book used to file a dead row per chapter and evict the real places the listener left. The same test covers a zero clock, which matters because `_start()` sets `_state.time = 0` before metadata lands.
+
+**Attribution (R8)**: the position belongs to the track being LEFT, so every transport move that mutates `_state.qi` calls `_rememberOutgoingPosition()` (`:1195`) FIRST. A track heard to its end is FORGOTTEN — `_forgetPosition` (`:1200`) deletes it pre-advance and `_finishedUrl` flags the URL so the advance cannot write the ending clock back in. `stop()` writes before clearing live state: the ✕ ends the session, not the memory.
+
+**Read rules** (`_resumeAt`, `:1224`, thresholds shared from `audio-track.js:258-263` so library rows describe exactly what a tap will do): resume when `t ≥ 30` and `t < 0.97 × d`, seeking to `t − 5` (rewind-on-resume). `d = 0` (metadata never arrived) resumes on the clock alone. **Emergent and pinned as correct**: a recording shorter than ~31 s can never resume, since the two tests together require `d > 30 / 0.97`.
+
+**Migration**: `_migrateWholeBookResume()` (`:1381`) converts a pre-switch whole-book snapshot — an `audio-bible-v1` URL with a clock measured against the WHOLE BOOK — into the right chapter track plus an offset inside it, using `BIBLE_AUDIO_CHAPTERS`.
+
+**The seven registration legs** every user-data store must land together (`user-data-parity.test.js` is the three-way canary that makes a miss go RED): `STORE_NAMES` and the `DB_VERSION` bump in `stores/idb-adapter.js:93,81`; `idb-adapter.test.js`; the `_entry-b.js` import + window map (`:67`); `STORE_SHAPES` in `utils/import-validators.js:79`; SettingsScreen's guarded export entry (`SettingsScreen.jsx:784`, `method: 'replaceAll'`); and `USER_DATA_STORES` in `utils/user-data-size.js:74`. The parity test exists because `vot-audio-library` (v9) shipped with leg 6 missing for a release.
+
+### 23.7 `vot-audio-library` — the Listening Library's metadata (IDB v9)
+
+`stores/audio-library-store.js`. Small metadata only — saved recordings (cap 100), a bounded recent list (cap 30), the playback-rate preference, and two monotonic lifetime counters. No media bytes, no arbitrary URL field; every track in or out passes `normalizeAudioTrack`.
+
+**`plays` vs `completions` are deliberately two counters** because starting a recording and finishing one are different acts and My Progress shows both:
+
+- `countPlay()` (`:239`) — lifetime recordings STARTED. Never called from `_start()`, which also runs for auto-advance, next/prev, `playAt` and the boot-resume rebuild; counting starts there would credit a whole queue to one tap on Play All.
+- `countCompletion()` (`:264`) — recordings heard to their END, fired from `_countCompletion()` (`audio-player.js:723`) at the same moment the read credit is granted, so it counts WHOLE recordings (a multi-part letter counts once, when its last part ends).
+- On restore, `plays` takes a conservative lower bound from `recent.length` when the field is absent (`:136`); `completions` gets NO inference — a pre-counter library holds no evidence about what ever reached its last second, and an invented number would be a lie about the reader's own listening.
+
+**Recents policy (post-C2-A/W1)**: `recordPlayed()` (`:218`) moved out of `_start()` and onto `_countPlay()`'s four user-initiated entry points (`audio-player.js:1524`). It had fired on every auto-advance, so one Genesis evening flushed all 30 rows AND repointed "Resume last" at a chapter nobody chose. The shelf answers *what did I put on* — a decision, not a track boundary. The two counters are isolated inside `_countPlay` in nested try/catch: a failing shelf write must not cost the play count, and neither may stand between a tap and audio.
+
+**Continuation (C2-A/A1)**: a shelf row or "Resume last" is one Track, and used to play as a queue of ONE. `_locateTrack()` (`:1569`) now finds that recording in the LIVE manifests by its immutable URL and `playTrack()` (`:1768`) rebuilds around it — a Bible chapter gets its book from that chapter forward, a letter its collection forward on the exact rendition and part the row names. Only a URL no manifest carries any more (a legacy whole-book asset, a retired recording, a range compilation) still plays alone.
+
+### 23.8 The read-credit bridge
+
+A recording played to its end counts like a read (owner directive 2026-08-09). `_notifyListened()` (`audio-player.js:692`) fires from `'ended'` BEFORE `next()` advances; range-compilation sections carry `key: null` and never notify. **Two completion grains, because the corpus has two:**
+
+- a LETTER is one recording that may be split across parts, so it scores when its LAST part ends — the same-key guard against the following track is what waits for it;
+- a BIBLE CHAPTER is a whole recording of its own. Every shipped edition is per-chapter and a book's chapters all share one key, so the letter guard credited a 50-chapter book exactly once, and only when the queue happened to hold the whole book. Bible tracks therefore notify **per track**, independent of queue shape, carrying the chapter parsed from `partLabel` (`_chapterOfTrack`, `:672`).
+
+The App side is `window.__votAudioListened(volKey, itemId, chapterNum)` in `hooks/useMarkAsRead.js:243` — a fail-quiet window bridge, never an import across bundles. A `bible-*` volKey resolves into the SAME chapter key space `BibleChapterView`'s own mark-as-read writes (`v1:<bookId>:<chapter>`), so a listened chapter checks its index card, counts toward the Scripture-chapter milestones and records a reading day for the streak. A whole-book legacy recording names no chapter: it counts as finished in the Listening Library but claims no chapter read. Letters resolve through `COL_BY_KEY`'s `readKey`, which has no `bible-*` entry — that mismatch was the whole defect.
+
+### 23.9 The native media card
+
+Android only, and the JS player stays the single source of playback truth in both directions.
+
+**Out** — `_syncNative()` (`audio-player.js:409`) pushes `(title, artist, isPlaying, position, duration, rate)` through `AndroidBridge.setAudioNowPlaying` (`AppInterface.kt:150`) to `AudioKeepAliveService`'s `MediaSessionCompat` + MediaStyle notification. It is **edge-driven**: called from `_mediaSession`, `_syncMediaSessionState` and the transport edges, and deliberately NOT from `_syncMediaSessionPosition`, which runs at 1 Hz off `timeupdate` (`:344` says so at the call site). The card's second line is `_cardArtist()` (`:396`): a Bible chapter names its EDITION, because those tracks carry no reader and all three editions would otherwise read "The Volumes of Truth" alike.
+
+**Back** — the service's `commandSink` (`AudioKeepAliveService.kt:360`, wired in `MainActivity.kt:506`) forwards `(cmd, posMs)` over `JsBridge` as `window.__votMediaCommand` (`JsEvent.kt:56`), received by `_installNativeTransport()` (`audio-player.js:430`). `play`/`pause`/`toggle` all resolve through `toggle()` — the system only offers Play while paused and Pause while playing, so the edge is always the right one. A bad command can never crash the player.
+
+Pause keeps the card alive (keep-alive releases only on idle; the paused notification detaches from the FGS so it is swipeable, and swiping stops the service). Separately, `_setAudioActive()` (`:226`) is the keep-alive edge that lets the WebView keep playing with the screen off.
+
+### 23.10 Prefetch, and what it must never warm
+
+`_warmTargets()` (`audio-player.js:598`) warms the next `PREFETCH_AHEAD = 2` queued URLs into the HTTP cache through a detached, never-playing element — a sliding window, skipped on Save-Data / 2g / a poor connection or while the current track is still filling. The one hard exclusion is a prefix test for `AUDIO_BIBLE_RELEASE_PREFIX`: whole-book tracks are 30–260 MB, so "warming" one is a full audiobook download. Every shipped edition is per-chapter and warms like a letter.
+
+### 23.11 Where audio touches the reading surface
+
+Read-along's follow-scroll is the **fifth** sanctioned writer of `.screen-scroll`'s `scrollTop`, and the lease it obeys is documented in two places that must stay in agreement: the block in `hooks/use-autoscroll.js:18-31` (which enumerates all five) and `ui/components/ReadAlongHighlight.jsx:23-54` (which states the three ways follow-scroll yields). Full map in **§22**; the transport itself in **§20.1**. At most one writer may write at a time — read both blocks before adding a sixth.
 
 ---
 

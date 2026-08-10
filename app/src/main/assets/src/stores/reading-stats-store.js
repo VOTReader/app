@@ -43,6 +43,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { _jrnDateStr } from './journal-stats-store.js';
+import { FEATURED_UNLOCK_DEFS } from '../utils/achievements.js';
 
 /**
  * @typedef {{
@@ -59,33 +60,29 @@ import { _jrnDateStr } from './journal-stats-store.js';
  */
 
 /**
- * Reading milestones (BACKLOG [23]). Same shape and semantics as
- * JournalStatsStore's MILESTONE_DEFS, so the two milestone systems stay
- * one pattern rather than two: a static table, a persisted list of
- * unlocked keys, and a check that runs where the number changes.
+ * Reading milestones (BACKLOG [23]) — the UNLOCK LEDGER only, since
+ * 2026-08-10.
  *
- * Every threshold is measured against data this store ALREADY accrues —
- * no new collection. `words` reads totalWordsRead, `items` reads
- * totalCompletions, `rereads` reads rereads. The word thresholds are set
- * against the corpus's own scale (the whole VOT + Bible corpus measures
- * ~1.09M words), so "100k words" is a real fraction of the library rather
- * than an arbitrary round number.
+ * This used to be `READING_MILESTONE_DEFS`, a ten-row display table that My
+ * Progress rendered as a strip. That made two milestone systems over the same
+ * three numbers, and the strip (a persisted once-ever unlock list) could
+ * disagree with the Milestones screen (earned-ness recomputed live). Owner
+ * decision: COMBINE. The table folded into `utils/achievements.js` as its
+ * FEATURED subset — the ten rows were already ten of the achievements, metric
+ * for metric and label for label — and both surfaces now render from
+ * `buildAchievements`.
  *
- * @typedef {{ key: string, type: 'words'|'items'|'rereads', threshold: number, label: string }} ReadingMilestoneDef
- * @type {ReadingMilestoneDef[]}
+ * What remains here is the part that could not fold: a persisted list of keys
+ * so a threshold TOASTS exactly once ever. `FEATURED_UNLOCK_DEFS` resolves
+ * those rows out of the one definition table (keeping the legacy key space, so
+ * no reader's saved unlocks are invalidated and no toast re-fires), which is
+ * why the ledger can no longer carry a threshold the display does not have.
+ *
+ * `utils/achievements.js` is a pure, import-free module and rides both bundles
+ * — the same arrangement `utils/audio-track.js` has with the two audio stores.
+ *
+ * @typedef {{ key: string, achievementKey: string, metric: string, threshold: number, label: string }} ReadingMilestoneDef
  */
-export var READING_MILESTONE_DEFS = [
-  { key: 'read-first',    type: 'items',   threshold: 1,       label: 'First reading finished' },
-  { key: 'read-10',       type: 'items',   threshold: 10,      label: '10 readings finished' },
-  { key: 'read-50',       type: 'items',   threshold: 50,      label: '50 readings finished' },
-  { key: 'read-200',      type: 'items',   threshold: 200,     label: '200 readings finished' },
-  { key: 'words-10k',     type: 'words',   threshold: 10000,   label: '10,000 words read' },
-  { key: 'words-100k',    type: 'words',   threshold: 100000,  label: '100,000 words read' },
-  { key: 'words-500k',    type: 'words',   threshold: 500000,  label: '500,000 words read' },
-  { key: 'words-1m',      type: 'words',   threshold: 1000000, label: 'One million words read' },
-  { key: 'reread-first',  type: 'rereads', threshold: 1,       label: 'Returned to a reading' },
-  { key: 'reread-25',     type: 'rereads', threshold: 25,      label: '25 re-readings' }
-];
 
 var MAX_DAY_KEYS = 400;
 var MAX_WPM_SAMPLES = 50;
@@ -368,20 +365,10 @@ export var ReadingStatsStore = extendStore(
       this._bump();
     },
 
-    /**
-     * Every milestone def paired with its unlocked flag, in table order —
-     * the shape My Progress renders. Mirrors JournalStatsStore.milestones().
-     *
-     * @returns {Array<ReadingMilestoneDef & { unlocked: boolean }>}
-     */
-    milestones() {
-      var data = this._load();
-      var u = data.milestonesUnlocked || [];
-      return READING_MILESTONE_DEFS.map(function(m) {
-        return { key: m.key, type: m.type, threshold: m.threshold, label: m.label,
-                 unlocked: u.indexOf(m.key) >= 0 };
-      });
-    },
+    /* milestones() RETIRED 2026-08-10. Its one caller was My Progress's
+       strip, which now renders `buildAchievements(...).featured` — the same
+       objects the Milestones screen shows, so the two cannot disagree. This
+       store's remaining milestone job is the unlock ledger below. */
 
     /**
      * Unlock any milestone whose threshold `data` has just crossed, and
@@ -399,10 +386,12 @@ export var ReadingStatsStore = extendStore(
       var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
       /** @type {ReadingMilestoneDef[]} */
       var newly = [];
-      READING_MILESTONE_DEFS.forEach(function(m) {
+      FEATURED_UNLOCK_DEFS.forEach(function(m) {
         if (u.indexOf(m.key) >= 0) return;
-        var n = m.type === 'words' ? (data.totalWordsRead || 0)
-              : m.type === 'rereads' ? (data.rereads || 0)
+        // The achievements engine's metric names, mapped onto this store's
+        // own fields — the only three metrics the featured subset uses.
+        var n = m.metric === 'words' ? (data.totalWordsRead || 0)
+              : m.metric === 'rereads' ? (data.rereads || 0)
               : (data.totalCompletions || 0);
         if (n >= m.threshold) { u.push(m.key); newly.push(m); }
       });

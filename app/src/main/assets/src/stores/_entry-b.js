@@ -61,7 +61,10 @@ import {
   JournalStatsStore, jrnShowMilestoneToast,
 } from './journal-stats-store.js';
 import { ReadingStreakStore } from './reading-streak-store.js';
-import { ReadingStatsStore, READING_MILESTONE_DEFS } from './reading-stats-store.js';
+/* READING_MILESTONE_DEFS retired 2026-08-10 — the ten-row table folded into
+   utils/achievements.js as its FEATURED subset, so there is nothing left here
+   to publish as a global (the unlock ledger reads FEATURED_UNLOCK_DEFS). */
+import { ReadingStatsStore } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { AudioLibraryStore } from './audio-library-store.js';
 import { AudioPositionsStore } from './audio-positions-store.js';
@@ -183,7 +186,7 @@ Object.assign(window, {
   _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
   JournalStatsStore, jrnShowMilestoneToast,
   ReadingStreakStore,
-  ReadingStatsStore, READING_MILESTONE_DEFS,
+  ReadingStatsStore,
   GardenPosStore,
   AudioLibraryStore,
   AudioPositionsStore,

@@ -14,6 +14,7 @@ import { render, cleanup, act } from '@testing-library/react';
 import { MyProgressScreen, _fmtWords } from './MyProgressScreen.jsx';
 import { tallyGroup, countReadFor, mostAnnotatedSources } from '../../utils/progress-stats.js';
 import { countTextWords } from '../../utils/word-count.js';
+import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 
 const STUBBED = [
   'ScreenLayout', 'LibraryNav',
@@ -343,5 +344,78 @@ describe('MyProgressScreen — listening block', () => {
     globalThis.AudioLibraryStore = mkStore({ getPlays: () => 4 });   // no saved(), no getCompletions()
     const { container } = renderScreen();
     expect(listenCells(container)).toEqual([{ num: '4', label: 'Recordings Played' }]);
+  });
+});
+
+/* ── the Milestones strip is a VIEW of the one engine (2026-08-10) ────────
+   It used to render ReadingStatsStore.milestones(), a second ten-row table
+   read against a PERSISTED once-ever unlock ledger — so a reader who cleared
+   their progress kept ✦ marks here while the Milestones screen, which
+   recomputes from the data, showed them unearned. Owner decision: COMBINE.
+   The strip now renders buildAchievements(...).featured — literally the same
+   item objects that screen shows. */
+describe('MyProgressScreen — the Milestones strip', () => {
+  const stripLabels = (container) =>
+    [...container.querySelectorAll('.prg-milestone-label')].map((n) => n.textContent);
+  const reached = (container) =>
+    [...container.querySelectorAll('.prg-milestone.is-unlocked .prg-milestone-label')].map((n) => n.textContent);
+
+  it('renders the featured ten, in strip order, from the achievements engine', () => {
+    setupGlobals();
+    const { container } = renderScreen();
+    expect(stripLabels(container)).toEqual([
+      'First reading finished', '10 readings finished', '50 readings finished',
+      '200 readings finished', '10,000 words read', '100,000 words read',
+      '500,000 words read', 'One million words read',
+      'Returned to a reading', '25 re-readings',
+    ]);
+    // A locked milestone is still shown — a goal you cannot see is not a goal.
+    expect(reached(container)).toEqual([]);
+    expect(container.textContent).toContain('0 of 10 reading milestones reached');
+  });
+
+  it('marks reached rows from the LIVE ledger, not a persisted unlock list', () => {
+    setupGlobals();
+    // No milestonesUnlocked anywhere: earned-ness is a fact about the data.
+    globalThis.ReadingStatsStore = mkStore({
+      get: () => ({ totalWordsRead: 120000, totalCompletions: 12, rereads: 1 }),
+      measuredWpm: () => null,
+      wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
+    });
+    const { container } = renderScreen();
+    expect(reached(container)).toEqual([
+      'First reading finished', '10 readings finished',
+      '10,000 words read', '100,000 words read', 'Returned to a reading',
+    ]);
+    expect(container.textContent).toContain('5 of 10 reading milestones reached');
+  });
+
+  it('cannot disagree with the Milestones screen — same engine, same snapshot', () => {
+    setupGlobals();
+    const stats = { totalWordsRead: 600000, totalCompletions: 60, rereads: 30 };
+    globalThis.ReadingStatsStore = mkStore({
+      get: () => stats,
+      measuredWpm: () => null,
+      wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
+    });
+    const { container } = renderScreen();
+    // What the full screen would compute for these same ten, from the same
+    // collector this screen used.
+    const built = buildAchievements(collectAchievementSnapshot({}));
+    const expected = built.featured.filter((i) => i.earned).map((i) => i.label);
+    expect(reached(container)).toEqual(expected);
+    // 3 reading tiers (200 unreached) + 3 word tiers (1M unreached) + both
+    // returns. Pinned so a silently-empty `expected` can't make this vacuous.
+    expect(expected.length).toBe(8);
+  });
+
+  it('keeps the "View all milestones" doorway to the full screen', () => {
+    setupGlobals();
+    const calls = [];
+    const { container } = renderScreen({ onOpenMilestones: () => calls.push(1) });
+    const link = container.querySelector('.prg-milestones-all');
+    expect(link.textContent).toContain('View all milestones');
+    link.click();
+    expect(calls.length).toBe(1);
   });
 });

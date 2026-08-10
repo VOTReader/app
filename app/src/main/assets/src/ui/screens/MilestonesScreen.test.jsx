@@ -21,7 +21,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import { MilestonesScreen } from './MilestonesScreen.jsx';
-import { ACHIEVEMENT_STORE_NAMES } from '../../utils/achievements.js';
+import {
+  ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_STORE_NAMES, ACHIEVEMENT_TOTAL,
+  FEATURED_ACHIEVEMENTS, buildAchievements, collectAchievementSnapshot,
+} from '../../utils/achievements.js';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', ...ACHIEVEMENT_STORE_NAMES];
 
@@ -235,5 +238,52 @@ describe('MilestonesScreen — rebuild is memoized', () => {
     setupGlobals(spies);
     renderScreen();
     expect([...new Set(subscribed)].sort()).toEqual([...ACHIEVEMENT_STORE_NAMES].sort());
+  });
+});
+
+/* ── the folded strip rows (2026-08-10) ───────────────────────────────────
+   My Progress's ten-row strip used to be a SECOND milestone table. It folded
+   into this engine as its FEATURED subset, which means these ten rows must
+   appear on this screen exactly once each — a fold that added rows, or that
+   counted a featured row twice in the summary, would be a worse bug than the
+   duplication it replaced. */
+describe('MilestonesScreen — the folded My Progress rows', () => {
+  it('shows each featured row ONCE, inside its own category', () => {
+    setupGlobals();
+    renderScreen();
+    const labels = rowLabels();
+    for (const f of FEATURED_ACHIEVEMENTS) {
+      const def = ACHIEVEMENT_CATEGORIES.flatMap((c) => c.defs).find((d) => d.key === f.key);
+      expect(labels.filter((l) => l === def.label).length).toBe(1);
+    }
+    // The three categories the ten came from are the ones that already existed.
+    expect(catHeadings()).toEqual(expect.arrayContaining(['Readings Finished', 'Words Read', 'Returnings']));
+  });
+
+  it('counts them in the summary exactly once — the total is unchanged', () => {
+    setupGlobals();
+    renderScreen();
+    expect(document.querySelector('.milestones-summary-count').textContent)
+      .toBe('0of ' + ACHIEVEMENT_TOTAL + ' reached');
+    expect(rowLabels().length).toBe(ACHIEVEMENT_TOTAL);
+  });
+
+  it('earns a featured row here on the same data My Progress marks it on', () => {
+    // 12 finished readings: readings-1 and readings-10 are featured rows.
+    setupGlobals({
+      ReadingStatsStore: {
+        subscribe: () => () => {}, getVersion: () => 0,
+        get: () => ({ totalWordsRead: 0, totalCompletions: 12, rereads: 0, wordsByDay: {} }),
+      },
+    });
+    renderScreen();
+    const earned = earnedRows().map((li) => li.querySelector('.milestones-label').textContent);
+    expect(earned).toContain('First reading finished');
+    expect(earned).toContain('10 readings finished');
+    expect(earned).not.toContain('50 readings finished');
+    // Same numbers the strip would show for the featured ten.
+    const strip = buildAchievements(collectAchievementSnapshot({})).featured;
+    expect(strip.filter((i) => i.earned).map((i) => i.label))
+      .toEqual(['First reading finished', '10 readings finished']);
   });
 });

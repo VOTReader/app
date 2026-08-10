@@ -20,8 +20,12 @@
    reading-stats ledger, streak store, annotation/note/bookmark/link/
    journal stores, the listening library's plays counter). Nothing here
    persists — earned-ness is a fact about the data, recomputed on render.
-   The older 10-entry ReadingStatsStore milestone table keeps its unlock
-   toasts; this module is the full display surface built on top.
+
+   ONE ENGINE since 2026-08-10 (owner decision). The ten-row table that used
+   to live in reading-stats-store, which My Progress rendered as a strip, is
+   now this module's FEATURED subset — see the block above buildAchievements.
+   Both surfaces render from one call; the store keeps only the persisted
+   ledger that makes a milestone TOAST exactly once, driven from here.
 
    readItems key space: 'v1:<readKey>:<cid>'. A NUMERIC cid is a Scripture
    chapter (Bible books + Matthew). A slug counts as a public letter/entry
@@ -219,31 +223,115 @@ export const ACHIEVEMENT_CATEGORIES = [
 /** Total achievement count across every category. */
 export const ACHIEVEMENT_TOTAL = ACHIEVEMENT_CATEGORIES.reduce((n, c) => n + c.defs.length, 0);
 
+/** Every def, indexed by key — the resolver the FEATURED subset below uses. */
+const _DEF_BY_KEY = (() => {
+  /** @type {Map<string, AchievementDef>} */
+  const map = new Map();
+  for (const cat of ACHIEVEMENT_CATEGORIES) for (const def of cat.defs) map.set(def.key, def);
+  return map;
+})();
+
+/* ── THE FEATURED SUBSET (one engine, 2026-08-10) ─────────────────────────
+   There used to be two milestone systems: this one, and a ten-row table in
+   reading-stats-store (READING_MILESTONE_DEFS) that My Progress rendered as a
+   compact strip. Two tables of thresholds over the same three numbers meant
+   the strip and the full screen could disagree about what the reader had
+   earned — and they did, because the strip read a PERSISTED unlock ledger
+   while the screen recomputes earned-ness live.
+
+   Owner decision: COMBINE. The ten strip rows were already, item for item, ten
+   of the achievements below — same metric, same threshold, same label — so
+   folding them is a mapping, not a new table. My Progress renders
+   `buildAchievements(...).featured`, which holds the SAME item objects that
+   appear in `categories`; an earned-count divergence is not merely unlikely,
+   it has nowhere to come from. Nothing is double-counted either: featured is a
+   VIEW, never an addition, so ACHIEVEMENT_TOTAL is untouched.
+
+   `unlockKey` is the one thing that did not fold. The store persists a list of
+   milestone keys so a threshold toasts exactly ONCE ever, and those keys are
+   already written into every reader's data; renaming them would re-fire ten
+   toasts on the next completion. So the ledger keeps its key space, declared
+   HERE beside the achievement it belongs to rather than in a second table. */
+
+/**
+ * The ten achievements My Progress shows in its strip, IN STRIP ORDER, each
+ * paired with the legacy key ReadingStatsStore's unlock ledger persists for it.
+ *
+ * @type {ReadonlyArray<{ key: string, unlockKey: string }>}
+ */
+export const FEATURED_ACHIEVEMENTS = Object.freeze([
+  { key: 'readings-1',    unlockKey: 'read-first' },
+  { key: 'readings-10',   unlockKey: 'read-10' },
+  { key: 'readings-50',   unlockKey: 'read-50' },
+  { key: 'readings-200',  unlockKey: 'read-200' },
+  { key: 'words-10000',   unlockKey: 'words-10k' },
+  { key: 'words-100000',  unlockKey: 'words-100k' },
+  { key: 'words-500000',  unlockKey: 'words-500k' },
+  { key: 'words-1000000', unlockKey: 'words-1m' },
+  { key: 'returns-1',     unlockKey: 'reread-first' },
+  { key: 'returns-25',    unlockKey: 'reread-25' },
+].map((entry) => Object.freeze(entry)));
+
+/** Featured keys as a set — what `buildAchievements` flags each item with. */
+const _FEATURED_KEYS = new Set(FEATURED_ACHIEVEMENTS.map((f) => f.key));
+
+/**
+ * The unlock-ledger rows, RESOLVED from the definitions above so the ledger
+ * cannot carry a threshold the display does not. Consumed by
+ * ReadingStatsStore._checkMilestones (it lives in bundle-b; this module is
+ * pure and import-safe from either side, like utils/audio-track.js).
+ *
+ * A featured key naming no achievement is dropped rather than thrown — a
+ * milestone table must never be able to black-screen the app at import time.
+ * `achievements.test.js` pins the length, which is what catches a typo.
+ *
+ * @type {ReadonlyArray<{ key: string, achievementKey: string, metric: string, threshold: number, label: string }>}
+ */
+export const FEATURED_UNLOCK_DEFS = Object.freeze(
+  FEATURED_ACHIEVEMENTS.map((f) => {
+    const def = _DEF_BY_KEY.get(f.key);
+    return def ? Object.freeze({
+      key: f.unlockKey, achievementKey: def.key,
+      metric: String(def.metric), threshold: def.threshold, label: def.label,
+    }) : null;
+  }).filter(Boolean)
+);
+
 /** @param {unknown} v @returns {number} */
 function _count(v) { return Math.max(0, Math.floor(Number(v) || 0)); }
 
 /**
- * PURE layer: snapshot → categorized, progress-annotated achievements.
+ * PURE layer: snapshot → categorized, progress-annotated achievements, plus
+ * the FEATURED view My Progress's strip renders.
+ *
+ * `featured` holds the very same item OBJECTS that appear in `categories` —
+ * not copies — so the strip and the full screen cannot disagree about what is
+ * earned, and featured items are never counted twice in `earned`/`total`.
  *
  * @param {Partial<AchievementSnapshot>} snapshot
- * @returns {{ earned: number, total: number, categories: Array<{ id: string, label: string, eyebrow: string, earned: number, total: number, items: Array<{ key: string, label: string, threshold: number, value: number, earned: boolean, fraction: number }> }> }}
+ * @returns {{ earned: number, total: number, categories: Array<{ id: string, label: string, eyebrow: string, earned: number, total: number, items: Array<{ key: string, label: string, threshold: number, value: number, earned: boolean, fraction: number, featured: boolean }> }>, featured: Array<{ key: string, label: string, threshold: number, value: number, earned: boolean, fraction: number, featured: boolean }> }}
  */
 export function buildAchievements(snapshot) {
   const s = snapshot || {};
   let earnedTotal = 0;
+  /** @type {Map<string, any>} */
+  const byKey = new Map();
   const categories = ACHIEVEMENT_CATEGORIES.map((cat) => {
     const items = cat.defs.map((def) => {
       const value = _count(s[def.metric]);
       const earned = value >= def.threshold;
       if (earned) earnedTotal++;
-      return {
+      const item = {
         key: def.key,
         label: def.label,
         threshold: def.threshold,
         value,
         earned,
         fraction: Math.max(0, Math.min(1, value / def.threshold)),
+        featured: _FEATURED_KEYS.has(def.key),
       };
+      byKey.set(def.key, item);
+      return item;
     });
     return {
       id: cat.id, label: cat.label, eyebrow: cat.eyebrow,
@@ -252,7 +340,8 @@ export function buildAchievements(snapshot) {
       items,
     };
   });
-  return { earned: earnedTotal, total: ACHIEVEMENT_TOTAL, categories };
+  const featured = FEATURED_ACHIEVEMENTS.map((f) => byKey.get(f.key)).filter(Boolean);
+  return { earned: earnedTotal, total: ACHIEVEMENT_TOTAL, categories, featured };
 }
 
 /** Best rolling 7-day words total from a wordsByDay map (keys 'YYYY-MM-DD'). */

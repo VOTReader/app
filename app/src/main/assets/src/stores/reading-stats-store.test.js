@@ -15,7 +15,8 @@
 */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ReadingStatsStore, READING_MILESTONE_DEFS } from './reading-stats-store.js';
+import { ReadingStatsStore } from './reading-stats-store.js';
+import { FEATURED_UNLOCK_DEFS } from '../utils/achievements.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -284,13 +285,28 @@ describe('reading milestones', () => {
     expect(second.map((m) => m.key)).toContain('words-10k');
   });
 
-  it('reports every def with its unlocked flag, in table order', () => {
+  /* milestones() retired 2026-08-10 — its only caller, My Progress's strip,
+     renders the achievements engine's FEATURED subset now. What this store
+     still owns is the persisted ledger, and the ledger's KEY SPACE is the
+     thing that must not move: those keys are already written into every
+     reader's data, so a rename would re-fire ten toasts on the next
+     completion. */
+  it('persists the LEGACY unlock keys, not the achievement keys', () => {
     ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
-    const ms = ReadingStatsStore.milestones();
-    expect(ms.length).toBe(READING_MILESTONE_DEFS.length);
-    expect(ms[0].key).toBe(READING_MILESTONE_DEFS[0].key);
-    expect(ms.find((m) => m.key === 'read-first').unlocked).toBe(true);
-    expect(ms.find((m) => m.key === 'words-1m').unlocked).toBe(false);
+    expect(ReadingStatsStore.get().milestonesUnlocked).toContain('read-first');
+    expect(ReadingStatsStore.get().milestonesUnlocked).not.toContain('readings-1');
+  });
+
+  it('drives the ledger from the achievements engine, ten rows, in strip order', () => {
+    expect(FEATURED_UNLOCK_DEFS.length).toBe(10);
+    expect(FEATURED_UNLOCK_DEFS[0].key).toBe('read-first');
+    expect(FEATURED_UNLOCK_DEFS[0].achievementKey).toBe('readings-1');
+    // Every unlock row carries a metric this store actually accrues — the
+    // three fields _checkMilestones knows how to read.
+    for (const def of FEATURED_UNLOCK_DEFS) {
+      expect(['words', 'completions', 'rereads']).toContain(def.metric);
+      expect(def.threshold).toBeGreaterThan(0);
+    }
   });
 
   it('ALWAYS returns an array — including the no-words path the caller reads .length on', () => {

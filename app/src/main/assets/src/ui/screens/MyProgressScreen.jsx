@@ -16,7 +16,13 @@
    History-derived rows honor historyEnabled=false. The reading table
    honors settings.markAsRead the same way Settings does (hidden behind
    an explanatory line while the toggle is off).
+
+   The Milestones strip is the FEATURED subset of utils/achievements.js
+   (2026-08-10) — the same ten items MilestonesScreen shows among its full
+   set, not a second table. See that module's FEATURED block.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 
 /**
  * Compact count for the hero cells: exact with separators below 10k
@@ -299,28 +305,34 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
           );
         })() : null}
 
-        {/* BACKLOG [23] — reading milestones. Same table-driven pattern as the
-            journal's, reading only numbers this store already accrues. Locked
-            rows are shown too: a milestone you cannot see is not a goal. */}
+        {/* BACKLOG [23] — reading milestones. ONE ENGINE since 2026-08-10:
+            these ten rows are the FEATURED subset of utils/achievements.js,
+            the same items the Milestones screen renders, so the strip and the
+            full screen cannot disagree about what has been earned. (They could
+            before: this strip read the store's persisted once-ever unlock
+            ledger while the screen recomputes earned-ness from the data.)
+            Locked rows are still shown — a milestone you cannot see is not a
+            goal. Unmemoized, like LibraryScreen's summary tile: this screen
+            already subscribes to every contributing store, and it renders
+            rarely enough that the snapshot walk is not worth a memo key. */}
         {(() => {
-          const ms = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.milestones === 'function')
-            ? ReadingStatsStore.milestones() : null;
+          const ms = buildAchievements(collectAchievementSnapshot(readItems)).featured;
           if (!ms || ms.length === 0) return null;
-          const unlocked = ms.filter((m) => m.unlocked);
+          const earned = ms.filter((m) => m.earned);
           return (
             <div className="settings-section prg-section">
               <div className="settings-section-label">Milestones</div>
-              <span className="sr-only">{unlocked.length} of {ms.length} reading milestones reached.</span>
+              <span className="sr-only">{earned.length} of {ms.length} reading milestones reached.</span>
               <div className="prg-milestones">
                 {ms.map((m) => (
-                  <div key={m.key} className={'prg-milestone' + (m.unlocked ? ' is-unlocked' : '')}>
-                    <span className="prg-milestone-mark" aria-hidden="true">{m.unlocked ? '✦' : '·'}</span>
+                  <div key={m.key} className={'prg-milestone' + (m.earned ? ' is-unlocked' : '')}>
+                    <span className="prg-milestone-mark" aria-hidden="true">{m.earned ? '✦' : '·'}</span>
                     <span className="prg-milestone-label">{m.label}</span>
-                    <span className="sr-only">{m.unlocked ? ' — reached' : ' — not yet reached'}</span>
+                    <span className="sr-only">{m.earned ? ' — reached' : ' — not yet reached'}</span>
                   </div>
                 ))}
               </div>
-              {/* The strip above is the compact classic 10; the full journey
+              {/* The strip above is the compact featured 10; the full journey
                   (chapters, letters, streaks, listening, …) lives one tap away. */}
               {onOpenMilestones && (
                 <button type="button" className="prg-milestones-all" onClick={onOpenMilestones}>
