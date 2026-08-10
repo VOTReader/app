@@ -102,7 +102,7 @@ beforeEach(async () => {
   globalThis.AUDIO_ALTERNATES = ALTERNATES;
   localStorage.removeItem('vot-audio-pos');   // no cross-test resume state
   setOnline(true);
-  bridge = { setAudioActive: vi.fn() };
+  bridge = { setAudioActive: vi.fn(), setAudioNowPlaying: vi.fn() };
   window.AndroidBridge = bridge;
   await load();
 });
@@ -821,15 +821,19 @@ describe('audio-player — subscribe / version', () => {
 });
 
 describe('audio-player — Android keep-alive bridge', () => {
-  it('activates on playing and deactivates on pause and stop', () => {
+  it('activates on playing, HOLDS through pause, deactivates on stop', () => {
+    // Media-card rework 2026-08-09: pause no longer releases the anchor —
+    // the paused system media card needs the WebView (this player) alive for
+    // its Play button to work, so only 'idle' (stop / queue end) deactivates.
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(bridge.setAudioActive).not.toHaveBeenCalled(); // 'loading' is not playback
 
     el().dispatchEvent(new Event('playing'));
     expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
 
-    AudioPlayer.toggle();
-    expect(bridge.setAudioActive).toHaveBeenLastCalledWith(false);
+    AudioPlayer.toggle();   // pause
+    expect(bridge.setAudioActive).not.toHaveBeenCalledWith(false);
+    expect(bridge.setAudioActive).toHaveBeenCalledTimes(1);
 
     el().dispatchEvent(new Event('playing'));
     AudioPlayer.stop();
@@ -841,6 +845,92 @@ describe('audio-player — Android keep-alive bridge', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(() => el().dispatchEvent(new Event('playing'))).not.toThrow();
     expect(AudioPlayer.getState().status).toBe('playing');
+  });
+});
+
+describe('audio-player — native media card (setAudioNowPlaying + __votMediaCommand)', () => {
+  // The web MediaSession is inert inside the Android WebView, so the player
+  // mirrors the same metadata to AndroidBridge.setAudioNowPlaying for the
+  // system media card (QS carousel / lock screen), and receives the card's
+  // transport taps back through window.__votMediaCommand.
+
+  it('mirrors track metadata + state to the bridge on start and edges', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    // Track start ('loading') already pushes metadata so the card titles
+    // itself before the first byte arrives.
+    expect(bridge.setAudioNowPlaying).toHaveBeenCalledWith(
+      'Letter A — Part 1', 'The Volumes of Truth · Read by Benjamin',
+      true,               // buffering counts as playing — same rule as the web session
+      expect.any(Number), expect.any(Number), expect.any(Number)
+    );
+    el().dispatchEvent(new Event('playing'));
+    expect(bridge.setAudioNowPlaying).toHaveBeenLastCalledWith(
+      'Letter A — Part 1', expect.any(String), true,
+      expect.any(Number), expect.any(Number), expect.any(Number)
+    );
+    AudioPlayer.toggle();   // pause edge → playing=false
+    expect(bridge.setAudioNowPlaying).toHaveBeenLastCalledWith(
+      expect.any(String), expect.any(String), false,
+      expect.any(Number), expect.any(Number), expect.any(Number)
+    );
+  });
+
+  it('does NOT sync natively on per-second timeupdates (edge-driven, not chatty)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    const calls = bridge.setAudioNowPlaying.mock.calls.length;
+    for (let t = 1; t <= 5; t++) {
+      el().currentTime = t;
+      el().dispatchEvent(new Event('timeupdate'));
+    }
+    // Five 1 Hz ticks, zero native updates — the card interpolates position
+    // from (position, rate); per-second Intents would be binder churn.
+    expect(bridge.setAudioNowPlaying.mock.calls.length).toBe(calls);
+  });
+
+  it('resyncs on seek (a position jump breaks the card interpolation)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 60;
+    el().dispatchEvent(new Event('durationchange'));
+    const calls = bridge.setAudioNowPlaying.mock.calls.length;
+    AudioPlayer.seek(42);
+    expect(bridge.setAudioNowPlaying.mock.calls.length).toBe(calls + 1);
+    const last = bridge.setAudioNowPlaying.mock.calls.at(-1);
+    expect(last[3]).toBe(42);   // positionSec
+    expect(last[4]).toBe(60);   // durationSec
+  });
+
+  it('routes system transport commands into the player', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    expect(typeof window.__votMediaCommand).toBe('function');
+
+    window.__votMediaCommand('toggle', 0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    window.__votMediaCommand('play', 0);
+    // The command reached the element (toggle -> el.play()); the status flips
+    // on the 'playing' event, which the fake element doesn't auto-fire.
+    expect(el().paused).toBe(false);
+    el().dispatchEvent(new Event('playing'));
+    expect(AudioPlayer.getState().status).toBe('playing');
+
+    const beforeNext = AudioPlayer.getState().qi;
+    window.__votMediaCommand('next', 0);
+    expect(AudioPlayer.getState().qi).toBe(beforeNext + 1);
+    window.__votMediaCommand('prev', 0);
+    expect(AudioPlayer.getState().qi).toBe(beforeNext);
+
+    el().duration = 90;
+    el().dispatchEvent(new Event('durationchange'));
+    window.__votMediaCommand('seekTo', 30000);   // ms in, seconds applied
+    expect(AudioPlayer.getState().time).toBe(30);
+  });
+
+  it('a bad command never throws into the bridge', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    expect(() => window.__votMediaCommand('definitely-not-a-command', NaN)).not.toThrow();
   });
 });
 

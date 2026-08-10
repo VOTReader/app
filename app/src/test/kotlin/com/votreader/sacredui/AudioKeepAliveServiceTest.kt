@@ -45,16 +45,47 @@ class AudioKeepAliveServiceTest {
     fun `channel and notification constants are stable and legal`() {
         assertEquals("vot_audio_playback", AudioKeepAliveService.CHANNEL_ID)
         assertEquals("Audio playback", AudioKeepAliveService.CHANNEL_NAME)
-        assertEquals("Playing audio", AudioKeepAliveService.NOTIFICATION_TEXT)
+        // (NOTIFICATION_TEXT retired 2026-08-09 — the MediaStyle notification
+        // shows the real track title/artist from the now-playing snapshot.)
         // startForeground(0, ...) is an IllegalArgumentException on every API level.
         assertTrue(AudioKeepAliveService.NOTIFICATION_ID != 0)
     }
 
     @Test
-    fun `the stop action is package-qualified`() {
+    fun `every service action is package-qualified`() {
         // A bare "STOP" would collide with a platform/third-party broadcast the
-        // moment this service ever gets a notification action or a PendingIntent.
+        // moment this service ever gets a notification action or a PendingIntent
+        // — and since the media-card rework it HAS both.
         assertTrue(AudioKeepAliveService.ACTION_STOP.startsWith("com.votreader.sacredui."))
+        assertTrue(AudioKeepAliveService.ACTION_UPDATE.startsWith("com.votreader.sacredui."))
+        assertTrue(AudioKeepAliveService.ACTION_CMD.startsWith("com.votreader.sacredui."))
+    }
+
+    @Test
+    fun `the session advertises the full transport surface`() {
+        // The QS card / lock screen only renders the buttons the PlaybackState
+        // ACTIONS advertise — dropping a bit silently loses that control.
+        val a = AudioKeepAliveService.SESSION_ACTIONS
+        for (bit in longArrayOf(
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_PLAY,
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_PAUSE,
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_PLAY_PAUSE,
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS,
+            android.support.v4.media.session.PlaybackStateCompat.ACTION_SEEK_TO,
+        )) {
+            assertTrue(a and bit != 0L, "SESSION_ACTIONS missing bit $bit")
+        }
+    }
+
+    @Test
+    fun `updateNowPlaying without a running service is dropped, not a resurrection`() {
+        // A trailing metadata update after the setAudioActive(false) stop must
+        // NOT re-start the service into a silent notification with no
+        // keep-alive edge left to clear it (the `running` gate).
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        AudioKeepAliveService.updateNowPlaying(app, "T", "A", true, 0L, 0L, 1f)
+        assertNull(shadowOf(app).nextStartedService, "update must not start a stopped service")
     }
 
     // ─── API-level branch ─────────────────────────────────────────────

@@ -119,6 +119,16 @@ interface BridgeHost {
     fun clearGardenCache()
 
     /**
+     * Ask for POST_NOTIFICATIONS if (and only if) it's needed and not yet
+     * granted: API 33+, once per process, fired contextually from the first
+     * audio playback of a session (setAudioActive true edge) — never at boot.
+     * Without it the Android 13+ system MEDIA CARD (the MediaStyle
+     * notification the QS carousel renders) is invisible; denial costs
+     * nothing else. Safe from any thread (posts to UI internally).
+     */
+    fun ensureNotificationsPermission()
+
+    /**
      * Start/stop [AudioKeepAliveService] — the mediaPlayback foreground service
      * that anchors the process while an audio letter streams. Mirrors the
      * setAudioActive bridge edge exactly.

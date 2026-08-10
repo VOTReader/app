@@ -130,6 +130,40 @@ class AppInterface(
     fun setAudioActive(active: Boolean) {
         vm.streamAudioActive = active
         host.setAudioKeepAlive(active)
+        // First playback of a session is the contextual moment to ask for
+        // POST_NOTIFICATIONS (API 33+ media card). One-shot per process,
+        // no-op when already granted — see BridgeHost's KDoc.
+        if (active) host.ensureNotificationsPermission()
+    }
+
+    /**
+     * Mirror of the web MediaSession metadata the player already maintains —
+     * the WebView's navigator.mediaSession never reaches the system media
+     * card, so audio-player.js calls this at the same sync points (track
+     * start, play/pause, seek, rate change) and AudioKeepAliveService renders
+     * it into its MediaSessionCompat + MediaStyle notification. Seconds
+     * (JS-native units) in, milliseconds (session-native) out. No UI work —
+     * startService is safe from the binder thread; a not-running service
+     * drops the update (see updateNowPlaying's KDoc).
+     */
+    @JavascriptInterface
+    fun setAudioNowPlaying(
+        title: String?,
+        artist: String?,
+        playing: Boolean,
+        positionSec: Double,
+        durationSec: Double,
+        rate: Double,
+    ) {
+        AudioKeepAliveService.updateNowPlaying(
+            host.activityContext,
+            title,
+            artist,
+            playing,
+            (positionSec.coerceAtLeast(0.0) * 1000).toLong(),
+            (durationSec.coerceAtLeast(0.0) * 1000).toLong(),
+            rate.toFloat().takeIf { it.isFinite() && it > 0f } ?: 1f,
+        )
     }
 
     @JavascriptInterface

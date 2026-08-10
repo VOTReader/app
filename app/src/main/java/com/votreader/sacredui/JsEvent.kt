@@ -15,6 +15,7 @@ package com.votreader.sacredui
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
  *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
+ *   MediaCommand          -> audio-player.__votMediaCommand(cmd, posMs)
  */
 sealed class JsEvent(val fn: String) {
     data object ImportFile : JsEvent("__onImportFile")
@@ -45,4 +46,12 @@ sealed class JsEvent(val fn: String) {
     // coordinates here; the JS side hit-tests the point and opens the
     // annotation action chip. Coordinates are %.f numbers, never strings.
     data object AnnotationTap : JsEvent("__nativeTapAnnotation")
+
+    // A transport command from the SYSTEM media surface (QS media card, lock
+    // screen, headset buttons) routed through AudioKeepAliveService's
+    // MediaSessionCompat callbacks / notification actions. cmd is one of
+    // "toggle" | "play" | "pause" | "next" | "prev" | "seekTo"; posMs is the
+    // seek target in ms (0 for everything else). audio-player.js installs the
+    // receiver and drives its own toggle()/next()/prev()/seek().
+    data object MediaCommand : JsEvent("__votMediaCommand")
 }

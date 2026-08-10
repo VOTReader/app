@@ -26,12 +26,17 @@
          ordinary kill candidate under memory pressure. FOREGROUND_SERVICE_MEDIA_-
          PLAYBACK is required from targetSdk 34 for a mediaPlayback-typed service
          and is ignored below it.
-         POST_NOTIFICATIONS is deliberately NOT declared: it is a runtime prompt,
-         the app has a no-nag policy, and it is not required for the service to
-         run — on Android 13+ without it the ongoing notification is simply
-         hidden while the process anchoring still works. -->
+         POST_NOTIFICATIONS (declared 2026-08-09, reversing the earlier no-nag
+         omission — owner call): the system MEDIA CARD (QS carousel / lock
+         screen, AudioKeepAliveService's MediaStyle notification) is invisible
+         on Android 13+ without it. Still no boot nag: the runtime prompt fires
+         CONTEXTUALLY, on the first audio playback of a session, from
+         AppInterface.setAudioActive → BridgeHost.ensureNotificationsPermission.
+         Denied = the app works exactly as before (hidden notification, process
+         anchoring intact). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- usesCleartextTraffic="false" is DOCUMENTATION, not new hardening: with

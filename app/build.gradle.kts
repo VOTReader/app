@@ -302,6 +302,10 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.core.splashscreen)
+    // System media card: MediaSessionCompat + MediaStyle notification for the
+    // streaming audio letters (AudioKeepAliveService). androidx.media, not
+    // media3 — see the version-catalog comment.
+    implementation(libs.androidx.media)
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime.ktx)

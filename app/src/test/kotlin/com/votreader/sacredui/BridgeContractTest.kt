@@ -32,6 +32,11 @@ class BridgeContractTest {
         // module state must not be duplicated into bundle-d. So androidImpl
         // intentionally has no mirror for it.
         "setAudioActive" to 1,
+        // setAudioNowPlaying mirrors the web MediaSession metadata to the
+        // native media card (title, artist, playing, positionSec, durationSec,
+        // rate). Same direct-call pattern as setAudioActive — audio-player.js
+        // only, no platform-bridge mirror.
+        "setAudioNowPlaying" to 6,
         "onAppReady" to 0,
         "setImmersiveMode" to 1,
         "setZoomEnabled" to 1,

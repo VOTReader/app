@@ -146,6 +146,15 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // above so the two flows never clobber each other's callback.
     private lateinit var micPrepLauncher: ActivityResultLauncher<String>
 
+    // POST_NOTIFICATIONS (API 33+), asked contextually on the first audio
+    // playback of a session so the system media card can render — never at
+    // boot (the no-nag policy stands; only the media use-case earns a prompt,
+    // owner call 2026-08-09). The result needs no callback: granted → the
+    // already-posted MediaStyle notification appears; denied → the app works
+    // exactly as before.
+    private lateinit var notifPermLauncher: ActivityResultLauncher<String>
+    private var notifPermAsked = false
+
     // Disk cache for Garden page images (shouldInterceptRequest path). The
     // GitHub release redirect is no-cache, so without this every page turn
     // re-downloaded the image + re-did the redirect hop — visible lag on a
@@ -199,6 +208,23 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // Streaming audio: anchor the process in a mediaPlayback foreground service
     // for as long as JS reports playback. Never throws (see setActive's KDoc).
     override fun setAudioKeepAlive(active: Boolean) = AudioKeepAliveService.setActive(this, active)
+    // Contextual POST_NOTIFICATIONS ask (API 33+, once per process) so the
+    // media card can show. Launcher registration happens in onCreate; the
+    // binder-thread caller (setAudioActive) is hopped to UI here.
+    override fun ensureNotificationsPermission() {
+        if (Build.VERSION.SDK_INT < 33 || notifPermAsked) return
+        runOnUiThread {
+            if (notifPermAsked) return@runOnUiThread
+            notifPermAsked = true
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                try { notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                catch (e: Exception) { Timber.w(e, "notification permission ask failed") }
+            }
+        }
+    }
 
     /**
      * The WebView is no longer capable of playing once it is torn down. Keep
@@ -464,6 +490,21 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             } else {
                 bridge.callOptional(JsEvent.MicPermissionResult, false)
             }
+        }
+
+        // POST_NOTIFICATIONS for the media card — result intentionally ignored
+        // (see the field comment). Registered unconditionally; launched only
+        // from ensureNotificationsPermission's API-33 gate.
+        notifPermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Timber.i("POST_NOTIFICATIONS %s", if (granted) "granted — media card visible" else "denied — media card hidden")
+        }
+
+        // System transport (QS media card / lock screen / headset) → the JS
+        // player. Cleared in onDestroy: with the WebView gone there is no
+        // player to command, and the next Activity re-registers its own sink
+        // (same static-hook pattern as VOTReaderApp.releaseTree).
+        AudioKeepAliveService.commandSink = { cmd, posMs ->
+            bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1312,6 +1353,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // #3: drop the pending splash safety hatch — the Activity is gone, so
         // there's nothing left to release (and nothing to leak).
         mainHandler.removeCallbacks(splashSafetyHatch)
+        // System-transport sink is bound to THIS Activity's bridge/WebView.
+        AudioKeepAliveService.commandSink = null
         // The WebView (and with it the <audio> element) is destroyed below, so
         // playback is over whether or not JS got to say setAudioActive(false).
         // Without this an ongoing "Playing audio" notification would outlive the

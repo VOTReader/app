@@ -5,6 +5,7 @@ appcompat = "1.7.1"
 activityKtx = "1.13.0"
 webkit = "1.16.0"
 coreSplashscreen = "1.0.1"
+media = "1.7.1"
 timber = "5.0.1"
 coroutines = "1.10.2"
 lifecycleRuntime = "2.9.1"
@@ -24,6 +25,11 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+# MediaSessionCompat + NotificationCompat.MediaStyle — the light path to the
+# system media card (QS carousel / lock screen). Deliberately androidx.media,
+# NOT media3: playback itself stays in the WebView's <audio>; native needs
+# only the session + styled notification (2026-08-09 owner call).
+androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntime" }

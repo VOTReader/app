@@ -163,11 +163,18 @@ function _setStatus(next) {
   if (_state.status === next) return;
   _state.status = next;
   if (next === 'playing') _clearStallWatchdog();
-  // Keep-alive tracks PLAYBACK, not buffering: 'loading' is a mid-stream stall
-  // ('waiting'), and releasing the wake-lock there would let the OS kill the
-  // very playback we're waiting on.
+  // Keep-alive tracks the listening SESSION, not the play state (media-card
+  // rework 2026-08-09): 'paused' keeps the anchor so the system media card
+  // survives a pause with its Play button LIVE — resuming from the card needs
+  // the WebView (this player) alive in the background, which is exactly what
+  // the anchor guarantees. Only 'idle' (stop / queue end) releases it; a
+  // paused card is also swipeable (native detaches it from the foreground
+  // service), and the swipe stops the service without touching this state —
+  // the next 'playing' edge simply re-starts it. 'loading' is a mid-stream
+  // stall ('waiting'); releasing there would let the OS kill the very
+  // playback we're waiting on.
   if (next === 'playing') _setAudioActive(true);
-  else if (next === 'paused' || next === 'idle') _setAudioActive(false);
+  else if (next === 'idle') _setAudioActive(false);
   _syncMediaSessionState(next);
   _notify();
 }
@@ -235,6 +242,11 @@ function _installMediaArbiter() {
 }
 
 function _mediaSession(track) {
+  // Native twin FIRST — the early-returns below bail on hosts without the web
+  // MediaSession API (jsdom, old WebViews), and the Android media card must
+  // not depend on the web API existing.
+  _installNativeTransport();
+  _syncNative();
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
@@ -267,10 +279,16 @@ function _syncMediaSessionPosition() {
     const position = Math.max(0, Math.min(Number(_state.time) || 0, duration));
     ms.setPositionState({ duration, position, playbackRate: _state.rate });
   } catch (_e) { /* a partially-supported Media Session must stay cosmetic */ }
+  // NO _syncNative() here: this runs at 1 Hz from 'timeupdate', and the native
+  // card interpolates position from (position, rate, timestamp) on its own —
+  // per-second Intents would be pure binder/notification churn. Native syncs
+  // ride the EDGES instead: state changes, track starts, seeks, rate changes.
 }
 
 /** @param {'idle'|'loading'|'playing'|'paused'} status */
 function _syncMediaSessionState(status) {
+  // Native twin FIRST — the guard below returns on hosts without the web API.
+  _syncNative();
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
@@ -292,6 +310,55 @@ function _clearMediaSession() {
     ms.metadata = null;
     ms.playbackState = 'none';
   } catch (_e) { /* same guards as _mediaSession */ }
+}
+
+/* ── native media card (Android system UI) ────────────────────────────── */
+// The web MediaSession above is INERT inside the Android WebView — it never
+// reaches the Quick Settings media card / lock screen. These mirrors feed the
+// SAME metadata + state to the native MediaSessionCompat that
+// AudioKeepAliveService renders (AndroidBridge.setAudioNowPlaying), and
+// receive the system's transport taps back as window.__votMediaCommand.
+// Best-effort like every bridge touch: the PWA has no bridge, older APKs may
+// predate the method, and a native throw must never disturb playback.
+
+/** Push the current track + state snapshot to the native media card. */
+function _syncNative() {
+  try {
+    const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
+    if (!b || typeof b.setAudioNowPlaying !== 'function') return;
+    const track = _state.queue[_state.qi];
+    if (!track) return;
+    const reader = readerLabel(track.readerCode);
+    b.setAudioNowPlaying(
+      track.title + (track.partLabel ? ' — ' + track.partLabel : ''),
+      'The Volumes of Truth' + (reader ? ' · ' + reader : ''),
+      // Buffering counts as playing — same rule as _syncMediaSessionState.
+      _state.status === 'playing' || _state.status === 'loading',
+      Number(_state.time) || 0,
+      Number(_state.duration) || 0,
+      Number(_state.rate) || 1
+    );
+  } catch (_e) { /* the card is cosmetic; playback must never notice */ }
+}
+
+let _nativeTransportInstalled = false;
+
+/** Install the system-transport receiver (idempotent). */
+function _installNativeTransport() {
+  if (_nativeTransportInstalled || typeof window === 'undefined') return;
+  _nativeTransportInstalled = true;
+  /** @param {string} cmd @param {number} posMs */
+  _g().__votMediaCommand = (cmd, posMs) => {
+    try {
+      if (cmd === 'next') next();
+      else if (cmd === 'prev') prev();
+      else if (cmd === 'seekTo') seek((Number(posMs) || 0) / 1000);
+      // play / pause / toggle all resolve through toggle(): the system only
+      // offers Play while paused and Pause while playing, so the edge is
+      // always the right one.
+      else toggle();
+    } catch (_e) { /* a bad system command must never crash the player */ }
+  };
 }
 
 /* ── element ──────────────────────────────────────────────────────────── */
@@ -1278,6 +1345,7 @@ function seek(seconds) {
   _state.time = t;
   _lastTick = Math.floor(t);
   _syncMediaSessionPosition();
+  _syncNative();   // a position JUMP breaks the card's interpolation — resync
   _notify();
   // A paused seek is a deliberate reposition — snapshot it now, or closing
   // the app right after would resume at the pre-seek position.
@@ -1312,6 +1380,7 @@ function setPlaybackRate(rate) {
     try { _el.defaultPlaybackRate = next; _el.playbackRate = next; } catch (_e) { /* unsupported engines retain normal speed */ }
   }
   _syncMediaSessionPosition();
+  _syncNative();   // rate feeds the card's position interpolation
   try {
     const library = _library();
     if (library && typeof library.setPlaybackRate === 'function') library.setPlaybackRate(next);

@@ -66,6 +66,9 @@ class FakeBridgeHost(
     /** Records every setAudioKeepAlive(active) call, in order. */
     val audioKeepAliveCalls: MutableList<Boolean> = mutableListOf()
 
+    /** Counts ensureNotificationsPermission() calls (media-card contextual ask). */
+    var notificationsPermissionAskCount: Int = 0
+
     override fun postToUi(action: () -> Unit) {
         postedActions.add(action)
         if (executePostedImmediately) action()
@@ -107,4 +110,6 @@ class FakeBridgeHost(
     override fun clearGardenCache() { gardenCacheClearCount++ }
 
     override fun setAudioKeepAlive(active: Boolean) { audioKeepAliveCalls.add(active) }
+
+    override fun ensureNotificationsPermission() { notificationsPermissionAskCount++ }
 }
