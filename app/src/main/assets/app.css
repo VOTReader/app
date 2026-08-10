@@ -5404,6 +5404,30 @@
     .notes-index-search::placeholder { color: var(--cream-muted); }
     .notes-index-search:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     body.light .notes-index-search:focus { background: var(--white); }
+
+    /* C2-C [C9] — the Highlights search box. It was the one index search that
+       was neither `type="search"` nor on the shared class, and its styling
+       lived in HighlightsScreen's JS-INJECTED stylesheet, out of reach of the
+       static sheet's tooling. The input now carries BOTH classes; these three
+       rules moved here verbatim from that injected sheet and, sitting after
+       .notes-index-search at equal specificity, still win every property they
+       declare — the box renders exactly as it did.
+
+       Two neutralisers are the only additions, both purely to hold that
+       "exactly": the shared rule's 0.85rem bottom margin would double up on
+       .hlx-controls' own 10px flex gap, and its focus BACKGROUND would repaint
+       a box whose own focus rule only ever changed the border. What the shared
+       class does add, deliberately, is the placeholder colour every sibling
+       search box already uses.
+
+       Nothing else moved: no other .hlx-* rule references .hlx-search, and its
+       parent .hlx-controls stays with the rest of the screen's sheet. */
+    .hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; box-sizing: border-box; }
+    body.light .hlx-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }
+    .hlx-search:focus { border-color: var(--gold); }
+    .notes-index-search.hlx-search { margin-bottom: 0; }
+    .notes-index-search.hlx-search:focus { background: var(--bg2); }
+    body.light .notes-index-search.hlx-search:focus { background: #f7f2e8; }
     .notes-index-controls {
       display: flex; flex-wrap: wrap; gap: 0.45rem;
       margin-bottom: 1rem;

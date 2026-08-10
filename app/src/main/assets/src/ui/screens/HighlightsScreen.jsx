@@ -15,9 +15,11 @@ import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
   R.push('.hlx-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-20); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 2px; }');
   R.push('.hlx-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-13); }');
   R.push('.hlx-controls { padding: 10px 18px 6px; display: flex; flex-direction: column; gap: 10px; }');
-  R.push('.hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; box-sizing: border-box; }');
-  R.push('body.light .hlx-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }');
-  R.push('.hlx-search:focus { border-color: var(--gold); }');
+  // C2-C [C9]: the three `.hlx-search` rules MOVED to app.css (they now sit
+  // directly after .notes-index-search, whose class this input also carries).
+  // Injected CSS is invisible to the static sheet's tooling and to anyone
+  // reading app.css for the search-field treatment; the box itself renders
+  // unchanged. Do not re-add them here.
   R.push('.hlx-sort-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }');
   R.push('.hlx-sort-label { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
   // Filter rows (Type chips + Color dots), each with a leading label.
@@ -227,8 +229,13 @@ export function HighlightsScreen(props) {
         </div>
         {marks.length > 0 && (
           <div className="hlx-controls">
+            {/* C2-C [C9]: same class, same type, same aria wording as every
+                sibling index search (Notes / Bookmarks / Links / History).
+                type="search" is what gives it the platform clear affordance
+                and the search keyboard; `hlx-search` keeps its own look. */}
             <input
-              className="hlx-search" type="text" placeholder="Search marks…"
+              className="notes-index-search hlx-search" type="search"
+              placeholder="Search marks…" aria-label="Search marks"
               value={query} onChange={function(e) { setQuery(e.target.value); }}
             />
             {/* Standardized date sort — identical class + wording to every

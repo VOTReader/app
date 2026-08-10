@@ -347,10 +347,15 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       <>
         <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">{"‹"}</button>
         <div className="srch-input-row">
+          {/* C2-C [C8]: the app's PRIMARY search field named itself only by
+              placeholder — which a screen reader stops announcing the moment
+              a character is typed, and which nothing announces on a field
+              restored with a query already in it. */}
           <input
             ref={inputRef}
             className="search-input"
             type="search"
+            aria-label="Search"
             placeholder="Search scriptures, volumes, studies…"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
@@ -360,7 +365,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             autoCorrect="off"
             spellCheck={false}
           />
-          {query ? <button className="srch-clear-btn" onClick={clearQuery}>{"✕"}</button> : null}
+          {/* …and its clear button announced as the bare glyph "✕". */}
+          {query ? <button className="srch-clear-btn" onClick={clearQuery} title="Clear search" aria-label="Clear search">{"✕"}</button> : null}
         </div>
       </>
     }>

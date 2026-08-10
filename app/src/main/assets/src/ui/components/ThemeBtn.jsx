@@ -5,8 +5,11 @@
 export function ThemeBtn({ theme, onThemeChange }) {
   const next = theme === "dark" ? "light" : "dark";
   const title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  // C2-C [C8]: the fourth icon in the top-nav cluster, named the same way as
+  // the other three — one string feeding both, explicit label, no reliance on
+  // `title` falling through to the accessible name.
   return (
-    <button className="nav-theme-btn" onClick={() => onThemeChange(next)} title={title}>
+    <button className="nav-theme-btn" onClick={() => onThemeChange(next)} title={title} aria-label={title}>
       {theme === "dark" ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <circle cx="12" cy="12" r="5" />

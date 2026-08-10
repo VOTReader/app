@@ -12,6 +12,7 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
+import { ThemeBtn } from '../components/ThemeBtn.jsx';
 
 const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel', 'LibraryNav', 'NavButtons'];
 
@@ -75,25 +76,90 @@ describe('HomeScreen — Listening Library card', () => {
 });
 
 describe('HomeScreen — Surprise FAB naming', () => {
-  it('exposes the accessible name "Surprise Me"', () => {
+  const NAME = 'Surprise Me — open a random chapter or letter';
+
+  it('exposes an accessible name that says what the button does', () => {
     setupGlobals();
     renderHome();
-    const fab = screen.getByRole('button', { name: 'Surprise Me' });
+    const fab = screen.getByRole('button', { name: NAME });
     expect(fab.className).toContain('surprise-fab');
   });
 
-  it('shows a visible caption matching the accessible name', () => {
+  /* C2-C [C8]: hover said "Open a Random Chapter or Letter" and TalkBack said
+     "Surprise Me" — two different answers to the same question. One string
+     now feeds both. */
+  it('gives the tooltip and the accessible name the SAME string', () => {
     setupGlobals();
     renderHome();
-    const fab = screen.getByRole('button', { name: 'Surprise Me' });
+    const fab = screen.getByRole('button', { name: NAME });
+    expect(fab.getAttribute('title')).toBe(NAME);
+    expect(fab.getAttribute('aria-label')).toBe(fab.getAttribute('title'));
+  });
+
+  it('shows a visible caption the accessible name still contains (label-in-name)', () => {
+    setupGlobals();
+    renderHome();
+    const fab = screen.getByRole('button', { name: NAME });
     const caption = fab.querySelector('.surprise-fab-caption');
     expect(caption).toBeTruthy();
     expect(caption.textContent).toBe('Surprise Me');
+    expect(NAME.startsWith(caption.textContent)).toBe(true);
   });
 
   it('renders no FAB when the setting is off', () => {
     setupGlobals();
     renderHome({ showSurprise: false });
-    expect(screen.queryByRole('button', { name: 'Surprise Me' })).toBeNull();
+    expect(screen.queryByRole('button', { name: NAME })).toBeNull();
+  });
+});
+
+/* C2-C [C8] — the top-nav icon cluster. These three buttons named themselves
+   through `title` alone. A title is only a LAST-RESORT fallback in the
+   accessible-name computation, is not announced by every assistive
+   technology, and never appears at all on touch — which is where this app
+   lives. The titles are simultaneously load-bearing CSS selectors
+   (`.nav-search-btn[title="Search"]`, `[title="History"]`), so they had to
+   stay byte-identical while the labels were added. */
+describe('NavButtons — the icon cluster names itself', () => {
+  // The REAL ThemeBtn, not the null stub: the fourth icon is part of the
+  // cluster contract below (title and label must agree on every one).
+  const nav = () => {
+    globalThis.ThemeBtn = ThemeBtn;
+    return render(
+      <div>{NavButtons({ onSettings: () => {}, onHistory: () => {}, onSearch: () => {}, theme: 'dark', onThemeChange: () => {} })}</div>,
+    );
+  };
+
+  it('gives Settings / History / Search EXPLICIT accessible names', () => {
+    setupGlobals();
+    const { container } = nav();
+    // Asserted as the attribute, not via getByRole: `title` already satisfies
+    // a by-name query as the accessible-name computation's last-resort
+    // fallback, which is precisely the fragile source this replaces.
+    expect(container.querySelector('.settings-gear-btn').getAttribute('aria-label')).toBe('Settings');
+    expect(container.querySelector('[title="History"]').getAttribute('aria-label')).toBe('History');
+    expect(container.querySelector('[title="Search"]').getAttribute('aria-label')).toBe('Search');
+    // …and the names still resolve, from the label now.
+    expect(screen.getByRole('button', { name: 'Settings' }).className).toContain('settings-gear-btn');
+    expect(screen.getByRole('button', { name: 'History' }).className).toContain('nav-search-btn');
+    expect(screen.getByRole('button', { name: 'Search' }).className).toContain('nav-search-btn');
+  });
+
+  it('leaves the title strings byte-identical — CSS selects on them', () => {
+    setupGlobals();
+    const { container } = nav();
+    expect(container.querySelector('[title="Settings"]')).toBeTruthy();
+    expect(container.querySelector('.nav-search-btn[title="History"]')).toBeTruthy();
+    expect(container.querySelector('.nav-search-btn[title="Search"]')).toBeTruthy();
+  });
+
+  it('keeps label and title in agreement on all FOUR cluster icons', () => {
+    setupGlobals();
+    const { container } = nav();
+    const btns = [...container.querySelectorAll('button[title]')];
+    expect(btns).toHaveLength(4);   // settings, history, search, theme
+    for (const btn of btns) {
+      expect(btn.getAttribute('aria-label'), btn.getAttribute('title')).toBe(btn.getAttribute('title'));
+    }
   });
 });

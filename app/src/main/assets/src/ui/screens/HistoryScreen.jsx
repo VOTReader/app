@@ -222,7 +222,11 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     const isConfirming = confirmingDayId === dId;
     return (
       <div key={dId} className="history-day-section">
-        <button className="history-day-header" onClick={() => toggle(dId)}>
+        {/* C2-C [C8]: all four accordion levels announce their state. The
+            chevron rotates for a sighted reader; without aria-expanded a
+            screen reader heard "Today · 4, button" whether the day was open
+            or shut, and the whole screen is four nested accordions. */}
+        <button className="history-day-header" aria-expanded={dOpen} onClick={() => toggle(dId)}>
           <span className="history-day-label">{dayLabel(year, month, dg.day)}</span>
           {dg.entries.length > 1 && <span className="history-day-count">{"\xB7 "}{dg.entries.length}</span>}
           <span className="history-day-spacer" />
@@ -313,7 +317,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
               const yOpen = isOpen(yId);
               return (
                 <div key={yg.year} className="history-year-section">
-                  <button className="history-year-header" onClick={() => toggle(yId)}>
+                  <button className="history-year-header" aria-expanded={yOpen} onClick={() => toggle(yId)}>
                     <span className="history-year-rule" />
                     <span className="history-year-label">{yg.year}</span>
                     <span className="history-year-rule r" />
@@ -325,7 +329,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
                     const monthTotal = mg.weeks.reduce((s, wk) => s + wk.days.reduce((s2, d) => s2 + d.entries.length, 0), 0);
                     return (
                       <div key={mg.month} className="history-month-section">
-                        <button className="history-month-header" onClick={() => toggle(mId)}>
+                        <button className="history-month-header" aria-expanded={mOpen} onClick={() => toggle(mId)}>
                           <span className="history-month-label">{MONTH_NAMES[mg.month]}</span>
                           <span className="history-month-count">{monthTotal}</span>
                           <span className={`history-chevron${mOpen ? ' is-open' : ''}`}>{"›"}</span>
@@ -337,7 +341,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
                           const wsLabel = `Week of ${MONTH_ABBR[wg.weekStart.getMonth()]} ${wg.weekStart.getDate()}`;
                           return (
                             <div key={wg.key} className="history-week-section">
-                              <button className="history-week-header" onClick={() => toggle(wId)}>
+                              <button className="history-week-header" aria-expanded={wOpen} onClick={() => toggle(wId)}>
                                 <span className="history-week-label">{wsLabel}</span>
                                 <span className="history-week-count">{weekTotal}</span>
                                 <span className={`history-chevron${wOpen ? ' is-open' : ''}`}>{"›"}</span>

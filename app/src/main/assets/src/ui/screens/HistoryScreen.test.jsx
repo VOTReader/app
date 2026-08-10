@@ -363,6 +363,60 @@ describe('HistoryScreen — resume chips on letter rows', () => {
   });
 });
 
+/* C2-C [C8] — this screen is FOUR nested accordions (year > month > week >
+   day). The chevron rotates for a sighted reader; a screen reader heard
+   "Today · 4, button" whether the group was open or shut, on every level. */
+describe('HistoryScreen — accordion state is announced', () => {
+  const OLD_TS = Date.now() - 730 * DAY;
+  const HISTORY = [
+    chapter('psalms', 'Psalms', 1, today(5)),
+    chapter('psalms', 'Psalms', 23, OLD_TS, 'The Lord Is My Shepherd'),
+  ];
+
+  const headers = () => ({
+    year: document.querySelector('.history-year-header'),
+    month: document.querySelector('.history-month-header'),
+    week: document.querySelector('.history-week-header'),
+    day: document.querySelector('.history-day-header'),
+  });
+
+  it('marks every level with aria-expanded', () => {
+    setupGlobals();
+    renderScreen(HISTORY);
+    const h = headers();
+    // Today's day group + the most recent year default open; its month/week
+    // follow, so all four levels carry a state and none of them is missing.
+    for (const key of ['year', 'month', 'week', 'day']) {
+      expect(h[key], key).toBeTruthy();
+      expect(h[key].getAttribute('aria-expanded'), key).toMatch(/^(true|false)$/);
+    }
+  });
+
+  it('flips the announced state with the chevron, on every level', () => {
+    setupGlobals();
+    renderScreen(HISTORY);
+    for (const key of ['year', 'day']) {
+      const before = headers()[key].getAttribute('aria-expanded');
+      fireEvent.click(headers()[key]);
+      const after = headers()[key].getAttribute('aria-expanded');
+      expect(after, key).not.toBe(before);
+      // …and it still agrees with the chevron the sighted reader sees.
+      expect(!!headers()[key].querySelector('.history-chevron.is-open'), key).toBe(after === 'true');
+    }
+  });
+
+  it('reports the search-time auto-expansion too', () => {
+    setupGlobals();
+    renderScreen(HISTORY);
+    expect(headers().year.getAttribute('aria-expanded')).toBe('true');
+    type('shepherd');
+    // Every surviving group holds a match and is flung open — say so.
+    for (const head of document.querySelectorAll('.history-year-header, .history-month-header, .history-week-header, .history-day-header')) {
+      expect(head.getAttribute('aria-expanded')).toBe('true');
+    }
+  });
+});
+
 /* Deduplicate acts on a whole calendar day, so it may not be offered while a
    query is showing a subset of that day — the count would describe the
    filtered rows and the press would remove more than it named. */

@@ -189,6 +189,16 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
   );
 }
 
+/* The sort cycle, in the order the one button steps through it. Each `mode`
+   IS a branch of displayLinks' comparator; adding a mode to one without the
+   other is what produced the dead branches C2-C [C10] found. */
+var SORT_CYCLE = [
+  { mode: 'recent',    label: 'Sort: Newest ↓' },
+  { mode: 'oldest',    label: 'Sort: Oldest ↑' },
+  { mode: 'source-az', label: 'Sort: Source A-Z' },
+  { mode: 'target-az', label: 'Sort: Target A-Z' },
+];
+
 /* ── LinksScreen ─────────────────────────────────────────────────── */
 export function LinksScreen(props) {
   var onBack = props.onBack;
@@ -219,6 +229,20 @@ export function LinksScreen(props) {
 
   // (Pre-Q3.3f-dead: var _sm = useState(false) + showSortMenu/setShowSortMenu
   //  destructure — neither half was referenced. Removed.)
+  //
+  // C2-C [C10]: 'source-az' and 'target-az' were IMPLEMENTED in the comparator
+  // below and unreachable from the UI — the control was a two-state
+  // recent/oldest toggle, so half the sort logic was dead weight that read as
+  // a finished feature. The toggle becomes a CYCLE over the same one button
+  // (this screen's existing control shape), so the comparator's four branches
+  // and the affordance finally describe each other.
+  var nextSort = function() {
+    setSortMode(function(m) {
+      var i = SORT_CYCLE.findIndex(function(s) { return s.mode === m; });
+      return SORT_CYCLE[(i + 1) % SORT_CYCLE.length].mode;
+    });
+  };
+  var sortLabel = (SORT_CYCLE.find(function(s) { return s.mode === sortMode; }) || SORT_CYCLE[0]).label;
 
   var _as = useState(null);
   var actionTarget = _as[0];
@@ -317,15 +341,15 @@ export function LinksScreen(props) {
           onChange={function(e) { setSearchQuery(e.target.value); }}
         />
 
-        {/* Controls row: single sort TOGGLE */}
+        {/* Controls row: the sort CYCLE (C2-C [C10]) */}
         <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
           <button
             className="notes-index-sort-btn"
             style={{ marginLeft: 'auto' }}
-            onClick={function() { setSortMode(function(m) { return m === 'oldest' ? 'recent' : 'oldest'; }); }}
-            title="Toggle sort order"
+            onClick={nextSort}
+            title="Cycle sort order"
           >
-            {sortMode === 'oldest' ? 'Sort: Oldest ↑' : 'Sort: Newest ↓'}
+            {sortLabel}
           </button>
         </div>
 

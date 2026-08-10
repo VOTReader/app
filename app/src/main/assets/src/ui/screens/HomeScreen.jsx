@@ -306,8 +306,15 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
              user had no way to know what it does. The visible caption
              matches the accessible name (label-in-name) so the two never
              drift; aria-hidden keeps the name sourced from aria-label
-             alone. */
-          <button className="surprise-fab" onClick={onSurprise} title="Open a Random Chapter or Letter" aria-label="Surprise Me">
+             alone.
+
+             C2-C [C8]: the tooltip and the accessible name USED to be two
+             different strings — hover said "Open a Random Chapter or Letter",
+             TalkBack said "Surprise Me". One string now feeds both, and it
+             is the descriptive one; it still OPENS with the visible caption,
+             so label-in-name (2.5.3) holds, which a bare swap to the
+             descriptive title would have broken. */
+          <button className="surprise-fab" onClick={onSurprise} title="Surprise Me — open a random chapter or letter" aria-label="Surprise Me — open a random chapter or letter">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3.5" />
               <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />

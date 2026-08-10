@@ -194,6 +194,29 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(screen.getByPlaceholderText(/Search scriptures/i).getAttribute('type')).toBe('search');
   });
 
+  /* C2-C [C8]: the app's primary search field named itself only by
+     placeholder — which stops being announced the moment a character is
+     typed, and is never announced at all on a field restored with a query
+     already in it — and its clear button announced as the glyph "✕". */
+  it('[C8] the query input has an accessible name of its own', () => {
+    render(<SearchScreen {...baseProps()} />);
+    const input = screen.getByRole('searchbox', { name: 'Search' });
+    expect(input.getAttribute('placeholder')).toMatch(/Search scriptures/i);
+  });
+
+  it('[C8] the clear button is named "Clear search", not "✕"', () => {
+    const props = baseProps();
+    render(<SearchScreen {...props} query="mercy" />);
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    expect(clear.className).toContain('srch-clear-btn');
+    expect(clear.getAttribute('title')).toBe('Clear search');
+  });
+
+  it('[C8] there is no clear button to name while the box is empty', () => {
+    render(<SearchScreen {...baseProps()} />);
+    expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
+  });
+
   it('(c) shows a live-region in-flight indicator while the engine runs, then clears it', async () => {
     vi.useFakeTimers();
     let resolveSearch;
