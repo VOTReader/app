@@ -1550,6 +1550,9 @@ function playSection(volKey, index, collectionLabel) {
   _state.qi = 0;
   _countPlay();
   _start();
+  // Section compilations (the 2-hour WTLB parts) are the best resume case of
+  // all — same consult as every other entry point.
+  _seekOnMetadata(_resumeAt(_state.queue[0]));
 }
 
 /**

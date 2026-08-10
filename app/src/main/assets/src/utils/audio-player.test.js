@@ -1966,3 +1966,22 @@ describe('audio-player — whole-book → per-chapter resume migration', () => {
     expect(el().currentTime).toBe(9000);
   });
 });
+
+describe('audio-player — section compilations resume', () => {
+  it('playSection resumes a remembered position with the rewind nudge', () => {
+    const url = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/sec1.mp3';
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === url ? { t: 1200, d: 7200 } : null),
+      setPosition: () => {}, clearPosition: () => {},
+    };
+    try {
+      AudioPlayer.playSection('wtlb1', 0, 'WTLB Part One');
+      expect(el().src).toBe(url);
+      el().duration = 7200;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(1195);   // 1200 − 5s rewind nudge
+    } finally {
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+});
