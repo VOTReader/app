@@ -369,6 +369,22 @@ if [ -n "$bundle_source_changed" ]; then
     exit 1
   fi
 
+  # ─── Step 5a2b: CSS custom-property gate (C2-D [D8]) ──────────────
+  # A `var(--name)` with no fallback and no declaration does not degrade —
+  # the whole declaration is invalid at computed-value time and drops.
+  # --border shipped that way 13 times and never painted a single border.
+  echo "[pre-commit] Checking CSS custom-property references..."
+  node tools/check-css-tokens.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "CSS-TOKENS gate FAILED — declare the property in app.css :root"
+    echo "(plus its body.light twin), or give every reference a fallback."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+
   # ─── Step 5a3: bundle byte budget (C2-D [D3]) ─────────────────────
   # Runs AFTER the rebuild above, against the bundles just regenerated +
   # staged. Nothing watched dist/ bytes before this, and bundle-d/-e grew

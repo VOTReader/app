@@ -533,8 +533,40 @@ C2-D  SAFETY NETS
        report 0-0.4% while fully tested — a 0% floor gates nothing.
        U17's "GardenImageCache drags the aggregate" finding is obsolete:
        per-class is exactly the shape that objection asks for.
-  [D6] Tests: BookmarksScreen (7 destructive paths), HighlightsScreen,
-       ChapterView, AudioSeekSlider, ReadingMinChip; nav-index.js 37%. M
+  [D6] DONE 2026-08-10. Re-scoped around W3, which had already covered
+       BookmarksScreen.sort / LinksScreen.sort / HighlightsScreen.search /
+       ChapterView.labels. What was still untested: +71 tests / 4 files.
+       nav-index's four PICK-TIME exports (searchNavIndex, navItemPreview,
+       navItemToEndpoint, buildSourceEndpoint — the ones whose output gets
+       WRITTEN DOWN in LinkStore, so a wrong key shape is a saved link that
+       never resolves again): 36.6 -> 80.2 statements, 40.8 -> 85.1 lines.
+       AudioSeekSlider (commit-on-release, the lost-pointer-capture
+       backstop, the preview bubble's thumb correction, aria-valuetext, and
+       the unknown-length case where the BAR paints empty while the SPOKEN
+       position stays the true clock). ReadingMinChip's three outcomes
+       incl. every hide-rather-than-guess path. ChapterView beyond labels —
+       chiefly that the inert swipe clone claims neither the
+       __onReadingComplete global slot nor a second body-portalled sheet.
+       Aggregate coverage 86.69 -> 87.55 / 77.14 -> 78.43 / 87.47 -> 88.07
+       / 91.81 -> 92.77.
+  [D8] DONE 2026-08-10 (folded in by the coordinator). `--border` was
+       referenced 13x (app.css x4, journal-styles x6, HighlightsScreen x3)
+       and DECLARED NOWHERE. An undeclared var() is not a soft fallback:
+       the whole declaration is invalid at computed-value time, so
+       `border: 1px solid var(--border)` computed to `none 0px` — probed
+       live before the fix. Those 13 borders had never painted, and two of
+       them were worse than cosmetic: .hlx-search and .jrn-search declare
+       their focus ring as a border-COLOUR change, so both search boxes had
+       no focus indicator at all, and the unselected Highlights type chips
+       read as bare text rather than chips. Declared in app.css :root
+       (rgba(200,164,86,0.16) — the hairline the audio-library cards
+       already draw) + body.light (rgba(110,98,76,0.18) — the picker
+       header/footer's). Before/after captured at 375px on Journal and
+       Highlights. New tools/check-css-tokens.js fails any var(--name) with
+       no fallback and no declaration, in pre-commit + CI; setProperty
+       targets are DISCOVERED, not allowlisted, and a fallback is treated
+       as the author handling absence. RED-proven: with the declaration
+       reverted it names all 13 sites.
   [D7] CLOSED 2026-08-10 — NOT WIRED, on measurement. The premise was
        wrong twice over: bible-studies.js rides no bundle at all (it is
        raw-injected by src/data/translations.js:85), and the win is not

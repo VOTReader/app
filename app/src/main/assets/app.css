@@ -298,6 +298,23 @@
         --gold-faint:  rgba(232,192,80,0.14);
         --gold-border: rgba(232,192,80,0.38);
         --gold-glow:   rgba(232,192,80,0.50);
+        /* The QUIET hairline — the neutral sibling of --gold-border, for a
+           card or pill that should have an edge without announcing it.
+           C2-D [D8], 2026-08-10: thirteen rules across app.css, the Journal
+           stylesheet and the Highlights sheet had been asking for `var(--border)`
+           and NOBODY EVER DECLARED IT. An undeclared custom property makes the
+           whole declaration invalid at computed-value time, so `border: 1px
+           solid var(--border)` did not fall back to something — it computed to
+           `none 0px`, and those thirteen borders had never once painted (probed
+           live before this landed). Worse for two of them: .hlx-search and
+           .jrn-search declare their focus ring as a border-COLOUR change, and a
+           border that does not exist cannot change colour, so those two search
+           boxes had no focus indicator at all.
+           The values are not new taste: dark is the hairline the audio-library
+           cards and shelf rows already draw, light is the one the picker header
+           and footer already draw. tools/check-css-tokens.js now fails the build
+           on any var(--name) with no declaration and no fallback. */
+        --border:      rgba(200,164,86,0.16);
         --cream:       #ffffff;
         --cream-dim:   #f2ede5;
         --cream-muted: #ccc4b4;
@@ -404,6 +421,7 @@
         --gold-faint:  rgba(122,92,16,0.08);
         --gold-border: rgba(122,92,16,0.28);
         --gold-glow:   rgba(122,92,16,0.35);
+        --border:      rgba(110,98,76,0.18);   /* the light twin — see :root */
         --cream:       #000000;
         --cream-dim:   #150a04;
         --cream-muted: #3a2510;

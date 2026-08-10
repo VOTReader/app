@@ -1341,10 +1341,19 @@ Steps: 10, 11, 12, 13, 14, 15, 16, 18, 20, 24, 30, 36, 48. **The number is the p
 - **Exceptions, deliberate:** `em` font-sizes (verse sups, the external-link ↗ marker, inline refs — parent-relative BY DESIGN so they follow whatever they sit in) and the three `clamp()` fluid headings (ends are tokens; the vw term between them is the point).
 - **Enforced:** `tools/check-type-scale.js` (npm `check:type-scale`, pre-commit + CI) fails on any literal rem/px font-size outside the ladder's own declaration. Need a size that doesn't exist? Add the step — and its `--fsc-` twin — in `:root`.
 
+## Every custom property must be declared (2026-08-10, C2-D [D8])
+
+An undeclared `var()` does not degrade — it **deletes the declaration**. The reference resolves to the guaranteed-invalid value, the whole declaration becomes invalid at computed-value time, and every longhand falls to `unset`; for `border-style` that is `none`. `border: 1px solid var(--border)` therefore computes to `none 0px`, not to a default colour.
+
+That shipped. **`--border` was referenced 13 times** — `app.css` ×4, `styles/journal-styles.js` ×6, `HighlightsScreen.jsx` ×3 — and declared nowhere, so none of those borders had ever painted (probed live in the preview before the fix). Two were worse than cosmetic: `.hlx-search` and `.jrn-search` declare their focus ring as a *border-colour* change, and a border that does not exist cannot change colour, so both search boxes had **no focus indicator at all**; the unselected Highlights type chips read as bare text rather than chips. It is now declared beside `--gold-border` as the quiet neutral twin — `rgba(200,164,86,0.16)` dark (the hairline the audio-library cards and shelf rows already draw) and `rgba(110,98,76,0.18)` light (the picker header/footer's).
+
+**`tools/check-css-tokens.js`** (npm `check:css-tokens`, pre-commit + CI) generalizes what `check-type-scale.js` did for `--fs-*` only: any `var(--name)` **with no fallback** whose name is never declared fails the build, naming every reference site. Three things count as declaring it — a `--name:` anywhere in the scanned tree (including JS-injected stylesheets and `index.html`), or a `style.setProperty('--name', …)` call, which is **discovered rather than allowlisted** (`--font-scale`, `--keyboard-height`, `--card-ar`, `--inset-top`, `--inset-bottom` all arrive that way and needed no listing). `var(--name, fallback)` is deliberately not flagged: a fallback IS the author saying what absence means, and it keeps the declaration valid. Block comments are blanked before scanning, so prose naming a token is not a violation.
+
 ## CSS variables reference
 
 - `--fs-10` … `--fs-48` / `--fsc-10` … `--fsc-48` (the type scale — see above; never inline a literal font-size)
 - `--gold`, `--gold-bright`, `--gold-dim`, `--gold-border`, `--gold-faint`, `--gold-glow`
+- `--border` (the quiet neutral hairline — cards/pills/inputs that want an edge without announcing it; `--gold-border` is the loud one)
 - `--cream-dim`, `--bg`, `--bg3`
 - `--tap-ref`, `--tap-ref-sub`, `--tap-ref-active` (inline scripture ref colors)
 - `--link-blue` (#6cb4dc dark / #4a90b8 light)
