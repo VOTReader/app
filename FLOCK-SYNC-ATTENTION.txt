@@ -1,0 +1,18 @@
+flock-audio-sync FAILED 2026-08-10 01:06
+Repo was reset to 4df1e4bc1.
+Error:
+git pull --ff-only origin main -> 128
+From https://github.com/VOTReader/app
+ * branch            main       -> FETCH_HEAD
+hint: Diverging branches can't be fast-forwarded, you need to either:
+hint:
+hint: 	git merge --no-ff
+hint:
+hint: or:
+hint:
+hint: 	git rebase
+hint:
+hint: Disable this message with "git config set advice.diverging false"
+fatal: Not possible to fast-forward, aborting.
+
+Full log: tools/_flock-audio-sync.log
