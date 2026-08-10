@@ -1,5 +1,13 @@
 """Mirror the whole-book Bible audiobooks to the audio-bible-v1 GitHub release.
 
+LEGACY (2026-08-09). The BRM KJV edition now streams PER-CHAPTER from
+audio-brm-v1/v2, so nothing this script uploads is queued from any more, and
+brm-kjv_<bookId> rows no longer appear in src/data/bible-audio-manifest.js.
+The release itself is PERMANENT and APPEND-ONLY: saved Listening Library
+recordings and pre-switch resume snapshots hold those immutable URLs, and the
+player still plays them (audio-track.js keeps the prefix in the trust
+boundary). Never delete or rename an asset here — only ever add.
+
 Sibling of mirror-audio-release.py (same explicit audio/mpeg upload — the
 release CDN is nosniff, so octet-stream assets won't play in <audio>). The
 Bible books live on their OWN tag: GitHub caps a release at 1,000 assets and
@@ -7,7 +15,7 @@ audio-v1 already carries the ~729 letter tracks.
 
 Source corpus: D:/BibleAudio/brministries-kjv/<slug>.mp3 (fetch-brm-kjv.py).
 Asset names: brm-kjv_<appBookId>.mp3 (appBookId = slug minus hyphens, with
-song-of-songs -> songofsolomon) — matching src/data/bible-audio-manifest.js.
+song-of-songs -> songofsolomon).
 
 Idempotent + additive: assets already on the release are skipped.
 

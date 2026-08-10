@@ -1147,6 +1147,11 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
   });
 });
 
+/* The whole-book shape is LEGACY as of 2026-08-09: every shipped edition is
+   per-chapter (see the BRM/WOP describes below). It stays exercised because
+   audio-bible-v1 is permanent — saved Listening Library recordings and
+   pre-switch resume snapshots still point at those one-file-per-book tracks,
+   and the code that plays them must keep working forever. */
 describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () => {
   const BURL = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/' + id + '.mp3';
   const BIBLE_MANIFEST = {
@@ -1308,5 +1313,203 @@ describe('audio-player — per-chapter Bible edition (Word of Promise)', () => {
   it('a chapterNum past the book clamps to its last chapter', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: null, chapterNum: 99 });
     expect(AudioPlayer.getState().queue[0].url).toBe(OT('wop1_jonah_004'));
+  });
+});
+
+/* The BRM KJV edition became per-chapter on 2026-08-09 (1,189 files across
+   audio-brm-v1 OT / audio-brm-v2 NT, replacing the 66 whole-book tracks).
+   Parity with the Word of Promise describe above is the point: playBibleBook
+   branches on SHAPE, not edition id, so both editions must behave identically. */
+describe('audio-player — per-chapter Bible edition (BRM KJV)', () => {
+  const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+  const NT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v2/' + id + '.mp3';
+  const mkParts = (book, t, n) => Array.from({ length: n }, (_v, i) => {
+    const c = String(i + 1).padStart(3, '0');
+    return ['brm' + t + '_' + book + '_' + c, '', 'Chapter ' + (i + 1)];
+  });
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:jonah': mkParts('jonah', 1, 4),
+      'bible-brm-kjv:micah': mkParts('micah', 1, 7),
+      'bible-brm-kjv:jude': mkParts('jude', 2, 1),
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah'], ['micah', 'Micah'], ['jude', 'Jude']];
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+  });
+
+  it('chapters are queue TRACKS with partLabels, streaming from the brm release', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV · Biblical Restoration Ministries' });
+    const s = AudioPlayer.getState();
+    expect(s.queue.length).toBe(12);                       // 4 Jonah + 7 Micah + 1 Jude, forward-only
+    expect(s.queue[0].url).toBe(OT('brm1_jonah_001'));
+    expect(s.queue[0].partLabel).toBe('Chapter 1');
+    expect(s.queue[0].title).toBe('Jonah');
+    expect(s.qi).toBe(0);
+    // The testament digit in the asset name — not the book — picks the tag.
+    expect(s.queue[11].url).toBe(NT('brm2_jude_001'));
+  });
+
+  it('choosing chapter N positions the queue at that chapter track (no seek)', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null, chapterNum: 3 });
+    const s = AudioPlayer.getState();
+    expect(s.queue[0].url).toBe(OT('brm1_jonah_003'));     // horizon starts AT the chapter
+    expect(s.queue[0].partLabel).toBe('Chapter 3');
+    expect(s.qi).toBe(0);
+    expect(el().src).toBe(OT('brm1_jonah_003'));
+    // No whole-book seek is armed any more: the chapter IS the file.
+    el().duration = 300;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(0);
+    // next() walks the remaining chapters, then into the next book's chapter 1.
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_jonah_004'));
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_micah_001'));
+  });
+
+  it('a chapterNum past the book clamps to its last chapter', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null, chapterNum: 99 });
+    expect(AudioPlayer.getState().queue[0].url).toBe(OT('brm1_jonah_004'));
+  });
+
+  it('per-chapter tracks DO prefetch-warm — only the legacy whole-book release is skipped', () => {
+    // The skip in _warmTargets tests exactly one prefix (audio-bible-v1), so
+    // this falls out of the switch rather than needing its own rule: a chapter
+    // file is letter-sized, and warming it is the same start-latency win.
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null });
+    const main = FakeAudio.last;
+    main.dispatchEvent(new Event('playing'));
+    main.duration = 100;
+    main.buffered = { length: 1, end: () => 100 };
+    main.currentTime = 1;
+    main.dispatchEvent(new Event('timeupdate'));
+    const warm = FakeAudio.last;
+    expect(warm).not.toBe(main);                           // a warmer WAS created
+    expect(warm.src).toBe(OT('brm1_jonah_002'));
+    expect(warm.played).toBe(false);
+  });
+});
+
+/* R6 — the resume hazard of the whole-book → per-chapter switch. An installed
+   app can hold a vot-audio-pos snapshot written by the PREVIOUS build: a
+   whole-book audio-bible-v1 URL plus a clock measured against the entire book.
+   Replayed verbatim against the new per-chapter queue that is a ~9,000s seek
+   into a ~300s file — the element fires 'ended' at once and the place is lost. */
+describe('audio-player — whole-book → per-chapter resume migration', () => {
+  const LEGACY = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/' + id + '.mp3';
+  const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+  const mkParts = (book, n) => Array.from({ length: n }, (_v, i) => {
+    const c = String(i + 1).padStart(3, '0');
+    return ['brm1_' + book + '_' + c, '', 'Chapter ' + (i + 1)];
+  });
+  /* Real BRM chapter-start offsets (the shipped BIBLE_AUDIO_CHAPTERS rows),
+     so the arithmetic under test is the arithmetic that will run on device. */
+  const GEN_STARTS = [0, 294, 485, 720, 939, 1114, 1326, 1527, 1716, 1955, 2149, 2350, 2531, 2686, 2891, 3067, 3211, 3477, 3781, 4126, 4309, 4562, 4784, 4959, 5560, 5802, 6093, 6530, 6738, 6988, 7313, 7793, 8057, 8226, 8475, 8684, 8973, 9244, 9481, 9663, 9835, 10270, 10592, 10915, 11201, 11435, 11700, 12013, 12272, 12672];
+
+  /** Where the migration must land for a book-relative clock. */
+  function expected(starts, saved) {
+    let index = 0;
+    for (let i = 0; i < starts.length; i++) {
+      if (starts[i] > saved) break;
+      index = i;
+    }
+    return { chapter: index + 1, offset: saved - starts[index] };
+  }
+
+  /** A snapshot written by the pre-switch build, then a reboot. */
+  async function reboot(snapshot) {
+    localStorage.setItem('vot-audio-pos', JSON.stringify(snapshot));
+    await load();
+    AudioPlayer.toggle();                       // first transport tap rebuilds
+    await Promise.resolve(); await Promise.resolve();
+    return AudioPlayer.getState();
+  }
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:genesis': mkParts('genesis', 50),
+      'bible-brm-kjv:exodus': mkParts('exodus', 40),
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis'], ['exodus', 'Exodus']];
+    globalThis.BIBLE_AUDIO_CHAPTERS = { 'bible-brm-kjv:genesis': GEN_STARTS };
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+    delete globalThis.BIBLE_AUDIO_CHAPTERS;
+  });
+
+  it('maps a deep whole-book position to the right chapter track and offset inside it', async () => {
+    const SAVED = 9000;
+    const want = expected(GEN_STARTS, SAVED);
+    expect(want.chapter).toBe(37);              // fixture sanity: 9,000s in = Genesis 37
+    expect(want.offset).toBe(27);
+
+    const s = await reboot({
+      v: 2, mode: 'collection', volKey: 'bible-brm-kjv', label: 'KJV · Biblical Restoration Ministries',
+      qi: 0, key: 'bible-brm-kjv:genesis', time: SAVED,
+      track: { key: 'bible-brm-kjv:genesis', title: 'Genesis', sub: 'KJV · Biblical Restoration Ministries', url: LEGACY('brm-kjv_genesis'), readerCode: '' },
+    });
+
+    const pad = String(want.chapter).padStart(3, '0');
+    expect(s.queue[s.qi].url).toBe(OT('brm1_genesis_' + pad));
+    expect(s.queue[s.qi].partLabel).toBe('Chapter ' + want.chapter);
+    expect(el().src).toBe(OT('brm1_genesis_' + pad));
+    // Without the migration this is chapter 1 seeked to 9,000s — the R6 bug.
+    expect(s.qi).not.toBe(0);
+    el().duration = 300;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(want.offset);
+    expect(el().currentTime).toBeLessThan(el().duration);
+  });
+
+  it('offsets the chapter within the whole rebuilt queue, not just within the book', async () => {
+    const SAVED = 9000;
+    const want = expected(GEN_STARTS, SAVED);
+    // No startKey (the queue was never sliced), so Genesis' chapters sit at
+    // the head and Exodus follows — the landing index is book-relative.
+    const s = await reboot({
+      v: 2, mode: 'collection', volKey: 'bible-brm-kjv', label: null,
+      qi: 0, key: 'bible-brm-kjv:genesis', time: SAVED,
+      track: { key: 'bible-brm-kjv:genesis', title: 'Genesis', sub: null, url: LEGACY('brm-kjv_genesis'), readerCode: '' },
+    });
+    expect(s.queue.length).toBe(90);            // 50 Genesis + 40 Exodus
+    expect(s.qi).toBe(want.chapter - 1);
+    expect(s.queue[s.qi].key).toBe('bible-brm-kjv:genesis');
+  });
+
+  it('falls back to chapter 1 at 0 when the book has no chapter index', async () => {
+    // Exodus has no BIBLE_AUDIO_CHAPTERS row here. The failure mode being
+    // avoided is a deep seek into a short file, so the only safe answer is the
+    // book's start — never the saved clock.
+    const s = await reboot({
+      v: 2, mode: 'collection', volKey: 'bible-brm-kjv', label: null,
+      qi: 1, key: 'bible-brm-kjv:exodus', time: 5000,
+      track: { key: 'bible-brm-kjv:exodus', title: 'Exodus', sub: null, url: LEGACY('brm-kjv_exodus'), readerCode: '' },
+    });
+    expect(s.queue[s.qi].url).toBe(OT('brm1_exodus_001'));
+    el().duration = 300;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('leaves a genuinely whole-book queue alone (a saved legacy recording still plays whole)', async () => {
+    // A saved Listening Library track is mode 'custom': its queue holds the
+    // legacy URL itself, so there is nothing to migrate and the clock is still
+    // book-relative and correct. audio-bible-v1 is permanent for exactly this.
+    const s = await reboot({
+      v: 2, mode: 'custom', volKey: '', label: 'KJV · Biblical Restoration Ministries',
+      qi: 0, key: 'bible-brm-kjv:genesis', time: 9000,
+      track: { key: 'bible-brm-kjv:genesis', title: 'Genesis', sub: null, url: LEGACY('brm-kjv_genesis'), readerCode: '' },
+      customQueue: [{ key: 'bible-brm-kjv:genesis', title: 'Genesis', sub: null, url: LEGACY('brm-kjv_genesis'), readerCode: '' }],
+    });
+    expect(s.queue[s.qi].url).toBe(LEGACY('brm-kjv_genesis'));
+    el().duration = 13414;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(9000);
   });
 });

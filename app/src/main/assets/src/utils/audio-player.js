@@ -485,7 +485,10 @@ function _warmTargets() {
   for (let i = _state.qi + 1; i < limit; i++) {
     const url = _state.queue[i] && _state.queue[i].url;
     // Whole-book Bible tracks are 30–260 MB each — "warming" one is a full
-    // audiobook download, not a head-of-file cache fill. Letters only.
+    // audiobook download, not a head-of-file cache fill. That shape now lives
+    // ONLY on audio-bible-v1 (legacy saved tracks + pre-switch resumes), so
+    // the skip is a single prefix test; every shipped edition is per-chapter
+    // and warms like a letter.
     if (url && !_warmedUrls.has(url) && url.lastIndexOf(AUDIO_BIBLE_RELEASE_PREFIX, 0) !== 0) out.push(url);
   }
   return out;
@@ -997,6 +1000,51 @@ function _withRestoredAlternate(restore, queue, saved) {
 }
 
 /**
+ * Whole-book → per-chapter resume migration (2026-08-09, the BRM switch).
+ *
+ * A snapshot written before an edition moved to per-chapter tracks holds a
+ * whole-book audio-bible-v1 URL and a clock measured against the WHOLE BOOK —
+ * e.g. 9,000s into Genesis. The rebuilt queue is now one track per chapter, so
+ * replaying that clock verbatim would seek 9,000s into a ~300s file: the
+ * element reports 'ended' immediately and the listener's place is gone. Map
+ * the book-relative time through BIBLE_AUDIO_CHAPTERS instead — the LAST
+ * chapter start <= the saved time is the chapter, and the remainder is the
+ * offset INSIDE that chapter.
+ *
+ * Every degradation lands on chapter 1 at 0. A deep seek into a short file is
+ * the one outcome worth ruling out, so an absent/short index never guesses.
+ *
+ * @param {any} r - the pending-restore descriptor
+ * @param {Track[]} queue - the rebuilt queue
+ * @returns {{ qi: number, time: number } | null} null when nothing to migrate
+ */
+function _migrateWholeBookResume(r, queue) {
+  if (!r || typeof r.url !== 'string' || typeof r.key !== 'string' || !r.key) return null;
+  // Whole-book tracks exist on exactly one release, and only there.
+  if (r.url.lastIndexOf(AUDIO_BIBLE_RELEASE_PREFIX, 0) !== 0) return null;
+  if (queue.some((t) => t.url === r.url)) return null;   // still a whole-book queue
+  const first = queue.findIndex((t) => t.key === r.key);
+  if (first < 0) return null;
+  let last = first;
+  while (last + 1 < queue.length && queue[last + 1].key === r.key) last++;
+  if (last === first) return null;   // one part = not per-chapter; nothing to map
+  const map = _g().BIBLE_AUDIO_CHAPTERS;
+  const secs = map && map[r.key];
+  const saved = Math.max(0, Number(r.time) || 0);
+  if (!Array.isArray(secs) || !secs.length) return { qi: first, time: 0 };
+  let chapter = 0;
+  for (let i = 0; i < secs.length; i++) {
+    const at = Number(secs[i]);
+    if (!Number.isFinite(at) || at > saved) break;
+    chapter = i;
+  }
+  // An index longer than the queue's chapters means the two disagree — take
+  // the last real chapter from its start rather than an unbacked offset.
+  if (chapter > last - first) return { qi: last, time: 0 };
+  return { qi: first + chapter, time: Math.max(0, saved - (Number(secs[chapter]) || 0)) };
+}
+
+/**
  * Rebuild the full queue a _restoreFromSaved() bar stands in for, then start
  * at the saved track + position. Loads the lazy VOT corpus first when needed
  * (index.html's __loadVotCorpus is idempotent).
@@ -1053,13 +1101,18 @@ async function _rebuildRestoredQueue() {
     const horizon = queue.findIndex((item) => item.key === r.startKey);
     if (horizon > 0) queue = queue.slice(horizon);
   }
-  const resumeAt = r.time || 0;
+  let resumeAt = r.time || 0;
   if (!queue.length) {
     // Corpus/manifest unavailable (or the letter vanished) — play the
     // placeholder track the bar is already showing; it has a real URL.
     queue = _state.queue.slice();
   }
-  let qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
+  // A pre-per-chapter snapshot's URL is gone from this queue and its clock is
+  // book-relative — translate both before the url/key search below, which
+  // would otherwise land on chapter 1 and seek the whole book's time into it.
+  const migrated = _migrateWholeBookResume(r, queue);
+  if (migrated) resumeAt = migrated.time;
+  let qi = migrated ? migrated.qi : (r.url ? queue.findIndex((item) => item.url === r.url) : -1);
   if (qi < 0 && r.key) {
     // A rebuilt queue always holds each letter's PRIMARY rendition, so a
     // listener resuming an alternate reader finds no url match. Swap that one

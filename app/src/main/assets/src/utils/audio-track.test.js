@@ -1,10 +1,12 @@
 // @ts-nocheck
 /* audio-track — the release-URL trust boundary.
 
-   Two immutable GitHub releases are the ONLY hosts a persisted or played
-   track may point at: audio-v1 (letters) and audio-bible-v1 (whole-book
-   Bible editions). These tests pin that boundary — an imported favorite or
-   a widened prefix must never turn the app into a generic remote loader. */
+   A frozen list of immutable GitHub releases is the ONLY set of hosts a
+   persisted or played track may point at: audio-v1 (letters), the per-chapter
+   Bible editions on their OT/NT tag pairs, and audio-bible-v1 (the retired
+   whole-book Bible tracks, kept live forever for saved recordings). These
+   tests pin that boundary — an imported favorite or a widened prefix must
+   never turn the app into a generic remote loader. */
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -12,6 +14,8 @@ import {
   AUDIO_BIBLE_RELEASE_PREFIX,
   AUDIO_WOP_OT_PREFIX,
   AUDIO_WOP_NT_PREFIX,
+  AUDIO_BRM_OT_PREFIX,
+  AUDIO_BRM_NT_PREFIX,
   BIBLE_AUDIO_EDITIONS,
   audioAssetUrl,
   bibleAudioAssetUrl,
@@ -33,7 +37,7 @@ describe('audio-track — release URL policy', () => {
     }
   });
 
-  it('accepts exactly the two release prefixes, nothing else', () => {
+  it('accepts exactly the frozen release prefixes, nothing else', () => {
     expect(isVotAudioUrl(AUDIO_RELEASE_PREFIX + 'idA1.mp3')).toBe(true);
     expect(isVotAudioUrl(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3')).toBe(true);
     expect(isVotAudioUrl('https://github.com/VOTReader/votreader-assets/releases/download/audio-v2/x.mp3')).toBe(false);
@@ -94,5 +98,44 @@ describe('audio-track — Word of Promise release routing', () => {
     const ed = bibleAudioEdition('wop-nkjv');
     expect(ed.volKey).toBe('bible-wop-nkjv');
     expect(ed.translation).toBe('nkjv');
+  });
+});
+
+/* BRM KJV moved from 66 whole-book tracks to 1,189 per-chapter files on
+   2026-08-09. Both shapes must resolve forever: the new asset ids stream from
+   the brm tag pair, and the ids already sitting in saved recordings + resume
+   snapshots keep pointing at audio-bible-v1, which is append-only for good. */
+describe('audio-track — BRM per-chapter routing beside the permanent legacy tag', () => {
+  it('routes brm1_/brm2_ assets to their testament tags', () => {
+    expect(bibleAudioAssetUrl('brm1_genesis_037')).toBe(AUDIO_BRM_OT_PREFIX + 'brm1_genesis_037.mp3');
+    expect(bibleAudioAssetUrl('brm2_revelation_022')).toBe(AUDIO_BRM_NT_PREFIX + 'brm2_revelation_022.mp3');
+  });
+
+  it('legacy whole-book brm-kjv_* ids still resolve to audio-bible-v1', () => {
+    // 'brm-kjv_' shares three characters with 'brm1_' and must NOT be captured
+    // by the new routing — a saved track's URL has to stay byte-identical.
+    expect(bibleAudioAssetUrl('brm-kjv_genesis')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
+    expect(bibleAudioAssetUrl('brm-kjv_revelation')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_revelation.mp3');
+  });
+
+  it('both brm tags join the trust boundary, and the legacy tag keeps its place', () => {
+    expect(isVotAudioUrl(AUDIO_BRM_OT_PREFIX + 'brm1_genesis_001.mp3')).toBe(true);
+    expect(isVotAudioUrl(AUDIO_BRM_NT_PREFIX + 'brm2_jude_001.mp3')).toBe(true);
+    expect(isVotAudioUrl(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3')).toBe(true);
+    expect(isVotAudioUrl('https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v3/x.mp3')).toBe(false);
+  });
+
+  it('a saved whole-book recording still normalizes after the switch', () => {
+    // The Listening Library holds these URLs; the migration must never be the
+    // reason a saved recording stops being playable.
+    const t = normalizeAudioTrack({
+      key: 'bible-brm-kjv:genesis',
+      title: 'Genesis',
+      sub: 'KJV · Biblical Restoration Ministries',
+      url: AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3',
+      readerCode: '',
+    });
+    expect(t).not.toBe(null);
+    expect(t.url).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
   });
 });

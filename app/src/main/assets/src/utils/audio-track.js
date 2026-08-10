@@ -12,9 +12,14 @@
 /** GitHub release location that owns every shipped VOT audio asset. */
 export const AUDIO_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/';
 
-/** Sibling release owning the whole-book Bible audiobooks (2026-08-09). A
- *  SEPARATE tag: GitHub enforces 1,000 assets per release and audio-v1
- *  already carries ~729 letter tracks; Bible editions get their own bucket. */
+/** Sibling release owning the original whole-book Bible audiobooks
+ *  (2026-08-09). A SEPARATE tag: GitHub enforces 1,000 assets per release and
+ *  audio-v1 already carries ~729 letter tracks.
+ *
+ *  LEGACY, AND PERMANENT. Nothing queues from here any more — BRM ships
+ *  per-chapter below — but saved Listening Library recordings and pre-switch
+ *  resume snapshots hold these immutable URLs, so the tag stays live forever
+ *  and the prefix stays in the trust boundary. Append-only; never prune. */
 export const AUDIO_BIBLE_RELEASE_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/';
 
 /** The Word of Promise per-chapter releases. 1,189 chapter files exceed the
@@ -23,6 +28,13 @@ export const AUDIO_BIBLE_RELEASE_PREFIX = 'https://github.com/VOTReader/votreade
 export const AUDIO_WOP_OT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/';
 export const AUDIO_WOP_NT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v2/';
 
+/** BRM KJV per-chapter releases — the same two-tag shape as the Word of
+ *  Promise ('brm1_' OT / 'brm2_' NT), and the edition's live source since
+ *  2026-08-09. The whole-book tracks it replaced stay reachable through
+ *  AUDIO_BIBLE_RELEASE_PREFIX above. */
+export const AUDIO_BRM_OT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/';
+export const AUDIO_BRM_NT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v2/';
+
 /** Every release prefix a stored/played track may point at — the whole trust
  *  boundary. Anything else is rejected. */
 const RELEASE_PREFIXES = Object.freeze([
@@ -30,6 +42,8 @@ const RELEASE_PREFIXES = Object.freeze([
   AUDIO_BIBLE_RELEASE_PREFIX,
   AUDIO_WOP_OT_PREFIX,
   AUDIO_WOP_NT_PREFIX,
+  AUDIO_BRM_OT_PREFIX,
+  AUDIO_BRM_NT_PREFIX,
 ]);
 
 /** Recorded Bible editions the app knows how to stream. Registry lives here
@@ -83,9 +97,12 @@ export function audioAssetUrl(id) {
 
 /**
  * Canonical stream URL for a Bible-edition asset. The asset name picks its
- * release: 'wop1_'/'wop2_' route to the Word of Promise OT/NT tags, anything
- * else to audio-bible-v1. Same id policy as audioAssetUrl — invalid ids
- * become ''.
+ * release: the per-chapter editions carry a '<prefix><testament>_' stamp
+ * ('wop1_'/'wop2_', 'brm1_'/'brm2_') routing to that edition's OT/NT tag.
+ * Everything else falls through to audio-bible-v1, which is what the legacy
+ * whole-book ids ('brm-kjv_genesis') still resolve to — note 'brm-kjv_' does
+ * NOT match 'brm1_'/'brm2_', so old saved tracks keep their original host.
+ * Same id policy as audioAssetUrl — invalid ids become ''.
  *
  * @param {unknown} id
  * @returns {string}
@@ -95,6 +112,8 @@ export function bibleAudioAssetUrl(id) {
   if (!/^[A-Za-z0-9_-]+$/.test(asset)) return '';
   const prefix = asset.lastIndexOf('wop1_', 0) === 0 ? AUDIO_WOP_OT_PREFIX
     : asset.lastIndexOf('wop2_', 0) === 0 ? AUDIO_WOP_NT_PREFIX
+    : asset.lastIndexOf('brm1_', 0) === 0 ? AUDIO_BRM_OT_PREFIX
+    : asset.lastIndexOf('brm2_', 0) === 0 ? AUDIO_BRM_NT_PREFIX
     : AUDIO_BIBLE_RELEASE_PREFIX;
   return prefix + asset + '.mp3';
 }
