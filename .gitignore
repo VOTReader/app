@@ -125,3 +125,4 @@ tools/_mirror-run*.log
 tools/_mirror-run*.err.log
 tools/_align-proof/
 tools/_align-work/
+FLOCK-SYNC-ATTENTION.txt

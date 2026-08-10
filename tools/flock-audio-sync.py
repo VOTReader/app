@@ -13,11 +13,19 @@ Drive folders. This stage is the APP side:
      rides bundle-a-vot, which IS corpus-gated)
   6. git commit through the full gates; push origin main.
 
-FAIL-CLEAN CONTRACT: any step failing aborts the run, resets the repo to the
-pre-run commit (tracked files only), and writes the failure to the log +
-FLOCK-SYNC-ATTENTION.txt in the repo root so the next agent session sees it.
-The repo is never left mid-change; the push only happens after the pre-commit
-gate chain passes. Manual run: python tools/flock-audio-sync.py [--dry-run]
+FAIL-CLEAN CONTRACT (hardened 2026-08-10 after the 01:06 divergence failure):
+any step failing aborts the run and writes the failure to the log +
+FLOCK-SYNC-ATTENTION.txt (gitignored — the c30 run proved add -A swept it into
+a commit). Cleanup is CONCURRENCY-SAFE: the repo is restored only when HEAD
+still equals the commit this run started from — if another session committed
+meanwhile, we restore ONLY the files this script touches and never reset, so
+a concurrent session's work cannot be destroyed (the old reset --hard could).
+Divergence policy: behind-only fast-forwards; local-ahead proceeds and pushes
+the gated local commits along; true divergence rebases our commits on origin
+and a conflicted rebase aborts cleanly to the attention file. Staging is by
+EXPLICIT path list — never add -A. A gated commit that fails only its PUSH is
+kept local (one pull --rebase retry), never thrown away.
+Manual run: python tools/flock-audio-sync.py [--dry-run]
 """
 import datetime
 import os
@@ -71,14 +79,50 @@ def bump_corpus():
     return new
 
 
+# Every tracked path this run may modify. Staging and restore both use this
+# list — nothing outside it is ever committed or rolled back.
+OWN_PATHS = [
+    "app/src/main/assets/src/data/audio-manifest.js",
+    "app/src/main/assets/service-worker.js",
+    "app/src/main/assets/src/search/cache.js",
+    "app/src/main/assets/dist",
+    "app/src/main/assets/index.html",          # build:csp re-hashes inline scripts
+]
+
+
+def reconcile_with_origin():
+    """Fetch, then bring main up to date without ever discarding local commits.
+    behind-only -> fast-forward; ahead-only -> proceed (push carries them);
+    diverged -> rebase ours onto origin, aborting cleanly on conflict."""
+    git("fetch", "origin", "main")
+    counts = git("rev-list", "--left-right", "--count", "HEAD...origin/main").split()
+    ahead, behind = int(counts[0]), int(counts[1])
+    if behind and not ahead:
+        git("merge", "--ff-only", "origin/main")
+        log(f"fast-forwarded {behind} commit(s) from origin")
+    elif ahead and behind:
+        log(f"diverged (ahead {ahead}, behind {behind}) — rebasing local commits onto origin")
+        try:
+            git("rebase", "origin/main")
+        except Exception:
+            git("rebase", "--abort")
+            raise RuntimeError(
+                f"rebase of {ahead} local commit(s) onto origin/main conflicted — "
+                "aborted cleanly; reconcile by hand")
+    elif ahead:
+        log(f"local main ahead by {ahead} gated commit(s) — they will ride this push")
+
+
 def main():
     dry = "--dry-run" in sys.argv
     log(f"=== flock-audio-sync start (dry={dry}) ===")
-    base = git("rev-parse", "HEAD").strip()
+    base = None
+    committed = False
     try:
         if git("status", "--porcelain", "-uno").strip():   # tracked files only — our own log is untracked
             raise RuntimeError("repo dirty — another session is mid-work; refusing to run")
-        git("pull", "--ff-only", "origin", "main")
+        reconcile_with_origin()
+        base = git("rev-parse", "HEAD").strip()            # AFTER reconcile — the true pre-run point
 
         run([sys.executable, os.path.join("tools", "fetch-drive-audio.py")], timeout=1800)
         run(["node", os.path.join("tools", "gen-audio-manifest.mjs")])
@@ -89,7 +133,7 @@ def main():
         added = git("diff", "--numstat", "--", MANIFEST).split("\t")[0]
         log(f"manifest changed (+{added} lines) — new recordings found")
         if dry:
-            git("checkout", "--", ".")
+            git("checkout", "--", *OWN_PATHS)   # scoped — never revert others' work
             log("dry-run: reverted, stopping before upload")
             return 0
 
@@ -97,24 +141,49 @@ def main():
             timeout=7200)
         new_v = bump_corpus()
         run("npm run build", shell_npm=True, timeout=1800)
-        git("add", "-A")
+        # Explicit staging — never add -A: a concurrent session's stray files
+        # (or our own attention note, as in c30) must not ride this commit.
+        foreign = [ln for ln in git("status", "--porcelain", "-uno").splitlines()
+                   if not any(ln[3:].startswith(p) for p in OWN_PATHS)]
+        if foreign:
+            raise RuntimeError("unexpected tracked changes outside OWN_PATHS: "
+                               + "; ".join(ln.strip() for ln in foreign[:6]))
+        git("add", "--", *OWN_PATHS)
         run(f'git commit -m "feat(audio): weekly flock sync — new recordings (c{new_v})" '
             f'-m "Automated: fetch-drive-audio -> gen-audio-manifest -> mirror-audio-release '
             f'--until-done -> gates. Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"',
             shell_npm=True, timeout=3600)   # pre-commit runs the full gate chain
-        git("push", "origin", "main")
+        committed = True
+        try:
+            git("push", "origin", "main")
+        except Exception:
+            log("push refused — origin moved mid-run; one pull --rebase retry")
+            git("pull", "--rebase", "origin", "main")
+            git("push", "origin", "main")
         log(f"pushed c{new_v} — done")
         return 0
     except Exception as e:
         log(f"FAILED: {e}")
+        cleanup = "no cleanup needed"
         try:
-            git("reset", "--hard", base)
-            git("clean", "-fd", "--", "app/src/main/assets/dist")
+            if committed:
+                # The commit passed the full gate chain — NEVER throw it away.
+                cleanup = "gated commit kept LOCAL (push failed); push it manually"
+            elif base and git("rev-parse", "HEAD").strip() == base:
+                # Nobody else committed meanwhile — restoring only our paths is safe.
+                git("checkout", "--", *OWN_PATHS)
+                git("clean", "-fd", "--", "app/src/main/assets/dist")
+                cleanup = f"own files restored to {base[:9]} (HEAD untouched)"
+            elif base:
+                # HEAD moved under us: a concurrent session committed. Touch NOTHING.
+                cleanup = ("HEAD moved during the run (concurrent session) — repo left "
+                           "as-is to protect their work; reconcile by hand")
         except Exception as e2:
-            log(f"reset also failed: {e2}")
+            cleanup = f"cleanup itself failed: {e2}"
+        log(f"cleanup: {cleanup}")
         with open(ATTN, "w", encoding="utf-8") as f:
             f.write(f"flock-audio-sync FAILED {datetime.datetime.now():%Y-%m-%d %H:%M}\n"
-                    f"Repo was reset to {base[:9]}.\nError:\n{e}\n"
+                    f"Cleanup: {cleanup}\nError:\n{e}\n"
                     f"Full log: tools/_flock-audio-sync.log\n")
         return 1
 
