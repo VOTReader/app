@@ -157,36 +157,59 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     return `${WEEKDAY_NAMES[date.getDay()]} · ${MONTH_ABBR[m]} ${d}`;
   };
 
-  /* Resume chips on chapter rows (BACKLOG [26]'s named remainder). A history
-     row for a Bible or Matthew chapter now carries the SAME chip its index
-     card shows — "62% · ~3 min left" — because History is where a reader
-     goes to pick up what they left, and the row that says only "2h ago"
-     cannot tell them which one is unfinished.
+  /* Resume chips on history rows — BACKLOG [26]'s named remainder, closed by
+     C2-C [C6]. A history row now carries the SAME chip its index card shows —
+     "62% · ~3 min left" — because History is where a reader goes to pick up
+     what they left, and a row that says only "2h ago" cannot tell them which
+     one is unfinished.
 
-     Only 'chapter' entries: letters/entries are reached by slug and their
-     word counts live behind a different corpus lookup, and study chapters
-     have no index-card chip to match. bookItemsFor is the SAME resolver
-     progress-stats uses, so a row and its index card count identically.
-     Cached per render — one lookup per BOOK, not one per row. */
+     ONE key space for both row kinds. `bookItemsFor` is the same resolver
+     progress-stats and the index cards use, and it is keyed by the SOURCE id
+     that the read tracker keys on: a Bible/Matthew chapter's bookId (item key
+     = chapter number), or a collection's `readKey` (item key = letter/entry
+     slug), which COL_BY_INDEX_SC resolves from the `volumeScreen` every letter
+     row already stores. So a row, its index card and the tracker's
+     `v1:<source>:<item>` record can never disagree.
+
+     Study-chapter rows stay chipless: their index has no chip to match.
+
+     Lazy per rendered row, as the auto-expanded day groups require — a
+     source's item map is built on FIRST touch and only for sources that
+     actually appear in rendered rows, so opening History does not sweep every
+     corpus. Collapsed groups never call this at all. */
   const chipWpm = readingChipWpm();
-  const bookItemCache = new Map();
-  const chapterItem = (bookId, chapterNum) => {
-    if (!bookId || chapterNum == null || typeof bookItemsFor !== 'function') return null;
-    if (!bookItemCache.has(bookId)) {
-      const byNum = new Map();
+  const sourceItemCache = new Map();
+  const sourceItem = (sourceId, itemKey) => {
+    if (!sourceId || itemKey == null || typeof bookItemsFor !== 'function') return null;
+    if (!sourceItemCache.has(sourceId)) {
+      const byKey = new Map();
       try {
-        for (const row of bookItemsFor(bookId)) byNum.set(String(row.key), row.item);
+        for (const row of bookItemsFor(sourceId)) byKey.set(String(row.key), row.item);
       } catch (_e) { /* an unloaded corpus simply yields no chip */ }
-      bookItemCache.set(bookId, byNum);
+      sourceItemCache.set(sourceId, byKey);
     }
-    return bookItemCache.get(bookId).get(String(chapterNum)) || null;
+    return sourceItemCache.get(sourceId).get(String(itemKey)) || null;
   };
   const entryChip = (entry) => {
-    if (!entry || entry.type !== 'chapter') return null;
-    const item = chapterItem(entry.bookId, entry.chapterNum);
+    if (!entry) return null;
+    let sourceId = null;
+    let itemKey = null;
+    if (entry.type === 'chapter') {
+      sourceId = entry.bookId;
+      itemKey = entry.chapterNum;
+    } else if (entry.type === 'letter') {
+      const col = entry.volumeScreen && typeof COL_BY_INDEX_SC !== 'undefined'
+        ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
+      if (!col || !col.readKey) return null;   // a legacy row without volumeScreen
+      sourceId = col.readKey;
+      itemKey = entry.letterId;
+    } else {
+      return null;
+    }
+    const item = sourceItem(sourceId, itemKey);
     if (!item) return null;
     const key = (typeof READ_VERSION_ID === 'string')
-      ? `${READ_VERSION_ID}:${entry.bookId}:${entry.chapterNum}` : null;
+      ? `${READ_VERSION_ID}:${sourceId}:${itemKey}` : null;
     return readingMinChip(item, key, chipWpm);
   };
 

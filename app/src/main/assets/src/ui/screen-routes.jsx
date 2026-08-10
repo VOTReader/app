@@ -47,6 +47,7 @@ import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -527,7 +528,10 @@ export function buildScreenRoutes({
 
     // ── Letter screens (10) — data-guarded ──
     'vot-one-letter':    () => _wrapVot(actL('one')     && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', actL('one'))}     letter={actL('one')}     volumeLabel="Volume One" />),
-    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')} />),
+    // C2-C [C2]: this was the ONE letter route that named no volume — it rode
+    // LetterView's `volumeLabel || "Volume Two"` fallback, which is why the
+    // fallback looked harmless. Say it here so the fallback can become honest.
+    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')}     volumeLabel="Volume Two" />),
     'vot-three-letter':    () => _wrapVot(actL('three')   && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', actL('three'))}   letter={actL('three')}     volumeLabel="Volume Three" />),
     'vot-four-letter':    () => _wrapVot(actL('four')    && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', actL('four'))}    letter={actL('four')}     volumeLabel="Volume Four" />),
     'vot-five-letter':    () => _wrapVot(actL('five')    && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', actL('five'))}    letter={actL('five')}     volumeLabel="Volume Five" />),
@@ -947,6 +951,10 @@ export function buildScreenRoutes({
           isRead={(num) => isRead('matthew', num)}
           readCount={(num) => Number(readItems[getReadKey('matthew', num)]) || 0}
           progressKeyFor={(num) => getReadKey('matthew', num)}
+          // C2-C [C7] / BACKLOG [29a]: the commentary-weight chip. Only the
+          // Matthew STUDY index gets it — bible-idx renders the same
+          // component over books that carry no votNotes at all.
+          noteWeights={MATTHEW_NOTE_RATIO}
           markAsReadEnabled={settings.markAsRead}
           bookmarkKeyFor={(num) => 'bible:matthew:' + num}
           theme={theme} onThemeChange={setTheme}

@@ -314,11 +314,16 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
 [25] TRANSLATION FACTS — DONE 2026-08-03. Seven non-NKJV picker descriptions
      now state the measured whole-canon length delta. Hardcoded by design:
      the shipped translation corpora are frozen, so the facts cannot drift.
-[26] SMART RESUME EVERYWHERE — PARTIAL 2026-08-03: index rows/cards ship
-     the "N% · ~M min left" chip (see DONE log). Remainder: History rows
-     only (different key namespace — needs the History→read-key mapping).
-     The original "reading dot" target was corrected by C2 recon 2026-08-03
-     (dot already resumes); do not re-add it here.
+[26] SMART RESUME EVERYWHERE — DONE 2026-08-10 (C2-C [C6]). Index rows/cards
+     shipped the "N% · ~M min left" chip 2026-08-03; History chapter rows
+     joined 2026-08-09; History LETTER rows — the named remainder, held back
+     only by the different key namespace — landed 2026-08-10. The mapping is
+     COL_BY_INDEX_SC.get(row.volumeScreen).readKey, which is both the id
+     bookItemsFor resolves the collection under and the middle segment of the
+     tracker's v1:<source>:<item> key, so a History row, its index card and
+     the frontier record cannot disagree. Study-chapter rows stay chipless
+     (their index has no chip to match). The original "reading dot" target
+     was corrected by C2 recon 2026-08-03 (dot already resumes).
 
 [27] AUTOSCROLL SPEED IN WPM — DONE 2026-08-04. The pill readout leads
      with the measured wpm ("~120 wpm · 30 lines/min") once the page is
@@ -336,7 +341,12 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      no block offsets. Investigating (b) DID surface a live P1 — the
      Matthew Study Bible contributed ZERO search documents (fixed; see
      HISTORY 08-04 s6) — which was worth more than both halves.
-     (a) Matthew commentary-weight badge STILL OPEN. Measured for real:
+     (a) Matthew commentary-weight badge DONE 2026-08-10 (C2-C [C7]) —
+     `utils/matthew-note-weight.js` holds the per-chapter table, frozen and
+     measured (it reproduces every figure below); ChapterIndex paints
+     "N.Nx notes" under the title on matthew-idx only. countItemWords was
+     NOT touched — the badge is the separate signal the contract demands.
+     Measured for real:
      verse text 23,221 words / 1,071 verses vs votNotes 49,752 words / 627
      notes = 2.14x commentary, ranging 0.00x (ch 2) to 8.43x (ch 24). Note
      the contract: study panels are supplemental and excluded from
@@ -407,16 +417,39 @@ C2-B  TRUTH-AND-COPY PASS (one commit)
 Owner-gated: two Milestones engines (10-row strip vs 84-item screen) need a
        canonical-table decision; backup "Last export" line stays retired.
 
-C2-C  READING-PATH COHERENCE
-  [C1] WtlbEntryView scripture sheet invisible to the modal registry —
-       auto-scroll keeps scrolling under the open sheet (~400 entries). S
-  [C2] "Volume Two"/"Matthew" hardcoded fallbacks on LetterView/HistoryCard/
-       ChapterView — confident mislabeling, the misattribution class. S
-  [C3] WTLB back button says "Index"; siblings name the destination. S
-  [C4] Scroll-notch 2Hz interval runs for everyone; gate on the setting. S
-  [C5] LetterView Videos card renders when a letter has no videos. S
-  [C6] History rows resume chips — closes [26] (bridge now exists). M
-  [C7] [29a] Matthew commentary-weight badge — measured, slot exists. S/M
+C2-C  READING-PATH COHERENCE — [C1]-[C7] DONE 2026-08-10 (one commit)
+  [C1] DONE. The sheet registers 'wtlb-scripture-sheet' with useModalRegistry
+       (gated on scriptureRef), so use-autoscroll's isModalOpen() finally sees
+       it. Registration only — Escape stays single-source in useAndroidBack.
+       __closeSheet wiring untouched. Live-verified on a Part One entry.
+  [C2] DONE. LetterView's three "Volume Two" fallbacks → 'Library' / an
+       omitted eyebrow half / a NULL collectionLabel (sub is nullable through
+       the whole Track shape); the ONE route that rode the fallback
+       ('vot-letter') now names Volume Two itself. HistoryEntryCard resolves
+       through the registry, honours the legacy numeric `volume`, and drops
+       the line entirely rather than guessing. ChapterView's five "Matthew"
+       literals → one derived bookLabel; a title-less book drops the book half.
+  [C3] DONE. backLabel: partLabel || 'Index' — "Back to Part One" /
+       "Part Two" / "The Blessed" / "Regarding The Holy Days". smoke-ci's
+       compact-nav assertion re-pointed at the real destination.
+  [C4] DONE. The body class is WATCHED (MutationObserver on <body>'s class)
+       instead of polled; the ResizeObserver + 500ms re-attach interval now
+       exist only while the notch is on. Default-off readers paid a 2 Hz
+       timer on every screen for the life of the app.
+  [C5] DONE. Presence guard (videos[]/videoVoiceUrl/videoMusicUrl) matching
+       its four siblings. Real blast radius, measured live: all 348 numbered
+       letters DO carry video, so the empty card was showing on 69 of 72
+       Bible-study chapters (LetterView hosts them) + Hidden Manna.
+  [C6] DONE — CLOSES [26]. Letter rows join chapter rows: one key space,
+       bookItemsFor keyed by the collection readKey COL_BY_INDEX_SC resolves
+       from the row's volumeScreen, tracker key v1:<source>:<item>. Lazy per
+       rendered row, one corpus sweep per source, none for a collapsed group.
+  [C7] DONE — CLOSES [29a]. utils/matthew-note-weight.js ships the measured
+       per-chapter table (frozen; reproduces [29a]'s 2.14x / 0.00x ch2 /
+       8.43x ch24); ChapterIndex renders "8.4x notes" UNDER the title on the
+       study index only. Under, not beside: measured live at 375px, a second
+       right-hand pill crushed the title column 145px -> 48px. countItemWords
+       untouched, per the [29a] contract.
   [C8] A11y: search input + clear unnamed; NavButtons title-only; History
        accordion no aria-expanded; Surprise tooltip/aria disagree. S each
   [C9] Highlights search: type="search" + shared class (JS-injected CSS

@@ -6,7 +6,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
   const currentRef = React.useRef(null);
   // Chapter-level bookmark indicator (owner report 2026-08-09): a chapter
   // holding a bookmark — the whole-chapter bookmark or any verse bookmark
@@ -51,6 +51,27 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // v1:<bid>:<cid> key; absent (legacy caller) → cold chip only.
   const _wpm = readingChipWpm();
   const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
+  // BACKLOG [29a] / C2-C [C7] — the SECOND signal, on the study screens that
+  // pass a measured table (utils/matthew-note-weight.js). It answers a
+  // question the minute chip is contractually forbidden to answer: study
+  // panels are excluded from countItemWords by design, so a chapter carrying
+  // 8,640 words of letter excerpts over 1,025 words of verse reads as an
+  // ordinary chapter until you open it. A chapter with NO notes shows no
+  // chip — silence is the honest signal for nothing.
+  //
+  // It renders UNDER the title, inside the info column, rather than as a
+  // second right-hand chip: at 375px a right-hand pill crushed the title
+  // column to 48px (measured live). See the .idx-note-chip block in app.css.
+  const noteChip = (ch) => {
+    const ratio = noteWeights ? noteWeights[ch.num] : 0;
+    if (!(ratio > 0)) return null;
+    return (
+      <span
+        className="idx-note-chip"
+        title={`Study commentary runs ${ratio.toFixed(1)}× the length of this chapter's verse text`}
+      >{ratio.toFixed(1)}{"\xD7"} notes</span>
+    );
+  };
   return (
     <ScreenLayout
       navChildren={LibraryNav({
@@ -100,6 +121,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                       ? <div className="chapter-card-title">{t}</div>
                       : <div className="chapter-card-title untitled">Chapter {ch.num}</div>;
                   })()}
+                  {noteChip(ch)}
                 </div>
                 {hasBookmark(ch.num) && (
                   <span className="chapter-card-bookmark" aria-label="Bookmarked" title="Bookmarked">

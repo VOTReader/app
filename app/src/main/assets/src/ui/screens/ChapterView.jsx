@@ -9,13 +9,22 @@ import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
+  /* C2-C [C2]: this screen said "Matthew" in five places — three of them
+     unconditionally (the hero eyebrow and both bottom-nav cards) and two as a
+     `book.title || 'Matthew'` fallback. It renders whatever `book` it is
+     handed; naming a different book than the one on screen is the
+     misattribution class the corpus audits exist to prevent. One derived
+     label feeds every site, and when a book carries no title the book half is
+     dropped rather than invented. */
+  const bookLabel = (book && book.title) || '';
+  const chapterRef = (n) => bookLabel ? `${bookLabel} ${n}` : `Chapter ${n}`;
   // "Go to Scripture" on the study-note scripture sheet — close the sheet,
   // then route the resolved {type:'bible'} endpoint through navigateToLink
   // (verse flash highlight + "Back to …" pill + Android back).
   const goToScriptureRef = onNavigateToLink ? (endpoint) => {
     setActiveScripRef(null);
     onNavigateToLink(endpoint, {
-      sourceLetterTitle: (book && book.title ? book.title : 'Matthew') + ' ' + chapter.num,
+      sourceLetterTitle: chapterRef(chapter.num),
       sourceVolumeLabel: 'Study Bible',
     });
   } : null;
@@ -121,7 +130,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         reading: true,
         // Derive from book.id like the verse keys two blocks below — the old
         // literal 'matthew-' would silently mis-key any future non-Matthew use.
-        chapterBookmark: (book && chapter) ? { hlKey: 'study:' + book.id + '-' + chapter.num, label: (book.title || 'Matthew') + ' ' + chapter.num + ' (Study)' } : null,
+        chapterBookmark: (book && chapter) ? { hlKey: 'study:' + book.id + '-' + chapter.num, label: chapterRef(chapter.num) + ' (Study)' } : null,
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
@@ -136,7 +145,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       <header className="hero">
         <div className="hero-bg" />
         <div className="hero-content">
-          <div className="hero-eyebrow">Matthew {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
+          <div className="hero-eyebrow">{bookLabel ? <>{bookLabel} {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
           <h1 className="hero-title">Chapter {chapter.num}</h1>
           {chapter.title && showChapterTitle && (
             !titleFocusHidden ? (
@@ -258,7 +267,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             {prevCh ? (
               <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
                 <div className="bottom-nav-label">‹ Previous</div>
-                <div className="bottom-nav-title">Matthew {prevCh.num}</div>
+                <div className="bottom-nav-title">{chapterRef(prevCh.num)}</div>
               </button>
             ) : prevBoundary ? (
               <button className="bottom-nav-card" onClick={onPrevBoundary}>
@@ -275,7 +284,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             {nextCh ? (
               <button className="bottom-nav-card next" onClick={() => onNavigate(nextCh.num)}>
                 <div className="bottom-nav-label">Next ›</div>
-                <div className="bottom-nav-title">Matthew {nextCh.num}</div>
+                <div className="bottom-nav-title">{chapterRef(nextCh.num)}</div>
               </button>
             ) : nextBoundary ? (
               <button className="bottom-nav-card next" onClick={onNextBoundary}>

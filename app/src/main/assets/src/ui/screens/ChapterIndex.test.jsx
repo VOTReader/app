@@ -153,6 +153,56 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
   });
 });
 
+/* C2-C [C7] / BACKLOG [29a] — the commentary-weight badge. The minute chip is
+   contractually blind to study panels (word-count.js counts verse text only,
+   by design), so a chapter carrying several times its own length in letter
+   excerpts reads as an ordinary chapter from the index. This is the SECOND
+   chip that says so, and only the study index passes the measured table. */
+describe('ChapterIndex — commentary-weight chip', () => {
+  const noteChips = () => [...document.querySelectorAll('.idx-note-chip')].map((c) => c.textContent);
+
+  it('renders nothing when no table is passed (every Bible book index)', () => {
+    setupGlobals();
+    renderIndex();
+    expect(noteChips()).toEqual([]);
+  });
+
+  it('states the measured ratio per chapter', () => {
+    setupGlobals();
+    renderIndex({ noteWeights: { 1: 0.49, 2: 0, 3: 8.43 } });
+    // Chapter 2 carries no notes at all → silence, not "0.0× notes".
+    expect(noteChips()).toEqual(['0.5× notes', '8.4× notes']);
+  });
+
+  it('explains itself in the tooltip rather than leaving a bare number', () => {
+    setupGlobals();
+    renderIndex({ noteWeights: { 1: 2.14 } });
+    expect(document.querySelector('.idx-note-chip').getAttribute('title'))
+      .toBe("Study commentary runs 2.1× the length of this chapter's verse text");
+  });
+
+  it('sits alongside the minute chip without displacing it', () => {
+    setupGlobals();
+    globalThis.countItemWords = countItemWords;
+    globalThis.readingMinutes = readingMinutes;
+    const WORDY = { ...BOOK, chapters: [{ num: 1, title: 'One', sections: [{ verses: [{ n: 1, text: Array.from({ length: 460 }, () => 'w').join(' ') }] }] }] };
+    renderIndex({ book: WORDY, noteWeights: { 1: 3.58 } });
+    const card = document.querySelector('.chapter-card-btn');
+    expect(card.querySelector('.idx-min-chip').textContent).toBe('~2 min');
+    expect(card.querySelector('.idx-note-chip').textContent).toBe('3.6× notes');
+  });
+});
+
+describe('MATTHEW_NOTE_RATIO — the measured table', () => {
+  it('covers all 28 chapters and reproduces the two extremes [29a] recorded', async () => {
+    const { MATTHEW_NOTE_RATIO } = await import('../../utils/matthew-note-weight.js');
+    expect(Object.keys(MATTHEW_NOTE_RATIO)).toHaveLength(28);
+    expect(MATTHEW_NOTE_RATIO[2]).toBe(0);        // no votNotes at all
+    expect(MATTHEW_NOTE_RATIO[24]).toBe(8.43);    // the heaviest chapter
+    for (let n = 1; n <= 28; n++) expect(typeof MATTHEW_NOTE_RATIO[n]).toBe('number');
+  });
+});
+
 describe('chapterIndexCurrentChapter — reading-dot decouple (route helper)', () => {
   it('returns the last-read chapter whenever the book is the active read', () => {
     // The reading-dot toggle (settings.showReadingDot) is deliberately NOT

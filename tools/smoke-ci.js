@@ -106,7 +106,11 @@ async function auditCompactReadingNav(page) {
     });
     const clipped = items.filter((item) => item.left < bounds.left - 1 || item.right > bounds.right + 1);
     const labels = items.map((item) => item.label);
-    const hasBack = labels.some((label) => /Back to Index/i.test(String(label)));
+    // C2-C [C3]: this walk ends on a WTLB Part One entry, and the back
+    // affordance now names that destination instead of the generic word
+    // "Index" — so the live assertion names it too (and is stronger for it:
+    // "Back to Index" would have passed on any WTLB-family screen).
+    const hasBack = labels.some((label) => /Back to Part One/i.test(String(label)));
     const hasHome = labels.some((label) => /^Home$/i.test(String(label)));
     return { ok: clipped.length === 0 && hasBack && hasHome, clipped, hasBack, hasHome, items };
   });

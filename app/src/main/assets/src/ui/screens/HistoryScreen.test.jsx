@@ -28,7 +28,7 @@ import { timeAgo } from '../../utils/dates.js';
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'HistoryEntryCard', 'ConfirmStrip',
   'timeAgo', 'WEEKDAY_NAMES', 'MONTH_NAMES', 'MONTH_ABBR', 'COL_BY_INDEX_SC',
   'countItemWords', 'readingMinutes', 'bookItemsFor', 'READ_VERSION_ID',
-  'ReadingStatsStore', 'BOOKS'];
+  'ReadingStatsStore', 'BOOKS', 'LETTERS_V1', 'studyAbbrev'];
 
 /** A 3-chapter book whose chapters have real, countable verse text. */
 const BOOK = {
@@ -39,6 +39,12 @@ const BOOK = {
     sections: [{ verses: Array.from({ length: 40 }, (_u, i) => ({ n: i + 1, text: 'a word of the psalm sung in the assembly of the upright ' + i })) }],
   })),
 };
+
+/** Volume One's letters — Format A, real countable body text (C2-C [C6]). */
+const V1_LETTERS = ['the-wide-path', 'the-seventh-day'].map((id, i) => ({
+  id, num: i + 1, title: id === 'the-wide-path' ? 'The Wide Path' : 'The Seventh Day',
+  blocks: [{ type: 'para', segments: [{ t: 'text', v: Array.from({ length: 400 }, (_u, n) => 'word' + n).join(' ') }] }],
+}));
 
 function setupGlobals(over = {}) {
   globalThis.ScreenLayout = ({ children, navChildren }) => (
@@ -55,13 +61,19 @@ function setupGlobals(over = {}) {
     'July', 'August', 'September', 'October', 'November', 'December'];
   globalThis.MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  globalThis.COL_BY_INDEX_SC = new Map([['vol-one-idx', { label: 'Volume One' }]]);
+  // `readKey` is the letter-row half of the chip's key space: it is the id
+  // bookItemsFor resolves the collection under AND the middle segment of the
+  // tracker's v1:<source>:<item> key (C2-C [C6]).
+  globalThis.COL_BY_INDEX_SC = new Map([['vol-one-idx', { label: 'Volume One', readKey: 'volume-one' }]]);
   // Real counters + real corpus resolver — same ones the index cards use.
   globalThis.countItemWords = countItemWords;
   globalThis.readingMinutes = readingMinutes;
-  globalThis.bookItemsFor = bookItemsFor;
+  globalThis.bookItemsFor = over.bookItemsFor || bookItemsFor;
   globalThis.READ_VERSION_ID = READ_VERSION_ID;
   globalThis.BOOKS = { psalms: BOOK };
+  globalThis.LETTERS_V1 = V1_LETTERS;
+  // index.html's one-liner: the abbrev table, else a shortened title.
+  globalThis.studyAbbrev = (_slug, fallback) => fallback || '';
   if (over.progress) {
     globalThis.ReadingStatsStore = {
       subscribe: () => () => {}, getVersion: () => 0,
@@ -85,9 +97,13 @@ const chapter = (bookId, bookTitle, num, ts, chapterTitle = null) => ({
   type: 'chapter', key: `ch:${bookId}:${num}`, bookId, bookTitle,
   chapterNum: num, chapterTitle, ts,
 });
-const letter = (id, title, num, ts) => ({
+const letter = (id, title, num, ts, over = {}) => ({
   type: 'letter', key: 'lt:' + id, letterId: id, letterTitle: title,
-  letterNum: num, volumeScreen: 'vol-one-idx', ts,
+  letterNum: num, volumeScreen: 'vol-one-idx', ts, ...over,
+});
+const study = (slug, title, num, ts) => ({
+  type: 'study-chapter', key: 'st:' + slug + ':' + num, studyId: slug, studySlug: slug,
+  studyTitle: title, studyChapterId: 'c' + num, chapterNum: num, chapterTitle: 'Part ' + num, ts,
 });
 
 const renderScreen = (history, props = {}) => render(
@@ -264,12 +280,9 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
     expect(within(cards[1]).getByText(/50% · ~\d+ min left/)).toBeTruthy();
   });
 
-  it('gives letters and unknown books no chip at all', () => {
+  it('gives an unresolvable book no chip at all', () => {
     setupGlobals({ progress: {} });
-    renderScreen([
-      letter('the-wide-path', 'The Wide Path', 1, today(5)),
-      chapter('nowhere', 'Nowhere', 3, today(9)),
-    ]);
+    renderScreen([chapter('nowhere', 'Nowhere', 3, today(9))]);
     expect(chipText()).toEqual([]);
   });
 
@@ -279,6 +292,74 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
     renderScreen([chapter('psalms', 'Psalms', 1, today(5))]);
     expect(chipText()).toEqual([]);
     expect(cardTitles()).toHaveLength(1);
+  });
+});
+
+/* C2-C [C6] — the other half of BACKLOG [26]. Letter rows were the named
+   remainder: they live in a different key space (a collection readKey + a
+   slug, not a bookId + a number), which is the ONLY reason they had no chip.
+   COL_BY_INDEX_SC resolves that key space from the `volumeScreen` every
+   letter row already stores. */
+describe('HistoryScreen — resume chips on letter rows', () => {
+  const chipText = () => [...document.querySelectorAll('.idx-min-chip')].map((c) => c.textContent);
+
+  it('shows the cold estimate on a letter row (it showed nothing before)', () => {
+    setupGlobals({ progress: {} });
+    renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5))]);
+    expect(chipText()).toEqual([expect.stringMatching(/^~\d+ min$/)]);
+  });
+
+  it('shows percent-read and time-left for a letter left part-way', () => {
+    setupGlobals({
+      progress: { [`${READ_VERSION_ID}:volume-one:the-wide-path`]: { b: 10, c: [1, 2, 3, 4], tw: 400, w: 160 } },
+    });
+    renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5))]);
+    const chip = document.querySelector('.idx-min-chip.in-progress');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('40%');
+    expect(chip.textContent).toContain('min left');
+  });
+
+  it('reads the frontier under v1:<collection readKey>:<letterId>, not a neighbor', () => {
+    setupGlobals({
+      progress: { [`${READ_VERSION_ID}:volume-one:the-seventh-day`]: { b: 10, c: [1, 2, 3, 4, 5], tw: 400, w: 200 } },
+    });
+    renderScreen([
+      letter('the-wide-path', 'The Wide Path', 1, today(5)),
+      letter('the-seventh-day', 'The Seventh Day', 2, today(9)),
+    ]);
+    const cards = [...document.querySelectorAll('.chapter-card-btn')];
+    expect(within(cards[0]).queryByText(/min left/)).toBeNull();
+    expect(within(cards[1]).getByText(/50% · ~\d+ min left/)).toBeTruthy();
+  });
+
+  it('gives a legacy row with no volumeScreen no chip rather than guessing a collection', () => {
+    setupGlobals({ progress: {} });
+    renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5), { volumeScreen: undefined })]);
+    expect(chipText()).toEqual([]);
+    expect(cardTitles()).toEqual(['The Wide Path']);   // the row itself still renders
+  });
+
+  it('leaves study-chapter rows chipless — their index has no chip to match', () => {
+    setupGlobals({ progress: {} });
+    renderScreen([study('the-lamb-of-god', 'The Lamb of God', 3, today(5))]);
+    expect(chipText()).toEqual([]);
+  });
+
+  it('sweeps each corpus ONCE per render and never for a collapsed group', () => {
+    // Auto-expanded day groups must not jank: the item map is built lazily on
+    // first touch, per SOURCE, and a group that is not open never asks.
+    const calls = [];
+    setupGlobals({ progress: {}, bookItemsFor: (id) => { calls.push(id); return bookItemsFor(id); } });
+    renderScreen([
+      letter('the-wide-path', 'The Wide Path', 1, today(5)),
+      letter('the-seventh-day', 'The Seventh Day', 2, today(6)),
+      chapter('psalms', 'Psalms', 1, today(7)),
+      chapter('psalms', 'Psalms', 2, today(8)),
+      // Two years back — its groups are default-CLOSED, so its rows never render.
+      chapter('psalms', 'Psalms', 3, Date.now() - 730 * DAY),
+    ]);
+    expect(calls).toEqual(['volume-one', 'psalms']);
   });
 });
 

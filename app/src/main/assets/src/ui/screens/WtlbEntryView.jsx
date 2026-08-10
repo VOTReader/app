@@ -90,6 +90,25 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     return () => { window.__closeSheet = prev || null; };
   }, [scriptureRef]);
 
+  // W1.5(a.2) parity with LetterView's two sheets (C2-C [C1], 2026-08-10).
+  // This sheet claimed ONLY window.__closeSheet — the older, disjoint slot the
+  // Android back handler reads. Every consumer of the MODAL REGISTRY therefore
+  // saw an empty registry while the sheet was open, and the visible cost was
+  // the auto-scroll transport: use-autoscroll's isModalOpen() gate asks
+  // modalRegistry.isAnyOpen(), read false, and kept scrolling the page out from
+  // under an open scripture sheet on ~400 Format B entries.
+  //
+  // REGISTRATION ONLY. Escape stays single-source in useAndroidBack's
+  // dispatcher (use-modal-registry.js header, W1.5 DISPATCHER CONTRACT):
+  // a second listener here would race it — the local one dismisses and
+  // unregisters, the dispatcher then reads an empty registry and navigates
+  // back, so one Escape press would both close the sheet AND leave the entry.
+  useModalRegistry({
+    id: 'wtlb-scripture-sheet',
+    dismiss: () => setScriptureRef(null),
+    active: scriptureRef != null,
+  });
+
   const openSheetForRef = (ref) => {
     setScriptureRef(ref);
     setScriptureText(lookupVerse(ref));
@@ -329,7 +348,12 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       />}
       navChildren={LibraryNav({
         // onHome — NOT onBack. onBack is the in-content back-hint pill.
-        onBack: onHome, backLabel: 'Index',
+        // C2-C [C3]: the label names the REAL destination like every sibling
+        // reading screen does (LetterView says its volume, ChapterView says
+        // its book). 'Index' described a generic noun, not a place — the
+        // index this returns to is Part One / Part Two / The Blessed /
+        // Regarding The Holy Days, which partLabel already carries.
+        onBack: onHome, backLabel: partLabel || 'Index',
         arrows: {
           onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),

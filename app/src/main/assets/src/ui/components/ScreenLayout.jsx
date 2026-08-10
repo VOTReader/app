@@ -99,13 +99,40 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
      every other screen. */
   useReadTracker(scrollRef, inert, placeKey);
 
+  /* C2-C [C4]: the scroll-notch marker is an OPT-IN reading aid
+     (Settings → Reading, mirrored onto `body.scroll-notch` by use-settings).
+     Its machinery below — a ResizeObserver plus a 500 ms re-attach interval —
+     used to be built unconditionally on every screen for every reader: the
+     interval fired twice a second forever and update() bailed on the body
+     class at its first line, so a reader with the notch OFF (the default) paid
+     a 2 Hz timer to do nothing, on every screen, for the life of the app.
+
+     The class is now WATCHED instead of polled. A MutationObserver on <body>'s
+     class attribute is event-driven — zero cost while idle, one callback when
+     use-settings toggles its dozen classes — and gates the effect below so the
+     interval only exists while the notch is actually on. Watching the class
+     rather than taking a settings prop keeps ScreenLayout free of the settings
+     object it has never needed (it is rendered by all 59 screens). */
+  const [notchOn, setNotchOn] = React.useState(
+    () => typeof document !== 'undefined' && !!document.body && document.body.classList.contains('scroll-notch')
+  );
+  React.useEffect(() => {
+    if (inert || typeof MutationObserver === 'undefined' || !document.body) return undefined;
+    const read = () => setNotchOn(document.body.classList.contains('scroll-notch'));
+    read();   // the class may have been set between mount and effect
+    const mo = new MutationObserver(read);
+    mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, [inert]);
+
   React.useEffect(() => {
     if (inert) return;
     const marker = notchRef.current;
     if (!marker) return;
+    if (!notchOn) { marker.style.opacity = '0'; return; }
     const update = () => {
       const el = __scrollEl;
-      if (!el || !document.body.classList.contains('scroll-notch')) {
+      if (!el) {
         marker.style.opacity = '0';
         return;
       }
@@ -127,7 +154,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       if (__scrollEl) { ro.observe(__scrollEl); update(); }
     }, 500);
     return () => { ro.disconnect(); clearInterval(poll); };
-  }, [inert]);
+  }, [inert, notchOn]);
 
   // Suppress accidental taps that fire when a scrolling finger lifts on an
   // interactive element (footnote marker, highlight, icon, etc.). When the

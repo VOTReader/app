@@ -261,7 +261,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         // it shrank this arrow to 11.52px on 13 screens. LibraryNav renders
         // `nav-home nav-back-icon` like every other screen. `nav-volume` is gone.
         // onHome — NOT onBack. onBack is the in-content back-hint pill.
-        onBack: onHome, backLabel: volumeLabel || "Volume Two",
+        // C2-C [C2]: the fallback was "Volume Two" — a CONFIDENT wrong answer
+        // (the misattribution class) for any caller that forgets the prop.
+        // Every route now passes volumeLabel explicitly, so this only fires
+        // for a future caller, and it says the one thing that is always true.
+        onBack: onHome, backLabel: volumeLabel || "Library",
         arrows: {
           onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
@@ -286,7 +290,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       <header className="hero">
         <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
-          <div className="hero-eyebrow">{volumeLabel || "Volume Two"} {"\xA0\xB7\xA0"} {studyMode ? letter.num === 0 ? "Preface" : `Chapter ${letter.num}` : letter.num === 0 ? "Preface" : `Letter ${letter.num}`}</div>
+          {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is
+              OMITTED (and its separator with it) rather than asserting
+              "Volume Two". The position label alone is honest. */}
+          <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{studyMode ? letter.num === 0 ? "Preface" : `Chapter ${letter.num}` : letter.num === 0 ? "Preface" : `Letter ${letter.num}`}</div>
           <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           <div className="hero-ornament">
@@ -303,7 +310,16 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               is pointer-events:none + HTML inert). */}
           {!studyMode && AudioPlayer.hasAudio(volKey, letter.id) && (
             <div className="hero-play-row">
-              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || 'Volume Two' })} />
+              {/* C2-C [C2]: collectionLabel becomes the track's `sub` — the
+                  second line of the mini-player, the listening desk, the
+                  shelves, the saved-recording rows and the native media card.
+                  A wrong volume there is a lie that OUTLIVES the screen (it
+                  persists into the Listening Library). `sub` is nullable
+                  through the whole Track shape (utils/audio-track.js
+                  normalizes '' → null) and every reader guards it — the bar
+                  prints '', the desk/shelf filter(Boolean) it out, AudioShelf
+                  falls back to 'The Volumes of Truth'. */}
+              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null })} />
             </div>
           )}
         </div>
@@ -573,6 +589,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 </div>
               )}
 
+              {/* C2-C [C5]: the presence guard its four siblings above all
+                  have. Without it this card rendered on EVERY letter — the
+                  heading "Videos" over a single link to the channel's front
+                  page, which is not a video of this letter. The guard mirrors
+                  what the card can actually show: a videos[] array, the
+                  voice-over URL, or the set-to-music URL. */}
+              {(letter.videos?.length > 0 || letter.videoVoiceUrl || letter.videoMusicUrl) && (
               <div className="related-card">
                 <div className="related-card-title">Videos</div>
                 {letter.videos?.map((v, i) => (
@@ -588,6 +611,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   <span style={{ color: '#cc4444' }}>▶</span> Official YouTube Channel
                 </a>
               </div>
+              )}
             </div>
           </main>
         </div>
