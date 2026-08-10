@@ -219,16 +219,28 @@ if [ -n "$src_changed" ]; then
   echo "[pre-commit] Typecheck OK."
   echo ""
 
-  # ─── Step 4: vitest run (Q5.1) ────────────────────────────────────
-  # Source files changed → run the full vitest suite. Fast for now
-  # (~2.3s); grows as Q5.2+ adds real tests. Zero-tolerance.
-  echo "[pre-commit] Source files staged — running vitest..."
-  npm run test
+  # ─── Step 4: vitest run + coverage floor (Q5.1 / C2-D [D1]) ───────
+  # Source files changed → run the full vitest suite. Zero-tolerance on a
+  # failing test AND on the coverage floors in vitest.config.js.
+  #
+  # This used to run the coverage-free `npm run test`, so the floors were
+  # enforced ONLY in CI — a collapse in the covered tier (a suite deleted, a
+  # module silently unimported) reached main and failed after push instead of
+  # at the commit prompt. `test:coverage` is the same suite plus the v8
+  # instrumentation: measured 2026-08-10 at 66s vs 47s for 3,941 tests, on a
+  # commit that already pays for a bundle rebuild. `npm run test` stays
+  # coverage-free for watch/dev so the fast loop is untouched.
+  echo "[pre-commit] Source files staged — running vitest (with coverage floors)..."
+  npm run test:coverage
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
     echo "---------------------------------------------------------------"
-    echo "Tests FAILED — see vitest output above."
+    echo "Tests OR the coverage floor FAILED — see vitest output above."
+    echo "A coverage line under its threshold means the covered tier (hooks/"
+    echo "stores/utils/renderer/search) LOST ground — find the suite or module"
+    echo "that stopped running. The floors sit ~25 points under measured, so"
+    echo "they only trip on a collapse; never lower one to make this pass."
     echo "Fix the failing tests, re-stage the file(s), then retry."
     echo "Emergency bypass (not recommended): git commit --no-verify"
     echo "---------------------------------------------------------------"
@@ -353,6 +365,24 @@ if [ -n "$bundle_source_changed" ]; then
     echo "TYPE-SCALE gate FAILED — replace the literal font-size with a"
     echo "--fs-N token (or --fsc-N for pinned chrome). If the size you need"
     echo "genuinely isn't on the ladder, add the step in app.css :root."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+
+  # ─── Step 5a3: bundle byte budget (C2-D [D3]) ─────────────────────
+  # Runs AFTER the rebuild above, against the bundles just regenerated +
+  # staged. Nothing watched dist/ bytes before this, and bundle-d/-e grew
+  # ~70%/~110% past their documented sizes unnoticed. Ceilings sit ~15% over
+  # the measured baseline — a collapse detector, not a diet.
+  echo "[pre-commit] Checking the dist/ byte budget..."
+  node tools/check-bundle-budget.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "BUNDLE BUDGET gate FAILED — see the named bundle above. Find what"
+    echo "got pulled in before assuming the ceiling is stale; re-baselining"
+    echo "means editing tools/check-bundle-budget.js in this same commit."
     echo "---------------------------------------------------------------"
     exit 1
   fi

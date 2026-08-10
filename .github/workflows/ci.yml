@@ -172,6 +172,13 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify the dist/ byte budget (C2-D [D3])
+        # Per-bundle byte ceilings ~15% over the size measured 2026-08-10.
+        # Nothing watched dist/ bytes before this gate and bundle-d/-e grew
+        # ~70%/~110% past their documented sizes across many green commits.
+        # Runs after `npm run build` so it measures freshly-built output.
+        run: npm run check:bundle-budget
+
       - name: Verify the type scale (one ladder, no literal font-sizes)
         # Every font-size must name a --fs-N / --fsc-N token defined once in
         # app.css :root, so Settings -> Text Size moves ALL type together and

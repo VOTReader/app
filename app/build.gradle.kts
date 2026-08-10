@@ -207,18 +207,46 @@ android {
     }
 }
 
-// Classes under coverage measurement: the two pure-JVM-tested classes.
-// See the jacoco {} doc-comment above for why StorageManager isn't here.
-// U17 (measured + reverted): GardenImageCache was tried here — it IS pure-JVM-
-// tested so JaCoCo instruments it, but its LINE coverage is dominated by the
-// HttpURLConnection fetch + cacheDir file-I/O + eviction-sweep paths that aren't
-// exercisable without heavy network/FS mocking, so adding it dragged the bundle
-// to 0.59 (< 0.85). Like StorageManager (Robolectric artifact), its real
-// coverage is device-verified (the n1-smoke-walk), not the unit gate. Kept the
-// gate to the two classes whose numbers are HONEST at the pure-JVM level.
+// Classes under coverage measurement.
+//
+// C2-D [D5], 2026-08-10 — WIDENED 2 -> 5, and the single blended BUNDLE floor
+// became one PER-CLASS floor each. The old gate measured JsBridge +
+// BoundedLogTree only: 249 Kotlin tests ran on every commit and 11 of 13
+// classes were ungated, so a suite could be deleted wholesale without the
+// build noticing.
+//
+// The five here are exactly the classes whose JaCoCo numbers are HONEST —
+// measured 2026-08-10 by pointing classDirectories at the whole package and
+// reading jacocoTestReport.xml:
+//
+//   BoundedLogTree     73/73  100.0%   (incl. $Companion + $LogEntry)
+//   MainActivityLogic  34/34  100.0%   (incl. $RecoveryDecision, $ScreenshotGeometry)
+//   JsBridge           32/46   69.6%
+//   AppInterface      135/232  58.2%
+//   GardenImageCache   74/137  54.0%
+//
+// EXCLUDED, and why — every one of these HAS tests that run on every commit;
+// they are excluded because JaCoCo cannot see them, not because they are
+// untested. Their suites run under @RunWith(RobolectricTestRunner), and
+// Robolectric loads production classes through its own sandbox classloader,
+// which bypasses JaCoCo's bytecode-rewriting agent. Measured, they report:
+//   StorageManager 0.4% · NativeAudioRecorder 0% · AudioKeepAliveService 0% ·
+//   MainViewModel 0% · VOTReaderApp 0% (its $Companion, reached from a plain
+//   JVM test, reports 100% — which is the artifact in one line).
+// A 0% floor is a gate that measures nothing, so they stay out. MainActivity
+// (0/289) has no unit suite at all by design: its testable logic was extracted
+// to MainActivityLogic, which is gated here at 100%.
+//
+// U17's finding is now obsolete, not reverted: GardenImageCache was tried in
+// the BLENDED bundle rule and dragged the aggregate to 0.59 (< 0.85), so it
+// was pulled. Per-class floors are exactly the shape that objection asks for —
+// its 54% is locked at 54% and cannot dilute anyone else's number.
 val coveredClasses = listOf(
     "com/votreader/sacredui/JsBridge*.class",
-    "com/votreader/sacredui/BoundedLogTree*.class"
+    "com/votreader/sacredui/BoundedLogTree*.class",
+    "com/votreader/sacredui/MainActivityLogic*.class",
+    "com/votreader/sacredui/AppInterface*.class",
+    "com/votreader/sacredui/GardenImageCache*.class"
 )
 
 // Helper that returns the class tree filtered to the covered set.
@@ -279,20 +307,37 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         }
     }
     violationRules {
-        rule {
-            limit {
-                counter = "LINE"
-                value = "COVEREDRATIO"
-                // Locked just below the floor current tests achieve
-                // (87.6% as of NK6 — JsBridge 27/39 + BoundedLogTree
-                // 58/58 = 85/97). A 2-point buffer absorbs unrelated
-                // refactor noise; a real test removal that drops one
-                // of these two classes below ~80% will catch.
-                // Re-run jacocoTestReport after adding tests, then
-                // raise this value — never lower it silently.
-                minimum = "0.85".toBigDecimal()
+        // PER-CLASS floors ([D5]) — each a few points under what that class
+        // measures today, so the rule only trips when a class LOSES its tests.
+        // A blended bundle rule cannot do this: at 5 classes, BoundedLogTree's
+        // 100% masks a total collapse of GardenImageCache. The NK6 bundle rule
+        // (0.85 across 2 classes) is superseded, not relaxed — JsBridge is now
+        // pinned at 0.65 and BoundedLogTree at 0.95 individually, which is
+        // strictly tighter per class than the blend they used to hide inside.
+        //
+        // `element = "CLASS"` + an exact `includes` name matches ONLY that
+        // class; Kotlin's nested/synthetic siblings carry a `$` and are not
+        // matched (they stay in the report, they just aren't floored — a
+        // 0/1 inlined comparator lambda must not fail a build).
+        //
+        // Ratchet discipline (mirrors vitest.config.js): raise after adding
+        // tests; never lower one silently to make a build pass.
+        fun classFloor(className: String, min: String) {
+            rule {
+                element = "CLASS"
+                includes = listOf("com.votreader.sacredui.$className")
+                limit {
+                    counter = "LINE"
+                    value = "COVEREDRATIO"
+                    minimum = min.toBigDecimal()
+                }
             }
         }
+        classFloor("BoundedLogTree", "0.95")      // measured 100.0% (32/32)
+        classFloor("MainActivityLogic", "0.95")   // measured 100.0% (26/26)
+        classFloor("JsBridge", "0.65")            // measured  69.6% (32/46)
+        classFloor("AppInterface", "0.52")        // measured  58.2% (135/232)
+        classFloor("GardenImageCache", "0.48")    // measured  54.4% (74/136)
     }
 }
 

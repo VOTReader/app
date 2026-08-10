@@ -263,6 +263,29 @@ export default defineConfig({
       // sat in the measured include at 67/56/63/72 per-file — REMOVING a
       // below-aggregate file is mildly ACCRETIVE, so the aggregate floors are
       // safely held as-is.)
+      // C2-D [D1], 2026-08-10 — THESE FOUR ARE A FLOOR, NOT A RATCHET.
+      // Measured on this date: statements 86.68 (10577/12201) · branches
+      // 77.17 (7350/9524) · functions 87.48 (1741/1990) · lines 91.82
+      // (8477/9232), across 3,941 tests / 214 files.
+      //
+      // The aggregate floors below sit ~26 points under that, and they were
+      // DELIBERATELY LEFT THERE rather than ratcheted to the measurement.
+      // The ratchet discipline written above is right for a number climbing
+      // out of single digits; at 87% it inverts — a floor a point under
+      // measured fails the next honest commit that adds an uncovered branch
+      // to a hot file, so it stops being a regression detector and becomes a
+      // tax on writing code. What these four exist to catch now is a
+      // COLLAPSE: a suite that stopped running, a module that dropped out of
+      // the graph, a scope edit that quietly emptied the denominator. The
+      // tight, genuinely ratcheted numbers are the PER-FILE floors below,
+      // which are safe to set close because an unrelated commit doesn't
+      // touch those files.
+      //
+      // What actually changed in [D1] is WHERE they run: the pre-commit hook
+      // called the coverage-free `npm run test`, so these floors were a
+      // post-push CI check only. It now runs `npm run test:coverage`
+      // (66s vs 47s, measured), and `npm run test` stays coverage-free for
+      // the watch loop.
       thresholds: {
         statements: 60,
         branches: 51,

@@ -483,16 +483,47 @@ C2-C  READING-PATH COHERENCE — ALL DONE 2026-08-10
        HighlightsScreen while here (BACKLOG [D6] names both gaps).
 
 C2-D  SAFETY NETS
-  [D1] vitest aggregate coverage gate 26 points below measured — ratchet. S
+  [D1] DONE 2026-08-10. NOT ratcheted — deliberately. Measured is 86.68 /
+       77.17 / 87.48 / 91.82 (statements/branches/functions/lines, 3,941
+       tests); a floor a point under that fails the next honest commit that
+       adds an uncovered branch, so the four aggregates stay ~26 points down
+       as a COLLAPSE detector and the tight ratcheted numbers stay the
+       per-file floors. What was actually broken: pre-commit ran the
+       coverage-free `npm run test`, so the floors were a post-push CI check
+       only. It runs `npm run test:coverage` now (66s vs 47s, measured);
+       `npm run test` stays coverage-free for the watch loop.
   [D2] user-data-parity gains the STORE_NAMES leg; vot-library-order /
        vot-note-default / vot-ann-hint-dismissed join the backup lists
        (restore currently loses tile arrangement + defaults). S
-  [D3] Bundle byte budget gate (bundle-d +67%, -e +106% vs docs; no gate
-       watches dist bytes). M
+  [D3] DONE 2026-08-10. tools/check-bundle-budget.js — nine per-file byte
+       ceilings ~15% over the size measured at landing, in pre-commit
+       (after the rebuild) + CI. Names the grown bundle, prints its growth
+       vs baseline, and says re-baselining means editing the number in the
+       tool in the same commit. No skip flag, on purpose.
   [D4] vot-state (readItems+tabs+settings) rides the documented cross-tab
        clobber path — extend STORE-1 merge or single-tab lock for PWA. M
-  [D5] JaCoCo gates 2 of 13 Kotlin classes; 249 tests ungated. M
+  [D5] DONE 2026-08-10. JaCoCo 2 -> 5 classes, and the blended bundle floor
+       became five per-class floors (BoundedLogTree .95 / MainActivityLogic
+       .95 / JsBridge .65 / AppInterface .52 / GardenImageCache .48, each
+       under measured). The other five tested classes stay out because
+       Robolectric's sandbox classloader bypasses JaCoCo's agent and they
+       report 0-0.4% while fully tested — a 0% floor gates nothing.
+       U17's "GardenImageCache drags the aggregate" finding is obsolete:
+       per-class is exactly the shape that objection asks for.
   [D6] Tests: BookmarksScreen (7 destructive paths), HighlightsScreen,
        ChapterView, AudioSeekSlider, ReadingMinChip; nav-index.js 37%. M
-  [D7] bible-studies.js ships 4.4MB unminified (lazy, but largest fetch). S/M
+  [D7] CLOSED 2026-08-10 — NOT WIRED, on measurement. The premise was
+       wrong twice over: bible-studies.js rides no bundle at all (it is
+       raw-injected by src/data/translations.js:85), and the win is not
+       1.2 MB. Minified it goes 4,380,459 -> 3,164,053 bytes (-27.8%), but
+       every path that serves it compresses: gzip -9 is 969,492 raw vs
+       901,233 minified, so the real saving is 68,259 bytes (-7.0%) on a
+       one-time, SW-cached lazy fetch — and the same 7% in the APK, whose
+       assets are deflate-stored. Wiring it costs five integration points
+       (build.py output, the translations.js loader path, the SW cache
+       BUCKET it moves between, gradle ignoreAssetsPatterns, and
+       check-apk-assets) plus a 3.2 MB generated blob committed beside the
+       4.4 MB source. Not worth 68 KB. Re-open only if the nine alternate
+       translations (~4.5 MB each, same shape, same loader) ever justify
+       the pipeline for the whole family at once.
 ================================================================================
