@@ -453,3 +453,57 @@ describe('AudioManagerSheet — Up-next queue editor', () => {
     expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(true);
   });
 });
+
+describe('AudioManagerSheet — title jump to text (owner request 2026-08-09)', () => {
+  afterEach(() => {
+    delete globalThis.COL_BY_KEY;
+    delete window.__openAudioText;
+  });
+
+  it('the title is a chevroned button that opens the text and closes the sheet — playback untouched', () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { letterScreen: 'vol1-letter' }]]);
+    const opener = vi.fn();
+    window.__openAudioText = opener;
+    startCollection();
+    emit('playing');
+    const onClose = vi.fn();
+    openSheet(onClose);
+
+    const jump = document.querySelector('.audio-manager-jump');
+    expect(jump).toBeTruthy();
+    // The '›' go-to cue the owner asked for — marks the title as tappable.
+    expect(jump.querySelector('.audio-manager-jump-chevron')).toBeTruthy();
+    expect(jump.getAttribute('aria-label')).toContain('playback continues');
+
+    const before = AudioPlayer.getState();
+    const loadsBefore = el().loadCalls;
+    const srcBefore = el().src;
+    fireEvent.click(jump);
+    expect(opener).toHaveBeenCalledTimes(1);
+    expect(opener.mock.calls[0][0].key).toBe('vol1:preface');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // Pure navigation: the player never noticed the jump.
+    const after = AudioPlayer.getState();
+    expect(after.status).toBe('playing');
+    expect(after.qi).toBe(before.qi);
+    expect(el().paused).toBe(false);
+    expect(el().loadCalls).toBe(loadsBefore);   // never reloaded…
+    expect(el().src).toBe(srcBefore);           // …never restarted
+  });
+
+  it('a track with no destination keeps the plain, untappable title', () => {
+    // No COL_BY_KEY installed → vol1 resolves no letterScreen → plain copy.
+    window.__openAudioText = vi.fn();
+    startCollection();
+    openSheet();
+    expect(document.querySelector('.audio-manager-jump')).toBeNull();
+    expect(document.querySelector('.audio-manager-track-copy h2')).toBeTruthy();
+  });
+
+  it('hasTextDestination: Bible tracks are jumpable, keyless compilations are not', async () => {
+    const { hasTextDestination } = await import('./AudioShelf.jsx');
+    expect(hasTextDestination({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' })).toBe(true);
+    expect(hasTextDestination({ key: null })).toBe(false);
+    expect(hasTextDestination({ key: 'vol1:letter-a' })).toBe(false);   // no COL_BY_KEY here
+  });
+});

@@ -286,6 +286,27 @@ describe('screen-routes — Listening Library and Milestones return to their act
     expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
   });
 
+  it('a Bible-edition track jumps to the PLAYING chapter through navigateToLink (2026-08-09 desk-title jump)', () => {
+    const { routes, props } = makeRoutes();
+    routes['audio-library']().props.onOpenTrack({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' });
+    expect(props.navigateToLink).toHaveBeenCalledWith(
+      { type: 'bible', bookId: 'jeremiah', chapter: 46 },
+      { sourceLetterTitle: 'Listening Library' }
+    );
+    // The letter machinery must not fire for a Bible destination.
+    expect(props.pushFromLetter).not.toHaveBeenCalled();
+    expect(props.setLetterId).not.toHaveBeenCalled();
+  });
+
+  it('an unlabeled Bible part lands on chapter 1', () => {
+    const { routes, props } = makeRoutes();
+    routes['audio-library']().props.onOpenTrack({ key: 'bible-wop-nkjv:matthew', partLabel: null });
+    expect(props.navigateToLink).toHaveBeenCalledWith(
+      { type: 'bible', bookId: 'matthew', chapter: 1 },
+      { sourceLetterTitle: 'Listening Library' }
+    );
+  });
+
   it('hub → collection chains the hub (and ITS origin) so back unwinds level by level', () => {
     // Library → hub already chained; opening a collection pushes a third link.
     const hubOrigin = { screen: 'library', returnOrigin: null };

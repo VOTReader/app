@@ -43,10 +43,12 @@ export function relativePlayedAt(stamp) {
 }
 
 /**
- * A text destination exists ONLY for a VOT collection track whose collection
- * actually declares a letter screen. Bible audiobooks have no letter screen,
- * and neither does Hidden Manna's absent index — without the letterScreen
- * half of this test the Text icon renders a tap that silently does nothing.
+ * A text destination exists for a VOT collection track whose collection
+ * declares a letter screen, and (since the 2026-08-09 desk-title jump) for
+ * any Bible-edition track — those open the playing book's chapter in the
+ * reader. Hidden Manna's absent index and range compilations (key null)
+ * still have none — without this test the Text icon / desk title renders a
+ * tap that silently does nothing.
  *
  * @param {any} track
  * @returns {boolean}
@@ -55,6 +57,7 @@ export function hasTextDestination(track) {
   const key = track && typeof track.key === 'string' ? track.key : '';
   const divider = key.indexOf(':');
   if (divider < 1 || divider >= key.length - 1) return false;
+  if (key.indexOf('bible-') === 0) return true;
   if (typeof COL_BY_KEY === 'undefined') return false;
   const collection = COL_BY_KEY.get(key.slice(0, divider));
   return !!(collection && collection.letterScreen);

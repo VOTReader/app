@@ -353,20 +353,37 @@ export function buildScreenRoutes({
     navigateToLink({ type: 'bible', bookId: bid, chapter: ch }, { sourceLetterTitle: srcTitle || null });
   };
 
-  // The Text affordance on any Listening Library row. A track's key is
-  // "volKey:letterId", so only a VOT collection that declares a letterScreen
-  // has a destination — Bible audiobooks and Hidden Manna have none, and the
-  // screens gate their icon on the same rule so the tap is never dead.
+  // The Text affordance on any Listening Library row / the listening desk's
+  // title (owner request 2026-08-09: "tap letter/chapter title, jump to, do
+  // not interrupt the audio"). A track's key is "volKey:itemId":
+  //   - a VOT collection that declares a letterScreen → its LetterView;
+  //   - a Bible edition (volKey 'bible-*') → that book's chapter in the
+  //     reader (per-chapter editions label every part "Chapter N"; anything
+  //     unlabeled lands on chapter 1);
+  //   - Hidden Manna (no index) and range compilations (key null) have no
+  //     destination — hasTextDestination gates every tap on the same rule.
+  // Pure navigation: the AudioPlayer singleton is never touched, so playback
+  // continues across the jump.
   const _openAudioText = (track, sourceScreen) => {
     const key = track && typeof track.key === 'string' ? track.key : '';
     const divider = key.indexOf(':');
     if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
     const volKey = key.slice(0, divider);
+    const id = key.slice(divider + 1);
+    if (volKey.indexOf('bible-') === 0) {
+      // navigateToLink raises the standard "‹ Back to …" pill and kicks the
+      // lazy bible corpus — same door the {{nav:book:ch}} chips use.
+      const m = typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
+      navigateToLink(
+        { type: 'bible', bookId: id, chapter: m ? Number(m[1]) : 1 },
+        { sourceLetterTitle: 'Listening Library' }
+      );
+      return;
+    }
     const collection = COL_BY_KEY.get(volKey);
     if (!collection || !collection.letterScreen) return;
     // Same wiring as colIdxProps' nav — the reading dot / last-read tracking
     // must not distinguish a Library open from an index open.
-    const id = key.slice(divider + 1);
     pushFromLetter({
       sourceScreen,
       sourceLetterTitle: 'Listening Library',
@@ -376,6 +393,10 @@ export function buildScreenRoutes({
     setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
     setScreen(collection.letterScreen);
   };
+  // The listening desk (AudioManagerSheet) renders outside the routed tree,
+  // so it reaches the opener through this bridge — reassigned every build so
+  // the closure always carries the CURRENT screen for the back pill.
+  window.__openAudioText = (track) => _openAudioText(track, screen);
   // Entering a Listening Library sub-screen chains the origin so backing out
   // lands on the hub, and the hub's own back still returns to Library/Volumes.
   const _enterAudioSub = (destination) => {

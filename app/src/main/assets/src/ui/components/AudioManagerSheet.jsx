@@ -9,6 +9,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES } from '../../utils/audio-track.js';
 import { SheetHandle } from './SheetHandle.jsx';
+import { hasTextDestination } from './AudioShelf.jsx';
 
 /** @param {number} seconds @returns {string} */
 function formatTime(seconds) {
@@ -103,12 +104,33 @@ export function AudioManagerSheet({ open, state, onClose }) {
         <SheetHandle onClose={onClose} />
         <div className="audio-manager-kicker">Listening now</div>
         <div className="audio-manager-head">
+          {/* Owner request 2026-08-09: tapping the letter/chapter title jumps
+              to its TEXT in the reader — pure navigation through the
+              __openAudioText bridge (screen-routes), so playback is never
+              interrupted or restarted. Tracks with no destination (range
+              compilations, Hidden Manna) keep the plain, untappable copy. */}
+          {hasTextDestination(current) && typeof window !== 'undefined' && typeof window.__openAudioText === 'function' ? (
+            <button
+              type="button"
+              className="audio-manager-track-copy audio-manager-jump"
+              aria-label={'Open the text of ' + trackLabel(current.title) + ' — playback continues'}
+              onClick={() => { window.__openAudioText(current); onClose(); }}
+            >
+              {/* '›' — the same go-to cue the home cards carry; marks the
+                  title as the tap that opens the text. */}
+              <h2 id="audio-manager-title">{trackLabel(current.title)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
+              <p>
+                {[current.sub, current.partLabel, reader].filter(Boolean).join(' · ') || 'The Volumes of Truth'}
+              </p>
+            </button>
+          ) : (
           <div className="audio-manager-track-copy">
             <h2 id="audio-manager-title">{trackLabel(current.title)}</h2>
             <p>
               {[current.sub, current.partLabel, reader].filter(Boolean).join(' · ') || 'The Volumes of Truth'}
             </p>
           </div>
+          )}
           <button
             type="button"
             className={'audio-manager-save' + (saved ? ' is-saved' : '')}
