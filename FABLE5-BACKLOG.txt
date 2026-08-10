@@ -350,3 +350,81 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      trends. One sample per Settings mount (where measureUserData already
      runs), same-day overwrite, capped at 60.
 ═══════════════════════════════════════════════════════════════════════════
+
+================================================================================
+CAMPAIGN 2 QUEUE (written 2026-08-10, post-s9 triple recon — audio residuals /
+reading-flow / technical). Full evidence with file:line cites lives in the three
+recon reports; this is the adjudicated working order. Strike items as they land.
+
+C2-A  LISTENING TRUTH + CONTINUATION (the big one)
+  [A1] "Resume last" + every shelf row build a queue of ONE — a Bible chapter
+       dead-ends after ~4 min with next hidden. Rebuild the BOOK (Bible) or
+       collection-forward (letters) around the resumed track. M
+  [A2] recordPlayed fires on every auto-advance — one Genesis evening flushes
+       all letters out of the 30-cap recent shelf AND repoints "Resume last".
+       Record user-initiated plays only (the plays-counter precedent). S/M
+  [A3] Bible listening earns nothing: _notifyListened's same-key guard skips
+       every chapter but the book's last, and __votAudioListened resolves via
+       COL_BY_KEY (no bible-* entry) — no read counts, no streaks. Also
+       completions counts per-book vs per-chapter depending on queue shape.
+       Unify: per-chapter credit into the bible readItems key space. M
+  [A4] Desk queue rows + shelves title Bible tracks by BOOK ("Psalms" x150);
+       chapter lives in the sub-line; aria repeats it 150x. Title = chapter
+       for per-chapter editions. S/M
+  [A5] Matthew parity: matthew-ch has no Listen pill but the desk title-jump
+       lands there. Thread bibleAudio into MatthewChapterView. S/M
+  [A6] Positions polish: write floor t>=30s (skipping chapters files dead rows
+       into the 200-LRU); boundary write when a NEW queue replaces the old
+       (up to 5s lost today); desk restore misdescribes queue pre-tap;
+       window doesn't follow auto-advance while open; expanders silent to SR. S each
+  [A7] A11y/uniformity: sleep chips show armed state; Voice/Speed rows pick ONE
+       radio semantics; native media card carries the edition label. S each
+  [A8] Collection screen: Bible books offer chapter entry + the Text icon it
+       withholds (canOpenText excludes bible). S/M
+  [A9] completions milestone tier (the counter reaches no achievement). S
+
+C2-B  TRUTH-AND-COPY PASS (one commit)
+  [B1] About page 2 claims nothing is downloaded except Garden images — false
+       since streaming shipped; also never mentions the Listening Library. S
+  [B2] "Whole-book audiobook" copy on Settings/AudioLibrary/comments — all
+       three editions are per-chapter. S
+  [B3] use-autoscroll lease block says FOUR writers; five are sanctioned and
+       CLAUDE.md points every future session at that block. S
+  [B4] CLAUDE.md drift: latest-landed re-head, 54->59 screens, per-bundle sizes
+       (aggregate right, parts stale), file-structure counts (or delete per CQ3). S
+  [B5] ARCHITECTURE.md: re-date; add the AUDIO SECTION — a ~4,200-line
+       subsystem has zero deep reference (trust boundary, shape-branching,
+       seek contract, forward-only horizon, positions store, native card). L
+Owner-gated: two Milestones engines (10-row strip vs 84-item screen) need a
+       canonical-table decision; backup "Last export" line stays retired.
+
+C2-C  READING-PATH COHERENCE
+  [C1] WtlbEntryView scripture sheet invisible to the modal registry —
+       auto-scroll keeps scrolling under the open sheet (~400 entries). S
+  [C2] "Volume Two"/"Matthew" hardcoded fallbacks on LetterView/HistoryCard/
+       ChapterView — confident mislabeling, the misattribution class. S
+  [C3] WTLB back button says "Index"; siblings name the destination. S
+  [C4] Scroll-notch 2Hz interval runs for everyone; gate on the setting. S
+  [C5] LetterView Videos card renders when a letter has no videos. S
+  [C6] History rows resume chips — closes [26] (bridge now exists). M
+  [C7] [29a] Matthew commentary-weight badge — measured, slot exists. S/M
+  [C8] A11y: search input + clear unnamed; NavButtons title-only; History
+       accordion no aria-expanded; Surprise tooltip/aria disagree. S each
+  [C9] Highlights search: type="search" + shared class (JS-injected CSS
+       escapes the type-scale gate). S
+  [C10] Bookmarks/Links dead sort modes — wire or delete. S
+
+C2-D  SAFETY NETS
+  [D1] vitest aggregate coverage gate 26 points below measured — ratchet. S
+  [D2] user-data-parity gains the STORE_NAMES leg; vot-library-order /
+       vot-note-default / vot-ann-hint-dismissed join the backup lists
+       (restore currently loses tile arrangement + defaults). S
+  [D3] Bundle byte budget gate (bundle-d +67%, -e +106% vs docs; no gate
+       watches dist bytes). M
+  [D4] vot-state (readItems+tabs+settings) rides the documented cross-tab
+       clobber path — extend STORE-1 merge or single-tab lock for PWA. M
+  [D5] JaCoCo gates 2 of 13 Kotlin classes; 249 tests ungated. M
+  [D6] Tests: BookmarksScreen (7 destructive paths), HighlightsScreen,
+       ChapterView, AudioSeekSlider, ReadingMinChip; nav-index.js 37%. M
+  [D7] bible-studies.js ships 4.4MB unminified (lazy, but largest fetch). S/M
+================================================================================
