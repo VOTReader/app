@@ -62,6 +62,7 @@ import {
  * @property {number} duration  - current track length, seconds (0 until known)
  * @property {number} rate      - selected playback-rate preset
  * @property {number} sleepEndsAt - epoch ms, 0 when no sleep timer is armed
+ * @property {boolean} sleepAtTrackEnd - stop when the CURRENT recording ends
  */
 
 /** Shared DOM id so every audio message replaces the previous one. */
@@ -72,6 +73,10 @@ const LOAD_FAIL_MSG = 'Couldn’t load this track.';
 
 /** Restart-vs-step-back threshold for prev(), seconds (the usual media convention). */
 const PREV_RESTART_SEC = 3;
+
+/** Default short-jump, seconds — the same step the listening desk's ∓15 buttons
+ *  take, so a host media card that omits `seekOffset` agrees with the app. */
+const SEEK_STEP_SEC = 15;
 
 /**
  * Stream URL for a track. The manifest stores Google Drive file ids, but the
@@ -101,7 +106,7 @@ let _el = null;
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0 };
+const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepAtTrackEnd: false };
 /** Last whole second notified — the timeupdate re-render storm guard. */
 let _lastTick = -1;
 /** Position to resume from after a load error (see toggle()). */
@@ -145,11 +150,14 @@ function _clearStallWatchdog() {
   if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
 }
 
-/** @returns {void} */
+/** Disarms BOTH sleep modes — the countdown and the end-of-track flag are one
+ *  user-facing setting with one Clear.
+ *  @returns {void} */
 function _clearSleepTimer(notify = true) {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
-  if (_state.sleepEndsAt) {
+  if (_state.sleepEndsAt || _state.sleepAtTrackEnd) {
     _state.sleepEndsAt = 0;
+    _state.sleepAtTrackEnd = false;
     if (notify) _notify();
   }
 }
@@ -265,14 +273,51 @@ function _mediaSession(track) {
         album: track.sub || '',
       });
     }
-    ms.setActionHandler('play', () => toggle());
-    ms.setActionHandler('pause', () => toggle());
-    ms.setActionHandler('previoustrack', () => prev());
-    ms.setActionHandler('nexttrack', () => next());
-    ms.setActionHandler('seekto', (/** @type {any} */ d) => seek((d && d.seekTime) || 0));
+    _setAction(ms, 'play', () => toggle());
+    _setAction(ms, 'pause', () => toggle());
+    _setAction(ms, 'seekto', (/** @type {any} */ d) => seek((d && d.seekTime) || 0));
+    // Desktop-PWA reach: Chrome's own media hub and hardware media keys
+    // offer these three; the phone reads the NATIVE card instead (the web
+    // MediaSession is inert inside the WebView), so this is desktop-only value
+    // for three lines. `offset` is optional in the spec — default to the same
+    // 15s the listening desk's ∓15 buttons use.
+    _setAction(ms, 'seekbackward', (/** @type {any} */ d) => skip(-((d && d.seekOffset) || SEEK_STEP_SEC)));
+    _setAction(ms, 'seekforward', (/** @type {any} */ d) => skip((d && d.seekOffset) || SEEK_STEP_SEC));
+    _setAction(ms, 'stop', () => stop());
+    _syncMediaSessionActions();
     _syncMediaSessionState(_state.status);
     _syncMediaSessionPosition();
   } catch (_e) { /* unsupported action / no Media Session — cosmetic only */ }
+}
+
+/**
+ * setActionHandler throws on actions a given host doesn't implement, so each
+ * registration is isolated: one unsupported action must not skip the rest.
+ *
+ * @param {any} ms
+ * @param {string} action
+ * @param {((detail?: any) => void) | null} handler
+ */
+function _setAction(ms, action, handler) {
+  try { ms.setActionHandler(action, handler); } catch (_e) { /* action unsupported here */ }
+}
+
+/**
+ * Prev/next exist only while the queue has somewhere to go. A media card that
+ * shows dead skip buttons for a single saved recording is worse than one that
+ * shows none, so these are re-applied on every queue-SHAPE change — track
+ * starts (through _mediaSession) and queue edits alike.
+ *
+ * @returns {void}
+ */
+function _syncMediaSessionActions() {
+  try {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = /** @type {any} */ (navigator).mediaSession;
+    const multi = _state.queue.length > 1;
+    _setAction(ms, 'previoustrack', multi ? () => prev() : null);
+    _setAction(ms, 'nexttrack', multi ? () => next() : null);
+  } catch (_e) { /* no Media Session on this host — cosmetic only */ }
 }
 
 /** Keep lock-screen scrubbers and Bluetooth displays in step with the player. */
@@ -310,8 +355,8 @@ function _clearMediaSession() {
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
-    for (const a of ['play', 'pause', 'previoustrack', 'nexttrack', 'seekto']) {
-      ms.setActionHandler(a, null);
+    for (const a of ['play', 'pause', 'previoustrack', 'nexttrack', 'seekto', 'seekbackward', 'seekforward', 'stop']) {
+      _setAction(ms, a, null);
     }
     ms.metadata = null;
     ms.playbackState = 'none';
@@ -426,12 +471,35 @@ function _ensureEl() {
     // and flag the URL so the advance can't write the ending clock back in.
     _finishedUrl = (finished && finished.url) || null;
     _forgetPosition(_finishedUrl);
-    try { next(); } finally { _finishedUrl = null; }
+    try {
+      // The sleep mode a clock cannot express, checked BEFORE the advance:
+      // "stop when this recording ends" has no computable moment (playback
+      // rate and buffering both move it), so the END EVENT is the trigger.
+      if (_state.sleepAtTrackEnd) _sleepAtTrackEndFire();
+      else next();
+    } finally { _finishedUrl = null; }
   });
   el.addEventListener('error', _onError);
 
   _el = el;
   return el;
+}
+
+/**
+ * End-of-track sleep firing. Deliberately identical to the countdown timer's
+ * expiry — pause, never stop, so the queue and the resume snapshot survive —
+ * and one-shot: the flag clears itself, so the NEXT track boundary advances
+ * normally without the listener having to disarm anything.
+ *
+ * @returns {void}
+ */
+function _sleepAtTrackEndFire() {
+  _state.sleepAtTrackEnd = false;
+  const wasLive = _state.status === 'playing' || _state.status === 'loading';
+  if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
+  _markPaused();
+  if (!wasLive) _notify();
+  if (wasLive) _toast('Sleep timer ended. Playback paused.');
 }
 
 /** Move a live loading/playing element into one intentional paused state. */
@@ -1506,8 +1574,13 @@ function next() {
 }
 
 /**
- * Restart the current track when it's more than PREV_RESTART_SEC in;
- * otherwise step back one (clamped at the head of the queue).
+ * Restart the current track when it's more than PREV_RESTART_SEC in; otherwise
+ * step back one. At the HEAD of the queue there is nothing to step back to, so
+ * "previous" means restart there too — including under the threshold, where the
+ * old clamp walked `qi` to itself and handed `_start()` the SAME url. `_start()`
+ * skips the src assignment in that case (deliberately, so a prewarm isn't
+ * thrown away), which left the element playing on undisturbed: at the one
+ * position a listener presses prev most, it did nothing at all.
  *
  * @returns {void}
  */
@@ -1515,8 +1588,12 @@ function prev() {
   if (!_state.queue.length) return;
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   if (_el && (_el.currentTime || 0) > PREV_RESTART_SEC) { seek(0); return; }
+  const target = Math.max(0, _state.qi - 1);
+  // Landing on the track already playing: a seek, not a reload — the stream
+  // stays open and the position is the only thing that moves.
+  if (target === _state.qi && _el) { seek(0); return; }
   _rememberOutgoingPosition();   // R8 — same rule stepping backwards
-  _state.qi = Math.max(0, _state.qi - 1);
+  _state.qi = target;
   _start();
   _lastPersistSec = -1;
   _persist();
@@ -1599,6 +1676,7 @@ function setSleepTimer(minutes) {
   const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
   if (_state.status === 'idle' || !_state.queue.length) return false;
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _state.sleepAtTrackEnd = false;   // one sleep arming at a time
   _state.sleepEndsAt = Date.now() + mins * 60000;
   _sleepTimer = setTimeout(() => {
     _sleepTimer = null;
@@ -1613,7 +1691,25 @@ function setSleepTimer(minutes) {
   return true;
 }
 
-/** @returns {void} */
+/**
+ * Arm the fourth sleep option: stop when the CURRENT recording ends. Session-
+ * only like the countdown, and deliberately NOT clock math — the remaining
+ * time is unknowable while the playback rate can change and the stream can
+ * stall, so the flag is read by the 'ended' event instead. Replaces any armed
+ * countdown; survives pause/resume because it holds no deadline at all.
+ *
+ * @returns {boolean}
+ */
+function setSleepAtTrackEnd() {
+  if (_state.status === 'idle' || !_state.queue.length) return false;
+  if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _state.sleepEndsAt = 0;
+  _state.sleepAtTrackEnd = true;
+  _notify();
+  return true;
+}
+
+/** Disarms both sleep modes. @returns {void} */
 function clearSleepTimer() { _clearSleepTimer(); }
 
 /**
@@ -1639,6 +1735,9 @@ function _commitQueueEdit(queue) {
   _state.queue = queue;
   const current = queue[_state.qi];
   _source = { mode: 'custom', volKey: '', label: current ? current.sub : null };
+  // A queue edit is the one queue-SHAPE change with no track start behind it,
+  // so the host media card's skip handlers have to be re-decided here.
+  _syncMediaSessionActions();
   _persist();
   _notify();
 }
@@ -1797,6 +1896,7 @@ export const AudioPlayer = {
   setPlaybackRate,
   getSleepRemainingSeconds,
   setSleepTimer,
+  setSleepAtTrackEnd,
   clearSleepTimer,
   playAt,
   removeUpcoming,

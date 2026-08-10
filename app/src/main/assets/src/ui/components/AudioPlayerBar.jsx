@@ -57,6 +57,14 @@ export function AudioPlayerBar() {
   // live in AudioSeekSlider, shared with the listening desk.
   const dur = Math.max(0, Math.floor(st.duration || 0));
 
+  // A queue of one has nowhere to skip to, but it still deserves a way back to
+  // the beginning — a saved recording played on its own used to have no restart
+  // control at all. Same glyph, honest promise; next stays hidden.
+  const single = queue.length < 2;
+  // Place in the QUEUE, not in the book: "3 of 12" beside the source line.
+  // Derived, never stored — and silent at 1 of 1, which is noise, not news.
+  const place = single ? null : '· ' + (st.qi + 1) + ' of ' + queue.length;
+
   return (
     <>
     <div className="audio-bar" role="region" aria-label="Audio player">
@@ -103,6 +111,9 @@ export function AudioPlayerBar() {
             </span>
             <span className="audio-bar-sub">
               <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
+              {/* Its own span, not appended to the source text: the source is
+                  the part that ellipsizes, and the place must not vanish with it. */}
+              {place ? <span className="audio-bar-pos">{place}</span> : null}
               {/* Until metadata lands the total is unknown, not 0:00. */}
               <span className="audio-bar-time">{dur ? fmt(st.time) + ' / ' + fmt(dur) : fmt(st.time)}</span>
             </span>
@@ -111,19 +122,17 @@ export function AudioPlayerBar() {
         <AudioSeekSlider className="audio-bar-seek" ariaLabel="Seek" time={st.time} duration={st.duration} />
       </div>
 
-      {queue.length > 1 && (
-        <>
-          <button type="button" className="audio-bar-nav" onClick={() => AudioPlayer.prev()} aria-label="Previous track">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7" />
-            </svg>
-          </button>
-          <button type="button" className="audio-bar-nav" onClick={() => AudioPlayer.next()} aria-label="Next track">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </>
+      <button type="button" className="audio-bar-nav" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
+      </button>
+      {single ? null : (
+        <button type="button" className="audio-bar-nav" onClick={() => AudioPlayer.next()} aria-label="Next track">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       )}
 
       <button type="button" className="audio-bar-close" onClick={() => AudioPlayer.stop()} aria-label="Close player">

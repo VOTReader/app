@@ -81,6 +81,10 @@ const barOpenClass = () => document.body.classList.contains('audio-bar-open');
 const seekInput = () => screen.getByRole('slider', { name: 'Seek' });
 const clock = () => document.querySelector('.audio-bar-time').textContent;
 const title = () => document.querySelector('.audio-bar-title').textContent;
+const position = () => {
+  const node = document.querySelector('.audio-bar-pos');
+  return node ? node.textContent : null;
+};
 
 beforeEach(() => {
   globalThis.Audio = FakeAudio;
@@ -177,11 +181,10 @@ describe('AudioPlayerBar — transport', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
   });
 
-  it('offers prev/next only for a real queue, and walks it through the store', () => {
+  it('offers next only for a real queue, and walks it through the store', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
     expect(screen.queryByRole('button', { name: 'Next track' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Previous track' })).toBeNull();
 
     playWholeCollection();
     expect(title()).toBe('A Word of Warning');
@@ -192,6 +195,47 @@ describe('AudioPlayerBar — transport', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
     expect(AudioPlayer.getState().qi).toBe(0);
     expect(title()).toBe('A Word of Warning');
+  });
+
+  /* A saved recording played on its own used to have NO restart control at all:
+     next was meaningless so the whole prev/next pair was hidden, and the desk
+     disabled prev. The glyph stays; only what it promises changes. */
+  it('keeps prev as a Restart control on a queue of one, with next still hidden', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+
+    const restart = screen.getByRole('button', { name: 'Restart' });
+    expect(restart.classList.contains('audio-bar-nav')).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Previous track' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Next track' })).toBeNull();
+
+    act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
+    act(() => { el().currentTime = 45; el().dispatchEvent(new Event('timeupdate')); });
+    const srcAssignments = el().srcHistory.length;
+
+    fireEvent.click(restart);
+    expect(el().currentTime).toBe(0);
+    expect(AudioPlayer.getState().time).toBe(0);
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(el().srcHistory).toHaveLength(srcAssignments);   // a seek, not a re-fetch
+
+    // A real queue relabels the same control.
+    playWholeCollection();
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Previous track' })).toBeTruthy();
+  });
+
+  it('reads out the position within the QUEUE, and stays quiet for a lone recording', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    expect(position()).toBe(null);              // "1 of 1" is noise, not information
+
+    playWholeCollection();
+    expect(position()).toBe('· 1 of 4');
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    expect(position()).toBe('· 2 of 4');
+    // …counted within the queue, beside the source line, never inside it.
+    expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume One · Read by Benjamin');
   });
 
   it('clamps prev at the head of the queue and closes itself past the end', () => {

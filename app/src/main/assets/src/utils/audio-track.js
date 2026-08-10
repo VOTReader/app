@@ -190,8 +190,11 @@ export const AUDIO_RESUME_END_FRACTION = 0.97;
 /** Rewind on resume — a few words of context beat an exact splice. */
 export const AUDIO_RESUME_REWIND_SEC = 5;
 
-/** Standard rates intentionally offered by the listening UI. */
-export const AUDIO_PLAYBACK_RATES = Object.freeze([0.75, 1, 1.25, 1.5, 2]);
+/** Standard rates intentionally offered by the listening UI. This closed set IS
+ *  the trust boundary for playback speed: the desk's radiogroup renders from it
+ *  and `normalizeAudioRate` snaps every imported value onto it, so adding a step
+ *  is a one-line change and nothing may pin the array's LENGTH. */
+export const AUDIO_PLAYBACK_RATES = Object.freeze([0.75, 1, 1.25, 1.5, 1.75, 2]);
 
 /**
  * Imported values must land on a tested, comprehensible rate. A nearby

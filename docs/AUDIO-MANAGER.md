@@ -9,8 +9,16 @@ that engine rather than creating independent `<audio>` elements or queues.
 - Start a letter, section, or collection from its existing **Listen** / **Play
   All** controls.
 - Open the mini-player's title area for the expanded listening desk.
-- Seek, skip 15 seconds, use previous/next, select a speed from 0.75x to 2x,
-  and arm a 15/30/60 minute sleep timer.
+- Seek, skip 15 seconds, use previous/next, select a speed from 0.75x to 2x
+  (0.75 / 1 / 1.25 / 1.5 / 1.75 / 2), and arm a 15/30/60 minute sleep timer or
+  stop at the end of the current recording.
+- Restart the current recording. Previous is a real control at every position:
+  past three seconds, and at the HEAD of the queue at any position, it seeks to
+  zero rather than stepping to a track that isn't there. A queue of one
+  therefore keeps the control and labels it "Restart"; next is hidden (bar) and
+  disabled (desk) when there is nothing to advance to.
+- See where they are in the queue: the bar's sub-line and the desk's head carry
+  "N of M", counted within the QUEUE — not within the book or collection.
 - Save recordings, reopen recently played recordings, and clear recent history
   from **Volumes → Listening Library**.
 - Leave any recording and come back to it later. Every recording keeps its own
@@ -78,7 +86,15 @@ Display strings are also bounded and copied before use.
   readable for existing installs. It is ONE slot — the last thing that was
   playing — and it is what puts the bar back on screen at boot.
 - Sleep timers are intentionally session-only. Restarting an app must not wake
-  it later merely to pause a recording.
+  it later merely to pause a recording. That applies to BOTH modes: the minute
+  countdown and the end-of-track flag. The two replace each other — one sleep
+  arming at a time, one Clear that disarms whichever is live.
+- "End of track" is never clock math. Playback rate and buffering both move
+  when a recording actually finishes, so a computed deadline would be wrong;
+  the flag is read by the element's `ended` event, BEFORE the queue advances.
+  It pauses exactly like the countdown (queue and resume snapshot survive) and
+  clears itself, so the next boundary advances normally. Holding no deadline is
+  also why it survives a pause and resume for free.
 
 `vot-audio-positions` (IndexedDB v10) is the per-recording memory beside that
 one slot:
@@ -115,9 +131,17 @@ starts, it pauses VOT playback, including the loading state. This prevents
 memo recording/playback and streamed VOT audio from overlapping.
 
 The Media Session integration publishes title, reader, album, playback state,
-position, rate, seek, previous, and next where the host supports those APIs.
-The Android bridge's `setAudioActive()` remains best-effort lifecycle support;
-this module does not claim to provide a native foreground media service.
+position, rate, seek, ∓15 second seeks, stop, previous, and next where the host
+supports those APIs. Each `setActionHandler` call is isolated, because the
+method throws on actions a given host does not implement and one unsupported
+action must not skip the rest. Previous/next are registered ONLY while the
+queue holds more than one recording, and are re-decided on every queue-shape
+change — track starts and queue edits alike — so a lone saved recording never
+shows dead skip buttons. In practice this reaches desktop Chrome only: the web
+MediaSession is inert inside the Android WebView, where the system card is fed
+by `AudioKeepAliveService` through `setAudioNowPlaying` instead. The Android
+bridge's `setAudioActive()` remains best-effort lifecycle support; this module
+does not claim to provide a native foreground media service.
 
 ## Extension rules
 
@@ -151,11 +175,12 @@ npm.cmd run build
 ```
 
 The player tests cover loading-state pause safety, trusted direct playback,
-sleep-timer pause behavior, custom-queue persistence/restore, audio arbitration,
-Media Session position reporting, and the durable-resume rules (the 30 s floor,
-the 97 % tail, the 5 s nudge, forget-on-ended, outgoing-track attribution, and
-the write throttle). Store tests cover caps, deduplication, LRU eviction,
-backup-import normalization, and URL rejection.
+sleep-timer pause behavior (both modes), head-of-queue restart, custom-queue
+persistence/restore, audio arbitration, Media Session position reporting and
+queue-shape-dependent action registration, and the durable-resume rules (the
+30 s floor, the 97 % tail, the 5 s nudge, forget-on-ended, outgoing-track
+attribution, and the write throttle). Store tests cover caps, deduplication,
+LRU eviction, backup-import normalization, and URL rejection.
 
 `user-data-parity.test.js` is the canary for the registration legs: it fails
 by name if a store reaches the backup, the "Your Data" size, or the import

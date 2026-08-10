@@ -347,6 +347,46 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(AudioPlayer.getState().qi).toBe(0);
   });
 
+  /* Head of queue is where "previous" is most often pressed and was the one
+     place it did nothing: the clamp walked qi to ITSELF, and _start() skips the
+     src assignment when the URL is unchanged, so the element kept playing from
+     wherever it was. Both sides of the 3s threshold must restart. */
+  it('prev at the head RESTARTS the track when under the 3s threshold', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    expect(AudioPlayer.getState().qi).toBe(0);
+    el().duration = 100;
+    el().currentTime = 1.5;
+    const srcAssignments = el().srcHistory.length;
+
+    AudioPlayer.prev();
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(el().currentTime).toBe(0);
+    expect(AudioPlayer.getState().time).toBe(0);
+    // A restart is a SEEK, never a re-fetch of a track already streaming.
+    expect(el().srcHistory).toHaveLength(srcAssignments);
+  });
+
+  it('prev at the head restarts past the 3s threshold too, and on a queue of one', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    el().duration = 100;
+    el().currentTime = 42;
+    AudioPlayer.prev();
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(el().currentTime).toBe(0);
+
+    // The lone-recording case the bar now exposes as a Restart control.
+    AudioPlayer.stop();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().duration = 100;
+    el().currentTime = 2;
+    AudioPlayer.prev();
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(el().currentTime).toBe(0);
+    el().currentTime = 30;
+    AudioPlayer.prev();
+    expect(el().currentTime).toBe(0);
+  });
+
   it('seek clamps to [0, duration]', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     el().duration = 60;
@@ -475,6 +515,84 @@ describe('audio-player — listening controls + arbitration', () => {
     } finally {
       memo.remove();
     }
+  });
+});
+
+/* The fourth sleep option. A minute countdown cannot express "stop at the end
+   of what I'm listening to": playback rate and buffering make any computed end
+   time wrong, so the flag is read by the 'ended' EVENT, before the advance. */
+describe('audio-player — sleep at end of track', () => {
+  it('pauses at the boundary instead of advancing, keeps the queue, and disarms itself', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    expect(AudioPlayer.setSleepAtTrackEnd()).toBe(true);
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+    const src = el().src;
+
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().qi).toBe(0);              // never advanced
+    expect(el().src).toBe(src);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().queue).toHaveLength(4);   // pause, never stop
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+    expect(el().paused).toBe(true);
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Sleep timer ended. Playback paused.');
+
+    // One-shot: the next boundary advances normally.
+    AudioPlayer.toggle();
+    el().dispatchEvent(new Event('playing'));
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().qi).toBe(1);
+  });
+
+  it('survives a pause and resume — it is a flag, not a clock', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.setSleepAtTrackEnd();
+
+    AudioPlayer.toggle();                                    // pause
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+    AudioPlayer.toggle();                                    // resume
+    el().dispatchEvent(new Event('playing'));
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+  });
+
+  it('Clear cancels it, and the two sleep modes replace each other', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    el().dispatchEvent(new Event('playing'));
+
+    AudioPlayer.setSleepAtTrackEnd();
+    AudioPlayer.clearSleepTimer();
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().qi).toBe(1);               // disarmed — advanced
+
+    // Arming a countdown drops the flag…
+    AudioPlayer.setSleepAtTrackEnd();
+    AudioPlayer.setSleepTimer(30);
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+    expect(AudioPlayer.getSleepRemainingSeconds()).toBe(1800);
+    // …and arming the flag drops the countdown.
+    AudioPlayer.setSleepAtTrackEnd();
+    expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+    AudioPlayer.clearSleepTimer();
+  });
+
+  it('refuses to arm with nothing playing, and stop() disarms it', () => {
+    expect(AudioPlayer.setSleepAtTrackEnd()).toBe(false);
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.setSleepAtTrackEnd();
+    AudioPlayer.stop();
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
   });
 });
 
@@ -966,6 +1084,62 @@ describe('audio-player — Media Session', () => {
     } finally {
       delete window.navigator.mediaSession;
       delete globalThis.MediaMetadata;
+    }
+  });
+
+  /* Desktop-PWA only in practice: the web MediaSession is inert inside the
+     Android WebView (the phone reads the native card instead), so these
+     handlers exist for Chrome's own media hub and hardware keys. */
+  it('registers ∓15s and stop, and offers prev/next only when the queue has somewhere to go', () => {
+    const session = {
+      metadata: null, handlers: {}, position: null, playbackState: 'none',
+      setActionHandler(a, h) { this.handlers[a] = h; },
+      setPositionState(state) { this.position = state; },
+    };
+    Object.defineProperty(window.navigator, 'mediaSession', { configurable: true, value: session });
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      el().duration = 300;
+      el().dispatchEvent(new Event('durationchange'));
+
+      // A lone recording must not advertise dead transport on the media card.
+      expect(session.handlers.previoustrack).toBe(null);
+      expect(session.handlers.nexttrack).toBe(null);
+
+      expect(typeof session.handlers.seekbackward).toBe('function');
+      expect(typeof session.handlers.seekforward).toBe('function');
+      expect(typeof session.handlers.stop).toBe('function');
+
+      session.handlers.seekforward();
+      expect(AudioPlayer.getState().time).toBe(15);
+      session.handlers.seekforward();
+      expect(AudioPlayer.getState().time).toBe(30);
+      session.handlers.seekbackward();
+      expect(AudioPlayer.getState().time).toBe(15);
+
+      // A real queue re-registers them…
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+      expect(typeof session.handlers.previoustrack).toBe('function');
+      expect(typeof session.handlers.nexttrack).toBe('function');
+      session.handlers.nexttrack();
+      expect(AudioPlayer.getState().qi).toBe(1);
+
+      // …and a queue EDIT that shrinks it back to one drops them again, with no
+      // track start to piggyback on.
+      expect(AudioPlayer.clearUpcoming()).toBe(true);
+      expect(AudioPlayer.getState().queue).toHaveLength(2);
+      expect(typeof session.handlers.nexttrack).toBe('function');
+      expect(AudioPlayer.removeUpcoming(0)).toBe(false);   // current is protected
+      AudioPlayer.playAt(0);
+      expect(AudioPlayer.clearUpcoming()).toBe(true);
+      expect(AudioPlayer.getState().queue).toHaveLength(1);
+      expect(session.handlers.previoustrack).toBe(null);
+      expect(session.handlers.nexttrack).toBe(null);
+
+      session.handlers.stop();
+      expect(AudioPlayer.getState().status).toBe('idle');
+    } finally {
+      delete window.navigator.mediaSession;
     }
   });
 });

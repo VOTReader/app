@@ -205,15 +205,21 @@ describe('AudioManagerSheet — modal contract', () => {
 });
 
 describe('AudioManagerSheet — now playing + the Listening Library star', () => {
-  it('names the recording with its collection, part, and reader', () => {
+  it('names the recording with its collection, part, reader, and place in the queue', () => {
     startCollection();
     openSheet();
     expect(screen.getByRole('heading', { name: 'A Word of Warning' })).toBeTruthy();
-    expect(headSub()).toBe('Volume One · Read by Benjamin');
+    expect(headSub()).toBe('Volume One · Read by Benjamin · 1 of 4');
 
     fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
     expect(screen.getByRole('heading', { name: 'The Wide Path' })).toBeTruthy();
-    expect(headSub()).toBe('Volume One · Part 1 · Read by Benjamin');
+    expect(headSub()).toBe('Volume One · Part 1 · Read by Benjamin · 2 of 4');
+  });
+
+  it('leaves the place-in-queue readout off a lone recording', () => {
+    startSingle();
+    openSheet();
+    expect(headSub()).toBe('Volume One · Text-to-speech');
   });
 
   it('saves and unsaves the current recording through AudioLibraryStore', () => {
@@ -261,13 +267,23 @@ describe('AudioManagerSheet — transport', () => {
     expect(el().played).toBe(true);
   });
 
-  it('disables prev for a queue of one and next at the end of the queue', () => {
+  it('turns prev into a live Restart for a queue of one, and disables next at the end', () => {
     startSingle();
     openSheet();
-    expect(screen.getByRole('button', { name: 'Previous track' }).disabled).toBe(true);
+    // The desk mirrors the bar: a lone recording still deserves a restart.
+    const restart = screen.getByRole('button', { name: 'Restart' });
+    expect(restart.disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Previous track' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(true);
 
+    act(() => { el().duration = 300; el().dispatchEvent(new Event('durationchange')); });
+    drive(() => AudioPlayer.seek(120));
+    fireEvent.click(restart);
+    expect(el().currentTime).toBe(0);
+    expect(AudioPlayer.getState().qi).toBe(0);
+
     drive(startCollection);
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Previous track' }).disabled).toBe(false);
     expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(false);
 
@@ -326,6 +342,9 @@ describe('AudioManagerSheet — speed', () => {
     openSheet();
 
     expect(screen.getAllByRole('radio')).toHaveLength(AUDIO_PLAYBACK_RATES.length);
+    // The registry IS the closed set the radiogroup renders — including the
+    // 1.75× step between 1.5 and 2 that a long recording actually wants.
+    expect(screen.getAllByRole('radio').map((b) => b.textContent)).toEqual(['0.75×', '1×', '1.25×', '1.5×', '1.75×', '2×']);
     expect(speedValue()).toBe('1×');
     expect(screen.getByRole('radio', { name: '1×' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: '1×' }).classList.contains('is-active')).toBe(true);
@@ -384,6 +403,54 @@ describe('AudioManagerSheet — sleep timer', () => {
     fireEvent.click(screen.getByRole('button', { name: '15m' }));
     expect(sleepValue()).toBe('15 min left');
     expect(AudioPlayer.getSleepRemainingSeconds()).toBe(900);
+  });
+
+  /* The fourth option. A minute countdown can't say "finish this chapter": a
+     computed end time is wrong the moment the speed changes or the stream
+     stalls, so the flag rides the 'ended' event instead. */
+  it('arms End of track beside the countdowns, shows it in the head, and pauses at the boundary', () => {
+    startCollection();
+    openSheet();
+    emit('playing');
+
+    const endOfTrack = screen.getByRole('button', { name: 'End of track' });
+    expect(endOfTrack.getAttribute('aria-pressed')).toBe('false');
+    expect(sleepValue()).toBe('Off');
+
+    fireEvent.click(endOfTrack);
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(true);
+    expect(sleepValue()).toBe('Ends after this track');
+    expect(screen.getByRole('button', { name: 'End of track' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'End of track' }).classList.contains('is-active')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Clear' }).disabled).toBe(false);
+
+    emit('ended');
+    expect(AudioPlayer.getState().qi).toBe(0);            // the next recording never started
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(sleepValue()).toBe('Off');                     // one-shot, cleared itself
+  });
+
+  it('lets Clear disarm End of track, and each sleep mode replaces the other', () => {
+    startCollection();
+    openSheet();
+    emit('playing');
+
+    fireEvent.click(screen.getByRole('button', { name: 'End of track' }));
+    fireEvent.click(screen.getByRole('button', { name: '30m' }));
+    expect(sleepValue()).toBe('30 min left');
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'End of track' }));
+    expect(sleepValue()).toBe('Ends after this track');
+    expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(sleepValue()).toBe('Off');
+    expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
+    expect(screen.getByRole('button', { name: 'Clear' }).disabled).toBe(true);
+
+    emit('ended');
+    expect(AudioPlayer.getState().qi).toBe(1);            // disarmed — advanced normally
   });
 });
 

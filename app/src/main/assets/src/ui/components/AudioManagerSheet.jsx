@@ -79,7 +79,17 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const reader = AudioPlayer.readerLabel(current.readerCode);
   const saved = !!(library && typeof library.isSaved === 'function' && library.isSaved(current));
   const sleepSeconds = AudioPlayer.getSleepRemainingSeconds();
+  const sleepAtEnd = !!state.sleepAtTrackEnd;
   const upcoming = queue.slice(state.qi + 1);
+  // Mirrors the bar: a queue of one turns prev into a Restart rather than a
+  // dead control, and the place-in-queue readout stays silent at 1 of 1.
+  const single = queue.length < 2;
+  const headLine = [
+    current.sub,
+    current.partLabel,
+    reader,
+    single ? null : (state.qi + 1) + ' of ' + queue.length,
+  ].filter(Boolean).join(' · ') || 'The Volumes of Truth';
 
   return ReactDOM.createPortal(
     <>
@@ -110,16 +120,12 @@ export function AudioManagerSheet({ open, state, onClose }) {
               {/* '›' — the same go-to cue the home cards carry; marks the
                   title as the tap that opens the text. */}
               <h2 id="audio-manager-title">{trackLabel(current.title)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
-              <p>
-                {[current.sub, current.partLabel, reader].filter(Boolean).join(' · ') || 'The Volumes of Truth'}
-              </p>
+              <p>{headLine}</p>
             </button>
           ) : (
           <div className="audio-manager-track-copy">
             <h2 id="audio-manager-title">{trackLabel(current.title)}</h2>
-            <p>
-              {[current.sub, current.partLabel, reader].filter(Boolean).join(' · ') || 'The Volumes of Truth'}
-            </p>
+            <p>{headLine}</p>
           </div>
           )}
           <button
@@ -143,7 +149,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
 
         <div className="audio-manager-transport" aria-label="Playback controls">
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(-15)} aria-label="Back 15 seconds">−15</button>
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} disabled={queue.length < 2} aria-label="Previous track">
+          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /><path d="M19 5v14" /></svg>
           </button>
           <button
@@ -178,10 +184,18 @@ export function AudioManagerSheet({ open, state, onClose }) {
             </div>
           </div>
           <div className="audio-manager-tool">
-            <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepLabel(sleepSeconds)}</strong></div>
+            <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
             <div className="audio-manager-segment" role="group" aria-label="Sleep timer">
               {[15, 30, 60].map((minutes) => <button key={minutes} type="button" onClick={() => AudioPlayer.setSleepTimer(minutes)}>{minutes}m</button>)}
-              <button type="button" disabled={!sleepSeconds} onClick={() => AudioPlayer.clearSleepTimer()}>Clear</button>
+              {/* The one sleep mode a countdown can't express — it holds no
+                  deadline, so the player reads it off the 'ended' event. */}
+              <button
+                type="button"
+                className={sleepAtEnd ? 'is-active' : ''}
+                aria-pressed={sleepAtEnd}
+                onClick={() => AudioPlayer.setSleepAtTrackEnd()}
+              >End of track</button>
+              <button type="button" disabled={!sleepSeconds && !sleepAtEnd} onClick={() => AudioPlayer.clearSleepTimer()}>Clear</button>
             </div>
           </div>
         </div>
