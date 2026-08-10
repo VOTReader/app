@@ -230,6 +230,56 @@ function SettingsGroup({ label, sub, open, onToggle, children = null }) {
   );
 }
 
+/* AudioRateRow — Listening → Default Speed.
+   ═══════════════════════════════════════════════════════════════════════
+   The one settings row with NO settings key. Playback speed has been owned
+   by AudioLibraryStore.rate since the listening desk shipped: the desk
+   writes it, the player rehydrates from it at every track start, backup
+   carries it, and normalizeAudioRate snaps imported values onto the closed
+   AUDIO_PLAYBACK_RATES set. A settings.audioRate twin would be a second
+   truth needing a sync rule in both directions — so this row reads and
+   writes the store itself.
+
+   The write goes through AudioPlayer.setPlaybackRate where the player
+   exists: that call persists to this same store AND retimes whatever is
+   playing right now (setting only the store would leave a live recording
+   at the old speed until the next track). With no player module loaded,
+   the store write alone is the whole job.
+
+   Module scope so React identity is stable across SettingsScreen renders. */
+function AudioRateRow() {
+  const store = /** @type {any} */ (globalThis).AudioLibraryStore;
+  // Re-render when the desk (or an import) changes the rate behind us.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (store && typeof store.subscribe === 'function') ? store.subscribe(cb) : () => {}, [store]),
+    () => (store && typeof store.getVersion === 'function') ? store.getVersion() : 0
+  );
+  const rates = /** @type {number[]} */ (/** @type {any} */ (globalThis).AUDIO_PLAYBACK_RATES) || [];
+  // No store (or no rate registry) = nothing honest to show or write.
+  if (!store || typeof store.getPlaybackRate !== 'function' || rates.length === 0) return null;
+  const current = store.getPlaybackRate();
+  return (
+    <SelectField
+      eyebrow="Listening"
+      title="Default Speed"
+      label="Default Speed"
+      desc="How fast recordings play when you start one. The listening desk can still change speed for what is playing; whatever you leave it on becomes this setting, because both are the same preference."
+      value={String(current)}
+      options={rates.map((rate) => ({
+        id: String(rate),
+        label: rate + '×',
+        desc: rate === 1 ? 'Normal speed' : rate < 1 ? 'Slower than recorded' : 'Faster than recorded',
+      }))}
+      onChange={(v) => {
+        const rate = Number(v);
+        const player = /** @type {any} */ (globalThis).AudioPlayer;
+        if (player && typeof player.setPlaybackRate === 'function') player.setPlaybackRate(rate);
+        else if (typeof store.setPlaybackRate === 'function') store.setPlaybackRate(rate);
+      }}
+    />
+  );
+}
+
 /* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
 function DataInfoRow({ label, value = null, children = null }) {
   return (
@@ -1503,41 +1553,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}
             />
-            <SelectField
-              eyebrow="Reading"
-              title="Bible Audio"
-              label="Bible Audio"
-              desc="Recorded voice for the whole-book Listen button on Bible chapter indexes. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
-              value={settings.bibleAudio || "brm-kjv"}
-              options={[
-                /* Registry source of truth: utils/audio-track.js
-                   (BIBLE_AUDIO_EDITIONS, published as a global for this
-                   classic-globals screen). 'Off' is appended locally. */
-                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => ({
-                  id, label: /** @type {any} */ (ed).label,
-                  desc: 'Whole-book audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
-                })),
-                { id: "off", label: "Off", desc: "Hide the Bible Listen button" },
-              ]}
-              onChange={(v) => onSetting("bibleAudio", v)}
-            />
-            <SelectField
-              eyebrow="Reading"
-              title="Letter Voice"
-              label="Letter Voice"
-              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader starts every letter THEY have recorded in their voice, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
-              value={settings.letterReader || "auto"}
-              options={[
-                { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },
-                /* Registry source of truth: utils/audio-track.js (AUDIO_READERS,
-                   published as a global for this classic-globals screen), in
-                   the app's reader rank. */
-                ...Object.entries(/** @type {any} */ (globalThis).AUDIO_READERS || {}).map(([id, label]) => ({
-                  id, label: String(label), desc: 'Prefer this reading wherever it exists',
-                })),
-              ]}
-              onChange={(v) => onSetting("letterReader", v)}
-            />
             <SettingsRow
               label="Chapter Titles"
               desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
@@ -1599,25 +1614,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />
-            {/* Read-along. Parked in Reading for now — a later commit moves
-                both rows into a new "Listening" group with the audio settings. */}
-            <SettingsRow
-              label="Read-Along Highlight"
-              desc="While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don't have them simply play as before."
-              checked={settings.readAlongHighlight !== false}
-              onToggle={() => onToggle("readAlongHighlight")}
-            />
-            {/* Dependent row: with no wash there is nothing to follow, so the
-                scroll toggle is UNMOUNTED rather than greyed (the disclosure
-                discipline the whole screen follows). */}
-            {settings.readAlongHighlight !== false && (
-              <SettingsRow
-                label="Follow the Voice"
-                desc="Let the page scroll a little on its own to keep the sentence being read inside the middle of the screen. It stands down the moment you scroll by hand, and never scrolls while auto-scroll is running."
-                checked={settings.readAlongFollow !== false}
-                onToggle={() => onToggle("readAlongFollow")}
-              />
-            )}
             <SelectField
               eyebrow="Reading"
               title="Reading Streak Dwell Time"
@@ -1654,6 +1650,75 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.doubleTapFullscreen !== false}
               onToggle={() => onToggle("doubleTapFullscreen")}
             />
+          </div>
+        </SettingsGroup>
+
+        {/* Listening (2026-08-09). The audio controls were scattered: the two
+            voice pickers sat under Reading beside translation and headings,
+            and the read-along toggles carried a comment promising this move.
+            One group now owns every choice that shapes what you HEAR. */}
+        <SettingsGroup label="Listening" sub="Voices, speed & read-along" {...groupProps('listening')}>
+          <div className="settings-card">
+            <SelectField
+              eyebrow="Listening"
+              title="Bible Audio"
+              label="Bible Audio"
+              desc="Recorded voice for the whole-book Listen button on Bible chapter indexes. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
+              value={settings.bibleAudio || "brm-kjv"}
+              options={[
+                /* Registry source of truth: utils/audio-track.js
+                   (BIBLE_AUDIO_EDITIONS, published as a global for this
+                   classic-globals screen). 'Off' is appended locally. */
+                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => ({
+                  id, label: /** @type {any} */ (ed).label,
+                  desc: 'Whole-book audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
+                })),
+                { id: "off", label: "Off", desc: "Hide the Bible Listen button" },
+              ]}
+              onChange={(v) => onSetting("bibleAudio", v)}
+            />
+            <SelectField
+              eyebrow="Listening"
+              title="Letter Voice"
+              label="Letter Voice"
+              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader starts every letter THEY have recorded in their voice, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
+              value={settings.letterReader || "auto"}
+              options={[
+                { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },
+                /* Registry source of truth: utils/audio-track.js (AUDIO_READERS,
+                   published as a global for this classic-globals screen), in
+                   the app's reader rank. */
+                ...Object.entries(/** @type {any} */ (globalThis).AUDIO_READERS || {}).map(([id, label]) => ({
+                  id, label: String(label), desc: 'Prefer this reading wherever it exists',
+                })),
+              ]}
+              onChange={(v) => onSetting("letterReader", v)}
+            />
+            {/* Default Speed reads and writes the LISTENING LIBRARY, not a
+                settings key: AudioLibraryStore has owned `rate` since the desk
+                shipped (the player rehydrates from it at every track start), so
+                a settings.audioRate twin would be a second truth to keep in
+                sync. The write prefers AudioPlayer.setPlaybackRate — that IS
+                the store write, plus it retimes whatever is playing right now —
+                and falls back to the store when the player module is absent. */}
+            <AudioRateRow />
+            <SettingsRow
+              label="Read-Along Highlight"
+              desc="While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don't have them simply play as before."
+              checked={settings.readAlongHighlight !== false}
+              onToggle={() => onToggle("readAlongHighlight")}
+            />
+            {/* Dependent row: with no wash there is nothing to follow, so the
+                scroll toggle is UNMOUNTED rather than greyed (the disclosure
+                discipline the whole screen follows). */}
+            {settings.readAlongHighlight !== false && (
+              <SettingsRow
+                label="Follow the Voice"
+                desc="Let the page scroll a little on its own to keep the sentence being read inside the middle of the screen. It stands down the moment you scroll by hand, and never scrolls while auto-scroll is running."
+                checked={settings.readAlongFollow !== false}
+                onToggle={() => onToggle("readAlongFollow")}
+              />
+            )}
           </div>
         </SettingsGroup>
 

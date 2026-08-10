@@ -636,12 +636,30 @@ function _notifyListened() {
     if (!track || !track.key) return;
     const following = _state.queue[_state.qi + 1];
     if (following && following.key === track.key) return;   // more parts remain
+    // One WHOLE recording finished. Counted here rather than on every 'ended'
+    // so a multi-part letter scores once, and counted before the bridge lookup
+    // below so the tally does not depend on the App-side hook being mounted.
+    _countCompletion();
     const g = _g();
     if (typeof g.__votAudioListened !== 'function') return;
     const divider = track.key.indexOf(':');
     if (divider <= 0) return;
     g.__votAudioListened(track.key.slice(0, divider), track.key.slice(divider + 1));
   } catch (_e) { /* listen counting must never interfere with queue advance */ }
+}
+
+/**
+ * Persist one "heard to the end" in the Listening Library. Same fail-quiet
+ * contract as _countPlay: My Progress's listening block is an enhancement,
+ * never something that may stand between a finished track and the advance.
+ *
+ * @returns {void}
+ */
+function _countCompletion() {
+  try {
+    const library = _library();
+    if (library && typeof library.countCompletion === 'function') library.countCompletion();
+  } catch (_e) { /* a counter must never interfere with the queue advance */ }
 }
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */

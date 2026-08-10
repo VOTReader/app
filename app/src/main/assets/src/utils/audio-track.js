@@ -108,7 +108,10 @@ export function audioReaderLabel(code) {
 
 /* SettingsScreen is a classic-globals module (no imports) — publish the
    registries the same way AudioLibraryStore bridges across bundles. audio-track
-   rides bundles b + d, both booted before the lazy Settings screen loads. */
+   rides bundles b + d, both booted before the lazy Settings screen loads.
+   AUDIO_PLAYBACK_RATES publishes itself beside its own declaration further
+   down — reading a `const` before its initializer runs is a TDZ throw, not a
+   hoisted undefined, so a registry is published where it is declared. */
 if (typeof globalThis !== 'undefined') {
   /** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS = BIBLE_AUDIO_EDITIONS;
   /** @type {any} */ (globalThis).AUDIO_READERS = AUDIO_READERS;
@@ -228,6 +231,14 @@ export const AUDIO_RESUME_REWIND_SEC = 5;
  *  and `normalizeAudioRate` snaps every imported value onto it, so adding a step
  *  is a one-line change and nothing may pin the array's LENGTH. */
 export const AUDIO_PLAYBACK_RATES = Object.freeze([0.75, 1, 1.25, 1.5, 1.75, 2]);
+
+/* Published for the classic-globals Settings screen (Listening → Default
+   Speed), the same bridge BIBLE_AUDIO_EDITIONS / AUDIO_READERS use above.
+   Declared HERE, next to the const, because the publish block above runs
+   before this initializer. */
+if (typeof globalThis !== 'undefined') {
+  /** @type {any} */ (globalThis).AUDIO_PLAYBACK_RATES = AUDIO_PLAYBACK_RATES;
+}
 
 /**
  * Imported values must land on a tested, comprehensible rate. A nearby

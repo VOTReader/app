@@ -4,6 +4,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 
 export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null }) {
   const currentRef = React.useRef(null);
@@ -43,32 +44,13 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // the legacy fallback for any call site that doesn't. One string feeds
   // BOTH the tooltip and the TalkBack label so they can never disagree.
   const backDest = backLabel || "Books";
-  // "~N min" estimate per chapter card, at the user's measured pace when
-  // one exists (ReadingStatsStore, bundle-b) — 230-wpm default otherwise.
-  // Counts the BASE book text (word-count.js contract); hidden when the
-  // counters are absent or the chapter shape yields no words.
-  const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
-  // Smart-resume ([26]): an in-progress chapter shows "N% · ~M min left"
-  // (frontier via progressKeyFor — the tracker's v1:<bid>:<cid> key space).
-  const minChip = (ch) => {
-    if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
-    const words = countItemWords(ch);
-    if (words <= 0) return null;
-    if (progressKeyFor && typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.getProgress === 'function') {
-      let p = null;
-      try { p = ReadingStatsStore.getProgress(progressKeyFor(ch.num)); } catch (_e) { /* stats optional */ }
-      if (p && p.b > 0 && p.c && p.c.length > 0 && p.c.length < p.b) {
-        const weighted = p.tw > 0 && p.w >= 0 && p.w < p.tw;
-        const fraction = weighted ? p.w / p.tw : p.c.length / p.b;
-        const pct = Math.min(99, Math.round(fraction * 100));
-        const leftWords = weighted ? p.tw - p.w : Math.round(words * (1 - fraction));
-        const left = readingMinutes(leftWords, _wpm);
-        return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
-      }
-    }
-    const m = readingMinutes(words, _wpm);
-    return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
-  };
+  // "~N min" per chapter card — or "N% · ~M min left" once the read tracker
+  // has left a frontier inside it ([26] smart-resume). The chip itself lives
+  // in components/ReadingMinChip.jsx: index cards, letter rows and History
+  // rows all render the SAME one. progressKeyFor threads the tracker's
+  // v1:<bid>:<cid> key; absent (legacy caller) → cold chip only.
+  const _wpm = readingChipWpm();
+  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
   return (
     <ScreenLayout
       navChildren={LibraryNav({

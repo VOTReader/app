@@ -10,20 +10,56 @@
 
 import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 
-/** Subscribe to one cross-bundle store by name (absent store = inert). */
+/** Subscribe to one cross-bundle store by name (absent store = inert).
+ *  RETURNS the version so the caller can key work on it. */
 function useStoreVersion(name) {
   const store = /** @type {any} */ (globalThis)[name];
-  React.useSyncExternalStore(
+  return React.useSyncExternalStore(
     React.useCallback((cb) => (store && typeof store.subscribe === 'function') ? store.subscribe(cb) : () => {}, [store]),
     () => (store && typeof store.getVersion === 'function') ? store.getVersion() : 0
   );
 }
 
 export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
+  // Fixed list → stable hook order. The joined versions are the memo key
+  // below: every one of these stores can change an achievement, and none of
+  // them can change one without bumping its version.
+  const storeVersions = ACHIEVEMENT_STORE_NAMES.map(useStoreVersion).join('|');
 
-  const built = buildAchievements(collectAchievementSnapshot(readItems));
+  // Rebuilding all ~84 achievements means re-reading ten stores and walking
+  // the whole readItems map. Unmemoized, that ran on EVERY render — including
+  // the ones caused by this screen's own filter toggle, and by any one of the
+  // ten stores ticking for a reason no achievement depends on. The inputs are
+  // exactly the store versions and readItems, so those are the deps.
+  const built = React.useMemo(
+    () => buildAchievements(collectAchievementSnapshot(readItems)),
+    // storeVersions reads as "unnecessary" to the linter because the snapshot
+    // reaches the stores as cross-bundle GLOBALS, not as values closed over
+    // here — but it is the load-bearing dep: without it this never recomputes
+    // when a store changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+    [storeVersions, readItems]
+  );
   const pct = built.total ? Math.round((built.earned / built.total) * 100) : 0;
+
+  /* "Hide reached" (2026-08-09). 84 rows is a long scroll once most of the
+     early tiers are earned; hiding them turns the screen into what is LEFT.
+     A category that empties out disappears with its jump chip — an empty
+     heading would read as a category with nothing in it. */
+  const [hideReached, setHideReached] = React.useState(false);
+  const categories = React.useMemo(() => (
+    hideReached
+      ? built.categories
+        .map((cat) => ({ ...cat, items: cat.items.filter((item) => !item.earned) }))
+        .filter((cat) => cat.items.length > 0)
+      : built.categories
+  ), [built, hideReached]);
+
+  /** Jump to a category heading. Same scrollIntoView the index screens use. */
+  const jumpTo = (id) => {
+    const el = (typeof document !== 'undefined') ? document.getElementById('ms-cat-' + id) : null;
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <ScreenLayout
@@ -46,7 +82,33 @@ export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onS
           </div>
         </section>
 
-        {built.categories.map((cat) => (
+        <div className="milestones-controls">
+          <button
+            type="button"
+            className={'milestones-filter' + (hideReached ? ' is-on' : '')}
+            aria-pressed={hideReached}
+            onClick={() => setHideReached((v) => !v)}
+          >Hide reached</button>
+          <span className="milestones-controls-note" aria-hidden="true">
+            {hideReached ? `${built.total - built.earned} still to reach` : `${built.total} milestones`}
+          </span>
+        </div>
+
+        {categories.length > 1 && (
+          <nav className="milestones-jump" aria-label="Jump to a category">
+            {categories.map((cat) => (
+              <button key={cat.id} type="button" className="milestones-jump-chip" onClick={() => jumpTo(cat.id)}>
+                {cat.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        {categories.length === 0 && (
+          <p className="milestones-allclear">Every milestone here has been reached.</p>
+        )}
+
+        {categories.map((cat) => (
           <section key={cat.id} className="milestones-cat" aria-labelledby={'ms-cat-' + cat.id}>
             <div className="milestones-cat-head">
               <div>

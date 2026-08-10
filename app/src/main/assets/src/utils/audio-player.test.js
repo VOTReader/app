@@ -638,6 +638,39 @@ describe('audio-player — listen completion counts', () => {
       delete globalThis.__votAudioListened;
     }
   });
+
+  /* The listening library's own tally of finished recordings (My Progress).
+     It rides the SAME moment as the read-count bridge — one whole recording,
+     last part only — but must not depend on that bridge being wired. */
+  it('counts one library completion per WHOLE recording finished', () => {
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn(), countCompletion: vi.fn() };
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('ended'));      // part 1 of 2 — not finished yet
+    expect(library.countCompletion).not.toHaveBeenCalled();
+    el().dispatchEvent(new Event('ended'));      // part 2 — the letter is done
+    expect(library.countCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts the completion even with no read-count bridge mounted', () => {
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn(), countCompletion: vi.fn() };
+    globalThis.AudioLibraryStore = library;
+    expect(globalThis.__votAudioListened).toBeUndefined();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('ended'));
+    expect(library.countCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a library store that throws — the queue still advances', () => {
+    globalThis.AudioLibraryStore = {
+      countPlay: vi.fn(), recordPlayed: vi.fn(),
+      countCompletion: () => { throw new Error('idb gone'); },
+    };
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    const before = AudioPlayer.getState().qi;
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().qi).toBe(before + 1);
+  });
 });
 
 describe('audio-player — honest play counting', () => {

@@ -21,7 +21,7 @@ const STUBBED = [
   'JournalStatsStore', 'ReadingStreakStore', 'AnnotationStore',
   'ReadingStatsStore', 'JournalMediaStore', 'countTextWords',
   'buildProgressGroups', 'tallyGroup', 'countReadFor', 'mostAnnotatedSources',
-  'findEntryContext', 'BIBLE_BOOK_LIST',
+  'findEntryContext', 'BIBLE_BOOK_LIST', 'AudioLibraryStore',
 ];
 
 const mkStore = (over = {}) => ({ subscribe: () => () => {}, getVersion: () => 0, ...over });
@@ -52,6 +52,15 @@ function setupGlobals(over = {}) {
       measuredWpm: () => (over.stats.wpm == null ? null : over.stats.wpm),
       wordsForDays: (n) => over.stats.days
         || Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
+    });
+  }
+  // Listening Library — absent unless a test asks, so its ABSENCE stays the
+  // guard path the zero-data hero assertions above depend on.
+  if (over.listening) {
+    globalThis.AudioLibraryStore = mkStore({
+      getPlays: () => over.listening.plays || 0,
+      getCompletions: () => over.listening.completions || 0,
+      saved: () => new Array(over.listening.saved || 0).fill({}),
     });
   }
   if (over.media) globalThis.JournalMediaStore = { list: () => Promise.resolve(over.media) };
@@ -280,5 +289,59 @@ describe('MyProgressScreen — library counts + most annotated', () => {
     expect(rows[0].querySelector('.prg-src-title').textContent).toBe('Psalms');
     expect(rows[0].querySelector('.prg-src-col').textContent).toBe('Scripture');
     expect(rows[0].textContent).toContain('2 marks');
+  });
+});
+
+/* Listening (2026-08-09). The dashboard subscribed to eight stores and not
+   the Listening Library, so hours of listening reported nothing. Three
+   different acts, three cells — and no cell may invent a number. */
+describe('MyProgressScreen — listening block', () => {
+  const listenCells = (container) => {
+    const block = container.querySelector('.prg-listen-hero');
+    if (!block) return null;
+    return [...block.querySelectorAll('.prg-stat')].map((s) => ({
+      num: s.querySelector('.prg-stat-num').textContent,
+      label: s.querySelector('.prg-stat-label').textContent,
+    }));
+  };
+
+  it('reports plays, completions and saves from the library store', () => {
+    setupGlobals({ listening: { plays: 12, completions: 5, saved: 3 } });
+    const { container } = renderScreen();
+    expect(listenCells(container)).toEqual([
+      { num: '12', label: 'Recordings Played' },
+      { num: '5', label: 'Heard to the End' },
+      { num: '3', label: 'Saved' },
+    ]);
+  });
+
+  it('counts finished recordings separately from started ones', () => {
+    // Twenty starts, one finish: the block must not conflate the two.
+    setupGlobals({ listening: { plays: 20, completions: 1, saved: 0 } });
+    const { container } = renderScreen();
+    const cells = listenCells(container);
+    expect(cells[1]).toEqual({ num: '1', label: 'Heard to the End' });
+    expect(container.querySelector('.prg-listen-hero').textContent).toContain('recording finished');
+  });
+
+  it('hides the whole block for a reader who has never played anything', () => {
+    setupGlobals({ listening: { plays: 0, completions: 0, saved: 0 } });
+    const { container } = renderScreen();
+    expect(listenCells(container)).toBeNull();
+  });
+
+  it('hides the block entirely when the library store is absent', () => {
+    setupGlobals();
+    const { container } = renderScreen();
+    expect(listenCells(container)).toBeNull();
+    // …and the top hero is untouched by its absence.
+    expect([...container.querySelectorAll('.prg-stat-num')].length).toBe(4);
+  });
+
+  it('omits a single cell whose reader the store cannot answer', () => {
+    setupGlobals();
+    globalThis.AudioLibraryStore = mkStore({ getPlays: () => 4 });   // no saved(), no getCompletions()
+    const { container } = renderScreen();
+    expect(listenCells(container)).toEqual([{ num: '4', label: 'Recordings Played' }]);
   });
 });

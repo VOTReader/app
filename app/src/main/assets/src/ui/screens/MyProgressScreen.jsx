@@ -118,6 +118,13 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
     React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
     () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
   );
+  // The Listening Library was the one store this dashboard never watched —
+  // reading, journaling and annotation all reported here while the hours
+  // spent listening went uncounted.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof AudioLibraryStore !== 'undefined') ? AudioLibraryStore.subscribe(cb) : () => {}, []),
+    () => (typeof AudioLibraryStore !== 'undefined') ? AudioLibraryStore.getVersion() : 0
+  );
 
   // Voice-memo minutes — JournalMediaStore.list() is async (IDB cursor);
   // resolved once on mount. The row is omitted entirely at 0.
@@ -219,6 +226,27 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
     ...(readingStats && readingStats.totalActiveMs > 60000
       ? [{ num: _fmtDuration(readingStats.totalActiveMs), label: 'Reading Time', sub: 'time actually spent reading' }] : []),
   ];
+  /* Listening (2026-08-09). Three facts the Listening Library already keeps,
+     each a DIFFERENT act: pressing play, finishing what you started, and
+     keeping a recording. Every guard is independent — a store that cannot
+     answer a question contributes null and its cell is omitted rather than
+     reported as 0. The whole block hides while all three are zero: a reader
+     who has never opened a recording is shown nothing, not three zeros. */
+  const listenStats = (() => {
+    if (typeof AudioLibraryStore === 'undefined') return [];
+    const num = (fn) => (typeof fn === 'function' ? Math.max(0, Math.floor(Number(fn()) || 0)) : null);
+    const plays = num(AudioLibraryStore.getPlays && AudioLibraryStore.getPlays.bind(AudioLibraryStore));
+    const done = num(AudioLibraryStore.getCompletions && AudioLibraryStore.getCompletions.bind(AudioLibraryStore));
+    const savedCount = typeof AudioLibraryStore.saved === 'function'
+      ? (AudioLibraryStore.saved() || []).length : null;
+    if (!plays && !done && !savedCount) return [];
+    return [
+      ...(plays === null ? [] : [{ num: plays.toLocaleString('en-US'), label: 'Recordings Played', sub: plays === 1 ? 'time you pressed play' : 'times you pressed play' }]),
+      ...(done === null ? [] : [{ num: done.toLocaleString('en-US'), label: 'Heard to the End', sub: done === 1 ? 'recording finished' : 'recordings finished' }]),
+      ...(savedCount === null ? [] : [{ num: savedCount.toLocaleString('en-US'), label: 'Saved', sub: savedCount === 1 ? 'recording kept' : 'recordings kept' }]),
+    ];
+  })();
+
   const libraryRows = [
     { label: 'Notes', count: noteCount },
     { label: 'Highlights & Underlines', count: markCount },
@@ -373,6 +401,23 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
                   <span className="progress-row-tally">{voiceMins} min</span>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {listenStats.length > 0 && (
+          <div className="settings-section prg-section">
+            <div className="settings-section-label">Listening</div>
+            {/* Same hero-cell language as the top of the screen — these are
+                counts of what you did, not rows of a table. */}
+            <div className="prg-hero prg-listen-hero">
+              {listenStats.map((s) => (
+                <div key={s.label} className="prg-stat">
+                  <span className="prg-stat-num">{s.num}</span>
+                  <span className="prg-stat-label">{s.label}</span>
+                  <span className="prg-stat-sub">{s.sub}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

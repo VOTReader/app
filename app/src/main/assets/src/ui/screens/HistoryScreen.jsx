@@ -2,9 +2,48 @@
    HistoryScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
+
+/**
+ * Everything about one entry a reader might type to find it again, lowercased
+ * into one haystack — the same substring contract Notes / Bookmarks / Links
+ * use. Composed in DISPLAY order ("Psalms 23", "Volume One 4") so a natural
+ * two-word query matches as a plain substring without tokenizing.
+ *
+ * @param {any} entry
+ * @returns {string}
+ */
+function _entrySearchText(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const parts = [];
+  if (entry.type === 'letter') {
+    const col = entry.volumeScreen && typeof COL_BY_INDEX_SC !== 'undefined' ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
+    parts.push(col ? col.label : '', entry.letterTitle, 'Letter ' + entry.letterNum, entry.letterId);
+  } else if (entry.type === 'study-chapter') {
+    parts.push(entry.studyTitle, entry.studySlug, entry.chapterTitle, 'Part ' + entry.chapterNum);
+  } else {
+    // Book title FIRST, then the number: "psalms 23" is one substring of it.
+    parts.push(entry.bookTitle, entry.bookTitle + ' ' + entry.chapterNum,
+      entry.chapterTitle, 'Chapter ' + entry.chapterNum, entry.bookId);
+  }
+  return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
+}
+
 export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings, theme, onThemeChange, onPruneDay }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
+
+  // Search (2026-08-09). History was the ONE index screen with no search box
+  // while every sibling had one — and it is the screen holding the most rows
+  // (2,000-entry cap), spread across collapsed day/week/month/year groups.
+  // Filtering happens BEFORE grouping, so a group with no match doesn't
+  // render at all and the ones that remain are all matches.
+  const [query, setQuery] = React.useState('');
+  const q = query.trim().toLowerCase();
+  const matches = React.useMemo(
+    () => (q ? history.filter((entry) => _entrySearchText(entry).includes(q)) : history),
+    [history, q]
+  );
 
   // Split history into:
   //   currentDays: array of { day, entries } for entries within the CURRENT month/year (top, no wrapper)
@@ -12,7 +51,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   const { currentDays, tree } = React.useMemo(() => {
     const curMs = new Map();   // dayNum → entries[]
     const ys = new Map();       // year → Map(month → Map(weekKey → { weekStart, days: Map(day → entries[]) }))
-    for (const entry of history) {
+    for (const entry of matches) {
       const d = new Date(entry.ts);
       const y = d.getFullYear(),m = d.getMonth(),day = d.getDate();
       if (y === curY && m === curM) {
@@ -48,11 +87,20 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
       }))
     }));
     return { currentDays, tree: treeArr };
-  }, [history, curY, curM]);
+  }, [matches, curY, curM]);
 
   // Most-recent year/month/week of each container default-open; everything else default-closed.
   // Current-month days at top: today + yesterday default-open, others default-closed.
   const [overrides, setOverrides] = React.useState({});
+  // A search's expansion state is kept SEPARATE from the browsing one, and
+  // reset whenever the query changes. Reusing one map would mean a year the
+  // reader collapsed while browsing silently swallows its own matches — and
+  // reusing it the other way would leave everything flung open after the
+  // search box is cleared.
+  const [searchOverrides, setSearchOverrides] = React.useState({});
+  // Same-object bail-out when there is nothing to clear, so the reset costs
+  // no render on the common path (typing into an all-default tree).
+  React.useEffect(() => { setSearchOverrides((prev) => (Object.keys(prev).length ? {} : prev)); }, [q]);
   const yest = new Date(curY, curM, curD - 1);
   const yestY = yest.getFullYear(), yestM = yest.getMonth(), yestD = yest.getDate();
   const recentYearId = tree.length > 0 ? `y:${tree[0].year}` : null;
@@ -75,8 +123,19 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     if (recentWeekIds.has(id)) return true;                                    // Most recent week of each month
     return false;
   };
-  const isOpen = (id) => id in overrides ? overrides[id] : defaultOpen(id);
-  const toggle = (id) => setOverrides((prev) => ({ ...prev, [id]: !(id in prev ? prev[id] : defaultOpen(id)) }));
+  // While a query is active every surviving group HOLDS a match, so the
+  // default flips to open — a match hidden inside a collapsed 2019 is the
+  // same as no match at all. The chevrons still work: an explicit toggle
+  // lands in the search map and outlives only this query.
+  const isOpen = (id) => {
+    if (q) return id in searchOverrides ? searchOverrides[id] : true;
+    return id in overrides ? overrides[id] : defaultOpen(id);
+  };
+  const toggle = (id) => {
+    const next = !isOpen(id);
+    if (q) setSearchOverrides((prev) => ({ ...prev, [id]: next }));
+    else setOverrides((prev) => ({ ...prev, [id]: next }));
+  };
 
   // Dedupe-confirmation state (per-day; latest pending wins). The
   // ConfirmStrip itself is the dismissal affordance — Cancel / Yes are
@@ -98,6 +157,39 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     return `${WEEKDAY_NAMES[date.getDay()]} · ${MONTH_ABBR[m]} ${d}`;
   };
 
+  /* Resume chips on chapter rows (BACKLOG [26]'s named remainder). A history
+     row for a Bible or Matthew chapter now carries the SAME chip its index
+     card shows — "62% · ~3 min left" — because History is where a reader
+     goes to pick up what they left, and the row that says only "2h ago"
+     cannot tell them which one is unfinished.
+
+     Only 'chapter' entries: letters/entries are reached by slug and their
+     word counts live behind a different corpus lookup, and study chapters
+     have no index-card chip to match. bookItemsFor is the SAME resolver
+     progress-stats uses, so a row and its index card count identically.
+     Cached per render — one lookup per BOOK, not one per row. */
+  const chipWpm = readingChipWpm();
+  const bookItemCache = new Map();
+  const chapterItem = (bookId, chapterNum) => {
+    if (!bookId || chapterNum == null || typeof bookItemsFor !== 'function') return null;
+    if (!bookItemCache.has(bookId)) {
+      const byNum = new Map();
+      try {
+        for (const row of bookItemsFor(bookId)) byNum.set(String(row.key), row.item);
+      } catch (_e) { /* an unloaded corpus simply yields no chip */ }
+      bookItemCache.set(bookId, byNum);
+    }
+    return bookItemCache.get(bookId).get(String(chapterNum)) || null;
+  };
+  const entryChip = (entry) => {
+    if (!entry || entry.type !== 'chapter') return null;
+    const item = chapterItem(entry.bookId, entry.chapterNum);
+    if (!item) return null;
+    const key = (typeof READ_VERSION_ID === 'string')
+      ? `${READ_VERSION_ID}:${entry.bookId}:${entry.chapterNum}` : null;
+    return readingMinChip(item, key, chipWpm);
+  };
+
   // Render one day-section. Used both for current-month days (top of screen)
   // and for tree-leaf days (inside Year > Month > Week).
   const renderDaySection = (year, month, dg, isCurrent) => {
@@ -113,7 +205,11 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
           <span className="history-day-spacer" />
           <span className={`history-chevron${dOpen ? ' is-open' : ''}`}>{"›"}</span>
         </button>
-        {dOpen && dupes > 0 && (
+        {/* Deduplicate counts the day's REAL entries; while a query is
+            filtering them the number on the button would describe a subset
+            and the press would act on the whole day. Maintenance belongs to
+            the unfiltered view. */}
+        {dOpen && dupes > 0 && !q && (
           <div className="history-dedupe-row">
             {isConfirming ? (
               <ConfirmStrip
@@ -133,7 +229,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
         {dOpen && (
           <div className="chapter-cards">
             {dg.entries.map((entry, i) => (
-              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} />
+              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)} />
             ))}
           </div>
         )}
@@ -157,6 +253,25 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
             <div className="vol-index-ornament-line r" />
           </div>
         </div>
+        {/* Same search box, same class, same placeholder grammar as Notes /
+            Bookmarks / Links. Absent while there is nothing to search. */}
+        {history.length > 0 && (
+          <input
+            className="notes-index-search"
+            type="search"
+            placeholder="Search history…"
+            aria-label="Search history"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        )}
+        {history.length > 0 && q && (
+          <div className="history-search-count" aria-live="polite">
+            {matches.length === 0
+              ? 'No visits match'
+              : `${matches.length} ${matches.length === 1 ? 'visit' : 'visits'} match`}
+          </div>
+        )}
         {history.length === 0 ? (
           <div className="history-empty">
             <div className="history-empty-sigil">✦</div>

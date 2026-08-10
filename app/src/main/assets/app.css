@@ -1245,6 +1245,41 @@
       .milestones-summary-count span { color: var(--cream-dim); font-size: var(--fs-11); }
       .milestones-summary-bar { flex: 1; height: 6px; border-radius: 4px; background: rgba(200, 164, 86, 0.16); overflow: hidden; }
       .milestones-summary-bar > div { height: 100%; border-radius: 4px; background: var(--gold); transition: width 0.3s ease; }
+      /* Controls: the "Hide reached" filter + the per-category jump chips.
+         Compact, but every target keeps the 44px touch floor. */
+      .milestones-controls { display: flex; align-items: center; gap: 0.7rem; margin-top: 1rem; }
+      .milestones-filter {
+        min-height: 44px; padding: 0.3rem 0.85rem;
+        border: 1px solid var(--gold-border); border-radius: 999px;
+        background: transparent; color: var(--cream-dim); cursor: pointer;
+        font-family: 'Cinzel', serif; font-size: var(--fs-11);
+        letter-spacing: 0.14em; text-transform: uppercase;
+        transition: border-color 0.15s, background 0.15s, color 0.15s;
+      }
+      .milestones-filter.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold); }
+      @media (hover: hover) { .milestones-filter:hover { border-color: var(--gold-dim); color: var(--gold); } }
+      .milestones-controls-note { color: var(--cream-muted); font-size: var(--fs-11); font-style: italic; }
+      .milestones-jump {
+        display: flex; flex-wrap: wrap; gap: 0.4rem;
+        margin-top: 0.7rem; padding-bottom: 0.15rem;
+      }
+      .milestones-jump-chip {
+        min-height: 44px; padding: 0.25rem 0.7rem;
+        border: 1px solid var(--gold-border); border-radius: 8px;
+        background: var(--bg2); color: var(--cream-muted); cursor: pointer;
+        font-family: var(--font-body); font-size: var(--fs-11); line-height: 1.2;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .milestones-jump-chip:active { border-color: var(--gold-dim); color: var(--gold); }
+      @media (hover: hover) { .milestones-jump-chip:hover { border-color: var(--gold-dim); color: var(--gold); } }
+      .milestones-allclear {
+        margin: 1.4rem 0 0; padding: 0.9rem;
+        border: 1px solid var(--gold-border); border-left: 3px solid var(--gold);
+        color: var(--gold-dim); font-size: var(--fs-13); font-style: italic;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .milestones-filter, .milestones-jump-chip { transition: none; }
+      }
       .milestones-cat { margin-top: 1.5rem; }
       .milestones-cat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; padding: 0 0.1rem 0.5rem; border-bottom: 1px solid var(--gold-border); }
       .milestones-cat-head div { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
@@ -3108,6 +3143,17 @@
       font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
     }
     .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
+    /* Result tally under the search box — states the count in words so the
+       filtered emptiness below it is never mistaken for a broken screen. */
+    .history-search-count {
+      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em;
+      text-transform:uppercase; color:var(--gold-dim);
+      margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
+    }
+    /* The shared resume chip on a history row shares the right edge with the
+       visit time, so here (unlike an index card) it may shrink and ellipsize
+       rather than push the row wide. */
+    .history-day-section .idx-min-chip { min-width:0; flex-shrink:1; max-width:9.5rem; overflow:hidden; text-overflow:ellipsis; }
 
     /* ── HISTORY tree hierarchy ─────────────────────────────────────── */
     .history-year-section { margin-top:1.8rem; }
@@ -4981,6 +5027,10 @@
       font-size: var(--fs-12); color: var(--cream-muted); line-height: 1.25;
     }
     .prg-section { margin-left: auto; margin-right: auto; }
+    /* Listening block: the hero grid re-used inside a labelled section, so it
+       centers under its label and drops the hero's own bottom gutter (the
+       section already owns the spacing between blocks). */
+    .prg-listen-hero { margin: 0 auto; }
     /* Every card child row shares the same divider discipline as
        .progress-row: bottom rule, none on the last. */
     .prg-row, .prg-note, .prg-history-row, .prg-src-row {

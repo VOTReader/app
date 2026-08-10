@@ -32,7 +32,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('AudioLibraryStore — normalized metadata', () => {
   it('starts with a conservative empty library and normal playback speed', () => {
-    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0 });
+    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0 });
   });
 
   it('recordPlayed keeps the recent shelf without crediting a lifetime play', () => {
@@ -52,6 +52,19 @@ describe('AudioLibraryStore — normalized metadata', () => {
 
     AudioLibraryStore.replaceAll({ plays: 10000000 });
     expect(AudioLibraryStore.countPlay()).toBe(10000000);
+  });
+
+  it('counts completions separately from plays, and stays bounded', () => {
+    AudioLibraryStore.countPlay();
+    expect(AudioLibraryStore.getCompletions()).toBe(0);   // started ≠ finished
+
+    expect(AudioLibraryStore.countCompletion()).toBe(1);
+    AudioLibraryStore.countCompletion();
+    expect(AudioLibraryStore.getCompletions()).toBe(2);
+    expect(AudioLibraryStore.getPlays()).toBe(1);         // untouched by the above
+
+    AudioLibraryStore.replaceAll({ completions: 10000000 });
+    expect(AudioLibraryStore.countCompletion()).toBe(10000000);
   });
 
   it('saves once by release URL, then toggles that save off', () => {
@@ -122,7 +135,7 @@ describe('normalizeAudioLibrary — import boundary', () => {
       recent: [{ ...track(2), url: 'javascript:alert(1)', playedAt: 30 }],
       rate: 2,
     });
-    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0 });
+    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0, completions: 0 });
   });
 
   it('bounds an imported plays counter', () => {
@@ -130,6 +143,23 @@ describe('normalizeAudioLibrary — import boundary', () => {
     expect(normalizeAudioLibrary({ plays: -3 }).plays).toBe(0);
     expect(normalizeAudioLibrary({ plays: 'lots' }).plays).toBe(0);
     expect(normalizeAudioLibrary({ plays: 99999999999 }).plays).toBe(10000000);
+  });
+
+  it('bounds an imported completions counter the same way', () => {
+    expect(normalizeAudioLibrary({ completions: 12 }).completions).toBe(12);
+    expect(normalizeAudioLibrary({ completions: -3 }).completions).toBe(0);
+    expect(normalizeAudioLibrary({ completions: 'many' }).completions).toBe(0);
+    expect(normalizeAudioLibrary({ completions: 99999999999 }).completions).toBe(10000000);
+  });
+
+  it('never infers completions from the recent shelf', () => {
+    // A started recording is not a finished one — plays may take the shelf as
+    // a lower bound; completions has no such evidence and must stay at zero.
+    const legacy = normalizeAudioLibrary({
+      recent: [{ ...track(1), playedAt: 11 }, { ...track(2), playedAt: 10 }],
+    });
+    expect(legacy.plays).toBe(2);
+    expect(legacy.completions).toBe(0);
   });
 
   it('keeps a conservative listening lower bound for pre-counter libraries', () => {

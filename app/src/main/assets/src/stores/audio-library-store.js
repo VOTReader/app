@@ -3,9 +3,10 @@
    AudioLibraryStore — durable Listening Library metadata
 
    This store owns only small metadata: saved recordings, a bounded recent
-   list, and the user's playback-rate preference. Audio bytes remain streamed
-   from the app's immutable GitHub release assets; there is deliberately no
-   local-media cache or arbitrary URL field here.
+   list, the user's playback-rate preference, and two monotonic lifetime
+   counters (recordings started / recordings finished). Audio bytes remain
+   streamed from the app's immutable GitHub release assets; there is
+   deliberately no local-media cache or arbitrary URL field here.
 */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -29,15 +30,29 @@ export const MAX_RECENT_AUDIO_TRACKS = 30;
 /** @typedef {SavedAudioTrack & { playedAt: number }} RecentAudioTrack */
 
 /**
- * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number }} AudioLibraryData
+ * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number, completions: number }} AudioLibraryData
  */
+
+/** Lifetime counters are monotonic and bounded — one ceiling for both. */
+const MAX_LIFETIME_COUNT = 10000000;
 
 /** @returns {AudioLibraryData} */
 function _empty() {
   // `plays` (2026-08-09): lifetime recordings-started counter for the
   // milestones system. Additive to v1 — older records retain the conservative
   // lower bound already present in their recent-history shelf.
-  return { v: 1, saved: [], recent: [], rate: 1, plays: 0 };
+  // `completions` (2026-08-09): recordings heard all the way to their END,
+  // which `plays` cannot express — starting a recording and finishing one are
+  // different acts, and My Progress shows both. Additive to v1 as well, but
+  // with NO lower-bound inference: a pre-counter library holds no evidence
+  // about which of its recordings ever reached their last second, and an
+  // invented number would be a lie about the reader's own listening.
+  return { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0 };
+}
+
+/** @param {unknown} value @returns {number} */
+function _lifetimeCount(value) {
+  return Math.max(0, Math.min(MAX_LIFETIME_COUNT, Math.floor(Number(value) || 0)));
 }
 
 /** @param {unknown} value @returns {number} */
@@ -109,7 +124,7 @@ export function normalizeAudioLibrary(value) {
   const recent = /** @type {RecentAudioTrack[]} */ (_sortedUniqueTracks(raw.recent, 'playedAt', MAX_RECENT_AUDIO_TRACKS));
 
   const hasLifetimePlayCount = Object.prototype.hasOwnProperty.call(raw, 'plays');
-  const normalizedPlays = Math.max(0, Math.min(10000000, Math.floor(Number(raw.plays) || 0)));
+  const normalizedPlays = _lifetimeCount(raw.plays);
   return {
     v: 1,
     saved,
@@ -119,6 +134,9 @@ export function normalizeAudioLibrary(value) {
     // recent release. It is a conservative lower bound, never a guess at
     // playback events that were not retained.
     plays: hasLifetimePlayCount ? normalizedPlays : Math.max(normalizedPlays, recent.length),
+    // No lower-bound sibling: the recent shelf records that a recording was
+    // STARTED, which says nothing about whether it was finished.
+    completions: _lifetimeCount(raw.completions),
   };
 }
 
@@ -221,7 +239,7 @@ export const AudioLibraryStore = extendStore(
     countPlay() {
       if (this._shouldDefer('countPlay')) return this.get().plays;
       const data = _writeableData(this);
-      data.plays = Math.min(10000000, data.plays + 1);
+      data.plays = Math.min(MAX_LIFETIME_COUNT, data.plays + 1);
       this._cache = data;
       this._save();
       this._bump();
@@ -230,6 +248,31 @@ export const AudioLibraryStore = extendStore(
 
     /** Lifetime recordings-played count (milestones). @returns {number} */
     getPlays() { return this.get().plays; },
+
+    /**
+     * Count one recording heard to its END. Fired from the player's
+     * end-of-track notification (the same moment the listened-to-the-end read
+     * credit is granted), so it counts WHOLE recordings: a multi-part letter
+     * counts once, when its last part finishes.
+     *
+     * Monotonic and separate from countPlay for the reason plays is separate
+     * from the recent shelf — starting and finishing are different facts, and
+     * a listener who abandons a recording halfway has not finished it.
+     *
+     * @returns {number} the lifetime count after this completion
+     */
+    countCompletion() {
+      if (this._shouldDefer('countCompletion')) return this.get().completions;
+      const data = _writeableData(this);
+      data.completions = Math.min(MAX_LIFETIME_COUNT, data.completions + 1);
+      this._cache = data;
+      this._save();
+      this._bump();
+      return data.completions;
+    },
+
+    /** Lifetime recordings-heard-to-the-end count. @returns {number} */
+    getCompletions() { return this.get().completions; },
 
     /**
      * Drop ONE recording from the recent shelf, by its immutable release URL —

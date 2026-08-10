@@ -18,7 +18,7 @@ import 'fake-indexeddb/auto';
 import { screen, cleanup, fireEvent, within, act } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, rowLabels, row,
-  groupHeads, groupHead,
+  groupHeads, groupHead, groupRowLabels, fakeAudioLibrary,
 } from './settings-harness.jsx';
 import { classifyV3ImportBegin as realClassifyV3 } from '../../utils/backup-android.js';
 
@@ -90,7 +90,9 @@ describe('auto-scroll settings disclosure', () => {
 /* Read-along. Two keys, both default ON, and the SAME disclosure discipline:
    with no sentence wash there is nothing to follow, so the scroll row is
    unmounted rather than greyed. Behaviour lives in
-   ui/components/ReadAlongHighlight.jsx (+ its own suite). */
+   ui/components/ReadAlongHighlight.jsx (+ its own suite).
+   These rows moved Reading → Listening (2026-08-09); the group-membership
+   assertions live in the 'Listening group' block below. */
 describe('read-along settings disclosure', () => {
   it('shows both rows checked when the settings have never been touched', () => {
     renderSettings();
@@ -120,6 +122,90 @@ describe('read-along settings disclosure', () => {
     expect(onToggle).toHaveBeenCalledWith('readAlongFollow');
     fireEvent.click(within(row('Read-Along Highlight')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('readAlongHighlight');
+  });
+});
+
+/* Listening (2026-08-09). Everything that shapes what you HEAR moved into
+   one group between Reading and Auto-Scroll: the two voice pickers left
+   Reading, and the read-along pair left the comment that promised this.
+   Default Speed is the one row with no settings key — it reads and writes
+   AudioLibraryStore.rate, the same preference the listening desk writes. */
+describe('Listening group', () => {
+  const LISTENING_ROWS = ['Bible Audio', 'Letter Voice', 'Default Speed',
+    'Read-Along Highlight', 'Follow the Voice'];
+
+  it('houses every listening row, and Reading houses none of them', () => {
+    renderSettings();
+    const listening = groupRowLabels('Listening');
+    const reading = groupRowLabels('Reading');
+    for (const label of LISTENING_ROWS) {
+      expect(listening).toContain(label);
+      expect(reading).not.toContain(label);
+    }
+    // Reading kept its own rows — this was a move, not a transplant of the group.
+    expect(reading).toContain('Bible Translation');
+    expect(reading).toContain('Chapter Titles');
+  });
+
+  it('sits between Reading and Auto-Scroll', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    const labels = groupHeads().map((h) => h.querySelector('.settings-section-label').textContent.trim());
+    expect(labels.indexOf('Listening')).toBe(labels.indexOf('Reading') + 1);
+    expect(labels.indexOf('Auto-Scroll')).toBe(labels.indexOf('Listening') + 1);
+  });
+
+  it('keeps the read-along disclosure discipline inside its new group', () => {
+    renderSettings({ readAlongHighlight: false });
+    expect(groupRowLabels('Listening')).toContain('Read-Along Highlight');
+    expect(groupRowLabels('Listening')).not.toContain('Follow the Voice');
+  });
+
+  it('shows the speed the listening library already holds — no settings key', () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({ AudioLibraryStore: fakeAudioLibrary(1.5) });
+    renderSettings();   // settings object carries NO audioRate — deliberately
+    expect(within(row('Default Speed')).getByRole('button', { name: /1.5/ })).toBeTruthy();
+  });
+
+  it('writes the chosen speed THROUGH to the library store', () => {
+    teardownSettingsGlobals();
+    const library = fakeAudioLibrary(1);
+    setupSettingsGlobals({ AudioLibraryStore: library });
+    const onSetting = vi.fn();
+    renderSettings({}, { onSetting });
+    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1×/ }));
+    fireEvent.click(screen.getByText('1.25×'));
+    expect(library.getPlaybackRate()).toBe(1.25);
+    // The row re-reads the store it just wrote — one source of truth, live.
+    expect(within(row('Default Speed')).getByRole('button', { name: /1.25/ })).toBeTruthy();
+    // …and no parallel settings key was invented for it.
+    expect(onSetting).not.toHaveBeenCalled();
+  });
+
+  it('prefers the player, which retimes live playback AND persists', () => {
+    teardownSettingsGlobals();
+    const library = fakeAudioLibrary(1);
+    const applied = [];
+    setupSettingsGlobals({
+      AudioLibraryStore: library,
+      // The real AudioPlayer.setPlaybackRate writes this same store; the stub
+      // stands in for "the player is loaded", which is what the row branches on.
+      AudioPlayer: { setPlaybackRate: (r) => { applied.push(r); library.setPlaybackRate(r); } },
+    });
+    renderSettings();
+    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1×/ }));
+    fireEvent.click(screen.getByText('2×'));
+    expect(applied).toEqual([2]);
+    expect(library.getPlaybackRate()).toBe(2);
+  });
+
+  it('hides the speed row entirely when the library store is absent', () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({ AudioLibraryStore: undefined });
+    renderSettings();
+    // Hidden, not a lying "1×": with no store there is nothing to read or write.
+    expect(row('Default Speed')).toBeUndefined();
+    expect(row('Bible Audio')).toBeTruthy();
   });
 });
 
@@ -656,10 +742,10 @@ describe('Android v3 import — native stream not closed until the confirm settl
    screen-reader order, same discipline as the auto-scroll disclosure.
    ─────────────────────────────────────────────────────────────────────── */
 describe('settings groups — collapsible accordion', () => {
-  const GROUPS = ['Appearance', 'Reading', 'Auto-Scroll', 'Top-Nav Buttons',
+  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top-Nav Buttons',
     'Search, Tabs & History', 'A Return to The Garden', 'Your Data', 'Mark as Read'];
 
-  it('renders all 8 group headers, every one collapsed on entry', () => {
+  it('renders all 9 group headers, every one collapsed on entry', () => {
     renderSettings({}, {}, { expandGroups: false });
     expect(groupHeads().length).toBe(GROUPS.length);
     for (const label of GROUPS) {

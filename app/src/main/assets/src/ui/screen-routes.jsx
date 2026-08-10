@@ -264,11 +264,11 @@ export function buildScreenRoutes({
   // (a non-matching screen yields null → the route renders nothing).
   const actL = (k) => (activeVolKey === k ? activeLetter : null);
   // Whole-book Bible audiobooks: the selected recorded edition (Settings →
-  // Reading → Bible Audio), or null when off/unknown — which hides every
+  // Listening → Bible Audio), or null when off/unknown — which hides every
   // Bible Listen pill. Registry + policy live in utils/audio-track.js.
   const _bibleAudioEd = bibleAudioEdition(settings.bibleAudio);
   const bibleAudioProp = _bibleAudioEd ? { volKey: _bibleAudioEd.volKey, label: _bibleAudioEd.label } : null;
-  // Default LETTER voice (Settings → Reading → Letter Voice). The player is a
+  // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
   // it, idempotently, from the same render that owns the setting. 'auto' and
   // any unknown code both resolve to "use the manifest's primary reading".

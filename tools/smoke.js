@@ -427,6 +427,39 @@
       await lib(/My Progress/);
       return /Most Annotated/i.test(document.body.textContent || '');
     });
+    await step('Library → Milestones', async function () {
+      // NOT via lib(): clickByText skips any control whose textContent runs
+      // past 80 chars, and an un-started Milestones tile carries eyebrow +
+      // title + detail + a one-line guide, which crosses it. Click the tile
+      // directly rather than loosening the shared matcher for every screen.
+      clickByText(/Personal Study/); await sleep(320);
+      var tile = [].slice.call(document.querySelectorAll('button')).find(function (b) {
+        return /Milestones/.test(b.textContent || '');
+      });
+      if (!tile) return false;
+      tile.click(); await sleep(360);
+      // The screen is built from ten stores at render time, so "it rendered"
+      // is not enough: assert the LEDGER actually came out — the summary line
+      // ("N of M reached"), real category sections, and the controls added
+      // 2026-08-09 (the Hide-reached filter + one jump chip per category).
+      // A store read that silently returned nothing would leave a heading
+      // with zero rows, which this catches.
+      var summary = document.querySelector('.milestones-summary-count');
+      if (!summary || !/of\s+\d+\s+reached/.test(summary.textContent || '')) return false;
+      var cats = document.querySelectorAll('.milestones-cat').length;
+      var rows = document.querySelectorAll('.milestones-list li').length;
+      var chips = document.querySelectorAll('.milestones-jump-chip').length;
+      var filter = document.querySelector('.milestones-filter');
+      if (cats < 10 || rows < 50 || chips !== cats || !filter) return false;
+      // The filter hides every reached row and restores them — pressed twice
+      // so the walk leaves the screen exactly as it found it.
+      filter.click(); await sleep(180);
+      var filtered = document.querySelectorAll('.milestones-list li').length;
+      var earnedAfter = document.querySelectorAll('.milestones-list li.is-earned').length;
+      filter.click(); await sleep(180);
+      var restored = document.querySelectorAll('.milestones-list li').length;
+      return earnedAfter === 0 && filtered <= rows && restored === rows;
+    });
     await step('Settings', async function () {
       clickByText(/App Configuration|^Settings/); await sleep(360);
       return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');

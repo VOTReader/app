@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayButton, AudioSectionChips } from './AudioPlayButton.jsx';
+import { readingChipWpm, readingMinChip } from './ReadingMinChip.jsx';
 
 /* Read marks are COUNT-aware (2026-08-03): a re-read letter shows ✓ ×N.
    Rendered as one shared element so every index surface stays identical. */
@@ -23,34 +24,15 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
       currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
     }
   }, []);
-  // "~N min" estimate per row, at the user's measured pace when one exists
-  // (ReadingStatsStore, bundle-b) — 230-wpm default otherwise. Hidden when
-  // the counters are absent or the item shape yields no words.
-  const _wpm = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.measuredWpm === 'function') ? ReadingStatsStore.measuredWpm() : null;
-  // Smart-resume chip ([26], 2026-08-03): an IN-PROGRESS item (the tracker
-  // left a frontier) shows how far in and what remains — "62% · ~2 min left" —
-  // instead of the cold total. progressKeyFor threads the SAME v1:<bid>:<cid>
-  // key the tracker records under; absent (legacy caller) → cold chip only.
-  const minChip = (item, itemId) => {
-    if (typeof countItemWords !== 'function' || typeof readingMinutes !== 'function') return null;
-    const words = countItemWords(item);
-    if (words <= 0) return null;
-    if (itemId != null && progressKeyFor
-        && typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.getProgress === 'function') {
-      let p = null;
-      try { p = ReadingStatsStore.getProgress(progressKeyFor(itemId)); } catch (_e) { /* stats optional */ }
-      if (p && p.b > 0 && p.c && p.c.length > 0 && p.c.length < p.b) {
-        const weighted = p.tw > 0 && p.w >= 0 && p.w < p.tw;
-        const fraction = weighted ? p.w / p.tw : p.c.length / p.b;
-        const pct = Math.min(99, Math.round(fraction * 100));
-        const leftWords = weighted ? p.tw - p.w : Math.round(words * (1 - fraction));
-        const left = readingMinutes(leftWords, _wpm);
-        return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
-      }
-    }
-    const m = readingMinutes(words, _wpm);
-    return m > 0 ? <span className="idx-min-chip">~{m} min</span> : null;
-  };
+  // "~N min" per row — or "N% · ~M min left" for an IN-PROGRESS item (the
+  // tracker left a frontier inside it; [26] smart-resume). One shared chip
+  // for every index surface: components/ReadingMinChip.jsx. progressKeyFor
+  // threads the SAME v1:<bid>:<cid> key the tracker records under; absent
+  // (legacy caller) → cold chip only.
+  const _wpm = readingChipWpm();
+  const minChip = (item, itemId) => readingMinChip(
+    item, (itemId != null && progressKeyFor) ? progressKeyFor(itemId) : null, _wpm
+  );
   const compactMeta = (item, itemId) => {
     const chip = minChip(item, itemId);
     const read = markAsReadEnabled && isRead(itemId)

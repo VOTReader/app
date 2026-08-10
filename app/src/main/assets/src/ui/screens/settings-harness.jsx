@@ -34,6 +34,9 @@ import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { ClearProgressRow } from '../components/ClearProgressRow.jsx';
 import { FontPickerRow } from '../components/FontPickerRow.jsx';
 import { READING_FONTS, readingFontById } from '../../utils/reading-fonts.js';
+import {
+  AUDIO_PLAYBACK_RATES, AUDIO_READERS, BIBLE_AUDIO_EDITIONS, normalizeAudioRate,
+} from '../../utils/audio-track.js';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
 import { clampLpm } from '../../hooks/use-autoscroll.js';
@@ -50,6 +53,34 @@ function fakeStore(extra) {
     // Destructive imports require every store to be fully hydrated.
     getState: () => 'loaded',
     ...extra,
+  };
+}
+
+/**
+ * Stateful Listening-Library stub. Settings' Default Speed row has NO
+ * settings key — it reads and writes AudioLibraryStore.rate directly — so a
+ * dead stub would make every write assertion vacuous. This one actually
+ * holds the value, normalizes it the way the real store does, and notifies
+ * subscribers, which is what the row's useSyncExternalStore re-reads.
+ *
+ * @param {number} [rate] starting playback rate
+ */
+export function fakeAudioLibrary(rate = 1) {
+  let value = normalizeAudioRate(rate);
+  let version = 0;
+  const listeners = new Set();
+  return {
+    subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+    getVersion: () => version,
+    getPlaybackRate: () => value,
+    setPlaybackRate: (next) => {
+      value = normalizeAudioRate(next);
+      version++;
+      listeners.forEach((cb) => cb());
+      return value;
+    },
+    saved: () => [], recent: () => [], getPlays: () => 0, getCompletions: () => 0,
+    getState: () => 'loaded',
   };
 }
 
@@ -79,6 +110,16 @@ export function setupSettingsGlobals(overrides = {}) {
   put('ThemeBtn', () => null);
   put('LibraryNav', LibraryNav);
   put('NavButtons', NavButtons);
+
+  // Listening group. The two voice pickers read their registries from the
+  // REAL audio-track module (same bridge the app publishes); Default Speed
+  // reads/writes the library store above. AudioPlayer is deliberately NOT
+  // installed by default — its absence is the store-only fallback path, and
+  // a test that wants the player path passes its own stub as an override.
+  put('AUDIO_PLAYBACK_RATES', AUDIO_PLAYBACK_RATES);
+  put('AudioLibraryStore', fakeAudioLibrary());
+  put('BIBLE_AUDIO_EDITIONS', BIBLE_AUDIO_EDITIONS);
+  put('AUDIO_READERS', AUDIO_READERS);
 
   // Select option tables (index.html globals in the real app).
   put('TRANSLATION_OPTIONS', [{ id: 'nkjv', label: 'NKJV', desc: '' }]);
@@ -156,6 +197,20 @@ export const groupHeads = () => [...document.querySelectorAll('.settings-group-h
 /** The group header whose label matches, or undefined. */
 export const groupHead = (label) => groupHeads()
   .find((h) => { const l = h.querySelector('.settings-section-label'); return l && l.textContent.trim() === label; });
+
+/** The whole <div.settings-section> a group header belongs to, or undefined. */
+export const groupSection = (label) => {
+  const head = groupHead(label);
+  return head ? head.closest('.settings-section') : undefined;
+};
+
+/** Labels of the rows mounted INSIDE one group — what pins WHERE a row lives. */
+export const groupRowLabels = (label) => {
+  const section = groupSection(label);
+  return section
+    ? [...section.querySelectorAll('.settings-row-label')].map((l) => l.textContent.trim())
+    : [];
+};
 
 /** Open every collapsed group (the redesign mounts group bodies lazily). */
 export function expandAllGroups() {
