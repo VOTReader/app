@@ -15,6 +15,8 @@ import {
   AUDIO_WOP_OT_PREFIX,
   AUDIO_WOP_NT_PREFIX,
   AUDIO_BRM_OT_PREFIX,
+  AUDIO_WEB_OT_PREFIX,
+  AUDIO_WEB_NT_PREFIX,
   AUDIO_BRM_NT_PREFIX,
   BIBLE_AUDIO_EDITIONS,
   audioAssetUrl,
@@ -137,5 +139,20 @@ describe('audio-track — BRM per-chapter routing beside the permanent legacy ta
     });
     expect(t).not.toBe(null);
     expect(t.url).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
+  });
+});
+
+describe('audio-track — WEB (third edition) routing', () => {
+  it('routes web1_/web2_ to their tags and trusts both prefixes', () => {
+    expect(bibleAudioAssetUrl('web1_genesis_001')).toBe(AUDIO_WEB_OT_PREFIX + 'web1_genesis_001.mp3');
+    expect(bibleAudioAssetUrl('web2_jude_001')).toBe(AUDIO_WEB_NT_PREFIX + 'web2_jude_001.mp3');
+    expect(isVotAudioUrl(AUDIO_WEB_OT_PREFIX + 'web1_psalms_117.mp3')).toBe(true);
+    expect(isVotAudioUrl('https://github.com/VOTReader/votreader-assets/releases/download/audio-web-v3/x.mp3')).toBe(false);
+  });
+
+  it('web-ebible edition resolves from settings', () => {
+    const ed = bibleAudioEdition('web-ebible');
+    expect(ed.volKey).toBe('bible-web');
+    expect(ed.translation).toBe('web');
   });
 });

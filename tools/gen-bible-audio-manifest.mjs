@@ -140,7 +140,7 @@ ${chapterRows.join(',\n')}
   var books = [
 ${chapterBookRows}
   ];
-  var editions = [['bible-brm-kjv', 'brm'], ['bible-wop-nkjv', 'wop']];
+  var editions = [['bible-brm-kjv', 'brm'], ['bible-wop-nkjv', 'wop'], ['bible-web', 'web']];
   for (var e = 0; e < editions.length; e++) {
     for (var b = 0; b < books.length; b++) {
       var id = books[b][0], testament = books[b][1], count = books[b][2];

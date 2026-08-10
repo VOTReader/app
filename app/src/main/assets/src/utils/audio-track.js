@@ -35,6 +35,11 @@ export const AUDIO_WOP_NT_PREFIX = 'https://github.com/VOTReader/votreader-asset
 export const AUDIO_BRM_OT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/';
 export const AUDIO_BRM_NT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v2/';
 
+/** World English Bible per-chapter releases (ebible.org recording, public
+ *  domain) — 'web1_' OT / 'web2_' NT, the third recorded edition. */
+export const AUDIO_WEB_OT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-web-v1/';
+export const AUDIO_WEB_NT_PREFIX = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-web-v2/';
+
 /** Every release prefix a stored/played track may point at — the whole trust
  *  boundary. Anything else is rejected. */
 const RELEASE_PREFIXES = Object.freeze([
@@ -44,6 +49,8 @@ const RELEASE_PREFIXES = Object.freeze([
   AUDIO_WOP_NT_PREFIX,
   AUDIO_BRM_OT_PREFIX,
   AUDIO_BRM_NT_PREFIX,
+  AUDIO_WEB_OT_PREFIX,
+  AUDIO_WEB_NT_PREFIX,
 ]);
 
 /** Recorded Bible editions the app knows how to stream. Registry lives here
@@ -61,6 +68,11 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     label: 'NKJV · The Word of Promise (Dramatized)',
     translation: 'nkjv',
     volKey: 'bible-wop-nkjv',
+  }),
+  'web-ebible': Object.freeze({
+    label: 'WEB · World English Bible',
+    translation: 'web',
+    volKey: 'bible-web',
   }),
 });
 
@@ -114,6 +126,8 @@ export function bibleAudioAssetUrl(id) {
     : asset.lastIndexOf('wop2_', 0) === 0 ? AUDIO_WOP_NT_PREFIX
     : asset.lastIndexOf('brm1_', 0) === 0 ? AUDIO_BRM_OT_PREFIX
     : asset.lastIndexOf('brm2_', 0) === 0 ? AUDIO_BRM_NT_PREFIX
+    : asset.lastIndexOf('web1_', 0) === 0 ? AUDIO_WEB_OT_PREFIX
+    : asset.lastIndexOf('web2_', 0) === 0 ? AUDIO_WEB_NT_PREFIX
     : AUDIO_BIBLE_RELEASE_PREFIX;
   return prefix + asset + '.mp3';
 }
