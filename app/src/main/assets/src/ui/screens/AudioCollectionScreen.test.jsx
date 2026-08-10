@@ -174,16 +174,59 @@ describe('AudioCollectionScreen -- a VOT collection', () => {
 });
 
 describe('AudioCollectionScreen -- a Bible edition', () => {
+  const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+  /** A per-chapter book, which is what every shipped edition actually is. */
+  const perChapter = (book, n) => Array.from({ length: n }, (_v, i) =>
+    ['brm1_' + book + '_' + String(i + 1).padStart(3, '0'), '', 'Chapter ' + (i + 1)]);
+
   it('lists the books its manifest ships and plays whole-book audiobooks forward-only', () => {
     renderScreen('bible-brm-kjv');
     expect(screen.getByRole('heading', { name: 'KJV · Biblical Restoration Ministries' })).toBeTruthy();
     expect(screen.getByText('Genesis')).toBeTruthy();
     expect(screen.getByText('Exodus')).toBeTruthy();
     expect(screen.queryByText('Psalms')).toBeNull();   // not in this edition's manifest
-    expect(screen.queryByRole('button', { name: /Open text/ })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Play Exodus' }));
     expect(queueUrls()).toEqual([BURL('brm_exo')]);    // Genesis stays behind the horizon
+  });
+
+  /* A8 (2026-08-10): the screen withheld the Text icon from every Bible row
+     with a blanket `!bible`, though the desk's own title jump has opened Bible
+     tracks since the day it shipped — hasTextDestination has always resolved
+     them. The gate is now that one shared rule, applied per row. */
+  it('offers the Text affordance on a Bible book, keyed like every other row', () => {
+    const onOpenText = vi.fn();
+    renderScreen('bible-brm-kjv', { onOpenText });
+    fireEvent.click(screen.getByRole('button', { name: 'Open text for Genesis' }));
+    expect(onOpenText).toHaveBeenCalledWith({ key: 'bible-brm-kjv:genesis' });
+  });
+
+  it('discloses a book’s chapters and starts the book AT the tapped one', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    renderScreen('bible-brm-kjv');
+
+    // Closed by default: 66 books, and Psalms alone is 150 rows.
+    expect(screen.queryByText('Chapter 3')).toBeNull();
+    const disclosure = screen.getByRole('button', { name: '4 chapters of Jonah' });
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Chapter 3')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play Jonah 3' }));
+    // The book from that chapter forward — the same forward-only horizon the
+    // reader's own Listen pill builds.
+    expect(queueUrls()).toEqual([OT('brm1_jonah_003'), OT('brm1_jonah_004')]);
+
+    fireEvent.click(disclosure);
+    expect(screen.queryByText('Chapter 3')).toBeNull();
+  });
+
+  it('offers no chapter disclosure for a whole-book recording', () => {
+    renderScreen('bible-brm-kjv');
+    expect(screen.queryByRole('button', { name: /chapters of/ })).toBeNull();
   });
 });
 

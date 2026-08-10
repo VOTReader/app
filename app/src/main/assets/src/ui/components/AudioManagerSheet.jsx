@@ -9,6 +9,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
+import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { hasTextDestination } from './AudioShelf.jsx';
 
@@ -204,7 +205,15 @@ export function AudioManagerSheet({ open, state, onClose }) {
   // visit would put the reader somewhere they didn't ask to be.
   const [earlierPages, setEarlierPages] = React.useState(0);
   const [laterPages, setLaterPages] = React.useState(0);
-  React.useEffect(() => { setEarlierPages(0); setLaterPages(0); }, [open]);
+  // What an expander did, announced politely. The region is rendered EMPTY and
+  // always present, so the first fill is what a screen reader speaks — a live
+  // region created together with its content announces nothing.
+  const [queueNote, setQueueNote] = React.useState('');
+  // A voice chip waiting on its confirm, by chip id (see needsVoiceConfirm).
+  const [pendingVoice, setPendingVoice] = React.useState('');
+  React.useEffect(() => {
+    setEarlierPages(0); setLaterPages(0); setQueueNote(''); setPendingVoice('');
+  }, [open]);
 
   const currentRowRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => {
@@ -222,7 +231,11 @@ export function AudioManagerSheet({ open, state, onClose }) {
     }
     node.scrollIntoView({ block: 'center' });
     return undefined;
-  }, [renders]);
+    // `state.qi` (2026-08-10): the desk left open through an auto-advance kept
+    // the OLD row centred while the playing one drifted off — on a 1,189-row
+    // Bible queue, out of the window entirely. The visibility test above is
+    // what keeps this from yanking a short queue on every boundary.
+  }, [renders, state.qi]);
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -240,15 +253,30 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const sleepAtEnd = !!state.sleepAtTrackEnd;
   const upcoming = queue.length - (state.qi + 1);
   const voices = voiceChoices(current);
+  // A boot-restored bar is ONE placeholder track standing in for a queue whose
+  // shape nobody knows yet — the real one is rebuilt on the first transport
+  // tap. Describing it as a lone recording ("Restart", "1 recording", "1 of 1")
+  // was a confident lie about a 1,189-chapter edition; the desk stays neutral
+  // until the rebuild answers (2026-08-10).
+  const restoring = !!state.restoring;
   // Mirrors the bar: a queue of one turns prev into a Restart rather than a
   // dead control, and the place-in-queue readout stays silent at 1 of 1.
-  const single = queue.length < 2;
+  const single = !restoring && queue.length < 2;
   const headLine = [
     current.sub,
     current.partLabel,
     reader,
-    single ? null : (state.qi + 1) + ' of ' + queue.length,
+    restoring || single ? null : (state.qi + 1) + ' of ' + queue.length,
   ].filter(Boolean).join(' · ') || 'The Volumes of Truth';
+  // A voice switch REBUILDS the queue from the corpus, so anything the
+  // listener made by hand is lost — a queue they reordered or pruned (source
+  // mode 'custom'), or a lone saved recording that is about to become a whole
+  // collection. Plain, unedited queues rebuild to themselves and switch
+  // immediately; only these two ask first (owner directive 2026-08-10).
+  const needsVoiceConfirm = state.sourceMode === 'custom';
+  const pendingChip = needsVoiceConfirm && voices
+    ? voices.chips.find((chip) => chip.id === pendingVoice) || null
+    : null;
 
   // The window. Only a genuinely long queue is paged; everything else renders
   // whole, so the common case has no expanders and nothing to discover.
@@ -320,18 +348,34 @@ export function AudioManagerSheet({ open, state, onClose }) {
               <span>{voices.kind === 'edition' ? 'Audio Bible' : 'Voice'}</span>
               <strong>{voices.activeLabel}</strong>
             </div>
-            <div className="audio-manager-segment" role="group" aria-label={voices.kind === 'edition' ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
+            {/* Voice and Speed are the same KIND of control — pick exactly one
+                of a closed set — so they carry the same semantics (2026-08-10):
+                radiogroup/radio/aria-checked, not a row of toggle buttons. */}
+            <div className="audio-manager-segment" role="radiogroup" aria-label={voices.kind === 'edition' ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
               {voices.chips.map((chip) => (
                 <button
                   key={chip.id}
                   type="button"
+                  role="radio"
                   className={chip.active ? 'is-active' : ''}
-                  aria-pressed={chip.active}
-                  onClick={chip.select}
+                  aria-checked={chip.active}
+                  onClick={() => { if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select(); }}
                 >{chip.label}</button>
               ))}
             </div>
-            <p className="audio-manager-voice-note">Switches this {voices.kind === 'edition' ? 'chapter' : 'recording'} — starts it again, and the queue follows.</p>
+            {pendingChip ? (
+              <ConfirmStrip
+                className="audio-manager-voice-confirm"
+                question={single
+                  ? 'Switching voice rebuilds this into a full queue. Continue?'
+                  : 'Switching voice rebuilds this queue and drops your changes to it. Continue?'}
+                yesLabel="Yes, switch"
+                onCancel={() => setPendingVoice('')}
+                onConfirm={() => { setPendingVoice(''); pendingChip.select(); }}
+              />
+            ) : (
+              <p className="audio-manager-voice-note">Switches this {voices.kind === 'edition' ? 'chapter' : 'recording'} — starts it again, and the queue follows.</p>
+            )}
           </div>
         ) : null}
 
@@ -379,7 +423,19 @@ export function AudioManagerSheet({ open, state, onClose }) {
           <div className="audio-manager-tool">
             <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
             <div className="audio-manager-segment" role="group" aria-label="Sleep timer">
-              {[15, 30, 60].map((minutes) => <button key={minutes} type="button" onClick={() => AudioPlayer.setSleepTimer(minutes)}>{minutes}m</button>)}
+              {/* Which preset is ARMED cannot be read off the remaining
+                  seconds — a 30-minute timer with 15 left is not the 15m chip —
+                  so the player keeps the preset beside the deadline and the
+                  armed chip shows it, the way "End of track" always has. */}
+              {[15, 30, 60].map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  className={state.sleepMinutes === minutes ? 'is-active' : ''}
+                  aria-pressed={state.sleepMinutes === minutes}
+                  onClick={() => AudioPlayer.setSleepTimer(minutes)}
+                >{minutes}m</button>
+              ))}
               {/* The one sleep mode a countdown can't express — it holds no
                   deadline, so the player reads it off the 'ended' event. */}
               <button
@@ -395,11 +451,23 @@ export function AudioManagerSheet({ open, state, onClose }) {
 
         <div className="audio-manager-queue">
           <div className="audio-manager-section-head">
-            <div><span>Queue</span><strong>{single ? '1 recording' : (state.qi + 1) + ' of ' + queue.length}</strong></div>
+            <div><span>Queue</span><strong>{restoring ? 'Resuming…' : single ? '1 recording' : (state.qi + 1) + ' of ' + queue.length}</strong></div>
             {upcoming > 0 ? <button type="button" onClick={() => AudioPlayer.clearUpcoming()}>Clear upcoming</button> : null}
           </div>
+          {/* Created empty and kept mounted: a live region that appears WITH
+              its text announces nothing, so the expanders below fill this one
+              instead. Tapping "Show 40 earlier" is otherwise silent to a
+              screen reader — 40 rows arrive above the focus with no word said. */}
+          <p className="sr-only" aria-live="polite">{queueNote}</p>
           {from > 0 ? (
-            <button type="button" className="audio-manager-queue-page" onClick={() => setEarlierPages((n) => n + 1)}>
+            <button
+              type="button"
+              className="audio-manager-queue-page"
+              onClick={() => {
+                setEarlierPages((n) => n + 1);
+                setQueueNote('Showing ' + (to - Math.max(0, from - QUEUE_PAGE)) + ' of ' + queue.length + ' recordings.');
+              }}
+            >
               {'Show ' + Math.min(QUEUE_PAGE, from) + ' earlier'}
             </button>
           ) : null}
@@ -456,7 +524,14 @@ export function AudioManagerSheet({ open, state, onClose }) {
             })}
           </ol>
           {to < queue.length ? (
-            <button type="button" className="audio-manager-queue-page" onClick={() => setLaterPages((n) => n + 1)}>
+            <button
+              type="button"
+              className="audio-manager-queue-page"
+              onClick={() => {
+                setLaterPages((n) => n + 1);
+                setQueueNote('Showing ' + (Math.min(queue.length, to + QUEUE_PAGE) - from) + ' of ' + queue.length + ' recordings.');
+              }}
+            >
               {'Show ' + Math.min(QUEUE_PAGE, queue.length - to) + ' later'}
             </button>
           ) : null}

@@ -29,6 +29,19 @@ export function AudioSavedScreen({ onBack, backLabel = 'Listening Library', onOp
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   useAudioPositions();
+  // The VOT registry and manifest are lazy, and since 2026-08-10 a row REBUILDS
+  // its collection around itself rather than playing alone — which it can only
+  // do once those have landed. The hub warms them the same way; this screen is
+  // reachable directly (a restored tab), so it warms them too rather than
+  // silently degrading a tap into a queue of one. Bible editions ride bundle-a
+  // and are never gated behind this.
+  React.useEffect(() => {
+    if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
+  }, []);
+  React.useSyncExternalStore(
+    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
+    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
+  );
 
   const [query, setQuery] = React.useState('');
   const saved = library && typeof library.saved === 'function' ? library.saved() : [];

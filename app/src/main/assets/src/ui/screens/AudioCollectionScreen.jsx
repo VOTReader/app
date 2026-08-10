@@ -16,7 +16,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
-import { ChevronIcon, PauseIcon, PlayIcon, TextIcon, renditionRemainingLabel, useAudioPositions } from '../components/AudioShelf.jsx';
+import { ChevronIcon, PauseIcon, PlayIcon, TextIcon, hasTextDestination, renditionRemainingLabel, useAudioPositions } from '../components/AudioShelf.jsx';
 
 /** 'bible-*' volKeys are whole-book audiobook editions, not letter collections. */
 function isBibleVol(volKey) {
@@ -83,12 +83,19 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   );
 
   const [openVoices, setOpenVoices] = React.useState(/** @type {string | null} */ (null));
+  // One book's chapters, disclosed. Rendered only while open — a Bible edition
+  // lists 66 books and Psalms alone would put 150 rows on the page uninvited.
+  const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
 
   const { label, items, col } = resolveSource(volKey);
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(volKey, item.id));
   const missing = items.length - playable.length;
   const sections = bible ? null : AudioPlayer.sectionsFor(volKey);
-  const canOpenText = !bible && !!(col && col.letterScreen) && typeof onOpenText === 'function';
+  // Per ROW, through the one rule every Listening Library surface uses: a
+  // collection that declares a letter screen, or any Bible edition (whose
+  // tracks open the book's chapter in the reader). The screen-level `!bible`
+  // gate withheld the icon from Bible rows that hasTextDestination resolves.
+  const canOpenText = typeof onOpenText === 'function';
 
   const state = AudioPlayer.getState();
   const queue = Array.isArray(state.queue) ? state.queue : [];
@@ -168,6 +175,11 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const meta = [parts > 1 ? parts + ' parts' : null, reader].filter(Boolean).join(' · ');
                 const remaining = primary ? renditionRemainingLabel(primary.tracks) : '';
                 const voicesOpen = openVoices === item.id;
+                // A per-chapter Bible book is a list of recordings, not one:
+                // the row discloses them so a chapter can be started from the
+                // Listening Library instead of only from the reader.
+                const chapters = bible && parts > 1 ? primary.tracks : null;
+                const chaptersOpen = !!chapters && openChapters === item.id;
                 return (
                   <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '')}>
                     <div className="audio-library-row">
@@ -198,7 +210,19 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                             <span>{renditions.length} voices</span><ChevronIcon />
                           </button>
                         ) : null}
-                        {canOpenText ? (
+                        {chapters ? (
+                          <button
+                            type="button"
+                            className={'audio-collection-voices' + (chaptersOpen ? ' is-open' : '')}
+                            onClick={() => setOpenChapters(chaptersOpen ? null : item.id)}
+                            aria-expanded={chaptersOpen}
+                            aria-controls={'audio-chapters-' + item.id}
+                            aria-label={chapters.length + ' chapters of ' + (item.title || 'this book')}
+                          >
+                            <span>{chapters.length} chapters</span><ChevronIcon />
+                          </button>
+                        ) : null}
+                        {canOpenText && hasTextDestination({ key }) ? (
                           <button type="button" className="audio-library-icon-button" onClick={() => onOpenText({ key })} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
                         ) : null}
                       </div>
@@ -219,6 +243,27 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                                 <PlayIcon />
                               </button>
                               <span>{name}{rendition.tracks.length > 1 ? ' · ' + rendition.tracks.length + ' parts' : ''}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    {chaptersOpen ? (
+                      <div className="audio-collection-voice-list" id={'audio-chapters-' + item.id}>
+                        {chapters.map((track, index) => {
+                          const chapterNum = index + 1;
+                          const playingThis = !!(current && current.url === track.url);
+                          return (
+                            <div key={track.url} className={'audio-collection-voice' + (playingThis ? ' is-current' : '')}>
+                              <button
+                                type="button"
+                                className="audio-library-row-play"
+                                onClick={() => AudioPlayer.playBibleBook({ volKey, bookId: item.id, label, chapterNum })}
+                                aria-label={'Play ' + (item.title || 'this book') + ' ' + chapterNum}
+                              >
+                                <PlayIcon />
+                              </button>
+                              <span>{track.partLabel || ('Chapter ' + chapterNum)}</span>
                             </div>
                           );
                         })}

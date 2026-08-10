@@ -48,6 +48,7 @@
  * @property {number} journalEntries - journal entries
  * @property {number} journalStreakBest - best journal streak
  * @property {number} audioPlays    - recordings started, lifetime
+ * @property {number} audioCompletions - recordings heard to their END, lifetime
  * @property {number} audioSaved    - recordings currently saved
  */
 
@@ -197,6 +198,13 @@ export const ACHIEVEMENT_CATEGORIES = [
     defs: [1, 10, 50, 200, 500].map((t) => ({
       key: 'listening-' + t, metric: 'audioPlays', threshold: t,
       label: t === 1 ? 'First recording played' : _num(t) + ' recordings played',
+    })),
+  },
+  {
+    id: 'completed-audio', label: 'Heard to the End', eyebrow: 'Recordings finished, last second included',
+    defs: [1, 10, 50, 250, 1000].map((t) => ({
+      key: 'completed-audio-' + t, metric: 'audioCompletions', threshold: t,
+      label: t === 1 ? 'First recording finished' : _num(t) + ' recordings finished',
     })),
   },
   {
@@ -357,11 +365,14 @@ export function collectAchievementSnapshot(readItems) {
     if (d) journalStreakBest = Math.max(_count(d.currentStreak), _count(d.longestStreak));
   } catch (_e) { /* journal stats optional */ }
 
-  let audioPlays = 0, audioSaved = 0;
+  let audioPlays = 0, audioSaved = 0, audioCompletions = 0;
   try {
     const lib = store('AudioLibraryStore');
     if (lib && typeof lib.getPlays === 'function') audioPlays = _count(lib.getPlays());
     if (lib && typeof lib.saved === 'function') audioSaved = _count((lib.saved() || []).length);
+    // Starting a recording and finishing one are different acts, and the store
+    // has counted both since 2026-08-09 — only `plays` had a tier to reach.
+    if (lib && typeof lib.getCompletions === 'function') audioCompletions = _count(lib.getCompletions());
   } catch (_e) { /* listening library optional */ }
 
   return {
@@ -375,6 +386,6 @@ export function collectAchievementSnapshot(readItems) {
     links: countOf('LinkStore', 'all-length'),
     journalEntries: countOf('JournalStore', 'count'),
     journalStreakBest,
-    audioPlays, audioSaved,
+    audioPlays, audioCompletions, audioSaved,
   };
 }

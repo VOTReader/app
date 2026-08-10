@@ -77,6 +77,20 @@ describe('achievements — buildAchievements (pure)', () => {
     // notes: 1 + 10 earned; listening: first play earned.
     expect(built.earned).toBe(3);
   });
+
+  /* A9 (2026-08-10). Finishing a recording is a different act from starting
+     one, and the store has counted both since 2026-08-09 — but only `plays`
+     had a tier, so the completions counter reached no achievement at all. */
+  it('gives finished recordings their own tier, separate from starts', () => {
+    const built = buildAchievements({ audioPlays: 3, audioCompletions: 12 });
+    const heard = built.categories.find((c) => c.id === 'completed-audio');
+    expect(heard.label).toBe('Heard to the End');
+    expect(heard.items.map((i) => i.threshold)).toEqual([1, 10, 50, 250, 1000]);
+    expect(heard.earned).toBe(2);                                   // 1 and 10
+    expect(heard.items.find((i) => i.key === 'completed-audio-50').fraction).toBeCloseTo(0.24);
+    // Starting three recordings has earned nothing beyond the first-play tier.
+    expect(built.categories.find((c) => c.id === 'listening').earned).toBe(1);
+  });
 });
 
 describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
@@ -127,7 +141,7 @@ describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
       }),
     };
     window.ReadingStreakStore = { get: () => ({ currentStreak: 3, longestStreak: 11, totalDays: 40 }) };
-    window.AudioLibraryStore = { getPlays: () => 7, saved: () => [{}, {}] };
+    window.AudioLibraryStore = { getPlays: () => 7, saved: () => [{}, {}], getCompletions: () => 4 };
 
     const s = collectAchievementSnapshot({});
     expect(s.words).toBe(12345);
@@ -137,7 +151,16 @@ describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
     expect(s.streakBest).toBe(11);
     expect(s.activeDays).toBe(40);
     expect(s.audioPlays).toBe(7);
+    expect(s.audioCompletions).toBe(4);
     expect(s.audioSaved).toBe(2);
+  });
+
+  /* A9 (2026-08-10): the store has counted finished recordings since the
+     day the counter shipped, and nothing in the milestones table read it —
+     the one listening tier counted STARTS. */
+  it('a library with no completions counter reads zero rather than throwing', () => {
+    window.AudioLibraryStore = { getPlays: () => 3, saved: () => [] };
+    expect(collectAchievementSnapshot({}).audioCompletions).toBe(0);
   });
 
   it('tallies annotation GROUPS, not per-verse fragments', () => {

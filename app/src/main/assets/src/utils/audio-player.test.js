@@ -1259,6 +1259,55 @@ describe('audio-player — subscribe / version', () => {
   });
 });
 
+/* Two module-private descriptors the listening desk has to DESCRIBE, mirrored
+   into public state so the desk cannot describe them wrong (A6/the voice-switch
+   warning, 2026-08-10). */
+describe('audio-player — queue shape the desk can read', () => {
+  it('reports HOW the queue was built', () => {
+    expect(AudioPlayer.getState().sourceMode).toBe('');
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.getState().sourceMode).toBe('collection');
+    AudioPlayer.playSection('wtlb1', 0, 'WTLB One');
+    expect(AudioPlayer.getState().sourceMode).toBe('section');
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    expect(AudioPlayer.getState().sourceMode).toBe('letter');
+    AudioPlayer.stop();
+    expect(AudioPlayer.getState().sourceMode).toBe('');
+  });
+
+  it('a queue EDIT turns the source custom — the fact a voice switch must warn about', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.getState().sourceMode).toBe('collection');
+    AudioPlayer.removeUpcoming(2);
+    expect(AudioPlayer.getState().sourceMode).toBe('custom');
+  });
+
+  it('flags a restore placeholder until the real queue is rebuilt', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+      track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+    }));
+    await load();
+    // One placeholder track stands in for a queue whose SHAPE is unknown.
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    expect(AudioPlayer.getState().queue).toHaveLength(1);
+
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(AudioPlayer.getState().restoring).toBe(false);
+      expect(AudioPlayer.getState().queue).toHaveLength(4);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+});
+
 describe('audio-player — Android keep-alive bridge', () => {
   it('activates on playing, HOLDS through pause, deactivates on stop', () => {
     // Media-card rework 2026-08-09: pause no longer releases the anchor —
@@ -1312,6 +1361,41 @@ describe('audio-player — native media card (setAudioNowPlaying + __votMediaCom
       expect.any(String), expect.any(String), false,
       expect.any(Number), expect.any(Number), expect.any(Number)
     );
+  });
+
+  /* A7 (owner directive 2026-08-10). A Bible track carries no reader code, so
+     the card's second line said "The Volumes of Truth" for all three editions
+     alike — the one line that could name the voice named nothing. */
+  it('names the EDITION on the second line for a Bible chapter', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-wop-nkjv:jonah': [['wop1_jonah_001', '', 'Chapter 1'], ['wop1_jonah_002', '', 'Chapter 2']],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    try {
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: 'NKJV · The Word of Promise (Dramatized)' });
+      expect(bridge.setAudioNowPlaying).toHaveBeenLastCalledWith(
+        'Jonah 1 — Chapter 1', 'NKJV · Dramatized', true,
+        expect.any(Number), expect.any(Number), expect.any(Number)
+      );
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+    }
+  });
+
+  it('an unknown bible-* volKey falls back to the app name rather than inventing one', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-nope:jonah': [['brm1_jonah_001', '', 'Chapter 1']] };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    try {
+      AudioPlayer.playBibleBook({ volKey: 'bible-nope', bookId: 'jonah', label: null });
+      expect(bridge.setAudioNowPlaying).toHaveBeenLastCalledWith(
+        expect.any(String), 'The Volumes of Truth', true,
+        expect.any(Number), expect.any(Number), expect.any(Number)
+      );
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+    }
   });
 
   it('does NOT sync natively on per-second timeupdates (edge-driven, not chatty)', () => {
@@ -1758,6 +1842,82 @@ describe('audio-player — durable per-recording positions', () => {
     }
   });
 
+  /* A6 (owner directive 2026-08-10). The 30s floor is the RESUME rule, so it
+     belongs on the write path too: a position that can never resume means the
+     same thing as no position at all, and storing one spends a slot of a
+     200-entry LRU — skipping chapters through a book filed a dead row for
+     every chapter passed and evicted the real places the listener left. */
+  it('never stores a position too early to resume — not even at a forced boundary', () => {
+    const positions = installPositions();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 3600;
+    tick(12);                                     // 12s into a one-hour recording
+    expect(positions.setPosition).not.toHaveBeenCalled();
+
+    AudioPlayer.stop();                           // the forced ✕ write lands too
+    expect(positions.setPosition).not.toHaveBeenCalled();
+    expect(positions.map.size).toBe(0);
+  });
+
+  it('starts storing the moment the position becomes resumable', () => {
+    const positions = installPositions();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 3600;
+    tick(29);
+    expect(positions.map.has(URL_OF('idC'))).toBe(false);
+    tick(35);                                     // the next ~5s snapshot tick
+    expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 35, d: 3600 });
+  });
+
+  it('skipping forward through a queue files no dead rows', () => {
+    const positions = installPositions();
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 900;
+    tick(6);
+    AudioPlayer.next();                           // "not this one either"
+    tick(4);
+    AudioPlayer.next();
+    expect(positions.setPosition).not.toHaveBeenCalled();
+    expect(positions.map.size).toBe(0);
+  });
+
+  it('writes the outgoing position when a NEW queue replaces the old one (R8b)', () => {
+    const positions = installPositions();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 900;
+    tick(300);
+    positions.setPosition.mockClear();
+
+    // Starting something else is a boundary: without the write, up to the
+    // whole throttle window of the outgoing recording is lost.
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    expect(positions.setPosition).toHaveBeenCalledTimes(1);
+    expect(positions.setPosition.mock.calls[0][0].url).toBe(URL_OF('idC'));
+    expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 300, d: 900 });
+  });
+
+  it('the same boundary write covers playCollection, playSection and playTrack', () => {
+    const positions = installPositions();
+    for (const start of [
+      () => AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' }),
+      () => AudioPlayer.playSection('wtlb1', 0, 'WTLB One'),
+      () => AudioPlayer.playTrack(SOLO),
+    ]) {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      el().dispatchEvent(new Event('playing'));
+      el().duration = 900;
+      tick(300);
+      positions.map.delete(URL_OF('idC'));
+      start();
+      expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 300, d: 900 });
+      AudioPlayer.stop();
+    }
+  });
+
   it('plays exactly the same with no positions store, or one that throws', () => {
     delete globalThis.AudioPositionsStore;
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
@@ -2039,8 +2199,36 @@ describe('audio-player — per-chapter Bible edition (BRM KJV)', () => {
     expect(s.queue.length).toBe(4);                        // book scope: Jonah only
     expect(s.queue[0].url).toBe(OT('brm1_jonah_001'));
     expect(s.queue[0].partLabel).toBe('Chapter 1');
-    expect(s.queue[0].title).toBe('Jonah');
+    expect(s.queue[0].title).toBe('Jonah 1');
     expect(s.qi).toBe(0);
+  });
+
+  /* A4 (owner directive 2026-08-10): a book's parts shared ONE title, so 150
+     desk rows, shelf rows, bar titles and native cards all read "Psalms". */
+  it('titles every chapter track by its CHAPTER, and keeps the label too', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'micah', label: null });
+    const q = AudioPlayer.getState().queue;
+    expect(q.map((t) => t.title)).toEqual([
+      'Micah 1', 'Micah 2', 'Micah 3', 'Micah 4', 'Micah 5', 'Micah 6', 'Micah 7',
+    ]);
+    // partLabel is unchanged: the desk head, the jump-to-text and the read
+    // credit all read the chapter THERE.
+    expect(q.map((t) => t.partLabel)).toEqual([
+      'Chapter 1', 'Chapter 2', 'Chapter 3', 'Chapter 4', 'Chapter 5', 'Chapter 6', 'Chapter 7',
+    ]);
+  });
+
+  it('a one-chapter book still reads as the book (Jude 1, not Jude)', () => {
+    // Jude's single part IS chapter 1, but its manifest row is one part long —
+    // the "whole-book vs per-chapter" test is the SHAPE, so this book keeps
+    // its plain title, exactly as a legacy whole-book recording does.
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: null });
+    expect(AudioPlayer.getState().queue[0].title).toBe('Jude');
+  });
+
+  it('letters are untouched — a part is not a chapter', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.getState().queue.map((t) => t.title)).toEqual(['Letter A', 'Letter A']);
   });
 
   it('the testament digit in the asset name — not the book — picks the tag', () => {

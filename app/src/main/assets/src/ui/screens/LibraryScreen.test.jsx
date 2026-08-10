@@ -11,6 +11,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { act, render, cleanup } from '@testing-library/react';
 import { LibraryScreen } from './LibraryScreen.jsx';
+import { ACHIEVEMENT_TOTAL } from '../../utils/achievements.js';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'NoteStore', 'LinkStore', 'BookmarkStore',
   'JournalStore', 'AnnotationStore', 'ReadingStatsStore', 'ReadingStreakStore',
@@ -132,7 +133,10 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
       version++;
       listeners.forEach((cb) => cb());
     });
-    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent).toBe('1 of 84 reached');
+    // The TOTAL is whatever the table declares — pinning a literal here made
+    // adding a category a two-file edit for no assertion value.
+    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent)
+      .toBe('1 of ' + ACHIEVEMENT_TOTAL + ' reached');
   });
 
   it('adopts a restored custom tile order after asynchronous hydration', () => {

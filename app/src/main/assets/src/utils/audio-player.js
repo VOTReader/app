@@ -30,6 +30,7 @@ import {
   AUDIO_RESUME_END_FRACTION,
   AUDIO_RESUME_MIN_SEC,
   AUDIO_RESUME_REWIND_SEC,
+  BIBLE_AUDIO_EDITIONS,
   audioAssetUrl,
   audioReaderLabel,
   bibleAudioAssetUrl,
@@ -63,7 +64,12 @@ import {
  * @property {number} duration  - current track length, seconds (0 until known)
  * @property {number} rate      - selected playback-rate preset
  * @property {number} sleepEndsAt - epoch ms, 0 when no sleep timer is armed
+ * @property {number} sleepMinutes - the countdown preset that was armed, 0 when none
  * @property {boolean} sleepAtTrackEnd - stop when the CURRENT recording ends
+ * @property {boolean} restoring - the bar is a boot placeholder; the real queue
+ *   has not been rebuilt yet, so its SHAPE is unknown (see _pendingRestore)
+ * @property {'letter'|'collection'|'section'|'custom'|''} sourceMode - how this
+ *   queue was built; 'custom' means a user-edited queue or a lone recording
  */
 
 /** Shared DOM id so every audio message replaces the previous one. */
@@ -107,7 +113,7 @@ let _el = null;
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepAtTrackEnd: false };
+const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|''} */ ('') };
 /** Last whole second notified — the timeupdate re-render storm guard. */
 let _lastTick = -1;
 /** Position to resume from after a load error (see toggle()). */
@@ -158,6 +164,7 @@ function _clearSleepTimer(notify = true) {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   if (_state.sleepEndsAt || _state.sleepAtTrackEnd) {
     _state.sleepEndsAt = 0;
+    _state.sleepMinutes = 0;
     _state.sleepAtTrackEnd = false;
     if (notify) _notify();
   }
@@ -266,11 +273,10 @@ function _mediaSession(track) {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
     const MM = _g().MediaMetadata;
-    const reader = readerLabel(track.readerCode);
     if (typeof MM === 'function') {
       ms.metadata = new MM({
         title: track.title + (track.partLabel ? ' — ' + track.partLabel : ''),
-        artist: 'The Volumes of Truth' + (reader ? ' · ' + reader : ''),
+        artist: _cardArtist(track),
         album: track.sub || '',
       });
     }
@@ -373,6 +379,28 @@ function _clearMediaSession() {
 // Best-effort like every bridge touch: the PWA has no bridge, older APKs may
 // predate the method, and a native throw must never disturb playback.
 
+/**
+ * The line under the title on a media card — the web MediaSession "artist" and
+ * its native twin. A letter's is the app plus the reader who read it; a Bible
+ * chapter's is the EDITION, because that is the voice the listener chose and
+ * bible-* tracks carry no reader code at all (without this, every edition's
+ * card said "The Volumes of Truth" and the three were indistinguishable).
+ *
+ * @param {Track} track
+ * @returns {string}
+ */
+function _cardArtist(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  const divider = key.indexOf(':');
+  if (divider > 0 && _isBibleVol(key)) {
+    const volKey = key.slice(0, divider);
+    const edition = Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey);
+    if (edition) return edition.short || edition.label;
+  }
+  const reader = readerLabel(track.readerCode);
+  return 'The Volumes of Truth' + (reader ? ' · ' + reader : '');
+}
+
 /** Push the current track + state snapshot to the native media card. */
 function _syncNative() {
   try {
@@ -380,10 +408,9 @@ function _syncNative() {
     if (!b || typeof b.setAudioNowPlaying !== 'function') return;
     const track = _state.queue[_state.qi];
     if (!track) return;
-    const reader = readerLabel(track.readerCode);
     b.setAudioNowPlaying(
       track.title + (track.partLabel ? ' — ' + track.partLabel : ''),
-      'The Volumes of Truth' + (reader ? ' · ' + reader : ''),
+      _cardArtist(track),
       // Buffering counts as playing — same rule as _syncMediaSessionState.
       _state.status === 'playing' || _state.status === 'loading',
       Number(_state.time) || 0,
@@ -624,17 +651,22 @@ function _maybePrefetchNext() {
 }
 
 /**
- * The chapter a per-chapter Bible track carries, or 0. Every shipped edition
- * labels its parts "Chapter N" (bible-audio-manifest.js expands them from one
- * loop), so the label IS the answer; a legacy whole-book recording carries no
- * part label and has no single chapter to name.
+ * The chapter a "Chapter N" part label names, or 0. Every shipped Bible
+ * edition labels its parts that way (bible-audio-manifest.js expands them from
+ * one loop), so the label IS the answer; a legacy whole-book recording carries
+ * no part label and has no single chapter to name.
  *
- * @param {Track | null | undefined} track
+ * @param {unknown} partLabel
  * @returns {number}
  */
-function _chapterOfTrack(track) {
-  const match = track && typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
+function _chapterOfLabel(partLabel) {
+  const match = typeof partLabel === 'string' ? partLabel.match(/^Chapter (\d+)$/) : null;
   return match ? Number(match[1]) : 0;
+}
+
+/** @param {Track | null | undefined} track @returns {number} */
+function _chapterOfTrack(track) {
+  return _chapterOfLabel(track && track.partLabel);
 }
 
 /**
@@ -964,14 +996,26 @@ function _tracksFor(volKey, item, collectionLabel) {
   const key = volKey + ':' + item.id;
   const parts = m[key];
   if (!parts || !parts.length) return [];
-  return parts.map((p) => ({
-    key,
-    title: item.title || '',
-    sub: collectionLabel || null,
-    url: _assetUrlFor(volKey, p[0]),
-    readerCode: p[1] || '',
-    partLabel: p[2] || null,
-  }));
+  // A per-chapter Bible edition titles by CHAPTER (owner directive
+  // 2026-08-10): a book's parts share one item title, so 150 desk rows, 150
+  // shelf rows, 150 bar titles and 150 native cards all read "Psalms" and told
+  // the listener nothing about which one they were hearing. "Psalms 117" is
+  // the recording's name; the chapter still rides partLabel as well, which is
+  // where the desk's head line, the jump-to-text and the read credit read it.
+  const byChapter = _isBibleVol(volKey) && parts.length > 1;
+  const title = item.title || '';
+  return parts.map((p) => {
+    const partLabel = p[2] || null;
+    const chapter = byChapter ? _chapterOfLabel(partLabel) : 0;
+    return {
+      key,
+      title: chapter ? title + ' ' + chapter : title,
+      sub: collectionLabel || null,
+      url: _assetUrlFor(volKey, p[0]),
+      readerCode: p[1] || '',
+      partLabel,
+    };
+  });
 }
 
 /**
@@ -1056,6 +1100,25 @@ let _pendingRestore = /** @type {any} */ (null);
 /** Last persisted whole-second, so the 1 Hz tick writes every ~5s, not 1 Hz. */
 let _lastPersistSec = -1;
 
+/* Both descriptors above are module-private, but the listening desk has to
+   DESCRIBE the queue they define — "1 recording" and a Restart-labelled prev
+   are lies while a restore placeholder stands in for an unknown queue, and a
+   voice switch must warn before discarding a queue the listener edited. Each
+   gets one writer that mirrors the fact the desk needs into public state, so
+   the mirror cannot drift from the descriptor. */
+
+/** @param {typeof _source} next @returns {void} */
+function _setSource(next) {
+  _source = next;
+  _state.sourceMode = next ? next.mode : '';
+}
+
+/** @param {any} next @returns {void} */
+function _setPendingRestore(next) {
+  _pendingRestore = next || null;
+  _state.restoring = !!_pendingRestore;
+}
+
 /* ── durable per-recording positions (owner directive 2026-08-09) ─────────
    The snapshot above is ONE slot — it remembers the last thing playing, so
    starting anything else forgets where the reader was in everything else.
@@ -1076,8 +1139,18 @@ let _lastPositionWriteAt = 0;
 let _finishedUrl = /** @type {string | null} */ (null);
 
 /**
- * Remember where a track was left. Skipped for a zero clock: `_start()` sets
- * `_state.time = 0` before metadata lands, and a piggybacked write there would
+ * Remember where a track was left — but only from a position that could ever
+ * be RESUMED from.
+ *
+ * The floor is `AUDIO_RESUME_MIN_SEC`, applied uniformly (2026-08-10),
+ * including at the forced stop/pause boundaries. It is not a throttle: a
+ * position under 30 s can never resume — `_resumeAt` refuses it, and every
+ * library row that quotes "N left" refuses it too — so storing one writes a
+ * row that means exactly what having no row means, while consuming one of the
+ * 200 LRU slots. Skipping chapters through a book used to file a dead row for
+ * every chapter passed, evicting the real places the listener left. A zero
+ * clock is covered by the same test, which matters because `_start()` sets
+ * `_state.time = 0` before metadata lands and a piggybacked write there would
  * erase the very record a resume is about to read.
  *
  * @param {Track | null | undefined} track
@@ -1090,7 +1163,7 @@ let _finishedUrl = /** @type {string | null} */ (null);
 function _rememberPosition(track, time, duration, force) {
   try {
     const t = Number(time) || 0;
-    if (!track || !track.url || !(t > 0)) return;
+    if (!track || !track.url || !(t >= AUDIO_RESUME_MIN_SEC)) return;
     if (_finishedUrl && track.url === _finishedUrl) return;
     const now = Date.now();
     if (!force && now - _lastPositionWriteAt < POSITION_WRITE_MS) return;
@@ -1228,7 +1301,7 @@ function _restoreFromSaved() {
       ? s.customQueue.map(normalizeAudioTrack).filter(Boolean)
       : [];
     if (mode === 'custom' && !customQueue.length) return;
-    _pendingRestore = {
+    _setPendingRestore({
       mode,
       volKey: typeof s.volKey === 'string' ? s.volKey : '',
       label: typeof s.label === 'string' ? s.label : null,
@@ -1240,14 +1313,14 @@ function _restoreFromSaved() {
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
-    };
+    });
     _state.queue = [track];
     _state.qi = 0;
     _state.time = _pendingRestore.time;
     _state.duration = 0;
     _state.status = 'paused';
     _notify();
-  } catch (_e) { _pendingRestore = null; }
+  } catch (_e) { _setPendingRestore(null); }
 }
 
 /**
@@ -1335,7 +1408,7 @@ async function _rebuildRestoredQueue() {
   const r = _pendingRestore;
   if (!r) return;
   if (_offline()) { _toast(OFFLINE_MSG); return; }
-  _pendingRestore = null;
+  _setPendingRestore(null);
   const g = _g();
   if (r.mode !== 'custom') {
     try {
@@ -1413,7 +1486,7 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _source = { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null };
+  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null });
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -1535,8 +1608,12 @@ function playLetter(opts) {
   }
   const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, reader);
   if (rendition) queue = rendition.tracks;
-  _pendingRestore = null;
-  _source = { mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null };
+  // R8b — a NEW queue replacing this one is a boundary like any other:
+  // without this the outgoing recording loses up to five seconds (the
+  // throttle window) every time the listener starts something else.
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'letter', volKey: o.volKey, label: o.collectionLabel || null });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
@@ -1603,8 +1680,12 @@ function playCollection(opts) {
       queue = queue.slice(Math.min(spi, run - 1));
     }
   }
-  _pendingRestore = null;
-  _source = { mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader };
+  // R8b — a NEW queue replacing this one is a boundary like any other:
+  // without this the outgoing recording loses up to five seconds (the
+  // throttle window) every time the listener starts something else.
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
@@ -1632,8 +1713,12 @@ function playSection(volKey, index, collectionLabel) {
   const sections = sectionsFor(volKey);
   if (!sections || !sections.length) return;
   const startIndex = Math.max(0, Math.min(index || 0, sections.length - 1));
-  _pendingRestore = null;
-  _source = { mode: 'section', volKey, label: collectionLabel || null, startIndex };
+  // R8b — a NEW queue replacing this one is a boundary like any other:
+  // without this the outgoing recording loses up to five seconds (the
+  // throttle window) every time the listener starts something else.
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'section', volKey, label: collectionLabel || null, startIndex });
   _state.queue = sections.slice(startIndex).map((s) => ({
     key: null,
     title: s[0] || '',
@@ -1697,8 +1782,12 @@ function playTrack(track) {
       return;
     }
   }
-  _pendingRestore = null;
-  _source = { mode: 'custom', volKey: '', label: normalized.sub };
+  // R8b — a NEW queue replacing this one is a boundary like any other:
+  // without this the outgoing recording loses up to five seconds (the
+  // throttle window) every time the listener starts something else.
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'custom', volKey: '', label: normalized.sub });
   _state.queue = [normalized];
   _state.qi = 0;
   _countPlay();
@@ -1869,9 +1958,14 @@ function setSleepTimer(minutes) {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   _state.sleepAtTrackEnd = false;   // one sleep arming at a time
   _state.sleepEndsAt = Date.now() + mins * 60000;
+  // The PRESET, kept beside the deadline: the desk shows which chip is armed,
+  // and the remaining seconds cannot answer that (a 30-minute timer with 15
+  // minutes left is not the 15-minute chip).
+  _state.sleepMinutes = mins;
   _sleepTimer = setTimeout(() => {
     _sleepTimer = null;
     _state.sleepEndsAt = 0;
+    _state.sleepMinutes = 0;
     const wasLive = _state.status === 'playing' || _state.status === 'loading';
     if (wasLive && _el) _el.pause();
     _markPaused();
@@ -1895,6 +1989,7 @@ function setSleepAtTrackEnd() {
   if (_state.status === 'idle' || !_state.queue.length) return false;
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   _state.sleepEndsAt = 0;
+  _state.sleepMinutes = 0;
   _state.sleepAtTrackEnd = true;
   _notify();
   return true;
@@ -1925,7 +2020,7 @@ function playAt(index) {
 function _commitQueueEdit(queue) {
   _state.queue = queue;
   const current = queue[_state.qi];
-  _source = { mode: 'custom', volKey: '', label: current ? current.sub : null };
+  _setSource({ mode: 'custom', volKey: '', label: current ? current.sub : null });
   // A queue edit is the one queue-SHAPE change with no track start behind it,
   // so the host media card's skip handlers have to be re-decided here.
   _syncMediaSessionActions();
@@ -1992,8 +2087,8 @@ function stop() {
   // in a 90-minute reading. Written before the live state is cleared.
   _rememberCurrentPosition(true);
   // The boot snapshot is the part that must not resurrect the bar.
-  _pendingRestore = null;
-  _source = null;
+  _setPendingRestore(null);
+  _setSource(null);
   _clearPersist();
   _clearStallWatchdog();
   _clearSleepTimer(false);

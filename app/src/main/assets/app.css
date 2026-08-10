@@ -1143,6 +1143,15 @@
       @media (hover: hover) { .audio-manager-queue-page:hover { border-color: var(--gold); color: var(--gold); } }
       .audio-manager-queue-page:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       .audio-manager-voice-note { margin: 0.45rem 0 0; color: var(--cream-dim); font-size: var(--fs-10); font-style: italic; line-height: 1.4; }
+      /* The standard ConfirmStrip, wrapped for the desk: it normally sits
+         inside an annotation chip that supplies the surface, and here it has to
+         supply its own. Its two buttons keep the desk's 44px contract. */
+      .audio-manager-voice-confirm {
+        margin: 0.45rem 0 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap;
+        border-top: 1px solid var(--gold-border);
+      }
+      .audio-manager-voice-confirm .ann-chip-confirm-q { font-size: var(--fs-11); }
+      .audio-manager-voice-confirm .ann-chip-confirm-btn { min-height: 44px; }
       /* The relocated top-of-desk voice picker (owner 2026-08-10): a bordered
          band under the track identity so "what am I hearing" and its switch
          read as one unit, before the transport. */

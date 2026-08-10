@@ -28,7 +28,11 @@ that engine rather than creating independent `<audio>` elements or queues.
   reach the same words at the same second, so a "seamless" switch would drop
   the listener mid-sentence. A recording with only one voice shows no row.
   Switching Bible edition also moves `settings.bibleAudio`, so the Listen pills
-  on chapter indexes follow the choice instead of snapping back.
+  on chapter indexes follow the choice instead of snapping back. A switch
+  REBUILDS the queue from the corpus, so the two queues that cannot survive it
+  ask first, through the app's standard confirm strip: one the listener
+  reordered or pruned, and a lone recording about to become a whole collection.
+  Every plain queue rebuilds to itself and switches on the first tap.
 - Set a DEFAULT voice for the Letters in **Settings → Reading → Letter Voice**.
   `auto` (the default) uses each recording's primary reading; a reader code
   starts every letter that reader has recorded in their voice, and letters they
@@ -66,12 +70,24 @@ that engine rather than creating independent `<audio>` elements or queues.
   destructive queue actions; upcoming rows still move earlier/later, leave, or
   clear as a block. With a per-chapter Bible edition this list IS the chapter
   picker, so the desk centres the playing row when it opens.
-- Reach any position in a very long queue. A whole Bible edition queues 1,189
-  chapters, so the desk renders a WINDOW of current ± 40 rows with "Show N
-  earlier / later" expanders (`QUEUE_WINDOW_MIN` / `QUEUE_PAGE` in
-  `AudioManagerSheet.jsx`). Deliberately paged and dumb — no virtual scroller,
-  nothing to go wrong when the queue is edited underneath it. Anything shorter
-  than ~80 rows renders whole, with no expanders to discover.
+- Reach any position in a very long queue. A book queues up to 150 chapters, so
+  the desk renders a WINDOW of current ± 40 rows with "Show N earlier / later"
+  expanders (`QUEUE_WINDOW_MIN` / `QUEUE_PAGE` in `AudioManagerSheet.jsx`).
+  Deliberately paged and dumb — no virtual scroller, nothing to go wrong when
+  the queue is edited underneath it. Anything shorter than ~80 rows renders
+  whole, with no expanders to discover. The window and its centring follow
+  playback while the desk is open, and each expander announces what it revealed
+  through a polite live region.
+- Tell the recordings apart. A per-chapter Bible track is titled by its CHAPTER
+  ("Psalms 117"), not by its book, so desk rows, library shelves, the
+  mini-player and the system media card all name one recording rather than 150
+  identical ones; the chapter still rides the part label beside it. The media
+  card's second line names the EDITION for a Bible chapter, since those tracks
+  carry no reader.
+- Start a Bible chapter from the Listening Library itself: a book row in a
+  Bible edition discloses its chapters (rendered only while open) and each one
+  starts the book from there, and the Text affordance opens the book in the
+  reader — the same destination rule every other row uses.
 - Open the source text for saved/recent letter recordings when the corpus key
   still resolves.
 
@@ -95,6 +111,14 @@ it; the cache — not the app — owns eviction.
 | The one scrubber both of those render | `app/src/main/assets/src/ui/components/AudioSeekSlider.jsx` |
 | Saved/recent/browse screen | `app/src/main/assets/src/ui/screens/AudioLibraryScreen.jsx` |
 | IDB registration, import validation, and Settings backup mapping | `idb-adapter.js`, `import-validators.js`, `SettingsScreen.jsx` |
+
+Two module-private descriptors are mirrored into the player's public state
+because the desk has to DESCRIBE them: `sourceMode` (how the queue was built —
+`custom` means edited by hand or a lone recording, which is what a voice switch
+warns about) and `restoring` (the bar is a boot placeholder whose real queue has
+not been rebuilt yet, so the desk says "Resuming…" instead of claiming "1
+recording" and a Restart-labelled prev). Each has ONE writer beside its
+descriptor, so the mirror cannot drift from the fact.
 
 Two settings reach the player, and neither is read from React state inside it:
 `settings.letterReader` is PUSHED in by `AudioPlayer.setPreferredReader(...)`
@@ -180,8 +204,14 @@ rows describe exactly the judgment the player acts on): a recording resumes
 when at least 30 s in and below 97 % of its length, five seconds before where
 it was left. A recording heard to its end is forgotten, not resumed. Closing
 the player with ✕ discards the boot snapshot but KEEPS the positions map.
-Writes are throttled to at most one a second, and always land at a boundary
-(track change, stop). The outgoing track's clock is written BEFORE the queue
+
+The 30 s floor governs the WRITE path too, uniformly, forced boundaries
+included: a position under it can never be resumed from, so storing one records
+a row that means exactly what having no row means while spending a slot of the
+200-entry LRU — skipping through a book used to file a dead row per chapter
+passed and evict the real places. Writes are otherwise throttled to at most one
+a second and always land at a boundary: a track change, a stop, and a NEW queue
+replacing the old one. The outgoing track's clock is written BEFORE the queue
 index moves, or the position would be filed under the recording just starting.
 
 ## One-audio policy
