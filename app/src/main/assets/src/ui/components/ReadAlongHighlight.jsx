@@ -59,11 +59,30 @@
    the scroll. They arrive as props through sharedViewProps, the way every
    other settings-driven reading-view behaviour does.
 
-   EFFECT HYGIENE: the paint effect carries a real dependency array and
+   ┌─ THE CLOCK ───────────────────────────────────────────────────────┐
+   │ The store's `time` only moves when the whole SECOND changes (the  │
+   │ timeupdate re-render guard in audio-player.js), so sub-second      │
+   │ alignment is invisible through it. The paint is therefore driven  │
+   │ by a requestAnimationFrame loop reading                            │
+   │ `AudioPlayer.getPreciseTime()` — the element's live currentTime.  │
+   │ The loop touches REFS ONLY: no setState, so the reading screen    │
+   │ never re-renders per frame, and rAF's own background-tab throttle │
+   │ is the visibility gate (a hidden tab stops asking for frames).    │
+   │ It paints ONLY when the fragment INDEX changes, so follow-scroll  │
+   │ keeps exactly its old cadence — one retarget per sentence.        │
+   │                                                                    │
+   │ The player's whole-second tick stays wired as a SAFETY NET, doing │
+   │ the same index check. The two drivers cannot double-paint: the    │
+   │ `i !== lastFrag.current` guard makes whichever arrives second a   │
+   │ no-op. In a browser the frame loop always wins (60 Hz vs 1 Hz);   │
+   │ where frames never come — no rAF at all, or a harness that owns   │
+   │ the frame source — the tick is what keeps the wash moving.        │
+   └───────────────────────────────────────────────────────────────────┘
+
+   EFFECT HYGIENE: the paint effects carry real dependency arrays and
    the per-part fragment filtering is memoized, so the querySelector +
    getBoundingClientRect + filter allocation run on a fragment CHANGE —
-   not on every host render. The player's own whole-second tick is the
-   only steady clock in here.
+   not on every host render and not on every frame.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
@@ -80,11 +99,68 @@ const GLIDE_MS = 260;
  * by up to 0.5/DPR px; a real external write is orders of magnitude larger.
  */
 const DRIFT_PX = 1.5;
+/**
+ * THE ONE PERCEPTUAL LEAD. The eye wants the wash a beat before the ear
+ * confirms it. The alignment data ships TRUE onsets — no lead baked in — so
+ * this constant is the single place a lead exists in the whole pipeline. The
+ * karaoke QA pages (tools/hone-sample.mjs, tools/hone-bible-sample.mjs) mirror
+ * this value so what an ear check hears is what the app will paint.
+ */
+const LEAD_S = 0.15;
 
-/** @returns {any[] | null} */
-function _syncFor(key) {
+/**
+ * The release asset this track streams: the URL's last path segment without
+ * its `.mp3`. Every VOT audio URL is `<releasePrefix><assetId>.mp3` and the
+ * asset id is `[A-Za-z0-9_-]+` (utils/audio-track.js owns that contract).
+ *
+ * @param {any} track
+ * @returns {string}
+ */
+function _assetIdOf(track) {
+  const url = (track && typeof track.url === 'string') ? track.url : '';
+  const tail = url.slice(url.lastIndexOf('/') + 1);
+  return tail.slice(-4).toLowerCase() === '.mp3' ? tail.slice(0, -4) : '';
+}
+
+/**
+ * The per-ASSET timeline of an alternate rendition, when one has shipped.
+ * Alternates are aligned individually (each reader's recording has its own
+ * pacing), so they are keyed by asset id rather than by letter.
+ *
+ * @param {any} track
+ * @returns {any[] | null}
+ */
+function _altRowsFor(track) {
   const g = /** @type {any} */ (globalThis);
-  return (g.AUDIO_SYNC && g.AUDIO_SYNC[key]) || null;
+  const id = _assetIdOf(track);
+  return (id && g.AUDIO_SYNC_ALT && g.AUDIO_SYNC_ALT[id]) || null;
+}
+
+/**
+ * The alignment rows that belong to the recording ACTUALLY PLAYING — not
+ * merely to this letter. AUDIO_SYNC is keyed by "volKey:letterId", but a
+ * letter can have several complete readings (AUDIO_ALTERNATES: different
+ * reader, different pacing), and painting the primary reading's timeline over
+ * an alternate is a confidently wrong highlight. So: an alternate's own
+ * per-asset rows win; otherwise the letter's rows ship only when this asset IS
+ * the primary rendition, which AUDIO_MANIFEST is the register of. An alternate
+ * with no timeline of its own paints NOTHING — honest beats plausible.
+ *
+ * @param {string} key
+ * @param {any} track
+ * @returns {any[] | null}
+ */
+function _syncFor(key, track) {
+  const g = /** @type {any} */ (globalThis);
+  const alt = _altRowsFor(track);
+  if (alt) return alt;
+  const rows = (g.AUDIO_SYNC && g.AUDIO_SYNC[key]) || null;
+  if (!rows) return null;
+  const assetId = _assetIdOf(track);
+  const parts = (g.AUDIO_MANIFEST && g.AUDIO_MANIFEST[key]) || null;
+  if (!assetId || !Array.isArray(parts)) return null;
+  for (const p of parts) { if (p && p[0] === assetId) return rows; }
+  return null;
 }
 
 /**
@@ -232,6 +308,48 @@ function _follow(range, mainRef, userScrollAt, glideRef) {
 }
 
 /**
+ * PAINT fragment `i` (and, if follow is on, bring it into the band). Imperative
+ * and idempotent-by-index: the caller has already established that `i` differs
+ * from what is on screen, and `lastFrag` is claimed here — including on the
+ * paths that give up (missing block, unmappable offsets), so a row that cannot
+ * be painted is not retried 60 times a second.
+ *
+ * Module-local rather than a hook body because TWO drivers call it: the frame
+ * loop and the player's whole-second tick (see THE CLOCK in the header).
+ *
+ * @param {any[]} frags
+ * @param {number} i
+ * @param {{ current: any }} mainRef
+ * @param {string} letterId
+ * @param {(id: string, i: number) => string} hlKeyFn
+ * @param {boolean} readAlongFollow
+ * @param {{ current: number }} userScrollAt
+ * @param {{ current: number | null }} glideRef
+ * @param {{ current: number }} lastFrag
+ * @returns {void}
+ */
+function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag) {
+  lastFrag.current = i;
+  if (i < 0) { /** @type {any} */ (CSS).highlights.delete(HL_NAME); return; }
+  const [, bi, cs, ce] = frags[i];
+  const blockEl = mainRef.current && mainRef.current.querySelector('[data-hl-key="' + hlKeyFn(letterId, bi) + '"]');
+  if (!blockEl) return;
+  let range;
+  if (ce === -1) {
+    // Format B sentinel — paint the whole paragraph block.
+    range = blockEl.ownerDocument.createRange();
+    try { range.selectNodeContents(blockEl); } catch (_e) { return; }
+  } else {
+    range = rangeIn(blockEl, cs, ce);
+  }
+  if (!range) return;
+  const H = /** @type {any} */ (globalThis).Highlight;
+  if (typeof H !== 'function') return;
+  /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
+  if (readAlongFollow) _follow(range, mainRef, userScrollAt, glideRef);
+}
+
+/**
  * @param {object} props
  * @param {string} props.volKey
  * @param {string} props.letterId
@@ -260,12 +378,17 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // Two reads off the frozen lazy corpus — cheap, and `rows` keeps a stable
   // identity, so the filter below re-allocates only when the letter, the part,
   // or playing-ness changes (or once, when the lazy corpus finally lands).
-  const rows = (active && readAlongOn) ? _syncFor(key) : null;
+  const rows = (active && readAlongOn) ? _syncFor(key, track) : null;
+  // An alternate rendition's rows are keyed by ASSET, so they describe exactly
+  // one recording and are always part 0 — the queue-position part index means
+  // nothing to them.
+  const perAsset = !!rows && rows === _altRowsFor(track);
   const frags = React.useMemo(() => {
     if (!rows || !rows.length) return null;
-    const only = rows.filter((f) => (f[4] || 0) === part);
+    const want = perAsset ? 0 : part;
+    const only = rows.filter((f) => (f[4] || 0) === want);
     return only.length ? only : null;
-  }, [rows, part]);
+  }, [rows, part, perAsset]);
 
   // USER INTENT REVOKES THE LEASE (header rule 2). Capture + passive, matching
   // use-autoscroll's own yield listeners so it cannot be starved by the pager's
@@ -285,6 +408,34 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     };
   }, [mainRef, key]);
 
+  // THE FRAME LOOP (header: THE CLOCK). Refs only — no state is written here,
+  // so a frame costs one binary search and, on a sentence boundary, one paint.
+  // Cancelled on pause, on unmount and on a letter change by the cleanup.
+  React.useEffect(() => {
+    const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
+    if (!supported) return undefined;
+    if (!active || !frags || !mainRef.current) return undefined;
+    if (typeof requestAnimationFrame !== 'function') return undefined;
+    let id = /** @type {number | null} */ (null);
+    let stopped = false;
+    const tick = () => {
+      id = null;
+      const i = fragmentAt(frags, AudioPlayer.getPreciseTime() + LEAD_S);
+      if (i !== lastFrag.current) {
+        _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag);
+      }
+      if (!stopped) id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => {
+      stopped = true;
+      if (id != null) { try { cancelAnimationFrame(id); } catch (_e) { /* frame source gone */ } }
+    };
+  }, [active, frags, letterId, hlKeyFn, mainRef, readAlongFollow]);
+
+  // THE SAFETY NET + the structural clear. Runs on the player's whole-second
+  // tick; the index guard inside makes it a no-op whenever the frame loop above
+  // already moved the wash, and the only driver when frames never arrive.
   React.useEffect(() => {
     const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
     if (!supported) return undefined;
@@ -293,26 +444,9 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       lastFrag.current = -1;
       return undefined;
     }
-    const i = fragmentAt(frags, time + 0.15); // slight lead — eye beats ear
+    const i = fragmentAt(frags, time + LEAD_S);
     if (i === lastFrag.current) return undefined;
-    lastFrag.current = i;
-    if (i < 0) { /** @type {any} */ (CSS).highlights.delete(HL_NAME); return undefined; }
-    const [, bi, cs, ce] = frags[i];
-    const blockEl = mainRef.current.querySelector('[data-hl-key="' + hlKeyFn(letterId, bi) + '"]');
-    if (!blockEl) return undefined;
-    let range;
-    if (ce === -1) {
-      // Format B sentinel — paint the whole paragraph block.
-      range = blockEl.ownerDocument.createRange();
-      try { range.selectNodeContents(blockEl); } catch (_e) { return undefined; }
-    } else {
-      range = rangeIn(blockEl, cs, ce);
-    }
-    if (!range) return undefined;
-    const H = /** @type {any} */ (globalThis).Highlight;
-    if (typeof H !== 'function') return undefined;
-    /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
-    if (readAlongFollow) _follow(range, mainRef, userScrollAt, glide);
+    _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag);
     return undefined;
   }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow]);
 

@@ -183,6 +183,8 @@ afterEach(() => {
   delete globalThis.Highlight;
   delete globalThis.AUDIO_MANIFEST;
   delete globalThis.AUDIO_SYNC;
+  delete globalThis.AUDIO_ALTERNATES;
+  delete globalThis.AUDIO_SYNC_ALT;
   delete globalThis.Audio;
   localStorage.removeItem('vot-audio-pos');
 });
@@ -239,6 +241,125 @@ describe('ReadAlongHighlight — the sentence wash', () => {
     play();
     clockTo(6);
     expect(painted()).toBeNull();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The precise clock — the requestAnimationFrame driver
+   ─────────────────────────────────────────────────────────────────────────
+   The store's clock only moves on whole SECONDS, so the wash is driven from
+   AudioPlayer.getPreciseTime() (the element's live currentTime) on a frame
+   loop. These tests move the ELEMENT without dispatching `timeupdate`, which
+   is exactly the sub-second region the store cannot see — so a paint here can
+   only have come from the frame loop.
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('ReadAlongHighlight — the frame-driven clock', () => {
+  /** Advance the element alone: no timeupdate, so the store never hears it. */
+  const elementTo = (t) => { FakeAudio.last.currentTime = t; };
+
+  it('paints once per fragment CHANGE, not once per frame', () => {
+    mount({ readAlongFollow: false });
+    play();
+    const sets = vi.spyOn(highlights, 'set');
+
+    elementTo(6);
+    frame(0);
+    expect(painted()).toBe('Sentence number two.');
+    expect(sets).toHaveBeenCalledTimes(1);
+
+    frame(16); frame(32); frame(48);            // same sentence, three more frames
+    expect(sets).toHaveBeenCalledTimes(1);
+
+    elementTo(9.9);                             // the lead carries it over the 10s row
+    frame(64);
+    expect(painted()).toBe(BLOCK1);
+    expect(sets).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries the one perceptual lead, so the wash arrives a beat early', () => {
+    mount({ readAlongFollow: false });
+    play();
+    elementTo(4.9);                             // 0.1s BEFORE the 5s onset
+    frame(0);
+    expect(painted()).toBe('Sentence number two.');
+  });
+
+  it('follows the voice on a sub-second boundary the store tick cannot see', () => {
+    mount({ readAlongFollow: false });
+    play();
+    clockTo(6);                                 // store + element agree at 6s
+    expect(painted()).toBe('Sentence number two.');
+    elementTo(9.87);                            // mid-second: floor(9.87) === 9, no tick
+    frame(0);
+    expect(painted()).toBe(BLOCK1);
+  });
+
+  it('stops asking for frames when playback pauses', () => {
+    mount({ readAlongFollow: false });
+    play();
+    elementTo(6);
+    frame(0);
+    expect(rafCbs.size).toBe(1);                // the loop re-armed itself
+
+    act(() => { AudioPlayer.toggle(); });        // pause
+    expect(rafCbs.size).toBe(0);                // the pending frame was cancelled
+
+    const sets = vi.spyOn(highlights, 'set');
+    elementTo(11);
+    frame(100);
+    expect(sets).not.toHaveBeenCalled();
+  });
+
+  it('stops asking for frames on unmount', () => {
+    const view = mount({ readAlongFollow: false });
+    play();
+    elementTo(6);
+    frame(0);
+    expect(rafCbs.size).toBe(1);
+    view.unmount();
+    expect(rafCbs.size).toBe(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   One timeline per RECORDING (the alternates guard)
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('ReadAlongHighlight — alignment belongs to the asset, not the letter', () => {
+  const ALT_ASSET = 'idAlt';
+
+  /** Start reader T's separate reading of the same letter. */
+  const playAlt = () => act(() => {
+    AudioPlayer.playLetter({
+      volKey: 'vol1', letter: { id: 'letter-a', title: 'A Letter' },
+      collectionLabel: 'Volume One', reader: 'T',
+    });
+  });
+
+  beforeEach(() => { globalThis.AUDIO_ALTERNATES = { 'vol1:letter-a': [['T', [[ALT_ASSET]]]] }; });
+
+  it('paints NOTHING over an alternate rendition that has no timeline of its own', () => {
+    mount();
+    playAlt();
+    expect(AudioPlayer.getState().queue[0].url).toContain(ALT_ASSET);
+    clockTo(6);
+    expect(painted()).toBeNull();               // the primary's timing is not this reading's
+  });
+
+  it('paints an aligned alternate from its own per-asset rows', () => {
+    globalThis.AUDIO_SYNC_ALT = { [ALT_ASSET]: [[1, 0, 0, 14, 0], [4, 0, 14, 34, 0]] };
+    mount();
+    playAlt();
+    clockTo(2);
+    expect(painted()).toBe('Sentence one. ');
+    clockTo(6);
+    expect(painted()).toBe('Sentence number two.');
+  });
+
+  it('still paints the primary reading, which the manifest vouches for', () => {
+    mount();
+    play();
+    clockTo(6);
+    expect(painted()).toBe('Sentence number two.');
   });
 });
 

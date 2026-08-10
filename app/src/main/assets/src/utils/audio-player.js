@@ -2157,6 +2157,19 @@ function getVersion() { return _version; }
  */
 function getState() { return _state; }
 
+/**
+ * The element's LIVE position, not the store's. `_state.time` is only notified
+ * when the whole SECOND changes (the timeupdate re-render guard above), which
+ * is the right cadence for a displayed clock and far too coarse for anything
+ * that has to land on a syllable — read-along's rAF driver reads this instead.
+ * Deliberately notifies nothing and allocates nothing: it is a pull, called up
+ * to once per animation frame. Falls back to the store's value before the
+ * element exists (boot-restore placeholder) so the caller never sees NaN.
+ *
+ * @returns {number}
+ */
+function getPreciseTime() { return _el ? (_el.currentTime || 0) : _state.time; }
+
 // Boot-time durable-resume: if a prior session left a position snapshot, put
 // the bar up PAUSED at that spot (display-only state; no network, no corpus).
 // Runs at module eval — deliberately touches only localStorage + _state.
@@ -2167,6 +2180,7 @@ export const AudioPlayer = {
   subscribe,
   getVersion,
   getState,
+  getPreciseTime,
   hasAudio,
   prewarm,
   firstReaderCode,
