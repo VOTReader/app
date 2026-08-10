@@ -2,8 +2,9 @@
    AudioCollectionScreen -- every recording of ONE source, in reading order.
 
    Two shapes of source share this screen: a VOT letter collection (resolved
-   through the COLLECTIONS registry globals) and a whole-book Bible edition
-   (resolved through BIBLE_AUDIO_EDITIONS + its manifest). Only rows that
+   through the COLLECTIONS registry globals) and a recorded Bible edition
+   (resolved through BIBLE_AUDIO_EDITIONS + its manifest), whose rows are its
+   BOOKS and whose chapters disclose beneath them. Only rows that
    actually have a recording are listed; the footer says plainly how many
    still await one, because a silent gap reads as a bug.
 
@@ -18,7 +19,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
 import { ChevronIcon, PauseIcon, PlayIcon, TextIcon, hasTextDestination, renditionRemainingLabel, useAudioPositions } from '../components/AudioShelf.jsx';
 
-/** 'bible-*' volKeys are whole-book audiobook editions, not letter collections. */
+/** 'bible-*' volKeys are recorded Bible editions, not letter collections. */
 function isBibleVol(volKey) {
   return typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
 }
@@ -172,7 +173,10 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const rowPlaying = isCurrent && live;
                 const parts = primary ? primary.tracks.length : 0;
                 const reader = primary ? AudioPlayer.readerLabel(primary.reader) : null;
-                const meta = [parts > 1 ? parts + ' parts' : null, reader].filter(Boolean).join(' · ');
+                // A Bible book's "parts" ARE its chapters — every shipped
+                // edition is recorded one chapter at a time — and the row's own
+                // disclosure below already calls them that (B2, 2026-08-10).
+                const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader].filter(Boolean).join(' · ');
                 const remaining = primary ? renditionRemainingLabel(primary.tracks) : '';
                 const voicesOpen = openVoices === item.id;
                 // A per-chapter Bible book is a list of recordings, not one:

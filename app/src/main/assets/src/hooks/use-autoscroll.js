@@ -16,12 +16,14 @@
    clock and no DOM. `useAutoScroll` is the thin React wrapper.
 
    ┌─ THE SCROLLTOP LEASE ─────────────────────────────────────────────┐
-   │ FOUR writers touch this container's scrollTop:                    │
+   │ FIVE writers touch this container's scrollTop:                    │
    │   1. the user's finger                                            │
    │   2. use-scroll-memory's startRestore (up to 90 rAF attempts,     │
    │      writing every frame, flagged by body.scroll-restoring)       │
    │   3. the pager's swipe settle                                     │
    │   4. this controller                                              │
+   │   5. read-along's governed follow — the rAF glide that keeps      │
+   │      the sentence being read in view (ReadAlongHighlight.jsx)     │
    │ At most ONE may write at a time. Every pause rule below is that   │
    │ one invariant applied to a different revoker — which is why the   │
    │ restore interlock, the pointer yield, and the external-nav stop   │

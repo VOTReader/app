@@ -263,7 +263,7 @@ export function buildScreenRoutes({
   // matching volume, so each letter route stays guarded exactly as before
   // (a non-matching screen yields null → the route renders nothing).
   const actL = (k) => (activeVolKey === k ? activeLetter : null);
-  // Whole-book Bible audiobooks: the selected recorded edition (Settings →
+  // Recorded Bible editions (per-chapter): the selected edition (Settings →
   // Listening → Bible Audio), or null when off/unknown — which hides every
   // Bible Listen pill. Registry + policy live in utils/audio-track.js.
   const _bibleAudioEd = bibleAudioEdition(settings.bibleAudio);

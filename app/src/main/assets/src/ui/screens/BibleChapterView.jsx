@@ -171,12 +171,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 <div className="hero-ornament-diamond" />
                 <div className="hero-ornament-line r" />
               </div>
-              {/* Whole-book audiobook (2026-08-09): the recording is one track
-                  per BOOK, so this pill starts the book positioned at THIS
-                  chapter — a seek into the book track via the announcement-
-                  scanned BIBLE_AUDIO_CHAPTERS index (books without a chapter
-                  row just start at the book). Mirrors the letter hero pill;
-                  inert peeks keep it (same pointer-events:none contract). */}
+              {/* Recorded Bible edition (comment corrected 2026-08-10): every
+                  shipped edition is one track per CHAPTER, so this pill starts
+                  the book's queue positioned at THIS chapter and auto-advance
+                  runs to the end of the book. (The retired whole-book shape
+                  reached the same chapter by SEEKING via BIBLE_AUDIO_CHAPTERS;
+                  playBibleBook still branches on shape for it.) Mirrors the
+                  letter hero pill; inert peeks keep it (same
+                  pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
                 <div className="hero-play-row">
                   <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} />

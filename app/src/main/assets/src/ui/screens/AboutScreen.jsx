@@ -46,11 +46,18 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                   <p>The complete Volumes of Truth corpus.</p>
                   <p>The entire Bible in ten translations, including two custom Restored Name editions.</p>
                   <p>Every PDF, Bible study, and letter study.</p>
+                  <p>A Listening Library — the Letters and the Bible, read aloud.</p>
                   <p className="about-subhead">Your Tools</p>
                   <p>Highlight, underline, bookmark, and note — anywhere.</p>
                   <p>A private journal with photos, voice memos, and a full feature suite — kept on your device.</p>
                   <p>Full-text search across the entire library.</p>
-                  <p>Fully offline. Your data never leaves this device; nothing is downloaded except the <em>Return to the Garden</em> images.</p>
+                  {/* B1 (2026-08-10): this line claimed "nothing is downloaded
+                      except the Garden images", which stopped being true the
+                      day audio shipped — every Listen streams an MP3. The
+                      privacy promise it was really making (nothing of YOURS
+                      leaves) is unchanged and stays; the download claim is now
+                      the truth. */}
+                  <p>Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files — your own data never leaves this device.</p>
                 </div>
               </>
             )}

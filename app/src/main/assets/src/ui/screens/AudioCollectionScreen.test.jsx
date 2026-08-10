@@ -179,7 +179,7 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
   const perChapter = (book, n) => Array.from({ length: n }, (_v, i) =>
     ['brm1_' + book + '_' + String(i + 1).padStart(3, '0'), '', 'Chapter ' + (i + 1)]);
 
-  it('lists the books its manifest ships and plays whole-book audiobooks forward-only', () => {
+  it('lists the books its manifest ships and plays them forward-only', () => {
     renderScreen('bible-brm-kjv');
     expect(screen.getByRole('heading', { name: 'KJV · Biblical Restoration Ministries' })).toBeTruthy();
     expect(screen.getByText('Genesis')).toBeTruthy();
@@ -227,6 +227,24 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
   it('offers no chapter disclosure for a whole-book recording', () => {
     renderScreen('bible-brm-kjv');
     expect(screen.queryByRole('button', { name: /chapters of/ })).toBeNull();
+  });
+
+  /* B2 (2026-08-10): a Bible book's "parts" ARE its chapters, and the row's own
+     disclosure already called them that — the meta line beside the title said
+     "4 parts" one inch from a button reading "4 chapters of Jonah". */
+  it('counts a book’s recordings as CHAPTERS, while a letter keeps its parts', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    renderScreen('bible-brm-kjv');
+    // The row's meta line specifically — the disclosure button beside it has
+    // said "4 chapters" since A8, which is exactly what made "4 parts" jar.
+    expect(document.querySelector('.audio-library-row-copy small').textContent).toBe('4 chapters');
+    expect(screen.queryByText('4 parts')).toBeNull();
+
+    cleanup();
+    installGlobals();
+    renderScreen('one');   // Letter C is two PARTS of one recording, not chapters
+    expect(screen.getByText('2 parts · Read by Timothy')).toBeTruthy();
   });
 });
 

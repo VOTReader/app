@@ -254,7 +254,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
                   <span className="audio-library-shelf-copy">
                     <strong>{edition.label}</strong>
-                    <small>{books ? books + ' books · whole-book audiobooks' : 'Whole-book audiobooks'}</small>
+                    <small>{books ? books + ' books · chapter by chapter' : 'Read chapter by chapter'}</small>
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>

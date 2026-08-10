@@ -60,6 +60,19 @@ const ITEMS = [
 
 const URL_OF = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
 
+/* A per-chapter Bible edition (the shipped shape): parts ARE chapters, so the
+   player titles each track by its chapter AND labels the part "Chapter N".
+   Jude's single-part row is the counter-case — one part is not a chapter list,
+   so its title stays plain and the label is the only chapter it has. */
+const bibleParts = (book, t, n) => Array.from({ length: n }, (_v, i) => (
+  ['brm' + t + '_' + book + '_' + String(i + 1).padStart(3, '0'), '', 'Chapter ' + (i + 1)]
+));
+const BIBLE_MANIFEST = {
+  'bible-brm-kjv:jonah': bibleParts('jonah', 1, 4),
+  'bible-brm-kjv:jude': bibleParts('jude', 2, 1),
+};
+const BIBLE_BOOKS = [['jonah', 'Jonah'], ['jude', 'Jude']];
+
 /** The element the player lazily created on first play. */
 const el = () => FakeAudio.last;
 /** Media events arrive from outside React — they must re-render inside act(). */
@@ -105,6 +118,8 @@ afterEach(() => {
   if (typeof arbiter === 'function') document.removeEventListener('play', arbiter, true);
   delete globalThis.__votAudioArbiter;
   delete globalThis.AUDIO_MANIFEST;
+  delete globalThis.BIBLE_AUDIO_MANIFEST;
+  delete globalThis.BIBLE_AUDIO_BOOKS;
   delete globalThis.ReactDOM;
   delete globalThis.Audio;
   localStorage.removeItem('vot-audio-pos');
@@ -136,6 +151,35 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
 
     expect(title()).toBe('The Wide Path · Part 1');
     expect(document.querySelector('.audio-bar-part').textContent).toBe(' · Part 1');
+  });
+
+  /* A per-chapter Bible track carries BOTH a chapter title (C2-A/A4) and its
+     "Chapter N" part label, so the bar printed the number twice in one glance:
+     "Genesis 2 · Chapter 2". The label is still the data every consumer parses
+     — only the echo is suppressed, and only when the title already ends with
+     that number (2026-08-10). */
+  it('prints a Bible chapter ONCE — the title already carries the number', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
+    globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
+    render(<AudioPlayerBar />);
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV · BRM', chapterNum: 2 }));
+
+    expect(title()).toBe('Jonah 2');
+    expect(document.querySelector('.audio-bar-part')).toBeNull();
+    // The queue data is untouched — the jump-to-text and read credit read it.
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].partLabel).toBe('Chapter 2');
+  });
+
+  it('keeps a part label the title does not already spell out', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
+    globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
+    render(<AudioPlayerBar />);
+    // Jude is a one-part row, so its title stays plain "Jude" — the label is
+    // then the only place the chapter appears and must survive.
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: 'KJV · BRM' }));
+
+    expect(title()).toBe('Jude · Chapter 1');
+    expect(document.querySelector('.audio-bar-part').textContent).toBe(' · Chapter 1');
   });
 
   it('drops the body class when playback goes idle and again on unmount', () => {

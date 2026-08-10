@@ -59,3 +59,32 @@ describe('AboutScreen — page-aware CTA', () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 });
+
+/* B1 (2026-08-10). Page 2 is the app's own account of itself, and it had gone
+   stale in the one direction that matters: it promised "nothing is downloaded
+   except the Garden images" months after every Listen began streaming an MP3
+   from a GitHub release. The privacy promise underneath it (nothing of YOURS
+   leaves the device) was always true and stays; the download claim is now the
+   truth, and the Listening Library is named where the rest of the library is. */
+describe('AboutScreen — page 2 describes the app that actually shipped', () => {
+  const page2 = () => {
+    setupGlobals();
+    renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    return document.querySelector('.about-features').textContent;
+  };
+
+  it('no longer claims the Garden images are the only thing fetched', () => {
+    const text = page2();
+    expect(text).not.toMatch(/nothing is downloaded/i);
+    expect(text).toMatch(/Listen streams/i);
+  });
+
+  it('still promises the reader that their own data stays on the device', () => {
+    expect(page2()).toMatch(/your own data never leaves this device/i);
+  });
+
+  it('names the Listening Library among what the library holds', () => {
+    expect(page2()).toMatch(/Listening Library/);
+  });
+});

@@ -7,7 +7,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
+import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS, displayPartLabel } from '../../utils/audio-track.js';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -264,7 +264,10 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const single = !restoring && queue.length < 2;
   const headLine = [
     current.sub,
-    current.partLabel,
+    // Suppressed when it would only echo the <h2> directly above it — a
+    // per-chapter Bible track is titled "Genesis 2" and labelled "Chapter 2"
+    // (2026-08-10). The label itself is untouched; see displayPartLabel.
+    displayPartLabel(current.title, current.partLabel),
     reader,
     restoring || single ? null : (state.qi + 1) + ' of ' + queue.length,
   ].filter(Boolean).join(' · ') || 'The Volumes of Truth';

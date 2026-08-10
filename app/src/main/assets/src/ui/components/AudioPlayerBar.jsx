@@ -15,6 +15,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { displayPartLabel } from '../../utils/audio-track.js';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
@@ -47,6 +48,7 @@ export function AudioPlayerBar() {
   /** @type {Partial<import('../../utils/audio-player.js').Track>} */
   const track = queue[st.qi] || {};
   const reader = AudioPlayer.readerLabel(track.readerCode);
+  const part = displayPartLabel(track.title, track.partLabel);
   // Buffering is an ACTIVE session: toggle() on a loading element pauses it,
   // so the button must promise Pause — the same rule AudioManagerSheet
   // applies. Splitting them told a screen reader the opposite of the truth
@@ -107,7 +109,10 @@ export function AudioPlayerBar() {
           <span className="audio-bar-summary-text">
             <span className="audio-bar-title">
               {track.title || ''}
-              {track.partLabel ? <span className="audio-bar-part">{' · ' + track.partLabel}</span> : null}
+              {/* Silent when it would only repeat the title: a per-chapter
+                  Bible track is titled "Genesis 2" AND labelled "Chapter 2",
+                  so the bar read both (2026-08-10). See displayPartLabel. */}
+              {part ? <span className="audio-bar-part">{' · ' + part}</span> : null}
             </span>
             <span className="audio-bar-sub">
               <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>

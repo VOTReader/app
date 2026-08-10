@@ -985,10 +985,11 @@ describe('AudioManagerSheet — switching voice warns before discarding a queue'
 
 describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
   beforeEach(() => {
-    globalThis.BIBLE_AUDIO_BOOKS = [['psalms', 'Psalms']];
+    globalThis.BIBLE_AUDIO_BOOKS = [['psalms', 'Psalms'], ['jude', 'Jude']];
     globalThis.BIBLE_AUDIO_MANIFEST = {
       'bible-brm-kjv:psalms': Array.from({ length: 150 }, (_v, i) =>
         ['brm1_psalms_' + String(i + 1).padStart(3, '0'), '', 'Chapter ' + (i + 1)]),
+      'bible-brm-kjv:jude': [['brm2_jude_001', '', 'Chapter 1']],
     };
   });
   afterEach(() => {
@@ -1002,11 +1003,23 @@ describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
     openSheet();
 
     expect(screen.getByRole('heading', { name: 'Psalms 117' })).toBeTruthy();
-    expect(headSub()).toBe('KJV · Biblical Restoration Ministries · Chapter 117 · 1 of 34');
+    // The head line no longer repeats "Chapter 117" a line under a heading
+    // that already says 117 (2026-08-10, the title-unique rule). partLabel is
+    // untouched — the jump-to-text and the voice switch still read it.
+    expect(headSub()).toBe('KJV · Biblical Restoration Ministries · 1 of 34');
     // 150 rows that all read "Psalms" told the listener nothing about which
-    // one they were hearing; the sub-line still carries the chapter, so
-    // nothing was traded away for it.
+    // one they were hearing.
     expect(queueTitles().slice(0, 3)).toEqual(['Psalms 117', 'Psalms 118', 'Psalms 119']);
     expect(screen.getByRole('button', { name: 'Play now: Psalms 119' })).toBeTruthy();
+  });
+
+  it('a title that does NOT spell out the chapter keeps its label in the head', () => {
+    // One part is not a chapter list, so Jude keeps its plain title — and the
+    // part label is then the only place the chapter appears.
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: 'KJV · BRM' }));
+    openSheet();
+
+    expect(screen.getByRole('heading', { name: 'Jude' })).toBeTruthy();
+    expect(headSub()).toBe('KJV · BRM · Chapter 1');
   });
 });

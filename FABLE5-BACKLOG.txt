@@ -356,32 +356,41 @@ CAMPAIGN 2 QUEUE (written 2026-08-10, post-s9 triple recon — audio residuals /
 reading-flow / technical). Full evidence with file:line cites lives in the three
 recon reports; this is the adjudicated working order. Strike items as they land.
 
-C2-A  LISTENING TRUTH + CONTINUATION (the big one)
-  [A1] "Resume last" + every shelf row build a queue of ONE — a Bible chapter
-       dead-ends after ~4 min with next hidden. Rebuild the BOOK (Bible) or
-       collection-forward (letters) around the resumed track. M
-  [A2] recordPlayed fires on every auto-advance — one Genesis evening flushes
-       all letters out of the 30-cap recent shelf AND repoints "Resume last".
-       Record user-initiated plays only (the plays-counter precedent). S/M
-  [A3] Bible listening earns nothing: _notifyListened's same-key guard skips
-       every chapter but the book's last, and __votAudioListened resolves via
-       COL_BY_KEY (no bible-* entry) — no read counts, no streaks. Also
-       completions counts per-book vs per-chapter depending on queue shape.
-       Unify: per-chapter credit into the bible readItems key space. M
-  [A4] Desk queue rows + shelves title Bible tracks by BOOK ("Psalms" x150);
-       chapter lives in the sub-line; aria repeats it 150x. Title = chapter
-       for per-chapter editions. S/M
-  [A5] Matthew parity: matthew-ch has no Listen pill but the desk title-jump
-       lands there. Thread bibleAudio into MatthewChapterView. S/M
-  [A6] Positions polish: write floor t>=30s (skipping chapters files dead rows
-       into the 200-LRU); boundary write when a NEW queue replaces the old
-       (up to 5s lost today); desk restore misdescribes queue pre-tap;
-       window doesn't follow auto-advance while open; expanders silent to SR. S each
-  [A7] A11y/uniformity: sleep chips show armed state; Voice/Speed rows pick ONE
-       radio semantics; native media card carries the edition label. S each
-  [A8] Collection screen: Bible books offer chapter entry + the Text icon it
-       withholds (canOpenText excludes bible). S/M
-  [A9] completions milestone tier (the counter reaches no achievement). S
+C2-A  LISTENING TRUTH + CONTINUATION (the big one) — ALL DONE 2026-08-10
+      (de6665c = A1/A2/A3/A5 · 0c9dac7 = A4/A6/A7/A8/A9 + the switch warning;
+       the two owner directives landed first in 2647e70.)
+  [A1] DONE 2026-08-10 (de6665c). playTrack locates the recording in the LIVE
+       manifests by immutable URL and rebuilds around it — a Bible chapter gets
+       its book from that chapter forward, a letter its collection forward on
+       the named rendition/part. Only a URL no manifest carries still plays alone.
+  [A2] DONE 2026-08-10 (de6665c). recordPlayed left _start() for _countPlay()'s
+       four user-initiated entry points; the two counters are isolated so a
+       failing shelf write cannot cost the play count.
+  [A3] DONE 2026-08-10 (de6665c). Bible tracks notify PER TRACK regardless of
+       queue shape, carrying the chapter; __votAudioListened resolves bible-*
+       into the v1:<bookId>:<chapter> key space BibleChapterView already writes.
+  [A4] DONE 2026-08-10 (0c9dac7). _tracksFor titles per-chapter shapes by
+       chapter ("Psalms 117"); partLabel still carries "Chapter N" for the desk
+       head, the jump-to-text and the read credit.
+  [A5] DONE 2026-08-10 (de6665c). ChapterView's hero gained the pill, fed by
+       bibleAudio threaded through MatthewChapterView from the route's prop.
+  [A6] DONE 2026-08-10 (0c9dac7). 30s floor governs the WRITE path; a new queue
+       replacing the old is a boundary write; the desk says "Resuming…" instead
+       of describing a boot placeholder; the window follows auto-advance and the
+       expanders announce through a live region mounted empty.
+  [A7] DONE 2026-08-10 (0c9dac7). Sleep chips show the armed preset; Voice joins
+       Speed as radiogroup/radio/aria-checked; the media card's second line names
+       the EDITION for a Bible chapter.
+  [A8] DONE 2026-08-10 (0c9dac7). Bible rows gained the Text affordance the
+       blanket !bible gate withheld, plus a per-book chapter disclosure whose
+       taps start the book at that chapter.
+  [A9] DONE 2026-08-10 (0c9dac7). 'Heard to the End' (1/10/50/250/1000) reads
+       the completions counter, which had reached no achievement since it shipped.
+  [WARNING] DONE 2026-08-10 (0c9dac7, owner directive). A voice switch rebuilds
+       the queue from the corpus, so the two queues that cannot survive it ask
+       first through ConfirmStrip: one the listener reordered or pruned, and a
+       lone recording about to become a whole collection. Plain queues switch
+       on the first tap, unchanged.
 
 C2-B  TRUTH-AND-COPY PASS (one commit)
   [B1] About page 2 claims nothing is downloaded except Garden images — false

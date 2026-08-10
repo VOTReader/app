@@ -63,11 +63,13 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
           <div className="vol-index-eyebrow">Scriptures of Truth</div>
           <h1 className="vol-index-title">{book.title}</h1>
           <div className="vol-index-subtitle">{book.subtitle}</div>
-          {/* Whole-book audiobook (2026-08-09): one track per book, streamed
-              from the audio-bible release. The selected edition arrives via
-              bibleAudio (null = Settings 'Off' / unknown edition); a book the
-              edition's manifest doesn't carry self-hides the same way a
-              letter without a recording does. */}
+          {/* Recorded Bible edition (per-chapter since 2026-08-09; comment
+              corrected 2026-08-10). No chapter is named here — this is the
+              book index — so the book starts at its first chapter and
+              auto-advance carries on through the book. The selected edition
+              arrives via bibleAudio (null = Settings 'Off' / unknown edition);
+              a book the edition's manifest doesn't carry self-hides the same
+              way a letter without a recording does. */}
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
             <div className="hero-play-row">
               <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} />

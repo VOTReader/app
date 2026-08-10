@@ -1,11 +1,13 @@
 // @ts-check
 /* ═══════════════════════════════════════════════════════════════════════
-   audio-player — streaming audio-letter playback (singleton store)
+   audio-player — streaming playback for letters and Bible (singleton store)
    ═══════════════════════════════════════════════════════════════════════
-   Letters across the 14 VOT collections stream from immutable GitHub Release
-   assets. src/data/audio-manifest.js (auto-generated, rides bundle-a-vot)
-   maps corpus ids to asset ids; this module turns that into a queue and
-   drives ONE <audio> element.
+   Two corpora stream from immutable GitHub Release assets: letters across the
+   14 VOT collections (src/data/audio-manifest.js, auto-generated, rides
+   bundle-a-vot) and the recorded Bible editions, which are PER-CHAPTER —
+   1,189 tracks each (src/data/bible-audio-manifest.js, rides bundle-a). Both
+   map ids to asset ids; this module turns either into a queue and drives ONE
+   <audio> element. Deep reference: ARCHITECTURE.md § Audio subsystem.
 
    Store contract (the repo's useSyncExternalStore idiom):
      subscribe(cb) -> unsubscribe · getVersion() -> number · getState()
@@ -145,7 +147,9 @@ const _sections = () => _g().AUDIO_SECTIONS || null;
 const _alternates = () => _g().AUDIO_ALTERNATES || null;
 /** Bible-edition manifest — rides bundle-a (critical path), so it exists from boot. */
 const _bibleManifest = () => _g().BIBLE_AUDIO_MANIFEST || null;
-/** 'bible-*' volKeys stream whole-book audiobooks from the audio-bible release. */
+/** 'bible-*' volKeys stream a recorded Bible edition — per-chapter tracks off
+ *  that edition's own OT/NT release tags (the retired whole-book tracks on
+ *  audio-bible-v1 resolve through the same routing). */
 const _isBibleVol = (volKey) => typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
 /** The manifest a volKey's entries live in. */
 const _mapFor = (volKey) => (_isBibleVol(volKey) ? _bibleManifest() : _manifest());
@@ -868,10 +872,10 @@ function collectionHasAudio(volKey) {
 }
 
 /**
- * Play a whole-book Bible audiobook, queueing the ENTIRE edition positioned
- * at this book (the letters' album behavior, book-sized). Book order + titles
- * come from BIBLE_AUDIO_BOOKS, which ships in the same lazy bundle as the
- * Bible corpus — any screen showing a Listen pill has it by construction.
+ * Play a recorded Bible book, queueing THAT BOOK's chapters from the one
+ * tapped (the letters' album behavior, book-scoped). Book titles come from
+ * BIBLE_AUDIO_BOOKS, which ships in the same lazy bundle as the Bible corpus —
+ * any screen showing a Listen pill has it by construction.
  *
  * @param {{ volKey: string, bookId: string, label?: string | null, chapterNum?: number | null, noResume?: boolean }} opts
  * @returns {void}
@@ -885,10 +889,12 @@ function playBibleBook(opts) {
   // auto-advance ends where the book ends.
   const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));
   if (!items.length) return;
-  // Two edition shapes: PER-CHAPTER editions (WOP) carry one manifest part
-  // per chapter, so "play chapter N" is a queue POSITION; whole-book editions
-  // (BRM) carry one part per book, so it's a SEEK into the book track via
-  // BIBLE_AUDIO_CHAPTERS (loadedmetadata timing — the restore contract).
+  // Two edition SHAPES, and the branch is on the shape, not on the edition id
+  // — every shipped edition (BRM, WOP, WEB) is PER-CHAPTER, carrying one
+  // manifest part per chapter, so "play chapter N" is a queue POSITION. The
+  // retired whole-book shape carries one part per book, so there it is a SEEK
+  // into the book track via BIBLE_AUDIO_CHAPTERS (loadedmetadata timing — the
+  // restore contract). A fourth edition of either shape needs no change here.
   const m = _mapFor(o.volKey);
   const parts = (m && m[o.volKey + ':' + o.bookId]) || [];
   const perChapter = parts.length > 1;

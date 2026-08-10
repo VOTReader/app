@@ -24,6 +24,7 @@ import {
   audioReaderLabel,
   bibleAudioAssetUrl,
   bibleAudioEdition,
+  displayPartLabel,
   isVotAudioUrl,
   normalizeAudioTrack,
 } from './audio-track.js';
@@ -187,5 +188,39 @@ describe('audio-track — display registries the listening UI renders from', () 
   it('publishes both registries as globals for the classic-script screens', () => {
     expect(globalThis.BIBLE_AUDIO_EDITIONS).toBe(BIBLE_AUDIO_EDITIONS);
     expect(globalThis.AUDIO_READERS).toBe(AUDIO_READERS);
+  });
+});
+
+/* A per-chapter Bible edition titles each track by its chapter (C2-A/A4) and
+   still labels its part "Chapter N" — the authoritative chapter every consumer
+   parses. The mini-player bar and the listening desk therefore printed the
+   number twice in one glance ("Genesis 2 · Chapter 2"). displayPartLabel is the
+   display rule that stops the echo, and ONLY the echo. */
+describe('audio-track — displayPartLabel (the title-unique rule)', () => {
+  it('suppresses a chapter label the title already ends with', () => {
+    expect(displayPartLabel('Genesis 2', 'Chapter 2')).toBe(null);
+    expect(displayPartLabel('Psalms 117', 'Chapter 117')).toBe(null);
+    expect(displayPartLabel('1 Kings 3', 'Chapter 3')).toBe(null);
+  });
+
+  it('keeps a chapter label the title does NOT end with', () => {
+    // The trap the rule is built for: a naive "endsWith" would eat this one.
+    expect(displayPartLabel('Genesis 12', 'Chapter 2')).toBe('Chapter 2');
+    expect(displayPartLabel('Genesis', 'Chapter 2')).toBe('Chapter 2');
+    expect(displayPartLabel('Jude', 'Chapter 1')).toBe('Chapter 1');
+    expect(displayPartLabel('2 John', 'Chapter 2')).toBe('Chapter 2');
+  });
+
+  it('never touches a label that is not a chapter', () => {
+    expect(displayPartLabel('The Wide Path', 'Part 1')).toBe('Part 1');
+    expect(displayPartLabel('The Wide Path 2', 'Part 2')).toBe('Part 2');
+    expect(displayPartLabel('Recompense', 'Addendum')).toBe('Addendum');
+  });
+
+  it('answers null for the tracks that carry no label at all', () => {
+    expect(displayPartLabel('The Seventh Day', null)).toBe(null);
+    expect(displayPartLabel('The Seventh Day', '')).toBe(null);
+    expect(displayPartLabel('The Seventh Day', undefined)).toBe(null);
+    expect(displayPartLabel(null, 'Chapter 2')).toBe('Chapter 2');
   });
 });

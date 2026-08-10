@@ -1506,7 +1506,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     >
       <div className="settings-screen">
         <div className="settings-header">
-          <div className="settings-eyebrow">VOT Study Bible</div>
+          <div className="settings-eyebrow">VOTReader</div>
           <h1 className="settings-title">Settings</h1>
           <div className="settings-ornament">
             <div className="settings-ornament-line" />
@@ -1663,7 +1663,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Listening"
               title="Bible Audio"
               label="Bible Audio"
-              desc="Recorded voice for the whole-book Listen button on Bible chapter indexes. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
+              desc="Recorded voice for the Listen button on Bible books and chapters. Every edition is recorded a chapter at a time, so Listen starts at the chapter you are on. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
               value={settings.bibleAudio || "brm-kjv"}
               options={[
                 /* Registry source of truth: utils/audio-track.js
@@ -1671,7 +1671,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                    classic-globals screen). 'Off' is appended locally. */
                 ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => ({
                   id, label: /** @type {any} */ (ed).label,
-                  desc: 'Whole-book audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
+                  /* B2 (2026-08-10): "Whole-book audiobook" was true of BRM
+                     for one day in s3. All three shipped editions are 1,189
+                     per-chapter recordings. */
+                  desc: 'Per-chapter audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
                 })),
                 { id: "off", label: "Off", desc: "Hide the Bible Listen button" },
               ]}

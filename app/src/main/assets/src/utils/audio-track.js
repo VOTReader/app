@@ -211,6 +211,42 @@ export function normalizeAudioTrack(value) {
   };
 }
 
+/**
+ * The part label a player surface should PRINT beside a title — or null when
+ * printing it would only echo the title back.
+ *
+ * Since the per-chapter Bible editions began titling each track by its chapter
+ * (2026-08-10, C2-A/A4), a chapter carries BOTH `title` "Genesis 2" and
+ * `partLabel` "Chapter 2": the bar read "Genesis 2 · Chapter 2" and the desk's
+ * head line said the number a third time in the same glance. The part label is
+ * still the authoritative chapter (the jump-to-text, the read credit and the
+ * voice switch all parse it), so it is the DISPLAY that suppresses, never the
+ * data.
+ *
+ * The rule is deliberately narrow — TITLE-UNIQUE: suppress only when the title
+ * already ends with the exact number the label names, as a separate word. So
+ * "Chapter 2" beside "Genesis 12" survives (2 is not that title's last word),
+ * as does every non-chapter label ("Part 2", "Addendum") and every Bible track
+ * whose title names no chapter (a legacy whole-book recording).
+ *
+ * @param {unknown} title
+ * @param {unknown} partLabel
+ * @returns {string | null}
+ */
+export function displayPartLabel(title, partLabel) {
+  const label = typeof partLabel === 'string' ? partLabel.trim() : '';
+  if (!label) return null;
+  const match = label.match(/^Chapter (\d+)$/);
+  if (!match) return label;
+  const text = typeof title === 'string' ? title.trim() : '';
+  const number = match[1];
+  const at = text.length - number.length;
+  // A separate trailing word: the digits must end the title AND be preceded by
+  // a space (never by another digit, which is what makes "Genesis 12" safe).
+  if (at > 0 && text.slice(at) === number && /\s/.test(text.charAt(at - 1))) return null;
+  return label;
+}
+
 /* ── durable-resume policy ────────────────────────────────────────────────
    Shared here rather than owned by the player, because the Listening Library
    surfaces have to describe the SAME judgment the player acts on: a row that
