@@ -76,7 +76,8 @@ afterEach(() => {
   AudioPlayer.stop();   // public reset — a second module instance would fork the singleton
   cleanup();
   for (const key of ['ScreenLayout', 'LibraryNav', 'COL_BY_KEY', 'colPreface', 'colLetterArr',
-    'AUDIO_MANIFEST', 'AUDIO_ALTERNATES', 'AUDIO_SECTIONS', 'BIBLE_AUDIO_BOOKS', 'BIBLE_AUDIO_MANIFEST', 'Audio']) delete globalThis[key];
+    'AUDIO_MANIFEST', 'AUDIO_ALTERNATES', 'AUDIO_SECTIONS', 'BIBLE_AUDIO_BOOKS', 'BIBLE_AUDIO_MANIFEST',
+    'AudioPositionsStore', 'Audio']) delete globalThis[key];
   localStorage.removeItem('vot-audio-pos');
 });
 
@@ -141,6 +142,19 @@ describe('AudioCollectionScreen -- a VOT collection', () => {
     renderScreen('one', { onOpenText });
     fireEvent.click(screen.getByRole('button', { name: 'Open text for Letter A' }));
     expect(onOpenText).toHaveBeenCalledWith({ key: 'one:letter-a' });
+  });
+
+  it('a row says how much of its recording is left, from the part the reader is in', () => {
+    // Letter C is two parts and only its SECOND is remembered — which is the
+    // whole point: a part heard to its end has its record deleted, so the
+    // first surviving one is where the reader actually stands.
+    globalThis.AudioPositionsStore = {
+      subscribe: () => () => {}, getVersion: () => 0,
+      getPosition: (track) => ((track && track.url) === URL_OF('idC2') ? { t: 300, d: 900 } : null),
+    };
+    renderScreen('one');
+    expect(screen.getByText('10:00 left')).toBeTruthy();
+    expect(screen.getAllByText(/left$/)).toHaveLength(1);   // Letter A stays unannotated
   });
 });
 

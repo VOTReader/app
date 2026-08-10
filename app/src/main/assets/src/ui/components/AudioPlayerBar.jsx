@@ -16,18 +16,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
-
-/**
- * m:ss — floored, zero-padded seconds. Minutes are uncapped on purpose:
- * a 90-minute letter reads "90:00", not "1:30:00".
- * @param {number} s
- * @returns {string}
- */
-function fmt(s) {
-  const t = Math.max(0, Math.floor(s || 0));
-  const sec = t % 60;
-  return Math.floor(t / 60) + ':' + (sec < 10 ? '0' : '') + sec;
-}
+import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
 export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -64,14 +53,9 @@ export function AudioPlayerBar() {
   // for the whole cold start.
   const active = st.status === 'playing' || st.status === 'loading';
 
-  // A slider must never advertise max=0 while its value grows — the same
-  // a11y defect class already fixed once in JournalAudioBlock. Duration is 0
-  // until metadata lands, so the range is floored at 1 and disabled instead.
+  // Only the CLOCK is read here now; the range input's floor/clamp/paint rules
+  // live in AudioSeekSlider, shared with the listening desk.
   const dur = Math.max(0, Math.floor(st.duration || 0));
-  const max = Math.max(1, dur);
-  // Unknown length ⇒ an empty track, not a full one: clamping a real elapsed
-  // time into the floored max=1 painted the disabled slider at 100%.
-  const pos = dur === 0 ? 0 : Math.min(max, Math.max(0, Math.floor(st.time || 0)));
 
   return (
     <>
@@ -124,18 +108,7 @@ export function AudioPlayerBar() {
             </span>
           </span>
         </button>
-        <input
-          type="range"
-          className="audio-bar-seek"
-          min={0}
-          max={max}
-          step={1}
-          value={pos}
-          disabled={dur === 0}
-          aria-label="Seek"
-          aria-valuetext={fmt(st.time) + ' of ' + (dur ? fmt(dur) : 'unknown length')}
-          onChange={(e) => AudioPlayer.seek(+e.target.value)}
-        />
+        <AudioSeekSlider className="audio-bar-seek" ariaLabel="Seek" time={st.time} duration={st.duration} />
       </div>
 
       {queue.length > 1 && (

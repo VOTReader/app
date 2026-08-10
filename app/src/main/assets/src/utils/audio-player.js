@@ -27,6 +27,9 @@
 import { showToast } from './toast.js';
 import {
   AUDIO_BIBLE_RELEASE_PREFIX,
+  AUDIO_RESUME_END_FRACTION,
+  AUDIO_RESUME_MIN_SEC,
+  AUDIO_RESUME_REWIND_SEC,
   audioAssetUrl,
   bibleAudioAssetUrl,
   isVotAudioUrl,
@@ -116,6 +119,9 @@ const _volHasAudio = new Map();
 const _g = () => /** @type {any} */ (globalThis);
 /** AudioLibraryStore lives in bundle-b; resolve it at call time to avoid a second bundled singleton. */
 const _library = () => _g().AudioLibraryStore || null;
+/** AudioPositionsStore is the same bundle and the same rule — the per-recording
+ *  resume map is reached by runtime bridge, never imported from bundle-d. */
+const _positions = () => _g().AudioPositionsStore || null;
 /** @returns {Record<string, Array<any[]>> | null} */
 const _manifest = () => _g().AUDIO_MANIFEST || null;
 /** @returns {Record<string, Array<any[]>> | null} */
@@ -411,7 +417,17 @@ function _ensureEl() {
   // Fires while the CURRENT track buffers, including when paused — the last
   // one lands right as it finishes, which is exactly when warming may begin.
   el.addEventListener('progress', () => _maybePrefetchNext());
-  el.addEventListener('ended', () => { _notifyListened(); next(); });
+  // Both the listen-count bridge and the position map read PRE-advance state,
+  // so they run in this slot, before next() moves qi.
+  el.addEventListener('ended', () => {
+    const finished = _state.queue[_state.qi];
+    _notifyListened();
+    // A recording heard to its end has no place to return to. Drop the record,
+    // and flag the URL so the advance can't write the ending clock back in.
+    _finishedUrl = (finished && finished.url) || null;
+    _forgetPosition(_finishedUrl);
+    try { next(); } finally { _finishedUrl = null; }
+  });
   el.addEventListener('error', _onError);
 
   _el = el;
@@ -735,12 +751,10 @@ function playBibleBook(opts) {
     startPartIndex: perChapter && Number.isInteger(n) && n >= 2 ? Math.min(n - 1, parts.length - 1) : 0,
   });
   if (perChapter) return;
-  const at = bibleChapterStart(o.volKey, o.bookId, o.chapterNum);
-  if (at > 0 && _el) {
-    _el.addEventListener('loadedmetadata', () => {
-      try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — book start */ }
-    }, { once: true });
-  }
+  // A whole-book edition seeks INTO the book track. The chapter the reader
+  // actually tapped outranks a remembered position: playCollection queued its
+  // resume listener first, so this one — added second — wins the assignment.
+  _seekOnMetadata(bibleChapterStart(o.volKey, o.bookId, o.chapterNum));
 }
 
 /**
@@ -893,7 +907,125 @@ let _pendingRestore = /** @type {any} */ (null);
 /** Last persisted whole-second, so the 1 Hz tick writes every ~5s, not 1 Hz. */
 let _lastPersistSec = -1;
 
+/* ── durable per-recording positions (owner directive 2026-08-09) ─────────
+   The snapshot above is ONE slot — it remembers the last thing playing, so
+   starting anything else forgets where the reader was in everything else.
+   AudioPositionsStore (bundle-b, reached by the fail-quiet globalThis bridge)
+   holds the per-recording map beside it: URL → {t, d, at}.
+
+   Everything here is best-effort by construction. Playback must never depend
+   on the store: every call is wrapped, a missing bridge is a no-op, and the
+   writes are throttled so a scrub or a busy tick can't become an IDB storm. */
+
+/** Floor between position writes, ms. */
+const POSITION_WRITE_MS = 1000;
+
+/** Epoch ms of the last position write — the >= 1/s throttle. */
+let _lastPositionWriteAt = 0;
+/** URL of a track that just played to its end. Its record was deliberately
+ *  deleted, so the advance it triggers must not write the position back. */
+let _finishedUrl = /** @type {string | null} */ (null);
+
+/**
+ * Remember where a track was left. Skipped for a zero clock: `_start()` sets
+ * `_state.time = 0` before metadata lands, and a piggybacked write there would
+ * erase the very record a resume is about to read.
+ *
+ * @param {Track | null | undefined} track
+ * @param {number} time
+ * @param {number} duration
+ * @param {boolean} [force] - bypass the throttle at a deliberate boundary
+ *   (track change, stop, the ✕) where losing the write loses the position.
+ * @returns {void}
+ */
+function _rememberPosition(track, time, duration, force) {
+  try {
+    const t = Number(time) || 0;
+    if (!track || !track.url || !(t > 0)) return;
+    if (_finishedUrl && track.url === _finishedUrl) return;
+    const now = Date.now();
+    if (!force && now - _lastPositionWriteAt < POSITION_WRITE_MS) return;
+    const store = _positions();
+    if (!store || typeof store.setPosition !== 'function') return;
+    _lastPositionWriteAt = now;
+    store.setPosition(track, t, Number(duration) || 0);
+  } catch (_e) { /* position memory must never stand between a tap and audio */ }
+}
+
+/** Write the CURRENT track's position — the piggyback for `_persist()`. */
+function _rememberCurrentPosition(force) {
+  _rememberPosition(_state.queue[_state.qi], _state.time, _state.duration, force);
+}
+
+/**
+ * R8 — the position belongs to the track being LEFT. Every transport move that
+ * mutates `_state.qi` calls this FIRST, or the outgoing clock lands on the
+ * incoming recording.
+ *
+ * @returns {void}
+ */
+function _rememberOutgoingPosition() {
+  _rememberCurrentPosition(true);
+}
+
+/** @param {string | null} url @returns {void} */
+function _forgetPosition(url) {
+  try {
+    const store = _positions();
+    if (url && store && typeof store.clearPosition === 'function') store.clearPosition(url);
+  } catch (_e) { /* same rule: the map is an enhancement, never a dependency */ }
+}
+
+/**
+ * Where a track should start, given what the map remembers. 0 means "from the
+ * top" — either nothing is remembered, the listener barely began, or they
+ * reached the tail (which reads as finished, not as a place to return to).
+ *
+ * A record with an UNKNOWN length (d = 0, metadata never arrived) resumes on
+ * the clock alone: not knowing how long a recording runs is no reason to throw
+ * away an hour of it.
+ *
+ * EMERGENT AND CORRECT: a recording shorter than ~31s can never resume, since
+ * `t >= 30` and `t < 0.97 * d` together require d > 30 / 0.97 ≈ 30.9. Nothing
+ * that brief is worth resuming — restarting it costs the listener half a
+ * minute, and the rewind nudge would land at or before its beginning anyway.
+ *
+ * @param {Track | null | undefined} track
+ * @returns {number} seconds to seek to, 0 for no resume
+ */
+function _resumeAt(track) {
+  try {
+    const store = _positions();
+    if (!track || !track.url || !store || typeof store.getPosition !== 'function') return 0;
+    const saved = store.getPosition(track.url);
+    if (!saved) return 0;
+    const t = Number(saved.t) || 0;
+    const d = Number(saved.d) || 0;
+    if (!(t >= AUDIO_RESUME_MIN_SEC)) return 0;
+    if (d > 0 && t >= d * AUDIO_RESUME_END_FRACTION) return 0;
+    return Math.max(0, t - AUDIO_RESUME_REWIND_SEC);
+  } catch (_e) { return 0; }
+}
+
+/**
+ * Seek once the element can honor it. `loadedmetadata` is the earliest safe
+ * moment — a currentTime assignment before that is ignored or throws. This IS
+ * the boot-restore timing contract; every deferred seek in this module uses it.
+ *
+ * @param {number} at
+ * @returns {void}
+ */
+function _seekOnMetadata(at) {
+  if (!(at > 0) || !_el) return;
+  _el.addEventListener('loadedmetadata', () => {
+    try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
+  }, { once: true });
+}
+
 function _persist() {
+  // Durable per-recording memory rides the same call sites as the boot
+  // snapshot, and ahead of its localStorage guard: the two are independent.
+  _rememberCurrentPosition(false);
   try {
     if (typeof localStorage === 'undefined') return;
     const src = _pendingRestore || _source;
@@ -1134,13 +1266,10 @@ async function _rebuildRestoredQueue() {
   _state.queue = queue;
   _state.qi = qi;
   _start();
-  // Seek once the element can honor it; loadedmetadata is the earliest safe
-  // moment (currentTime assignment before that is ignored or throws).
-  if (resumeAt > 0 && _el) {
-    _el.addEventListener('loadedmetadata', () => {
-      try { /** @type {HTMLAudioElement} */ (_el).currentTime = resumeAt; } catch (_e) { /* unseekable — start over */ }
-    }, { once: true });
-  }
+  // The snapshot's own clock is authoritative here — it is the freshest thing
+  // known about this exact track — so the boot restore does NOT consult the
+  // per-recording map. Unchanged behavior; only the seek call is now shared.
+  _seekOnMetadata(resumeAt);
 }
 
 /* ── playback entry points ────────────────────────────────────────────── */
@@ -1198,6 +1327,7 @@ function playLetter(opts) {
   _state.qi = 0;
   _countPlay();
   _start();
+  _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
 }
 
 /**
@@ -1261,6 +1391,9 @@ function playCollection(opts) {
   _state.qi = 0;
   _countPlay();
   _start();
+  // Durable resume consults the STARTING track only: everything queued behind
+  // it is being reached in order, from its beginning.
+  _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
 }
 
 /**
@@ -1311,6 +1444,9 @@ function playTrack(track) {
   _state.qi = 0;
   _countPlay();
   _start();
+  // What makes every Listening Library row and "Resume last" pick up where the
+  // reader left off instead of restarting from zero.
+  _seekOnMetadata(_resumeAt(normalized));
 }
 
 /* ── transport ────────────────────────────────────────────────────────── */
@@ -1361,6 +1497,7 @@ function toggle() {
 function next() {
   if (!_state.queue.length) return;
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
   if (_state.qi + 1 >= _state.queue.length) { stop(); return; }
   _state.qi++;
   _start();
@@ -1378,6 +1515,7 @@ function prev() {
   if (!_state.queue.length) return;
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   if (_el && (_el.currentTime || 0) > PREV_RESTART_SEC) { seek(0); return; }
+  _rememberOutgoingPosition();   // R8 — same rule stepping backwards
   _state.qi = Math.max(0, _state.qi - 1);
   _start();
   _lastPersistSec = -1;
@@ -1489,6 +1627,7 @@ function playAt(index) {
   if (_pendingRestore || !_state.queue.length) return;
   const nextIndex = Math.floor(Number(index));
   if (!Number.isFinite(nextIndex) || nextIndex < 0 || nextIndex >= _state.queue.length) return;
+  _rememberOutgoingPosition();   // R8 — the jumped-away-from track keeps its clock
   _state.qi = nextIndex;
   _start();
   _lastPersistSec = -1;
@@ -1558,7 +1697,11 @@ function clearUpcoming() {
  */
 function stop() {
   const wasActive = _state.status !== 'idle';
-  // The ✕ means "I'm done with this" — a later boot must not resurrect it.
+  // The ✕ means "I'm done with THIS SESSION", not "forget where I was": the
+  // per-recording map survives, so closing the bar no longer erases the place
+  // in a 90-minute reading. Written before the live state is cleared.
+  _rememberCurrentPosition(true);
+  // The boot snapshot is the part that must not resurrect the bar.
   _pendingRestore = null;
   _source = null;
   _clearPersist();

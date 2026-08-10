@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 507 distinct identifiers.
+// Total: 508 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -31,6 +31,7 @@ declare const AudioManagerSheet: any;
 declare const AudioPlayButton: any;
 declare const AudioPlayer: any;
 declare const AudioPlayerBar: any;
+declare const AudioPositionsStore: any;
 declare const AudioSavedScreen: any;
 declare const AudioSectionChips: any;
 declare const AudioVolumesScreen: any;

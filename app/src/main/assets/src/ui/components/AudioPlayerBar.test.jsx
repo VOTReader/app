@@ -268,6 +268,85 @@ describe('AudioPlayerBar — inline seek', () => {
   });
 });
 
+describe('AudioPlayerBar — the scrub commits on release', () => {
+  /** A known-length track, 30s in. */
+  function playWithLength() {
+    playSingleLetter();
+    act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
+    act(() => { el().currentTime = 30; el().dispatchEvent(new Event('timeupdate')); });
+  }
+  const bubble = () => document.querySelector('.audio-seek-bubble');
+
+  it('previews under the finger and seeks ONCE when it lifts', () => {
+    render(<AudioPlayerBar />);
+    playWithLength();
+
+    const input = seekInput();
+    fireEvent.pointerDown(input);
+    fireEvent.change(input, { target: { value: '90' } });
+    fireEvent.change(input, { target: { value: '150' } });
+
+    // Nothing committed yet: with a durable position store behind seek(), a
+    // commit per drag pixel would be a seek + a write per pixel.
+    expect(el().currentTime).toBe(30);
+    expect(AudioPlayer.getState().time).toBe(30);
+    expect(clock()).toBe('0:30 / 4:00');
+    // …while the thumb and its readout follow the drag.
+    expect(seekInput().value).toBe('150');
+    expect(bubble().textContent).toBe('2:30');
+
+    fireEvent.pointerUp(input);
+    expect(el().currentTime).toBe(150);
+    expect(AudioPlayer.getState().time).toBe(150);
+    expect(bubble()).toBeNull();
+  });
+
+  it('commits immediately when no pointer is down — the keyboard path', () => {
+    render(<AudioPlayerBar />);
+    playWithLength();
+
+    // An arrow key fires the same value change with no pointer involved; a
+    // keyboard listener must not have to lift a finger to be heard.
+    fireEvent.change(seekInput(), { target: { value: '60' } });
+    expect(el().currentTime).toBe(60);
+    expect(bubble()).toBeNull();
+  });
+
+  it('a cancelled gesture drops the preview and leaves the clock alone', () => {
+    render(<AudioPlayerBar />);
+    playWithLength();
+
+    const input = seekInput();
+    fireEvent.pointerDown(input);
+    fireEvent.change(input, { target: { value: '200' } });
+    expect(bubble()).toBeTruthy();
+
+    fireEvent.pointerCancel(input);
+    expect(bubble()).toBeNull();
+    expect(el().currentTime).toBe(30);          // the store's position re-asserts
+    expect(seekInput().value).toBe('30');
+  });
+
+  it('paints the played portion from the position percent', () => {
+    render(<AudioPlayerBar />);
+    playWithLength();
+    // ONE inline custom property drives both engines' track pseudo-elements.
+    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 12.50%');
+
+    act(() => { el().currentTime = 120; el().dispatchEvent(new Event('timeupdate')); });
+    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 50.00%');
+  });
+
+  it('paints an unknown length EMPTY rather than full', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    act(() => { el().currentTime = 123; el().dispatchEvent(new Event('timeupdate')); });
+    expect(seekInput().disabled).toBe(true);
+    expect(seekInput().value).toBe('0');
+    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 0.00%');
+  });
+});
+
 describe('AudioPlayerBar — the listening desk disclosure', () => {
   it('opens AudioManagerSheet from the summary button, portalled out of the bar', () => {
     const { container } = render(<AudioPlayerBar />);

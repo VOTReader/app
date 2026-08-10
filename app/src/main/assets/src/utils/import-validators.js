@@ -76,6 +76,7 @@ const STORE_SHAPES = {
   'vot-reading-stats': 'object',           // {totalWordsRead, wordsByDay, progress, …}
   'vot-garden-pos': 'object',              // {lastPage}
   'vot-audio-library': 'object',           // {saved, recent, rate}; store normalizes nested fields
+  'vot-audio-positions': 'object',         // {positions}; store re-checks every URL key + clamps
   'vot-state': 'object',                   // {tabs?, settings?, …} — store does NOT coerce
   'vot-bookmarks': 'array',
   'vot-links': 'array',

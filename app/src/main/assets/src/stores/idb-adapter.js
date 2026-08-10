@@ -76,7 +76,9 @@ export const IDBAdapter = (function () {
   // STORE_SET no longer lists it).
   // 9 — added vot-audio-library (saved recordings, recent listening, and
   // playback-rate preference). The onupgradeneeded guard keeps this additive.
-  const DB_VERSION = 9;
+  // 10 — added vot-audio-positions (durable per-recording resume points: a
+  // bounded URL → {t,d,at} map, LRU-capped at 200). Same additive pattern.
+  const DB_VERSION = 10;
 
   /**
    * The persistent `vot-*` stores, plus the `meta` store for migration
@@ -113,6 +115,7 @@ export const IDBAdapter = (function () {
     'vot-garden-pos',
     'vot-ann-hint-dismissed',
     'vot-audio-library',
+    'vot-audio-positions',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

@@ -728,6 +728,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (audioLibraryStore) {
       stores['vot-audio-library'] = { store: audioLibraryStore, method: 'replaceAll' };
     }
+    // Same bundle, same guard — where the reader is inside each recording.
+    const audioPositionsStore = /** @type {any} */ (globalThis).AudioPositionsStore;
+    if (audioPositionsStore) {
+      stores['vot-audio-positions'] = { store: audioPositionsStore, method: 'replaceAll' };
+    }
     return stores;
   };
   /**

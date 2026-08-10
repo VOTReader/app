@@ -16,7 +16,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
-import { ChevronIcon, PauseIcon, PlayIcon, TextIcon } from '../components/AudioShelf.jsx';
+import { ChevronIcon, PauseIcon, PlayIcon, TextIcon, renditionRemainingLabel, useAudioPositions } from '../components/AudioShelf.jsx';
 
 /** 'bible-*' volKeys are whole-book audiobook editions, not letter collections. */
 function isBibleVol(volKey) {
@@ -69,6 +69,7 @@ function itemNoun(col, count) {
  */
 export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening Library', onOpenText, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useAudioPositions();
 
   const bible = isBibleVol(volKey);
   // Letter audio needs the lazy VOT corpus (registry + manifest); the Bible
@@ -165,6 +166,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const parts = primary ? primary.tracks.length : 0;
                 const reader = primary ? AudioPlayer.readerLabel(primary.reader) : null;
                 const meta = [parts > 1 ? parts + ' parts' : null, reader].filter(Boolean).join(' · ');
+                const remaining = primary ? renditionRemainingLabel(primary.tracks) : '';
                 const voicesOpen = openVoices === item.id;
                 return (
                   <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '')}>
@@ -183,6 +185,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                         {meta ? <small>{meta}</small> : null}
                       </div>
                       <div className="audio-library-row-actions">
+                        {remaining ? <span className="audio-library-remaining">{remaining}</span> : null}
                         {renditions.length > 1 ? (
                           <button
                             type="button"

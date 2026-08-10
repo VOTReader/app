@@ -115,6 +115,7 @@ afterEach(() => {
   delete globalThis.AUDIO_SECTIONS;
   delete globalThis.AUDIO_ALTERNATES;
   delete globalThis.AudioLibraryStore;
+  delete globalThis.AudioPositionsStore;
   delete globalThis.__votAudioArbiter;
   delete globalThis.Audio;
   delete window.AndroidBridge;
@@ -1103,6 +1104,185 @@ describe('audio-player — durable resume (position survives restart)', () => {
   });
 });
 
+describe('audio-player — durable per-recording positions', () => {
+  /* AudioPositionsStore rides bundle-b; the player only ever sees it through
+     the fail-quiet globalThis bridge, so an in-memory stand-in with the same
+     three methods is the whole contract. */
+  const urlOf = (value) => (typeof value === 'string' ? value : (value && value.url) || '');
+  function installPositions(seed) {
+    const map = new Map(Object.entries(seed || {}));
+    const store = {
+      map,
+      getPosition: vi.fn((value) => map.get(urlOf(value)) || null),
+      setPosition: vi.fn((value, t, d) => { map.set(urlOf(value), { t, d }); }),
+      clearPosition: vi.fn((value) => { map.delete(urlOf(value)); }),
+    };
+    globalThis.AudioPositionsStore = store;
+    return store;
+  }
+  const tick = (t) => { el().currentTime = t; el().dispatchEvent(new Event('timeupdate')); };
+  const meta = (duration) => { el().duration = duration; el().dispatchEvent(new Event('loadedmetadata')); };
+  const SOLO = { key: 'vol2:solo', title: 'Solo', sub: 'Volume Two', url: URL_OF('idSolo'), readerCode: 'M', partLabel: null };
+
+  it('resumes a remembered recording five seconds before where it was left', () => {
+    installPositions({ [URL_OF('idSolo')]: { t: 300, d: 1200 } });
+    AudioPlayer.playTrack(SOLO);
+    expect(el().src).toBe(URL_OF('idSolo'));
+    expect(el().currentTime).toBe(0);      // pre-metadata the seek is deferred…
+    meta(1200);
+    expect(el().currentTime).toBe(295);    // …then lands with the context nudge
+  });
+
+  it('does not resume a recording barely begun (under 30s)', () => {
+    installPositions({ [URL_OF('idSolo')]: { t: 29.9, d: 1200 } });
+    AudioPlayer.playTrack(SOLO);
+    meta(1200);
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('does not resume a recording already at its tail (97% or past)', () => {
+    installPositions({ [URL_OF('idSolo')]: { t: 1164, d: 1200 } });   // exactly 97%
+    AudioPlayer.playTrack(SOLO);
+    meta(1200);
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('still resumes when the length was never recorded', () => {
+    // Not knowing how long a recording runs is no reason to throw away an
+    // hour of it — the tail test is simply skipped.
+    installPositions({ [URL_OF('idSolo')]: { t: 3000, d: 0 } });
+    AudioPlayer.playTrack(SOLO);
+    meta(4000);
+    expect(el().currentTime).toBe(2995);
+  });
+
+  it('a recording of ~31s or less can NEVER resume — emergent, and CORRECT', () => {
+    // `t >= 30` and `t < 0.97 * d` have no common solution until d exceeds
+    // 30 / 0.97 ≈ 30.93, so nothing at or under half a minute can ever resume,
+    // whatever is stored for it. That is the RIGHT answer, not an oversight: a
+    // clip that short is cheaper to hear again than to be dropped into, and the
+    // 5s nudge would land at or before its own beginning. Pinned here so that
+    // changing either threshold is a decision someone makes on purpose.
+    const positions = installPositions({ [URL_OF('idSolo')]: { t: 29.9, d: 30 } });
+    AudioPlayer.playTrack(SOLO);
+    meta(30);
+    expect(el().currentTime).toBe(0);          // below the 30s floor
+
+    AudioPlayer.stop();
+    positions.map.set(URL_OF('idSolo'), { t: 30, d: 30 });   // the only other candidate
+    AudioPlayer.playTrack(SOLO);
+    meta(30);
+    expect(el().currentTime).toBe(0);          // …and it is already "finished"
+  });
+
+  it('playLetter resumes the letter it starts', () => {
+    installPositions({ [URL_OF('idC')]: { t: 480, d: 1500 } });
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    meta(1500);
+    expect(el().currentTime).toBe(475);
+  });
+
+  it('playCollection consults the STARTING track only', () => {
+    installPositions({
+      [URL_OF('idPreface')]: { t: 240, d: 900 },
+      [URL_OF('idA1')]: { t: 500, d: 900 },
+    });
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    meta(900);
+    expect(el().currentTime).toBe(235);        // the preface's own remembered place
+
+    // Walking forward starts the next recording at its beginning: only the
+    // track the listener actually chose is consulted.
+    AudioPlayer.next();
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('a recording heard to its end is forgotten, and the advance cannot write it back', () => {
+    const positions = installPositions();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    tick(40);
+    expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 40, d: 0 });
+
+    el().dispatchEvent(new Event('ended'));
+    expect(positions.clearPosition).toHaveBeenCalledWith(URL_OF('idC'));
+    expect(positions.map.has(URL_OF('idC'))).toBe(false);
+  });
+
+  it('attributes the clock to the track being LEFT, not the one starting (R8)', () => {
+    const positions = installPositions();
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 420;
+    tick(200);
+    positions.setPosition.mockClear();
+
+    AudioPlayer.next();
+    expect(positions.setPosition).toHaveBeenCalledTimes(1);
+    expect(positions.setPosition.mock.calls[0][0].url).toBe(URL_OF('idPreface'));
+    expect(positions.setPosition.mock.calls[0][1]).toBe(200);
+    expect(positions.map.get(URL_OF('idPreface'))).toEqual({ t: 200, d: 420 });
+    expect(positions.map.has(URL_OF('idA1'))).toBe(false);   // nothing landed on the new track
+  });
+
+  it('closing the bar keeps the place in the recording', () => {
+    const positions = installPositions();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 3600;
+    tick(1800);
+
+    AudioPlayer.stop();
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);                 // the one-slot snapshot goes
+    expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 1800, d: 3600 });   // the memory does not
+  });
+
+  it('writes at most once a second, and always at a boundary', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-09T12:00:00Z'));
+      const positions = installPositions();
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      el().duration = 600;
+      el().dispatchEvent(new Event('durationchange'));
+
+      AudioPlayer.seek(100);
+      AudioPlayer.seek(150);
+      AudioPlayer.seek(200);
+      expect(positions.setPosition).toHaveBeenCalledTimes(1);   // a drag cannot storm the store
+
+      vi.advanceTimersByTime(1100);
+      AudioPlayer.seek(250);
+      expect(positions.setPosition).toHaveBeenCalledTimes(2);
+
+      AudioPlayer.stop();                                       // a boundary always lands
+      expect(positions.setPosition).toHaveBeenCalledTimes(3);
+      expect(positions.map.get(URL_OF('idC'))).toEqual({ t: 250, d: 600 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('plays exactly the same with no positions store, or one that throws', () => {
+    delete globalThis.AudioPositionsStore;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    tick(40);
+    expect(AudioPlayer.getState().status).toBe('playing');
+    AudioPlayer.stop();
+
+    const boom = () => { throw new Error('store is on fire'); };
+    globalThis.AudioPositionsStore = { getPosition: boom, setPosition: boom, clearPosition: boom };
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    tick(40);
+    expect(AudioPlayer.getState().status).toBe('playing');
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().status).toBe('idle');
+  });
+});
+
 describe('audio-player — prewarm (instant-tap pipe warming)', () => {
   it('points the idle element at the letter’s first track without changing state', () => {
     AudioPlayer.prewarm('vol1', 'letter-a');
@@ -1265,6 +1445,24 @@ describe('audio-player — Bible chapter seek (whole-book track + offset index)'
     el().duration = 13414;
     el().dispatchEvent(new Event('loadedmetadata'));
     expect(el().currentTime).toBe(0);
+  });
+
+  it('a remembered position resumes the book when no chapter was tapped', () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 600, d: 13414 }), setPosition() {}, clearPosition() {} };
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jeremiah', label: 'KJV' });
+    el().duration = 13414;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(595);
+  });
+
+  it('an explicitly tapped chapter outranks a remembered position', () => {
+    // Both deferred seeks are registered; the chapter's is added second and
+    // therefore assigns last. A tap on chapter 7 must mean chapter 7.
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 600, d: 13414 }), setPosition() {}, clearPosition() {} };
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jeremiah', label: 'KJV', chapterNum: 7 });
+    el().duration = 13414;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(1755);
   });
 });
 

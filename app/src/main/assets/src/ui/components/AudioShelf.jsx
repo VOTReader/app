@@ -12,9 +12,68 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { AUDIO_RESUME_END_FRACTION } from '../../utils/audio-track.js';
+import { formatClock } from './AudioSeekSlider.jsx';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
 export function audioLibraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
+
+/** AudioPositionsStore — same bundle, same call-time bridge. */
+export function audioPositionsStore() { return /** @type {any} */ (globalThis).AudioPositionsStore || null; }
+
+/**
+ * Re-render a listening surface when the per-recording positions change, so a
+ * row's "left" figure is never a stale number from the last time it mounted.
+ * A harness without bundle-b subscribes to nothing and renders no figures.
+ *
+ * @returns {void}
+ */
+export function useAudioPositions() {
+  const store = audioPositionsStore();
+  React.useSyncExternalStore(
+    React.useCallback((callback) => (store && typeof store.subscribe === 'function' ? store.subscribe(callback) : () => {}), [store]),
+    React.useCallback(() => (store && typeof store.getVersion === 'function' ? store.getVersion() : 0), [store])
+  );
+}
+
+/**
+ * What the positions store has to say about one recording: "2:10 left", a
+ * finished mark, or '' when it has nothing worth showing.
+ *
+ * A LENGTH IS REQUIRED. Without it "left" would be a guess, so a record whose
+ * duration never arrived stays silent rather than inventing a number — the row
+ * keeps whatever it showed before.
+ *
+ * @param {any} track - a Track-shaped object or its release URL
+ * @returns {string}
+ */
+export function remainingLabel(track) {
+  const store = audioPositionsStore();
+  if (!store || typeof store.getPosition !== 'function') return '';
+  const saved = store.getPosition(track);
+  if (!saved || !(saved.d > 0) || !(saved.t > 0)) return '';
+  // Same threshold the player refuses to resume past — a row must not promise
+  // "0:04 left" for a tap that will restart the recording from the top.
+  if (saved.t >= saved.d * AUDIO_RESUME_END_FRACTION) return 'Finished';
+  return formatClock(saved.d - saved.t) + ' left';
+}
+
+/**
+ * The same figure for a whole rendition — one row, but a multi-part letter is
+ * several recordings. The FIRST remembered part is where the reader is: parts
+ * played through to their end have their records deleted as they finish.
+ *
+ * @param {any[] | null | undefined} tracks
+ * @returns {string}
+ */
+export function renditionRemainingLabel(tracks) {
+  if (!Array.isArray(tracks)) return '';
+  for (const track of tracks) {
+    const label = remainingLabel(track);
+    if (label) return label;
+  }
+  return '';
+}
 
 /** @param {any} track @returns {string} */
 export function trackName(track) { return (track && track.title) || 'Untitled recording'; }
@@ -108,6 +167,9 @@ export function AudioShelfRow({ track, source, onOpenTrack }) {
   const rowPlaying = isCurrent && (state.status === 'playing' || state.status === 'loading');
   const isSaved = source === 'saved' || !!(library && typeof library.isSaved === 'function' && library.isSaved(track));
   const canOpenText = typeof onOpenTrack === 'function' && hasTextDestination(track);
+  // Where the reader actually stands in this recording outranks when they last
+  // touched it — but only when the store knows; otherwise the row is unchanged.
+  const remaining = remainingLabel(track);
 
   return (
     <article className={'audio-library-row' + (isCurrent ? ' is-current' : '')}>
@@ -125,9 +187,11 @@ export function AudioShelfRow({ track, source, onOpenTrack }) {
         <small>{trackMeta(track)}</small>
       </div>
       <div className="audio-library-row-actions">
-        {source === 'recent'
-          ? <span title={new Date(track.playedAt).toLocaleString()}>{relativePlayedAt(track.playedAt)}</span>
-          : <span>{isSaved ? 'Saved' : ''}</span>}
+        {remaining
+          ? <span className="audio-library-remaining" title={source === 'recent' ? relativePlayedAt(track.playedAt) : undefined}>{remaining}</span>
+          : source === 'recent'
+            ? <span title={new Date(track.playedAt).toLocaleString()}>{relativePlayedAt(track.playedAt)}</span>
+            : <span>{isSaved ? 'Saved' : ''}</span>}
         {canOpenText ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(track)} aria-label={'Open text for ' + trackName(track)} title="Open text"><TextIcon /></button> : null}
         <button
           type="button"

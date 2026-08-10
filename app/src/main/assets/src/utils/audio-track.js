@@ -175,6 +175,21 @@ export function normalizeAudioTrack(value) {
   };
 }
 
+/* ── durable-resume policy ────────────────────────────────────────────────
+   Shared here rather than owned by the player, because the Listening Library
+   surfaces have to describe the SAME judgment the player acts on: a row that
+   says "2:10 left" and a tap that restarts from zero would be a lie. Pure
+   constants, so both bundles import them directly (no runtime bridge). */
+
+/** Below this many seconds a recording restarts — dropping a listener into
+ *  the middle of an opening line is worse than replaying half a minute. */
+export const AUDIO_RESUME_MIN_SEC = 30;
+/** At or past this fraction of the length a recording reads as FINISHED: a
+ *  place to start again, not a place to return to. */
+export const AUDIO_RESUME_END_FRACTION = 0.97;
+/** Rewind on resume — a few words of context beat an exact splice. */
+export const AUDIO_RESUME_REWIND_SEC = 5;
+
 /** Standard rates intentionally offered by the listening UI. */
 export const AUDIO_PLAYBACK_RATES = Object.freeze([0.75, 1, 1.25, 1.5, 2]);
 

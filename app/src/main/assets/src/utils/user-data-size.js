@@ -71,6 +71,7 @@ export const USER_DATA_STORES = [
   'vot-home-order',
   'vot-state',           // includes readItems (marked-as-read) + tabs + settings
   'vot-audio-library',   // saved recordings + recent listening + play counts (IDB v9)
+  'vot-audio-positions', // per-recording resume points (IDB v10)
   'vot-welcomed',
   'vot-about-seen',
   'vot-garden-warning-acked',

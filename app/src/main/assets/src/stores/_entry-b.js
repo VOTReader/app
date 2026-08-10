@@ -64,6 +64,7 @@ import { ReadingStreakStore } from './reading-streak-store.js';
 import { ReadingStatsStore, READING_MILESTONE_DEFS } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { AudioLibraryStore } from './audio-library-store.js';
+import { AudioPositionsStore } from './audio-positions-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 
@@ -185,6 +186,7 @@ Object.assign(window, {
   ReadingStatsStore, READING_MILESTONE_DEFS,
   GardenPosStore,
   AudioLibraryStore,
+  AudioPositionsStore,
   JournalIndexStore,
   jrnId, JournalStore, JournalNotebookStore,
   // Components

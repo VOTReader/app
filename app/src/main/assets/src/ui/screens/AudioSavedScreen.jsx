@@ -7,7 +7,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AudioShelfRow, SearchIcon, audioLibraryStore, trackSearchText } from '../components/AudioShelf.jsx';
+import { AudioShelfRow, SearchIcon, audioLibraryStore, trackSearchText, useAudioPositions } from '../components/AudioShelf.jsx';
 
 /**
  * @param {{
@@ -28,6 +28,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Listening Library', onOp
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useAudioPositions();
 
   const [query, setQuery] = React.useState('');
   const saved = library && typeof library.saved === 'function' ? library.saved() : [];

@@ -8,16 +8,9 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES } from '../../utils/audio-track.js';
+import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { hasTextDestination } from './AudioShelf.jsx';
-
-/** @param {number} seconds @returns {string} */
-function formatTime(seconds) {
-  const value = Math.max(0, Math.floor(Number(seconds) || 0));
-  const mins = Math.floor(value / 60);
-  const secs = value % 60;
-  return mins + ':' + (secs < 10 ? '0' : '') + secs;
-}
 
 /** @returns {any | null} */
 function libraryStore() {
@@ -80,8 +73,6 @@ export function AudioManagerSheet({ open, state, onClose }) {
   if (!current) return null;
 
   const duration = Math.max(0, Math.floor(state.duration || 0));
-  const maximum = Math.max(1, duration);
-  const position = Math.min(maximum, Math.max(0, Math.floor(state.time || 0)));
   const playing = state.status === 'playing';
   const loading = state.status === 'loading';
   const active = playing || loading;
@@ -146,17 +137,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
         </div>
 
         <div className="audio-manager-progress">
-          <input
-            type="range"
-            min={0}
-            max={maximum}
-            step={1}
-            value={position}
-            disabled={duration === 0}
-            aria-label="Playback position"
-            aria-valuetext={formatTime(state.time) + ' of ' + (duration ? formatTime(duration) : 'unknown length')}
-            onChange={(event) => AudioPlayer.seek(Number(event.target.value))}
-          />
+          <AudioSeekSlider className="audio-manager-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
           <div className="audio-manager-time"><span>{formatTime(state.time)}</span><span>{duration ? formatTime(duration) : '—'}</span></div>
         </div>
 

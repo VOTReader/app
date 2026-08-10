@@ -12,7 +12,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
-  audioLibraryStore, hasTextDestination, trackMeta, trackName,
+  audioLibraryStore, hasTextDestination, trackMeta, trackName, useAudioPositions,
 } from '../components/AudioShelf.jsx';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
@@ -79,6 +79,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useAudioPositions();
 
   // The VOT registry and manifest are lazy. Warming them here lets the browse
   // shelf name real available recordings without duplicating a catalog. The

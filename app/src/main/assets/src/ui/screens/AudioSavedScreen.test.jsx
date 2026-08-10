@@ -57,8 +57,16 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  for (const key of ['ScreenLayout', 'LibraryNav', 'COL_BY_KEY', 'AudioLibraryStore']) delete globalThis[key];
+  for (const key of ['ScreenLayout', 'LibraryNav', 'COL_BY_KEY', 'AudioLibraryStore', 'AudioPositionsStore']) delete globalThis[key];
 });
+
+/** The bundle-b positions bridge, answering for one recording only. */
+function installPositions(forUrl, record) {
+  globalThis.AudioPositionsStore = {
+    subscribe: () => () => {}, getVersion: () => 0,
+    getPosition: (track) => ((track && track.url) === forUrl ? record : null),
+  };
+}
 
 describe('AudioSavedScreen', () => {
   it('lists every kept recording with play, text, and un-save at hand', () => {
@@ -92,6 +100,22 @@ describe('AudioSavedScreen', () => {
     renderScreen({ onOpenTrack });
     fireEvent.click(screen.getByRole('button', { name: 'Open text for The Wide Path' }));
     expect(onOpenTrack).toHaveBeenCalledWith(wide);
+  });
+
+  it('says how much of a recording is left once the positions store knows', () => {
+    installPositions(wide.url, { t: 1290, d: 1800 });
+    renderScreen();
+    expect(screen.getByText('8:30 left')).toBeTruthy();
+    // The row the store knows nothing about is untouched — no invented figure.
+    expect(screen.getAllByText('8:30 left')).toHaveLength(1);
+  });
+
+  it('marks a recording the reader reached the end of as finished', () => {
+    // Past the same 97% the player refuses to resume from, so the row never
+    // promises "0:04 left" for a tap that will restart from the top.
+    installPositions(wide.url, { t: 1750, d: 1800 });
+    renderScreen();
+    expect(screen.getByText('Finished')).toBeTruthy();
   });
 
   it('an empty shelf explains how recordings arrive here', () => {

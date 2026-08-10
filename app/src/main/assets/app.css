@@ -951,14 +951,39 @@
       }
       .audio-bar-seek:disabled { opacity: 0.4; cursor: default; }
       .audio-bar-seek:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .audio-bar-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--gold-border); }
+      /* Played portion: ONE inline custom property (--seek-pct, written by
+         AudioSeekSlider) drives both engines' track pseudo-elements — custom
+         properties inherit into them, so the gradient stop is the only thing
+         that has to change as the clock advances. Hard stops, not a blend:
+         the boundary IS the position. */
+      .audio-bar-seek::-webkit-slider-runnable-track {
+        height: 4px; border-radius: 2px;
+        background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%));
+      }
       .audio-bar-seek::-webkit-slider-thumb {
         -webkit-appearance: none; appearance: none;
         width: 14px; height: 14px; border-radius: 50%;
         background: var(--gold); border: 0; margin-top: -5px;
       }
-      .audio-bar-seek::-moz-range-track { height: 4px; border-radius: 2px; background: var(--gold-border); }
+      .audio-bar-seek::-moz-range-track {
+        height: 4px; border-radius: 2px;
+        background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%));
+      }
       .audio-bar-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 0; }
+      /* Scrub preview: the thumb follows the finger locally and the seek lands
+         once on release, so the bubble is the only readout of where the drag
+         currently is. Pinned in px like the bar's own clock — a readout tied
+         to a thumb position must not resize under the Text Size setting. */
+      .audio-seek-wrap { position: relative; }
+      .audio-seek-bubble {
+        position: absolute; bottom: calc(100% + 3px); transform: translateX(-50%);
+        padding: 1px 7px; border: 1px solid var(--gold-border); border-radius: 999px;
+        background: var(--bg3); color: var(--gold);
+        font-size: var(--fsc-11); font-variant-numeric: tabular-nums; line-height: 1.55;
+        white-space: nowrap; pointer-events: none;
+        box-shadow: 0 2px 9px rgba(0, 0, 0, 0.42);
+      }
+      body.light .audio-seek-bubble { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.14); }
       .audio-bar-nav, .audio-bar-close {
         flex-shrink: 0; width: 40px; height: 40px; padding: 0; border-radius: 999px;
         display: flex; align-items: center; justify-content: center;
@@ -1038,15 +1063,18 @@
       .audio-manager-save:focus-visible, .audio-manager-transport button:focus-visible, .audio-manager-segment button:focus-visible,
       .audio-manager-queue button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       .audio-manager-progress { padding: 1.05rem 0 0.8rem; }
-      .audio-manager-progress input {
+      /* Named, not `.audio-manager-progress input`: the desk's scrubber is the
+         shared AudioSeekSlider now, so the hook is its class rather than its
+         position in the DOM. Same --seek-pct fill as the bar's. */
+      .audio-manager-seek {
         -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; padding: 0;
         background: transparent; cursor: pointer;
       }
-      .audio-manager-progress input:disabled { opacity: 0.45; cursor: default; }
-      .audio-manager-progress input::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: var(--gold-border); }
-      .audio-manager-progress input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--gold); }
-      .audio-manager-progress input::-moz-range-track { height: 4px; border-radius: 4px; background: var(--gold-border); }
-      .audio-manager-progress input::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--gold); }
+      .audio-manager-seek:disabled { opacity: 0.45; cursor: default; }
+      .audio-manager-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%)); }
+      .audio-manager-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--gold); }
+      .audio-manager-seek::-moz-range-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%)); }
+      .audio-manager-seek::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--gold); }
       .audio-manager-time { display: flex; justify-content: space-between; margin-top: 0.25rem; color: var(--cream-dim); font-size: var(--fs-11); font-variant-numeric: tabular-nums; }
       .audio-manager-transport { display: flex; align-items: center; justify-content: center; gap: clamp(0.45rem, 2.2vw, 1.25rem); padding-bottom: 1.1rem; }
       .audio-manager-round, .audio-manager-play {
@@ -1139,7 +1167,7 @@
       .audio-library-list { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-top:0; border-radius:0 0 10px 10px; background:rgba(0,0,0,.045); }.audio-library-row { position:relative; display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:.56rem; padding:.42rem .5rem; border-top:1px solid rgba(200,164,86,.13); transition:background .16s ease; }.audio-library-row:first-child { border-top:0; }.audio-library-row.is-current { background:rgba(200,164,86,.085); }.audio-library-row.is-current::before { content:""; position:absolute; left:0; top:.5rem; bottom:.5rem; width:2px; background:var(--gold); border-radius:0 2px 2px 0; }
       .audio-library-row-play { width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid rgba(200,164,86,.26); border-radius:50%; background:rgba(200,164,86,.045); color:var(--gold); cursor:pointer; }.audio-library-row-play svg { width:17px; height:17px; }.audio-library-row-play.is-playing { border-color:var(--gold); background:var(--gold); color:#17130a; }
       .audio-library-row-copy { min-width:0; min-height:47px; padding:.1rem 0; display:flex; flex-direction:column; justify-content:center; gap:.12rem; }.audio-library-row-copy strong { overflow:hidden; color:var(--cream); font-size:var(--fs-13); font-weight:500; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
-      .audio-library-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:.1rem; }.audio-library-row-actions > span { max-width:5.4rem; overflow:hidden; padding:0 .12rem; color:var(--cream-dim); font-size:var(--fs-10); text-align:right; text-overflow:ellipsis; white-space:nowrap; }
+      .audio-library-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:.1rem; }.audio-library-row-actions > span { max-width:5.4rem; overflow:hidden; padding:0 .12rem; color:var(--cream-dim); font-size:var(--fs-10); text-align:right; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-actions > span.audio-library-remaining { color:var(--gold-dim); font-variant-numeric:tabular-nums; }
       .audio-library-empty { margin:0; padding:1rem .85rem .1rem; color:var(--cream-dim); font-size:var(--fs-12); font-style:italic; line-height:1.5; }.audio-library-empty b { color:var(--cream); font-style:normal; font-weight:500; }
       .audio-library-group { margin:1.15rem 0 .45rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-12); font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
       .audio-library-shelf { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-radius:10px; background:rgba(0,0,0,.045); }
