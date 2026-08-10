@@ -492,16 +492,39 @@ C2-D  SAFETY NETS
        coverage-free `npm run test`, so the floors were a post-push CI check
        only. It runs `npm run test:coverage` now (66s vs 47s, measured);
        `npm run test` stays coverage-free for the watch loop.
-  [D2] user-data-parity gains the STORE_NAMES leg; vot-library-order /
-       vot-note-default / vot-ann-hint-dismissed join the backup lists
-       (restore currently loses tile arrangement + defaults). S
+  [D2] DONE 2026-08-10. The parity test gains its FOURTH leg —
+       IDBAdapter.STORE_NAMES — which is the only one that can see a store
+       all the others forgot together: it starts from the schema, not from
+       the other lists. RED-proven (with the three reverted it names all
+       three by name). vot-library-order / vot-note-default join the export
+       map + STORE_SHAPES + USER_DATA_STORES; vot-ann-hint-dismissed joins
+       _flagStores() as the fourth flag. Import already tolerated their
+       absence (`if (!(name in storesObj)) continue`), so old .votbak files
+       restore unchanged. NoteDefaultStore gained a replaceAll that routes
+       through set() — set takes two positional args, and normalizing on the
+       way in means a hand-edited backup cannot leave the store in a state
+       its own UI cannot produce. Leg 4 also pins `meta` as the ONE exempt
+       schema store, by exact match.
+  [D4] DONE 2026-08-10 — MERGED, not documented-as-lossy, because the two
+       halves of vot-state want opposite policies. Session fields (tabs,
+       activeTabIdx, theme, settings, activeReadKey) STAY last-writer-wins:
+       a stomped write costs nothing durable (the losing tab still holds its
+       copy and rewrites on the next tick) and merging two tab strips would
+       invent a layout neither window had. The accumulating maps merge:
+       readItems is the marked-as-read ledger behind My Progress, the streak
+       and 84 achievements, and a mark made in tab A and clobbered by tab B
+       was permanently gone. All three maps go through mergeMapByKey WITH
+       base, so unmarkRead / clearReadForBook / clearAllProgress are honored
+       instead of resurrected; counts resolve to the higher of the two.
+       Found en route: `_save` returned early for merge stores and the LS
+       boot shim lived AFTER that return, on a comment that read "no merge
+       store uses lsShim" — vot-state is now both, so the shim hoisted above
+       the split and stays a synchronous write. RED-proven by 9 tests.
   [D3] DONE 2026-08-10. tools/check-bundle-budget.js — nine per-file byte
        ceilings ~15% over the size measured at landing, in pre-commit
        (after the rebuild) + CI. Names the grown bundle, prints its growth
        vs baseline, and says re-baselining means editing the number in the
        tool in the same commit. No skip flag, on purpose.
-  [D4] vot-state (readItems+tabs+settings) rides the documented cross-tab
-       clobber path — extend STORE-1 merge or single-tab lock for PWA. M
   [D5] DONE 2026-08-10. JaCoCo 2 -> 5 classes, and the blended bundle floor
        became five per-class floors (BoundedLogTree .95 / MainActivityLogic
        .95 / JsBridge .65 / AppInterface .52 / GardenImageCache .48, each

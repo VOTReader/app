@@ -252,3 +252,65 @@ export function mergeAnnotationsStore(base, ours, theirs) {
 export function mergeJournalIndexStore(base, ours, theirs) {
   return mergeMapByKey(base, ours, theirs, function (_b, o, t) { return unionStrings(o, t); });
 }
+
+/**
+ * A read count, normalized. `readItems` values are counts, but pre-2026-08-03
+ * data holds `true` — one read.
+ * @param {any} v
+ * @returns {number}
+ */
+function _count(v) {
+  if (v === true) return 1;
+  return (typeof v === 'number' && isFinite(v)) ? v : 0;
+}
+
+/** Value-merge for read counts: the higher count, keeping its original shape
+ *  (so a legacy `true` survives as `true` and never becomes `1` gratuitously). */
+function _higherCount(_b, o, t) { return _count(o) >= _count(t) ? o : t; }
+
+/** Value-merge for "where I was last": the writing tab is the recent one. */
+function _oursWins(_b, o, _t) { return o; }
+
+/**
+ * vot-state — the ONE store where the two halves want opposite policies,
+ * so the merge is field-discriminating rather than one shape (C2-D [D4]).
+ *
+ * SESSION FIELDS — tabs, activeTabIdx, theme, settings, activeReadKey —
+ * stay LAST-WRITER-WINS, deliberately. They describe where this window is
+ * and how it is configured, and a stomped write costs nothing durable: the
+ * losing tab still holds its own copy in memory and rewrites it on its next
+ * change (usePersistedState flushes the whole 8-field union on every tick).
+ * Merging two tab strips would be worse than the problem — it would
+ * resurrect tabs the reader closed and invent an arrangement neither window
+ * had. "The layout I most recently had" IS the right answer here.
+ *
+ * ACCUMULATING MAPS — readItems, lastReadChapters, lastReadLetterMap — are
+ * merged, because for them a stomped write is permanent. readItems is the
+ * marked-as-read ledger that feeds My Progress, the streak and 84
+ * achievements; a mark made in tab A and clobbered by tab B's stale write
+ * is gone, since B never had it and A will only rewrite it if A changes
+ * again. That is the loss this whole item exists for.
+ *
+ * All three merge through `mergeMapByKey` with `base`, so a DELETE is still
+ * honored: unmarkRead / clearReadForBook / clearAllProgress remove keys, and
+ * a base-blind union would resurrect every one of them on the next sibling
+ * write. Read counts resolve to the higher of the two (they only ever climb,
+ * and two tabs crediting the same chapter must not double it); the two
+ * last-read cursors resolve to OURS (the tab writing now is the tab that
+ * just read something).
+ *
+ * @param {any} base
+ * @param {any} ours
+ * @param {any} theirs
+ * @returns {Record<string, any>}
+ */
+export function mergeStateStore(base, ours, theirs) {
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  // Start from theirs so a field only a sibling knows about (a newer app
+  // version's addition) survives, then let ours win every session field.
+  const out = Object.assign({}, T, O);
+  out.readItems = mergeMapByKey(B.readItems, O.readItems, T.readItems, _higherCount);
+  out.lastReadChapters = mergeMapByKey(B.lastReadChapters, O.lastReadChapters, T.lastReadChapters, _oursWins);
+  out.lastReadLetterMap = mergeMapByKey(B.lastReadLetterMap, O.lastReadLetterMap, T.lastReadLetterMap, _oursWins);
+  return out;
+}

@@ -72,9 +72,18 @@ export const USER_DATA_STORES = [
   'vot-state',           // includes readItems (marked-as-read) + tabs + settings
   'vot-audio-library',   // saved recordings + recent listening + play counts (IDB v9)
   'vot-audio-positions', // per-recording resume points (IDB v10)
+  // C2-D [D2], 2026-08-10 — these three are hand-made choices that were
+  // dying with the device: the Library tile arrangement, the note style +
+  // colour the reader last chose (every new note inherits it), and the
+  // dismissal of the annotation coach-mark (a restored backup re-pitched a
+  // hint the reader had already waved off). All three are IDB stores of
+  // long standing; only the backup never knew about them.
+  'vot-library-order',
+  'vot-note-default',
   'vot-welcomed',
   'vot-about-seen',
   'vot-garden-warning-acked',
+  'vot-ann-hint-dismissed',
 ];
 
 /**

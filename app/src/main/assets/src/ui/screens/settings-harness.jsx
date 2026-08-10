@@ -170,7 +170,12 @@ export function setupSettingsGlobals(overrides = {}) {
     'LinkStore', 'NotebookStore', 'HistoryStore', 'JournalStore', 'JournalIndexStore',
     'JournalMediaStore', 'JournalNotebookStore', 'JournalStatsStore', 'ReadingStreakStore', 'ReadingStatsStore',
     'ProphecyCardsStore', 'RecentNavStore', 'HomeOrderStore', 'GardenPosStore',
-    'WelcomedFlagStore', 'AboutSeenFlagStore', 'GardenWarningFlagStore']) put(s, fakeStore());
+    'WelcomedFlagStore', 'AboutSeenFlagStore', 'GardenWarningFlagStore',
+    // C2-D [D2] — the three that joined the backup. A missing stub here does
+    // not fail loudly: _exportableStores() builds a map whose value is
+    // `undefined`, and the export/import handler throws deep inside instead,
+    // which is how these arrived as seven unrelated-looking failures.
+    'LibraryOrderStore', 'NoteDefaultStore', 'AnnHintDismissedFlagStore']) put(s, fakeStore());
 
   // Backup/import plumbing — reachable only from buttons a render test never presses.
   for (const f of ['buildExportPayload', 'applyImportPayload', 'buildV3Manifest', 'applyV3',

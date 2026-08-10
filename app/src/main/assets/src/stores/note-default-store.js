@@ -49,5 +49,20 @@ export const NoteDefaultStore = extendStore(
       this._save();
       this._bump();
     },
+
+    /**
+     * Restore the whole record from a backup. The import path calls one
+     * method with one payload, and `set` takes two positional arguments —
+     * so this is the seam, not a second way to write. It routes THROUGH
+     * `set`, which means a hand-edited .votbak carrying
+     * `{style:'squiggle', color:'blank'}` lands normalized rather than
+     * putting the store in a state its own UI cannot produce.
+     * @param {any} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      const d = (data && typeof data === 'object') ? data : {};
+      this.set(d.style, d.color);
+    },
   }
 );

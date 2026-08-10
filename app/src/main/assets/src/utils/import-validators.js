@@ -78,11 +78,13 @@ const STORE_SHAPES = {
   'vot-audio-library': 'object',           // {saved, recent, rate}; store normalizes nested fields
   'vot-audio-positions': 'object',         // {positions}; store re-checks every URL key + clamps
   'vot-state': 'object',                   // {tabs?, settings?, …} — store does NOT coerce
+  'vot-note-default': 'object',            // {style, color}; replaceAll routes through set(), which normalizes
   'vot-bookmarks': 'array',
   'vot-links': 'array',
   'vot-recent-nav': 'array',
   'vot-history': 'array',
   'vot-home-order': 'stringArray',         // tile-id[] — store does NOT coerce
+  'vot-library-order': 'stringArray',      // tile-id[] — get() re-merges against DEFAULT_LIBRARY_ORDER
   'vot-notebooks': 'listObject',
   'vot-journal': 'listObject',
   'vot-journal-notebooks': 'listObject',

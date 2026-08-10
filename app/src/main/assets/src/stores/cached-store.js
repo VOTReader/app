@@ -260,6 +260,24 @@ export function CachedStore(storageKey, defaultVal, opts) {
     return defaultVal;
   }
 
+  /**
+   * Write the reduced boot-script copy to localStorage, if this store has an
+   * `lsShim`. Hoisted out of `_save`'s IDB branch in C2-D [D4]: that branch
+   * returned early for merge stores on the documented assumption that "no
+   * merge store uses lsShim", and vot-state then became both. Leaving it
+   * inside would have skipped the LS write on every vot-state flush —
+   * invisible to every store assertion and loud on the next cold boot, since
+   * index.html reads theme + fontStyle + fontScale from this key BEFORE
+   * React mounts and a stale copy is a wrong-theme flash.
+   * @param {any} value the cache value being persisted
+   * @returns {void}
+   */
+  function writeLsShim(value) {
+    if (!lsShim) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(lsShim(value))); }
+    catch (e) { console.warn('LS shim write failed for', storageKey, e); }
+  }
+
   /** @type {CachedStoreBase<T>} */
   const inst = {
     _cache: null,
@@ -340,12 +358,22 @@ export function CachedStore(storageKey, defaultVal, opts) {
      *
      * STORE-1: a store with `crossTabMerge` set routes through `_saveMerged`
      * (serialized read-merge-write) instead of this blind blob write, so a
-     * second PWA tab can't clobber committed records. No merge store uses
-     * `lsShim`, so the merge path needs no LS branch.
+     * second PWA tab can't clobber committed records. Both paths call
+     * `writeLsShim` — vot-state is now both a merge store AND the one lsShim
+     * store ([D4]), so the LS branch is no longer exclusive to this one.
      */
     _save() {
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
+        // The boot-script copy is written SYNCHRONOUSLY here, before either
+        // flush path, because that is the timing it has always had: a reader
+        // who flips the theme and immediately closes the tab must not reopen
+        // into the old one. It is safe to take from the local cache rather
+        // than from the merge result — the shim reads only theme + fontStyle
+        // + fontScale, and every field it reads is a last-writer-wins session
+        // field, so `ours` and `merged` agree on all of them by construction
+        // (mergeStateStore's doc comment is where that is guaranteed).
+        writeLsShim(this._cache);
         if (this._crossTabMerge) {
           if (_locksAvailable()) { this._saveMerged(); return; }
           // STOR5: navigator.locks missing → this merge store silently degrades to
@@ -380,12 +408,6 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // re-flush of the LATEST cache so a transient quota/abort blip recovers.
             self._scheduleWriteRetry();
           });
-        }
-        if (lsShim) {
-          try {
-            const reduced = lsShim(cacheToWrite);
-            localStorage.setItem(storageKey, JSON.stringify(reduced));
-          } catch (e) { console.warn('LS shim write failed for', storageKey, e); }
         }
         return;
       }

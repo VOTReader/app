@@ -769,6 +769,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     'vot-history':             { store: HistoryStore,         method: 'setAll' },
     'vot-prophecy-cards':      { store: ProphecyCardsStore,   method: 'setAll' },
     'vot-home-order':          { store: HomeOrderStore,       method: 'set' },
+    'vot-library-order':       { store: LibraryOrderStore,    method: 'set' },
+    'vot-note-default':        { store: NoteDefaultStore,     method: 'replaceAll' },
     'vot-state':               { store: StateStore,           method: 'set' },
     };
 
@@ -793,6 +795,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     'vot-welcomed':              WelcomedFlagStore,
     'vot-about-seen':            AboutSeenFlagStore,
     'vot-garden-warning-acked':  GardenWarningFlagStore,
+    // [D2]: the fourth flag has always existed (IDB v7) and was the only one
+    // the backup skipped, so a restore re-pitched the annotation coach-mark
+    // at a reader who had dismissed it.
+    'vot-ann-hint-dismissed':    AnnHintDismissedFlagStore,
   });
 
   // Web export uses the v3 STREAMING container (GB-scale — never holds the whole

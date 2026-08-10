@@ -1,9 +1,9 @@
 // @ts-nocheck — reads the three declarations from source via node fs/path/url
 // (outside the DOM types the Q4 scope carries), same as reading-fonts.test.js.
 
-/* Three-way user-data store parity.
+/* Four-way user-data store parity.
    ─────────────────────────────────────────────────────────────────────
-   Three lists name the user's own stores, and nothing made them agree:
+   Four lists name the user's own stores, and nothing made them agree:
 
      1. SettingsScreen.jsx  _exportableStores() + _flagStores()
         — WHAT THE BACKUP WRITES AND RESTORES. The source of truth: a
@@ -16,6 +16,17 @@
           here is restored from a .votbak with its top-level shape
           unchecked (validateStorePayload tolerates unknown names by
           design, for forward-compat with newer backups).
+     4. stores/idb-adapter.js  STORE_NAMES  (added C2-D [D2])
+        — every store the SCHEMA declares. This is the leg that closes
+          the loop in the other direction: legs 1-3 could all agree
+          with each other about a set of stores that quietly OMITTED a
+          real one, which is exactly what happened. vot-library-order,
+          vot-note-default and vot-ann-hint-dismissed had been in the
+          schema since IDB v3/v4/v7 and in NO backup list at all, so
+          the reader's Library tile arrangement, the note style+colour
+          every new note inherits, and a dismissed coach-mark simply
+          died with the device. Three lists agreeing is not parity if
+          all three are short.
 
    Each list was maintained by hand, by comment ("If a store is added to
    the export, add it here too"). That held until `vot-audio-library`
@@ -32,11 +43,19 @@
    found, plausible count) so a refactor that outruns the regex goes RED
    here rather than silently passing a vacuous parity check.
 
-   THE CARVE-OUT: the three flag stores (vot-welcomed / vot-about-seen /
-   vot-garden-warning-acked) are booleans, not payloads — they ride
-   _flagStores() and USER_DATA_STORES but deliberately have no
-   STORE_SHAPES entry. That exemption is asserted explicitly below so it
-   can never quietly widen into a place to hide a real store.
+   THE CARVE-OUT: the four flag stores (vot-welcomed / vot-about-seen /
+   vot-garden-warning-acked / vot-ann-hint-dismissed) are booleans, not
+   payloads — they ride _flagStores() and USER_DATA_STORES but
+   deliberately have no STORE_SHAPES entry. That exemption is asserted
+   explicitly below so it can never quietly widen into a place to hide a
+   real store.
+
+   THE OTHER CARVE-OUT: `meta` is the one store in the schema that is NOT
+   the reader's content — it holds migration bookkeeping and the storage-
+   growth series, and it is deliberately outside USER_DATA_STORES so the
+   series can never inflate the very number it trends. It is the ONLY
+   name leg 4 exempts, by exact match, so "it's just bookkeeping" cannot
+   become a second place to lose a store.
 */
 
 import { describe, it, expect } from 'vitest';
@@ -44,6 +63,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { USER_DATA_STORES } from './user-data-size.js';
+import { IDBAdapter } from '../stores/idb-adapter.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SETTINGS_PATH = join(HERE, '..', 'ui', 'screens', 'SettingsScreen.jsx');
@@ -118,6 +138,10 @@ const SHAPED = votLiterals(sliceBetween(
 /** Everything the backup touches: payload stores + flag stores. */
 const BACKED_UP = [...EXPORTABLE, ...FLAGS];
 
+/** Leg 4 — every `vot-*` store the IDB schema declares. `meta` is excluded
+ *  here (it is bookkeeping, not content) and asserted separately below. */
+const SCHEMA = IDBAdapter.STORE_NAMES.filter((n) => n.startsWith('vot-'));
+
 /* ── reporting ──────────────────────────────────────────────────────── */
 
 /**
@@ -153,14 +177,17 @@ function expectCovered(have, want, leg, file, symptom) {
 /* ── the extractors must actually be reading something ──────────────── */
 
 describe('user-data parity — extraction sanity', () => {
-  it('reads a plausible store list out of each of the three declarations', () => {
+  it('reads a plausible store list out of each of the four declarations', () => {
     // Floors, not exact counts: adding a store must not fail THIS test (it
     // fails the parity tests below, which say what to do). They exist so a
     // regex that stops matching can never make the parity checks vacuous.
     expect(EXPORTABLE.length, 'SettingsScreen _exportableStores() parsed too small').toBeGreaterThanOrEqual(15);
-    expect(FLAGS.length, 'SettingsScreen _flagStores() parsed too small').toBeGreaterThanOrEqual(3);
+    expect(FLAGS.length, 'SettingsScreen _flagStores() parsed too small').toBeGreaterThanOrEqual(4);
     expect(SHAPED.length, 'import-validators STORE_SHAPES parsed too small').toBeGreaterThanOrEqual(15);
     expect(USER_DATA_STORES.length).toBeGreaterThanOrEqual(18);
+    // Leg 4 is a real import, not a regex — it needs no marker sanity, only
+    // the guarantee that the schema isn't somehow empty.
+    expect(SCHEMA.length, 'IDBAdapter.STORE_NAMES parsed too small').toBeGreaterThanOrEqual(20);
   });
 
   it('sees the globalThis-guarded AudioLibraryStore entry by name', () => {
@@ -222,13 +249,55 @@ describe('user-data parity — STORE_SHAPES (the import trust boundary)', () => 
     );
   });
 
-  it('deliberately exempts the three boolean flag stores', () => {
+  it('deliberately exempts the four boolean flag stores', () => {
     // Flags are `true`/`false`, not payloads — they are applied via set()/clear(),
     // never through validateStorePayload. Pinned so the exemption stays exactly
-    // three known names and never becomes a general hole in the boundary.
+    // four known names and never becomes a general hole in the boundary.
     expect(FLAGS.slice().sort()).toEqual([
-      'vot-about-seen', 'vot-garden-warning-acked', 'vot-welcomed',
+      'vot-about-seen', 'vot-ann-hint-dismissed',
+      'vot-garden-warning-acked', 'vot-welcomed',
     ]);
     for (const flag of FLAGS) expect(SHAPED).not.toContain(flag);
+  });
+});
+
+/* ── leg 4: the schema and the backup name the same stores ───────────── */
+
+describe('user-data parity — STORE_NAMES (the IDB schema)', () => {
+  it('backs up every vot-* store the schema declares', () => {
+    // The direction the other three legs structurally cannot see: they check
+    // each other, so a store none of them ever heard of stays invisible. This
+    // one starts from the DATABASE. If a store exists to hold something, the
+    // burden is on the author to say why it is not the reader's to keep.
+    expectCovered(
+      SCHEMA, BACKED_UP,
+      "SettingsScreen's export + flag maps",
+      'app/src/main/assets/src/ui/screens/SettingsScreen.jsx',
+      'the store exists, the app writes to it, and Export does not read it — '
+      + 'whatever it holds dies with the device. If it genuinely is not user '
+      + 'data, exempt it HERE by name with the reason, the way `meta` is.',
+    );
+  });
+
+  it('backs up nothing the schema does not declare', () => {
+    // The reverse: an export entry for a store the schema never creates would
+    // read undefined forever and restore into nothing — the shape of a missed
+    // DB_VERSION bump (leg 1 of the seven registration legs).
+    expectCovered(
+      BACKED_UP, SCHEMA,
+      'IDBAdapter.STORE_NAMES', 'app/src/main/assets/src/stores/idb-adapter.js',
+      'the backup names a store the schema never creates, so it exports nothing '
+      + 'and restores nowhere. Add it to STORE_NAMES and bump DB_VERSION.',
+    );
+  });
+
+  it('exempts `meta` and nothing else', () => {
+    // `meta` holds migration bookkeeping + the storage-growth series, and is
+    // deliberately outside USER_DATA_STORES so the series cannot inflate the
+    // number it trends (see user-data-size.js). Pinned by exact match so the
+    // exemption cannot widen into a place to park a real store.
+    const nonVot = IDBAdapter.STORE_NAMES.filter((n) => !n.startsWith('vot-'));
+    expect(nonVot).toEqual(['meta']);
+    expect(USER_DATA_STORES).not.toContain('meta');
   });
 });

@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CachedStore, extendStore, _resetStoreRegistry } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
-import { mergeListStore } from './store-merge.js';
+import { mergeListStore, mergeStateStore } from './store-merge.js';
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
@@ -144,6 +144,145 @@ describe('STORE-1 protected (crossTabMerge) — committed data survives', () => 
     // B's in-memory cache now contains X too (pulled in by the merge), so a
     // subsequent B render is consistent without a reload.
     expect(b.list().map((e) => e.id).sort()).toEqual(['X', 'Y']);
+  });
+});
+
+/* C2-D [D4] — vot-state: the store where the two halves want opposite
+   policies. Same two-tab topology, a state-shaped store (the real
+   StateStore is a module singleton, so this rebuilds its exact opts:
+   idb + lsShim + mergeStateStore). What is asserted here is the SPLIT —
+   the accumulating ledger merges, the session fields do not. */
+
+/** The boot-script shim, verbatim in shape from state-store.js. */
+const bootShim = (full) => ({
+  theme: full && full.theme,
+  settings: { fontStyle: full && full.settings && full.settings.fontStyle },
+});
+
+function makeStateLikeStore(storeName, merge) {
+  const base = CachedStore(storeName, {}, merge
+    ? { idb: true, lsShim: bootShim, crossTabMerge: merge }
+    : { idb: true, lsShim: bootShim });
+  return extendStore(base, {
+    get() { return this._load(); },
+    /** usePersistedState's single write: the whole union, every tick. */
+    set(full) {
+      if (this._shouldDefer('set', full)) return;
+      this._cache = full;
+      this._save();
+      this._bump();
+    },
+    /** Read the current union, apply a patch, write it back — how App() moves. */
+    patch(fn) { const next = JSON.parse(JSON.stringify(this._load())); fn(next); this.set(next); },
+  });
+}
+
+const stateIn = (store) => (idb[store] && idb[store].v) || {};
+
+async function twoStateTabs(storeName, merge) {
+  const a = makeStateLikeStore(storeName, merge);
+  const b = makeStateLikeStore(storeName, merge);
+  await a._hydrate();
+  await b._hydrate();
+  return { a, b };
+}
+
+describe('[D4] vot-state unprotected — a read mark dies in the clobber', () => {
+  it("Tab B's stale write destroys the chapter Tab A marked read", async () => {
+    const store = 'vot-test-state-unprotected';
+    const { a, b } = await twoStateTabs(store, null);
+    a.set({ tabs: [{ id: 'ta' }], readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    b.set({ tabs: [{ id: 'tb' }], readItems: {} });
+    await b.whenSaved();
+    // The mark is gone from the only place it lived, and Tab B never had it.
+    expect(stateIn(store).readItems).toEqual({});
+  });
+});
+
+describe('[D4] vot-state protected — the ledger merges, the session does not', () => {
+  it('keeps a read mark made in the other tab (the headline fix)', async () => {
+    const store = 'vot-test-state-marks';
+    const { a, b } = await twoStateTabs(store, mergeStateStore);
+    a.set({ tabs: [{ id: 'ta' }], readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    b.set({ tabs: [{ id: 'tb' }], readItems: { 'v1:genesis:1': 1 } });
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ 'v1:john:3': 1, 'v1:genesis:1': 1 });
+  });
+
+  it('leaves tabs / theme / settings LAST-WRITER-WINS, on purpose', async () => {
+    const store = 'vot-test-state-session';
+    const { a, b } = await twoStateTabs(store, mergeStateStore);
+    a.set({ tabs: [{ id: 'ta' }], theme: 'light', settings: { fontScale: '120' }, readItems: {} });
+    await a.whenSaved();
+    b.set({ tabs: [{ id: 'tb' }], theme: 'dark', settings: { fontScale: '100' }, readItems: {} });
+    await b.whenSaved();
+    // Not merged, not unioned — B's window is the one that wrote last, and its
+    // arrangement is the answer. Merging tab strips would invent a layout
+    // neither window had and resurrect tabs the reader closed.
+    expect(stateIn(store).tabs).toEqual([{ id: 'tb' }]);
+    expect(stateIn(store).theme).toBe('dark');
+    expect(stateIn(store).settings).toEqual({ fontScale: '100' });
+  });
+
+  it('honors unmarkRead — the cleared mark is not resurrected', async () => {
+    const store = 'vot-test-state-unmark';
+    const a = makeStateLikeStore(store, mergeStateStore);
+    await a._hydrate();
+    a.set({ readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    // Tab B hydrates now, so the mark is in ITS common ancestor.
+    const b = makeStateLikeStore(store, mergeStateStore);
+    await b._hydrate();
+    a.patch((s) => { delete s.readItems['v1:john:3']; });   // unmarkRead
+    await a.whenSaved();
+    b.patch((s) => { s.readItems['v1:luke:2'] = 1; });      // B marks something else
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ 'v1:luke:2': 1 });
+  });
+
+  it('takes the HIGHER read count rather than summing (no double credit)', async () => {
+    const store = 'vot-test-state-counts';
+    const a = makeStateLikeStore(store, mergeStateStore);
+    await a._hydrate();
+    a.set({ readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    const b = makeStateLikeStore(store, mergeStateStore);
+    await b._hydrate();
+    a.patch((s) => { s.readItems['v1:john:3'] = 3; });
+    await a.whenSaved();
+    b.patch((s) => { s.readItems['v1:john:3'] = 2; });
+    await b.whenSaved();
+    expect(stateIn(store).readItems['v1:john:3']).toBe(3);
+  });
+
+  it('merges the two last-read cursors, resolving a conflict to the writer', async () => {
+    const store = 'vot-test-state-cursors';
+    const { a, b } = await twoStateTabs(store, mergeStateStore);
+    a.set({ lastReadChapters: { john: 3 }, lastReadLetterMap: { one: 'the-wide-path' } });
+    await a.whenSaved();
+    b.set({ lastReadChapters: { genesis: 7, john: 9 }, lastReadLetterMap: {} });
+    await b.whenSaved();
+    // john: both sides have it, the writer wins. genesis: B's own. one: A's,
+    // and B never touched it, so it survives instead of being clobbered.
+    expect(stateIn(store).lastReadChapters).toEqual({ genesis: 7, john: 9 });
+    expect(stateIn(store).lastReadLetterMap).toEqual({ one: 'the-wide-path' });
+  });
+
+  it('still writes the boot-script localStorage shim on the MERGED path', async () => {
+    // The regression this fix could have introduced: _saveMerged returns
+    // before _save's LS branch, and vot-state is the one lsShim store. A
+    // stale shim is a wrong-theme flash on every cold boot — invisible to
+    // every other assertion here.
+    const store = 'vot-test-state-lsshim';
+    const { a } = await twoStateTabs(store, mergeStateStore);
+    localStorage.removeItem(store);
+    a.set({ theme: 'light', settings: { fontStyle: 'modern' }, readItems: {} });
+    await a.whenSaved();
+    expect(JSON.parse(localStorage.getItem(store))).toEqual({
+      theme: 'light', settings: { fontStyle: 'modern' },
+    });
   });
 });
 

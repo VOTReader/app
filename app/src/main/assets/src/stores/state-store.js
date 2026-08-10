@@ -53,6 +53,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeStateStore } from './store-merge.js';
 
 /**
  * @typedef {{
@@ -94,6 +95,13 @@ export const StateStore = extendStore(
   CachedStore('vot-state', /** @type {VotState} */ ({}), {
     idb: true,
     lsShim: _bootScriptShim,
+    // C2-D [D4]: two PWA tabs each flush this whole union, so the second
+    // one to write used to destroy whatever the first had committed. For
+    // tabs/theme/settings that is correct and stays that way; for readItems
+    // (the marked-as-read ledger behind My Progress, the streak and the
+    // achievements) it was permanent loss. mergeStateStore splits the two —
+    // see its doc comment for why the halves get opposite policies.
+    crossTabMerge: mergeStateStore,
   }),
   {
     /**
