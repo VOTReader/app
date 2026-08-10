@@ -215,26 +215,47 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     }
   };
 
-  // A finished audio letter counts like a finished read (owner directive
+  // A finished audio recording counts like a finished read (owner directive
   // 2026-08-09): the item's count increments on EVERY complete listen, same
   // as the detector's re-read increments. No stats-ledger record — the
   // ledger holds measured READING (words + visibility-honest time), and a
   // listen is neither. Respects the markAsRead gate like any new mark.
+  //
+  // TWO key spaces, because the player notifies for two kinds of recording
+  // (2026-08-10): a letter resolves its collection's readKey through
+  // COL_BY_KEY, while a Bible edition ('bible-*' volKeys, which COL_BY_KEY has
+  // no entry for and never will) lands in the SAME chapter key space
+  // BibleChapterView's own mark-as-read writes — `v1:<bookId>:<chapter>` — so
+  // a listened chapter shows a check on the chapter index, counts toward the
+  // Scripture-chapter milestones, and feeds the streak, exactly like a read
+  // one. The audio manifest's book ids ARE the corpus book ids by
+  // construction (BIBLE_AUDIO_BOOKS is generated from books.js).
   React.useEffect(() => {
-    window.__votAudioListened = (volKey, letterId) => {
+    const credit = (key) => {
+      setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+      // A full listen is as strong a "was here today" signal as a
+      // completed read — keep the streak coherent with it.
+      if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
+        try { ReadingStreakStore.recordReadingDay(Date.now()); }
+        catch (e) { console.warn('reading-streak record failed', e); }
+      }
+    };
+    window.__votAudioListened = (volKey, itemId, chapterNum) => {
       if (enabledRef.current === false) return;
       try {
+        if (!itemId) return;
+        if (typeof volKey === 'string' && volKey.indexOf('bible-') === 0) {
+          // A whole-book legacy recording names no single chapter, so there is
+          // nothing honest to credit — the completion still counts in the
+          // Listening Library, but no chapter is claimed read.
+          const chapter = Math.floor(Number(chapterNum) || 0);
+          if (chapter > 0) credit(getReadKey(itemId, chapter));
+          return;
+        }
         const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY) ? COL_BY_KEY.get(volKey) : null;
         const rk = col && col.readKey;
-        if (!rk || !letterId) return;
-        const key = getReadKey(rk, letterId);
-        setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
-        // A full listen is as strong a "was here today" signal as a
-        // completed read — keep the streak coherent with it.
-        if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
-          try { ReadingStreakStore.recordReadingDay(Date.now()); }
-          catch (e) { console.warn('reading-streak record failed', e); }
-        }
+        if (!rk) return;
+        credit(getReadKey(rk, itemId));
       } catch (e) { console.warn('listen count failed', e); }
     };
     return () => { window.__votAudioListened = null; };

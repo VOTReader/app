@@ -604,7 +604,8 @@ describe('audio-player — listen completion counts', () => {
       AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
       el().dispatchEvent(new Event('playing'));
       el().dispatchEvent(new Event('ended'));
-      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-c');
+      // The third argument is the CHAPTER, and a letter has none.
+      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-c', 0);
     } finally {
       delete globalThis.__votAudioListened;
     }
@@ -620,7 +621,7 @@ describe('audio-player — listen completion counts', () => {
       expect(listened).not.toHaveBeenCalled();
       el().dispatchEvent(new Event('playing'));
       el().dispatchEvent(new Event('ended'));      // Part 2 = the letter's end
-      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-a');
+      expect(listened).toHaveBeenCalledExactlyOnceWith('vol1', 'letter-a', 0);
     } finally {
       delete globalThis.__votAudioListened;
     }
@@ -686,9 +687,48 @@ describe('audio-player — honest play counting', () => {
     el().currentTime = 1;                     // under the restart threshold
     AudioPlayer.prev();                       // → back to part 1
     expect(AudioPlayer.getState().qi).toBe(1);
-    // The recent shelf still sees every start; the lifetime counter sees one tap.
-    expect(library.recordPlayed).toHaveBeenCalledTimes(4);
+    // BOTH counters read the tap, not the traversal (2026-08-10): the recent
+    // shelf holds 30 rows, and one long queue used to flush every one of them.
+    expect(library.recordPlayed).toHaveBeenCalledTimes(1);
+    expect(library.recordPlayed).toHaveBeenCalledWith(expect.objectContaining({ url: URL_OF('idPreface') }));
     expect(library.countPlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('an auto-advance never touches the recent shelf (the 30-row flush)', () => {
+    const library = fakeLibrary();
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    library.recordPlayed.mockClear();
+    el().dispatchEvent(new Event('ended'));   // ended → next(): the queue moved itself
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(library.recordPlayed).not.toHaveBeenCalled();
+  });
+
+  it('neither counter fires for next / prev / playAt — only for a decision', () => {
+    const library = fakeLibrary();
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    library.recordPlayed.mockClear();
+    library.countPlay.mockClear();
+    AudioPlayer.next();
+    AudioPlayer.playAt(3);
+    el().currentTime = 0;
+    AudioPlayer.prev();
+    expect(library.recordPlayed).not.toHaveBeenCalled();
+    expect(library.countPlay).not.toHaveBeenCalled();
+  });
+
+  it('records the shelf row even when the lifetime counter throws, and vice versa', () => {
+    const recordPlayed = vi.fn();
+    globalThis.AudioLibraryStore = { recordPlayed, countPlay: () => { throw new Error('idb gone'); } };
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    expect(recordPlayed).toHaveBeenCalledTimes(1);
+    expect(el().played).toBe(true);
+
+    const countPlay = vi.fn();
+    globalThis.AudioLibraryStore = { recordPlayed: () => { throw new Error('idb gone'); }, countPlay };
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    expect(countPlay).toHaveBeenCalledTimes(1);
   });
 
   it('counts playSection and playTrack once each; resuming a snapshot counts none', async () => {
@@ -710,6 +750,205 @@ describe('audio-player — honest play counting', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(el().played).toBe(true);
     expect(library.countPlay).not.toHaveBeenCalled();
+  });
+});
+
+/* A1 (owner directive 2026-08-10). Every Listening Library row and "Resume
+   last" used to build a queue of ONE, so a Bible chapter dead-ended after four
+   minutes with next hidden. A row is a PLACE in the corpus; playTrack rebuilds
+   the queue around it and only falls back to a lone recording when nothing in
+   the manifests carries that URL any more. */
+describe('audio-player — a library row continues (playTrack rebuilds around it)', () => {
+  const withRegistry = (fn) => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try { fn(); } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  };
+  const row = (over) => ({
+    key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One',
+    url: URL_OF('idC'), readerCode: 'T', partLabel: null, ...over,
+  });
+
+  it('a letter row rebuilds its collection FORWARD from that letter', () => {
+    withRegistry(() => {
+      AudioPlayer.playTrack(row({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA1'), readerCode: 'B', partLabel: 'Part 1' }));
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(s.qi).toBe(0);
+      expect(el().src).toBe(URL_OF('idA1'));
+      // Not a dead end any more: the transport walks on past the row's letter.
+      AudioPlayer.next();
+      AudioPlayer.next();
+      expect(el().src).toBe(URL_OF('idC'));
+    });
+  });
+
+  it('opens on the exact PART and VOICE the row names, not the primary reading', () => {
+    withRegistry(() => {
+      AudioPlayer.playTrack(row({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA2v'), readerCode: 'V', partLabel: 'Part 2' }));
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA2v'), URL_OF('idC')]);
+      expect(s.queue[0].readerCode).toBe('V');
+      expect(el().src).toBe(URL_OF('idA2v'));
+    });
+  });
+
+  it('honors the remembered position of the row it rebuilt around', () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 200, d: 900 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    withRegistry(() => {
+      AudioPlayer.playTrack(row());
+      expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idC')]);
+      el().duration = 900;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(195);          // 200 − the 5s rewind nudge
+    });
+  });
+
+  it('still plays alone when the registry has not landed (nothing to rebuild from)', () => {
+    AudioPlayer.playTrack(row());
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idC')]);
+  });
+
+  it('still plays alone for a recording no manifest carries any more', () => {
+    withRegistry(() => {
+      // A saved row whose asset was retired: the key resolves, the URL does not.
+      AudioPlayer.playTrack(row({ url: URL_OF('idRetired') }));
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idRetired')]);
+      expect(s.queue).toHaveLength(1);
+    });
+  });
+
+  it('still plays alone for a range compilation (no key at all)', () => {
+    withRegistry(() => {
+      AudioPlayer.playTrack({ key: null, title: 'Part 1 · Intro–19', sub: 'WTLB One', url: trackUrl('sec1'), readerCode: 'V', partLabel: null });
+      expect(AudioPlayer.getState().queue).toHaveLength(1);
+    });
+  });
+});
+
+describe('audio-player — a Bible library row continues into its BOOK', () => {
+  const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+  const LEGACY = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/brm-kjv_jonah.mp3';
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:jonah': [
+        ['brm1_jonah_001', '', 'Chapter 1'], ['brm1_jonah_002', '', 'Chapter 2'],
+        ['brm1_jonah_003', '', 'Chapter 3'], ['brm1_jonah_004', '', 'Chapter 4'],
+      ],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+  });
+
+  it('rebuilds the book from the tapped chapter forward', () => {
+    AudioPlayer.playTrack({
+      key: 'bible-brm-kjv:jonah', title: 'Jonah', sub: 'KJV · Biblical Restoration Ministries',
+      url: OT('brm1_jonah_003'), readerCode: '', partLabel: 'Chapter 3',
+    });
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.url)).toEqual([OT('brm1_jonah_003'), OT('brm1_jonah_004')]);
+    expect(s.qi).toBe(0);
+    expect(el().src).toBe(OT('brm1_jonah_003'));
+  });
+
+  it('the chapter comes from the URL, not the stored label', () => {
+    AudioPlayer.playTrack({
+      key: 'bible-brm-kjv:jonah', title: 'Jonah', sub: null,
+      url: OT('brm1_jonah_002'), readerCode: '', partLabel: 'Chapter 99',
+    });
+    expect(AudioPlayer.getState().queue[0].url).toBe(OT('brm1_jonah_002'));
+  });
+
+  it('a remembered position wins on this path — there is no chapter TAP to outrank it', () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 120, d: 400 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    AudioPlayer.playTrack({
+      key: 'bible-brm-kjv:jonah', title: 'Jonah', sub: null,
+      url: OT('brm1_jonah_002'), readerCode: '', partLabel: 'Chapter 2',
+    });
+    el().duration = 400;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(115);
+  });
+
+  it('a legacy whole-book recording still plays alone (its asset left the manifest)', () => {
+    AudioPlayer.playTrack({
+      key: 'bible-brm-kjv:jonah', title: 'Jonah', sub: null, url: LEGACY, readerCode: '', partLabel: null,
+    });
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.url)).toEqual([LEGACY]);
+    expect(s.queue).toHaveLength(1);
+  });
+});
+
+/* A3 (owner directive 2026-08-10). Bible listening earned NOTHING: the
+   same-key guard credited only a book's last chapter, and the read bridge had
+   no bible-* branch at all. Every chapter is a whole recording. */
+describe('audio-player — Bible chapters earn per-chapter credit', () => {
+  const mkParts = (book, n) => Array.from({ length: n }, (_v, i) =>
+    ['brm1_' + book + '_' + String(i + 1).padStart(3, '0'), '', 'Chapter ' + (i + 1)]);
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': mkParts('jonah', 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+    delete globalThis.__votAudioListened;
+  });
+
+  it('notifies the read bridge for EVERY chapter, naming the chapter', () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null });
+    el().dispatchEvent(new Event('ended'));        // chapter 1 → 2
+    expect(listened).toHaveBeenCalledExactlyOnceWith('bible-brm-kjv', 'jonah', 1);
+    el().dispatchEvent(new Event('ended'));        // chapter 2 → 3
+    expect(listened).toHaveBeenCalledTimes(2);
+    expect(listened).toHaveBeenLastCalledWith('bible-brm-kjv', 'jonah', 2);
+  });
+
+  it('counts one library completion PER CHAPTER, not one per book', () => {
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn(), countCompletion: vi.fn() };
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null });
+    el().dispatchEvent(new Event('ended'));
+    el().dispatchEvent(new Event('ended'));
+    expect(library.countCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it('credits the same chapter whatever SHAPE the queue happens to be', () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: null, chapterNum: 3 });
+    AudioPlayer.clearUpcoming();                   // a lone-chapter queue, user-edited
+    expect(AudioPlayer.getState().queue).toHaveLength(1);
+    el().dispatchEvent(new Event('ended'));
+    expect(listened).toHaveBeenCalledExactlyOnceWith('bible-brm-kjv', 'jonah', 3);
+  });
+
+  it('a whole-book recording names no chapter, but still counts as finished', () => {
+    const listened = vi.fn();
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn(), countCompletion: vi.fn() };
+    globalThis.__votAudioListened = listened;
+    globalThis.AudioLibraryStore = library;
+    AudioPlayer.playTrack({
+      key: 'bible-brm-kjv:jonah', title: 'Jonah', sub: null, partLabel: null, readerCode: '',
+      url: 'https://github.com/VOTReader/votreader-assets/releases/download/audio-bible-v1/brm-kjv_jonah.mp3',
+    });
+    el().dispatchEvent(new Event('ended'));
+    expect(listened).toHaveBeenCalledExactlyOnceWith('bible-brm-kjv', 'jonah', 0);
+    expect(library.countCompletion).toHaveBeenCalledTimes(1);
   });
 });
 

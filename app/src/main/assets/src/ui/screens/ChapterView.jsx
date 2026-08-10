@@ -3,8 +3,10 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // "Go to Scripture" on the study-note scripture sheet — close the sheet,
@@ -160,6 +162,16 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             <div className="hero-ornament-diamond" />
             <div className="hero-ornament-line r" />
           </div>
+          {/* Matthew parity (2026-08-10): the study screen is a Bible chapter
+              too, and the listening desk's title jump can LAND here — a screen
+              you can be sent to by the player had no way to start it. Same
+              pill, same call, same book/chapter as BibleChapterView's; absent
+              when Settings' Bible Audio is off or the edition lacks the book. */}
+          {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+            <div className="hero-play-row">
+              <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} />
+            </div>
+          )}
         </div>
       </header>
 

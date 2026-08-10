@@ -286,10 +286,14 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
    query is showing a subset of that day — the count would describe the
    filtered rows and the press would remove more than it named. */
 describe('HistoryScreen — deduplicate during a search', () => {
+  /* These three must land in ONE day group for the button to appear at all, so
+     they are spaced by SECONDS rather than by `today(minutes)`: a fixture that
+     reaches 35 minutes back straddles midnight for the first half-hour of every
+     day, and the suite failed there (caught 2026-08-10, 00:0x). */
   const DUPES = [
-    chapter('psalms', 'Psalms', 1, today(5)),
-    chapter('psalms', 'Psalms', 1, today(20)),
-    chapter('psalms', 'Psalms', 23, today(35), 'The Lord Is My Shepherd'),
+    chapter('psalms', 'Psalms', 1, Date.now() - 1000),
+    chapter('psalms', 'Psalms', 1, Date.now() - 2000),
+    chapter('psalms', 'Psalms', 23, Date.now() - 3000, 'The Lord Is My Shepherd'),
   ];
 
   it('offers deduplicate on the unfiltered day', () => {

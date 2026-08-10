@@ -1069,6 +1069,7 @@ export function buildScreenRoutes({
         <MatthewChapterView
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
           fromStudies={fromStudies} settings={settings}
+          bibleAudio={bibleAudioProp}
           titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
           prevChainEntry={prevChainEntry} nextChainEntry={nextChainEntry}
           goToChainEntryFirst={goToChainEntryFirst} goToChainEntryLast={goToChainEntryLast}

@@ -624,27 +624,56 @@ function _maybePrefetchNext() {
 }
 
 /**
- * A letter finished playing to its end (owner directive 2026-08-09: a full
+ * The chapter a per-chapter Bible track carries, or 0. Every shipped edition
+ * labels its parts "Chapter N" (bible-audio-manifest.js expands them from one
+ * loop), so the label IS the answer; a legacy whole-book recording carries no
+ * part label and has no single chapter to name.
+ *
+ * @param {Track | null | undefined} track
+ * @returns {number}
+ */
+function _chapterOfTrack(track) {
+  const match = track && typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
+  return match ? Number(match[1]) : 0;
+}
+
+/**
+ * A recording finished playing to its end (owner directive 2026-08-09: a full
  * listen counts like a full read — the item's read count increments). Fired
- * from 'ended' BEFORE next() advances. Multi-part letters notify only when
- * their LAST part ends; range-compilation sections carry key null and never
- * notify. The App-side bridge (useReadProgress) owns the actual counting.
+ * from 'ended' BEFORE next() advances; range-compilation sections carry key
+ * null and never notify. The App-side bridge (useReadProgress) owns the
+ * actual counting.
+ *
+ * TWO completion grains, because the corpus has two (2026-08-10):
+ *   - a LETTER is one recording that may be split across parts, so it scores
+ *     when its LAST part ends and the same-key guard is what waits for it;
+ *   - a BIBLE CHAPTER is a whole recording of its own. Every shipped edition
+ *     is per-chapter and a book's chapters all share one key, so applying the
+ *     letter guard there credited a 50-chapter book exactly once — and only
+ *     when the queue happened to hold the whole book. Bible tracks therefore
+ *     notify PER TRACK, independent of queue shape.
  */
 function _notifyListened() {
   try {
     const track = _state.queue[_state.qi];
     if (!track || !track.key) return;
-    const following = _state.queue[_state.qi + 1];
-    if (following && following.key === track.key) return;   // more parts remain
-    // One WHOLE recording finished. Counted here rather than on every 'ended'
-    // so a multi-part letter scores once, and counted before the bridge lookup
-    // below so the tally does not depend on the App-side hook being mounted.
+    const divider = track.key.indexOf(':');
+    if (divider <= 0) return;
+    const volKey = track.key.slice(0, divider);
+    const itemId = track.key.slice(divider + 1);
+    const perTrack = _isBibleVol(volKey);
+    if (!perTrack) {
+      const following = _state.queue[_state.qi + 1];
+      if (following && following.key === track.key) return;   // more parts remain
+    }
+    // One WHOLE recording finished. Counted before the bridge lookup below so
+    // the tally does not depend on the App-side hook being mounted.
     _countCompletion();
     const g = _g();
     if (typeof g.__votAudioListened !== 'function') return;
-    const divider = track.key.indexOf(':');
-    if (divider <= 0) return;
-    g.__votAudioListened(track.key.slice(0, divider), track.key.slice(divider + 1));
+    // The chapter rides along so the bridge can credit the BIBLE read-items key
+    // space (bookId + chapter), which is where a chapter read is recorded.
+    g.__votAudioListened(volKey, itemId, perTrack ? _chapterOfTrack(track) : 0);
   } catch (_e) { /* listen counting must never interfere with queue advance */ }
 }
 
@@ -702,10 +731,6 @@ function _start() {
   _state.status = 'loading';
   _notify();
   _mediaSession(track);
-  try {
-    const library = _library();
-    if (library && typeof library.recordPlayed === 'function') library.recordPlayed(track);
-  } catch (_e) { /* recent-history failures must not interfere with listening */ }
   _pauseOtherDomAudio(null);
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
@@ -1401,19 +1426,85 @@ async function _rebuildRestoredQueue() {
 /* ── playback entry points ────────────────────────────────────────────── */
 
 /**
- * One listening decision = one lifetime play (the Milestones tier reads this).
- * Deliberately NOT in _start(): auto-advance, next/prev, playAt and a resume
- * rebuild all start tracks nobody asked for individually, and counting those
- * would credit a whole queue to a single tap on Play All. recordPlayed still
- * fires per track — the recent shelf wants every start.
+ * One listening DECISION: one lifetime play (the Milestones tier reads this)
+ * and one row at the top of the recent shelf. Called only from the four entry
+ * points a listener actually taps — never from _start(), which also runs for
+ * auto-advance, next/prev, playAt and the boot-resume rebuild.
+ *
+ * recordPlayed moved here on 2026-08-10 for exactly the reason countPlay was
+ * never in _start(): the shelf is capped at 30 rows, so one Genesis evening of
+ * auto-advance flushed every letter out of it AND repointed "Resume last" at a
+ * chapter nobody chose. The shelf answers "what did I put on" — a decision,
+ * not a track boundary.
+ *
+ * The two counters are isolated from each other: a failing shelf write must
+ * not cost the play count, and neither may stand between a tap and audio.
  *
  * @returns {void}
  */
 function _countPlay() {
   try {
     const library = _library();
-    if (library && typeof library.countPlay === 'function') library.countPlay();
-  } catch (_e) { /* the milestones counter must never stand between a tap and audio */ }
+    if (!library) return;
+    const track = _state.queue[_state.qi];
+    try {
+      if (track && typeof library.recordPlayed === 'function') library.recordPlayed(track);
+    } catch (_e) { /* recent-history failures must not interfere with listening */ }
+    try {
+      if (typeof library.countPlay === 'function') library.countPlay();
+    } catch (_e) { /* the milestones counter must never stand between a tap and audio */ }
+  } catch (_e) { /* no library bridge at all — nothing to record */ }
+}
+
+/**
+ * A collection's caller-ordered items (preface first where one exists), read
+ * from the lazy VOT registry globals. Null when that registry has not landed —
+ * every caller then falls back to the smaller queue it can build alone.
+ *
+ * @param {string} volKey
+ * @returns {Array<any> | null}
+ */
+function _collectionItems(volKey) {
+  const g = _g();
+  const col = typeof g.COL_BY_KEY !== 'undefined' && g.COL_BY_KEY ? g.COL_BY_KEY.get(volKey) : null;
+  if (!col || typeof g.colLetterArr !== 'function') return null;
+  const preface = typeof g.colPreface === 'function' ? g.colPreface(col) : null;
+  const letters = g.colLetterArr(col) || [];
+  return preface ? [preface, ...letters] : letters;
+}
+
+/**
+ * Where a stored recording sits in the LIVE corpus: the item it belongs to,
+ * which of that item's renditions holds this exact asset, and which part or
+ * chapter the asset is. Null when no manifest carries the URL at all — a
+ * retired recording, or a legacy whole-book Bible asset whose edition now
+ * ships per chapter — which is precisely when rebuilding a queue around it
+ * would play something the listener never chose.
+ *
+ * Identity is the immutable URL, never the stored partLabel: the label is
+ * display data a future manifest may reword, the URL cannot change.
+ *
+ * @param {{ key: string | null, title: string, sub: string | null, url: string }} track
+ * @returns {{ volKey: string, id: string, bible: boolean, partIndex: number, reader: string } | null}
+ */
+function _locateTrack(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  const divider = key.indexOf(':');
+  if (divider < 1 || divider >= key.length - 1) return null;
+  const volKey = key.slice(0, divider);
+  const id = key.slice(divider + 1);
+  if (_isBibleVol(volKey)) {
+    const manifest = _bibleManifest();
+    const parts = manifest && manifest[key];
+    if (!Array.isArray(parts)) return null;
+    const at = parts.findIndex((p) => p && bibleAudioAssetUrl(p[0]) === track.url);
+    return at < 0 ? null : { volKey, id, bible: true, partIndex: at, reader: '' };
+  }
+  for (const rendition of renditionsFor(volKey, { id, title: track.title || '' }, track.sub)) {
+    const at = rendition.tracks.findIndex((t) => t.url === track.url);
+    if (at >= 0) return { volKey, id, bible: false, partIndex: at, reader: rendition.reader || '' };
+  }
+  return null;
 }
 
 /**
@@ -1437,16 +1528,10 @@ function playLetter(opts) {
   // neighboring letters and playback continues past the letter's end. The
   // registry globals live in index.html; when absent (tests, stripped
   // harnesses) the letter still plays alone.
-  const g = _g();
-  const col = typeof g.COL_BY_KEY !== 'undefined' && g.COL_BY_KEY ? g.COL_BY_KEY.get(o.volKey) : null;
-  if (col && typeof g.colLetterArr === 'function' && o.letter && o.letter.id) {
-    const pref = typeof g.colPreface === 'function' ? g.colPreface(col) : null;
-    const arr = g.colLetterArr(col) || [];
-    const items = pref ? [pref, ...arr] : arr;
-    if (items.some((item) => item && item.id === o.letter.id)) {
-      playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader });
-      return;
-    }
+  const items = o.letter && o.letter.id ? _collectionItems(o.volKey) : null;
+  if (items && items.some((item) => item && item.id === o.letter.id)) {
+    playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader });
+    return;
   }
   const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, reader);
   if (rendition) queue = rendition.tracks;
@@ -1492,16 +1577,7 @@ function playCollection(opts) {
   if (o.startId) {
     const wanted = o.volKey + ':' + o.startId;
     const at = queue.findIndex((t) => t.key === wanted);
-    if (at >= 0) {
-      startKey = wanted;
-      queue = queue.slice(at);
-      const spi = Math.floor(Number(o.startPartIndex) || 0);
-      if (spi > 0) {
-        let run = 0;
-        while (run < queue.length && queue[run].key === startKey) run++;
-        queue = queue.slice(Math.min(spi, run - 1));
-      }
-    }
+    if (at >= 0) { startKey = wanted; queue = queue.slice(at); }
   }
   let startReader = null;
   if (startKey) {
@@ -1515,6 +1591,16 @@ function playCollection(opts) {
       while (end < queue.length && queue[end].key === startKey) end++;
       queue = rendition.tracks.concat(queue.slice(end));
       startReader = wanted;
+    }
+    // Part/chapter-grained horizon, applied AFTER the voice swap (2026-08-10)
+    // so a chosen READING and a chosen PART compose — a library row that names
+    // "Part 2, read by Timothy" rebuilds to exactly that, where the older
+    // order let the rendition swap re-grow the parts the index had trimmed.
+    const spi = Math.floor(Number(o.startPartIndex) || 0);
+    if (spi > 0) {
+      let run = 0;
+      while (run < queue.length && queue[run].key === startKey) run++;
+      queue = queue.slice(Math.min(spi, run - 1));
     }
   }
   _pendingRestore = null;
@@ -1566,8 +1652,24 @@ function playSection(volKey, index, collectionLabel) {
 
 /**
  * Play one previously-saved or recently-played recording. Only normalized VOT
- * release assets can become a standalone queue, including after a backup
- * import, so this is not an arbitrary remote-audio loader.
+ * release assets can become a queue, including after a backup import, so this
+ * is not an arbitrary remote-audio loader.
+ *
+ * CONTINUATION (owner directive 2026-08-10). A library row is a PLACE in the
+ * corpus, not an island: it rebuilds the queue AROUND the recording, so
+ * listening carries on past its last second exactly as it would had the same
+ * recording been started from its own screen —
+ *   - a Bible chapter rebuilds its BOOK, positioned at that chapter;
+ *   - a letter rebuilds its collection from that letter forward (the s4
+ *     forward-only album queue), on the RENDITION the row actually names;
+ *   - anything the manifests no longer carry — a legacy whole-book Bible
+ *     asset, a range compilation, a letter whose registry has not landed —
+ *     still plays alone, which is the only case where a queue of one is the
+ *     truth rather than a dead end four minutes long.
+ * Every branch consults the per-recording resume map (playBibleBook and
+ * playCollection each do their own `_resumeAt`), so the position the row
+ * promises is honored in all three. There is no explicit chapter TAP on this
+ * path, so nothing outranks that resume.
  *
  * @param {unknown} track
  * @returns {void}
@@ -1576,13 +1678,32 @@ function playTrack(track) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const normalized = normalizeAudioTrack(track);
   if (!normalized) return;
+  const at = _locateTrack(normalized);
+  if (at && at.bible) {
+    // partIndex + 1 IS the chapter for a per-chapter edition, and 1 for a
+    // whole-book one (whose chapter-start offset is 0, leaving resume to win).
+    playBibleBook({ volKey: at.volKey, bookId: at.id, label: normalized.sub, chapterNum: at.partIndex + 1 });
+    return;
+  }
+  if (at) {
+    const items = _collectionItems(at.volKey);
+    if (items && items.some((item) => item && item.id === at.id)) {
+      playCollection({
+        volKey: at.volKey, items, collectionLabel: normalized.sub, startId: at.id,
+        // The row named a voice and a part; the rebuilt queue must open on
+        // exactly those, not on the manifest's primary or the reader default.
+        startReader: at.reader || undefined, startPartIndex: at.partIndex,
+      });
+      return;
+    }
+  }
   _pendingRestore = null;
   _source = { mode: 'custom', volKey: '', label: normalized.sub };
   _state.queue = [normalized];
   _state.qi = 0;
   _countPlay();
   _start();
-  // What makes every Listening Library row and "Resume last" pick up where the
+  // What makes every unresolvable Listening Library row still pick up where the
   // reader left off instead of restarting from zero.
   _seekOnMetadata(_resumeAt(normalized));
 }

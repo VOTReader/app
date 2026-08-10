@@ -43,6 +43,22 @@ that engine rather than creating independent `<audio>` elements or queues.
 - Leave any recording and come back to it later. Every recording keeps its own
   place, so starting a second one does not forget the first; library rows say
   how much of a recording is left, and "Resume last" resumes for real.
+- Carry on past it. A saved or recently-played row is a PLACE in the corpus,
+  not an island: starting one rebuilds the queue around it — a Bible chapter
+  gets its book from that chapter forward, a letter gets its collection from
+  that letter forward, on the exact reading and part the row names. Only a
+  recording no manifest carries any more (a legacy whole-book Bible asset, a
+  retired recording) plays alone, which is the one case where a queue of one
+  is the truth rather than a dead end four minutes long. Every branch still
+  consults the resume map, so the position the row promises is kept.
+- Earn credit for listening to Scripture. A Bible chapter heard to its end
+  marks that chapter read in the SAME ledger the reader writes to
+  (`v1:<bookId>:<chapter>`) and feeds the reading streak, exactly as a
+  finished letter has since 2026-08-09. Every shipped edition is per-chapter,
+  so each track is one whole recording: the completion counter and the read
+  credit both move per CHAPTER, whatever shape the queue happens to be in.
+  A whole-book recording names no single chapter, so it counts as finished
+  without claiming any chapter read.
 - Inspect and edit the WHOLE queue — heard, playing, and still ahead. Played
   rows are dimmed but tappable, so a chapter can be heard again without
   rebuilding the queue; the playing row is a marker with no controls at all
@@ -116,6 +132,13 @@ Display strings are also bounded and copied before use.
 - Saved recordings are capped at 100; recent recordings at 30. `removeRecent(url)`
   drops one recent row by its immutable release URL — an in-place mutator like
   `clearRecent`, so no persisted shape and no schema version moves.
+- The recent shelf and the lifetime play counter both record a listening
+  DECISION, never a track boundary: `recordPlayed` and `countPlay` fire
+  together from the player's four user-initiated entry points and from nowhere
+  else. Auto-advance, next/prev, `playAt` and the boot-resume rebuild all start
+  tracks nobody asked for individually — and with only 30 rows, one evening of
+  Genesis used to flush every letter off the shelf and repoint "Resume last" at
+  a chapter the listener never chose.
 - Both lists deduplicate by immutable release URL and retain the newest event.
 - The record participates in Settings export/import. Nested contents are
   normalized again on import, not merely trusted because the outer backup had

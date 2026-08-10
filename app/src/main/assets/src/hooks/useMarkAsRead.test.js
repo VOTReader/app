@@ -60,3 +60,44 @@ describe('useReadProgress — audio listen bridge', () => {
     expect(window.__votAudioListened).toBe(null);
   });
 });
+
+/* A Bible edition has no COL_BY_KEY entry and never will — its volKeys name a
+   RECORDING, not a collection — so a listened chapter used to resolve nothing
+   at all. It lands in the same chapter key space BibleChapterView's own
+   mark-as-read writes, which is what makes it show a check on the chapter
+   index and count toward the Scripture-chapter milestones. */
+describe('useReadProgress — audio listen bridge: Bible chapters', () => {
+  it('credits the CHAPTER key space and feeds the streak', () => {
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+
+    act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 3));
+    expect(result.current.readItems['v1:jonah:3']).toBe(1);
+    expect(result.current.isRead('jonah', 3)).toBe(true);
+    expect(window.ReadingStreakStore.recordReadingDay).toHaveBeenCalledTimes(1);
+
+    // A second listen increments, exactly as a re-read does.
+    act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 3));
+    expect(result.current.readItems['v1:jonah:3']).toBe(2);
+  });
+
+  it('adds on top of a chapter already read in the reader — one ledger', () => {
+    const { result } = renderHook(() => useReadProgress({
+      savedReadItems: { 'v1:matthew:5': 2 }, markAsReadEnabled: true,
+    }));
+    act(() => window.__votAudioListened('bible-wop-nkjv', 'matthew', 5));
+    expect(result.current.readItems['v1:matthew:5']).toBe(3);
+  });
+
+  it('claims nothing when no chapter is named (a whole-book recording)', () => {
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+    act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 0));
+    expect(result.current.readItems).toEqual({});
+    expect(window.ReadingStreakStore.recordReadingDay).not.toHaveBeenCalled();
+  });
+
+  it('respects the markAsRead gate like any other new mark', () => {
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: false }));
+    act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 1));
+    expect(result.current.readItems).toEqual({});
+  });
+});

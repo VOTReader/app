@@ -20,6 +20,10 @@ export function MatthewChapterView({
   chapter, chapterNum, mode, showStudy,
   // Context
   fromStudies, settings,
+  // Streaming audio — the recorded edition chosen in Settings, or null when
+  // Bible Audio is off (screen-routes' bibleAudioProp, same prop bible-ch and
+  // the chapter indexes take).
+  bibleAudio = null,
   // Focus-hidden state (passed through to ChapterView)
   titleFocusHidden, setTitleFocusHidden,
   // Chain nav (from useReadingChainNav)
@@ -54,6 +58,7 @@ export function MatthewChapterView({
     <>
       <ChapterView
         book={MATTHEW} chapter={chapter} mode={mode} showStudy={showStudy} showEchoes={settings.showInlineEchoes !== false}
+        bibleAudio={bibleAudio}
         showChapterTitle={settings.showChapterTitle !== false}
         titleFocusHidden={titleFocusHidden}
         setTitleFocusHidden={setTitleFocusHidden}
