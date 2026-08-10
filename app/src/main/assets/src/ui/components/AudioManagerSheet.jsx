@@ -119,7 +119,7 @@ function voiceChoices(current) {
         label: edition.short || edition.label,
         active: edition.volKey === split.volKey,
         select: () => {
-          AudioPlayer.playBibleBook({ volKey: edition.volKey, bookId: split.id, chapterNum, label: edition.label });
+          AudioPlayer.playBibleBook({ volKey: edition.volKey, bookId: split.id, chapterNum, label: edition.label, noResume: true });
           // Every other Listen pill in the app reads settings.bibleAudio, so a
           // voice chosen here has to become THE voice — otherwise the next
           // chapter tapped in the reader would snap back to the old edition.
@@ -147,7 +147,7 @@ function voiceChoices(current) {
         if (items && items.some((item) => item && item.id === split.id)) {
           AudioPlayer.playCollection({
             volKey: split.volKey, items, collectionLabel: current.sub,
-            startId: split.id, startReader: rendition.reader,
+            startId: split.id, startReader: rendition.reader, noResume: true,
           });
           return;
         }
@@ -308,6 +308,33 @@ export function AudioManagerSheet({ open, state, onClose }) {
           </button>
         </div>
 
+        {/* Voice sits right under the track identity (owner directive
+            2026-08-10): what you're hearing and the switch for it are one
+            glance apart. Absent entirely when this recording has only one
+            voice — a chip row of one is furniture. Switching restarts THIS
+            chapter/recording in the chosen voice and the rest of the queue
+            follows (the rebuilt queue IS that voice's). */}
+        {voices ? (
+          <div className="audio-manager-tool audio-manager-voice audio-manager-voice-top">
+            <div className="audio-manager-tool-head">
+              <span>{voices.kind === 'edition' ? 'Audio Bible' : 'Voice'}</span>
+              <strong>{voices.activeLabel}</strong>
+            </div>
+            <div className="audio-manager-segment" role="group" aria-label={voices.kind === 'edition' ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
+              {voices.chips.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={chip.active ? 'is-active' : ''}
+                  aria-pressed={chip.active}
+                  onClick={chip.select}
+                >{chip.label}</button>
+              ))}
+            </div>
+            <p className="audio-manager-voice-note">Switches this {voices.kind === 'edition' ? 'chapter' : 'recording'} — starts it again, and the queue follows.</p>
+          </div>
+        ) : null}
+
         <div className="audio-manager-progress">
           <AudioSeekSlider className="audio-manager-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
           <div className="audio-manager-time"><span>{formatTime(state.time)}</span><span>{duration ? formatTime(duration) : '—'}</span></div>
@@ -349,25 +376,6 @@ export function AudioManagerSheet({ open, state, onClose }) {
               ))}
             </div>
           </div>
-          {/* Voice (owner directive 2026-08-09). Absent entirely when this
-              recording has only one — a chip row of one is furniture. */}
-          {voices ? (
-            <div className="audio-manager-tool audio-manager-voice">
-              <div className="audio-manager-tool-head"><span>Voice</span><strong>{voices.activeLabel}</strong></div>
-              <div className="audio-manager-segment" role="group" aria-label={voices.kind === 'edition' ? 'Recorded edition' : 'Reader'}>
-                {voices.chips.map((chip) => (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    className={chip.active ? 'is-active' : ''}
-                    aria-pressed={chip.active}
-                    onClick={chip.select}
-                  >{chip.label}</button>
-                ))}
-              </div>
-              <p className="audio-manager-voice-note">Choosing a voice starts this {voices.kind === 'edition' ? 'chapter' : 'recording'} again.</p>
-            </div>
-          ) : null}
           <div className="audio-manager-tool">
             <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
             <div className="audio-manager-segment" role="group" aria-label="Sleep timer">

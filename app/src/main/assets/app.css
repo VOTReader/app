@@ -1143,6 +1143,10 @@
       @media (hover: hover) { .audio-manager-queue-page:hover { border-color: var(--gold); color: var(--gold); } }
       .audio-manager-queue-page:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       .audio-manager-voice-note { margin: 0.45rem 0 0; color: var(--cream-dim); font-size: var(--fs-10); font-style: italic; line-height: 1.4; }
+      /* The relocated top-of-desk voice picker (owner 2026-08-10): a bordered
+         band under the track identity so "what am I hearing" and its switch
+         read as one unit, before the transport. */
+      .audio-manager-voice-top { margin: 0.35rem 0 0.75rem; padding: 0.55rem 0.65rem 0.6rem; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--gold-faint); }
       .audio-manager-queue-actions { display: flex; align-items: center; }
       .audio-manager-queue-actions button { width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--gold-dim); cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-16); }
       @media (hover: hover) { .audio-manager-queue-actions button:not(:disabled):hover { background: var(--gold-faint); color: var(--gold); } }

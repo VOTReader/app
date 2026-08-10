@@ -123,7 +123,7 @@ const toolValue = (name) => {
 };
 const speedValue = () => toolValue('Speed');
 const sleepValue = () => toolValue('Sleep timer');
-const voiceValue = () => toolValue('Voice');
+const voiceValue = () => toolValue('Voice') ?? toolValue('Audio Bible');
 const queueSummary = () => document.querySelector('.audio-manager-section-head strong').textContent;
 const queueList = () => document.querySelector('.audio-manager-queue ol');
 const queueRows = () => Array.from(document.querySelectorAll('.audio-manager-queue li'));
@@ -647,7 +647,7 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     expect(voiceValue()).toBe('Read by Benjamin');
     expect(voiceChips().map((chip) => chip.textContent)).toEqual(['Read by Benjamin', 'Text-to-speech']);
     expect(voiceChips().map((chip) => chip.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
-    expect(document.querySelector('.audio-manager-voice-note').textContent).toContain('starts this recording again');
+    expect(document.querySelector('.audio-manager-voice-note').textContent).toContain('Switches this recording');
 
     act(() => { el().duration = 300; el().dispatchEvent(new Event('durationchange')); });
     drive(() => AudioPlayer.seek(120));
@@ -710,7 +710,7 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     expect(voiceChips().map((chip) => chip.textContent)).toEqual(['KJV · BRM', 'NKJV · Dramatized']);
     expect(voiceValue()).toBe('KJV · BRM');
     expect(voiceChips()[0].getAttribute('aria-pressed')).toBe('true');
-    expect(document.querySelector('.audio-manager-voice-note').textContent).toContain('starts this chapter again');
+    expect(document.querySelector('.audio-manager-voice-note').textContent).toContain('Switches this chapter');
 
     fireEvent.click(screen.getByRole('button', { name: 'NKJV · Dramatized' }));
     const state = AudioPlayer.getState();

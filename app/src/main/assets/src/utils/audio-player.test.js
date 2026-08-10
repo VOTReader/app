@@ -1612,17 +1612,17 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     expect(AudioPlayer.collectionHasAudio('bible-brm-kjv')).toBe(true);
   });
 
-  it('playBibleBook queues the tapped book and the books after it (forward-only), streaming from audio-bible-v1', () => {
+  it('playBibleBook queues ONLY the tapped book (book scope, owner 2026-08-10), streaming from audio-bible-v1', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'exodus', label: 'KJV · Biblical Restoration Ministries' });
     const s = AudioPlayer.getState();
-    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus'), BURL('brm-kjv_revelation')]);
+    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus')]);   // the BOOK, nothing after it
     expect(s.qi).toBe(0);
     expect(s.queue[0].title).toBe('Exodus');
     expect(s.queue[0].sub).toBe('KJV · Biblical Restoration Ministries');
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
-    // Bar next walks the FOLLOWING books; Genesis stays behind the horizon.
+    // Book scope: the queue ends where the book ends — next() at the tail stops.
     AudioPlayer.next();
-    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(BURL('brm-kjv_revelation'));
+    expect(AudioPlayer.getState().status).toBe('idle');
   });
 
   it('never offers reader alternates — a whole-book edition has one voice', () => {
@@ -1657,8 +1657,8 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     AudioPlayer.toggle();                            // first transport tap rebuilds
     await Promise.resolve(); await Promise.resolve();
     s = AudioPlayer.getState();
-    expect(s.queue.length).toBe(3);                  // full edition rebuilt from BIBLE_AUDIO_BOOKS
-    expect(s.qi).toBe(1);
+    expect(s.queue.length).toBe(1);                  // book scope: only Exodus rebuilds
+    expect(s.qi).toBe(0);
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
   });
 });
@@ -1743,7 +1743,7 @@ describe('audio-player — per-chapter Bible edition (Word of Promise)', () => {
   it('chapters are queue TRACKS with partLabels, streaming from the wop release', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', label: 'NKJV · The Word of Promise' });
     const s = AudioPlayer.getState();
-    expect(s.queue.length).toBe(11);                       // 4 Jonah + 7 Micah, forward-only from Jonah
+    expect(s.queue.length).toBe(4);                        // book scope: Jonah's 4 chapters, Micah stays out
     expect(s.queue[0].url).toBe(OT('wop1_jonah_001'));
     expect(s.queue[0].partLabel).toBe('Chapter 1');
     expect(s.qi).toBe(0);
@@ -1756,11 +1756,11 @@ describe('audio-player — per-chapter Bible edition (Word of Promise)', () => {
     expect(s.queue[0].partLabel).toBe('Chapter 3');
     expect(s.qi).toBe(0);
     expect(el().src).toBe(OT('wop1_jonah_003'));
-    // next() walks to chapter 4, then into the next book's chapter 1.
+    // next() walks to chapter 4; the queue ENDS with the book.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_jonah_004'));
     AudioPlayer.next();
-    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_micah_001'));
+    expect(AudioPlayer.getState().status).toBe('idle');    // book done — no bleed into Micah
   });
 
   it('a chapterNum past the book clamps to its last chapter', () => {
@@ -1797,13 +1797,16 @@ describe('audio-player — per-chapter Bible edition (BRM KJV)', () => {
   it('chapters are queue TRACKS with partLabels, streaming from the brm release', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV · Biblical Restoration Ministries' });
     const s = AudioPlayer.getState();
-    expect(s.queue.length).toBe(12);                       // 4 Jonah + 7 Micah + 1 Jude, forward-only
+    expect(s.queue.length).toBe(4);                        // book scope: Jonah only
     expect(s.queue[0].url).toBe(OT('brm1_jonah_001'));
     expect(s.queue[0].partLabel).toBe('Chapter 1');
     expect(s.queue[0].title).toBe('Jonah');
     expect(s.qi).toBe(0);
-    // The testament digit in the asset name — not the book — picks the tag.
-    expect(s.queue[11].url).toBe(NT('brm2_jude_001'));
+  });
+
+  it('the testament digit in the asset name — not the book — picks the tag', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: null });
+    expect(AudioPlayer.getState().queue[0].url).toBe(NT('brm2_jude_001'));
   });
 
   it('choosing chapter N positions the queue at that chapter track (no seek)', () => {
@@ -1817,11 +1820,11 @@ describe('audio-player — per-chapter Bible edition (BRM KJV)', () => {
     el().duration = 300;
     el().dispatchEvent(new Event('loadedmetadata'));
     expect(el().currentTime).toBe(0);
-    // next() walks the remaining chapters, then into the next book's chapter 1.
+    // next() walks the remaining chapters; the queue ENDS with the book.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_jonah_004'));
     AudioPlayer.next();
-    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_micah_001'));
+    expect(AudioPlayer.getState().status).toBe('idle');
   });
 
   it('a chapterNum past the book clamps to its last chapter', () => {
@@ -1920,17 +1923,17 @@ describe('audio-player — whole-book → per-chapter resume migration', () => {
     expect(el().currentTime).toBeLessThan(el().duration);
   });
 
-  it('offsets the chapter within the whole rebuilt queue, not just within the book', async () => {
+  it('rebuilds ONLY the saved book and lands on the migrated chapter', async () => {
     const SAVED = 9000;
     const want = expected(GEN_STARTS, SAVED);
-    // No startKey (the queue was never sliced), so Genesis' chapters sit at
-    // the head and Exodus follows — the landing index is book-relative.
+    // Book scope (owner 2026-08-10): even a legacy whole-Bible snapshot
+    // rebuilds just the saved track's book.
     const s = await reboot({
       v: 2, mode: 'collection', volKey: 'bible-brm-kjv', label: null,
       qi: 0, key: 'bible-brm-kjv:genesis', time: SAVED,
       track: { key: 'bible-brm-kjv:genesis', title: 'Genesis', sub: null, url: LEGACY('brm-kjv_genesis'), readerCode: '' },
     });
-    expect(s.queue.length).toBe(90);            // 50 Genesis + 40 Exodus
+    expect(s.queue.length).toBe(50);            // Genesis only — Exodus stays out
     expect(s.qi).toBe(want.chapter - 1);
     expect(s.queue[s.qi].key).toBe('bible-brm-kjv:genesis');
   });
@@ -1981,6 +1984,31 @@ describe('audio-player — section compilations resume', () => {
       el().dispatchEvent(new Event('loadedmetadata'));
       expect(el().currentTime).toBe(1195);   // 1200 − 5s rewind nudge
     } finally {
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+});
+
+describe('audio-player — voice switch honors its own promise (noResume)', () => {
+  it('a voice switch starts the chapter at 0 even when the target voice has a remembered position', () => {
+    const target = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/wop1_jonah_002.mp3';
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-wop-nkjv:jonah': [['wop1_jonah_001', '', 'Chapter 1'], ['wop1_jonah_002', '', 'Chapter 2']],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === target ? { t: 120, d: 240 } : null),
+      setPosition: () => {}, clearPosition: () => {},
+    };
+    try {
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 2, label: null, noResume: true });
+      expect(el().src).toBe(target);
+      el().duration = 240;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(0);   // the switch RESTARTS — no mid-sentence drop
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
       delete globalThis.AudioPositionsStore;
     }
   });

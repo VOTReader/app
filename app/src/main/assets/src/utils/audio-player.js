@@ -816,14 +816,17 @@ function collectionHasAudio(volKey) {
  * come from BIBLE_AUDIO_BOOKS, which ships in the same lazy bundle as the
  * Bible corpus — any screen showing a Listen pill has it by construction.
  *
- * @param {{ volKey: string, bookId: string, label?: string | null, chapterNum?: number | null }} opts
+ * @param {{ volKey: string, bookId: string, label?: string | null, chapterNum?: number | null, noResume?: boolean }} opts
  * @returns {void}
  */
 function playBibleBook(opts) {
   const o = opts || /** @type {any} */ ({});
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
-  const items = books.map((b) => ({ id: b[0], title: b[1] }));
+  // Queue scope is THE BOOK (owner directive 2026-08-10): a chapter tap
+  // queues that book's remaining chapters, never the rest of the Bible —
+  // auto-advance ends where the book ends.
+  const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));
   if (!items.length) return;
   // Two edition shapes: PER-CHAPTER editions (WOP) carry one manifest part
   // per chapter, so "play chapter N" is a queue POSITION; whole-book editions
@@ -836,6 +839,7 @@ function playBibleBook(opts) {
   playCollection({
     volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId,
     startPartIndex: perChapter && Number.isInteger(n) && n >= 2 ? Math.min(n - 1, parts.length - 1) : 0,
+    noResume: !!o.noResume,
   });
   if (perChapter) return;
   // A whole-book edition seeks INTO the book track. The chapter the reader
@@ -1325,12 +1329,14 @@ async function _rebuildRestoredQueue() {
     queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
   } else if (_isBibleVol(r.volKey)) {
     // Bible editions have no COL_BY_KEY registry — canonical book order ships
-    // in the manifest bundle as BIBLE_AUDIO_BOOKS [[id, title], …].
+    // in the manifest bundle as BIBLE_AUDIO_BOOKS [[id, title], …]. Queue
+    // scope is THE BOOK (owner directive 2026-08-10): whatever mode the
+    // snapshot carries, only the saved track's book is rebuilt. Legacy
+    // whole-Bible snapshots degrade to the same book scope via r.key.
     const books = Array.isArray(g.BIBLE_AUDIO_BOOKS) ? g.BIBLE_AUDIO_BOOKS : [];
-    const all = books.map((b) => ({ id: b[0], title: b[1] }));
-    const items = r.mode === 'letter'
-      ? all.filter((i) => r.key === r.volKey + ':' + i.id)
-      : all;
+    const items = books
+      .filter((b) => r.key === r.volKey + ':' + b[0])
+      .map((b) => ({ id: b[0], title: b[1] }));
     for (const item of items) {
       for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
     }
@@ -1468,7 +1474,7 @@ function playLetter(opts) {
  * per-chapter Bible edition choosing chapter N) — same forward-only rule,
  * chapter-grained.
  *
- * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string, startPartIndex?: number }} opts
+ * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string, startPartIndex?: number, noResume?: boolean }} opts
  * @returns {void}
  */
 function playCollection(opts) {
@@ -1518,8 +1524,11 @@ function playCollection(opts) {
   _countPlay();
   _start();
   // Durable resume consults the STARTING track only: everything queued behind
-  // it is being reached in order, from its beginning.
-  _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
+  // it is being reached in order, from its beginning. `noResume` exists for
+  // the desk's voice switch — its promise is "starts this again", and a
+  // remembered position in the OTHER voice would drop the listener
+  // mid-sentence in a recording with different pacing.
+  if (!o.noResume) _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
 }
 
 /**
