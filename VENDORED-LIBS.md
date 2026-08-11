@@ -51,6 +51,23 @@ each library embeds). Notes per blob:
   The MiniSearch index shape is defined once in
   `src/search/search-config.js`.
 
+## Vendored datasets (generator inputs, not shipped as-is)
+
+- **`tools/vendor/openbible-cross-references/cross_references.txt`** —
+  OpenBible.info cross-reference dataset (chiefly R.A. Torrey's *Treasury of
+  Scripture Knowledge*), retrieved 2026-08-10 from
+  <https://a.openbible.info/data/cross-references.zip>. 8,301,974 bytes,
+  344,799 data rows, sha256
+  `9055f13fdf8cb8067c49995dd19b27e8c1f91f71f713f6f0e19d92cfbe443fcc`.
+  **License: CC-BY 4.0 — attribution is REQUIRED wherever the data is
+  displayed** (AboutScreen credits line + the Scripture Web screen's info
+  surface; do not remove either without equivalent visible credit).
+  **Role: build input only.** It is never served to the app; the generator
+  `tools/gen-scripture-web.mjs` resolves it against the app's own canonical
+  verse table and emits `src/data/scripture-web-data.js` (301,539 unique
+  unordered verse pairs, delta-encoded typed arrays). Provenance, format and
+  the refresh procedure live in that directory's `README.md`.
+
 ## Retired
 
 - **`flexsearch.min.js` 0.7.41** (sha256

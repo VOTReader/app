@@ -43,7 +43,13 @@ const CORPUS_BUNDLES = ['bundle-a-bible.js', 'bundle-a-matthew.js', 'bundle-a-vo
 // dist corpus bundles — a content edit must bump CORPUS_VERSION or cached clients
 // keep the stale data forever. Fold them into the gate's fingerprint. Globbed so
 // a future translation is auto-covered.
-const DATA_CORPUS = readdirSync(dataDir).filter((f) => /^bible-[a-z-]+\.js$/.test(f)).sort();
+// scripture-web-data.js joins them (2026-08-10): the Scripture Web graph asset
+// is raw-injected + precached into the same STABLE corpus cache, so a
+// regenerated dataset must bump CORPUS_VERSION or cached clients keep the old
+// graph forever. Named explicitly — it doesn't match the bible-*.js glob.
+const DATA_CORPUS = readdirSync(dataDir)
+  .filter((f) => /^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
+  .sort();
 const checkOnly = process.argv.includes('--check');
 
 function fail(msg) {
