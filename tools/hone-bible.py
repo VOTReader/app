@@ -77,7 +77,8 @@ def main():
     B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
     print(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
 
-    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl))
+    snap = al.make_snap(al.silence_intervals(wav))
+    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl), snap_fn=snap)
     n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
     n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
     n_review = sum(1 for r in rows if r["status"] == "REVIEW")

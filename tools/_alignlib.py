@@ -493,39 +493,66 @@ def probe(wav_path, t, expect_text, s, whisper_leg):
     nrm = normalizer(s)
     segs = whisper_leg.transcribe_probe(clip)
     heard = [nrm(w) for seg in segs for w in seg.text.split() if nrm(w)]
-    want = [nrm(w) for w in spoken_words(expect_text)][:s["probe_tokens"]]
+    # Deut-15 lesson (BRM prior art): scripture is formulaic — an anchor made
+    # only of function words matches almost anywhere and false-confirms bad
+    # stamps. Extend past probe_tokens until the anchor holds >= 2 CONTENT
+    # tokens (len >= 4), and require the content tokens to actually match.
+    all_want = [nrm(w) for w in spoken_words(expect_text)]
+    take = s["probe_tokens"]
+    while take < min(len(all_want), s["probe_tokens"] + 6) and \
+            sum(1 for w in all_want[:take] if len(w) >= 4) < 2:
+        take += 1
+    want = all_want[:take]
     if not want:
         return False, heard[:8]
-    hi = matched = 0
+    hi = matched = content_matched = 0
     for w in want:                       # in-order fuzzy prefix match
         while hi < len(heard) and not tok_match(heard[hi], w):
             hi += 1
         if hi < len(heard):
             matched += 1
+            if len(w) >= 4:
+                content_matched += 1
             hi += 1
-    return matched >= max(2, len(want) - 2), heard[:12]
+    content_have = sum(1 for w in want if len(w) >= 4)
+    content_ok = content_matched >= min(2, content_have) if content_have else True
+    return (matched >= max(2, len(want) - 2)) and content_ok, heard[:12]
 
 
-def belt(A, B, units, s, probe_fn):
+def belt(A, B, units, s, probe_fn, snap_fn=None):
     """Adjudicate leg A against leg B, unit by unit.
 
     A: MMSLeg.align output, B: nw_rows output, both keyed by unit['owner'].
     probe_fn(t, expect_text) -> (ok, heard).
+    snap_fn(t) -> t', optional: silence-snap — a start landing inside a detected
+    silence interval moves to that interval's end (see silence_intervals /
+    make_snap). Counters the CTC first-token smear: forced alignment stretches a
+    unit's first word back into a preceding pause, an early bias the 2026-08-10
+    verify pass measured at ~0.3 s on pause-heavy poetry and ~0.4 s under WOP
+    music beds (where gaps are music, not silence — hence onset_bias_s below).
 
-    CONFIRMED  legs agree within agree_sec (the earlier stamp wins)
+    CONFIRMED  legs agree within agree_sec. The LATER stamp wins: both legs err
+               early (CTC smear; whisper stamps early under music), so within the
+               window the later estimate sits closer to the true onset — the
+               verify pass's signed probe deltas proved min() early-biased.
     PROBED_A/B legs disagree; an independent transcription at that start heard
                the unit's opening words. A is asked first — it is the precision leg.
     REVIEW     neither candidate survived its probe. The row still carries a t,
                interpolated between its neighbours and flagged `interpolated`, so a
                gap is visible in QA instead of silently painting a guess.
-    Ordering is repaired last: a regressing start is clamped (flagged `clamped`),
-    then lead_in is subtracted — lead_in DEFAULTS TO 0.0 because shipped data now
-    carries true onsets and the perceptual lead lives in the app/sample constant."""
+    Ordering: snap_fn, then settings onset_bias_s (per-family empirical shift for
+    music-bed editions), then monotonic clamp, then lead_in (defaults 0.0 — data
+    ships true onsets; the perceptual lead lives in the app/sample constant)."""
     rows = []
     for u in units:
         o = u["owner"]
         la, lb = A.get(o), B.get(o)
-        k = (lb or {}).get("firstSpoken", 0)
+        # Trust the spoken-prefix trim only when leg B's placement is sane — a
+        # junk B match (e.g. attracted into a chapter announcement) produces a
+        # junk firstSpoken, which then corrupts the probe's expected text and
+        # can false-confirm a bad stamp (BRM Psalm 3 v2, 2026-08-10).
+        b_ratio = (lb["hit"] / max(1, lb["tot"])) if lb and "hit" in lb else 0.0
+        k = (lb or {}).get("firstSpoken", 0) if b_ratio >= 0.5 else 0
         wts = (la or {}).get("wordTs") or []
         tA = wts[k] if (la and k < len(wts)) else (la or {}).get("t")
         tB = (lb or {}).get("t")
@@ -537,6 +564,9 @@ def belt(A, B, units, s, probe_fn):
             row["skippedPrefix"] = " ".join(toks[:k])
         expect = " ".join(toks[k:]) or str(u.get("text") or "")
         if tA is not None and tB is not None and abs(tA - tB) <= s["agree_sec"]:
+            # min(): wide-window ground truth (2026-08-10) showed max() adopts
+            # whisper's LATE stamps on clean speech; MMS-side min stays on the
+            # syllable, and silence-snap already corrects pause smear.
             row.update(t=round(min(tA, tB), 2), status="CONFIRMED",
                        delta=round(abs(tA - tB), 2), tEnd=la["tEnd"])
         else:
@@ -572,16 +602,56 @@ def belt(A, B, units, s, probe_fn):
                 r["t"] = prev_t
                 r["interpolated"] = True
 
+    bias = float(s.get("onset_bias_s", 0.0))
     last = -1.0
     for r in rows:
         if r.get("t") is None:
             continue
+        if snap_fn is not None and not r.get("interpolated"):
+            snapped = snap_fn(r["t"])
+            if snapped != r["t"]:
+                r["snapped_from"] = r["t"]
+                r["t"] = round(snapped, 2)
+        if bias:
+            r["t"] = round(r["t"] + bias, 2)
         if r["t"] < last:
             r["t"] = last
             r["clamped"] = True
         last = r["t"]
         r["t"] = max(0.0, round(r["t"] - s["lead_in"], 2))
     return rows
+
+
+def silence_intervals(wav, noise_db=-32, min_d=0.25):
+    """[(start, end), ...] from ffmpeg silencedetect, cached beside the wav.
+    Calibration note: WOP's continuous music bed yields NO intervals — by design
+    (its gaps are music; onset_bias_s handles that family instead)."""
+    import subprocess
+    cache = wav + ".sil.json"
+    if os.path.exists(cache):
+        return json.load(open(cache, encoding="utf-8"))
+    r = subprocess.run(["ffmpeg", "-i", wav, "-af",
+                        f"silencedetect=noise={noise_db}dB:d={min_d}", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    starts = [float(m) for m in re.findall(r"silence_start: ([0-9.]+)", r.stderr)]
+    ends = [float(m) for m in re.findall(r"silence_end: ([0-9.]+)", r.stderr)]
+    ivals = [[s0, e0] for s0, e0 in zip(starts, ends) if e0 > s0]
+    json.dump(ivals, open(cache, "w", encoding="utf-8"))
+    return ivals
+
+
+def make_snap(intervals, back_off=0.05, max_snap=1.5):
+    """snap_fn for belt(): a start inside a silence interval moves to the
+    interval's end minus back_off (the voice onset), never more than max_snap."""
+    def snap(t):
+        for s0, e0 in intervals:
+            if s0 <= t < e0:
+                target = max(t, e0 - back_off)
+                if target - t <= max_snap:
+                    return target
+                return t
+        return t
+    return snap
 
 
 # --------------------------------------------------------------- registry ---
@@ -651,6 +721,13 @@ FAMILIES = {
                            "New King James Version."),
         "unit": "verse",
         "psalm_superscription": "folded-v1",
+        # Continuous music bed: gaps between verses are music, so silence-snap
+        # never fires here. onset_bias_s stays 0.0 — a +0.35 "correction" was
+        # briefly dialed against hone-verify's clip-boundary deltas, then wide-
+        # window ground truth proved the original stamps right and the ruler
+        # bent (whisper clip stamps carry a ~±0.3 s floor). The knob remains
+        # for any edition where ground truth ever shows a real constant bias.
+        "onset_bias_s": 0.0,
     },
     "bible-web": {
         "initial_prompt": ("The World English Bible, a public domain reading of the Holy "

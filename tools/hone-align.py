@@ -276,7 +276,9 @@ def run_belt(key, s, asset=None):
         B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
         print(f"    {len(B)}/{len(units)} placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
 
-        rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, whisper))
+        snap = al.make_snap(al.silence_intervals(wav))
+        rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, whisper),
+                       snap_fn=snap)
         ratio = {}
         for u in units:
             b = B.get(u["owner"])
@@ -303,10 +305,24 @@ def run_belt(key, s, asset=None):
         print(f"    consumed fragments {cursor}..{limit}  ({len(hit_here)} cleared threshold)")
         cursor = limit + 1
 
-    for fi, parts in cleared.items():                # contested — never a silent pick
-        if len(parts) >= 2 and fi in assigned:
+    # Contested fragments (cleared threshold in 2+ parts — an Addendum re-reading
+    # the letter's opening lines does this). NEIGHBORHOOD VOTE before REVIEW:
+    # a fragment whose two uncontested neighbours shipped in the same part it was
+    # assigned to belongs there — the repeat elsewhere is the echo, not the home.
+    # Neighbours disagreeing (a true boundary straddle) stays REVIEW.
+    contested_set = {fi for fi, p in cleared.items() if len(p) >= 2}
+    for fi in sorted(contested_set):
+        if fi not in assigned:
+            continue
+        p = assigned[fi].get("part")
+        nb = [assigned[j].get("part") for j in (fi - 1, fi + 1)
+              if j in assigned and j not in contested_set]
+        if len(nb) == 2 and nb[0] == nb[1] == p:
+            assigned[fi]["contested"] = cleared[fi]
+            assigned[fi]["contestResolved"] = "neighborhood"
+        else:
             assigned[fi]["status"] = "REVIEW"
-            assigned[fi]["contested"] = parts
+            assigned[fi]["contested"] = cleared[fi]
 
     results, tuples = [], []
     last_t, last_part = -1.0, None       # PER PART: every part is its own recording
