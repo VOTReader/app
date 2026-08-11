@@ -26,7 +26,8 @@ function stubGlobals() {
 afterEach(() => {
   cleanup();
   ['RecentNavStore', 'searchNavIndex', 'navItemToEndpoint', 'LinkStore', 'buildSourceEndpoint',
-    'persistLink', 'COL_NAV_ICON', 'buildNavTree', 'contentDocToNavItem', 'VotSearchMini'].forEach(k => delete window[k]);
+    'persistLink', 'COL_NAV_ICON', 'buildNavTree', 'contentDocToNavItem', 'VotSearchMini',
+    '__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus'].forEach(k => delete window[k]);
 });
 
 const baseProps = {
@@ -252,6 +253,164 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
       fireEvent.click(hitRow);
       // Verse-precise hit → direct create, no refinement step.
       expect(window.persistLink).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/* ── Corpus scope (All / Scriptures / Volumes) ──────────────────────────────
+   The picker's Full-text scope searched every corpus at once with no way to
+   narrow, so a remembered scripture phrase competed with 350+ letters for the
+   20 rendered rows. SearchScreen has owned this control for a year
+   (.srch-corpus-row → engine `corpus` option); these pin the same three-way
+   choice, same vocabulary, inside the picker. */
+
+const VERSE_DOC = {
+  kind: 'verse', corpus: 'scriptures', volumeId: 'bible', bookId: 'john',
+  chapterNum: 3, verseNum: 16, ref: 'John 3:16', text: 'For God so loved the world…',
+};
+const LETTER_DOC = {
+  kind: 'letter', corpus: 'volumes', letterId: 'the-wide-path', heading: 'Volume One',
+  ref: 'Volume One · Letter 1', title: 'The Wide Path', text: 'God so loved that He warns…',
+};
+
+/** Engine stub that HONOURS options.corpus, so the scope has to be plumbed. */
+function stubCorpusEngine() {
+  window.navItemToEndpoint = (item) => ({
+    type: item.kind === 'letter' ? 'letter' : 'bible',
+    key: 'k', label: item.label, verse: item.verse || null,
+  });
+  window.contentDocToNavItem = (doc) => (doc.kind === 'verse'
+    ? {
+      kind: 'bible-chapter', bookId: doc.bookId, chapter: doc.chapterNum, verse: doc.verseNum,
+      label: doc.ref, category: 'New Testament', title: doc.ref,
+    }
+    : {
+      kind: 'letter', letterId: doc.letterId, label: doc.title,
+      category: doc.heading, collection: doc.heading,
+    });
+  window.VotSearchMini = {
+    init: vi.fn(async () => true),
+    getState: () => ({ ready: true }),
+    snippet: (text) => text.slice(0, 40),
+    search: vi.fn(async (_q, opts) => {
+      const corpus = (opts && opts.corpus) || 'all';
+      const docs = [VERSE_DOC, LETTER_DOC].filter((d) => corpus === 'all' || d.corpus === corpus);
+      return { parsedTerms: ['loved'], results: docs.map((doc, i) => ({ score: 9 - i, doc })) };
+    }),
+  };
+}
+
+async function settle() {
+  await act(async () => { vi.advanceTimersByTime(400); });
+  await act(async () => { await Promise.resolve(); });
+}
+
+describe('LinkPicker corpus scope (All / Scriptures / Volumes)', () => {
+  it('renders the corpus chips only in the Full text scope, defaulting to All', () => {
+    stubGlobals();
+    stubCorpusEngine();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    // Titles & refs is the picker's default scope — no corpus chips there.
+    expect(container.querySelector('.navpick-corpus')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+    const chips = [...container.querySelectorAll('.navpick-corpus-btn')];
+    expect(chips.map((c) => c.textContent)).toEqual(['All', 'Scriptures', 'Volumes']);
+    expect(chips[0].className).toContain('active');
+    expect(chips[0].getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('passes the active corpus to the engine and re-queries when it changes', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    stubCorpusEngine();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      await settle();
+      expect(window.VotSearchMini.search).toHaveBeenLastCalledWith('god so loved', expect.objectContaining({ corpus: 'all' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Scriptures' }));
+      await settle();
+      expect(window.VotSearchMini.search).toHaveBeenLastCalledWith('god so loved', expect.objectContaining({ corpus: 'scriptures' }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Scriptures keeps the verse hit and drops the letter hit; Volumes is the mirror', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    stubCorpusEngine();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    const labels = () => [...container.querySelectorAll('.navpick-row-label')].map((e) => e.textContent);
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      await settle();
+      expect(labels()).toEqual(['John 3:16', 'The Wide Path']);
+      fireEvent.click(screen.getByRole('radio', { name: 'Scriptures' }));
+      await settle();
+      expect(labels()).toEqual(['John 3:16']);
+      fireEvent.click(screen.getByRole('radio', { name: 'Volumes' }));
+      await settle();
+      expect(labels()).toEqual(['The Wide Path']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an empty scoped result names the scope and offers a one-tap widen to All', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    stubCorpusEngine();
+    // Nothing in Scriptures matches; the letter still does.
+    window.VotSearchMini.search = vi.fn(async (_q, opts) => ({
+      parsedTerms: ['loved'],
+      results: ((opts && opts.corpus) === 'scriptures') ? [] : [{ score: 9, doc: LETTER_DOC }],
+    }));
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Scriptures' }));
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      await settle();
+      expect(screen.getByText('Nothing in Scriptures matches')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Search every corpus instead' }));
+      await settle();
+      expect([...container.querySelectorAll('.navpick-corpus-btn')][0].className).toContain('active');
+      expect([...container.querySelectorAll('.navpick-row-label')].map((e) => e.textContent)).toEqual(['The Wide Path']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('LinkPicker search warm-up', () => {
+  it('waits for the lazy corpora before building the search index', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    /** @type {() => void} */ let releaseBible = () => {};
+    window.__loadBibleCorpus = vi.fn(() => new Promise((r) => { releaseBible = () => r(undefined); }));
+    window.VotSearchMini = {
+      init: vi.fn(async () => true),
+      getState: () => ({ ready: false }),
+      snippet: (t) => t,
+      search: vi.fn(async () => ({ results: [] })),
+    };
+    try {
+      render(<LinkPicker {...baseProps} />);
+      // The engine indexes whatever corpora are LOADED when init() runs, so a
+      // build kicked before the 5 MB Bible lands caches a scripture-less index
+      // — and the Scriptures scope would be honestly, permanently empty.
+      await act(async () => { vi.advanceTimersByTime(2000); });
+      expect(window.VotSearchMini.init).not.toHaveBeenCalled();
+      await act(async () => {
+        releaseBible();
+        for (let i = 0; i < 6; i++) await Promise.resolve();
+      });
+      expect(window.VotSearchMini.init).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

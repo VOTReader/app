@@ -4436,6 +4436,27 @@
     }
     .navpick-scope-btn.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
     body.light .navpick-scope-btn.active { color: #7a5c1e; }
+    /* ── Corpus chips (All / Scriptures / Volumes) — SearchScreen's
+       .srch-corpus-row control wearing the picker's sheet chrome. Full 44px
+       tap height (the underlined scope row above is a text toggle; these are
+       standalone pills the finger aims at). ── */
+    .navpick-corpus {
+      display: flex; gap: 6px;
+      margin: 10px 22px 0;
+    }
+    .navpick-corpus-btn {
+      flex: 1; min-height: 44px; padding: 0 6px;
+      background: transparent; border: 1px solid var(--gold-border); border-radius: 999px;
+      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    }
+    .navpick-corpus-btn.active {
+      background: var(--gold-faint); color: var(--gold-bright); border-color: var(--gold-dim);
+    }
+    body.light .navpick-corpus-btn.active { color: #7a5c1e; }
+    .navpick-corpus-btn:active { background: rgba(200,164,86,0.15); }
     .navpick-scope-jump {
       margin-top: 16px; padding: 10px 22px; min-height: 44px;
       background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);

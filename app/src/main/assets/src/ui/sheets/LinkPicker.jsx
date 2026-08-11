@@ -13,6 +13,13 @@
               Full text. Content docs map to nav items via
               contentDocToNavItem; Hidden Manna can never surface (it has
               no nav item, and the mapper returns null).
+              Full text carries the CORPUS chips — All / Scriptures /
+              Volumes, SearchScreen's own control (.srch-corpus-row) and
+              vocabulary, riding the same engine `corpus` option. Without
+              them one query fought 31k verses and 350+ letters for 20
+              rendered rows, so a remembered verse could never be isolated.
+              'all' is the default (what the picker did before the chips
+              existed, and SearchScreen's default too).
      Browse — the app's own top-down hierarchy as a drill-down tree
               (Bible → book → chapter grid; each Volumes collection →
               entries; Studies → chapters; Matthew Study Bible → chapter
@@ -25,12 +32,30 @@
    reuseEndpoint), so journal card/excerpt modes get them for free.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * The three corpus scopes, in SearchScreen's order + vocabulary
+ * (.srch-corpus-row). `id` is the engine's own `corpus` option value, so the
+ * chips are a straight pass-through — no picker-local mapping to drift.
+ * @type {Array<{id:string, label:string}>}
+ */
+const NAVPICK_CORPUS_SCOPES = [
+  { id: 'all', label: 'All' },
+  { id: 'scriptures', label: 'Scriptures' },
+  { id: 'volumes', label: 'Volumes' },
+];
+
 export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
   const [input, setInput] = React.useState('');
   const [view, setView] = React.useState('search'); // 'search' | 'browse' | 'recent'
   // Search scope — 'titles' (nav index: titles/refs/abbreviations, the fast
   // default) vs 'text' (MiniSearch full-text over verses + letter bodies).
   const [searchScope, setSearchScope] = React.useState('titles');
+  // Corpus scope for the full-text search — 'all' | 'scriptures' | 'volumes',
+  // handed straight to the engine. Sheet-local (like searchScope above), NOT
+  // the persisted settings.searchCorpus the Search SCREEN owns: the picker's
+  // search state is per-open by design, and narrowing a link hunt must not
+  // silently re-scope the main Search screen (or vice versa).
+  const [corpusScope, setCorpusScope] = React.useState('all');
   const [browsePath, setBrowsePath] = React.useState(/** @type {any[]} */ ([]));
   // Full-text results: null = idle (no query / too short), 'building' =
   // engine still preparing its index, [] / [...] = resolved rows.
@@ -56,16 +81,28 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   // bundle-e carries the MiniSearch engine — kick it plus a deferred index
   // init so the "In the text" group is warm by the time the user has typed.
   React.useEffect(() => {
-    ['__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus'].forEach((f) => {
-      if (typeof (/** @type {any} */ (window))[f] === 'function') (/** @type {any} */ (window))[f]();
+    let cancelled = false;
+    // AWAIT the corpora before init(): the engine indexes whatever is loaded
+    // at build time and then CACHES that index (search/cache.js), so a build
+    // kicked before the 5 MB Bible lands produces — and persists — a
+    // scripture-less index. The Scriptures corpus scope would be honestly,
+    // silently empty. SearchScreen has always awaited them; so does this now.
+    const loaders = ['__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus'].map((f) => {
+      const fn = (/** @type {any} */ (window))[f];
+      return (typeof fn === 'function') ? Promise.resolve(fn()).catch(() => {}) : Promise.resolve();
     });
     try { if (typeof loadBibleStudies === 'function') loadBibleStudies(); } catch (_e) { /* best-effort */ }
     if (typeof (/** @type {any} */ (window)).__loadScreensE === 'function') (/** @type {any} */ (window)).__loadScreensE();
+    // The 400ms floor stays: it keeps a cold ~10s index build off the picker's
+    // own first paint. The corpora simply have to be in as WELL.
     const t = setTimeout(() => {
-      const eng = (/** @type {any} */ (window)).VotSearchMini;
-      if (eng && typeof eng.init === 'function') eng.init().catch(() => {});
+      Promise.all(loaders).then(() => {
+        if (cancelled) return;
+        const eng = (/** @type {any} */ (window)).VotSearchMini;
+        if (eng && typeof eng.init === 'function') eng.init().catch(() => {});
+      });
     }, 400);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; clearTimeout(t); };
   }, []);
 
   // Android back button closes the picker (same save/restore pattern as every
@@ -91,6 +128,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   // Runs ONLY in the 'text' scope (the toggle keeps the two searches
   // predictable and separate). Structured/reference queries return no text
   // results by design — the empty state points back to Titles & refs.
+  // `corpusScope` is a search INPUT, so changing a chip re-runs the query.
   React.useEffect(() => {
     if (view !== 'search' || searchScope !== 'text') return undefined;
     const q = input.trim();
@@ -101,7 +139,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       if (!eng) { setContentHits(null); return; }
       try {
         if (!eng.getState().ready) setContentHits('building');
-        const res = await eng.search(q, { limit: 60 });
+        const res = await eng.search(q, { limit: 60, corpus: corpusScope });
         if (cancelled) return;
         const seen = new Set();
         const rows = [];
@@ -121,7 +159,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [input, view, searchScope]);
+  }, [input, view, searchScope, corpusScope]);
 
   const createLinkTo = React.useCallback((item) => {
     if (!item) return;
@@ -340,6 +378,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   };
 
   const isEmptyQuery = !input.trim();
+  const corpusScopeLabel = (NAVPICK_CORPUS_SCOPES.find((c) => c.id === corpusScope) || NAVPICK_CORPUS_SCOPES[0]).label;
   const VIEW_TABS = [
     { id: 'search', label: 'Search' },
     { id: 'browse', label: 'Browse' },
@@ -432,6 +471,22 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                 onClick={() => setSearchScope('text')}
               >Full text</button>
             </div>
+            {/* Corpus chips — SearchScreen's All / Scriptures / Volumes control,
+                same three ids the engine's `corpus` option takes. Only in the
+                Full text scope: it is the engine's filter, and the nav index
+                the Titles scope reads has no corpus discriminator. */}
+            {searchScope === 'text' && (
+              <div className="navpick-corpus" role="radiogroup" aria-label="Search corpus">
+                {NAVPICK_CORPUS_SCOPES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button" role="radio" aria-checked={corpusScope === c.id}
+                    className={"navpick-corpus-btn" + (corpusScope === c.id ? " active" : "")}
+                    onClick={() => setCorpusScope(c.id)}
+                  >{c.label}</button>
+                ))}
+              </div>
+            )}
           </>
         )}
         {/* Browse breadcrumb — back one level + where you are */}
@@ -486,8 +541,15 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
               )}
               {Array.isArray(contentHits) && contentHits.length === 0 && (
                 <div className="navpick-empty">
-                  <div className="navpick-empty-title">Nothing in the text matches</div>
+                  {/* Name the CORPUS that came up empty — otherwise a narrowed
+                      scope reads as "the phrase isn't in the app at all". */}
+                  <div className="navpick-empty-title">
+                    {corpusScope === 'all' ? 'Nothing in the text matches' : 'Nothing in ' + corpusScopeLabel + ' matches'}
+                  </div>
                   <div className="navpick-empty-hint">Full text finds phrases inside verses and letters. For references like &quot;Eph 6:5&quot; or titles, switch to Titles &amp; refs.</div>
+                  {corpusScope !== 'all' && (
+                    <button type="button" className="navpick-scope-jump" onClick={() => setCorpusScope('all')}>Search every corpus instead</button>
+                  )}
                 </div>
               )}
             </>
