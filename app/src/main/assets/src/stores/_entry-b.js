@@ -142,6 +142,7 @@ import {
   findEntryContext, lookupVersesFromBooks,
 } from '../data/scripture-resolution.js';
 import { linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna } from '../data/letter-linking.js';
+import { votNoteVolLabel } from '../data/vot-note-label.js';
 
 // ── Journal UI (sheets) ─────────────────────────────────────────────────
 import { JournalRecordingSheet } from '../ui/sheets/JournalRecordingSheet.jsx';
@@ -251,6 +252,7 @@ Object.assign(window, {
   parseRefStr, splitCompoundRef, findBook, parseScriptureRef, resolveVerseText,
   findEntryContext, lookupVersesFromBooks,
   linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna,
+  votNoteVolLabel,
   // Journal UI (sheets)
   JournalRecordingSheet, JournalInsertSheet, JournalInboundSheet,
   // Renderer

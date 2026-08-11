@@ -140,14 +140,32 @@ for (const col of COLLECTIONS) {
     }
   }
 }
+/**
+ * Mirror the app's own votNote resolution (index.html __finishVotInit +
+ * data/letter-linking.js resolveVotLetter), including its two special cases,
+ * so this generator's edge count matches what a reader can actually tap:
+ *
+ *   · Hidden Manna registers `title::title`, because the Study Bible PDF
+ *     cites those letters with no volume (they are not in a published one).
+ *   · The one note that points at The Blessed as an ALBUM rather than an
+ *     entry is registered under its `null::<title>` key, aimed at the
+ *     collection's introduction.
+ */
+const BLESSED_ALBUM_TITLE =
+  'The Blessed: More Declarations of Blessedness From The Lord, Our God and Savior';
+
 const resolveLetter = (volLabel, letterTitle) => {
   const volKey = labelToVolKey.get(norm(volLabel));
   if (volKey) {
     const hit = titleIndex.get(`${volKey}::${norm(letterTitle)}`);
     if (hit) return hit;
   }
-  // Title-keyed strays: a few votNotes carry the letter title in BOTH fields —
-  // fall back to a whole-corpus title search (titles are unique in practice).
+  if (norm(letterTitle) === norm(BLESSED_ALBUM_TITLE)) {
+    const intro = titleIndex.get('blessed::introduction');
+    if (intro) return intro;
+  }
+  // A votNote whose `vol` is just the letter title again is the importer
+  // recording a PDF row that named no volume — search the corpus by title.
   const want = `::${norm(letterTitle)}`;
   for (const [key, hit] of titleIndex) if (key.endsWith(want)) return hit;
   return null;

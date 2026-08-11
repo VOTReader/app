@@ -22,7 +22,7 @@ export function InlineEcho({ scriptures, votNotes }) {
       {votNotes.map((n, i) => (
         <button key={`ev${i}`} className="inline-echo-pill" onClick={() => scrollToRef(n.ref)} title={`See note at ${n.ref}`}>
           <span className="echo-arrow">{"↑"}</span>
-          <span>{n.ref}{" — "}{n.vol}</span>
+          <span>{n.ref}{votNoteVolLabel(n) ? " — " + votNoteVolLabel(n) : ""}</span>
         </button>
       ))}
     </div>

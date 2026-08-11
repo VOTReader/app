@@ -297,6 +297,39 @@ describe('corpus edge extraction', () => {
     expect(edges[0].v).toBe(verseIdOf({ bookId: 'matthew-plain', chapter: 1, verse: 18 }, t, null));
   });
 
+  it('consults the resolver for a note whose vol is null (the album row)', () => {
+    // ch5's note points at The Blessed as an ALBUM, so the PDF gives it no
+    // volume and the importer stored `vol: null`. Requiring `vol` here made
+    // the generator drop an edge the app itself resolves.
+    const t = corpusTable();
+    const matthew = { chapters: [{ num: 5, votNotes: [
+      { ref: '5:1-11', vol: null, letter: 'The Blessed: More Declarations…' },
+    ] }] };
+    const seen = [];
+    const { edges, unresolved } = extractVotNotes(matthew, t, (vol, letter) => {
+      seen.push([vol, letter]);
+      return { volKey: 'blessed', letterId: 'introduction' };
+    });
+    expect(seen).toEqual([[null, 'The Blessed: More Declarations…']]);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].letterId).toBe('introduction');
+    expect(unresolved).toHaveLength(0);
+  });
+
+  it('names the letter when a note cites one the corpus does not carry', () => {
+    // These are real: the Study Bible cites letters that were never imported.
+    // The message must say so, not read like data corruption.
+    const t = corpusTable();
+    const matthew = { chapters: [{ num: 26, votNotes: [
+      { ref: '26:28', vol: 'The Promise', letter: 'The Promise' },
+    ] }] };
+    const { edges, unresolved } = extractVotNotes(matthew, t, () => null);
+    expect(edges).toHaveLength(0);
+    expect(unresolved[0]).toContain('absent from the corpus');
+    expect(unresolved[0]).toContain('The Promise');
+    expect(unresolved[0]).toContain('26:28');
+  });
+
   it('reports an unresolvable votNote instead of inventing a target', () => {
     const t = corpusTable();
     const matthew = { chapters: [{ num: 10, votNotes: [

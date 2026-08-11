@@ -330,7 +330,11 @@ export function extractVotNotes(matthew, table, resolveLetter) {
   const unresolved = [];
   for (const ch of matthew.chapters || []) {
     for (const note of (Array.isArray(ch.votNotes) ? ch.votNotes : Object.values(ch.votNotes || {}))) {
-      if (!note || !note.vol || !note.letter) { if (note) unresolved.push(`votNote no target (ch ${ch.num})`); continue; }
+      // Only the LETTER is required. A few PDF rows name no volume at all
+      // (the letter is not in a published one), and one points at an album
+      // rather than a letter with `vol: null` — the caller's resolver knows
+      // how to place both, exactly as the app does.
+      if (!note || !note.letter) { if (note) unresolved.push(`votNote has no letter (ch ${ch.num})`); continue; }
       // ref is chapter-relative: "1:18-21" → chapter 1 verse 18. Title-keyed
       // strays (no parsable ref) anchor to the chapter's first verse.
       let chapter = ch.num, verse = 1;
@@ -339,7 +343,13 @@ export function extractVotNotes(matthew, table, resolveLetter) {
       const vid = verseIdOf({ bookId: 'matthew-plain', chapter, verse }, table, null);
       if (vid < 0) { unresolved.push(`votNote bad ref ${note.ref} (ch ${ch.num})`); continue; }
       const target = resolveLetter(note.vol, note.letter);
-      if (!target) { unresolved.push(`votNote unresolved letter: ${note.vol} :: ${note.letter}`); continue; }
+      if (!target) {
+        // Not corruption — the Study Bible cites letters that were never
+        // imported. See app/src/main/assets/src/data/vot-note-label.js.
+        unresolved.push(
+          `votNote cites a letter absent from the corpus: "${note.letter}" (Matthew ${note.ref})`);
+        continue;
+      }
       edges.push({ v: vid, kind: 'votNote', volKey: target.volKey, letterId: target.letterId });
     }
   }

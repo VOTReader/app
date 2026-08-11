@@ -582,3 +582,37 @@ C2-D  SAFETY NETS
        translations (~4.5 MB each, same shape, same loader) ever justify
        the pipeline for the whole family at once.
 ================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+[31] IMPORT THE TWO REMAINING HIDDEN MANNA LETTERS  (owner decision — needs
+     the authoritative text; NOT agent-doable)
+────────────────────────────────────────────────────────────────────────────
+   The New Testament Study Bible cites three letters that carry NO volume,
+   because they are not in any published volume. index.html's
+   HIDDEN_MANNA_TITLES already names all three:
+
+       "Woe to Dallas"                                         <- IMPORTED
+       "I Have Purged; Behold, I Shall Wipe Away and Restore"   <- NOT imported
+       "The Promise"                                            <- NOT imported
+
+   Evidence (2026-08-11, found while building the Scripture Web generator):
+   both missing titles appear in the Matthew Study Bible PDF's OCR and NOWHERE
+   in the Volumes / Flock / Rebuke / WTLB books — the same fingerprint as Woe
+   to Dallas. Both exist upstream: the full text of "I Am The Lord, I Have
+   Purged; Behold, I Shall Wipe Away and Restore" is on the
+   trumpetcallofgodonline mirror, and "The Promise" opens "Thus says The Lord
+   to His servant: Timothy, your sins are forgiven you; today's, yesterday's,
+   and yes, even those sins of tomorrow…" — matching the 26:28 votNote
+   excerpt verbatim.
+
+   Affects 3 notes: Matthew 10:9, 10:19, 26:28. They render today with the HM
+   badge, the reference, the title and the excerpt, but NO tap — which is
+   correct, because the letters are not in the app (resolveVotLetter returns
+   null and every render path gates tappability on it: no dead end). Importing
+   them into hidden-manna.js would make all three tappable and add 3 edges to
+   the Scripture Web.
+
+   NOT done in the fixing session because adding corpus content needs the
+   authoritative text from thevolumesoftruth.com and is the owner's call.
+   Same discipline as hidden-manna.js's header: not publicly indexed,
+   reachable ONLY via the Matthew votNote tap-through.

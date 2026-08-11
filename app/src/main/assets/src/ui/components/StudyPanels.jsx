@@ -47,6 +47,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
           <div className="vot-notes">
             {votNotes.map((n, i) => {
               const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
+              const volLabel = votNoteVolLabel(n);
               const hm = isHiddenManna(n);
               const badge = hm ? (
                 <span className="vot-note-hm" title={"Hidden Manna — The Word of The Lord Spoken to Timothy"}>HM</span>
@@ -57,7 +58,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                 <>
                   <div className="vot-note-header">
                     <span className="vot-note-ref">{n.ref}</span>
-                    <span className="vot-note-vol">{n.vol}</span>
+                    {volLabel && <span className="vot-note-vol">{volLabel}</span>}
                     {badge}
                   </div>
                   <div className="vot-note-letter">“{n.letter}”</div>

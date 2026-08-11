@@ -32,6 +32,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
       })}
       {votNotes.map((n, i) => {
         const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
+        const volLabel = votNoteVolLabel(n);
         const hm = isHiddenManna(n);
         const badge = hm ? (
           <span className="inline-vot-hm" title="Hidden Manna — The Word of The Lord Spoken to Timothy">HM</span>
@@ -42,7 +43,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
           <>
             <div className="inline-vot-header">
               <span className="inline-vot-ref">{n.ref}</span>
-              <span className="inline-vot-vol">{n.vol}</span>
+              {volLabel && <span className="inline-vot-vol">{volLabel}</span>}
               {badge}
             </div>
             <div className="inline-vot-letter">{"\""}{n.letter}{"\""}</div>
