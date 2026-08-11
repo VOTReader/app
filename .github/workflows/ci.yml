@@ -172,6 +172,15 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify MS_INDEX_VERSION was bumped when index-shaping code changed
+        # The built MiniSearch index is persisted in IndexedDB (~21 MB) and keyed by
+        # dataSignature(), which folds in MS_INDEX_VERSION but NOT the search code —
+        # so changing the doc shape, the indexed fields or the tokenizer left every
+        # client restoring an index the new builder would not produce. Worse than a
+        # stale SW cache: it survives a hard reload AND clearing Cache Storage.
+        # cache.js asked for a manual bump; nothing enforced it until this gate.
+        run: npm run check:search-index
+
       - name: Verify every runtime src/ asset is derivable + staged by the deploy
         # deploy-web.yml excludes src/ (it is bundled into dist/) and copies a few
         # files back in. That copy-back was the hand-written glob

@@ -424,6 +424,46 @@ if [ -n "$bundle_source_changed" ]; then
   fi
   git add tools/corpus-version.lock
 
+  # ─── Step 5b2: search-index version gate ──────────────────────────
+  # The built MiniSearch index is persisted to IndexedDB (~21 MB) and keyed by
+  # dataSignature(), which folds in MS_INDEX_VERSION but NOT the search code. So
+  # changing the doc shape / indexed fields / tokenizer left every existing client
+  # restoring an index the new builder would never produce — and because it lives
+  # in IndexedDB, neither a hard reload nor clearing Cache Storage dislodges it.
+  # cache.js asked for a manual bump; nothing enforced it until this gate.
+  echo "[pre-commit] Checking MS_INDEX_VERSION vs index-shaping code..."
+  node tools/check-search-index-version.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "SEARCH-INDEX gate FAILED — see message above. Bump MS_INDEX_VERSION"
+    echo "in app/src/main/assets/src/search/cache.js, then retry."
+    echo "Emergency bypass (not recommended): git commit --no-verify"
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  git add tools/search-index-version.lock
+
+  # ─── Step 5b3: runtime src/ asset staging gate ─────────────────────
+  # deploy-web.yml excludes src/ (it is bundled) and copies a few runtime-loaded
+  # files back in. That copy-back was a hand-written glob and silently dropped
+  # src/data/scripture-web-data.js (2.6 MB), which would have 404'd live while
+  # working perfectly in local preview. The list is now derived from the loaders.
+  echo "[pre-commit] Checking runtime src/ assets are derivable..."
+  node tools/list-runtime-src-assets.js --check
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "RUNTIME-ASSET gate FAILED — see message above. A file the app loads at"
+    echo "runtime from src/ is missing, or service-worker.js precaches a src/ path"
+    echo "no loader references (which means the deploy would drop it)."
+    echo "Emergency bypass (not recommended): git commit --no-verify"
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+
   # ─── Step 5c: packaged-APK asset gate ─────────────────────────────
   # ignoreAssetsPatterns (app/build.gradle.kts) is basename-matched with no
   # negative-include, so it is easy to exclude an asset the app injects at

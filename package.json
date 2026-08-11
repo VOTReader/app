@@ -34,7 +34,8 @@
     "check:css-tokens": "node tools/check-css-tokens.js",
     "check:bundle-budget": "node tools/check-bundle-budget.js",
     "check:runtime-assets": "node tools/list-runtime-src-assets.js --check",
-    "check:live": "node tools/check-live-version.js"
+    "check:live": "node tools/check-live-version.js",
+    "check:search-index": "node tools/check-search-index-version.js --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

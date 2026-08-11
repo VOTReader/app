@@ -112,7 +112,8 @@ jobs:
           python check_balance.py        # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
           npm run smoke-lite             # BLD3 — globals mirror + COLLECTIONS linkage + module cycles
           npm run check:runtime-assets   # every runtime src/ asset is derivable (the staging gate's first half)
-          npm run check:corpus           # CORPUS_VERSION matches the corpus-bundle hash
+          npm run check:search-index     # MS_INDEX_VERSION bumped if index-shaping code changed (stale IDB index)
+          npm run check:corpus           # CORPUS_VERSION covers the corpus bundles, src/data corpus files AND fonts/reading
           npm run validate:data          # Format A/B/C/D schema integrity
           npm run check:footnotes        # CORP6 — no dup/white footnote verse numbers
           npm run check:csp              # index.html inline-script CSP hashes in sync
@@ -125,6 +126,26 @@ jobs:
         # from package.json (build:sw), so the deployed SW always carries
         # the right version regardless of the committed state.
         run: npm run build
+
+      - name: Verify committed dist/ matches this build — PWA and APK must not diverge
+        # THE DIVERGENCE GATE (2026-08-11). This deploy publishes what it just
+        # REBUILT; the Android APK packages the dist/ bytes that are COMMITTED to
+        # the repo. Those are two different artifacts from one commit, and nothing
+        # here compared them — so a commit whose dist/ was stale (rebuilt but not
+        # re-staged) would publish correct bytes to the web while the APK shipped
+        # the old ones, from the same SHA. That is exactly the class that bit
+        # dist/bundle-f.js: the build chain emitted it, .githooks/pre-commit never
+        # staged it, and only ci.yml's identical check would have caught it — on a
+        # branch whose commits were never pushed, so nothing ever ran.
+        #
+        # ci.yml runs this too, but the deploy is a SEPARATE workflow with no
+        # cross-workflow `needs:`, so it must re-prove it or a red-CI commit can
+        # still publish. A non-zero exit aborts before anything is staged, leaving
+        # the site on the prior good version — the safe failure mode.
+        #
+        # index.html is included because build:csp may rewrite its CSP script-src
+        # hashes; service-worker.js because build:sw rewrites CACHE_VERSION.
+        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/index.html app/src/main/assets/service-worker.js
 
       - name: Stage web-facing files into _site/
         run: |

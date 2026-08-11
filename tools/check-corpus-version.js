@@ -32,6 +32,7 @@ import { fileURLToPath } from 'url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
+const assetsDir = resolve(root, 'app/src/main/assets');
 const distDir = resolve(root, 'app/src/main/assets/dist');
 const dataDir = resolve(root, 'app/src/main/assets/src/data');
 const swPath = resolve(root, 'app/src/main/assets/service-worker.js');
@@ -50,7 +51,8 @@ const CORPUS_BUNDLES = ['bundle-a-bible.js', 'bundle-a-matthew.js', 'bundle-a-vo
 const DATA_CORPUS = readdirSync(dataDir)
   .filter((f) => /^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
   .sort();
-const checkOnly = process.argv.includes('--check');
+const args = process.argv.slice(2);
+const checkOnly = args.includes('--check');
 
 function fail(msg) {
   console.error('');
@@ -86,6 +88,26 @@ if (ccvMatch[1] !== corpusVersion) {
   );
 }
 
+// The vendored Reading Fonts (2026-08-11). The SW precaches these into the
+// STABLE corpus cache (READING_FONT_PRECACHE) precisely so an app-version bump
+// does not re-download ~1.7 MB of never-changing faces. The consequence is that
+// they were covered by NEITHER version: not listed in CORE_ASSETS (so outside the
+// CACHE_VERSION content hash) and not in this fingerprint — so replacing or
+// re-subsetting a font file busted NO cache, and every already-installed client
+// would keep rendering the old face forever with nothing to dislodge it.
+// Folding them in here puts them under the same rule as the corpus bundles: change
+// the bytes, bump CORPUS_VERSION. Derived from the SW's OWN list (not a disk glob)
+// so the gate cannot drift from what is actually pinned in the corpus bucket.
+const READING_FONTS = [...sw.matchAll(/'\.\/(fonts\/reading\/[^']+)'/g)].map((m) => m[1]).sort();
+if (!READING_FONTS.length) {
+  fail(
+    'Could not extract any fonts/reading/ paths from service-worker.js.\n' +
+    '    READING_FONT_PRECACHE is the source of truth for this gate; if it was\n' +
+    '    renamed or restructured, update the extraction here rather than dropping\n' +
+    '    the fonts from the fingerprint (that is the hole this closed).'
+  );
+}
+
 // Hash the corpus bundles (CRLF-stripped → deterministic cross-platform).
 const hash = createHash('sha256');
 for (const name of CORPUS_BUNDLES) {
@@ -97,6 +119,18 @@ for (const name of CORPUS_BUNDLES) {
 for (const name of DATA_CORPUS) {
   hash.update(name);
   hash.update(readFileSync(resolve(dataDir, name)).filter((b) => b !== 0x0d));
+}
+for (const rel of READING_FONTS) {
+  const fp = resolve(assetsDir, rel);
+  if (!existsSync(fp)) {
+    fail(
+      'Missing reading font: ' + rel + '\n' +
+      '    service-worker.js precaches it into the corpus cache, so it must exist.\n' +
+      '    (tools/gen-reading-fonts.mjs prints the canonical list.)'
+    );
+  }
+  hash.update(rel);
+  hash.update(readFileSync(fp).filter((b) => b !== 0x0d));
 }
 const digest = hash.digest('hex').slice(0, 16);
 
@@ -136,17 +170,52 @@ if (!lock) {
   process.exit(0);
 }
 
+// ── Deliberate re-baseline: the gate's COVERAGE grew, the bytes did not. ──
+// Needed when this tool starts fingerprinting a set of files it previously
+// ignored (e.g. fonts/reading/ joined the hash on 2026-08-11). The digest changes
+// even though every byte a client already holds is identical, so the normal
+// "bump CORPUS_VERSION" remedy would be wrong: it would force every installed
+// client to re-download ~11 MB of unchanged corpus and fonts for nothing.
+//
+// Deliberately gated behind an explicit flag and loud output — this is the one
+// path that accepts a new digest at an UNCHANGED version, so using it when real
+// content changed would silently ship stale data to every cached client. Use it
+// only when you can say why the bytes cannot have changed.
+if (args.includes('--rebaseline')) {
+  if (checkOnly) fail('--rebaseline cannot be combined with --check.');
+  const prev = lock.hash;
+  writeLock();
+  console.log(
+    `[corpus-version] RE-BASELINED at CORPUS_VERSION=${corpusVersion} (NOT bumped).\n` +
+    `    fingerprint ${prev} -> ${digest}\n` +
+    '    Use this ONLY when the fingerprint moved because the gate now covers MORE\n' +
+    '    files, not because corpus content changed. Clients keep their existing\n' +
+    `    vot-corpus-${corpusVersion} bucket, which is correct precisely because the\n` +
+    '    bytes they hold are unchanged.'
+  );
+  process.exit(0);
+}
+
 // ── Corpus bytes changed. ──
 if (lock.version === corpusVersion) {
   // The exact bug this gate exists to prevent.
   fail(
-    'CORPUS BUNDLES CHANGED BUT CORPUS_VERSION WAS NOT BUMPED.\n' +
-    `    CORPUS_VERSION is still '${corpusVersion}'. The lazy corpus bundles\n` +
-    '    (bundle-a-bible/matthew/vot.js) are SW-cached and busted ONLY by a\n' +
-    '    CORPUS_VERSION change — so every existing web client would keep STALE\n' +
-    '    scripture/letters forever. Bump CORPUS_VERSION in\n' +
+    'STABLE-CACHE CONTENT CHANGED BUT CORPUS_VERSION WAS NOT BUMPED.\n' +
+    `    CORPUS_VERSION is still '${corpusVersion}'. Everything this gate\n` +
+    '    fingerprints lives in the STABLE vot-corpus-<version> bucket, which a\n' +
+    '    CACHE_VERSION bump does NOT clear — only a CORPUS_VERSION change does. So\n' +
+    '    every already-installed client would keep the OLD bytes forever.\n' +
+    '    Covered here:\n' +
+    `      - the lazy corpus bundles      (${CORPUS_BUNDLES.join(', ')})\n` +
+    `      - runtime src/data corpus files (${DATA_CORPUS.length}: bible-*.js, scripture-web-data.js)\n` +
+    `      - the vendored reading fonts    (${READING_FONTS.length} woff2 in fonts/reading/)\n` +
+    '    Bump CORPUS_VERSION in\n' +
     `    app/src/main/assets/service-worker.js  (e.g. ${corpusVersion} -> ${nextVersion(corpusVersion)}),\n` +
-    '    then rebuild + re-commit.'
+    '    then rebuild + re-commit.\n' +
+    '\n' +
+    '    ONLY IF you know the bytes cannot have changed and this gate simply started\n' +
+    '    covering MORE files, re-baseline instead (no client re-download):\n' +
+    '      node tools/check-corpus-version.js --rebaseline'
   );
 }
 
