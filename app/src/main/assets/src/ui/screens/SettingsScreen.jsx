@@ -509,6 +509,51 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // on mount; the derived display strings below pick the right text
   // for each (status, persisted, persistDenied) combination.
   const storageInfo = useStorageInfo();
+
+  // APP VERSION (2026-08-11) — which build is actually running, and is it the
+  // newest one published? Added after a long misdiagnosis in which "the cache is
+  // stale" and "this was never deployed" were indistinguishable from inside the
+  // app, so the wrong fix got attempted repeatedly. `running` comes from the
+  // controlling service worker (the only artifact that knows CACHE_VERSION and is
+  // not itself inside the hash it is derived from); `server` is a read-only probe
+  // of the deployed service-worker.js that installs nothing.
+  const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
+  const refreshBuildInfo = React.useCallback(async () => {
+    setBuildInfo((b) => ({ ...b, state: 'loading' }));
+    // typeof guards: these three live in bundle-b and reach this screen (bundle-e)
+    // as ambient globals, so they are absent in any host that renders Settings
+    // without the stores bundle — the vitest harness does exactly that. An
+    // unguarded call throws inside a passive effect, which surfaces as an
+    // unhandled test error rather than a failure, i.e. noise that hides real ones.
+    const running = (typeof getBuildVersion === 'function') ? await getBuildVersion() : null;
+    if (!running) {
+      // No service worker to ask: the Android WebView (assets ship inside the APK)
+      // or a first visit before the SW has taken control.
+      setBuildInfo({ state: 'no-sw', running: null, server: null });
+      return;
+    }
+    const server = (typeof fetchServerBuildVersion === 'function') ? await fetchServerBuildVersion() : null;
+    setBuildInfo({ state: 'ok', running, server });
+  }, []);
+  React.useEffect(() => { refreshBuildInfo(); }, [refreshBuildInfo]);
+
+  const versionDisplayText = (() => {
+    if (buildInfo.state === 'loading') return 'Checking…';
+    if (buildInfo.state === 'no-sw') {
+      return PlatformBridge.isAndroid
+        ? 'Installed app build — updates arrive by installing a new APK, not over the web.'
+        : 'Not yet managed by the offline service worker on this device.';
+    }
+    const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));
+    const runningText = fmt(buildInfo.running.cacheVersion)
+      + ' · corpus ' + (buildInfo.running.corpusVersion || '?');
+    if (!buildInfo.server) return runningText + ' — could not reach the server to compare.';
+    if (buildInfo.server.cacheVersion === buildInfo.running.cacheVersion) {
+      return runningText + ' — up to date with the published version.';
+    }
+    return runningText + ' — an update is available ('
+      + fmt(buildInfo.server.cacheVersion) + '). Reopen the app to apply it.';
+  })();
   const protectionDisplayText = (() => {
     if (storageInfo.status === 'loading') return 'Checking…';
     if (storageInfo.status === 'unavailable') return 'Persistence API unavailable on this browser.';
@@ -1846,6 +1891,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <SettingsGroup label="Your Data" sub="Backup, storage & privacy" {...groupProps('data')}>
           <div className="settings-card">
+            <DataInfoRow label="App version" value={versionDisplayText}>
+              <button
+                className="settings-clear-btn"
+                disabled={buildInfo.state === 'loading'}
+                onClick={(e) => { e.stopPropagation(); refreshBuildInfo(); }}
+              >Check</button>
+            </DataInfoRow>
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />
             <DataInfoRow label="Your data" value={userDataDisplayText} />

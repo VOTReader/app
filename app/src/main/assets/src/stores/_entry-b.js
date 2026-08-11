@@ -39,6 +39,10 @@ import '../styles/journal-styles.js';
 // ── Stores ──────────────────────────────────────────────────────────────
 import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST } from './cached-store.js';
 import { showToast, hideToast } from '../utils/toast.js';
+// Build identity (2026-08-11) — Settings' "App version" row asks the service
+// worker which build is actually serving the page, and the server what the
+// newest build is. Lives in bundle-b beside sw-register.js (same subsystem).
+import { getBuildVersion, fetchServerBuildVersion, formatBuildVersion } from '../utils/build-version.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 import { READING_FONTS, readingFontById, readingFontCss } from '../utils/reading-fonts.js';
 import { IDBAdapter } from './idb-adapter.js';
@@ -170,6 +174,7 @@ Object.assign(window, {
   // Stores
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   showToast, hideToast,
+  getBuildVersion, fetchServerBuildVersion, formatBuildVersion,
   navHandoff,
   READING_FONTS, readingFontById, readingFontCss,
   IDBAdapter,

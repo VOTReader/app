@@ -24,6 +24,37 @@
 
 import { PlatformBridge } from './platform-bridge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
+import { showToast } from './toast.js';
+
+/**
+ * "A new version is ready — Reload" — offered to a reader who is mid-session and
+ * VISIBLE when a new build activates.
+ *
+ * Reuses the tab-close undo toast's shape: .vot-toast-undo carries
+ * pointer-events:auto (the base .vot-toast is pointer-events:none, so its button
+ * would be untappable) and .vot-undo-btn styles the inline control. durationMs:0
+ * means it stays until acted on — an update notice that fades after 3s is worse
+ * than none, because it trains the reader to distrust it.
+ *
+ * The markup is TRUSTED STATIC only (SEC-2 in utils/toast.js): no dynamic string
+ * is interpolated here, so opts.html is the correct channel.
+ *
+ * @param {() => void} onReload
+ * @returns {void}
+ */
+function showUpdateReadyToast(onReload) {
+  if (typeof document === 'undefined') return;
+  showToast({
+    id: 'vot-toast-update',
+    className: 'vot-toast vot-toast-undo',
+    html: 'A new version is ready. <button type="button" class="vot-undo-btn">Reload</button>',
+    durationMs: 0,
+    ariaLive: 'polite',
+  });
+  const el = document.getElementById('vot-toast-update');
+  const btn = el && el.querySelector('.vot-undo-btn');
+  if (btn) btn.addEventListener('click', onReload, { once: true });
+}
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -66,6 +97,13 @@ export function registerServiceWorker() {
       doReload();
       return;
     }
+    // UPDATE-READY (2026-08-11): the deferred-until-backgrounded reload is kept as
+    // the fallback, but it is no longer the ONLY path. A reader who keeps the app
+    // open and visible used to sit on the old build with no way to know a new one
+    // had already activated, and no way to ask for it — which is indistinguishable
+    // from "the update never arrived", the exact ambiguity that made the stale-cache
+    // problem so hard to diagnose. Offer the reload instead of only waiting for it.
+    showUpdateReadyToast(doReload);
     const onHidden = () => {
       if (document.visibilityState === 'hidden') {
         document.removeEventListener('visibilitychange', onHidden);

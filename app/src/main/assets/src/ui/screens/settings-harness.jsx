@@ -163,6 +163,13 @@ export function setupSettingsGlobals(overrides = {}) {
   });
   put('showToast', () => {});
   put('hideToast', () => {});
+  // Build identity (utils/build-version.js, exposed by bundle-b) — the "App
+  // version" row's effect calls these on mount. Stubbed as a client that is
+  // running the same build the server publishes, so the row renders its
+  // steady-state "up to date" text rather than a loading or error branch.
+  put('getBuildVersion', () => Promise.resolve({ cacheVersion: 'v1.0.2-testhash01', corpusVersion: 'c99' }));
+  put('fetchServerBuildVersion', () => Promise.resolve({ cacheVersion: 'v1.0.2-testhash01', corpusVersion: 'c99' }));
+  put('formatBuildVersion', (v) => String(v || 'unknown'));
   put('IDBAdapter', { deleteDatabase: () => Promise.resolve(), open: () => Promise.resolve(null) });
 
   // Stores touched by handlers/effects, never by a render gate.
