@@ -107,15 +107,22 @@ vec3 genreColor(float g){ return GENRE[int(g + .5)]; }`;
 }
 
 /**
- * Read the app's chrome tokens off :root so the view matches the rest of the
- * app in both themes. Canvas-drawn text escapes the CSS gates, so it reads
- * the same custom properties every other screen uses rather than inventing
- * hexes — including the type-scale steps.
+ * Read the app's chrome tokens so the view matches the rest of the app in
+ * both themes. Canvas-drawn text escapes the CSS gates, so it reads the same
+ * custom properties every other screen uses rather than inventing hexes —
+ * including the type-scale steps.
  *
- * @param {Element} [el] element to resolve against (defaults to <html>)
+ * RESOLVE AGAINST <body>, NOT <html>. The dark palette is declared on :root
+ * but the light palette is a full token swap on `body.light`, so resolving at
+ * the document element returns the DARK values even in light mode — and since
+ * the GL surface paints that colour over the CSS background, the whole view
+ * would stay black on parchment.
+ *
+ * @param {Element} [el] element to resolve against (defaults to <body>)
  */
 export function readChromeTokens(el) {
-  const root = el || (typeof document !== 'undefined' ? document.documentElement : null);
+  const root = el || (typeof document !== 'undefined'
+    ? (document.body || document.documentElement) : null);
   if (!root || typeof getComputedStyle !== 'function') return FALLBACK_CHROME;
   const cs = getComputedStyle(root);
   const get = (name, fallback) => {

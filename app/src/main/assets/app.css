@@ -6774,3 +6774,32 @@
     @media (prefers-reduced-motion: reduce) {
       .sw-btn, .sw-seg-btn { transition: none; }
     }
+
+    /* My Web — the empty state, shown until the reader's first link lands. */
+    .sw-empty {
+      position: absolute; z-index: 5; left: 50%; top: 42%;
+      transform: translate(-50%, -50%);
+      width: min(460px, calc(100vw - 48px)); text-align: center;
+      pointer-events: none;
+      font-family: var(--font-body); color: var(--cream-muted);
+    }
+    .sw-empty-title {
+      font-family: var(--font-cinzel); font-size: var(--fs-20);
+      color: var(--gold); letter-spacing: 0.04em; margin-bottom: 10px;
+    }
+    .sw-empty-body { font-size: var(--fs-15); line-height: 1.65; }
+    .sw-empty-body strong { color: var(--gold-bright); font-weight: 600; }
+
+    @media (max-width: 560px) {
+      .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+      .sw-credit { bottom: calc(4px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-10); }
+    }
+
+    @media (max-width: 560px) {
+      /* Above the control strip, not behind it — CC-BY attribution has to stay
+         legible, not merely present. */
+      .sw-credit { bottom: calc(122px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    }
+
+    /* About: the CC-BY line for the Scripture Web dataset. */
+    .about-credit { font-size: var(--fs-13); color: var(--cream-muted); }

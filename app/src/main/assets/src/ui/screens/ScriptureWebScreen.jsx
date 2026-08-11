@@ -29,8 +29,22 @@ import {
   pickArc, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
-import { readChromeTokens, GENRE_NAMES } from '../../utils/scripture-web/palette.js';
-import { buildVotRail, buildPersonalGraph } from '../../utils/scripture-web/personal-graph.js';
+import { readChromeTokens, GENRE_NAMES, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
+import {
+  buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
+} from '../../utils/scripture-web/personal-graph.js';
+import { drawPersonalWeb, pickPersonal } from '../scripture-web/rail-renderer.js';
+
+/**
+ * Short names for the VOT rail. Full collection titles ("Words To Live By:
+ * Part One") do not fit above a rail segment sized by letter count.
+ */
+const SHORT_VOL = {
+  one: 'Vol I', two: 'Vol II', three: 'Vol III', four: 'Vol IV', five: 'Vol V',
+  six: 'Vol VI', seven: 'Vol VII', rebuke: 'Rebuke', wtlb1: 'WTLB I',
+  wtlb2: 'WTLB II', blessed: 'Blessed', flock: 'Flock', timothy: 'Timothy',
+  holydays: 'Holy Days', hm: 'Manna',
+};
 
 /** Deepest zoom, as a multiple of fit-to-width. Well past single-verse. */
 const MAX_ZOOM = 4000;
@@ -72,6 +86,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [detail, setDetail] = React.useState(null);      // the open sheet
   const [tip, setTip] = React.useState(null);            // hover chip
   const [announce, setAnnounce] = React.useState('');
+  const [showUnderlay, setShowUnderlay] = React.useState(true);
+  const [personalCount, setPersonalCount] = React.useState(0);
 
   // ── everything below here is per-frame state; deliberately NOT React ──
   const camRef = React.useRef(null);
@@ -84,6 +100,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const chromeRef = React.useRef(readChromeTokens());
   const rafRef = React.useRef(0);
   const personalRef = React.useRef(null);
+  // frame() runs per draw and must stay identity-stable, so it reads the mode
+  // from a ref rather than closing over the state value.
+  const modeRef = React.useRef('canonical');
 
   const theme = settings && settings.theme;
 
@@ -121,8 +140,43 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
   }, []);
 
-  // Re-read chrome tokens whenever the theme flips.
-  React.useEffect(() => { chromeRef.current = readChromeTokens(); schedule(); }, [theme, schedule]);
+  // A frame requested while the page is hidden never runs, so rafRef stays
+  // set and EVERY later schedule() short-circuits — the view would come back
+  // from the background permanently frozen, redrawing for nothing. Clearing
+  // the stale handle on the way back is what keeps that from happening.
+  React.useEffect(() => {
+    const revive = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+      schedule();
+    };
+    document.addEventListener('visibilitychange', revive);
+    window.addEventListener('pageshow', revive);
+    window.addEventListener('focus', revive);
+    return () => {
+      document.removeEventListener('visibilitychange', revive);
+      window.removeEventListener('pageshow', revive);
+      window.removeEventListener('focus', revive);
+    };
+  }, [schedule]);
+
+  // Re-read chrome tokens whenever the theme flips. The settings prop covers
+  // the in-app toggle, but light/dark is ultimately carried by a class on
+  // <body> — watch that too, or a theme change from anywhere else leaves the
+  // canvas painting yesterday's colours (the GL surface covers the CSS
+  // background, so a stale token reads as "the theme didn't apply").
+  React.useEffect(() => {
+    const reread = () => { chromeRef.current = readChromeTokens(); schedule(); };
+    reread();
+    if (typeof MutationObserver === 'undefined' || !document.body) return undefined;
+    const mo = new MutationObserver(reread);
+    mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, [theme, schedule]);
+
+  // frame() reads the mode from a ref so it can stay identity-stable across
+  // renders; keep that ref in step with the state it mirrors.
+  React.useEffect(() => { modeRef.current = mode; schedule(); }, [mode, schedule]);
 
   /**
    * The vertical frame. On a wide screen the dome fills naturally; on a tall
@@ -132,11 +186,23 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
    */
   const frame = React.useCallback(() => {
     const v = viewRef.current;
-    const ruler = RULER_H * v.DPR;
+    // A narrow screen puts the controls along the BOTTOM, so the ruler needs
+    // to finish above them — reserve the control strip as well as its own
+    // two label rows, or book names print underneath the buttons.
+    const narrow = (v.W / (v.DPR || 1)) <= 560;
+    const ruler = (narrow ? RULER_H + 104 : RULER_H) * v.DPR;
     const avail = v.H - ruler;
+    if (modeRef.current === 'personal') {
+      // No dome to centre — the rails want the whole frame, less the strip the
+      // legend and credit occupy along the bottom.
+      const base = avail - 20 * v.DPR;
+      return { base, ceil: base * 0.985, ruler };
+    }
     const domeH = Math.min(avail, (v.W / 2) * MAX_STRETCH);
-    const pad = Math.max(0, (avail - domeH) / 2);
-    const base = pad + domeH;
+    // Bias the slack ABOVE the dome (0.72 / 0.28) rather than centring it:
+    // the controls live at the bottom on a narrow screen, and a dome floating
+    // in the middle leaves a dead band between the ruler and them.
+    const base = Math.min(avail, domeH + Math.max(0, avail - domeH) * 0.72);
     return { base, ceil: domeH * 0.985, ruler };
   }, []);
 
@@ -152,6 +218,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     };
   }, [density, frame]);
 
+  /** Everything the rail renderer needs to place a personal endpoint. */
+  const railOpts = React.useCallback(() => {
+    const v = viewRef.current, cam = camRef.current;
+    const f = frame();
+    return {
+      width: v.W, height: v.H, DPR: v.DPR, base: f.base,
+      chrome: chromeRef.current,
+      votRail: personalRef.current && personalRef.current.votRail,
+      verseX: (verse) => verseToX(cam, v.W, verse),
+      showUnderlay,
+    };
+  }, [frame, showUnderlay]);
+
   // ── render ──────────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
     const g = graph, cam = camRef.current, r = rendererRef.current;
@@ -160,6 +239,27 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const zoom = cam.ppv / fitPPV(cam, v.W);
     const chrome = chromeRef.current;
     const base = viewFor();
+    if (mode === 'personal') {
+      // The personal web is Canvas2D over a cleared GL surface: hundreds of
+      // links, not hundreds of thousands, so crisp 2D curves beat a second
+      // shader. The GL pass still runs to paint the ground colour.
+      r.draw(Object.assign({}, base, {
+        camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
+        colorMode, density: 'essential', light: chrome.isLight, bg: chrome.bg,
+        focusRange: null, focusArc: -1, hoverArc: -1,
+      }));
+      const uic = uiRef.current;
+      const ctx = uic && uic.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, v.W, v.H);
+        const p = personalRef.current;
+        drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(railOpts(), {
+          hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc,
+        }));
+        drawRulerOnly(ctx, g, cam, base, v, chrome);
+      }
+      return;
+    }
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: Math.min(0.8 + Math.log2(zoom) * 0.24, 3.0) * v.DPR,
@@ -169,7 +269,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       hoverArc: hoverRef.current,
     }));
     drawRuler(uiRef.current, g, cam, base, v, chrome);
-  }, [graph, colorMode, density, viewFor]);
+  }, [graph, colorMode, density, viewFor, mode, railOpts]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -220,7 +320,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const linkVersion = useLinkVersion();
   React.useEffect(() => {
     if (!graph || mode !== 'personal') return;
-    personalRef.current = buildPersonal(graph);
+    const built = buildPersonal(graph);
+    personalRef.current = built;
+    setPersonalCount(built && built.graph ? built.graph.count : 0);
     schedule();
   }, [graph, mode, linkVersion, schedule]);
 
@@ -305,6 +407,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!g || !cam || !v.W) return null;
     const px = cx * v.DPR, py = cy * v.DPR;
     const view = viewFor();
+    if (mode === 'personal') {
+      const p = personalRef.current;
+      const i = pickPersonal(p && p.graph, railOpts(), px, py, 10 * v.DPR);
+      if (i >= 0) return { kind: 'link', index: i };
+      const ci = pickChapter(g, cam, view, px, py);
+      return ci >= 0 ? { kind: 'chapter', chapterIndex: ci } : null;
+    }
     const ci = pickChapter(g, cam, view, px, py);
     if (ci >= 0) {
       const zoomed = cam.ppv > 26 * v.DPR;
@@ -316,11 +425,21 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     const hit = pickArc(g, cam, view, px, py, 8 * v.DPR);
     return hit ? { kind: 'arc', hit } : null;
-  }, [graph, viewFor]);
+  }, [graph, viewFor, mode, railOpts]);
 
   const describe = React.useCallback((found) => {
     const g = graph;
     if (!found) return null;
+    if (found.kind === 'link') {
+      const p = personalRef.current;
+      const rec = p && p.graph && p.graph.records[found.index];
+      if (!rec) return null;
+      return {
+        kind: 'link', index: found.index, record: rec,
+        source: rec.source, target: rec.target,
+        joins: p.graph.kind[found.index],
+      };
+    }
     if (found.kind === 'arc') {
       const a = refOfVerse(g, found.hit.from), b = refOfVerse(g, found.hit.to);
       return { kind: 'arc', a, b, votes: found.hit.votes,
@@ -464,8 +583,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="sw-title">
-          <h1>The Scripture Web</h1>
-          {stats && <p>{stats.shown.toLocaleString()} of {stats.total.toLocaleString()} connections</p>}
+          <h1>{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
+          {mode === 'personal'
+            ? <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>
+            : (stats && <p>{stats.shown.toLocaleString()} of {stats.total.toLocaleString()} connections</p>)}
         </div>
       </div>
 
@@ -476,21 +597,44 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <button type="button" className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
             aria-pressed={mode === 'personal'} onClick={() => setMode('personal')}>My web</button>
         </div>
-        <button type="button" className="sw-btn" onClick={cycleDensity}
-          aria-label={'Density: ' + DENSITY_LABEL[density] + ' — ' + DENSITY_HINT[density]}>
-          {DENSITY_LABEL[density]}
-        </button>
-        <button type="button" className="sw-btn" onClick={cycleColor}
-          aria-label={'Colour shows ' + COLOR_HINT[colorMode]}>
-          Colour · {COLOR_LABEL[colorMode]}
-        </button>
+        {mode === 'canonical' ? (
+          <React.Fragment>
+            <button type="button" className="sw-btn" onClick={cycleDensity}
+              aria-label={'Density: ' + DENSITY_LABEL[density] + ' — ' + DENSITY_HINT[density]}>
+              {DENSITY_LABEL[density]}
+            </button>
+            <button type="button" className="sw-btn" onClick={cycleColor}
+              aria-label={'Colour shows ' + COLOR_HINT[colorMode]}>
+              Colour · {COLOR_LABEL[colorMode]}
+            </button>
+          </React.Fragment>
+        ) : (
+          <button type="button" className="sw-btn" aria-pressed={showUnderlay}
+            onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
+            aria-label="Show the connections the Volumes already make">
+            Corpus links
+          </button>
+        )}
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
       </div>
 
+      {mode === 'personal' && graph && personalCount === 0 && (
+        <div className="sw-empty">
+          <div className="sw-empty-title">Your web is still being woven.</div>
+          <div className="sw-empty-body">
+            Select text anywhere in the app, tap <strong>Link</strong>, and pick a
+            destination. Every link you make draws a thread here — between two
+            passages of scripture, between a letter and a verse, or across the
+            Volumes. The faint gold threads below are the connections the
+            Volumes already make.
+          </div>
+        </div>
+      )}
       {tip && <TipChip info={tip} />}
       {detail && (
         <DetailSheet info={detail} graph={graph} onClose={() => setDetail(null)}
-          onOpen={openInReader} />
+          onOpen={openInReader}
+          onOpenEndpoint={(ep) => { if (ep && typeof navigateToLink === 'function') navigateToLink(ep); }} />
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(colorMode)}</div>
@@ -564,7 +708,9 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
     span[c[0]][1] = c[2] + c[3];
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.font = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
+  // Right edge already claimed on each of the two label rows, so a book can
+  // only print where it will not touch whatever printed before it.
+  const rowEnd = [-Infinity, -Infinity];
   for (let bi = 0; bi < span.length; bi++) {
     const s = span[bi][0], e = span[bi][1];
     const x0 = X(s), x1 = X(e);
@@ -572,17 +718,99 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
     ctx.strokeStyle = 'rgba(' + gold + ',0.22)';
     ctx.beginPath(); ctx.moveTo(x0, base + 2 * DPR); ctx.lineTo(x0, base + 9 * DPR); ctx.stroke();
     const width = x1 - x0;
-    const label = width > 92 * DPR ? g.books[bi].title.toUpperCase()
-      : width > 17 * DPR ? g.books[bi].abbr.toUpperCase() : null;
+    // MEASURE before printing. A label wider than its book's own span (or its
+    // share of a staggered row) collides with its neighbour into mush — very
+    // visible on a phone, where Matthew/Luke/Acts sit within a few px of each
+    // other. Full name if it fits, else the abbreviation, else nothing.
+    const full = g.books[bi].title.toUpperCase();
+    const abbr = g.books[bi].abbr.toUpperCase();
+    const fullFont = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
+    const abbrFont = (chrome.fsRuler * DPR) + 'px Cinzel,Georgia,serif';
+    ctx.font = fullFont;
+    let label = null;
+    if (ctx.measureText(full).width <= width - 8 * DPR) {
+      label = full;
+    } else {
+      ctx.font = abbrFont;
+      const w = ctx.measureText(abbr).width;
+      // Staggering onto a second row buys a book roughly twice its own width
+      // before it can touch the neighbour printed on the same row.
+      if (w <= width * 2) label = abbr;
+    }
     if (!label) continue;
-    // Alternate the baseline for tight books so short names (Joel, Amos,
-    // Obad) still get printed instead of being dropped for want of room.
-    const tight = width <= 34 * DPR;
-    ctx.fillStyle = 'rgba(' + ink + ',' + (tight ? 0.62 : 0.86) + ')';
-    ctx.font = (tight ? '' : '600 ') + ((tight ? chrome.fsRuler : chrome.fsLabel) * DPR) +
-      'px Cinzel,Georgia,serif';
+    ctx.font = label === full ? fullFont : abbrFont;
+    const w = ctx.measureText(label).width;
     const cx = Math.max(Math.min((x0 + x1) / 2, W - 30 * DPR), 30 * DPR);
-    ctx.fillText(label, cx, base + (tight && (bi % 2) ? 48 : 34) * DPR);
+    const left = cx - w / 2, right = cx + w / 2;
+    const pad = 5 * DPR;
+    // Prefer the top row; fall to the second only if the top is taken. If
+    // both are claimed, the book goes unlabelled rather than overprinting.
+    let row = -1;
+    if (left >= rowEnd[0] + pad) row = 0;
+    else if (left >= rowEnd[1] + pad) row = 1;
+    if (row < 0) continue;
+    rowEnd[row] = right;
+    ctx.fillStyle = 'rgba(' + ink + ',' + (row ? 0.62 : 0.86) + ')';
+    ctx.fillText(label, cx, base + (row ? 48 : 34) * DPR);
+  }
+}
+
+/**
+ * The scripture rail's ruler, reused under the personal web so the bottom
+ * axis reads identically in both modes.
+ */
+function drawRulerOnly(ctx, g, cam, view, v, chrome) {
+  const W = v.W, DPR = v.DPR, base = view.base;
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const X = (verse) => verseToX(cam, W, verse);
+  const span = [];
+  for (const c of g.chapters) {
+    if (!span[c[0]]) span[c[0]] = [c[2], c[2] + c[3]];
+    span[c[0]][1] = c[2] + c[3];
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const rowEnd = [-Infinity, -Infinity];
+  for (let bi = 0; bi < span.length; bi++) {
+    const x0 = X(span[bi][0]), x1 = X(span[bi][1]);
+    if (x1 < -90 || x0 > W + 90) continue;
+    ctx.strokeStyle = 'rgba(' + gold + ',0.22)';
+    ctx.beginPath(); ctx.moveTo(x0, base + 2 * DPR); ctx.lineTo(x0, base + 9 * DPR); ctx.stroke();
+    const width = x1 - x0;
+    // MEASURE before printing. A label wider than its book's own span (or its
+    // share of a staggered row) collides with its neighbour into mush — very
+    // visible on a phone, where Matthew/Luke/Acts sit within a few px of each
+    // other. Full name if it fits, else the abbreviation, else nothing.
+    const full = g.books[bi].title.toUpperCase();
+    const abbr = g.books[bi].abbr.toUpperCase();
+    const fullFont = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
+    const abbrFont = (chrome.fsRuler * DPR) + 'px Cinzel,Georgia,serif';
+    ctx.font = fullFont;
+    let label = null;
+    if (ctx.measureText(full).width <= width - 8 * DPR) {
+      label = full;
+    } else {
+      ctx.font = abbrFont;
+      const w = ctx.measureText(abbr).width;
+      // Staggering onto a second row buys a book roughly twice its own width
+      // before it can touch the neighbour printed on the same row.
+      if (w <= width * 2) label = abbr;
+    }
+    if (!label) continue;
+    ctx.font = label === full ? fullFont : abbrFont;
+    const w = ctx.measureText(label).width;
+    const cx = Math.max(Math.min((x0 + x1) / 2, W - 30 * DPR), 30 * DPR);
+    const left = cx - w / 2, right = cx + w / 2;
+    const pad = 5 * DPR;
+    // Prefer the top row; fall to the second only if the top is taken. If
+    // both are claimed, the book goes unlabelled rather than overprinting.
+    let row = -1;
+    if (left >= rowEnd[0] + pad) row = 0;
+    else if (left >= rowEnd[1] + pad) row = 1;
+    if (row < 0) continue;
+    rowEnd[row] = right;
+    ctx.fillStyle = 'rgba(' + ink + ',' + (row ? 0.62 : 0.86) + ')';
+    ctx.fillText(label, cx, base + (row ? 48 : 34) * DPR);
   }
 }
 
@@ -605,6 +833,15 @@ function TipChip({ info }) {
           <div className="sw-tip-meta">{s.span.toLocaleString()} verses apart · weight {s.votes}</div>
         </React.Fragment>
       )}
+      {s.kind === 'link' && (
+        <React.Fragment>
+          <div className="sw-tip-eyebrow">Your link</div>
+          <div className="sw-tip-ref">{endpointLabel(s.source)}</div>
+          <div className="sw-tip-arrow">↕</div>
+          <div className="sw-tip-ref sw-tip-ref-alt">{endpointLabel(s.target)}</div>
+          <div className="sw-tip-meta">{LINK_KIND_NAMES[s.joins]}</div>
+        </React.Fragment>
+      )}
       {s.kind === 'chapter' && (
         <React.Fragment>
           <div className="sw-tip-eyebrow">Chapter</div>
@@ -623,7 +860,28 @@ function TipChip({ info }) {
   );
 }
 
-function DetailSheet({ info, graph, onClose, onOpen }) {
+function DetailSheet({ info, graph, onClose, onOpen, onOpenEndpoint }) {
+  if (info.kind === 'link') {
+    return (
+      <div className="sw-sheet" role="dialog" aria-modal="false" aria-label="Link details">
+        <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
+        <div className="sw-sheet-eyebrow">Your link</div>
+        <div className="sw-sheet-meta">{LINK_KIND_NAMES[info.joins]}</div>
+        <div className="sw-sheet-rows">
+          {[info.source, info.target].map((ep, i) => (
+            <div className="sw-sheet-row" key={i}>
+              <div className="sw-sheet-ref">{endpointLabel(ep)}</div>
+              {ep && ep.preview && <div className="sw-sheet-text">{ep.preview}</div>}
+              <button type="button" className="sw-btn sw-btn-open"
+                onClick={() => onOpenEndpoint(ep)}>Open in reader</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   const rows = info.kind === 'arc'
     ? [{ ref: info.a, verse: info.a.chapterIndex != null ? verseIdFor(graph, info.a) : null },
        { ref: info.b, verse: verseIdFor(graph, info.b) }]
@@ -691,7 +949,16 @@ function graphStats(graph, density) {
   return { shown, total: graph.count };
 }
 
+/** A LinkEndpoint's own label, falling back to its key. */
+function endpointLabel(ep) {
+  if (!ep) return '';
+  return ep.label || ep.key || '';
+}
+
 function summaryOf(found) {
+  if (found.kind === 'link') {
+    return endpointLabel(found.source) + ' and ' + endpointLabel(found.target) + ', your link.';
+  }
   if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
   if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
   return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
@@ -741,11 +1008,19 @@ function buildPersonal(graph) {
       const col = COLLECTIONS.find((c) => c.volKey === volKey);
       if (!col) continue;
       const arr = (typeof colLetterArr === 'function') ? colLetterArr(col) : [];
-      collections.push({ volKey, label: col.label, items: arr });
+      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items: arr });
     }
   }
   const votRail = buildVotRail(collections);
-  return buildPersonalGraph(LinkStore.all(), { verseIdOf, votRail });
+  const ctx = { verseIdOf, votRail };
+  return {
+    votRail,
+    graph: buildPersonalGraph(LinkStore.all(), ctx),
+    // The corpus's OWN curated Bible->Volumes edges, drawn dim beneath the
+    // reader's links: on day one the personal web is nearly empty, and this
+    // shows what the app already knows so the screen is never a blank page.
+    underlay: buildCuratedUnderlay(graph.votEdges, ctx),
+  };
 }
 
 /**

@@ -10,7 +10,9 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import { arcRadiusGLSL, CEIL_SOFTNESS } from '../../utils/scripture-web/geometry.js';
-import { DISTANCE_RAMP, GENRE_COLORS, rampGLSL } from '../../utils/scripture-web/palette.js';
+import {
+  DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
+} from '../../utils/scripture-web/palette.js';
 
 describe('shader / CPU agreement', () => {
   it('inlines the SHARED height law rather than restating it', () => {
@@ -72,6 +74,37 @@ describe('modes', () => {
       expect(c).toHaveLength(3);
       for (const ch of c) expect(ch).toBeGreaterThanOrEqual(0), expect(ch).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('chrome tokens follow the theme', () => {
+  it('resolves against <body>, where the light palette is declared', () => {
+    // The dark palette sits on :root; light is a full token swap on
+    // `body.light`. Resolving at <html> returns the DARK values in light mode,
+    // and because the GL surface paints that colour over the CSS background,
+    // the entire view would stay black on parchment.
+    document.documentElement.style.setProperty('--bg', '#000000');
+    document.body.style.setProperty('--bg', '#f7f2e8');
+    expect(readChromeTokens().bg.trim()).toBe('#f7f2e8');
+    document.documentElement.style.removeProperty('--bg');
+    document.body.style.removeProperty('--bg');
+  });
+
+  it('reports the light flag from the body class the app actually sets', () => {
+    document.body.classList.remove('light');
+    expect(readChromeTokens().isLight).toBe(false);
+    document.body.classList.add('light');
+    expect(readChromeTokens().isLight).toBe(true);
+    document.body.classList.remove('light');
+  });
+
+  it('parses both hex and rgb() into clearColor components', () => {
+    expect(cssColorToRGB('#000000')).toEqual([0, 0, 0]);
+    expect(cssColorToRGB('#fff')).toEqual([1, 1, 1]);
+    const [r, g, b] = cssColorToRGB('rgb(247, 242, 232)');
+    expect(r).toBeCloseTo(247 / 255, 5);
+    expect(g).toBeCloseTo(242 / 255, 5);
+    expect(b).toBeCloseTo(232 / 255, 5);
   });
 });
 

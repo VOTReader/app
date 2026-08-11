@@ -33,9 +33,9 @@ describe('buildVotRail', () => {
   it('lays collections out in reading order with contiguous segments', () => {
     expect(votRail.total).toBe(4);
     expect(votRail.segments).toEqual([
-      { volKey: 'one', label: 'Volume One', start: 0, count: 2 },
-      { volKey: 'wtlb1', label: 'Words To Live By', start: 2, count: 1 },
-      { volKey: 'blessed', label: 'The Blessed', start: 3, count: 1 },
+      { volKey: 'one', label: 'Volume One', short: 'Volume One', start: 0, count: 2 },
+      { volKey: 'wtlb1', label: 'Words To Live By', short: 'Words To Live By', start: 2, count: 1 },
+      { volKey: 'blessed', label: 'The Blessed', short: 'The Blessed', start: 3, count: 1 },
     ]);
   });
 

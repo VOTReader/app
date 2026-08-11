@@ -43,10 +43,10 @@ export function localizeFactor(zoom) {
  * fit, exactly like the source visualization. On a phone held upright,
  * half the screen's WIDTH is nowhere near its height, so an unstretched
  * semicircle would sit in the bottom quarter with dead space above it — the
- * dome is allowed to rise into a shallow ellipse instead. Capped so it can
- * never become a noodle.
+ * dome is allowed to rise into a taller arch instead. Capped so it can never
+ * become a noodle: at the limit it reads as a gothic arch, not a thread.
  */
-export const MAX_STRETCH = 1.35;
+export const MAX_STRETCH = 2.2;
 
 /**
  * Vertical squash applied so the widest arc fills the frame.

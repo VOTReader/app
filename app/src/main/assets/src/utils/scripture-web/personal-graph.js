@@ -18,7 +18,8 @@
 
 /**
  * @typedef {{ total:number, index:Map<string, number>,
- *   segments:Array<{volKey:string, label:string, start:number, count:number}>,
+ *   segments:Array<{volKey:string, label:string, short?:string,
+ *     start:number, count:number}>,
  *   nodes:Array<{volKey:string, id:string, title:string}> }} VotRail
  */
 
@@ -47,11 +48,10 @@ export function baseKey(key) {
 /**
  * Build the top rail from the live VOT corpus.
  *
- * @param {Array<{volKey:string, label:string, items:Array<{id:string, title:string}>}>} collections
+ * @param {Array<{volKey:string, label:string, short?:string,
+ *   items:Array<{id:string, title:string}>}>} collections
  *   in READING_CHAIN order
- * @returns {{ total:number, index:Map<string, number>,
- *   segments:Array<{volKey:string, label:string, start:number, count:number}>,
- *   nodes:Array<{volKey:string, id:string, title:string}> }}
+ * @returns {VotRail}
  */
 export function buildVotRail(collections) {
   const index = new Map();
@@ -60,7 +60,10 @@ export function buildVotRail(collections) {
   let cursor = 0;
   for (const col of collections || []) {
     const items = col.items || [];
-    segments.push({ volKey: col.volKey, label: col.label, start: cursor, count: items.length });
+    segments.push({
+      volKey: col.volKey, label: col.label, short: col.short || col.label,
+      start: cursor, count: items.length,
+    });
     for (const item of items) {
       if (!item || !item.id) continue;
       index.set(col.volKey + ':' + item.id, cursor);

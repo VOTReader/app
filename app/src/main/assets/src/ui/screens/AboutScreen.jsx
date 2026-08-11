@@ -36,6 +36,15 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                     <a href="https://www.thevolumesoftruth.com" target="_blank" rel="noopener noreferrer"><em>thevolumesoftruth.com</em></a>
                     .
                   </p>
+                  {/* CC-BY obligation for the Scripture Web's cross-reference
+                      dataset. Attribution must be VISIBLE wherever the data is
+                      shown; the screen carries its own line too. Do not remove
+                      either without equivalent credit. */}
+                  <p className="about-credit">
+                    Cross-reference data from{" "}
+                    <a href="https://www.openbible.info/labs/cross-references/" target="_blank" rel="noopener noreferrer"><em>OpenBible.info</em></a>
+                    , used under CC-BY.
+                  </p>
                 </div>
               </>
             ) : (

@@ -20,11 +20,11 @@ beforeEach(() => {
 });
 
 describe('LibraryOrderStore — DEFAULT_LIBRARY_ORDER constant', () => {
-  it('is frozen and carries the 7 canonical tile ids', () => {
+  it('is frozen and carries the 8 canonical tile ids', () => {
     expect(Object.isFrozen(DEFAULT_LIBRARY_ORDER)).toBe(true);
     expect(new Set(DEFAULT_LIBRARY_ORDER)).toEqual(new Set([
       'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
-      'milestones',
+      'milestones', 'scripture-web',
     ]));
   });
 });
@@ -35,7 +35,8 @@ describe('LibraryOrderStore — get() schema merge', () => {
   });
 
   it('returns a full valid permutation as-is', () => {
-    const custom = ['milestones', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes'];
+    const custom = ['milestones', 'scripture-web', 'progress', 'highlights', 'bookmarks',
+      'journal', 'links', 'notes'];
     LibraryOrderStore.set(custom);
     expect(LibraryOrderStore.get()).toEqual(custom);
   });
@@ -45,14 +46,16 @@ describe('LibraryOrderStore — get() schema merge', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones']);
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+       'scripture-web']);
   });
 
   it('MIGRATES the older pre-progress 5-tile save the same way', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'notes', 'links', 'journal', 'bookmarks'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones']);
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+       'scripture-web']);
   });
 
   it('SHRINKS: a retired id is dropped in place, the rest of the arrangement survives', () => {
@@ -60,16 +63,19 @@ describe('LibraryOrderStore — get() schema merge', () => {
     // saved order still names it. The other eight keep their custom
     // arrangement and nothing is appended.
     /** @type {any} */ (LibraryOrderStore)._cache =
-      ['milestones', 'audio', 'retired-tile', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes'];
+      ['milestones', 'audio', 'retired-tile', 'scripture-web', 'progress', 'highlights',
+       'bookmarks', 'journal', 'links', 'notes'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['milestones', 'progress', 'highlights', 'bookmarks', 'journal', 'links', 'notes']);
+      ['milestones', 'scripture-web', 'progress', 'highlights', 'bookmarks', 'journal',
+       'links', 'notes']);
   });
 
   it('drops a foreign id from an import payload the same way', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'foreign-id', 'notes'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones']);
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+       'scripture-web']);
   });
 
   it('returns the full default order for an empty save, and falls back when it is not an array', () => {
@@ -90,16 +96,19 @@ describe('LibraryOrderStore — get() schema merge', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['notes', 'notes', 'journal'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress', 'milestones']);
+      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress', 'milestones',
+       'scripture-web']);
   });
 });
 
 describe('LibraryOrderStore — set()', () => {
   it('persists a defensive COPY of the caller array', () => {
-    const input = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones'];
+    const input = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights',
+      'milestones', 'scripture-web'];
     LibraryOrderStore.set(input);
     input.push('smuggled');
     expect(LibraryOrderStore.get()).toEqual(
-      ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones']);
+      ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones',
+       'scripture-web']);
   });
 });

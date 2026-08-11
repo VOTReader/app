@@ -418,6 +418,24 @@
       // The collection list lives one level in, not splayed across the hub.
       return /Volume One/.test(document.body.textContent || '') && /Collections/.test(document.body.textContent || '');
     });
+    await step('Scripture Web', async function () {
+      // Reached from the Library like every other personal-study surface. The
+      // canvases are WebGL/2D, so assert the SHELL (headless CI may have no
+      // GPU): the screen mounted, both canvases exist, the graph asset landed
+      // and reported its size, and the CC-BY attribution is on screen — that
+      // last one is a licence obligation, not decoration.
+      await goHome();
+      clickByText(/Personal Study/); await sleep(320);
+      clickByText(/Scripture Web/); await sleep(2200);
+      const root = document.querySelector('.sw-root');
+      if (!root) return false;
+      const canvases = document.querySelectorAll('.sw-canvas').length === 2;
+      const body = document.body.textContent || '';
+      const credited = /OpenBible\.info \(CC-BY\)/.test(body);
+      const counted = /of\s[\d,]+\sconnections/.test(body) || /links you have made/.test(body);
+      const fellBack = !!document.querySelector('.sw-fallback');
+      return canvases && credited && (counted || fellBack);
+    });
     await step('Library → Notes', async function () { return lib(/My Notes/, /My Notes/); });
     await step('Library → Bookmarks', async function () { return lib(/My Bookmarks/, /My Bookmarks/); });
     await step('Library → Highlights', async function () { return lib(/My Marks|Highlights/, /Highlight|Underline/); });
