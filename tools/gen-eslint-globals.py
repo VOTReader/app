@@ -48,6 +48,8 @@ ENTRY_FILES = [
     # here too, so they're recognized as globals at their typeof-guarded route
     # call sites in screen-routes.jsx.
     ROOT / 'app/src/main/assets/src/ui/_entry-e.js',
+    # bundle-f — The Scripture Web, same typeof-guarded route call site.
+    ROOT / 'app/src/main/assets/src/ui/_entry-f.js',
 ]
 INDEX_HTML = ROOT / 'app/src/main/assets/index.html'
 DATA_DIR = ROOT / 'app/src/main/assets/src/data'

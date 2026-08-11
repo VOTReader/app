@@ -39,6 +39,7 @@ function makeGraph(pairs) {
     books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 },
             { id: 'beta', title: 'Beta', abbr: 'Bet', start: 20 }],
     chapters, chapterOfVerse, densityTiers: [20, 10],
+    attribution: 'OpenBible.info (CC-BY)', votEdges: [], prophecy: [], votLinks: [],
   };
 }
 
@@ -319,14 +320,15 @@ describe('focus + ruler picking', () => {
 
 describe('decode', () => {
   it('mirrors the generator delta runs, skipping empty tiers', () => {
-    expect(deltaRuns({ off: 0, len: 10, off20: 3, off10: 7 }))
-      .toEqual([[0, 3], [3, 4], [7, 3]]);
-    expect(deltaRuns({ off: 5, len: 4, off20: 0, off10: 0 })).toEqual([[5, 4]]);
-    expect(deltaRuns({ off: 0, len: 3, off20: 3, off10: 3 })).toEqual([[0, 3]]);
+    const bucket = (off, len, off20, off10) =>
+      ({ off, len, off20, off10, segments: 8, chunks: [] });
+    expect(deltaRuns(bucket(0, 10, 3, 7))).toEqual([[0, 3], [3, 4], [7, 3]]);
+    expect(deltaRuns(bucket(5, 4, 0, 0))).toEqual([[5, 4]]);
+    expect(deltaRuns(bucket(0, 3, 3, 3))).toEqual([[0, 3]]);
   });
 
   it('maps density names to prefix counts and vote floors', () => {
-    const b = { off: 0, len: 100, off20: 10, off10: 40 };
+    const b = { off: 0, len: 100, off20: 10, off10: 40, segments: 16, chunks: [] };
     expect(bucketDrawCount(b, 'essential')).toBe(10);
     expect(bucketDrawCount(b, 'classic')).toBe(40);
     expect(bucketDrawCount(b, 'complete')).toBe(100);

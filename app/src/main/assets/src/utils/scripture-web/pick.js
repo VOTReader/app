@@ -22,10 +22,13 @@ import { bucketDrawCount } from './decode.js';
 /**
  * Nearest arc to a screen point.
  *
- * @param {object} g — decoded graph (decode.js)
- * @param {object} cam — camera (geometry.js)
- * @param {object} view — { width, height, base, ceil, squash, localize, density }
- * @param {number} px @param {number} py — device px, y down
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number,
+ *   localize:number, density:import('./decode.js').Density,
+ *   rulerDepth?:number}} view
+ * @param {number} px
+ * @param {number} py
  * @param {number} tol — hit tolerance, device px
  * @returns {{ index:number, distance:number, from:number, to:number, votes:number }|null}
  */
@@ -57,9 +60,11 @@ export function pickArc(g, cam, view, px, py, tol) {
  * Every arc touching a verse range — the focus set behind "show me this
  * chapter's whole web". Returns indices in draw order.
  *
- * @param {object} g @param {number} lo @param {number} hi — inclusive verse ids
- * @param {'essential'|'classic'|'complete'} density
- * @param {number} [limit] — stop after this many (0/undefined = no cap)
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} lo
+ * @param {number} hi
+ * @param {import('./decode.js').Density} density
+ * @param {number} [limit] stop after this many (0/undefined = no cap)
  */
 export function arcsTouching(g, lo, hi, density, limit) {
   const out = [];
@@ -76,7 +81,13 @@ export function arcsTouching(g, lo, hi, density, limit) {
   return out;
 }
 
-/** How many arcs touch a verse range (cheaper than materializing them). */
+/**
+ * How many arcs touch a verse range (cheaper than materializing them).
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} lo
+ * @param {number} hi
+ * @param {import('./decode.js').Density} density
+ */
 export function countTouching(g, lo, hi, density) {
   let n = 0;
   for (const bucket of g.buckets) {
@@ -91,6 +102,11 @@ export function countTouching(g, lo, hi, density) {
 
 /**
  * The chapter under a point in the ruler strip below the baseline.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, rulerDepth?:number}} view
+ * @param {number} px
+ * @param {number} py
  * @returns {number} chapter index, or -1
  */
 export function pickChapter(g, cam, view, px, py) {
@@ -103,6 +119,11 @@ export function pickChapter(g, cam, view, px, py) {
 
 /**
  * The verse under a point, once zoomed far enough that verses are addressable.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, rulerDepth?:number}} view
+ * @param {number} px
+ * @param {number} py
  * @returns {number} verse id, or -1
  */
 export function pickVerse(g, cam, view, px, py) {
@@ -115,6 +136,8 @@ export function pickVerse(g, cam, view, px, py) {
 
 /**
  * Resolve a verse id to a human reference.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} verseId
  * @returns {{ bookId:string, bookTitle:string, abbr:string, chapter:number,
  *   verse:number, chapterIndex:number, label:string }}
  */
@@ -134,13 +157,25 @@ export function refOfVerse(g, verseId) {
   };
 }
 
-/** First and last verse ids of a chapter, inclusive. */
+/**
+ * First and last verse ids of a chapter, inclusive.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} chapterIndex
+ * @returns {[number, number]}
+ */
 export function chapterRange(g, chapterIndex) {
   const ch = g.chapters[chapterIndex];
   return [ch[2], ch[2] + ch[3] - 1];
 }
 
-/** Centre a chapter in the viewport at a given zoom — used by "go to". */
+/**
+ * Centre a chapter in the viewport at a given zoom — used by "go to".
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {number} width
+ * @param {number} chapterIndex
+ * @param {number} [ppv]
+ */
 export function focusChapter(g, cam, width, chapterIndex, ppv) {
   const [lo, hi] = chapterRange(g, chapterIndex);
   cam.x = (lo + hi) / 2;

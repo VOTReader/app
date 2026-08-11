@@ -6621,3 +6621,156 @@
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     input, textarea { user-select: text; -webkit-user-select: text; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       THE SCRIPTURE WEB (bundle-f)
+       ═══════════════════════════════════════════════════════════════════
+       A full-bleed instrument: two canvases under a thin chrome layer.
+       Every colour is a declared token (check-css-tokens.js) and every
+       font-size names a scale step (check-type-scale.js). The arcs
+       themselves are drawn in WebGL and carry their own data palette. */
+    .sw-root {
+      position: fixed; inset: 0; background: var(--bg);
+      touch-action: none; overflow: hidden; outline: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .sw-root:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .sw-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .sw-canvas-gl { z-index: 1; }
+    .sw-canvas-ui { z-index: 2; pointer-events: none; }
+
+    .sw-topbar {
+      position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
+      left: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+    }
+    .sw-title h1 {
+      margin: 0; font-family: var(--font-cinzel);
+      font-size: var(--fsc-15); font-weight: 600;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold);
+    }
+    .sw-title p {
+      margin: 3px 0 0; font-size: var(--fsc-11);
+      color: var(--cream-muted); letter-spacing: 0.04em;
+    }
+
+    .sw-controls {
+      position: absolute; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px;
+      right: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+      max-width: 62vw; justify-content: flex-end;
+    }
+    .sw-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 44px; min-width: 44px; padding: 0 14px;
+      background: transparent; color: var(--cream-dim);
+      border: 1px solid var(--gold-border); border-radius: 999px;
+      font-family: var(--font-cinzel); font-size: var(--fsc-11);
+      letter-spacing: 0.09em; text-transform: uppercase; cursor: pointer;
+      transition: var(--transition);
+    }
+    .sw-btn:hover { border-color: var(--gold); color: var(--gold-bright); }
+    .sw-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .sw-btn-icon { padding: 0; }
+    .sw-seg { display: inline-flex; border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
+    .sw-seg-btn {
+      min-height: 44px; padding: 0 14px; background: transparent; border: 0;
+      color: var(--cream-muted); font-family: var(--font-cinzel);
+      font-size: var(--fsc-11); letter-spacing: 0.09em; text-transform: uppercase;
+      cursor: pointer; transition: var(--transition);
+    }
+    .sw-seg-btn.is-on { background: var(--gold-faint); color: var(--gold-bright); }
+    .sw-seg-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+    .sw-loading, .sw-fallback {
+      position: absolute; inset: 0; z-index: 5;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 0 28px; text-align: center;
+      color: var(--cream-muted); font-size: var(--fs-15); background: var(--bg);
+    }
+    .sw-fallback-title { color: var(--cream-dim); font-size: var(--fs-20); font-family: var(--font-cinzel); }
+    .sw-fallback-body { max-width: 34em; line-height: 1.6; }
+
+    .sw-tip {
+      position: fixed; z-index: 6; pointer-events: none; max-width: 300px;
+      background: var(--bg3); border: 1px solid var(--gold-border);
+      border-radius: var(--radius); padding: 11px 13px;
+      font-family: var(--font-body); color: var(--cream-dim);
+    }
+    .sw-tip-eyebrow {
+      font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
+      letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px;
+    }
+    .sw-tip-ref { font-size: var(--fs-16); color: var(--gold-bright); }
+    .sw-tip-ref-alt { color: var(--link-blue); }
+    .sw-tip-arrow { color: var(--gold-dim); font-size: var(--fs-13); margin: 2px 0; }
+    .sw-tip-meta {
+      margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border);
+      color: var(--cream-muted); font-size: var(--fs-13);
+    }
+
+    .sw-sheet {
+      position: absolute; z-index: 7; left: 50%; transform: translateX(-50%);
+      bottom: calc(12px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      width: min(560px, calc(100vw - 24px));
+      background: var(--bg3); border: 1px solid var(--gold-border);
+      border-radius: var(--radius); padding: 16px 18px 18px;
+      font-family: var(--font-body); color: var(--cream-dim);
+      max-height: 52vh; overflow-y: auto;
+    }
+    .sw-sheet-close {
+      position: absolute; top: 8px; right: 8px;
+      min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
+      background: transparent; border: 0; color: var(--cream-muted); cursor: pointer;
+    }
+    .sw-sheet-close:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .sw-sheet-eyebrow {
+      font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
+      letter-spacing: 0.16em; text-transform: uppercase;
+    }
+    .sw-sheet-title { font-size: var(--fs-20); color: var(--gold-bright); margin-top: 6px; }
+    .sw-sheet-meta { color: var(--cream-muted); font-size: var(--fs-13); margin-top: 4px; }
+    .sw-sheet-rows { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+    .sw-sheet-row { border-top: 1px solid var(--border); padding-top: 12px; }
+    .sw-sheet-row:first-child { border-top: 0; padding-top: 0; }
+    .sw-sheet-ref { font-size: var(--fs-16); color: var(--gold-bright); }
+    .sw-sheet-text { margin-top: 5px; line-height: 1.55; font-size: var(--fs-15); }
+    .sw-btn-open { margin-top: 10px; }
+
+    .sw-legend {
+      position: absolute; z-index: 4; left: 14px;
+      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 70vw;
+      font-size: var(--fsc-10); color: var(--cream-muted); letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+    .sw-key { display: inline-flex; align-items: center; gap: 5px; }
+    .sw-key-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+    .sw-key-gradient {
+      width: 84px; height: 6px; border-radius: 3px; display: inline-block; margin: 0 6px;
+      background: linear-gradient(to right, #c252b8, #8f5cd9, #4f70d4, #5c9ec9, #b54750, #c9a06b, #99a84f, #54c25e);
+    }
+    .sw-key-t0 { background: #d0a838; } .sw-key-t1 { background: #f48fb1; } .sw-key-t2 { background: #6cb4dc; }
+    .sw-key-g0 { background: #d0a838; } .sw-key-g1 { background: #da833c; } .sw-key-g2 { background: #e7c45c; }
+    .sw-key-g3 { background: #ef6d67; } .sw-key-g4 { background: #f48fb1; } .sw-key-g5 { background: #7bcba3; }
+    .sw-key-g6 { background: #66bfd8; } .sw-key-g7 { background: #6c98e0; } .sw-key-g8 { background: #a480e2; }
+    .sw-key-g9 { background: #cd67cf; }
+
+    .sw-credit {
+      position: absolute; z-index: 4; right: 14px;
+      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      font-size: var(--fsc-10); color: var(--cream-muted); opacity: 0.75;
+      letter-spacing: 0.04em; pointer-events: none;
+    }
+    .sw-live {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip-path: inset(50%); white-space: nowrap;
+    }
+
+    @media (max-width: 560px) {
+      .sw-controls { max-width: 100vw; left: 14px; justify-content: flex-start;
+        top: auto; bottom: calc(30px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+      .sw-legend { display: none; }
+      .sw-credit { left: 14px; right: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sw-btn, .sw-seg-btn { transition: none; }
+    }

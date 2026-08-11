@@ -16,6 +16,29 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
+ * One span bucket of the baked layout.
+ * @typedef {{ off:number, len:number, off20:number, off10:number,
+ *   segments:number, chunks:Array<[number, number]> }} GraphBucket
+ */
+
+/**
+ * The decoded graph — what every other module in this feature consumes.
+ * @typedef {{
+ *   total:number, count:number,
+ *   from:Uint16Array, to:Uint16Array, votes:Int16Array,
+ *   buckets:GraphBucket[],
+ *   books:Array<{id:string, title:string, abbr:string, start:number}>,
+ *   chapters:Array<number[]>,
+ *   chapterOfVerse:Uint16Array,
+ *   densityTiers:number[], attribution:string,
+ *   votEdges:Array<any>, prophecy:Array<any>, votLinks:Array<any>,
+ *   chunkSize?:number
+ * }} ScriptureGraph
+ */
+
+/** @typedef {'essential'|'classic'|'complete'} Density */
+
+/**
  * base64 → Uint8Array.
  * @param {string} b64
  * @returns {Uint8Array}
@@ -30,7 +53,7 @@ export function base64ToBytes(b64) {
 /**
  * The runs `from` ascends within — one per density tier inside each bucket.
  * Mirrors deltaRuns() in tools/scripture-web-lib.mjs.
- * @param {{off:number, len:number, off20:number, off10:number}} bucket
+ * @param {GraphBucket} bucket
  * @returns {Array<[number, number]>} [start, length] pairs
  */
 export function deltaRuns(bucket) {
@@ -46,12 +69,7 @@ export function deltaRuns(bucket) {
  * Decode the whole graph asset.
  *
  * @param {any} data — the SCRIPTURE_WEB_DATA global
- * @returns {{
- *   total:number, count:number, from:Uint16Array, to:Uint16Array,
- *   votes:Int16Array, buckets:any[], books:any[], chapters:any[],
- *   chapterOfVerse:Uint16Array, densityTiers:number[], attribution:string,
- *   votEdges:any[], prophecy:any[], votLinks:any[]
- * }}
+ * @returns {ScriptureGraph}
  */
 export function decodeGraph(data) {
   if (!data || !data.count) throw new Error('scripture-web: data missing or empty');
@@ -107,8 +125,8 @@ export function decodeGraph(data) {
  * How many instances a bucket draws at a given density.
  * The layout is pre-sorted so each density is a PREFIX of the bucket — the
  * renderer just shortens its instance count; nothing is re-uploaded.
- * @param {{len:number, off20:number, off10:number}} bucket
- * @param {'essential'|'classic'|'complete'} density
+ * @param {GraphBucket} bucket
+ * @param {Density} density
  */
 export function bucketDrawCount(bucket, density) {
   if (density === 'essential') return bucket.off20;
@@ -116,7 +134,11 @@ export function bucketDrawCount(bucket, density) {
   return bucket.len;
 }
 
-/** Minimum vote weight a density admits — the picker uses it to match the GPU. */
+/**
+ * Minimum vote weight a density admits — the picker uses it to match the GPU.
+ * @param {Density} density
+ * @param {number[]} [tiers]
+ */
 export function minVotesFor(density, tiers) {
   const t = tiers || [20, 10];
   if (density === 'essential') return t[0];

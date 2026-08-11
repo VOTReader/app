@@ -36,7 +36,7 @@ function useStoreVersion(name) {
   );
 }
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, onOpenScriptureWeb, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
   // (AudioLibraryStore is in that list — the milestones chip counts listening.
   // The Listening Library itself moved to a HOME card on 2026-08-09.)
@@ -149,6 +149,21 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       icon: (
         <svg viewBox="0 0 24 24">
           <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 8.7l5.4-.8z" />
+        </svg>
+      ),
+    },
+    'scripture-web': {
+      id: 'scripture-web', eyebrow: 'The Whole Counsel', title: 'Scripture Web',
+      detail: '301,539 cross-references',
+      guide: null,
+      onClick: onOpenScriptureWeb,
+      icon: (
+        // Three nested arcs over a baseline — the visualization in miniature.
+        <svg viewBox="0 0 24 24">
+          <path d="M3 19a9 9 0 0 1 18 0" />
+          <path d="M6 19a6 6 0 0 1 12 0" />
+          <path d="M9 19a3 3 0 0 1 6 0" />
+          <line x1="2" y1="19" x2="22" y2="19" />
         </svg>
       ),
     },

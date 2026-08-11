@@ -43,7 +43,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-kRMrGhQxgZ9pxkXKG4DFwvXjAFjiVW5hlhoPVCkOpgg=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-6ktz9msrnDv/Y07S7pNF661UFj1o3PCYPqvgBVt7rIc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-kRMrGhQxgZ9pxkXKG4DFwvXjAFjiVW5hlhoPVCkOpgg=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -242,6 +242,13 @@
     var screensE = window.__makeLazyLoader('screens-e', 'dist/bundle-e.js', null);
     window.__screensE = screensE.corpus;
     window.__loadScreensE = screensE.load;
+    // The Scripture Web (bundle-f) — its own lazy bundle rather than a lodger
+    // in bundle-e: a WebGL renderer plus its geometry has no business on the
+    // cold-boot path, and bundle-e is near its byte ceiling. Same no-finishFn
+    // contract as screens-e.
+    var screensF = window.__makeLazyLoader('screens-f', 'dist/bundle-f.js', null);
+    window.__screensF = screensF.corpus;
+    window.__loadScreensF = screensF.load;
   })();
   </script>
 

@@ -79,7 +79,8 @@ describe('graceful degradation', () => {
   it('returns null when WebGL2 is unavailable instead of throwing', () => {
     // jsdom canvases have no WebGL2 — this is the real code path on an old
     // device, and the screen shows its fallback panel rather than a blank void.
-    const canvas = { getContext: () => null, addEventListener() {}, removeEventListener() {} };
-    expect(createRenderer(canvas, { count: 0 })).toBeNull();
+    const canvas = /** @type {any} */ (
+      { getContext: () => null, addEventListener() {}, removeEventListener() {} });
+    expect(createRenderer(canvas, /** @type {any} */ ({ count: 0 }))).toBeNull();
   });
 });

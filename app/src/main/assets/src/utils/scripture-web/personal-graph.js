@@ -16,6 +16,17 @@
    version-bumps (hundreds of records, not hundreds of thousands).
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * @typedef {{ total:number, index:Map<string, number>,
+ *   segments:Array<{volKey:string, label:string, start:number, count:number}>,
+ *   nodes:Array<{volKey:string, id:string, title:string}> }} VotRail
+ */
+
+/**
+ * @typedef {{ verseIdOf?: (bookId:string, chapter:number, verse:number) => number,
+ *   votRail?: VotRail }} PlaceCtx
+ */
+
 /** Endpoint types that live on the VOT (top) rail. */
 export const VOT_TYPES = new Set([
   'letter', 'wtlb', 'blessed', 'holy-days', 'study-letter', 'journal',
@@ -72,8 +83,8 @@ export function buildVotRail(collections) {
  * endpoints with bookId/chapter/verse already parsed, and a key can carry an
  * excerpt suffix or a block index that means nothing to us.
  *
- * @param {object} ep — a LinkEndpoint
- * @param {object} ctx — { verseIdOf(bookId, chapter, verse):number, votRail }
+ * @param {any} ep — a LinkEndpoint
+ * @param {PlaceCtx} ctx
  * @returns {{ rail:'bible'|'vot', pos:number, key:string }|null}
  */
 export function placeEndpoint(ep, ctx) {
@@ -130,8 +141,8 @@ export function placeEndpoint(ep, ctx) {
  * content the user has since deleted (or a corpus that has not loaded yet)
  * must not blank the whole screen.
  *
- * @param {Array<object>} links — LinkStore.all()
- * @param {object} ctx — { verseIdOf, votRail }
+ * @param {Array<{id?:string, source?:object, target?:object}>} links — LinkStore.all()
+ * @param {PlaceCtx} ctx
  * @returns {{
  *   count:number, aRail:Uint8Array, bRail:Uint8Array,
  *   aPos:Float32Array, bPos:Float32Array, kind:Uint8Array,
@@ -182,8 +193,9 @@ export function buildPersonalGraph(links, ctx) {
  * the renderer can draw them as one dimmed underlay beneath the user's own
  * links without a second code path.
  *
- * @param {Array<object>} votEdges — decoded graph .votEdges
- * @param {object} ctx — { votRail }
+ * @param {Array<{v:number, kind?:string, volKey?:string, letterId?:string,
+ *   entryId?:string, studyId?:string}>} votEdges — decoded graph .votEdges
+ * @param {{votRail?:VotRail}} ctx
  */
 export function buildCuratedUnderlay(votEdges, ctx) {
   const rows = [];

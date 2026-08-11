@@ -43,4 +43,8 @@ export function useLazyBundles() {
     React.useCallback((cb) => (typeof window.__screensE !== 'undefined' ? window.__screensE.subscribe(cb) : () => {}), []),
     () => (typeof window.__screensE !== 'undefined' ? window.__screensE.getVersion() : 0)
   );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__screensF !== 'undefined' ? window.__screensF.subscribe(cb) : () => {}), []),
+    () => (typeof window.__screensF !== 'undefined' ? window.__screensF.getVersion() : 0)
+  );
 }

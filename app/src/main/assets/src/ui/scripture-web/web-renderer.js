@@ -39,7 +39,8 @@ uniform float uCamX, uPPV, uBase, uCeil, uSquash, uLocalize;
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
-uniform float uFocusArc;     // single instance spotlighted (-1 = none)
+uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
+uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 out vec4 vCol; out float vEdge;
@@ -65,12 +66,16 @@ void main(){
 
   float id = float(gl_InstanceID) + uInstanceBase;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
+  float hovered = (uHoverArc >= 0. && abs(id - uHoverArc) < .5) ? 1. : 0.;
   float inRange = (uFocusRange.x <= uFocusRange.y &&
       ((a >= uFocusRange.x && a <= uFocusRange.y) ||
        (b >= uFocusRange.x && b <= uFocusRange.y))) ? 1. : 0.;
   float lit = max(spot, inRange);
+  // Only a TAP darkens the rest of the web. Merely moving the mouse across
+  // the dome must not blank the picture the reader is looking at.
   float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
   float dim = mix(1., mix(.05, 1., lit), focusing);
+  float bright = max(spot, hovered);
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
   // overhead recede so the local weave is legible instead of fogged.
@@ -87,11 +92,11 @@ void main(){
   } else {
     col = genreColor(aGenre);
   }
-  col = mix(col, vec3(1.), spot*.55);
+  col = mix(col, vec3(1.), bright*.55);
   col *= uLightness;                              // parchment needs darker ink
 
   float strength = clamp(aVotes/70., .30, 1.);
-  vCol = vec4(col, uAlpha*dim*strength*mix(1., 3.0, spot));
+  vCol = vec4(col, uAlpha*dim*strength*mix(1., 3.0, bright));
   vEdge = side;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
   gl_Position.y = -gl_Position.y;
@@ -129,7 +134,7 @@ function compile(gl, type, src) {
  * unavailable — the screen shows its fallback panel rather than a blank void.
  *
  * @param {HTMLCanvasElement} canvas
- * @param {object} graph — decoded graph (utils/scripture-web/decode.js)
+ * @param {import('../../utils/scripture-web/decode.js').ScriptureGraph} graph
  * @returns {object|null}
  */
 export function createRenderer(canvas, graph) {
@@ -166,7 +171,8 @@ export function createRenderer(canvas, graph) {
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uCeil', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
-    'uLightness', 'uSegments', 'uFocusRange', 'uFocusArc', 'uInstanceBase']) {
+    'uLightness', 'uSegments', 'uFocusRange', 'uFocusArc', 'uHoverArc',
+    'uInstanceBase']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -247,11 +253,12 @@ export function createRenderer(canvas, graph) {
 
     /**
      * Draw one frame.
-     * @param {object} v — {
-     *   width, height, base, ceil, squash, localize, camX, ppv,
-     *   strokeWidth, alpha, colorMode, density, light, bg,
-     *   focusRange: [lo,hi]|null, focusArc: number|-1
-     * }
+     * @param {{width:number, height:number, base:number, ceil:number,
+     *   squash:number, localize:number, camX:number, ppv:number,
+     *   strokeWidth:number, alpha:number, colorMode:string,
+     *   density:import('../../utils/scripture-web/decode.js').Density,
+     *   light:boolean, bg:string,
+     *   focusRange:(number[]|null), focusArc:number, hoverArc?:number}} v
      */
     draw(v) {
       if (lost) return lastStats;
@@ -281,6 +288,7 @@ export function createRenderer(canvas, graph) {
       gl.uniform1f(U.uColorMode, COLOR_MODES.indexOf(v.colorMode));
       gl.uniform1f(U.uLightness, v.light ? 0.72 : 1);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
+      gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
 

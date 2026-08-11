@@ -40,6 +40,7 @@ const BUDGETS = [
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-e.js', measured: 114137, max: 132000 },   // Settings/Search/Garden
+  { file: 'bundle-f.js', measured: 32447, max: 38000 },     // The Scripture Web (WebGL renderer + geometry)
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   { file: 'bundle-a-matthew.js', measured: 492357, max: 567000 },
   { file: 'bundle-a-vot.js', measured: 2432537, max: 2798000 },

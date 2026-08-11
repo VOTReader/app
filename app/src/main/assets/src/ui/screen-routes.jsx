@@ -661,6 +661,13 @@ export function buildScreenRoutes({
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
           onOpenMilestones={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
+          onOpenScriptureWeb={() => {
+            // Kick bundle-f before the route renders so the "Loading…" frame
+            // is usually skipped entirely.
+            if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
+            setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null });
+            setScreen('scripture-web');
+          }}
           totalReadCount={Object.keys(readItems || {}).length}
           readItems={readItems || {}}
           onSearch={goSearch}
@@ -1200,5 +1207,26 @@ export function buildScreenRoutes({
         tier={settings.gardenTier || GARDEN_DEFAULT_TIER}
       />
     ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
+
+    // The Scripture Web rides its own lazy bundle (bundle-f). Both corpora are
+    // kicked in the background on the same render-phase contract as _kickVot:
+    // the Bible corpus backs the verse previews in the detail sheet, the VOT
+    // corpus backs the personal web's top rail. Neither blocks the drawing.
+    'scripture-web': () => {
+      if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      return (typeof ScriptureWebScreen !== 'undefined') ? (
+        <ScriptureWebScreen
+          navigateToLink={(endpoint, meta) => {
+            if (!endpoint) return;
+            setNavOrigin({ screen: 'scripture-web' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
+          }}
+          onBack={() => setScreen('library')}
+          settings={settings}
+          updateSetting={updateSetting}
+        />
+      ) : _corpusView(window.__screensF, window.__loadScreensF, 'Loading…');
+    },
   };
 }

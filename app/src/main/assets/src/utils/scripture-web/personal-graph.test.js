@@ -112,7 +112,10 @@ describe('placeEndpoint — all endpoint types', () => {
       ['study-letter', { type: 'study-letter', key: 'letter:duty:0', letterId: 'duty' }, 1],
       ['journal', { type: 'journal', key: 'journal:the-wide-path:0', entryId: 'the-wide-path' }, 0],
     ];
-    for (const [name, ep, pos] of cases) {
+    for (const row of cases) {
+      const name = /** @type {string} */ (row[0]);
+      const ep = /** @type {any} */ (row[1]);
+      const pos = /** @type {number} */ (row[2]);
       expect(placeEndpoint(ep, ctx), name).toMatchObject({ rail: 'vot', pos });
     }
     expect(VOT_TYPES.size).toBe(6);
@@ -165,7 +168,7 @@ describe('buildPersonalGraph', () => {
   it('skips unresolvable links and counts them instead of throwing', () => {
     const g = buildPersonalGraph(links, ctx);
     expect(g.skipped).toBe(1);
-    expect(g.records.map((r) => r.id)).toEqual(['l1', 'l2', 'l3']);
+    expect(g.records.map((r) => /** @type {any} */ (r).id)).toEqual(['l1', 'l2', 'l3']);
   });
 
   it('records positions on both rails', () => {

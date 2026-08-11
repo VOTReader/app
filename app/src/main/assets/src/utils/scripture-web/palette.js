@@ -112,7 +112,7 @@ vec3 genreColor(float g){ return GENRE[int(g + .5)]; }`;
  * the same custom properties every other screen uses rather than inventing
  * hexes — including the type-scale steps.
  *
- * @param {Element} [el] — element to resolve against (defaults to <html>)
+ * @param {Element} [el] element to resolve against (defaults to <html>)
  */
 export function readChromeTokens(el) {
   const root = el || (typeof document !== 'undefined' ? document.documentElement : null);
