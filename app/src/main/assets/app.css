@@ -6796,12 +6796,14 @@
       clip-path: inset(50%); white-space: nowrap;
     }
 
-    @media (max-width: 560px) {
-      .sw-controls { max-width: 100vw; left: 14px; justify-content: flex-start;
-        top: auto; bottom: calc(30px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
-      .sw-legend { display: none; }
-      .sw-credit { left: 14px; right: auto; }
-    }
+    /* Narrow layout keys off the ROOT's own width via .sw-narrow (set from
+       clientWidth in JS) — a media query would still see the physical
+       portrait width inside the CSS-rotated landscape and stack the controls
+       over the web. */
+    .sw-root.sw-narrow .sw-controls { max-width: 100%; left: 14px; right: auto; justify-content: flex-start;
+      top: auto; bottom: calc(30px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-narrow .sw-legend { display: none; }
+    .sw-root.sw-narrow .sw-credit { left: 14px; right: auto; }
     @media (prefers-reduced-motion: reduce) {
       .sw-btn, .sw-seg-btn { transition: none; }
     }
@@ -6821,16 +6823,12 @@
     .sw-empty-body { font-size: var(--fs-15); line-height: 1.65; }
     .sw-empty-body strong { color: var(--gold-bright); font-weight: 600; }
 
-    @media (max-width: 560px) {
-      .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
-      .sw-credit { bottom: calc(4px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-10); }
-    }
+    .sw-root.sw-narrow .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-narrow .sw-credit { bottom: calc(4px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-10); }
 
-    @media (max-width: 560px) {
-      /* Above the control strip, not behind it — CC-BY attribution has to stay
-         legible, not merely present. */
-      .sw-credit { bottom: calc(122px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
-    }
+    /* Above the control strip, not behind it — CC-BY attribution has to stay
+       legible, not merely present. */
+    .sw-root.sw-narrow .sw-credit { bottom: calc(122px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
 
     /* About: the CC-BY line for the Scripture Web dataset. */
     .about-credit { font-size: var(--fs-13); color: var(--cream-muted); }

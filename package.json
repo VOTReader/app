@@ -32,7 +32,9 @@
     "check:apk-assets": "node tools/check-apk-assets.js",
     "check:type-scale": "node tools/check-type-scale.js",
     "check:css-tokens": "node tools/check-css-tokens.js",
-    "check:bundle-budget": "node tools/check-bundle-budget.js"
+    "check:bundle-budget": "node tools/check-bundle-budget.js",
+    "check:runtime-assets": "node tools/list-runtime-src-assets.js --check",
+    "check:live": "node tools/check-live-version.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

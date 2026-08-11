@@ -172,6 +172,17 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify every runtime src/ asset is derivable + staged by the deploy
+        # deploy-web.yml excludes src/ (it is bundled into dist/) and copies a few
+        # files back in. That copy-back was the hand-written glob
+        # `src/data/bible-*.js` and it silently dropped src/data/scripture-web-data.js
+        # — a 2.6 MB file ScriptureWebScreen injects via script.src — so the Scripture
+        # Web would have 404'd on the live PWA while working in local preview.
+        # Nothing failed; the file just wasn't there. This gate derives the runtime
+        # asset list from the loaders in src/ and fails if one is missing from disk,
+        # or if service-worker.js precaches a src/ path the scan cannot see.
+        run: npm run check:runtime-assets
+
       - name: Verify every CSS custom-property reference resolves (C2-D [D8])
         # An undeclared var() with no fallback is invalid at computed-value
         # time — the whole declaration drops, so a border becomes `none`

@@ -156,6 +156,32 @@ export function xToVerse(cam, width, x) {
 }
 
 /**
+ * Additive-blend brightness budget.
+ *
+ * On the dark theme threads GLOW where they stack. The perceived exposure of
+ * the whole picture is roughly (arcs × stroke width ÷ viewport height) ×
+ * alpha — arc length scales with width, area with width × height, so height
+ * is what's left. The SAME 301k arcs that render perfectly on a desktop
+ * canvas therefore white out on a phone: a third of the pixels, three times
+ * the energy per pixel (the on-device "neon blob on the settle frame").
+ *
+ * This returns a multiplier that caps the energy at the reference exposure —
+ * the desktop Complete rendering that was verified against the source
+ * image — and leaves anything at or below that budget untouched.
+ *
+ * @param {number} instances — arcs actually drawn (last frame's count)
+ * @param {number} strokeWidth — device px
+ * @param {number} height — viewport height, device px
+ * @returns {number} 0..1 multiplier for the base alpha
+ */
+export function additiveAlphaScale(instances, strokeWidth, height) {
+  if (!(instances > 0) || !(height > 0)) return 1;
+  const energy = (instances * Math.max(strokeWidth, 0.5)) / height;
+  const REFERENCE = 245;   // ≈ 301,539 arcs × 2px on a 2,500px-tall desktop
+  return Math.min(1, REFERENCE / energy);
+}
+
+/**
  * Map viewport pointer coords into a screen that has been CSS-rotated 90°
  * clockwise into landscape (transform-origin top left, translateY(-100%)).
  * Layout metrics ignore transforms, so the rotated screen's own x axis runs

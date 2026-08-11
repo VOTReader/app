@@ -37,17 +37,25 @@ name: Deploy Web (PWA → GitHub Pages)
 on:
   push:
     branches: [main]
-    # Only deploy when something that affects the published output changes.
-    # Skips docs / Kotlin / hook / CI-only commits (no point redeploying
-    # identical web content). workflow_dispatch is always available for a
-    # manual redeploy.
-    paths:
-      - 'app/src/main/assets/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tools/build.py'
-      - 'tools/sync-sw-version.js'
-      - '.github/workflows/deploy-web.yml'
+    # NO `paths:` FILTER — DELIBERATE (2026-08-11, owner directive: "any kind of
+    # change should always automatically deploy, whether a small bug fix or a big
+    # feature add or renderer/math/type change anything").
+    #
+    # There used to be an allow-list here (assets/**, package.json, build.py,
+    # sync-sw-version.js, this file). It was a landmine: the published bytes are
+    # produced by `npm run build`, whose output depends on far more than that list
+    # — tools/minify-bundle.mjs, every tools/gen-*.mjs generator, .nvmrc, the
+    # esbuild version in package-lock — so a commit could legitimately change what
+    # SHOULD be live and match no path, and then nothing deployed and nothing said
+    # so. The failure was silent in the worst direction: the developer believes he
+    # shipped.
+    #
+    # A redundant redeploy is nearly free (~3 min of Actions time) and is a no-op
+    # for clients: `npm run build` is deterministic, so identical source produces
+    # an identical CACHE_VERSION, and an unchanged service-worker.js means the
+    # browser's update check finds no byte-diff and installs nothing. Publishing
+    # on EVERY push to main trades a few wasted minutes for the guarantee that
+    # "committed to main" and "live" can never silently diverge.
   workflow_dispatch:
 
 permissions:
@@ -103,6 +111,7 @@ jobs:
           pip install -r requirements-dev.txt   # esprima — check_balance's authoritative JS parse
           python check_balance.py        # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
           npm run smoke-lite             # BLD3 — globals mirror + COLLECTIONS linkage + module cycles
+          npm run check:runtime-assets   # every runtime src/ asset is derivable (the staging gate's first half)
           npm run check:corpus           # CORPUS_VERSION matches the corpus-bundle hash
           npm run validate:data          # Format A/B/C/D schema integrity
           npm run check:footnotes        # CORP6 — no dup/white footnote verse numbers
@@ -125,13 +134,26 @@ jobs:
             --exclude='*.d.ts' \
             --exclude='*.lnk' \
             app/src/main/assets/ _site/
-          # The alternate translations + bible-studies.js are loaded at
-          # runtime from src/data/ (not bundled), so copy just those back in
-          # after the blanket src/ exclusion above — the rest of src/ stays out.
+          # Copy back the src/ files the app loads at RUNTIME (the alternate
+          # translations, bible-studies.js, scripture-web-data.js) after the
+          # blanket src/ exclusion above — the rest of src/ stays out.
+          #
+          # The list is DERIVED from the loaders in src/ by
+          # tools/list-runtime-src-assets.js, not hand-written here. It used to be
+          # the glob `cp src/data/bible-*.js`, which silently dropped
+          # src/data/scripture-web-data.js (2.6 MB, injected via script.src by
+          # ScriptureWebScreen) — the Scripture Web would have 404'd on the live
+          # PWA while working perfectly in local preview, with nothing failing loudly.
           mkdir -p _site/src/data
-          cp app/src/main/assets/src/data/bible-*.js _site/src/data/
+          node tools/list-runtime-src-assets.js | while read -r rel; do
+            mkdir -p "_site/$(dirname "$rel")"
+            cp "app/src/main/assets/$rel" "_site/$rel"
+          done
+          # Fail the deploy if any runtime asset did not land. This is the gate that
+          # turns "silently 404s in production" into "the deploy stops".
+          node tools/list-runtime-src-assets.js --check --site _site
           echo "Staged file count: $(find _site -type f | wc -l)"
-          echo "Translations staged into src/data: $(ls _site/src/data/ | wc -l)"
+          echo "Runtime src/data files staged: $(ls _site/src/data/ | wc -l)"
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6

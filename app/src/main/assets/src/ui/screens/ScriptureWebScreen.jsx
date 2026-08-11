@@ -23,7 +23,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
+  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer, additiveAlphaScale,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArc, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
@@ -314,10 +314,22 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }
       return;
     }
+    const strokeWidth = Math.min(0.8 + Math.log2(zoom) * 0.24, 3.0) * v.DPR;
+    let alpha = Math.min(0.052 + Math.log2(zoom) * 0.042, chrome.isLight ? 0.8 : 0.5);
+    if (!chrome.isLight) {
+      // Additive exposure budget: the same arc count that is perfect on a
+      // desktop canvas whites out on a phone (fewer pixels, more energy per
+      // pixel). Meter by what was ACTUALLY drawn last frame — after density
+      // and chunk culling — so Complete on a phone settles to the
+      // desktop-verified exposure instead of blooming into a neon blob.
+      const drawn = (r.stats && r.stats.instances)
+        || graphStats(g, liveDensity).shown;
+      alpha *= additiveAlphaScale(drawn, strokeWidth, v.H);
+    }
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
-      strokeWidth: Math.min(0.8 + Math.log2(zoom) * 0.24, 3.0) * v.DPR,
-      alpha: Math.min(0.052 + Math.log2(zoom) * 0.042, chrome.isLight ? 0.8 : 0.5),
+      strokeWidth,
+      alpha,
       colorMode, density: liveDensity, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
@@ -364,6 +376,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       const H = Math.round(glc.clientHeight * dpr);
       if (!W || !H) return;
       viewRef.current = { W, H, DPR: dpr };
+      // Layout class from the root's OWN width: a rotated portrait phone is a
+      // WIDE screen even though the physical viewport (and every media query)
+      // still reports 448px — keying the control layout off a media query put
+      // the buttons mid-screen and on top of the web (the on-device report).
+      const wrap = wrapRef.current;
+      if (wrap) wrap.classList.toggle('sw-narrow', glc.clientWidth <= 560);
       glc.width = uic.width = W;
       glc.height = uic.height = H;
       const cam = camRef.current;

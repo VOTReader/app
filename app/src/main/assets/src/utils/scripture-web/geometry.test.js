@@ -12,7 +12,7 @@ import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH,
   localizeFactor, squashFactor, arcRadiusY, arcRadiusGLSL, arcDistance,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
-  rotatePointer,
+  rotatePointer, additiveAlphaScale,
 } from './geometry.js';
 import {
   pickArc, arcsTouching, countTouching, pickChapter, pickVerse,
@@ -111,6 +111,36 @@ describe('height law', () => {
     expect(arcRadiusGLSL).toContain(String(CEIL_SOFTNESS));
     expect(arcRadiusGLSL).toContain('tanh');
     expect(arcRadiusGLSL).toContain('mix(semi, capped, localize)');
+  });
+});
+
+describe('additiveAlphaScale — the exposure budget', () => {
+  it('leaves the desktop-verified Complete rendering untouched', () => {
+    // 301,539 arcs, 2px strokes, 2,500px-tall canvas — the rendering that was
+    // matched against the source image. Budget boundary; scale ≈ 1.
+    expect(additiveAlphaScale(301539, 2, 2500)).toBeGreaterThan(0.97);
+  });
+
+  it('meters Complete DOWN on a phone instead of letting it bloom', () => {
+    // Pixel 9 Pro rotated: ~1,176 device px tall, 2.1px strokes. Same arcs,
+    // a third of the pixels — the neon-blob report. Roughly half exposure.
+    const scale = additiveAlphaScale(301539, 2.1, 1176);
+    expect(scale).toBeGreaterThan(0.35);
+    expect(scale).toBeLessThan(0.55);
+  });
+
+  it('never touches Classic on any screen', () => {
+    expect(additiveAlphaScale(38892, 2, 2500)).toBe(1);
+    expect(additiveAlphaScale(38892, 2.1, 1176)).toBe(1);
+  });
+
+  it('only ever dims — never brightens past the base alpha', () => {
+    for (const n of [10, 1000, 500000]) {
+      const v = additiveAlphaScale(n, 3, 800);
+      expect(v).toBeGreaterThan(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+    expect(additiveAlphaScale(0, 2, 1000)).toBe(1);   // nothing drawn yet
   });
 });
 
