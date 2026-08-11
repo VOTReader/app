@@ -438,23 +438,34 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         kind: 'link', index: found.index, record: rec,
         source: rec.source, target: rec.target,
         joins: p.graph.kind[found.index],
+        // The reader's OWN endpoints, passed through untouched — they already
+        // carry verse/verseEnd and char spans, so a link the user made over a
+        // range highlights that whole range on arrival.
+        cards: [endpointCard('Source', rec.source), endpointCard('Target', rec.target)],
       };
     }
     if (found.kind === 'arc') {
       const a = refOfVerse(g, found.hit.from), b = refOfVerse(g, found.hit.to);
-      return { kind: 'arc', a, b, votes: found.hit.votes,
-        span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index };
+      return {
+        kind: 'arc', a, b, votes: found.hit.votes,
+        span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
+        cards: [verseCard('From', a), verseCard('To', b)],
+      };
     }
     if (found.kind === 'verse') {
       const r = refOfVerse(g, found.verse);
       return { kind: 'verse', ref: r, verse: found.verse,
-        connections: countTouching(g, found.verse, found.verse, density) };
+        connections: countTouching(g, found.verse, found.verse, density),
+        cards: [verseCard('Verse', r)] };
     }
     const [lo, hi] = chapterRange(g, found.chapterIndex);
     const ch = g.chapters[found.chapterIndex];
+    const first = refOfVerse(g, lo);
     return { kind: 'chapter', chapterIndex: found.chapterIndex,
       book: g.books[ch[0]], chapter: ch[1], verses: ch[3], lo, hi,
-      connections: countTouching(g, lo, hi, density) };
+      connections: countTouching(g, lo, hi, density),
+      // Opening a chapter highlights the WHOLE chapter on arrival.
+      cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
   }, [graph, density]);
 
   const hover = React.useCallback((cx, cy) => {
@@ -534,15 +545,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.haptic('light');
   };
 
-  const openInReader = React.useCallback((verseId) => {
-    if (!graph || typeof navigateToLink !== 'function') return;
-    const r = refOfVerse(graph, verseId);
-    navigateToLink({
-      type: 'bible',
-      key: 'bible:' + r.bookId + ':' + r.chapter + ':' + r.verse,
-      bookId: r.bookId, chapter: r.chapter, verse: r.verse, label: r.label,
-    }, { sourceLetterTitle: 'The Scripture Web' });
-  }, [graph, navigateToLink]);
+  const openEndpoint = React.useCallback((endpoint) => {
+    if (!endpoint || typeof navigateToLink !== 'function') return;
+    // meta.sourceLetterTitle is what the reader's back pill is labelled with,
+    // and the hook snapshots the current screen as the return target — so a
+    // jump from here comes back HERE.
+    navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
+  }, [navigateToLink]);
 
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) {
@@ -632,9 +641,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       )}
       {tip && <TipChip info={tip} />}
       {detail && (
-        <DetailSheet info={detail} graph={graph} onClose={() => setDetail(null)}
-          onOpen={openInReader}
-          onOpenEndpoint={(ep) => { if (ep && typeof navigateToLink === 'function') navigateToLink(ep); }} />
+        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} />
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(colorMode)}</div>
@@ -860,63 +867,113 @@ function TipChip({ info }) {
   );
 }
 
-function DetailSheet({ info, graph, onClose, onOpen, onOpenEndpoint }) {
-  if (info.kind === 'link') {
-    return (
-      <div className="sw-sheet" role="dialog" aria-modal="false" aria-label="Link details">
-        <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
-        </button>
-        <div className="sw-sheet-eyebrow">Your link</div>
-        <div className="sw-sheet-meta">{LINK_KIND_NAMES[info.joins]}</div>
-        <div className="sw-sheet-rows">
-          {[info.source, info.target].map((ep, i) => (
-            <div className="sw-sheet-row" key={i}>
-              <div className="sw-sheet-ref">{endpointLabel(ep)}</div>
-              {ep && ep.preview && <div className="sw-sheet-text">{ep.preview}</div>}
-              <button type="button" className="sw-btn sw-btn-open"
-                onClick={() => onOpenEndpoint(ep)}>Open in reader</button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  const rows = info.kind === 'arc'
-    ? [{ ref: info.a, verse: info.a.chapterIndex != null ? verseIdFor(graph, info.a) : null },
-       { ref: info.b, verse: verseIdFor(graph, info.b) }]
-    : [{ ref: info.kind === 'verse' ? info.ref : null, verse: info.kind === 'verse' ? info.verse : info.lo }];
+function DetailSheet({ info, onClose, onOpen }) {
+  const cards = info.cards || [];
+  const eyebrow = info.kind === 'link' ? 'Your link'
+    : info.kind === 'arc' ? 'Connection'
+    : info.kind === 'chapter' ? 'Chapter' : 'Verse';
+  const meta = info.kind === 'arc'
+    ? info.span.toLocaleString() + ' verses apart · weight ' + info.votes
+    : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
+    : info.kind === 'chapter'
+      ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
+      : info.connections.toLocaleString() + ' connections';
+
   return (
-    <div className="sw-sheet" role="dialog" aria-modal="false" aria-label="Connection details">
+    <div className="sw-sheet" role="dialog" aria-modal="false"
+      aria-label={eyebrow + ' details'}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
       </button>
-      <div className="sw-sheet-eyebrow">
-        {info.kind === 'arc' ? 'Connection' : info.kind === 'chapter' ? 'Chapter' : 'Verse'}
-      </div>
-      {info.kind === 'arc' && (
-        <div className="sw-sheet-meta">
-          {info.span.toLocaleString()} verses apart · weight {info.votes}
-        </div>
-      )}
-      {info.kind === 'chapter' && (
-        <div className="sw-sheet-title">
-          {info.book.title} {info.chapter}
-          <span className="sw-sheet-meta"> · {info.verses} verses · {info.connections.toLocaleString()} connections</span>
-        </div>
-      )}
-      <div className="sw-sheet-rows">
-        {rows.map((row, i) => row.ref && (
-          <div className="sw-sheet-row" key={i}>
-            <div className="sw-sheet-ref">{row.ref.label}</div>
-            <div className="sw-sheet-text">{verseTextFor(row.ref)}</div>
-            <button type="button" className="sw-btn sw-btn-open"
-              onClick={() => onOpen(row.verse)}>Open in reader</button>
-          </div>
+      <div className="sw-sheet-eyebrow">{eyebrow}</div>
+      <div className="sw-sheet-meta">{meta}</div>
+      <div className="sw-sheet-cards">
+        {cards.map((card, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && (
+              <div className="sw-card-join" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+              </div>
+            )}
+            <button type="button" className="sw-card"
+              disabled={!card.endpoint}
+              aria-label={card.endpoint ? 'Open ' + card.label + ' in the reader' : card.label}
+              onClick={() => card.endpoint && onOpen(card.endpoint)}>
+              <span className="sw-card-eyebrow">{card.eyebrow}</span>
+              <span className="sw-card-label">{card.label}</span>
+              {card.cat && <span className="sw-card-cat">{card.cat}</span>}
+              {card.preview && <span className="sw-card-preview">{card.preview}</span>}
+              {card.endpoint && <span className="sw-card-go">Open in reader &rsaquo;</span>}
+            </button>
+          </React.Fragment>
         ))}
       </div>
     </div>
   );
+}
+
+/**
+ * A tappable card for a Bible verse the graph knows about.
+ *
+ * `verseEnd` is deliberately absent: the canonical web stores one verse id per
+ * arc end (the source dataset's ranges were resolved to their start verse), so
+ * a jump from here flashes that verse. The reader's OWN links keep whatever
+ * range they were made over — see endpointCard.
+ *
+ * @param {string} eyebrow
+ * @param {{bookId:string, bookTitle:string, chapter:number, verse:number, label:string}} ref
+ */
+function verseCard(eyebrow, ref) {
+  const endpoint = {
+    type: 'bible',
+    key: 'bible:' + ref.bookId + ':' + ref.chapter + ':' + ref.verse,
+    bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse, label: ref.label,
+  };
+  return {
+    eyebrow, label: ref.label, endpoint,
+    cat: typeof bookCategory === 'function' ? bookCategory(ref.bookId) : '',
+    preview: verseTextFor(ref),
+  };
+}
+
+/**
+ * A tappable card for a whole chapter — the anchor covers every verse in it,
+ * so arriving flashes the chapter rather than one line.
+ */
+function chapterCard(book, chapterNum, verses, firstRef) {
+  const label = book.title + ' ' + chapterNum;
+  return {
+    eyebrow: 'Chapter', label,
+    cat: typeof bookCategory === 'function' ? bookCategory(book.id) : '',
+    preview: verseTextFor(firstRef),
+    endpoint: {
+      type: 'bible', key: 'bible:' + book.id + ':' + chapterNum + ':1',
+      bookId: book.id, chapter: chapterNum, verse: 1, verseEnd: verses, label,
+    },
+  };
+}
+
+/**
+ * A tappable card for one side of a link the reader made. The stored endpoint
+ * is passed through UNTOUCHED so its verse range and character span survive —
+ * that is what makes a link made over a long passage flash the whole passage.
+ */
+function endpointCard(eyebrow, ep) {
+  if (!ep) return { eyebrow, label: '(unknown)', endpoint: null };
+  const cat = ep.type === 'bible' && typeof bookCategory === 'function'
+    ? bookCategory(ep.bookId)
+    : ep.type === 'study' ? 'Matthew Study Bible'
+    : ep.collection || '';
+  return {
+    eyebrow,
+    label: endpointLabel(ep),
+    cat,
+    preview: ep.preview || ep.text || (ep.type === 'bible' ? verseTextFor(ep) : ''),
+    endpoint: ep,
+  };
 }
 
 function legendFor(colorMode) {
@@ -962,11 +1019,6 @@ function summaryOf(found) {
   if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
   if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
   return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
-}
-
-function verseIdFor(graph, ref) {
-  const ch = graph.chapters[ref.chapterIndex];
-  return ch ? ch[2] + (ref.verse - 1) : 0;
 }
 
 /** Verse text via the app's own resolver, once the Bible corpus has landed. */
