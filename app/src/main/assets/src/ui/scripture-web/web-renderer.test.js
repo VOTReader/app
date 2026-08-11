@@ -60,6 +60,16 @@ describe('shader shape', () => {
   });
 });
 
+describe('deep-zoom declutter', () => {
+  it('fades fly-over arcs to NOTHING at full depth, not to a residual band', () => {
+    // The tanh ceiling flattens every large arc apex to the same height, so
+    // at depth hundreds of fly-overs stacked into horizontal smears across
+    // the screen (the on-device report). The floor must reach zero.
+    expect(SHADER_SOURCE.vertex).toContain('float flyFloor = mix(.10, 0., smoothstep(.55, 1., uLocalize));');
+    expect(SHADER_SOURCE.vertex).toContain('dim *= mix(1., mix(flyFloor, 1., anchored), uLocalize);');
+  });
+});
+
 describe('modes', () => {
   it('exposes the three colour modes in cycle order', () => {
     expect(COLOR_MODES).toEqual(['distance', 'testament', 'genre']);

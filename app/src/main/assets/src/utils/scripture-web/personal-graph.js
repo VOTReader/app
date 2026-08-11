@@ -197,16 +197,22 @@ export function buildPersonalGraph(links, ctx) {
  * links without a second code path.
  *
  * @param {Array<{v:number, kind?:string, volKey?:string, letterId?:string,
- *   entryId?:string, studyId?:string}>} votEdges — decoded graph .votEdges
+ *   entryId?:string, studyId?:string, chapterId?:string}>} votEdges
  * @param {{votRail?:VotRail}} ctx
  */
 export function buildCuratedUnderlay(votEdges, ctx) {
   const rows = [];
   for (const e of votEdges || []) {
-    if (!(e && e.v >= 0)) continue;
-    const id = e.letterId || e.entryId;
-    if (!id || !ctx.votRail) continue;
-    const scoped = e.volKey ? e.volKey + ':' + id : null;
+    if (!(e && e.v >= 0) || !ctx.votRail) continue;
+    // Letters and entries address the rail by their own id; STUDY edges carry
+    // {studyId, chapterId} instead, and their rail segments are keyed
+    // 'study-<studyId>'. Without this branch all 781 study threads silently
+    // vanished from the underlay (the "make sure all albums are included"
+    // report was this, seen from the outside).
+    const id = e.letterId || e.entryId || e.chapterId;
+    if (!id) continue;
+    const volKey = e.volKey || (e.studyId ? 'study-' + e.studyId : null);
+    const scoped = volKey ? volKey + ':' + id : null;
     const pos = (scoped != null && ctx.votRail.index.has(scoped))
       ? ctx.votRail.index.get(scoped)
       : ctx.votRail.index.get(id);

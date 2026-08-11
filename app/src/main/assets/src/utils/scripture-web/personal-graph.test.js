@@ -191,6 +191,26 @@ describe('buildPersonalGraph', () => {
 });
 
 describe('curated underlay', () => {
+  it('maps STUDY edges through their study-<id> rail segment', () => {
+    // Study edges carry {studyId, chapterId} rather than letterId/entryId.
+    // Before this branch existed, all 781 of them silently vanished from the
+    // underlay — reported from the device as albums missing from My Web.
+    const rail = buildVotRail([
+      { volKey: 'one', label: 'Volume One', items: [{ id: 'duty', title: 'Duty' }] },
+      { volKey: 'study-lamb-of-god', label: 'The Lamb of God', items: [
+        { id: 'lamb-of-god-ch3', title: 'Chapter 3' },
+      ] },
+    ]);
+    const u = buildCuratedUnderlay([
+      { v: 4, kind: 'study', studyId: 'lamb-of-god', chapterId: 'lamb-of-god-ch3' },
+      { v: 6, kind: 'footnote', volKey: 'one', letterId: 'duty' },
+      { v: 8, kind: 'study', studyId: 'not-on-rail', chapterId: 'x-ch1' },
+    ], { votRail: rail });
+    expect(u.count).toBe(2);
+    expect(Array.from(u.versePos)).toEqual([4, 6]);
+    expect(Array.from(u.votPos)).toEqual([1, 0]);
+  });
+
   it('pairs corpus votEdges onto the two rails', () => {
     const u = buildCuratedUnderlay([
       { v: 5, kind: 'footnote', volKey: 'one', letterId: 'duty' },

@@ -6656,6 +6656,16 @@
       -webkit-user-select: none; user-select: none;
     }
     .sw-root:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    /* Portrait phones: the whole instrument lays itself out in landscape via a
+       CSS rotation — no Android orientation change. Layout metrics
+       (clientWidth/Height) ignore transforms, so the canvases size themselves
+       to the rotated box, and a transformed ancestor is the containing block
+       for the fixed/absolute chrome inside, so every overlay rides along. */
+    .sw-root.sw-rotated {
+      top: 0; left: 0; width: 100vh; height: 100vw;
+      transform: rotate(90deg) translateY(-100%);
+      transform-origin: top left;
+    }
     .sw-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     .sw-canvas-gl { z-index: 1; }
     .sw-canvas-ui { z-index: 2; pointer-events: none; }
@@ -6763,6 +6773,12 @@
       width: 84px; height: 6px; border-radius: 3px; display: inline-block; margin: 0 6px;
       background: linear-gradient(to right, #c252b8, #8f5cd9, #4f70d4, #5c9ec9, #b54750, #c9a06b, #99a84f, #54c25e);
     }
+    /* A miniature of the chapter histogram: three descending bars. */
+    .sw-key-hist { display: inline-flex; align-items: flex-start; gap: 1px; height: 9px; }
+    .sw-key-hist i { display: inline-block; width: 2px; background: var(--cream-muted); }
+    .sw-key-hist i:nth-child(1) { height: 4px; }
+    .sw-key-hist i:nth-child(2) { height: 9px; }
+    .sw-key-hist i:nth-child(3) { height: 6px; }
     .sw-key-t0 { background: #d0a838; } .sw-key-t1 { background: #f48fb1; } .sw-key-t2 { background: #6cb4dc; }
     .sw-key-g0 { background: #d0a838; } .sw-key-g1 { background: #da833c; } .sw-key-g2 { background: #e7c45c; }
     .sw-key-g3 { background: #ef6d67; } .sw-key-g4 { background: #f48fb1; } .sw-key-g5 { background: #7bcba3; }
@@ -6823,10 +6839,12 @@
        Same reading as a My Links row: an eyebrow naming the side, the
        reference, its canon, and the text — the whole card being the tap
        target that jumps into the reader. */
-    .sw-sheet-cards { margin-top: 12px; display: flex; flex-direction: column; }
+    /* The two sides sit SIDE BY SIDE (owner call) so the sheet stays low and
+       both ends are visible at once, like the two halves of a My Links row. */
+    .sw-sheet-cards { margin-top: 10px; display: flex; flex-direction: row; align-items: stretch; gap: 2px; }
     .sw-card {
-      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-      width: 100%; min-height: 44px; padding: 12px 13px; text-align: left;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      flex: 1 1 0; min-width: 0; min-height: 44px; padding: 9px 11px; text-align: left;
       background: transparent; border: 1px solid var(--gold-border);
       border-radius: var(--radius); color: var(--cream-dim);
       font-family: var(--font-body); cursor: pointer; transition: var(--transition);
@@ -6838,23 +6856,33 @@
       font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
       letter-spacing: 0.16em; text-transform: uppercase;
     }
-    .sw-card-label { font-size: var(--fs-20); color: var(--gold-bright); line-height: 1.25; }
+    .sw-card-label { font-size: var(--fs-16); color: var(--gold-bright); line-height: 1.3;
+      overflow-wrap: break-word; max-width: 100%; }
     .sw-card-cat {
       font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--cream-muted);
       letter-spacing: 0.12em; text-transform: uppercase;
     }
     .sw-card-preview {
-      margin-top: 4px; font-size: var(--fs-15); line-height: 1.5; font-style: italic;
+      margin-top: 3px; font-size: var(--fs-13); line-height: 1.45; font-style: italic;
       color: var(--cream-dim);
-      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
     }
     .sw-card-go {
-      margin-top: 7px; font-family: var(--font-cinzel); font-size: var(--fsc-10);
-      letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold);
+      margin-top: auto; padding-top: 6px; font-family: var(--font-cinzel);
+      font-size: var(--fsc-10); letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--gold);
     }
     /* The chain link between the two sides, echoing the My Links row divider. */
     .sw-card-join {
       display: flex; align-items: center; justify-content: center;
-      color: var(--gold-dim); padding: 6px 0;
+      color: var(--gold-dim); padding: 0 3px; flex: 0 0 auto;
     }
+    .sw-sheet { padding: 12px 14px 14px; max-height: 46vh; }
+
+    /* Transient control explanation under the title. */
+    .sw-hint {
+      margin: 4px 0 0; font-size: var(--fsc-11); color: var(--gold-dim);
+      letter-spacing: 0.03em; font-style: italic; max-width: 46vw;
+    }
+    .sw-fallback-row { display: flex; gap: 10px; }

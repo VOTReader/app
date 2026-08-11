@@ -156,6 +156,21 @@ export function xToVerse(cam, width, x) {
 }
 
 /**
+ * Map viewport pointer coords into a screen that has been CSS-rotated 90°
+ * clockwise into landscape (transform-origin top left, translateY(-100%)).
+ * Layout metrics ignore transforms, so the rotated screen's own x axis runs
+ * down the physical screen: local x = clientY, local y = physicalWidth − clientX.
+ *
+ * @param {number} clientX
+ * @param {number} clientY
+ * @param {number} physicalWidth — window.innerWidth (the portrait width)
+ * @returns {{x:number, y:number}}
+ */
+export function rotatePointer(clientX, clientY, physicalWidth) {
+  return { x: clientY, y: physicalWidth - clientX };
+}
+
+/**
  * Zoom about a fixed screen point — the anchor stays under the finger/cursor.
  * @param {number} anchorX — device px to hold still
  * @param {number} factor — multiplicative zoom (>1 zooms in)

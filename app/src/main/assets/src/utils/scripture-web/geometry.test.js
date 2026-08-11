@@ -12,6 +12,7 @@ import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH,
   localizeFactor, squashFactor, arcRadiusY, arcRadiusGLSL, arcDistance,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
+  rotatePointer,
 } from './geometry.js';
 import {
   pickArc, arcsTouching, countTouching, pickChapter, pickVerse,
@@ -110,6 +111,24 @@ describe('height law', () => {
     expect(arcRadiusGLSL).toContain(String(CEIL_SOFTNESS));
     expect(arcRadiusGLSL).toContain('tanh');
     expect(arcRadiusGLSL).toContain('mix(semi, capped, localize)');
+  });
+});
+
+describe('rotatePointer — the CSS-landscape pointer map', () => {
+  it('maps the four corners of a portrait screen onto the rotated frame', () => {
+    // 1080x2400 portrait, rotated 90° cw: the rotated screen is 2400 wide.
+    const W = 1080;
+    expect(rotatePointer(W, 0, W)).toEqual({ x: 0, y: 0 });        // phys top-right = rotated origin
+    expect(rotatePointer(W, 2400, W)).toEqual({ x: 2400, y: 0 });  // phys bottom-right
+    expect(rotatePointer(0, 0, W)).toEqual({ x: 0, y: W });        // phys top-left = rotated bottom-left
+    expect(rotatePointer(0, 2400, W)).toEqual({ x: 2400, y: W });
+  });
+
+  it('a vertical finger-drag becomes a horizontal pan in the rotated frame', () => {
+    const a = rotatePointer(540, 300, 1080);
+    const b = rotatePointer(540, 900, 1080);
+    expect(b.x - a.x).toBe(600);   // moved along the rotated x axis
+    expect(b.y - a.y).toBe(0);     // no cross-axis drift
   });
 });
 

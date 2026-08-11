@@ -23,12 +23,13 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  localizeFactor, squashFactor, MAX_STRETCH,
+  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArc, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, GENRE_NAMES, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
@@ -46,6 +47,13 @@ const SHORT_VOL = {
   holydays: 'Holy Days', hm: 'Manna',
 };
 
+/** Short rail names for the Bible studies (full titles are sentence-long). */
+const SHORT_STUDY = {
+  'more-than-a-man': 'MTaM', 'odds-chart': 'Odds', 'lamb-of-god': 'Lamb',
+  'state-of-the-dead': 'SotD', 'grace-and-the-law': 'Grace',
+  'trinity-exposed': 'Trinity', 'purity': 'Purity',
+};
+
 /** Deepest zoom, as a multiple of fit-to-width. Well past single-verse. */
 const MAX_ZOOM = 4000;
 /** Height reserved below the baseline for the ruler + book names. */
@@ -54,9 +62,9 @@ const RULER_H = 74;
 const DENSITY_LABEL = { essential: 'Essential', classic: 'Classic', complete: 'Complete' };
 const COLOR_LABEL = { distance: 'Distance', testament: 'Testament', genre: 'Genre' };
 const DENSITY_HINT = {
-  essential: 'the strongest connections only',
-  classic: 'the classic view',
-  complete: 'every connection',
+  essential: 'only the strongest connections',
+  classic: 'the famous view — strong connections',
+  complete: 'every connection in the dataset',
 };
 const COLOR_HINT = {
   distance: 'how far apart in scripture the two ends sit',
@@ -79,6 +87,23 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [graph, setGraph] = React.useState(null);
   const [loadError, setLoadError] = React.useState(null);
   const [noWebGL, setNoWebGL] = React.useState(false);
+  const [glRetry, setGlRetry] = React.useState(0);
+  // A canon needs its width. On a phone held upright the screen is CSS-rotated
+  // into landscape — no Android orientation flip, the page just lays itself
+  // out sideways (owner call). Pointer coords are mapped back through loc().
+  const [rotated, setRotated] = React.useState(
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
+  React.useEffect(() => {
+    const onResize = () => setRotated(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const rotatedRef = React.useRef(rotated);
+
+  /** Viewport coords -> the rotated screen's own CSS space. */
+  const loc = React.useCallback((e) => (rotatedRef.current
+    ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
+    : { x: e.clientX, y: e.clientY }), []);
   const [mode, setMode] = React.useState('canonical');   // 'canonical' | 'personal'
   const [density, setDensity] = React.useState(
     DENSITY_STEPS.indexOf(settings && settings.webDensity) >= 0 ? settings.webDensity : 'classic');
@@ -86,6 +111,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [detail, setDetail] = React.useState(null);      // the open sheet
   const [tip, setTip] = React.useState(null);            // hover chip
   const [announce, setAnnounce] = React.useState('');
+  // A transient explanation under the title — set on control cycles so the
+  // reader is TOLD what Essential/Classic/Complete and the colour modes mean
+  // instead of having to guess (the on-device report).
+  const [hint, setHint] = React.useState('');
+  const hintTimer = React.useRef(0);
+  const flashHint = React.useCallback((text) => {
+    setHint(text);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(''), 3600);
+  }, []);
   const [showUnderlay, setShowUnderlay] = React.useState(true);
   const [personalCount, setPersonalCount] = React.useState(0);
 
@@ -103,6 +138,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
   const modeRef = React.useRef('canonical');
+  // True while a pinch/drag/wheel is in flight (with a short decay). Complete
+  // draws ~21M vertices a frame at overview — fine as a single settled frame,
+  // lethal as a sustained gesture rate on a phone GPU (the Pixel 9 Pro
+  // context-loss report). So gestures draw at Classic and the full set lands
+  // on the settle frame.
+  const gestureRef = React.useRef({ active: false, timer: 0 });
 
   const theme = settings && settings.theme;
 
@@ -139,6 +180,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
   }, []);
+
+  /** Mark gesture activity; the settle frame re-draws at full density. */
+  const touchGesture = React.useCallback(() => {
+    const g = gestureRef.current;
+    g.active = true;
+    if (g.timer) clearTimeout(g.timer);
+    g.timer = setTimeout(() => { g.active = false; schedule(); }, 180);
+  }, [schedule]);
 
   // A frame requested while the page is hidden never runs, so rafRef stays
   // set and EVERY later schedule() short-circuits — the view would come back
@@ -177,6 +226,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // frame() reads the mode from a ref so it can stay identity-stable across
   // renders; keep that ref in step with the state it mirrors.
   React.useEffect(() => { modeRef.current = mode; schedule(); }, [mode, schedule]);
+  React.useEffect(() => { rotatedRef.current = rotated; schedule(); }, [rotated, schedule]);
 
   /**
    * The vertical frame. On a wide screen the dome fills naturally; on a tall
@@ -190,7 +240,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // to finish above them — reserve the control strip as well as its own
     // two label rows, or book names print underneath the buttons.
     const narrow = (v.W / (v.DPR || 1)) <= 560;
-    const ruler = (narrow ? RULER_H + 104 : RULER_H) * v.DPR;
+    // Wide screens reserve the legend/credit line too, or the staggered book
+    // labels print straight through it (the "legends colliding" report).
+    const ruler = (narrow ? RULER_H + 104 : RULER_H + 26) * v.DPR;
     const avail = v.H - ruler;
     if (modeRef.current === 'personal') {
       // No dome to centre — the rails want the whole frame, less the strip the
@@ -239,6 +291,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const zoom = cam.ppv / fitPPV(cam, v.W);
     const chrome = chromeRef.current;
     const base = viewFor();
+    const liveDensity = (density === 'complete' && gestureRef.current.active)
+      ? 'classic' : density;
     if (mode === 'personal') {
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
@@ -264,11 +318,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: Math.min(0.8 + Math.log2(zoom) * 0.24, 3.0) * v.DPR,
       alpha: Math.min(0.052 + Math.log2(zoom) * 0.042, chrome.isLight ? 0.8 : 0.5),
-      colorMode, density, light: chrome.isLight, bg: chrome.bg,
+      colorMode, density: liveDensity, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
-    drawRuler(uiRef.current, g, cam, base, v, chrome);
+    drawRuler(uiRef.current, g, cam,
+      Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, liveDensity) }),
+      v, chrome);
   }, [graph, colorMode, density, viewFor, mode, railOpts]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
@@ -279,18 +335,31 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const glc = glRef.current, uic = uiRef.current;
     if (!glc || !uic) return;
     let renderer = null;
+    let disposed = false;
+    const build = () => createRenderer(glc, graph, {
+      // After a GPU reset every GL object is dead. Rebuild the whole
+      // renderer on the same (restored) context and repaint — this is what
+      // turns the on-device "wash-out until app restart" into a blink.
+      onContextRestored: () => {
+        if (disposed) return;
+        try { renderer && renderer.dispose(); } catch (_e) { /* already dead */ }
+        renderer = build();
+        rendererRef.current = renderer;
+        schedule();
+      },
+    });
     try {
-      renderer = createRenderer(glc, graph);
+      renderer = build();
     } catch (e) {
       setLoadError(e && e.message ? e.message : String(e));
       return;
     }
     if (!renderer) { setNoWebGL(true); return; }
     rendererRef.current = renderer;
-    camRef.current = createCamera(graph.total);
+    if (!camRef.current) camRef.current = createCamera(graph.total);
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
       const W = Math.round(glc.clientWidth * dpr);
       const H = Math.round(glc.clientHeight * dpr);
       if (!W || !H) return;
@@ -309,22 +378,29 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     glc.addEventListener('webglcontextrestored', onRestored);
 
     return () => {
+      disposed = true;
       if (ro) ro.disconnect(); else window.removeEventListener('resize', resize);
       glc.removeEventListener('webglcontextrestored', onRestored);
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [graph, schedule]);
+  }, [graph, schedule, glRetry]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
+  const [studiesTick, setStudiesTick] = React.useState(0);
   React.useEffect(() => {
     if (!graph || mode !== 'personal') return;
     const built = buildPersonal(graph);
     personalRef.current = built;
     setPersonalCount(built && built.graph ? built.graph.count : 0);
     schedule();
-  }, [graph, mode, linkVersion, schedule]);
+    // The studies corpus is lazy; when it lands after the first build, the
+    // study rail segments and their underlay threads appear on the re-run.
+    if (typeof BIBLE_STUDIES === 'undefined' && typeof loadBibleStudies === 'function') {
+      loadBibleStudies().then((ok) => { if (ok) setStudiesTick((n) => n + 1); });
+    }
+  }, [graph, mode, linkVersion, studiesTick, schedule]);
 
   // ── gestures — imperative, never React state per frame ──────────────────
   React.useEffect(() => {
@@ -335,12 +411,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
     const dpr = () => viewRef.current.DPR;
     const down = (e) => {
+      // A tap on the chrome is the chrome's alone. Without this, pressing
+      // "Essential" also picked whatever thread happened to run beneath the
+      // button — the pointer events bubble up from the button into this
+      // root-level gesture surface (the on-device double-activation report).
+      if (e.target && e.target.closest &&
+          e.target.closest('.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, button')) return;
       // setPointerCapture throws NotFoundError if the pointer is already gone
       // (or synthetic). Losing capture costs us nothing — the document-level
       // listeners still see the move — but letting it throw here would abort
       // the handler and leave the gesture dead.
       try { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); } catch (_e) { /* capture is optional */ }
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const pt = loc(e);
+      pointers.set(e.pointerId, pt);
       moved = false;
       if (pointers.size === 2) {
         const [p, q] = Array.from(pointers.values());
@@ -349,11 +432,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                   mid, verse: xToVerse(camRef.current, viewRef.current.W, mid * dpr()) };
         drag = null;
       } else {
-        drag = { x: e.clientX, camx: camRef.current.x };
+        drag = { x: pt.x, camx: camRef.current.x };
       }
     };
     const move = (e) => {
-      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const pt = loc(e);
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pt);
       const cam = camRef.current, W = viewRef.current.W;
       if (pinch && pointers.size === 2) {
         const [p, q] = Array.from(pointers.values());
@@ -361,23 +445,24 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         clampCamera(cam, W, MAX_ZOOM);
         cam.x = pinch.verse - (pinch.mid * dpr() - W / 2) / cam.ppv;
         clampCamera(cam, W, MAX_ZOOM);
-        moved = true; schedule(); return;
+        moved = true; touchGesture(); schedule(); return;
       }
       if (drag) {
-        if (Math.abs(e.clientX - drag.x) > 3) moved = true;
-        cam.x = drag.camx - (e.clientX - drag.x) * dpr() / cam.ppv;
+        if (Math.abs(pt.x - drag.x) > 3) moved = true;
+        cam.x = drag.camx - (pt.x - drag.x) * dpr() / cam.ppv;
         clampCamera(cam, W, MAX_ZOOM);
-        schedule(); return;
+        touchGesture(); schedule(); return;
       }
-      if (e.pointerType === 'mouse') handlersRef.current.hover(e.clientX, e.clientY);
+      if (e.pointerType === 'mouse') handlersRef.current.hover(pt.x, pt.y);
     };
     const up = (e) => {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = null;
       if (drag && !moved) {
+        const pt = loc(e);
         const now = Date.now();
-        if (now - lastTap < 300) { handlersRef.current.doubleTap(e.clientX); lastTap = 0; }
-        else { lastTap = now; handlersRef.current.tap(e.clientX, e.clientY); }
+        if (now - lastTap < 300) { handlersRef.current.doubleTap(pt.x); lastTap = 0; }
+        else { lastTap = now; handlersRef.current.tap(pt.x, pt.y); }
       }
       drag = null;
     };
@@ -385,8 +470,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const wheel = (e) => {
       e.preventDefault();
       const cam = camRef.current, W = viewRef.current.W;
-      zoomAbout(cam, W, e.clientX * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), MAX_ZOOM);
-      schedule();
+      zoomAbout(cam, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), MAX_ZOOM);
+      touchGesture(); schedule();
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -400,7 +485,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       el.removeEventListener('pointercancel', cancel);
       el.removeEventListener('wheel', wheel);
     };
-  }, [graph, schedule]);
+  }, [graph, schedule, touchGesture, loc]);
 
   const hitAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
@@ -537,11 +622,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const cycleDensity = () => {
     const next = DENSITY_STEPS[(DENSITY_STEPS.indexOf(density) + 1) % DENSITY_STEPS.length];
     setDensity(next);
+    flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
     if (typeof updateSetting === 'function') updateSetting('webDensity', next);
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.haptic('light');
   };
   const cycleColor = () => {
-    setColorMode(COLOR_MODES[(COLOR_MODES.indexOf(colorMode) + 1) % COLOR_MODES.length]);
+    const next = COLOR_MODES[(COLOR_MODES.indexOf(colorMode) + 1) % COLOR_MODES.length];
+    setColorMode(next);
+    flashHint('Colour shows ' + COLOR_HINT[next]);
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.haptic('light');
   };
 
@@ -566,12 +654,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   if (noWebGL) {
     return (
       <div className="sw-fallback">
-        <div className="sw-fallback-title">This device can’t draw the web.</div>
+        <div className="sw-fallback-title">The web can’t be drawn right now.</div>
         <div className="sw-fallback-body">
-          The Scripture Web needs WebGL2, which this browser or device doesn’t provide.
-          Every cross-reference is still reachable from the reader’s footnotes and links.
+          This needs WebGL2. If the device just recovered from a graphics
+          reset, trying again usually works; otherwise every cross-reference
+          is still reachable from the reader’s footnotes and links.
         </div>
-        <button type="button" className="sw-btn" onClick={onBack}>Go back</button>
+        <div className="sw-fallback-row">
+          <button type="button" className="sw-btn"
+            onClick={() => { setNoWebGL(false); setGlRetry((n) => n + 1); }}>Try again</button>
+          <button type="button" className="sw-btn" onClick={onBack}>Go back</button>
+        </div>
       </div>
     );
   }
@@ -579,7 +672,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const stats = graph ? graphStats(graph, density) : null;
 
   return (
-    <div className="sw-root" ref={wrapRef} tabIndex={0} onKeyDown={onKeyDown}
+    <div className={'sw-root' + (rotated ? ' sw-rotated' : '')} ref={wrapRef}
+      tabIndex={0} onKeyDown={onKeyDown}
       role="application"
       aria-label="The Scripture Web — an interactive map of cross-references">
       <canvas className="sw-canvas sw-canvas-gl" ref={glRef} aria-hidden="true" />
@@ -596,6 +690,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           {mode === 'personal'
             ? <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>
             : (stats && <p>{stats.shown.toLocaleString()} of {stats.total.toLocaleString()} connections</p>)}
+          {hint && <p className="sw-hint" role="status">{hint}</p>}
         </div>
       </div>
 
@@ -977,23 +1072,33 @@ function endpointCard(eyebrow, ep) {
 }
 
 function legendFor(colorMode) {
+  // Every variant ends with the histogram key — the bars hanging under the
+  // baseline (Psalm 119 reaching deepest) are chapter LENGTH, and nothing on
+  // screen said so until a reader asked what the deep column was.
+  const histKey = (
+    <span className="sw-key" key="hist">
+      <i className="sw-key-hist" aria-hidden="true"><i /><i /><i /></i>
+      bars below — chapter length
+    </span>
+  );
   if (colorMode === 'testament') {
     return ['Within the Old', 'Old ↔ New', 'Within the New'].map((label, i) => (
       <span className="sw-key" key={label}>
         <i className={'sw-key-dot sw-key-t' + i} />{label}
       </span>
-    ));
+    )).concat([histKey]);
   }
   if (colorMode === 'genre') {
     return GENRE_NAMES.map((label, i) => (
       <span className="sw-key" key={label}><i className={'sw-key-dot sw-key-g' + i} />{label}</span>
-    ));
+    )).concat([histKey]);
   }
-  return (
-    <span className="sw-key sw-key-ramp">
+  return [
+    <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" /><span>across the canon</span>
-    </span>
-  );
+    </span>,
+    histKey,
+  ];
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
@@ -1061,6 +1166,20 @@ function buildPersonal(graph) {
       if (!col) continue;
       const arr = (typeof colLetterArr === 'function') ? colLetterArr(col) : [];
       collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items: arr });
+    }
+  }
+  // The Bible studies are corpora too — their 781 curated threads need rail
+  // segments to land on, keyed 'study-<id>' with chapters as the nodes.
+  // (Hidden Manna stays OFF the rail on purpose: not publicly indexed.)
+  if (typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES)) {
+    for (const st of BIBLE_STUDIES) {
+      if (!st || !st.chapters) continue;
+      const key = st.slug || st.id;
+      collections.push({
+        volKey: 'study-' + key, label: st.title,
+        short: SHORT_STUDY[st.id] || SHORT_STUDY[key] || 'Study',
+        items: st.chapters.map((c) => ({ id: c.id, title: c.title || st.title })),
+      });
     }
   }
   const votRail = buildVotRail(collections);

@@ -78,11 +78,15 @@ void main(){
   float bright = max(spot, hovered);
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
-  // overhead recede so the local weave is legible instead of fogged.
+  // overhead recede so the local weave is legible instead of fogged. At FULL
+  // depth they are culled outright — the tanh ceiling flattens every big
+  // arc's apex to the same height, so hundreds of fly-overs otherwise stack
+  // into horizontal smears across the view (the on-device report).
   float m = 24.;
   float anchored = max(step(-m, x0)*step(x0, uRes.x + m),
                        step(-m, x1)*step(x1, uRes.x + m));
-  dim *= mix(1., mix(.10, 1., anchored), uLocalize);
+  float flyFloor = mix(.10, 0., smoothstep(.55, 1., uLocalize));
+  dim *= mix(1., mix(flyFloor, 1., anchored), uLocalize);
 
   vec3 col;
   if (uColorMode < .5) {
@@ -135,9 +139,10 @@ function compile(gl, type, src) {
  *
  * @param {HTMLCanvasElement} canvas
  * @param {import('../../utils/scripture-web/decode.js').ScriptureGraph} graph
+ * @param {{onContextRestored?: () => void}} [opts]
  * @returns {object|null}
  */
-export function createRenderer(canvas, graph) {
+export function createRenderer(canvas, graph, opts = {}) {
   // No `desynchronized`: the low-latency surface it asks for composites
   // differently under the Android WebView and cost us a blank canvas in
   // verification. Plain opaque + premultiplied is what this draws correctly.
@@ -238,9 +243,16 @@ export function createRenderer(canvas, graph) {
     if (graph.books[ch[0]].id === 'matthew-plain') { ntStart = ch[2]; break; }
   }
 
+  // Context loss (GPU reset, WebView renderer restart — the on-device
+  // "everything washes out" report). preventDefault() tells the browser we
+  // want a restore; every GL object is dead after one, so the OWNER must
+  // rebuild the renderer — onContextRestored is its hook for that.
   let lost = false;
   const onLost = (e) => { e.preventDefault(); lost = true; };
-  const onRestored = () => { lost = false; };
+  const onRestored = () => {
+    lost = false;
+    if (typeof opts.onContextRestored === 'function') opts.onContextRestored();
+  };
   canvas.addEventListener('webglcontextlost', onLost, false);
   canvas.addEventListener('webglcontextrestored', onRestored, false);
 
@@ -350,8 +362,9 @@ export function createRenderer(canvas, graph) {
       for (const a of attribs) gl.deleteBuffer(a.buf);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);
-      const ext = gl.getExtension('WEBGL_lose_context');
-      if (ext) ext.loseContext();
+      // NOTE: no loseContext() here. A rebuild after a real context loss
+      // reuses this same canvas, and force-losing the freshly restored
+      // context would kill the replacement renderer as it is being born.
     },
   };
 }
