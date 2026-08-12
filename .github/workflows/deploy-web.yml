@@ -147,6 +147,15 @@ jobs:
         # hashes; service-worker.js because build:sw rewrites CACHE_VERSION.
         run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/index.html app/src/main/assets/service-worker.js
 
+      - name: Verify ASSET_INTEGRITY describes what is about to be published
+        # The last gate before staging, and the one the diff above cannot replace.
+        # service-worker.js refuses to install a build whose bytes disagree with its
+        # ASSET_INTEGRITY map, so publishing a stale map would stop every client from
+        # updating — the exact failure this deploy exists to prevent. The diff gate is
+        # blind to it (an older generator reproduces the committed file byte-for-byte,
+        # leaving no diff), so this re-derives the hashes from the built assets.
+        run: npm run check:asset-integrity
+
       - name: Stage web-facing files into _site/
         run: |
           mkdir -p _site

@@ -172,6 +172,16 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify ASSET_INTEGRITY describes the assets on disk
+        # service-worker.js REFUSES to install a build whose bytes disagree with its
+        # generated ASSET_INTEGRITY map, so a stale map means no client can update at
+        # all. The map is written by tools/sync-sw-version.js, and the "committed
+        # dist/ matches the rebuild" diff below CANNOT catch a stale map: if an older
+        # generator ran, it reproduces the committed file exactly and there is no
+        # diff. This gate re-derives the hashes from the assets themselves, so it is
+        # blind to which generator ran and only asks whether the map is TRUE.
+        run: npm run check:asset-integrity
+
       - name: Verify MS_INDEX_VERSION was bumped when index-shaping code changed
         # The built MiniSearch index is persisted in IndexedDB (~21 MB) and keyed by
         # dataSignature(), which folds in MS_INDEX_VERSION but NOT the search code —
