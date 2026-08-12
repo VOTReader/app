@@ -60,7 +60,7 @@ function clauseSplit(text, base) {
   // Boundary strength 1: "; " / ": " / em-dash. Strength 2 (only while a piece
   // is still over budget): ", " before a clause-opening conjunction — VOT's
   // cascades chain with ", until" / ", and" / ", that", not semicolons.
-  const CONJ = /^(?:until|and|that|for|so|then|yet|nor|but|who|which|when|even|behold|lest)\b/i;
+  const CONJ = /^(?:until|and|that|for|so|then|yet|nor|but|who|whom|which|when|even|behold|lest|as)\b/i;
   const pieces = [];
   const splitAt = (t0, b0, re, guard) => {
     const out = [];
@@ -93,7 +93,12 @@ function formatAFragments(letter) {
   (letter.blocks || []).forEach((b, bi) => {
     if (b.type === 'para' || b.type === 'intro' || b.type === 'closing-fn') {
       const text = (b.segments || []).map(segText).join('');
-      const re = /[^.!?…]+[.!?…]*(?:["”’)\]]+)?(?:\s+|$)/g;
+      // Terminator allows trailing digits: inline footnote markers sit hard
+      // against the period ("...as it is written.1 I AM THE LORD.") and
+      // without [0-9]* the regex backtracks to the last whitespace, stranding
+      // "written.1" outside every fragment (owner report: 'written' never
+      // highlighted). Digits ride their sentence's tail, same as the merge rule.
+      const re = /[^.!?…]+[.!?…]*(?:["”’)\]]+)?[0-9]*(?:\s+|$)/g;
       let m;
       while ((m = re.exec(text)) !== null) {
         const trimmed = m[0].replace(/\s+$/, '');
