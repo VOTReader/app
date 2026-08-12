@@ -75,7 +75,7 @@ describe('modes', () => {
     expect(COLOR_MODES).toEqual(['distance', 'testament', 'genre']);
   });
   it('exposes the three densities from sparsest to fullest', () => {
-    expect(DENSITY_STEPS).toEqual(['essential', 'classic', 'complete']);
+    expect(DENSITY_STEPS).toEqual(['essential', 'famous']);
   });
   it('keeps a colour for every genre bucket', () => {
     expect(GENRE_COLORS).toHaveLength(10);

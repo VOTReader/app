@@ -40,11 +40,11 @@ const BUDGETS = [
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-e.js', measured: 114137, max: 132000 },   // Settings/Search/Garden
-  // The Scripture Web. Re-baselined 32,447 -> 41,806 in the commit that added
-  // "My web": the dual-rail Canvas2D renderer, the personal-graph adapter and
-  // the mode's own chrome. Deliberate — the first baseline predated half the
-  // feature.
-  { file: 'bundle-f.js', measured: 41806, max: 48000 },
+  // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
+  // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
+  // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.
+  // Deliberate — this is the feature's lazy bundle, not the cold boot path.
+  { file: 'bundle-f.js', measured: 57610, max: 66400 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   { file: 'bundle-a-matthew.js', measured: 492357, max: 567000 },
   { file: 'bundle-a-vot.js', measured: 2432537, max: 2798000 },

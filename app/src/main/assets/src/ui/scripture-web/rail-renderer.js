@@ -233,8 +233,16 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   return rails;
 }
 
+function insertNearest(out, candidate, limit) {
+  if (out.length === limit && candidate.distance >= out[out.length - 1].distance) return;
+  let at = out.length;
+  while (at > 0 && out[at - 1].distance > candidate.distance) at--;
+  out.splice(at, 0, candidate);
+  if (out.length > limit) out.pop();
+}
+
 /**
- * Nearest personal link to a point.
+ * Nearest personal links to a point.
  * @param {{count:number, aRail:Uint8Array, bRail:Uint8Array, aPos:Float32Array,
  *   bPos:Float32Array}|null} personal
  * @param {{verseX:(v:number)=>number, votRail:any, width:number, height:number,
@@ -242,13 +250,15 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
  * @param {number} px
  * @param {number} py
  * @param {number} tol
- * @returns {number} index, or -1
+ * @param {number} [limit]
+ * @returns {Array<{index:number, distance:number}>}
  */
-export function pickPersonal(personal, opts, px, py, tol) {
-  if (!personal || !personal.count) return -1;
+export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
+  if (!personal || !personal.count) return [];
   const { width, base, DPR, votRail, verseX } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
-  let best = -1, bestD = tol;
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const best = [];
   for (let i = 0; i < personal.count; i++) {
     const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, verseX, votRail, width, rails);
     const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, verseX, votRail, width, rails);
@@ -257,8 +267,48 @@ export function pickPersonal(personal, opts, px, py, tol) {
     const cross = personal.aRail[i] !== personal.bRail[i];
     const gap = Math.abs(rails.bottomY - rails.topY);
     const d = distanceToPath(linkPath(a[0], a[1], b[0], b[1], cross,
-      { n: 20, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }), px, py);
-    if (d < bestD) { bestD = d; best = i; }
+      { n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }), px, py);
+    if (d < tol) insertNearest(best, { index: i, distance: d }, cap);
+  }
+  return best;
+}
+
+/** Backwards-compatible nearest-link helper for small callers. */
+export function pickPersonal(personal, opts, px, py, tol) {
+  const hit = pickPersonalLinks(personal, opts, px, py, tol, 1)[0];
+  return hit ? hit.index : -1;
+}
+
+/**
+ * Nearest curated underlay links. The draw and pick paths share the same
+ * cubic sampling so faint corpus context is honest: if it is visible, it can
+ * be selected.
+ *
+ * @param {{count:number, versePos:Float32Array, votPos:Float32Array, records?:Array}|null} underlay
+ * @param {{verseX:(v:number)=>number, votRail:any, width:number, height:number,
+ *   DPR:number, base:number}} opts
+ * @param {number} px
+ * @param {number} py
+ * @param {number} tol
+ * @param {number} [limit]
+ * @returns {Array<{index:number, distance:number, verse:number, votPos:number, record:any}>}
+ */
+export function pickUnderlayLinks(underlay, opts, px, py, tol, limit) {
+  if (!underlay || !underlay.count) return [];
+  const { width, base, DPR, votRail, verseX } = opts;
+  const rails = railFrame({ H: opts.height, DPR }, base);
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const best = [];
+  for (let i = 0; i < underlay.count; i++) {
+    const a = [verseX(underlay.versePos[i]), rails.bottomY];
+    const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, verseX, votRail, width, rails);
+    const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
+    if (px < minX || px > maxX) continue;
+    const d = distanceToPath(linkPath(a[0], a[1], b[0], b[1], true, 12), px, py);
+    if (d < tol) insertNearest(best, {
+      index: i, distance: d, verse: underlay.versePos[i], votPos: underlay.votPos[i],
+      record: underlay.records && underlay.records[i],
+    }, cap);
   }
   return best;
 }

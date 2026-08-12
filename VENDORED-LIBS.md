@@ -64,8 +64,10 @@ each library embeds). Notes per blob:
   surface; do not remove either without equivalent visible credit).
   **Role: build input only.** It is never served to the app; the generator
   `tools/gen-scripture-web.mjs` resolves it against the app's own canonical
-  verse table and emits `src/data/scripture-web-data.js` (301,539 unique
-  unordered verse pairs, delta-encoded typed arrays). Provenance, format and
+  verse table. The source produces 301,539 unique unordered candidate pairs;
+  the shipped asset deliberately emits only the Famous tier (votes >= 7,
+  63,418 links) with Essential as its votes >= 20 prefix, delta-encoded typed
+  arrays. The obsolete 300k Complete tier is not shipped. Provenance, format and
   the refresh procedure live in that directory's `README.md`.
 
 ## Retired

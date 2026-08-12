@@ -217,13 +217,13 @@ export function buildCuratedUnderlay(votEdges, ctx) {
       ? ctx.votRail.index.get(scoped)
       : ctx.votRail.index.get(id);
     if (pos === undefined) continue;
-    rows.push([e.v, pos]);
+    rows.push([e.v, pos, e]);
   }
   const n = rows.length;
   const versePos = new Float32Array(n);
   const votPos = new Float32Array(n);
   for (let i = 0; i < n; i++) { versePos[i] = rows[i][0]; votPos[i] = rows[i][1]; }
-  return { count: n, versePos, votPos };
+  return { count: n, versePos, votPos, records: rows.map((row) => row[2]) };
 }
 
 /**

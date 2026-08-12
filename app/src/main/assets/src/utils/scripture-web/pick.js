@@ -7,9 +7,9 @@
    No GPU readback, no ID buffer, no spatial index. Every arc is an analytic
    half-ellipse, so the distance from the finger to each curve is a closed
    form (geometry.arcDistance), and a bounding-box reject kills the vast
-   majority before the maths runs. Measured ~2 ms across all 301,539 arcs on
-   desktop, and the visible set is always far smaller than that because the
-   density prefix and the bucket loop bound it.
+   majority before the maths runs. The shipped famous view is ~64k arcs, and
+   the visible set is always far smaller than that because the density prefix
+   and the bucket loop bound it.
 
    The one invariant that matters: this must use the SAME height law the
    vertex shader draws with, or arcs become untappable exactly where they
@@ -33,27 +33,60 @@ import { bucketDrawCount } from './decode.js';
  * @returns {{ index:number, distance:number, from:number, to:number, votes:number }|null}
  */
 export function pickArc(g, cam, view, px, py, tol) {
+  return pickArcs(g, cam, view, px, py, tol, 1)[0] || null;
+}
+
+/**
+ * Nearest arcs to a screen point, retaining a small candidate set so dense
+ * crossings can be disambiguated instead of silently choosing one line.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number,
+ *   localize:number, density:import('./decode.js').Density}} view
+ * @param {number} px
+ * @param {number} py
+ * @param {number} tol
+ * @param {number} [limit]
+ * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
+ */
+export function pickArcs(g, cam, view, px, py, tol, limit) {
   const { width, base, ceil, squash, localize, density } = view;
   const half = width / 2;
   const camX = cam.x, ppv = cam.ppv;
-  let best = -1;
-  let bestD = tol;
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const best = [];
+  const verseAtPoint = xToVerse(cam, width, px);
+  const verseTolerance = tol / ppv;
 
   for (const bucket of g.buckets) {
     const draw = bucketDrawCount(bucket, density);
-    const end = bucket.off + draw;
-    for (let i = bucket.off; i < end; i++) {
-      const x0 = (g.from[i] - camX) * ppv + half;
-      const x1 = (g.to[i] - camX) * ppv + half;
-      // Cheap x-range reject before any ellipse maths.
-      if (x1 < px - tol || x0 > px + tol) continue;
-      const ry = arcRadiusY((x1 - x0) * 0.5, ceil, squash, localize);
-      const d = arcDistance(px, py, x0, x1, base, ry, tol);
-      if (d < bestD) { bestD = d; best = i; }
+    const chunks = bucket.chunks || [];
+    const chunkSize = g.chunkSize || 256;
+    const chunkCount = Math.ceil(draw / chunkSize);
+    for (let c = 0; c < chunkCount; c++) {
+      const ext = chunks[c];
+      if (ext && (ext[1] < verseAtPoint - verseTolerance || ext[0] > verseAtPoint + verseTolerance)) continue;
+      const start = bucket.off + c * chunkSize;
+      const end = Math.min(start + chunkSize, bucket.off + draw);
+      for (let i = start; i < end; i++) {
+        const x0 = (g.from[i] - camX) * ppv + half;
+        const x1 = (g.to[i] - camX) * ppv + half;
+        // Cheap x-range reject before any ellipse maths.
+        if (x1 < px - tol || x0 > px + tol) continue;
+        const ry = arcRadiusY((x1 - x0) * 0.5, ceil, squash, localize);
+        const d = arcDistance(px, py, x0, x1, base, ry, tol);
+        if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
+        let at = best.length;
+        while (at > 0 && best[at - 1].distance > d) at--;
+        best.splice(at, 0, {
+          index: i, distance: d, from: g.from[i], to: g.to[i], votes: g.votes[i],
+        });
+        if (best.length > cap) best.pop();
+      }
     }
   }
-  if (best < 0) return null;
-  return { index: best, distance: bestD, from: g.from[best], to: g.to[best], votes: g.votes[best] };
+  return best;
 }
 
 /**
@@ -166,6 +199,38 @@ export function refOfVerse(g, verseId) {
 export function chapterRange(g, chapterIndex) {
   const ch = g.chapters[chapterIndex];
   return [ch[2], ch[2] + ch[3] - 1];
+}
+
+/**
+ * Resolve a short Bible reference against the graph's canonical book table.
+ * This deliberately accepts title, abbreviation, or book id and stays local
+ * to the already-loaded graph, so Go to never depends on the search bundle.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {string} input
+ * @returns {{chapterIndex:number, verse:number, lo:number, hi:number, hasVerse:boolean, label:string}|null}
+ */
+export function findWebReference(g, input) {
+  const m = /^\s*(.+?)\s+(\d+)(?::(\d+))?\s*$/.exec(String(input || ''));
+  if (!m) return null;
+  const clean = (s) => String(s || '').toLowerCase()
+    .replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
+  const wanted = clean(m[1]);
+  const bookIndex = g.books.findIndex((book) => [book.id, book.title, book.abbr]
+    .some((name) => clean(name) === wanted));
+  if (bookIndex < 0) return null;
+  const chapterNum = Number(m[2]);
+  const chapterIndex = g.chapters.findIndex((ch) => ch[0] === bookIndex && ch[1] === chapterNum);
+  if (chapterIndex < 0) return null;
+  const [lo, hi] = chapterRange(g, chapterIndex);
+  const requestedVerse = m[3] == null ? 1 : Number(m[3]);
+  if (m[3] != null && (requestedVerse < 1 || requestedVerse > hi - lo + 1)) return null;
+  const verse = lo + requestedVerse - 1;
+  return {
+    chapterIndex, verse, lo, hi,
+    hasVerse: m[3] != null,
+    label: g.books[bookIndex].title + ' ' + chapterNum + (m[3] == null ? '' : ':' + (verse - lo + 1)),
+  };
 }
 
 /**

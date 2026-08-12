@@ -1450,6 +1450,15 @@ export function validateScriptureWeb(data, opts = {}) {
   if (!/openbible/i.test(String(data.attribution))) {
     errors.push(`${file}: attribution must name OpenBible.info (CC-BY requires it)`);
   }
+  // The shipped Web is intentionally the famous ~64k-link view. A larger
+  // weak-tail asset recreates the laggy complete mode this gate is meant to
+  // keep out of the Android/PWA build.
+  if (!Array.isArray(data.densityTiers) || data.densityTiers[0] !== 20 || data.densityTiers[1] !== 7) {
+    errors.push(`${file}: expected density tiers [20, 7] (Essential / Famous)`);
+  }
+  if (data.count > 70000) {
+    errors.push(`${file}: graph count ${data.count} exceeds the shipped Famous-view ceiling of 70,000`);
+  }
 
   // Canon shape — 66 books / 1189 chapters / 31102 verses is the app's corpus.
   if (data.books.length !== 66) errors.push(`${file}: expected 66 books, got ${data.books.length}`);

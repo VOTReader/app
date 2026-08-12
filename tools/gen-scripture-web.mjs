@@ -101,11 +101,15 @@ if (stats.dropped.length) {
   console.log('  dropped rows (first 10):');
   for (const d of stats.dropped.slice(0, 10)) console.log(`    ${d}`);
 }
-const layout = layoutPairs(pairs);
+// Ship the famous ~64k-link view, not the weak 300k tail. The tail adds
+// lag and visual noise without improving the useful cross-reference map.
+const webPairs = pairs.filter((pair) => pair[2] >= DENSITY_TIERS[1]);
+console.log(`web: ${webPairs.length} shipped pairs (votes >= ${DENSITY_TIERS[1]})`);
+const layout = layoutPairs(webPairs);
 const delta = deltaEncode(layout);
 for (const [i, b] of layout.buckets.entries()) {
   console.log(`  bucket[${i}] span<${SPAN_BUCKETS[i]}: len=${b.len} ` +
-    `essential=${b.off20} classic=${b.off10} segs=${b.segments} chunks=${b.chunks.length}`);
+    `essential=${b.off20} famous=${b.off10} segs=${b.segments} chunks=${b.chunks.length}`);
 }
 
 // ── 3. VOT corpus edges ──────────────────────────────────────────────────────

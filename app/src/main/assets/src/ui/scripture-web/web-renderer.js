@@ -12,8 +12,8 @@
    Three things make it fast enough for a mid-range phone:
      · The asset is pre-sorted into span buckets, so short arcs are drawn with
        8 segments and only the longest get 48 — the average is ~12, not 48.
-     · Each density is a PREFIX of its bucket, so switching Essential /
-       Classic / Complete just shortens the instance count. Nothing re-uploads.
+     · Each density is a PREFIX of its bucket, so switching Essential / Famous
+       just shortens the instance count. Nothing re-uploads.
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
@@ -30,7 +30,7 @@ import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
 /** Colour modes, in the order the control cycles them. */
 export const COLOR_MODES = ['distance', 'testament', 'genre'];
 /** Density steps, in the order the control cycles them. */
-export const DENSITY_STEPS = ['essential', 'classic', 'complete'];
+export const DENSITY_STEPS = ['essential', 'famous'];
 
 const VERT = `#version 300 es
 precision highp float;
@@ -278,11 +278,10 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.viewport(0, 0, v.width, v.height);
       gl.clearColor(bg[0], bg[1], bg[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      // Dark: additive, so overlapping threads GLOW and true black stays
-      // black. Parchment: premultiplied over, because additive on a light
-      // ground only ever washes out.
-      if (v.light) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      else gl.blendFunc(gl.ONE, gl.ONE);
+      // Premultiplied-over on both themes keeps dense crossings legible. The
+      // old additive dark pass made the 300k tail bloom into neon and exposed
+      // the phone GPU to a needless sustained fill-rate spike.
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
       gl.useProgram(program);
       gl.bindVertexArray(vao);

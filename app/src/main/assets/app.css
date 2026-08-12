@@ -6673,6 +6673,8 @@
     .sw-topbar {
       position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
       left: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+      padding: 8px 10px 8px 8px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: var(--radius);
     }
     .sw-title h1 {
       margin: 0; font-family: var(--font-cinzel);
@@ -6687,7 +6689,8 @@
     .sw-controls {
       position: absolute; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px;
       right: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
-      max-width: 62vw; justify-content: flex-end;
+      max-width: 62vw; justify-content: flex-end; padding: 7px;
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
     }
     .sw-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -6700,7 +6703,10 @@
     }
     .sw-btn:hover { border-color: var(--gold); color: var(--gold-bright); }
     .sw-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .sw-btn.is-on, .sw-toggle.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); }
     .sw-btn-icon { padding: 0; }
+    .sw-zoom { display: inline-flex; gap: 4px; }
+    .sw-btn-zoom { width: 44px; padding: 0; font-family: var(--font-body); font-size: var(--fsc-18); letter-spacing: 0; }
     .sw-seg { display: inline-flex; border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
     .sw-seg-btn {
       min-height: 44px; padding: 0 14px; background: transparent; border: 0;
@@ -6710,6 +6716,59 @@
     }
     .sw-seg-btn.is-on { background: var(--gold-faint); color: var(--gold-bright); }
     .sw-seg-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .sw-select-wrap { display: inline-flex; align-items: center; }
+    .sw-select {
+      min-height: 44px; padding: 0 28px 0 13px; appearance: auto;
+      background: var(--bg3); color: var(--cream-dim); border: 1px solid var(--gold-border);
+      border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fsc-11);
+      letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer;
+    }
+    .sw-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+    .sw-context {
+      position: absolute; z-index: 4; left: 14px;
+      top: calc(76px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+      display: grid; gap: 2px; min-width: 170px; max-width: min(300px, 40%);
+      padding: 9px 12px 10px; background: var(--bg3);
+      border-left: 2px solid var(--gold); border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) 0; color: var(--cream-dim);
+      pointer-events: none;
+    }
+    .sw-context-eyebrow {
+      font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
+      letter-spacing: 0.16em; text-transform: uppercase;
+    }
+    .sw-context strong {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-family: var(--font-cinzel); font-size: var(--fsc-18); font-weight: 600;
+      color: var(--gold-bright); letter-spacing: 0.02em;
+    }
+    .sw-context-range { min-height: 1em; font-size: var(--fsc-12); color: var(--cream-dim); }
+    .sw-context-zoom { font-size: var(--fsc-11); color: var(--cream-muted); letter-spacing: 0.05em; }
+
+    .sw-goto {
+      position: absolute; z-index: 8; right: 14px; top: 78px; width: min(360px, calc(100% - 28px));
+      padding: 12px; background: var(--bg3); border: 1px solid var(--gold-border);
+      border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+    }
+    .sw-goto form { display: flex; gap: 7px; align-items: center; }
+    .sw-goto-input {
+      min-width: 0; flex: 1; min-height: 44px; padding: 0 12px; color: var(--cream-dim);
+      background: var(--bg); border: 1px solid var(--gold-border); border-radius: var(--radius);
+      font: var(--fs-15) var(--font-body);
+    }
+    .sw-goto-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+    .sw-goto-help { margin-top: 8px; color: var(--cream-muted); font-size: var(--fsc-11); }
+    .sw-orientation-note {
+      position: fixed; z-index: 20; left: 50%; top: 14px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px; max-width: calc(100% - 28px);
+      padding: 9px 12px; background: var(--bg3); border: 1px solid var(--gold-border);
+      border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+      color: var(--cream-dim); font-size: var(--fsc-11);
+    }
+    .sw-orientation-note strong { color: var(--gold-bright); font-family: var(--font-cinzel); letter-spacing: 0.08em; text-transform: uppercase; }
+    .sw-orientation-note span { color: var(--cream-muted); }
 
     .sw-loading, .sw-fallback {
       position: absolute; inset: 0; z-index: 5;
@@ -6721,7 +6780,7 @@
     .sw-fallback-body { max-width: 34em; line-height: 1.6; }
 
     .sw-tip {
-      position: fixed; z-index: 6; pointer-events: none; max-width: 300px;
+      position: absolute; z-index: 6; pointer-events: none; max-width: 300px;
       background: var(--bg3); border: 1px solid var(--gold-border);
       border-radius: var(--radius); padding: 11px 13px;
       font-family: var(--font-body); color: var(--cream-dim);
@@ -6741,11 +6800,12 @@
     .sw-sheet {
       position: absolute; z-index: 7; left: 50%; transform: translateX(-50%);
       bottom: calc(12px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      width: min(560px, calc(100vw - 24px));
+      width: min(560px, calc(100% - 24px));
       background: var(--bg3); border: 1px solid var(--gold-border);
       border-radius: var(--radius); padding: 16px 18px 18px;
       font-family: var(--font-body); color: var(--cream-dim);
       max-height: 52vh; overflow-y: auto;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.28);
     }
     .sw-sheet-close {
       position: absolute; top: 8px; right: 8px;
@@ -6812,7 +6872,7 @@
     .sw-empty {
       position: absolute; z-index: 5; left: 50%; top: 42%;
       transform: translate(-50%, -50%);
-      width: min(460px, calc(100vw - 48px)); text-align: center;
+      width: min(460px, calc(100% - 48px)); text-align: center;
       pointer-events: none;
       font-family: var(--font-body); color: var(--cream-muted);
     }
@@ -6828,7 +6888,24 @@
 
     /* Above the control strip, not behind it — CC-BY attribution has to stay
        legible, not merely present. */
-    .sw-root.sw-narrow .sw-credit { bottom: calc(122px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-narrow .sw-credit { bottom: calc(198px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+
+    /* A rotated phone still has a landscape-sized root, but the physical
+       viewport is tight enough that the last control otherwise falls onto a
+       second row. Keep every action in one compact, thumb-friendly bar. */
+    .sw-root.sw-rotated .sw-controls {
+      max-width: min(62%, calc(100% - 330px)); gap: 5px; padding: 5px;
+    }
+    .sw-root.sw-rotated .sw-btn { padding-left: 10px; padding-right: 10px; }
+    .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
+    .sw-root.sw-rotated .sw-select { padding-left: 10px; padding-right: 20px; }
+    .sw-root.sw-rotated .sw-context { max-width: 300px; }
+    .sw-root.sw-rotated .sw-sheet { width: min(560px, calc(100% - 24px)); }
+    @media (max-width: 1100px) and (orientation: landscape) {
+      .sw-controls { gap: 5px; padding: 5px; }
+      .sw-btn { padding-left: 10px; padding-right: 10px; }
+      .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
+    }
 
     /* About: the CC-BY line for the Scripture Web dataset. */
     .about-credit { font-size: var(--fs-13); color: var(--cream-muted); }
@@ -6878,9 +6955,32 @@
     }
     .sw-sheet { padding: 12px 14px 14px; max-height: 46vh; }
 
+    .sw-choice, .sw-list {
+      position: absolute; z-index: 8; left: 50%; transform: translateX(-50%);
+      bottom: calc(12px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      width: min(620px, calc(100% - 24px)); max-height: 62vh; overflow-y: auto;
+      padding: 14px; background: var(--bg3); border: 1px solid var(--gold-border);
+      border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+    }
+    .sw-choice-list { display: grid; gap: 6px; margin-top: 12px; }
+    .sw-choice-row {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      width: 100%; min-height: 48px; padding: 9px 11px; text-align: left;
+      background: transparent; border: 1px solid var(--gold-border); border-radius: var(--radius);
+      color: var(--cream-dim); cursor: pointer;
+    }
+    .sw-choice-row:hover, .sw-choice-row:focus-visible { border-color: var(--gold); background: var(--gold-faint); outline: none; }
+    .sw-choice-label { color: var(--gold-bright); font-size: var(--fs-15); line-height: 1.3; }
+    .sw-choice-meta { color: var(--cream-muted); font-size: var(--fsc-11); }
+    .sw-list-empty { padding: 18px 0 8px; color: var(--cream-muted); }
+    .sw-sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+
     /* Transient control explanation under the title. */
     .sw-hint {
       margin: 4px 0 0; font-size: var(--fsc-11); color: var(--gold-dim);
-      letter-spacing: 0.03em; font-style: italic; max-width: 46vw;
+      letter-spacing: 0.03em; font-style: italic; max-width: 46%;
     }
     .sw-fallback-row { display: flex; gap: 10px; }

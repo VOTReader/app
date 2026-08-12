@@ -23,10 +23,11 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer, additiveAlphaScale,
+  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
 } from '../../utils/scripture-web/geometry.js';
 import {
-  pickArc, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
+  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
+  arcsTouching, findWebReference,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
@@ -34,7 +35,9 @@ import { readChromeTokens, GENRE_NAMES, LINK_KIND_NAMES } from '../../utils/scri
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
-import { drawPersonalWeb, pickPersonal } from '../scripture-web/rail-renderer.js';
+import {
+  drawPersonalWeb, pickPersonalLinks, pickUnderlayLinks,
+} from '../scripture-web/rail-renderer.js';
 
 /**
  * Short names for the VOT rail. Full collection titles ("Words To Live By:
@@ -59,12 +62,11 @@ const MAX_ZOOM = 4000;
 /** Height reserved below the baseline for the ruler + book names. */
 const RULER_H = 74;
 
-const DENSITY_LABEL = { essential: 'Essential', classic: 'Classic', complete: 'Complete' };
+const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
 const COLOR_LABEL = { distance: 'Distance', testament: 'Testament', genre: 'Genre' };
 const DENSITY_HINT = {
   essential: 'only the strongest connections',
-  classic: 'the famous view — strong connections',
-  complete: 'every connection in the dataset',
+  famous: 'the famous view — about 64,000 connections',
 };
 const COLOR_HINT = {
   distance: 'how far apart in scripture the two ends sit',
@@ -92,27 +94,80 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // into landscape — no Android orientation flip, the page just lays itself
   // out sideways (owner call). Pointer coords are mapped back through loc().
   const [rotated, setRotated] = React.useState(
-    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth &&
+    window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   React.useEffect(() => {
-    const onResize = () => setRotated(window.innerHeight > window.innerWidth);
+    const onResize = () => {
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      setRotated(window.innerHeight > window.innerWidth && coarse);
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const rotatedRef = React.useRef(rotated);
+  const [orientationHint, setOrientationHint] = React.useState(false);
+  const showPortraitFallback = React.useCallback(() => {
+    setRotated(false);
+    setOrientationHint(true);
+  }, []);
+  const settleLandscapeRequest = React.useCallback(() => {
+    // Some desktop WebViews resolve orientation.lock() without changing the
+    // viewport. Do not leave the instrument sideways in that case.
+    window.setTimeout(() => {
+      if (window.innerHeight > window.innerWidth) showPortraitFallback();
+      else setOrientationHint(false);
+    }, 300);
+  }, [showPortraitFallback]);
+  const requestLandscape = React.useCallback(() => {
+    const orientation = typeof screen !== 'undefined' && screen.orientation;
+    if (!orientation || typeof orientation.lock !== 'function') {
+      showPortraitFallback();
+      return;
+    }
+    Promise.resolve(orientation.lock('landscape')).then(() => {
+      settleLandscapeRequest();
+    }).catch(showPortraitFallback);
+  }, [settleLandscapeRequest, showPortraitFallback]);
+  React.useEffect(() => {
+    if (!rotated) {
+      if (!(typeof window !== 'undefined' && window.innerHeight > window.innerWidth)) {
+        setOrientationHint(false);
+      }
+      return undefined;
+    }
+    const coarse = typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(pointer: coarse)').matches;
+    if (!coarse) return undefined;
+    const orientation = typeof screen !== 'undefined' && screen.orientation;
+    if (orientation && typeof orientation.lock === 'function') {
+      Promise.resolve(orientation.lock('landscape')).then(() => {
+        settleLandscapeRequest();
+      }).catch(showPortraitFallback);
+    } else showPortraitFallback();
+    return undefined;
+  }, [rotated, settleLandscapeRequest, showPortraitFallback]);
 
   /** Viewport coords -> the rotated screen's own CSS space. */
   const loc = React.useCallback((e) => (rotatedRef.current
     ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
     : { x: e.clientX, y: e.clientY }), []);
   const [mode, setMode] = React.useState('canonical');   // 'canonical' | 'personal'
-  const [density, setDensity] = React.useState(
-    DENSITY_STEPS.indexOf(settings && settings.webDensity) >= 0 ? settings.webDensity : 'classic');
+  const [density, setDensity] = React.useState(() => {
+    // `classic` was the old internal name; accept it once so existing
+    // settings migrate naturally while the feature speaks in user terms.
+    const saved = settings && settings.webDensity === 'classic' ? 'famous' : settings && settings.webDensity;
+    return DENSITY_STEPS.indexOf(saved) >= 0 ? saved : 'famous';
+  });
   const [colorMode, setColorMode] = React.useState('distance');
   const [detail, setDetail] = React.useState(null);      // the open sheet
+  const [choices, setChoices] = React.useState(null);    // overlapped line chooser
+  const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
+  const [goToOpen, setGoToOpen] = React.useState(false);
+  const [goToValue, setGoToValue] = React.useState('');
   const [tip, setTip] = React.useState(null);            // hover chip
   const [announce, setAnnounce] = React.useState('');
   // A transient explanation under the title — set on control cycles so the
-  // reader is TOLD what Essential/Classic/Complete and the colour modes mean
+  // reader is TOLD what Essential/Famous and the colour modes mean
   // instead of having to guess (the on-device report).
   const [hint, setHint] = React.useState('');
   const hintTimer = React.useRef(0);
@@ -129,6 +184,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const rendererRef = React.useRef(null);
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
+  const contextRef = React.useRef(null);
+  const rangeRef = React.useRef(null);
+  const zoomRef = React.useRef(null);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
@@ -138,13 +196,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
   const modeRef = React.useRef('canonical');
-  // True while a pinch/drag/wheel is in flight (with a short decay). Complete
-  // draws ~21M vertices a frame at overview — fine as a single settled frame,
-  // lethal as a sustained gesture rate on a phone GPU (the Pixel 9 Pro
-  // context-loss report). So gestures draw at Classic and the full set lands
-  // on the settle frame.
-  const gestureRef = React.useRef({ active: false, timer: 0 });
-
   const theme = settings && settings.theme;
 
   // ── load the graph asset (lazy, injected script, precached by the SW) ──
@@ -175,19 +226,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // rather than closing over one. Same for the pointer handlers below.
   const drawRef = React.useRef(() => {});
   const handlersRef = React.useRef({});
+  const hoverRafRef = React.useRef(0);
+  const hoverPointRef = React.useRef(null);
 
   const schedule = React.useCallback(() => {
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
   }, []);
-
-  /** Mark gesture activity; the settle frame re-draws at full density. */
-  const touchGesture = React.useCallback(() => {
-    const g = gestureRef.current;
-    g.active = true;
-    if (g.timer) clearTimeout(g.timer);
-    g.timer = setTimeout(() => { g.active = false; schedule(); }, 180);
-  }, [schedule]);
 
   // A frame requested while the page is hidden never runs, so rafRef stays
   // set and EVERY later schedule() short-circuits — the view would come back
@@ -291,8 +336,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const zoom = cam.ppv / fitPPV(cam, v.W);
     const chrome = chromeRef.current;
     const base = viewFor();
-    const liveDensity = (density === 'complete' && gestureRef.current.active)
-      ? 'classic' : density;
+    const location = webLocation(g, cam, v.W, zoom);
+    if (contextRef.current) contextRef.current.textContent = location.title;
+    if (rangeRef.current) rangeRef.current.textContent = location.range;
+    if (zoomRef.current) {
+      const zoomLabel = zoom < 1.1 ? 'Overview' : (zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom) + 'x');
+      zoomRef.current.textContent = zoomLabel;
+    }
     if (mode === 'personal') {
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
@@ -314,28 +364,21 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }
       return;
     }
-    const strokeWidth = Math.min(0.8 + Math.log2(zoom) * 0.24, 3.0) * v.DPR;
-    let alpha = Math.min(0.052 + Math.log2(zoom) * 0.042, chrome.isLight ? 0.8 : 0.5);
-    if (!chrome.isLight) {
-      // Additive exposure budget: the same arc count that is perfect on a
-      // desktop canvas whites out on a phone (fewer pixels, more energy per
-      // pixel). Meter by what was ACTUALLY drawn last frame — after density
-      // and chunk culling — so Complete on a phone settles to the
-      // desktop-verified exposure instead of blooming into a neon blob.
-      const drawn = (r.stats && r.stats.instances)
-        || graphStats(g, liveDensity).shown;
-      alpha *= additiveAlphaScale(drawn, strokeWidth, v.H);
-    }
+    const strokeWidth = Math.min(0.9 + Math.log2(zoom) * 0.16, 2.4) * v.DPR;
+    // The Famous view is intentionally high-coverage, but
+    // 64k overlapping ribbons still need a quiet baseline. Let zoom bring
+    // detail forward without recreating the old neon wash at overview.
+    const alpha = Math.min(0.075 + Math.log2(zoom) * 0.028, chrome.isLight ? 0.42 : 0.19);
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth,
       alpha,
-      colorMode, density: liveDensity, light: chrome.isLight, bg: chrome.bg,
+      colorMode, density, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
     drawRuler(uiRef.current, g, cam,
-      Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, liveDensity) }),
+      Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
   }, [graph, colorMode, density, viewFor, mode, railOpts]);
 
@@ -463,13 +506,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         clampCamera(cam, W, MAX_ZOOM);
         cam.x = pinch.verse - (pinch.mid * dpr() - W / 2) / cam.ppv;
         clampCamera(cam, W, MAX_ZOOM);
-        moved = true; touchGesture(); schedule(); return;
+        moved = true; schedule(); return;
       }
       if (drag) {
         if (Math.abs(pt.x - drag.x) > 3) moved = true;
         cam.x = drag.camx - (pt.x - drag.x) * dpr() / cam.ppv;
         clampCamera(cam, W, MAX_ZOOM);
-        touchGesture(); schedule(); return;
+        schedule(); return;
       }
       if (e.pointerType === 'mouse') handlersRef.current.hover(pt.x, pt.y);
     };
@@ -489,7 +532,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       e.preventDefault();
       const cam = camRef.current, W = viewRef.current.W;
       zoomAbout(cam, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), MAX_ZOOM);
-      touchGesture(); schedule();
+      schedule();
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -503,32 +546,44 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       el.removeEventListener('pointercancel', cancel);
       el.removeEventListener('wheel', wheel);
     };
-  }, [graph, schedule, touchGesture, loc]);
+  }, [graph, schedule, loc]);
 
-  const hitAt = React.useCallback((cx, cy) => {
+  const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
-    if (!g || !cam || !v.W) return null;
+    if (!g || !cam || !v.W) return [];
     const px = cx * v.DPR, py = cy * v.DPR;
     const view = viewFor();
     if (mode === 'personal') {
       const p = personalRef.current;
-      const i = pickPersonal(p && p.graph, railOpts(), px, py, 10 * v.DPR);
-      if (i >= 0) return { kind: 'link', index: i };
+      const opts = railOpts();
+      const userHits = pickPersonalLinks(p && p.graph, opts, px, py, 14 * v.DPR, 4);
+      if (userHits.length) return userHits.map((hit) => ({
+        kind: 'link', index: hit.index, distance: hit.distance,
+      }));
+      if (showUnderlay) {
+        const contextHits = pickUnderlayLinks(p && p.underlay, opts, px, py, 14 * v.DPR, 4);
+        if (contextHits.length) return contextHits.map((hit) => ({
+          kind: 'underlay', index: hit.index, distance: hit.distance,
+        }));
+      }
       const ci = pickChapter(g, cam, view, px, py);
-      return ci >= 0 ? { kind: 'chapter', chapterIndex: ci } : null;
+      return ci >= 0 ? [{ kind: 'chapter', chapterIndex: ci }] : [];
     }
     const ci = pickChapter(g, cam, view, px, py);
     if (ci >= 0) {
       const zoomed = cam.ppv > 26 * v.DPR;
       if (zoomed) {
         const verse = pickVerse(g, cam, view, px, py);
-        if (verse >= 0) return { kind: 'verse', verse };
+        if (verse >= 0) return [{ kind: 'verse', verse }];
       }
-      return { kind: 'chapter', chapterIndex: ci };
+      return [{ kind: 'chapter', chapterIndex: ci }];
     }
-    const hit = pickArc(g, cam, view, px, py, 8 * v.DPR);
-    return hit ? { kind: 'arc', hit } : null;
-  }, [graph, viewFor, mode, railOpts]);
+    return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
+      .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
+  }, [graph, viewFor, mode, railOpts, showUnderlay]);
+
+  const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
+    [hitCandidatesAt]);
 
   const describe = React.useCallback((found) => {
     const g = graph;
@@ -545,6 +600,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         // carry verse/verseEnd and char spans, so a link the user made over a
         // range highlights that whole range on arrival.
         cards: [endpointCard('Source', rec.source), endpointCard('Target', rec.target)],
+      };
+    }
+    if (found.kind === 'underlay') {
+      const p = personalRef.current;
+      const underlay = p && p.underlay;
+      const edge = underlay && underlay.records && underlay.records[found.index];
+      const node = p && p.votRail && p.votRail.nodes[underlay && underlay.votPos[found.index]];
+      if (!underlay || !edge || !node) return null;
+      const source = refOfVerse(g, underlay.versePos[found.index]);
+      const target = curatedEndpoint(edge, node);
+      return {
+        kind: 'underlay', index: found.index, source, target,
+        joins: edge.kind || 'curated connection',
+        cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
       };
     }
     if (found.kind === 'arc') {
@@ -571,33 +640,126 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
   }, [graph, density]);
 
-  const hover = React.useCallback((cx, cy) => {
-    const found = describe(hitAt(cx, cy));
-    const nextHover = found && found.kind === 'arc' ? found.index : -1;
-    if (nextHover !== hoverRef.current) { hoverRef.current = nextHover; schedule(); }
-    setTip(found ? { info: found, x: cx, y: cy } : null);
-  }, [describe, hitAt, schedule]);
-
-  const tap = React.useCallback((cx, cy) => {
-    const found = describe(hitAt(cx, cy));
-    if (!found) {
-      focusRef.current = { arc: -1, range: null };
-      hoverRef.current = -1;
-      setTip(null); setDetail(null); schedule(); return;
+  const listItems = React.useMemo(() => {
+    if (!graph || !listOpen) return [];
+    const found = [];
+    if (mode === 'personal') {
+      const p = personalRef.current;
+      const count = p && p.graph ? p.graph.count : 0;
+      for (let i = 0; i < Math.min(count, 36); i++) found.push({ kind: 'link', index: i });
+      if (!found.length && showUnderlay && p && p.underlay) {
+        for (let i = 0; i < Math.min(p.underlay.count, 36); i++) found.push({ kind: 'underlay', index: i });
+      }
+    } else {
+      const cam = camRef.current;
+      if (!cam) return [];
+      const centre = Math.max(0, Math.min(graph.total - 1, Math.round(cam.x)));
+      const chapterIndex = graph.chapterOfVerse[centre];
+      const [lo, hi] = chapterRange(graph, chapterIndex);
+      for (const index of arcsTouching(graph, lo, hi, density, 36)) {
+        found.push({ kind: 'arc', hit: {
+          index, from: graph.from[index], to: graph.to[index], votes: graph.votes[index],
+        } });
+      }
     }
-    focusRef.current = found.kind === 'arc'
+    return found.map(describe).filter(Boolean);
+  }, [describe, density, graph, listOpen, mode, showUnderlay]);
+
+  const submitGoTo = React.useCallback((event) => {
+    if (event && event.preventDefault) event.preventDefault();
+    const result = graph && findWebReference(graph, goToValue);
+    const cam = camRef.current, v = viewRef.current;
+    if (!result || !cam || !v.W) {
+      flashHint('Try a reference such as Jeremiah 6:16 or John 3.');
+      return;
+    }
+    cam.x = result.hasVerse ? result.verse : (result.lo + result.hi) / 2;
+    const chapterVerses = result.hi - result.lo + 1;
+    const targetZoom = result.hasVerse
+      ? Math.min(800, Math.max(160, graph.total / Math.max(chapterVerses * 2.5, 1)))
+      : Math.min(800, Math.max(16, graph.total / Math.max(chapterVerses * 4, 1)));
+    cam.ppv = fitPPV(cam, v.W) * targetZoom;
+    clampCamera(cam, v.W, MAX_ZOOM);
+    focusRef.current = { arc: -1, range: [result.lo, result.hi] };
+    setGoToOpen(false);
+    setGoToValue('');
+    setDetail(null); setChoices(null); setListOpen(false); setTip(null);
+    setAnnounce(result.label);
+    schedule();
+  }, [flashHint, goToValue, graph, schedule]);
+
+  const commitFound = React.useCallback((found) => {
+    if (!found) return;
+    focusRef.current = found.kind === 'arc' || found.kind === 'link'
       ? { arc: found.index, range: null }
-      : { arc: -1, range: found.kind === 'chapter' ? [found.lo, found.hi] : [found.verse, found.verse] };
+      : { arc: -1, range: found.kind === 'chapter' ? [found.lo, found.hi]
+        : found.kind === 'verse' ? [found.verse, found.verse] : null };
     hoverRef.current = -1;
     setTip(null);
+    setChoices(null);
+    setListOpen(false);
     setDetail(found);
     setAnnounce(summaryOf(found));
     schedule();
+  }, [schedule]);
+
+  const hover = React.useCallback((cx, cy) => {
+    hoverPointRef.current = { cx, cy };
+    if (hoverRafRef.current) return;
+    hoverRafRef.current = requestAnimationFrame(() => {
+      hoverRafRef.current = 0;
+      const point = hoverPointRef.current;
+      if (!point) return;
+      const found = describe(hitAt(point.cx, point.cy));
+      const nextHover = found && found.kind === 'arc' ? found.index : -1;
+      if (nextHover !== hoverRef.current) { hoverRef.current = nextHover; schedule(); }
+      setTip((previous) => {
+        if (!found) return previous ? null : previous;
+        if (previous && previous.info.kind === found.kind &&
+            (found.kind !== 'arc' || previous.info.index === found.index) &&
+            Math.abs(previous.x - point.cx) < 4 && Math.abs(previous.y - point.cy) < 4) {
+          return previous;
+        }
+        return { info: found, x: point.cx, y: point.cy };
+      });
+    });
   }, [describe, hitAt, schedule]);
+
+  React.useEffect(() => () => {
+    if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+  }, []);
+
+  const tap = React.useCallback((cx, cy) => {
+    const candidates = hitCandidatesAt(cx, cy);
+    const described = candidates.map(describe).filter(Boolean);
+    if (!described.length) {
+      focusRef.current = { arc: -1, range: null };
+      hoverRef.current = -1;
+      setTip(null); setChoices(null); setDetail(null); setListOpen(false); schedule(); return;
+    }
+    const closeEnough = candidates.length > 1 && candidates[1].distance <= 8 * viewRef.current.DPR;
+    if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
+        item.kind === 'link' || item.kind === 'underlay')) {
+      setChoices(described);
+      setDetail(null);
+      setListOpen(false);
+      setAnnounce(described.length + ' nearby connections. Choose one.');
+      schedule();
+      return;
+    }
+    commitFound(described[0]);
+  }, [commitFound, describe, hitCandidatesAt, schedule]);
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
     zoomAbout(cam, v.W, cx * v.DPR, 2.5, MAX_ZOOM);
+    schedule();
+  }, [schedule]);
+
+  const changeZoom = React.useCallback((factor) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!cam || !v.W) return;
+    zoomAbout(cam, v.W, v.W / 2, factor, MAX_ZOOM);
     schedule();
   }, [schedule]);
 
@@ -612,7 +774,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     clampCamera(cam, v.W, MAX_ZOOM);
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
-    setDetail(null); setTip(null); schedule();
+    setDetail(null); setChoices(null); setListOpen(false); setTip(null); setGoToOpen(false); schedule();
   }, [schedule]);
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
@@ -626,7 +788,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, MAX_ZOOM); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
-      if (detail || tip) { setDetail(null); setTip(null); focusRef.current = { arc: -1, range: null }; schedule(); }
+      if (goToOpen || listOpen || choices || detail || tip) {
+        setGoToOpen(false); setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+        focusRef.current = { arc: -1, range: null }; schedule();
+      }
       else if (onBack) onBack();
       return;
     } else return;
@@ -635,21 +800,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const centre = Math.round(cam.x);
     if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [detail, tip, graph, onBack, resetView, schedule]);
-
-  const cycleDensity = () => {
-    const next = DENSITY_STEPS[(DENSITY_STEPS.indexOf(density) + 1) % DENSITY_STEPS.length];
-    setDensity(next);
-    flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
-    if (typeof updateSetting === 'function') updateSetting('webDensity', next);
-    if (typeof PlatformBridge !== 'undefined') PlatformBridge.haptic('light');
-  };
-  const cycleColor = () => {
-    const next = COLOR_MODES[(COLOR_MODES.indexOf(colorMode) + 1) % COLOR_MODES.length];
-    setColorMode(next);
-    flashHint('Colour shows ' + COLOR_HINT[next]);
-    if (typeof PlatformBridge !== 'undefined') PlatformBridge.haptic('light');
-  };
+  }, [choices, detail, goToOpen, listOpen, tip, graph, onBack, resetView, schedule]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
@@ -690,10 +841,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const stats = graph ? graphStats(graph, density) : null;
 
   return (
+    <React.Fragment>
     <div className={'sw-root' + (rotated ? ' sw-rotated' : '')} ref={wrapRef}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
-      aria-label="The Scripture Web — an interactive map of cross-references">
+      aria-label="The Scripture Web — an interactive map of cross-references"
+      aria-describedby="sw-context-copy sw-a11y-help">
       <canvas className="sw-canvas sw-canvas-gl" ref={glRef} aria-hidden="true" />
       <canvas className="sw-canvas sw-canvas-ui" ref={uiRef} aria-hidden="true" />
 
@@ -715,30 +868,78 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-controls">
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
-            aria-pressed={mode === 'canonical'} onClick={() => setMode('canonical')}>Scripture</button>
+            aria-pressed={mode === 'canonical'} onClick={() => { setMode('canonical'); setDetail(null); setChoices(null); setListOpen(false); }}>Scripture</button>
           <button type="button" className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={() => setMode('personal')}>My web</button>
+            aria-pressed={mode === 'personal'} onClick={() => { setMode('personal'); setDetail(null); setChoices(null); setListOpen(false); }}>My web</button>
         </div>
+        <button type="button" className={'sw-btn' + (goToOpen ? ' is-on' : '')}
+          onClick={() => { setGoToOpen(!goToOpen); setListOpen(false); }}
+          aria-expanded={goToOpen} aria-haspopup="dialog">Go to</button>
+        <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
+          onClick={() => { setListOpen(!listOpen); setGoToOpen(false); setChoices(null); }}
+          aria-expanded={listOpen} aria-haspopup="dialog">Nearby</button>
         {mode === 'canonical' ? (
           <React.Fragment>
-            <button type="button" className="sw-btn" onClick={cycleDensity}
-              aria-label={'Density: ' + DENSITY_LABEL[density] + ' — ' + DENSITY_HINT[density]}>
-              {DENSITY_LABEL[density]}
-            </button>
-            <button type="button" className="sw-btn" onClick={cycleColor}
-              aria-label={'Colour shows ' + COLOR_HINT[colorMode]}>
-              Colour · {COLOR_LABEL[colorMode]}
-            </button>
+            <label className="sw-select-wrap">
+              <span className="sw-sr-only">Connection density</span>
+              <select className="sw-select" value={density} aria-label="Connection density"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDensity(next); flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
+                  if (typeof updateSetting === 'function') updateSetting('webDensity', next);
+                }}>
+                <option value="essential">Essential</option>
+                <option value="famous">Famous</option>
+              </select>
+            </label>
+            <label className="sw-select-wrap">
+              <span className="sw-sr-only">Colour mode</span>
+              <select className="sw-select" value={colorMode} aria-label="Colour mode"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setColorMode(next); flashHint('Colour shows ' + COLOR_HINT[next]);
+                }}>
+                {COLOR_MODES.map((value) => <option key={value} value={value}>{COLOR_LABEL[value]}</option>)}
+              </select>
+            </label>
           </React.Fragment>
         ) : (
-          <button type="button" className="sw-btn" aria-pressed={showUnderlay}
+          <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
-            aria-label="Show the connections the Volumes already make">
-            Corpus links
+            aria-label="Show the curated corpus connections">
+            Corpus context · {personalRef.current && personalRef.current.underlay
+              ? personalRef.current.underlay.count.toLocaleString() : '…'}
           </button>
         )}
+        <div className="sw-zoom" role="group" aria-label="Zoom">
+          <button type="button" className="sw-btn sw-btn-zoom" onClick={() => changeZoom(1 / 1.8)} aria-label="Zoom out">−</button>
+          <button type="button" className="sw-btn sw-btn-zoom" onClick={() => changeZoom(1.8)} aria-label="Zoom in">+</button>
+        </div>
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
       </div>
+
+      <div className="sw-context" aria-label="Current Scripture Web location">
+        <span className="sw-context-eyebrow">Viewing</span>
+        <strong ref={contextRef}>The whole canon</strong>
+        <span id="sw-context-copy" className="sw-context-range" ref={rangeRef} />
+        <span className="sw-context-zoom" ref={zoomRef}>Overview</span>
+      </div>
+
+      {goToOpen && (
+        <div className="sw-goto" role="dialog" aria-label="Go to a Bible reference">
+          <form onSubmit={submitGoTo}>
+            <label className="sw-sr-only" htmlFor="sw-goto-input">Bible reference</label>
+            <input id="sw-goto-input" className="sw-goto-input" autoFocus
+              value={goToValue} onChange={(e) => setGoToValue(e.target.value)}
+              placeholder="Jeremiah 6:16" list="sw-book-list" />
+            <button type="submit" className="sw-btn">Go</button>
+          </form>
+          <datalist id="sw-book-list">
+            {graph && graph.books.map((book) => <option key={book.id} value={book.title + ' '} />)}
+          </datalist>
+          <div className="sw-goto-help">Book, chapter, or verse — for example “Jer 6:16”.</div>
+        </div>
+      )}
 
       {mode === 'personal' && graph && personalCount === 0 && (
         <div className="sw-empty">
@@ -752,7 +953,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           </div>
         </div>
       )}
-      {tip && <TipChip info={tip} />}
+      {tip && <TipChip info={tip} viewport={viewRef.current} />}
+      {choices && <ConnectionChooser choices={choices} onChoose={commitFound}
+        onClose={() => { setChoices(null); schedule(); }} />}
+      {listOpen && <ConnectionList items={listItems} mode={mode}
+        onChoose={commitFound} onClose={() => setListOpen(false)} />}
       {detail && (
         <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} />
       )}
@@ -760,7 +965,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-legend" aria-hidden="true">{legendFor(colorMode)}</div>
       <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
+      <div id="sw-a11y-help" className="sw-sr-only">
+        Drag to move through scripture. Use the zoom controls or plus and minus keys.
+        Select a line to see its references; Nearby opens a keyboard-friendly list.
+      </div>
     </div>
+    {orientationHint && rotated && (
+      <div className="sw-orientation-note" role="status">
+        <strong>Best in landscape</strong>
+        <span>Turn your device sideways to read the full canon clearly.</span>
+        <button type="button" className="sw-btn" onClick={requestLandscape}>Try landscape</button>
+      </div>
+    )}
+    </React.Fragment>
   );
 }
 
@@ -936,11 +1153,13 @@ function drawRulerOnly(ctx, g, cam, view, v, chrome) {
 
 /* ── chrome pieces ─────────────────────────────────────────────────────── */
 
-function TipChip({ info }) {
+function TipChip({ info, viewport }) {
   const s = info.info;
+  const width = viewport && viewport.DPR ? viewport.W / viewport.DPR : 800;
+  const height = viewport && viewport.DPR ? viewport.H / viewport.DPR : 600;
   const style = {
-    left: Math.min(info.x + 16, (typeof window !== 'undefined' ? window.innerWidth : 800) - 300) + 'px',
-    top: Math.min(info.y + 16, (typeof window !== 'undefined' ? window.innerHeight : 600) - 130) + 'px',
+    left: Math.max(8, Math.min(info.x + 16, width - 308)) + 'px',
+    top: Math.max(8, Math.min(info.y + 16, height - 138)) + 'px',
   };
   return (
     <div className="sw-tip" style={style} aria-hidden="true">
@@ -962,6 +1181,15 @@ function TipChip({ info }) {
           <div className="sw-tip-meta">{LINK_KIND_NAMES[s.joins]}</div>
         </React.Fragment>
       )}
+      {s.kind === 'underlay' && (
+        <React.Fragment>
+          <div className="sw-tip-eyebrow">Corpus connection</div>
+          <div className="sw-tip-ref">{s.source.label}</div>
+          <div className="sw-tip-arrow">↕</div>
+          <div className="sw-tip-ref sw-tip-ref-alt">{s.target ? endpointLabel(s.target) : 'Corpus passage'}</div>
+          <div className="sw-tip-meta">{s.joins}</div>
+        </React.Fragment>
+      )}
       {s.kind === 'chapter' && (
         <React.Fragment>
           <div className="sw-tip-eyebrow">Chapter</div>
@@ -980,14 +1208,72 @@ function TipChip({ info }) {
   );
 }
 
+function connectionTitle(info) {
+  if (info.kind === 'arc') return info.a.label + ' ↕ ' + info.b.label;
+  if (info.kind === 'underlay') return info.source.label + ' ↕ ' + endpointLabel(info.target);
+  return endpointLabel(info.source) + ' ↕ ' + endpointLabel(info.target);
+}
+
+function connectionMeta(info) {
+  if (info.kind === 'arc') return info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
+  if (info.kind === 'underlay') return info.joins;
+  return LINK_KIND_NAMES[info.joins] || 'Your link';
+}
+
+function ConnectionChooser({ choices, onChoose, onClose }) {
+  const closeRef = React.useRef(null);
+  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  return (
+    <div className="sw-choice" role="dialog" aria-modal="false" aria-label="Connections here">
+      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
+      <div className="sw-sheet-eyebrow">Connections here</div>
+      <div className="sw-sheet-meta">Several threads are close together. Choose the one you meant.</div>
+      <div className="sw-choice-list">
+        {choices.map((choice, i) => (
+          <button type="button" className="sw-choice-row" key={i} onClick={() => onChoose(choice)}>
+            <span className="sw-choice-label">{connectionTitle(choice)}</span>
+            <span className="sw-choice-meta">{connectionMeta(choice)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConnectionList({ items, mode, onChoose, onClose }) {
+  const closeRef = React.useRef(null);
+  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  return (
+    <div className="sw-list" role="dialog" aria-modal="false" aria-label="Nearby connections">
+      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
+      <div className="sw-sheet-eyebrow">{mode === 'personal' ? 'Your nearby links' : 'Nearby connections'}</div>
+      <div className="sw-sheet-meta">Select a connection to focus it and open its passages.</div>
+      {items.length ? (
+        <div className="sw-choice-list">
+          {items.map((item, i) => (
+            <button type="button" className="sw-choice-row" key={i} onClick={() => onChoose(item)}>
+              <span className="sw-choice-label">{connectionTitle(item)}</span>
+              <span className="sw-choice-meta">{connectionMeta(item)}</span>
+            </button>
+          ))}
+        </div>
+      ) : <div className="sw-list-empty">No nearby connections at this location.</div>}
+    </div>
+  );
+}
+
 function DetailSheet({ info, onClose, onOpen }) {
+  const closeRef = React.useRef(null);
+  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   const cards = info.cards || [];
   const eyebrow = info.kind === 'link' ? 'Your link'
+    : info.kind === 'underlay' ? 'Corpus connection'
     : info.kind === 'arc' ? 'Connection'
     : info.kind === 'chapter' ? 'Chapter' : 'Verse';
   const meta = info.kind === 'arc'
     ? info.span.toLocaleString() + ' verses apart · weight ' + info.votes
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
+    : info.kind === 'underlay' ? info.joins
     : info.kind === 'chapter'
       ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
       : info.connections.toLocaleString() + ' connections';
@@ -995,7 +1281,7 @@ function DetailSheet({ info, onClose, onOpen }) {
   return (
     <div className="sw-sheet" role="dialog" aria-modal="false"
       aria-label={eyebrow + ' details'}>
-      <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
+      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
       </button>
       <div className="sw-sheet-eyebrow">{eyebrow}</div>
@@ -1078,7 +1364,7 @@ function endpointCard(eyebrow, ep) {
   if (!ep) return { eyebrow, label: '(unknown)', endpoint: null };
   const cat = ep.type === 'bible' && typeof bookCategory === 'function'
     ? bookCategory(ep.bookId)
-    : ep.type === 'study' ? 'Matthew Study Bible'
+    : ep.type === 'study' || ep.type === 'study-letter' || ep.type === 'study-chapter' ? 'Matthew Study Bible'
     : ep.collection || '';
   return {
     eyebrow,
@@ -1124,7 +1410,7 @@ function legendFor(colorMode) {
 function graphStats(graph, density) {
   let shown = 0;
   for (const b of graph.buckets) {
-    shown += density === 'essential' ? b.off20 : density === 'classic' ? b.off10 : b.len;
+    shown += density === 'essential' ? b.off20 : b.off10;
   }
   return { shown, total: graph.count };
 }
@@ -1135,9 +1421,64 @@ function endpointLabel(ep) {
   return ep.label || ep.key || '';
 }
 
+function curatedEndpoint(edge, node) {
+  if (edge.studyId) {
+    return {
+      type: 'study-letter', key: 'study:' + edge.studyId + ':' + edge.chapterId,
+      studyId: edge.studyId, studyChapterId: edge.chapterId,
+      screen: 'bible-study-chapter',
+      label: node.title, collection: 'Bible Studies',
+    };
+  }
+  if (edge.letterId) {
+    const screenByVolume = {
+      one: 'vot-one-letter', two: 'vot-letter', three: 'vot-three-letter',
+      four: 'vot-four-letter', five: 'vot-five-letter', six: 'vot-six-letter',
+      seven: 'vot-seven-letter', timothy: 'vot-timothy-letter', flock: 'vot-flock-letter',
+      rebuke: 'vot-rebuke-letter', hm: 'hm-letter',
+    };
+    return {
+      type: 'letter', key: 'letter:' + edge.letterId + ':0', letterId: edge.letterId,
+      screen: screenByVolume[edge.volKey] || 'vot-letter',
+      volKey: edge.volKey, collection: edge.volKey, label: node.title,
+    };
+  }
+  if (edge.entryId) {
+    const type = edge.volKey === 'blessed' ? 'blessed'
+      : edge.volKey === 'holydays' ? 'holy-days' : 'wtlb';
+    const screen = edge.volKey === 'blessed' ? 'blessed-entry'
+      : edge.volKey === 'holydays' ? 'holy-days-entry'
+      : edge.volKey === 'wtlb2' ? 'wtlb-two-entry' : 'wtlb-one-entry';
+    return {
+      type, key: 'wtlb:' + edge.entryId + ':0', entryId: edge.entryId,
+      screen,
+      volKey: edge.volKey, collection: edge.volKey, label: node.title,
+    };
+  }
+  return null;
+}
+
+function webLocation(g, cam, width, zoom) {
+  if (!(zoom >= 1.15)) return { title: 'The whole canon', range: '' };
+  const left = Math.max(0, Math.min(g.total - 1, Math.floor(xToVerse(cam, width, 0))));
+  const right = Math.max(0, Math.min(g.total - 1, Math.ceil(xToVerse(cam, width, width))));
+  const a = refOfVerse(g, left), b = refOfVerse(g, right);
+  if (a.chapterIndex === b.chapterIndex) {
+    return {
+      title: a.bookTitle + ' ' + a.chapter,
+      range: 'Verses ' + a.verse + (a.verse === b.verse ? '' : '–' + b.verse),
+    };
+  }
+  const center = refOfVerse(g, Math.max(0, Math.min(g.total - 1, Math.round(cam.x))));
+  return { title: center.bookTitle + ' ' + center.chapter, range: 'Visible ' + a.label + ' – ' + b.label };
+}
+
 function summaryOf(found) {
   if (found.kind === 'link') {
     return endpointLabel(found.source) + ' and ' + endpointLabel(found.target) + ', your link.';
+  }
+  if (found.kind === 'underlay') {
+    return found.source.label + ' and ' + endpointLabel(found.target) + ', corpus connection.';
   }
   if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
   if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';

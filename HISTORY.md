@@ -8,6 +8,18 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
 
+### 2026-08-12 s13 — Scripture Web interaction and UX uplift (working tree)
+
+The original Scripture Web exposed a 301k “Complete” candidate set that was visually noisy, expensive to draw, and difficult to understand or tap. The current runtime keeps the famous canonical tier at **63,418 links (votes >=7)**, with Essential at votes >=20; the obsolete Complete selector and its 300k surface are gone. The change is intentionally framed around the user's Jeremiah 6:16 request: stop and understand the way before adding more noise.
+
+**Canonical Web.** Dense crossings now retain up to four analytic candidates and open a chooser when a tap is ambiguous. The picker uses the same per-256 edge extents as the WebGL renderer, so hover/tap work does not scan irrelevant chunks at deep zoom. The context card continuously reports the current book/chapter and visible verse range, and **Go to** accepts a title, abbreviation, chapter, or verse (for example `Jer 6:16`). **Nearby** opens a keyboard-friendly list of the connections touching the current chapter, which makes the web usable without trying to land a fingertip on a one-pixel line.
+
+**My Web and navigation.** Personal links remain the first-class targets. Corpus underlay links now retain their source records and resolve to navigable study chapters, letters, or Volume entries; their detail cards say what they are instead of behaving like decoration. The detail, chooser, and nearby panels use focus restoration, 44px controls, explicit pressed/expanded state, live instructions, and a screen-reader help description.
+
+**Mobile and polish.** Hover work is rAF-throttled, tooltip placement is relative to the logical instrument viewport, and coarse-pointer portrait phones attempt landscape locking; when the browser cannot lock or falsely reports success, the web stays upright and shows a best-in-landscape hint. When rotation is active, overlays size against the landscape root rather than the physical portrait viewport. The Famous/Essential and colour controls are explicit selects, and the current location remains visible while zoomed so the user does not have to tap a line merely to learn which chapter is on screen.
+
+**Validation.** Targeted Scripture Web validation: 4 files / 84 tests. Final build and gates pass: 226 files / 4,185 tests, ESLint, typecheck, strict schema/data validation (63,418 cross-references + 2,098 curated edges), smoke-ci (0 crashes / 0 console errors / 0 resource 404s), bundle/artifact budgets, runtime assets, integrity, CSP, CSS tokens, type scale, and corpus version. `git diff --check` is clean aside from expected CRLF normalization warnings.
+
 ### 2026-08-11 s12 — "updates don't push": the cache was innocent
 
 **Owner report:** "no matter what whether PC Chrome, Explorer, or installed PWA on phone or regular android browser, caches stay stale and updates do not push correctly. We need a robust way to fix this decisively." Several prior attempts had gone at it as a caching bug.

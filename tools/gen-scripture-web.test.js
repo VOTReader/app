@@ -213,7 +213,7 @@ describe('bucket + density layout', () => {
   });
 
   it('exposes the density thresholds the UI advertises', () => {
-    expect(DENSITY_TIERS).toEqual([20, 10]);
+    expect(DENSITY_TIERS).toEqual([20, 7]);
     expect(SPAN_BUCKETS).toHaveLength(BUCKET_SEGMENTS.length);
   });
 });

@@ -36,7 +36,7 @@
  * }} ScriptureGraph
  */
 
-/** @typedef {'essential'|'classic'|'complete'} Density */
+/** @typedef {'essential'|'famous'} Density */
 
 /**
  * base64 → Uint8Array.
@@ -113,7 +113,7 @@ export function decodeGraph(data) {
     books: data.books,
     chapters: data.chapters,
     chapterOfVerse,
-    densityTiers: data.densityTiers || [20, 10],
+    densityTiers: data.densityTiers || [20, 7],
     attribution: data.attribution || '',
     votEdges: data.votEdges || [],
     prophecy: data.prophecy || [],
@@ -130,8 +130,7 @@ export function decodeGraph(data) {
  */
 export function bucketDrawCount(bucket, density) {
   if (density === 'essential') return bucket.off20;
-  if (density === 'classic') return bucket.off10;
-  return bucket.len;
+  return bucket.off10;
 }
 
 /**
@@ -140,8 +139,7 @@ export function bucketDrawCount(bucket, density) {
  * @param {number[]} [tiers]
  */
 export function minVotesFor(density, tiers) {
-  const t = tiers || [20, 10];
+  const t = tiers || [20, 7];
   if (density === 'essential') return t[0];
-  if (density === 'classic') return t[1];
-  return -Infinity;
+  return t[1];
 }

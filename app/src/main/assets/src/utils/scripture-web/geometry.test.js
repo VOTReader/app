@@ -12,11 +12,11 @@ import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH,
   localizeFactor, squashFactor, arcRadiusY, arcRadiusGLSL, arcDistance,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
-  rotatePointer, additiveAlphaScale,
+  rotatePointer,
 } from './geometry.js';
 import {
-  pickArc, arcsTouching, countTouching, pickChapter, pickVerse,
-  refOfVerse, chapterRange,
+  pickArc, pickArcs, arcsTouching, countTouching, pickChapter, pickVerse,
+  refOfVerse, chapterRange, findWebReference,
 } from './pick.js';
 import { deltaRuns, bucketDrawCount, minVotesFor, base64ToBytes, decodeGraph } from './decode.js';
 
@@ -33,20 +33,20 @@ function makeGraph(pairs) {
   pairs.forEach((p, i) => { from[i] = p[0]; to[i] = p[1]; votes[i] = p[2] == null ? 30 : p[2]; });
   // one bucket holding everything; tier offsets follow the votes given
   const off20 = pairs.filter((p) => (p[2] == null ? 30 : p[2]) >= 20).length;
-  const off10 = pairs.filter((p) => (p[2] == null ? 30 : p[2]) >= 10).length;
+  const off10 = pairs.filter((p) => (p[2] == null ? 30 : p[2]) >= 7).length;
   return {
     total, count: n, from, to, votes,
     buckets: [{ off: 0, len: n, off20, off10, segments: 32, chunks: [] }],
     books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 },
             { id: 'beta', title: 'Beta', abbr: 'Bet', start: 20 }],
-    chapters, chapterOfVerse, densityTiers: [20, 10],
+  chapters, chapterOfVerse, densityTiers: [20, 7],
     attribution: 'OpenBible.info (CC-BY)', votEdges: [], prophecy: [], votLinks: [],
   };
 }
 
 const VIEW = (over) => Object.assign({
   width: 1000, height: 600, base: 520, ceil: 480, localize: 0,
-  squash: squashFactor(480, 1000), density: 'complete', rulerDepth: 40,
+  squash: squashFactor(480, 1000), density: 'famous', rulerDepth: 40,
 }, over);
 
 /** A point exactly ON an arc, at parameter t (0 = left foot, 1 = right foot). */
@@ -111,36 +111,6 @@ describe('height law', () => {
     expect(arcRadiusGLSL).toContain(String(CEIL_SOFTNESS));
     expect(arcRadiusGLSL).toContain('tanh');
     expect(arcRadiusGLSL).toContain('mix(semi, capped, localize)');
-  });
-});
-
-describe('additiveAlphaScale — the exposure budget', () => {
-  it('leaves the desktop-verified Complete rendering untouched', () => {
-    // 301,539 arcs, 2px strokes, 2,500px-tall canvas — the rendering that was
-    // matched against the source image. Budget boundary; scale ≈ 1.
-    expect(additiveAlphaScale(301539, 2, 2500)).toBeGreaterThan(0.97);
-  });
-
-  it('meters Complete DOWN on a phone instead of letting it bloom', () => {
-    // Pixel 9 Pro rotated: ~1,176 device px tall, 2.1px strokes. Same arcs,
-    // a third of the pixels — the neon-blob report. Roughly half exposure.
-    const scale = additiveAlphaScale(301539, 2.1, 1176);
-    expect(scale).toBeGreaterThan(0.35);
-    expect(scale).toBeLessThan(0.55);
-  });
-
-  it('never touches Classic on any screen', () => {
-    expect(additiveAlphaScale(38892, 2, 2500)).toBe(1);
-    expect(additiveAlphaScale(38892, 2.1, 1176)).toBe(1);
-  });
-
-  it('only ever dims — never brightens past the base alpha', () => {
-    for (const n of [10, 1000, 500000]) {
-      const v = additiveAlphaScale(n, 3, 800);
-      expect(v).toBeGreaterThan(0);
-      expect(v).toBeLessThanOrEqual(1);
-    }
-    expect(additiveAlphaScale(0, 2, 1000)).toBe(1);   // nothing drawn yet
   });
 });
 
@@ -300,6 +270,41 @@ describe('pickArc agrees with the drawn curve', () => {
     }
   });
 
+  it('keeps the Famous cutoff itself tappable', () => {
+    const famous = makeGraph([[6, 33, 7]]);
+    const cam = createCamera(famous.total);
+    clampCamera(cam, 1000, 5000);
+    for (const localize of [0, localizeFactor(40), 1]) {
+      const view = VIEW({ density: 'famous', localize });
+      for (const t of [0.08, 0.5, 0.92]) {
+        const [px, py] = pointOnArc(famous, cam, view, 0, t);
+        const hit = pickArc(famous, cam, view, px, py, 6);
+        expect(hit, `Famous arc at localize=${localize}, t=${t}`).toMatchObject({ index: 0 });
+      }
+    }
+  });
+
+  it('returns overlapping candidates instead of hiding the second line', () => {
+    const overlap = makeGraph([[2, 38], [2, 38]]);
+    const cam = createCamera(overlap.total);
+    clampCamera(cam, 1000, 5000);
+    const view = VIEW();
+    const [px, py] = pointOnArc(overlap, cam, view, 0, 0.5);
+    expect(pickArcs(overlap, cam, view, px, py, 8, 4).map((hit) => hit.index))
+      .toEqual([0, 1]);
+  });
+
+  it('keeps chunk-culling consistent with the renderer', () => {
+    const chunked = makeGraph([[2, 8], [5, 35], [12, 18], [0, 39], [21, 29]]);
+    chunked.chunkSize = 2;
+    chunked.buckets[0].chunks = [[2, 35], [0, 39], [21, 29]];
+    const cam = createCamera(chunked.total);
+    clampCamera(cam, 1000, 5000);
+    const view = VIEW();
+    const [px, py] = pointOnArc(chunked, cam, view, 3, 0.5);
+    expect(pickArc(chunked, cam, view, px, py, 6)).toMatchObject({ index: 3 });
+  });
+
   it('returns null on empty sky', () => {
     const cam = createCamera(g.total);
     clampCamera(cam, 1000, 5000);
@@ -307,8 +312,8 @@ describe('pickArc agrees with the drawn curve', () => {
   });
 
   it('will not pick an arc the density filter has hidden', () => {
-    // A weak arc is drawn only at 'complete'; it must be untappable otherwise,
-    // or the user hits something they cannot see.
+    // The shipped web stops at Famous (votes >= 7); weaker rows must stay
+    // untappable, or the user hits something they cannot see.
     const weak = makeGraph([[0, 39, 50], [2, 8, 1]]);
     const cam = createCamera(weak.total);
     clampCamera(cam, 1000, 5000);
@@ -317,8 +322,7 @@ describe('pickArc agrees with the drawn curve', () => {
       const [px, py] = pointOnArc(weak, cam, view, 1, 0.5);
       return pickArc(weak, cam, view, px, py, 5);
     };
-    expect(at('complete')).not.toBeNull();
-    expect(at('classic')).toBeNull();
+    expect(at('famous')).toBeNull();
     expect(at('essential')).toBeNull();
   });
 });
@@ -328,13 +332,13 @@ describe('focus + ruler picking', () => {
 
   it('collects every arc touching a verse range', () => {
     const [lo, hi] = chapterRange(g, 0);            // verses 0..9
-    const idx = arcsTouching(g, lo, hi, 'complete');
+    const idx = arcsTouching(g, lo, hi, 'famous');
     expect(idx).toEqual([0, 1, 3]);
-    expect(countTouching(g, lo, hi, 'complete')).toBe(3);
+    expect(countTouching(g, lo, hi, 'famous')).toBe(3);
   });
 
   it('honours the limit', () => {
-    expect(arcsTouching(g, 0, 39, 'complete', 2)).toHaveLength(2);
+    expect(arcsTouching(g, 0, 39, 'famous', 2)).toHaveLength(2);
   });
 
   it('reads a chapter off the ruler strip and rejects the sky', () => {
@@ -361,6 +365,17 @@ describe('focus + ruler picking', () => {
     expect(refOfVerse(g, 39)).toMatchObject({ bookId: 'beta', chapter: 2, verse: 10 });
   });
 
+  it('resolves title and abbreviation references for Go to', () => {
+    expect(findWebReference(g, 'Alp 1:3')).toMatchObject({
+      chapterIndex: 0, verse: 2, hasVerse: true, label: 'Alpha 1:3',
+    });
+    expect(findWebReference(g, 'Beta 2')).toMatchObject({
+      chapterIndex: 3, verse: 30, hasVerse: false, label: 'Beta 2',
+    });
+    expect(findWebReference(g, 'Beta 2:99')).toBeNull();
+    expect(findWebReference(g, 'Nope 1')).toBeNull();
+  });
+
   it('reports chapter ranges inclusively', () => {
     expect(chapterRange(g, 0)).toEqual([0, 9]);
     expect(chapterRange(g, 3)).toEqual([30, 39]);
@@ -379,11 +394,9 @@ describe('decode', () => {
   it('maps density names to prefix counts and vote floors', () => {
     const b = { off: 0, len: 100, off20: 10, off10: 40, segments: 16, chunks: [] };
     expect(bucketDrawCount(b, 'essential')).toBe(10);
-    expect(bucketDrawCount(b, 'classic')).toBe(40);
-    expect(bucketDrawCount(b, 'complete')).toBe(100);
-    expect(minVotesFor('essential', [20, 10])).toBe(20);
-    expect(minVotesFor('classic', [20, 10])).toBe(10);
-    expect(minVotesFor('complete', [20, 10])).toBe(-Infinity);
+    expect(bucketDrawCount(b, 'famous')).toBe(40);
+    expect(minVotesFor('essential', [20, 7])).toBe(20);
+    expect(minVotesFor('famous', [20, 7])).toBe(7);
   });
 
   it('decodes base64 to bytes', () => {
@@ -409,7 +422,7 @@ describe('decode', () => {
       buckets: [{ off: 0, len: 4, off20: 2, off10: 4, segments: 8, chunks: [] }],
       books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 }],
       chapters: [[0, 1, 0, 40]],
-      densityTiers: [20, 10],
+      densityTiers: [20, 7],
       attribution: 'OpenBible.info (CC-BY)',
     };
     const g = decodeGraph(data);

@@ -2,7 +2,7 @@
    scripture-web/palette — Cluster F (esbuild bundle-f.js)
 
    Colour in this view always ENCODES something. Three modes, each answering
-   a different question about the same 301,539 connections:
+   a different question about the same ~64,000 shipped connections:
 
      distance   — how far apart in the canon the two ends sit. This is the
                   original Harrison/Römhild reading and the reason the whole

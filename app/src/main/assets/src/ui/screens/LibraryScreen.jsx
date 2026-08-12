@@ -154,7 +154,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     },
     'scripture-web': {
       id: 'scripture-web', eyebrow: 'The Whole Counsel', title: 'Scripture Web',
-      detail: '301,539 cross-references',
+      detail: '63,418 cross-references',
       guide: null,
       onClick: onOpenScriptureWeb,
       icon: (

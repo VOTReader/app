@@ -68,8 +68,8 @@ export const CANON_ABBREVS = [
 export const SPAN_BUCKETS = [50, 500, 5000, Infinity];
 /** Per-bucket ribbon segment counts (short arcs need few segments). */
 export const BUCKET_SEGMENTS = [8, 16, 32, 48];
-/** Density thresholds: Essential = votes >= 20, Classic = votes >= 10. */
-export const DENSITY_TIERS = [20, 10];
+/** Density thresholds: Essential = votes >= 20, Famous = votes >= 7. */
+export const DENSITY_TIERS = [20, 7];
 /** Instances per culling chunk (extents recorded per chunk). */
 export const CHUNK_SIZE = 256;
 
@@ -190,7 +190,7 @@ export function bucketOf(a, b) {
 
 /**
  * Order pairs into the baked LOD/density layout:
- *   bucket asc → density tier (>=20, >=10, rest) → min verse asc.
+ *   bucket asc → density tier (>=20, >=7) → min verse asc.
  * Returns typed arrays plus per-bucket metadata: [off, len, off20, off10,
  * segments] where off20/off10 are counts (draw [off, off+off20) etc.), and
  * per-CHUNK_SIZE extents [minA, maxB] for viewport culling.
