@@ -40,8 +40,11 @@ updates:
       prefix: "chore(deps)"
     groups:
       # Patch/minor land as one PR. Majors are deliberately excluded from the
-      # group so each arrives alone and gets judged on its own — eslint 10,
-      # jsdom 30 and typescript 7 were all declined on 2026-07-30 as churn.
+      # group so each arrives alone and gets judged on its own. That has worked:
+      # jsdom 30 and typescript 7 were declined on 2026-07-30 as churn and then
+      # ADOPTED on 2026-08-04 once they were worth it. eslint 10 is the one that
+      # never could be — see the ignore block below; it is blocked upstream by a
+      # peer cap, not by taste.
       dev-minor:
         patterns:
           - "*"
@@ -53,4 +56,34 @@ updates:
       # Permanent Rule 6, and a major could change output for the WebView
       # floor. Patch/minor still flow through the group above.
       - dependency-name: esbuild
+        update-types: ["version-update:semver-major"]
+
+      # ── eslint 10: BLOCKED UPSTREAM, not declined (2026-08-11) ──
+      # eslint-plugin-react's newest published release (7.37.5, and it IS the
+      # latest — the `next` tag points at 7.8.0-rc.0, an OLDER prerelease that
+      # peers on eslint ^3||^4) caps its eslint peer at:
+      #     ^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9.7
+      # so `npm ci` fails ERESOLVE on eslint 10 and the PR cannot go green. It had
+      # been reopened weekly and sitting red ever since, which trains everyone to
+      # ignore a red check — the one signal that has to stay meaningful.
+      #
+      # Ignoring the MAJOR only. eslint 9 patch/minor still flow through the
+      # dev-minor group above, so the linter keeps getting fixes.
+      #
+      # NOT a policy judgement about eslint 10, and NOT worked around: forcing it
+      # with npm `overrides` would install a combination the plugin's maintainers
+      # have not validated, and this repo's lint gate is zero-warning and
+      # load-bearing (500+ generated globals, 59 documented exhaustive-deps
+      # exceptions). A silently mis-firing rule is worse than an old linter.
+      #
+      # UNBLOCK CONDITION, so this does not rot: eslint-plugin-react publishes a
+      # release whose eslint peer range includes ^10. Check with
+      #     npm view eslint-plugin-react peerDependencies.eslint
+      # then delete these two entries and let the PR return. eslint-plugin-react-hooks
+      # is already there (7.1.1 peers on ^10), so react is the only blocker left.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # @eslint/js ships in lockstep with eslint, so a lone 10.x bump here hits the
+      # same ERESOLVE from the other side (that was PR #4).
+      - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
