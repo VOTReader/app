@@ -45,7 +45,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.7",
     "esbuild": "^0.28.0",
-    "eslint": "^9.39.4",
+    "eslint": "^10.8.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
