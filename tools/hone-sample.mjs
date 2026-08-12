@@ -98,10 +98,16 @@ const nParts = Math.max(
 const count = (pred) => shipped.filter(pred).length;
 const nConf = count((r) => !r.status || r.status === 'CONFIRMED');
 const nProbed = count((r) => r.status && String(r.status).startsWith('PROBED'));
-const nReview = count((r) => r.status === 'REVIEW') + (rows.size ? rows.size - shipped.length : 0);
+const nUnspoken = [...rows.values()].filter((r) => r.status === 'UNSPOKEN').length;
+const nReview = count((r) => r.status === 'REVIEW')
+  + (rows.size ? rows.size - shipped.length - nUnspoken : 0);
 const nInterp = count((r) => r.interpolated);
 
 function classFor(r) {
+  // UNSPOKEN: the recording verifiably does not contain these words (e.g. a
+  // rendition skipping "Thus says The Lord:"). Plain text — not a QA flag,
+  // exactly as the app renders it (owner call 2026-08-10).
+  if (r && r.status === 'UNSPOKEN') return 'frag unspoken';
   if (!r || r.ship_t == null) return 'frag miss';
   let c = 'frag';
   const st = r.status;
@@ -239,7 +245,8 @@ if (letter.from) metaBits.push(esc(letter.from));
 if (letter.date) metaBits.push(esc(letter.date));
 if (hone.coverage != null) metaBits.push('coverage ' + hone.coverage);
 metaBits.push((hone.shipped != null ? hone.shipped : shipped.length) + '/' + (hone.fragments != null ? hone.fragments : frags.length) + ' fragments timed');
-if (hasStatus) metaBits.push(nConf + ' confirmed · ' + nProbed + ' probed · ' + nReview + ' review');
+if (hasStatus) metaBits.push(nConf + ' confirmed · ' + nProbed + ' probed · ' + nReview + ' review'
+  + (nUnspoken ? ' · ' + nUnspoken + ' not in this recording' : ''));
 if (nInterp) metaBits.push(nInterp + ' interpolated');
 if (hone.settings && hone.settings.model) metaBits.push('model ' + esc(hone.settings.model));
 

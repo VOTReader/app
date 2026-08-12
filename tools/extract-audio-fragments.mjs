@@ -103,6 +103,24 @@ function formatAFragments(letter) {
           }
         }
       }
+      // Alpha-less fragments (footnote-marker digits like "12" stranded after a
+      // sentence's closing period) must never highlight solo — merge each into
+      // its predecessor's span (owner rule: numbers ride with their sentence).
+      for (let i = out.length - 1; i >= 0; i--) {
+        const f = out[i];
+        if (/[a-zA-Z]/.test(f.text)) continue;
+        if (i > 0 && f.bi === out[i - 1].bi) {
+          out[i - 1].ce = f.ce;                    // fold back onto its sentence
+          out[i - 1].text += f.text;
+          out.splice(i, 1);
+        } else if (i + 1 < out.length && f.bi === out[i + 1].bi) {
+          out[i + 1].cs = f.cs;                    // block-leading digit: fold forward
+          out[i + 1].text = f.text + out[i + 1].text;
+          out.splice(i, 1);
+        } else {
+          out.splice(i, 1);                        // digit alone in its block: unspoken, drop
+        }
+      }
     } else if (b.type === 'poetry') {
       let pos = 0;
       const push = (lt) => {

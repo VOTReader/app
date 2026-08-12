@@ -511,14 +511,15 @@ def probe(wav_path, t, expect_text, s, whisper_leg):
     if not want:
         return False, heard[:8]
     hi = matched = content_matched = 0
-    for w in want:                       # in-order fuzzy prefix match
-        while hi < len(heard) and not tok_match(heard[hi], w):
-            hi += 1
-        if hi < len(heard):
+    for w in want:                       # in-order fuzzy match, NON-CONSUMING on a miss:
+        j = hi                           # one misheard word ("yet"->"get") must cost one
+        while j < len(heard) and not tok_match(heard[j], w):
+            j += 1                       # token, not exhaust the scan for all that follow
+        if j < len(heard):
             matched += 1
             if len(w) >= 4:
                 content_matched += 1
-            hi += 1
+            hi = j + 1
     content_have = sum(1 for w in want if len(w) >= 4)
     content_ok = content_matched >= min(2, content_have) if content_have else True
     return (matched >= max(2, len(want) - 2)) and content_ok, heard[:12]
@@ -596,13 +597,19 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
                                if rows[j].get("t") is not None), None)
                 # probeMisses: what each rejected candidate actually heard —
                 # REVIEW rows must be diagnosable at corpus scale without reruns.
-                row.update(t=None, status="REVIEW", prevAnchor=prev_t,
-                           probeMisses=misses)
+                # UNSPOKEN vs REVIEW: when whisper found essentially none of the
+                # unit's words anywhere in the recording (a rendition skipping
+                # "Thus says The Lord:", a production dropping a line), the text
+                # is not misaligned — it is not in the audio. Terminal, never
+                # painted, never interpolated, and not a QA flag.
+                unspoken = b_ratio < 0.3
+                row.update(t=None, status="UNSPOKEN" if unspoken else "REVIEW",
+                           prevAnchor=prev_t, probeMisses=misses)
         rows.append(row)
 
     if s.get("interpolate_missing", True):
         for i, r in enumerate(rows):
-            if r.get("t") is not None:
+            if r.get("t") is not None or r.get("status") == "UNSPOKEN":
                 continue
             prev_t = next((rows[j]["t"] for j in range(i - 1, -1, -1)
                            if rows[j].get("t") is not None and not rows[j].get("interpolated")), None)
