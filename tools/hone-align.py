@@ -356,12 +356,26 @@ def run_belt(key, s, asset=None):
                 row["clamped"] = True
             row["ship_t"] = t
             last_t = t
-            tuples.append([t, f["bi"], f["cs"], f["ce"], row["part"]] if fmt == "A"
-                          else [t, f["pi"], -1, -1, row["part"]])
+            # Interpolated REVIEW guesses are QA-visible but NEVER shipped —
+            # the app paints only belt-proven onsets (owner: no wrong highlight;
+            # a skipped clause just doesn't paint until the next proven one).
+            if not row.get("interpolated"):
+                tuples.append([t, f["bi"], f["cs"], f["ce"], row["part"]] if fmt == "A"
+                              else [t, f["pi"], -1, -1, row["part"]])
         results.append(row)
 
-    tok_tot = sum(r["tokens"] for r in results)
+    # COVERAGE MEASURES THE ALIGNMENT, NOT THE PAGE. Units proven absent from
+    # the recording (UNSPOKEN — internal Addendum headers, renditions that skip
+    # a line) leave the denominator: counting printed-but-unspoken text against
+    # the aligner sank a perfect Volume One letter to 0.894. `unspokenShare`
+    # rides along so a degenerate run (bad transcript ⇒ everything "unspoken"
+    # ⇒ coverage 1.0) is visible instead of flattering.
+    tok_all = sum(r["tokens"] for r in results)
+    tok_unspoken = sum(r["tokens"] for r in results if r["status"] == "UNSPOKEN")
+    tok_tot = tok_all - tok_unspoken
     cov = sum(r["hit"] for r in results) / max(1, tok_tot)
+    cov_all = sum(r["hit"] for r in results) / max(1, tok_all)
+    unspoken_share = round(tok_unspoken / max(1, tok_all), 3)
     n_conf = sum(1 for r in results if r["status"] == "CONFIRMED")
     n_probed = sum(1 for r in results if str(r["status"]).startswith("PROBED"))
     n_review = sum(1 for r in results if r["status"] == "REVIEW")
@@ -370,7 +384,8 @@ def run_belt(key, s, asset=None):
     out = {"key": key, "asset": (tracks[0][0] if asset else None), "rendition": rend,
            "family": s["family"], "model": s["whisper_model"],
            "settings_hash": al.settings_hash(s), "settings": s,
-           "coverage": round(cov, 3), "fragments": n, "shipped": len(tuples),
+           "coverage": round(cov, 3), "coverageAll": round(cov_all, 3),
+           "unspokenShare": unspoken_share, "fragments": n, "shipped": len(tuples),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
            "parts": part_rows, "results": results, "tuples": tuples}
     os.makedirs(HONE, exist_ok=True)
