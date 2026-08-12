@@ -94,10 +94,15 @@ def ascii_fold(s):
 
 
 def spoken_words(text):
-    """MMS-domain spoken tokens: a-z + apostrophe (digit tokens kept, see module doc)."""
+    """MMS-domain spoken tokens: a-z + apostrophe (digit tokens kept, see module doc).
+
+    Punctuation SPLITS, never fuses: Format A fragments join segments without a
+    space ("Thus says The Lord:Beloved, ..."), and the old strip-inward rule
+    minted phantom tokens ("lordbeloved") that no transcript could ever match —
+    both dotted first sentences of 2026-08-10 trace to exactly this."""
     out = []
-    for w in ascii_fold(_WORD_SPLIT.sub(" ", str(text))).split():
-        t = re.sub(r"[^A-Za-z0-9']", "", w).lower().strip("'")
+    for t in re.split(r"[^A-Za-z0-9']+", ascii_fold(str(text)).lower()):
+        t = t.strip("'")
         if t:
             out.append(t)
     return out
@@ -563,7 +568,10 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
         if k:
             row["skippedPrefix"] = " ".join(toks[:k])
         expect = " ".join(toks[k:]) or str(u.get("text") or "")
-        if tA is not None and tB is not None and abs(tA - tB) <= s["agree_sec"]:
+        if tA is not None and tB is not None and abs(tA - tB) <= s["agree_sec"] + 1e-6:
+            # +1e-6: float epsilon. Two openers (roaring-lions, a-rare-bundle)
+            # had legs exactly 0.60 apart and 0.6000000000000014 > 0.6 sent a
+            # perfect stamp to probe-then-REVIEW — a dotted first sentence.
             # min(): wide-window ground truth (2026-08-10) showed max() adopts
             # whisper's LATE stamps on clean speech; MMS-side min stays on the
             # syllable, and silence-snap already corrects pause smear.
@@ -571,6 +579,7 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
                        delta=round(abs(tA - tB), 2), tEnd=la["tEnd"])
         else:
             picked = None
+            misses = []
             for cand, tag in ((tA, "PROBED_A"), (tB, "PROBED_B")):
                 if cand is None:
                     continue
@@ -578,13 +587,17 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
                 if ok:
                     picked = (cand, tag, heard)
                     break
+                misses.append({"t": cand, "heard": " ".join(heard)})
             if picked:
                 row.update(t=round(picked[0], 2), status=picked[1],
                            probe=" ".join(picked[2]), tEnd=(la or lb)["tEnd"])
             else:
                 prev_t = next((rows[j]["t"] for j in range(len(rows) - 1, -1, -1)
                                if rows[j].get("t") is not None), None)
-                row.update(t=None, status="REVIEW", prevAnchor=prev_t)
+                # probeMisses: what each rejected candidate actually heard —
+                # REVIEW rows must be diagnosable at corpus scale without reruns.
+                row.update(t=None, status="REVIEW", prevAnchor=prev_t,
+                           probeMisses=misses)
         rows.append(row)
 
     if s.get("interpolate_missing", True):

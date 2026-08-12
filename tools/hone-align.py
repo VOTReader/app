@@ -286,7 +286,14 @@ def run_belt(key, s, asset=None):
         hit_here = [u["owner"] for u in units if ratio[u["owner"]] >= s["min_frag_hit"]]
         for fi in hit_here:
             cleared.setdefault(fi, []).append(part)
-        last_ok = max(hit_here) if hit_here else None
+        # Consumption boundary = end of the last DENSE run (3 consecutive
+        # clearing fragments), not the last stray match: clause-level fragments
+        # are short enough to spuriously clear against echoed text, and one
+        # stray after the true boundary drags every fragment in between into
+        # the wrong part's audio (obey-god lost fi 61-74 to exactly this).
+        hit_set = set(hit_here)
+        dense = [fi for fi in hit_here if fi - 1 in hit_set and fi - 2 in hit_set]
+        last_ok = max(dense) if dense else (max(hit_here) if hit_here else None)
         is_last = part == len(tracks) - 1
         limit = (n - 1) if is_last else (last_ok if last_ok is not None else cursor - 1)
         for row, u in zip(rows, units):
@@ -336,7 +343,8 @@ def run_belt(key, s, asset=None):
         if r:
             for k in ("hit", "tokens", "ratio", "status", "tA", "tB", "t", "tEnd",
                       "score", "part", "delta", "probe", "prevAnchor", "skippedPrefix",
-                      "interpolated", "clamped", "contested"):
+                      "interpolated", "clamped", "contested", "contestResolved",
+                      "probeMisses", "snapped_from"):
                 if k in r:
                     row[k] = r[k]
         if row["t"] is not None and toks[fi]:

@@ -47,6 +47,47 @@ const B_COLS = { wtlb1: ctx.WTLB_ONE, wtlb2: ctx.WTLB_TWO, blessed: ctx.THE_BLES
 
 const segText = (s) => (!s || s.t === 'stanza-break') ? '' : String(s.v == null ? '' : s.v);
 
+// A sentence longer than this many tokens is sub-split at clause boundaries
+// ("; " / ": " / " — ") so the highlight tracks one thought at a time — VOT's
+// poetic prose chains 30-50-token cascades that otherwise paint a 3-line
+// block (owner report 2026-08-10). Split points never fall below 3 tokens a
+// side, so "Jesus wept."-scale units are unaffected.
+const CLAUSE_SPLIT_TOKENS = 12;
+
+function clauseSplit(text, base) {
+  const toks = (t) => t.split(/\s+/).filter(Boolean).length;
+  if (toks(text) <= CLAUSE_SPLIT_TOKENS) return [{ cs: base, ce: base + text.length, text }];
+  // Boundary strength 1: "; " / ": " / em-dash. Strength 2 (only while a piece
+  // is still over budget): ", " before a clause-opening conjunction — VOT's
+  // cascades chain with ", until" / ", and" / ", that", not semicolons.
+  const CONJ = /^(?:until|and|that|for|so|then|yet|nor|but|who|which|when|even|behold|lest)\b/i;
+  const pieces = [];
+  const splitAt = (t0, b0, re, guard) => {
+    const out = [];
+    let start = 0;
+    let m;
+    while ((m = re.exec(t0)) !== null) {
+      const cut = m.index + m[0].length;
+      if (guard && !CONJ.test(t0.slice(cut))) continue;
+      const left = t0.slice(start, cut).replace(/\s+$/, '');
+      if (toks(left) >= 3 && toks(t0.slice(cut)) >= 3) {
+        out.push({ cs: b0 + start, ce: b0 + start + left.length, text: left });
+        start = cut;
+      }
+    }
+    out.push({ cs: b0 + start, ce: b0 + t0.length, text: t0.slice(start) });
+    return out;
+  };
+  for (const p of splitAt(text, base, /(?:;\s+|:\s+| — |—\s+)/g, false)) {
+    if (toks(p.text) > CLAUSE_SPLIT_TOKENS) {
+      pieces.push(...splitAt(p.text, p.cs, /,\s+/g, true));
+    } else {
+      pieces.push(p);
+    }
+  }
+  return pieces;
+}
+
 function formatAFragments(letter) {
   const out = [];
   (letter.blocks || []).forEach((b, bi) => {
@@ -56,7 +97,11 @@ function formatAFragments(letter) {
       let m;
       while ((m = re.exec(text)) !== null) {
         const trimmed = m[0].replace(/\s+$/, '');
-        if (trimmed.trim().length >= 2) out.push({ bi, cs: m.index, ce: m.index + trimmed.length, text: trimmed });
+        if (trimmed.trim().length >= 2) {
+          for (const piece of clauseSplit(trimmed, m.index)) {
+            if (piece.text.trim().length >= 2) out.push({ bi, cs: piece.cs, ce: piece.ce, text: piece.text });
+          }
+        }
       }
     } else if (b.type === 'poetry') {
       let pos = 0;
