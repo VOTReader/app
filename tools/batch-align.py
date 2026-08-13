@@ -49,14 +49,20 @@ def belt_path(key, asset=None):
     return os.path.join(HONE, f"{safe}.large-v3.json")
 
 
-def is_current(path, want_hash):
+def is_current(path, want_hash, want_frag_hash):
+    """A belt is reusable only when EVERY input still matches: the settings AND
+    the fragment domain it was aligned against. Settings alone was not enough —
+    the 2026-08-12 DOM-offset fix changed offsets without touching settings, so
+    a 'resume' silently replayed timings addressed to the old character
+    positions and shipped them. Belts without the field predate it: recompute."""
     if not os.path.exists(path):
         return False
     try:
         d = json.load(open(path, encoding="utf-8"))
     except ValueError:
         return False
-    return d.get("settings_hash") == want_hash
+    return (d.get("settings_hash") == want_hash
+            and d.get("fragmentsHash") == want_frag_hash)
 
 
 def metrics(d):
@@ -105,7 +111,8 @@ def main():
             jobs.append((assets[0][0], belt_path(key, assets[0][0])))
         for asset, path in jobs:
             label = key + (f"@{asset}" if asset else "")
-            if not a.force and is_current(path, want_hash):
+            frag_hash = ha.fragments_hash(ha.fragments_for(key)[0])
+            if not a.force and is_current(path, want_hash, frag_hash):
                 d = json.load(open(path, encoding="utf-8"))
             else:
                 try:

@@ -50,8 +50,10 @@ export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetter
     // a non-whitespace character and this segment starts with a word char, opening
     // paren/bracket, or opening quote. Avoids false positives before trailing
     // punctuation (commas, periods, etc.) that the fetch script split into segments.
-    const prevV = i > 0 ? segments[i - 1].v || '' : '';
-    const v = seg.v && /^[\w([{"\u201c\u2018]/.test(seg.v) && /\S$/.test(prevV) ? ' ' + seg.v : seg.v || '';
+    // Lives in utils/segment-dom-text.js because the read-along extractor has to
+    // measure the SAME text domain \u2014 see that file's header for the drift this
+    // sharing exists to prevent.
+    const v = segmentRenderText(segments, i);
     if (seg.t === "bold-italic") return <React.Fragment key={i}>{renderTextWithScripRefs(v, "bold-italic", onScripClick, highlightText)}</React.Fragment>;
     if (seg.t === "italic") return <React.Fragment key={i}>{renderTextWithScripRefs(v, "italic-text", onScripClick, highlightText)}</React.Fragment>;
     if (seg.t === "caps") return <span key={i} style={{ fontWeight: 600, letterSpacing: '0.03em' }}>{v}</span>;

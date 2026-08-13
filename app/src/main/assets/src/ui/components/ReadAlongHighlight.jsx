@@ -210,6 +210,88 @@ export function rangeIn(el, cs, ce) {
 }
 
 /**
+ * The inverse of `rangeIn`: a (text node, offset) pair back to the block's
+ * textContent offset — the domain the timings address. Same TreeWalker, same
+ * order, so tap-to-seek and paint can never disagree about where a character is.
+ *
+ * @param {any} el block element carrying data-hl-key
+ * @param {any} node text node inside it
+ * @param {number} nodeOffset
+ * @returns {number} -1 when the node is not under this block
+ */
+export function offsetIn(el, node, nodeOffset) {
+  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  let n;
+  while ((n = walker.nextNode())) {
+    if (n === node) return pos + nodeOffset;
+    pos += n.nodeValue.length;
+  }
+  return -1;
+}
+
+/**
+ * The caret (text node + offset) under a viewport point, across both spellings
+ * of the API. `caretPositionFromPoint` is the standard; Blink shipped
+ * `caretRangeFromPoint` first and it is what the WebView floor (chrome108)
+ * actually has, so neither may be assumed (Permanent Rule 6 — feature-detect,
+ * never a target bump).
+ *
+ * @param {any} doc
+ * @param {number} x
+ * @param {number} y
+ * @returns {{ node: any, offset: number } | null}
+ */
+export function caretAt(doc, x, y) {
+  try {
+    if (typeof doc.caretPositionFromPoint === 'function') {
+      const p = doc.caretPositionFromPoint(x, y);
+      return p && p.offsetNode ? { node: p.offsetNode, offset: p.offset } : null;
+    }
+    if (typeof doc.caretRangeFromPoint === 'function') {
+      const r = doc.caretRangeFromPoint(x, y);
+      return r ? { node: r.startContainer, offset: r.startOffset } : null;
+    }
+  } catch (_e) { /* detached document / hostile embed */ }
+  return null;
+}
+
+/**
+ * Which shipped fragment owns the text under this point — the tap target for
+ * seek-to-here. Returns -1 when the point is not on timed text (an untimed
+ * block, chrome, or a gap between fragments with nothing before it).
+ *
+ * @param {Array<any>} frags
+ * @param {any} mainEl
+ * @param {string} letterId
+ * @param {(id: string, bi: number) => string} hlKeyFn
+ * @param {number} x
+ * @param {number} y
+ * @returns {number}
+ */
+export function fragmentAtPoint(frags, mainEl, letterId, hlKeyFn, x, y) {
+  const caret = caretAt(mainEl.ownerDocument, x, y);
+  if (!caret || !caret.node) return -1;
+  const host = caret.node.nodeType === 3 ? caret.node.parentElement : caret.node;
+  const blockEl = host && host.closest ? host.closest('[data-hl-key]') : null;
+  if (!blockEl || !mainEl.contains(blockEl)) return -1;
+  const hlKey = blockEl.getAttribute('data-hl-key');
+  const off = offsetIn(blockEl, caret.node, caret.offset);
+  if (off < 0) return -1;
+  let best = -1;
+  for (let i = 0; i < frags.length; i++) {
+    const [, bi, cs, ce] = frags[i];
+    if (hlKeyFn(letterId, bi) !== hlKey) continue;
+    // Format-B sentinel: the whole block is one fragment.
+    if (ce === -1) return i;
+    if (off >= cs && off < ce) return i;
+    if (cs <= off) best = i;          // gap between clauses: the one just before
+    else if (best < 0) best = i;      // tapped ahead of the block's first clause
+  }
+  return best;
+}
+
+/**
  * The LIVE reading container this body sits in. `closest`, not a document
  * query: an inert pager peek renders its own `.screen-scroll`, and a document
  * query could hand us that one.
@@ -363,7 +445,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
   const track = st.queue[st.qi];
-  const active = !!track && track.key === key && (st.status === 'playing' || st.status === 'loading');
+  const loaded = !!track && track.key === key;
+  const active = loaded && (st.status === 'playing' || st.status === 'loading');
   const time = st.time;
   const lastFrag = React.useRef(-1);
   const userScrollAt = React.useRef(0);
@@ -378,7 +461,12 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // Two reads off the frozen lazy corpus — cheap, and `rows` keeps a stable
   // identity, so the filter below re-allocates only when the letter, the part,
   // or playing-ness changes (or once, when the lazy corpus finally lands).
-  const rows = (active && readAlongOn) ? _syncFor(key, track) : null;
+  // LOADED, not `active`: the rows are also what tap-to-seek hit-tests against,
+  // and repositioning by tapping a clause is most useful while PAUSED. A
+  // consequence by design — the wash now stays put when you pause instead of
+  // vanishing, which is also the feedback a tap needs. The rAF driver below
+  // still runs only while `active`, so a paused reader costs no frames.
+  const rows = (loaded && readAlongOn) ? _syncFor(key, track) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
   // nothing to them.
@@ -449,6 +537,47 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag);
     return undefined;
   }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow]);
+
+  // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
+  // decoration with no box and no events — so the tap is resolved from the
+  // POINT: caret → block → textContent offset → the fragment whose span holds
+  // it. Adds no markup and no chrome; every timed clause is simply live.
+  //
+  // What must NOT be stolen: a real text selection (annotating is the reading
+  // surface's primary gesture), the tap that dismisses one, a drag or scroll,
+  // and any interactive descendant (footnote bubbles, scripture and letter
+  // links). Seek only — the transport keeps whatever play/pause state the
+  // reader chose.
+  React.useEffect(() => {
+    const el = mainRef.current;
+    if (!frags || !el) return undefined;
+    let downX = 0, downY = 0, downHadSelection = false;
+    const selectionLive = () => {
+      try {
+        const s = el.ownerDocument.getSelection();
+        return !!s && !s.isCollapsed && String(s).length > 0;
+      } catch (_e) { return false; }
+    };
+    const onDown = (e) => {
+      downX = e.clientX; downY = e.clientY;
+      downHadSelection = selectionLive();
+    };
+    const onClick = (e) => {
+      if (downHadSelection || selectionLive()) return;           // selecting, or dismissing one
+      if (Math.abs(e.clientX - downX) > 10 || Math.abs(e.clientY - downY) > 10) return;   // drag/scroll
+      if (e.target && e.target.closest
+          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref')) return;
+      const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY);
+      if (i < 0) return;                                          // untimed text — stay silent
+      AudioPlayer.seek(frags[i][0]);
+    };
+    el.addEventListener('pointerdown', onDown, { passive: true });
+    el.addEventListener('click', onClick);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('click', onClick);
+    };
+  }, [frags, mainRef, letterId, hlKeyFn]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {

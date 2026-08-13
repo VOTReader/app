@@ -29,6 +29,7 @@ apostrophe-free token domain — it reproduces the archived pre-_alignlib output
 Writes _align-work/hone/<key>.<model>.json; shipping stays the batch script's job.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -84,6 +85,18 @@ def fragments_for(key):
         raise SystemExit(f"no fragments for key {key!r}")
     e = frag_all[key]
     return e["fragments"], e["format"]
+
+
+def fragments_hash(frags):
+    """Fingerprint of THIS letter's fragment domain (offsets + text).
+
+    Belt caches were keyed on settings_hash alone, so re-extracting fragments
+    (a corpus edit, or the 2026-08-12 DOM-offset fix) left every belt looking
+    'current' and a re-run silently replayed timings addressed to the OLD
+    offsets. The cache key must cover every INPUT, and the fragments are one."""
+    payload = json.dumps([[f.get("bi", f.get("pi")), f.get("cs"), f.get("ce"), f["text"]]
+                          for f in frags], ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:10]
 
 
 def resolve_tracks(key, asset=None):
@@ -384,6 +397,7 @@ def run_belt(key, s, asset=None):
     out = {"key": key, "asset": (tracks[0][0] if asset else None), "rendition": rend,
            "family": s["family"], "model": s["whisper_model"],
            "settings_hash": al.settings_hash(s), "settings": s,
+           "fragmentsHash": fragments_hash(frags),
            "coverage": round(cov, 3), "coverageAll": round(cov_all, 3),
            "unspokenShare": unspoken_share, "fragments": n, "shipped": len(tuples),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,

@@ -31,7 +31,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
-import { ReadAlongHighlight, fragmentAt, rangeIn } from './ReadAlongHighlight.jsx';
+import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -549,5 +549,112 @@ describe('rangeIn — the TreeWalker offset mapper', () => {
     mount();
     expect(() => { play(); clockTo(6); }).not.toThrow();
     expect(painted()).toBeNull();
+  });
+});
+
+/* ── Tap a clause, hear it ─────────────────────────────────────────────────
+   The wash is a CSS Custom Highlight: no box, no events, so the tap is
+   resolved from the POINT. jsdom has neither layout nor caretRangeFromPoint,
+   so the caret API is stubbed to answer with a chosen (node, offset) — which
+   is precisely the seam under test: everything AFTER the caret (offset
+   mapping, fragment lookup, the guards, the seek) is real. */
+describe('tap-to-seek', () => {
+  /** Point the caret API at a character index inside a rendered block. */
+  const caretAtChar = (blockIndex, charOffset) => {
+    const block = document.querySelectorAll('[data-hl-key]')[blockIndex];
+    const node = block.firstChild;
+    document.caretRangeFromPoint = () => ({ startContainer: node, startOffset: charOffset });
+  };
+  const tapBody = (target) => {
+    const el = target || document.querySelector('.letter-body');
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 10 });
+    fireEvent.click(el, { clientX: 10, clientY: 10 });
+  };
+
+  it('offsetIn is the inverse of rangeIn', () => {
+    mount();
+    const block = document.querySelectorAll('[data-hl-key]')[0];
+    const r = rangeIn(block, 14, 34);
+    expect(offsetIn(block, r.startContainer, r.startOffset)).toBe(14);
+  });
+
+  it('a tap on the second clause seeks to its start', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(0, 20);                       // inside "Sentence number two."
+    tapBody();
+    expect(AudioPlayer.getState().time).toBe(5);
+  });
+
+  it('a tap on the first clause seeks back to it', () => {
+    mount(); play(); clockTo(6);
+    caretAtChar(0, 3);
+    tapBody();
+    expect(AudioPlayer.getState().time).toBe(2);
+  });
+
+  it('works while PAUSED and does not start playback', () => {
+    mount(); play(); clockTo(2);
+    act(() => AudioPlayer.toggle());
+    const before = AudioPlayer.getState().status;
+    caretAtChar(0, 20);
+    tapBody();
+    expect(AudioPlayer.getState().time).toBe(5);
+    expect(AudioPlayer.getState().status).toBe(before);
+  });
+
+  it('never steals a real text selection', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(0, 20);
+    const block = document.querySelectorAll('[data-hl-key]')[0];
+    const sel = document.getSelection();
+    const r = document.createRange();
+    r.setStart(block.firstChild, 0); r.setEnd(block.firstChild, 8);
+    sel.removeAllRanges(); sel.addRange(r);
+    tapBody();
+    expect(AudioPlayer.getState().time).toBe(2);
+    sel.removeAllRanges();
+  });
+
+  it('ignores a drag or scroll gesture', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(0, 20);
+    const el = document.querySelector('.letter-body');
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 10 });
+    fireEvent.click(el, { clientX: 10, clientY: 240 });     // moved far
+    expect(AudioPlayer.getState().time).toBe(2);
+  });
+
+  it('leaves footnote bubbles and links to their own handlers', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(0, 20);
+    const block = document.querySelectorAll('[data-hl-key]')[0];
+    const fn = document.createElement('span');
+    fn.className = 'fn-ref';
+    block.appendChild(fn);
+    tapBody(fn);
+    expect(AudioPlayer.getState().time).toBe(2);
+  });
+
+  it('a tap in another block seeks to that block clause', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(1, 3);
+    tapBody();
+    expect(AudioPlayer.getState().time).toBe(10);
+  });
+
+  it('stays silent on text that shipped no timing', () => {
+    mount();
+    const main = document.querySelector('.letter-body');
+    const block1Only = SYNC['vol1:letter-a'].filter((r) => r[1] === 1);
+    caretAtChar(0, 3);                        // block 0 is absent from these rows
+    expect(fragmentAtPoint(block1Only, main, 'letter-a', letterHlKey, 5, 5)).toBe(-1);
+  });
+
+  it('fragmentAtPoint reports -1 when the caret API is absent', () => {
+    mount();
+    delete document.caretRangeFromPoint;
+    delete document.caretPositionFromPoint;
+    const main = document.querySelector('.letter-body');
+    expect(fragmentAtPoint(SYNC['vol1:letter-a'], main, 'letter-a', letterHlKey, 5, 5)).toBe(-1);
   });
 });

@@ -21,6 +21,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+// THE text domain — the same function the renderer paints through, so these
+// character offsets cannot drift from the DOM they address. Never re-implement
+// segment joining here; see the module header for the bug that proves why.
+import { segmentsDomText } from '../app/src/main/assets/src/utils/segment-dom-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
@@ -92,7 +96,7 @@ function formatAFragments(letter) {
   const out = [];
   (letter.blocks || []).forEach((b, bi) => {
     if (b.type === 'para' || b.type === 'intro' || b.type === 'closing-fn') {
-      const text = (b.segments || []).map(segText).join('');
+      const text = segmentsDomText(b.segments);
       // Terminator allows trailing digits: inline footnote markers sit hard
       // against the period ("...as it is written.1 I AM THE LORD.") and
       // without [0-9]* the regex backtracks to the last whitespace, stranding
@@ -132,8 +136,11 @@ function formatAFragments(letter) {
         if (lt.trim().length >= 2) out.push({ bi, cs: pos, ce: pos + lt.length, text: lt });
         pos += lt.length;
       };
-      if (b.lines) for (const line of b.lines) push((line || []).map(segText).join(''));
-      else for (const seg of (b.segments || [])) push(segText(seg).replace(/^\n/, ''));
+      // Each poetry line is its own <Segments> run (LetterView), so the guard
+      // applies WITHIN a line; consecutive lines are separate divs, whose
+      // textContent concatenates with no separator.
+      if (b.lines) for (const line of b.lines) push(segmentsDomText(line));
+      else for (const seg of (b.segments || [])) push(segmentsDomText([{ ...seg, v: String(seg.v || '').replace(/^\n/, '') }]));
     } else if (b.type === 'closing') {
       const t = String(b.text || '');
       if (t.trim().length >= 2) out.push({ bi, cs: 0, ce: t.length, text: t });
