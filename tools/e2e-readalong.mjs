@@ -578,7 +578,11 @@ async function run() {
       if (flag('pixel-proof') || flag('shot')) {
         const shotDir = flag('shot') ? OUT : null;
         if (shotDir) mkdirSync(shotDir, { recursive: true });
-        const at = rows[Math.min(rows.length - 1, Math.floor(rows.length / 3))];
+        // --shot-row picks a specific clause, for capturing one named defect
+        // rather than whatever a third of the way in happens to be.
+        const want = opt('shot-row', '');
+        const at = want ? rows[Math.min(rows.length - 1, Number(want))]
+          : rows[Math.min(rows.length - 1, Math.floor(rows.length / 3))];
         await page.evaluate((t, lead) => AudioPlayer.seek(Math.max(0, t - lead + 0.02)), at[0], LEAD_S);
         await sleep(260);
         const proof = await pixelProof(page, key.replace(/[:/]/g, '__'), shotDir);
