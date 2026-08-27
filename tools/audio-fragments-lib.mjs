@@ -220,17 +220,76 @@ export function formatAFragments(letter) {
   return out;
 }
 
+/**
+ * A paragraph as SPOKEN, at exactly the corpus text's length.
+ *
+ * Every character the reader does not say is blanked to a space rather than
+ * removed, so an offset into this string IS an offset into `p.text`. That one
+ * property is what lets Format B carry real character offsets at all: the
+ * aligner can sentence-split and clause-split here and the result already
+ * addresses the corpus, which is the only domain that does not move. (The
+ * rendered domain moves with the footnote route, with soft line breaks, and
+ * even with whether the lazy Bible corpus has landed — utils/format-b-dom-text.js
+ * projects onto it at paint time.)
+ *
+ * A reference keeps its words: the readers speak the cites aloud, and those
+ * words are what anchor the matcher. Padding them back out to the marker's
+ * width costs nothing — the tokenizer splits on non-letters anyway.
+ */
+export function formatBSpoken(raw) {
+  const text = String(raw == null ? '' : raw);
+  const blank = (n) => ' '.repeat(n);
+  let out = text
+    .replace(/\{\{ref:([^}]+)\}\}/g, (m, ref) => {
+      const words = ref.trim();
+      return words.length <= m.length ? words + blank(m.length - words.length) : words.slice(0, m.length);
+    })
+    .replace(/\{\{nav:[^}]+\}\}/g, (m) => blank(m.length));
+  // Emphasis markers and the attribution brackets are printed, never spoken.
+  out = out.replace(/\*\*|[_*[\]~†]/g, (m) => blank(m.length));
+  if (out.length !== text.length) throw new Error('formatBSpoken changed length: ' + text.slice(0, 60));
+  return out;
+}
+
+/**
+ * Format B fragments, at CLAUSE granularity in the corpus offset domain.
+ *
+ * Was one fragment per paragraph with a `-1` sentinel meaning "paint the whole
+ * block" — up to 3,785 characters, roughly four minutes of motionless gold on
+ * the longest entry. The stated reason (the rendered domain shifts with
+ * footnotesMode) is real but small; see format-b-dom-text.js for what actually
+ * moves. With the projection in place the offsets can be real.
+ */
 export function formatBFragments(entry) {
   const out = [];
   (entry.paragraphs || []).forEach((p, pi) => {
-    let t = String(p.text || '');
-    t = t.replace(/\{\{ref:([^}]+)\}\}/g, ' $1 ')
-      .replace(/\{\{nav:[^}]+\}\}/g, ' ')
-      .replace(/\*\*|__|[_*]/g, ' ')
-      .replace(/[[\]~†]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (t.length >= 2) out.push({ pi, text: t });
+    const raw = String(p.text || '');
+    const spoken = formatBSpoken(raw);
+    // A soft line break here is a deliberate poetic one -- it renders as
+    // <br/> -- not a wrap: of the ~2,000 breaks in the Format B corpus exactly
+    // TWO continue a sentence onto the next line. So a line is a unit, the same
+    // way a Format A poetry line is, and the wash tracks the reader line by
+    // line instead of holding a whole stanza motionless.
+    const lines = [];
+    let at = 0;
+    for (const line of spoken.split('\n')) {
+      lines.push([at, at + line.length]);
+      at += line.length + 1;
+    }
+    for (const [ls, le] of lines) {
+      for (const [s0, e0] of sentenceSpans(spoken.slice(ls, le))) {
+        for (const piece of clauseSplit(spoken.slice(ls + s0, ls + e0), ls + s0)) {
+          // Blanked markup can leave a span opening or closing on spaces; a
+          // fragment must sit on the words it actually covers.
+          let cs = piece.cs;
+          let ce = piece.ce;
+          while (cs < ce && /\s/.test(spoken[cs])) cs++;
+          while (ce > cs && /\s/.test(spoken[ce - 1])) ce--;
+          const text = spoken.slice(cs, ce);
+          if (/[a-zA-Z]/.test(text) && text.trim().length >= 2) out.push({ pi, cs, ce, text });
+        }
+      }
+    }
   });
   return out;
 }

@@ -351,7 +351,7 @@ export function caretAt(doc, x, y) {
  * @param {number} y
  * @returns {number}
  */
-export function fragmentAtPoint(frags, mainEl, letterId, hlKeyFn, x, y) {
+export function fragmentAtPoint(frags, mainEl, letterId, hlKeyFn, x, y, offsetMapFn) {
   const caret = caretAt(mainEl.ownerDocument, x, y);
   if (!caret || !caret.node) return -1;
   const host = caret.node.nodeType === 3 ? caret.node.parentElement : caret.node;
@@ -362,10 +362,17 @@ export function fragmentAtPoint(frags, mainEl, letterId, hlKeyFn, x, y) {
   if (off < 0) return -1;
   let best = -1;
   for (let i = 0; i < frags.length; i++) {
-    const [, bi, cs, ce] = frags[i];
+    const [, bi, cs0, ce0] = frags[i];
     if (hlKeyFn(letterId, bi) !== hlKey) continue;
     // Format-B sentinel: the whole block is one fragment.
-    if (ce === -1) return i;
+    if (ce0 === -1) return i;
+    // The caret gives a DOM offset; a Format B row's offsets are corpus ones.
+    // Project the row rather than trying to invert the caret — the projection
+    // only goes one way, and a substituted run (a footnote number standing in
+    // for a whole reference) has no single corpus offset to come back to.
+    const map = offsetMapFn && offsetMapFn(bi);
+    const cs = map ? map(cs0) : cs0;
+    const ce = map ? map(ce0, true) : ce0;
     if (off >= cs && off < ce) return i;
     if (cs <= off) best = i;          // gap between clauses: the one just before
     else if (best < 0) best = i;      // tapped ahead of the block's first clause
@@ -492,11 +499,18 @@ function _follow(range, mainRef, userScrollAt, glideRef) {
  * @param {{ current: number }} lastFrag
  * @returns {void}
  */
-function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag) {
+function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag, offsetMapFn) {
   lastFrag.current = i;
   const clear = () => { /** @type {any} */ (CSS).highlights.delete(HL_NAME); };
   if (i < 0) { clear(); return; }
-  const [, bi, cs, ce] = frags[i];
+  const [, bi, cs0, ce0] = frags[i];
+  // Format B stores CORPUS offsets, because its rendered text is not its
+  // corpus text and the rendered one moves (footnote route, soft line breaks,
+  // whether the lazy Bible corpus has landed). The projection crosses that
+  // boundary here, once, at paint time. Format A and Bible pass no map.
+  const map = offsetMapFn && offsetMapFn(bi);
+  const cs = map ? map(cs0) : cs0;
+  const ce = map ? map(ce0, true) : ce0;
   const blockEl = mainRef.current && mainRef.current.querySelector('[data-hl-key="' + hlKeyFn(letterId, bi) + '"]');
   // EVERY give-up path clears. A row whose block is missing or whose offsets no
   // longer resolve must leave the reader with NO wash, not with the previous
@@ -506,8 +520,8 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
   // until the next resolvable one.
   if (!blockEl) { clear(); return; }
   let range;
-  if (ce === -1) {
-    // Format B sentinel — paint the whole paragraph block.
+  if (ce0 === -1) {
+    // Legacy Format B sentinel — paint the whole paragraph block.
     range = blockEl.ownerDocument.createRange();
     try { range.selectNodeContents(blockEl); } catch (_e) { clear(); return; }
   } else {
@@ -530,8 +544,10 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  * @param {boolean} [props.readAlongFollow] - settings.readAlongFollow (scroll)
  * @param {number} [props.chapter] - Bible surfaces only: the chapter on screen.
  *   Its presence is what selects the verse-timing path; letters omit it.
+ * @param {(blockIndex: number) => ((off: number, isEnd?: boolean) => number) | null} [props.offsetMapFn]
+ *   Format B only: projects a corpus offset onto the rendered one.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0 }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
@@ -616,7 +632,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       id = null;
       const i = fragmentAt(frags, AudioPlayer.getPreciseTime() + LEAD_S);
       if (i !== lastFrag.current) {
-        _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag);
+        _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
       }
       if (!stopped) id = requestAnimationFrame(tick);
     };
@@ -625,7 +641,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       stopped = true;
       if (id != null) { try { cancelAnimationFrame(id); } catch (_e) { /* frame source gone */ } }
     };
-  }, [active, frags, letterId, hlKeyFn, mainRef, readAlongFollow]);
+  }, [active, frags, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn]);
 
   // THE SAFETY NET + the structural clear. Runs on the player's whole-second
   // tick; the index guard inside makes it a no-op whenever the frame loop above
@@ -640,9 +656,9 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     }
     const i = fragmentAt(frags, time + LEAD_S);
     if (i === lastFrag.current) return undefined;
-    _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag);
+    _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
     return undefined;
-  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow]);
+  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn]);
 
   // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
   // decoration with no box and no events — so the tap is resolved from the
@@ -679,7 +695,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       // cannot be stopped: tapping a note icon jumped the audio.
       if (e.target && e.target.closest
           && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) return;
-      const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY);
+      const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY, offsetMapFn);
       if (i < 0) return;                                          // untimed text — stay silent
       AudioPlayer.seek(frags[i][0]);
     };
@@ -689,7 +705,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('click', onClick);
     };
-  }, [frags, mainRef, letterId, hlKeyFn]);
+  }, [frags, mainRef, letterId, hlKeyFn, offsetMapFn]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {

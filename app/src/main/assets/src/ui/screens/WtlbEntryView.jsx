@@ -4,6 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
+import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
@@ -72,6 +73,23 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     return { perParagraph, refNumMap, orderedRefs };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: entry.paragraphs is corpus data (read-only after boot); entry.id uniquely identifies the entry, so [entry.id, footnotesMode] is sufficient. Using [entry, ...] would force re-memoize on any parent re-render that hands a fresh object literal.
   }, [entry.id, footnotesMode]);
+
+  // One projection per paragraph, rebuilt only when something the render
+  // branches on actually changes. refAnalysis is the same pre-scan the renderer
+  // consumes, so the numbers here are the numbers on screen.
+  const paraOffsetMap = React.useMemo(() => {
+    const cache = new Map();
+    return (pi) => {
+      if (cache.has(pi)) return cache.get(pi);
+      const p = (entry.paragraphs || [])[pi];
+      const fn = p ? formatBOffsetMap(p.text, {
+        refs: refAnalysis.perParagraph[pi] || [],
+        footnotesMode,
+      }).toDom : null;
+      cache.set(pi, fn);
+      return fn;
+    };
+  }, [footnotesMode, refAnalysis, entry.paragraphs]);
 
   const lookupVerse = (ref) => {
     const perEntry = entry.scriptures || {};
@@ -485,10 +503,14 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         </div>
       </div>
 
-      {/* Read-along: paragraph-level wash for Format B (see ReadAlongHighlight —
-          char offsets shift with footnotesMode, so B paints whole paragraphs).
-          Both halves are separately gated in Settings → Reading. */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} />}
+      {/* Read-along. Format B timings are stored in the CORPUS offset domain,
+          because the rendered one is not stable — it moves with the footnote
+          route, with every soft line break, and with whether the lazy Bible
+          corpus has landed (a nav link reads "Songofsolomon" until it does).
+          offsetMapFn projects onto whatever is on screen right now, which is
+          what lets these entries paint a line at a time instead of washing a
+          whole paragraph. Both halves are separately gated in Settings.  */}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

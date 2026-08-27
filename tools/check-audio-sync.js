@@ -48,7 +48,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { CORPUS_FILES, buildCollections, blockDomainText } from './audio-fragments-lib.mjs';
+import { CORPUS_FILES, buildCollections, blockDomainText, formatBSpoken } from './audio-fragments-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -169,6 +169,7 @@ function spanClean(text, cs, ce, lineBounds) {
   return /[A-Za-z]/.test(text.slice(cs, ce));
 }
 
+const EMPTY_BOUNDS = new Set();
 const failures = [];
 const probeRows = {};
 const perKey = new Map();
@@ -217,11 +218,42 @@ function checkTimeline(key, itemKey, rows) {
       note(failures, key, 'PART-OUT-OF-RANGE', { row, parts: parts.length });
     }
 
-    // Format B sentinel: whole-paragraph paint, no offsets to check.
+    // Format B. `bi` is a paragraph index, and the offsets live in the CORPUS
+    // domain rather than the rendered one, so they are checked against the
+    // SPOKEN text -- same length as the corpus text, with everything the
+    // reader does not say blanked to spaces. Checking against the raw text
+    // would reject a legal boundary sitting beside a stripped marker, which is
+    // punctuation there and whitespace in the domain that was measured.
+    if (item.paragraphs && !item.blocks) {
+      const paras = item.paragraphs.length;
+      if (!(bi >= 0 && bi < paras)) { note(failures, key, 'PARA-OUT-OF-RANGE', { row, paras }); continue; }
+      if (cs === -1 || ce === -1) {
+        // The legacy whole-paragraph sentinel. Still honoured by the runtime.
+        if (!(cs === -1 && ce === -1)) note(failures, key, 'HALF-SENTINEL', { row });
+        continue;
+      }
+      const spoken = formatBSpoken(item.paragraphs[bi].text);
+      if (!(cs >= 0 && ce > cs && ce <= spoken.length)) {
+        note(failures, key, 'OUT-OF-BOUNDS', { row, len: spoken.length });
+        continue;
+      }
+      timedChars += ce - cs;
+      touchedChars += 0;                                  // counted per paragraph below
+      if (emitProbeText) (probeRows[key] = probeRows[key] || []).push([t, bi, cs, ce, part, spoken.slice(cs, ce)]);
+      if (!spanClean(spoken, cs, ce, EMPTY_BOUNDS)) {
+        note(failures, key, 'DRIFTED-OTHER', {
+          row,
+          painted: spoken.slice(Math.max(0, cs - 14), cs) + '┃' + spoken.slice(cs, Math.min(spoken.length, cs + 40)),
+        });
+      }
+      const bkey = part + ':p' + bi;
+      const list = spansByBlock.get(bkey) || [];
+      list.push([cs, ce, t]);
+      spansByBlock.set(bkey, list);
+      continue;
+    }
     if (cs === -1 || ce === -1) {
-      if (!(cs === -1 && ce === -1)) note(failures, key, 'HALF-SENTINEL', { row });
-      const paras = (item.paragraphs || []).length;
-      if (!(bi >= 0 && bi < paras)) note(failures, key, 'PARA-OUT-OF-RANGE', { row, paras });
+      note(failures, key, 'SENTINEL-ON-FORMAT-A', { row });
       continue;
     }
 

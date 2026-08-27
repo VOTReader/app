@@ -378,8 +378,13 @@ def run_belt(key, s, asset=None):
             # those words are provably absent from the recording, so painting
             # them would wash text the voice is not reading. They carry no t at
             # all and never reach here.
+            # Format B now carries REAL offsets too, in the corpus domain --
+            # the app projects them onto the rendered text at paint time
+            # (utils/format-b-dom-text.js). The old -1/-1 sentinel meant "paint
+            # the whole paragraph", which on the longest WTLB entry was 3,785
+            # characters of motionless gold.
             tuples.append([t, f["bi"], f["cs"], f["ce"], row["part"]] if fmt == "A"
-                          else [t, f["pi"], -1, -1, row["part"]])
+                          else [t, f["pi"], f["cs"], f["ce"], row["part"]])
         results.append(row)
 
     # COVERAGE MEASURES THE ALIGNMENT, NOT THE PAGE. Units proven absent from

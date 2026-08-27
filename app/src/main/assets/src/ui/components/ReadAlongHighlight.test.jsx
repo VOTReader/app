@@ -32,6 +32,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
+import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -817,5 +818,99 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     mountBible(); playChapter(1);
     clockTo(6);
     expect(painted()).toBeNull();
+  });
+});
+
+/* Format B (WTLB / The Blessed). Its timings are stored in the CORPUS offset
+   domain because the rendered one is not stable -- markers are stripped, soft
+   line breaks vanish, and a reference becomes either a footnote number or a
+   parenthesised cite. offsetMapFn crosses that gap at paint time, once. Without
+   it these entries could only wash a whole paragraph, which on the longest one
+   is about four minutes of motionless gold. */
+describe('ReadAlongHighlight — Format B paints through the offset projection', () => {
+  const RAW = 'Blessed are those who **hear**,\nAnd keep My Commandments {{ref:Matthew 4:4}} always.\nSays The Lord.';
+  const REFS = [{ ref: 'Matthew 4:4', trailing: false, num: 2 }];
+
+  // Exactly the fragments tools/audio-fragments-lib.mjs emits for this text.
+  const B_SYNC = {
+    'wtlb1:entry-a': [
+      [2, 0, 0, 31, 0],
+      [5, 0, 32, 84, 0],
+      [9, 0, 85, 99, 0],
+    ],
+  };
+
+  function BHost({ footnotesMode = true }) {
+    const mainRef = React.useRef(null);
+    const dom = formatBDomText(RAW, { refs: REFS, footnotesMode });
+    const map = React.useMemo(
+      () => formatBOffsetMap(RAW, { refs: REFS, footnotesMode }).toDom,
+      [footnotesMode],
+    );
+    return (
+      <div className="screen-scroll">
+        <main className="letter-body" ref={mainRef}>
+          <p data-hl-key="wtlb:entry-a:0">{dom}</p>
+        </main>
+        <ReadAlongHighlight
+          volKey="wtlb1"
+          letterId="entry-a"
+          mainRef={mainRef}
+          hlKeyFn={(id, pi) => 'wtlb:' + id + ':' + pi}
+          readAlongOn
+          readAlongFollow={false}
+          offsetMapFn={() => map}
+        />
+      </div>
+    );
+  }
+
+  const mountB = (props) => {
+    const out = render(<BHost {...props} />);
+    scroller = out.container.querySelector('.screen-scroll');
+    scroller.getBoundingClientRect = () => BOX;
+    Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true, configurable: true });
+    return out;
+  };
+
+  const playB = () => act(() => {
+    AudioPlayer.playLetter({ volKey: 'wtlb1', letter: { id: 'entry-a', title: 'An Entry' }, collectionLabel: 'WTLB' });
+  });
+
+  beforeEach(() => {
+    globalThis.AUDIO_MANIFEST = { 'wtlb1:entry-a': [['idB', 'B']] };
+    globalThis.AUDIO_SYNC = B_SYNC;
+  });
+
+  it('paints a line whose corpus span contains stripped markers', () => {
+    mountB(); playB();
+    clockTo(3);
+    expect(painted()).toBe('Blessed are those who hear,');
+  });
+
+  it('paints across a reference the renderer replaced with a number', () => {
+    mountB({ footnotesMode: true }); playB();
+    clockTo(6);
+    expect(painted()).toBe('And keep My Commandments 2 always.');
+  });
+
+  it('paints the same line when the reference renders as a cite instead', () => {
+    // Same shipped offsets, a different render: the projection absorbs it.
+    mountB({ footnotesMode: false }); playB();
+    clockTo(6);
+    expect(painted()).toBe('And keep My Commandments (Matthew 4:4) always.');
+  });
+
+  it('paints the last line, which sits past two vanished line breaks', () => {
+    mountB(); playB();
+    clockTo(10);
+    expect(painted()).toBe('Says The Lord.');
+  });
+
+  it('still honours the legacy whole-paragraph sentinel', () => {
+    globalThis.AUDIO_SYNC = { 'wtlb1:entry-a': [[2, 0, -1, -1, 0]] };
+    mountB(); playB();
+    clockTo(3);
+    expect(painted()).toBe(formatBDomText(RAW, { refs: REFS, footnotesMode: true }));
   });
 });
