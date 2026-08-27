@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 519 distinct identifiers.
+// Total: 522 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -50,6 +50,7 @@ declare const BIBLE_LSV: any;
 declare const BIBLE_RKJV: any;
 declare const BIBLE_RNKJV: any;
 declare const BIBLE_STUDIES: any;
+declare const BIBLE_SYNC_BRM_KJV: any;
 declare const BIBLE_WEB: any;
 declare const BIBLE_YLT: any;
 declare const BOOKS: any;
@@ -292,9 +293,11 @@ declare const _NAV_ICONS: any;
 declare const _OT_BOOKS_INLINE: any;
 declare const _TAIL_WITH_BOOK: any;
 declare const __bibleCorpus: any;
+declare const __bibleSyncStore: any;
 declare const __finishBibleInit: any;
 declare const __finishVotInit: any;
 declare const __loadBibleCorpus: any;
+declare const __loadBibleSync: any;
 declare const __loadMatthewCorpus: any;
 declare const __loadScreensE: any;
 declare const __loadScreensF: any;

@@ -129,6 +129,36 @@ if [ -n "$data_changed" ] || [ -n "$schema_tool_changed" ]; then
   echo ""
 fi
 
+# ─── Step 1b2: read-along offsets address the right characters ──────
+# AUDIO_SYNC ships CHARACTER OFFSETS into a block's rendered textContent. That
+# domain is defined in the app (segment-dom-text.js) and measured offline by
+# the aligner, months apart, so the two can drift silently — and did, by up to
+# 13 characters, painting the wash into the previous clause. Nothing saw it:
+# smoke.js only checks the row's BLOCK exists, and validate-schemas has no
+# AUDIO_SYNC coverage. Fires on any data change (a prose edit can invalidate a
+# timing just as a re-align can) and on changes to the gate or the shared
+# fragment library it derives the text domain from.
+sync_tool_changed=$(echo "$staged" | grep -E '^tools/(check-audio-sync|audio-fragments-lib|extract-audio-fragments)' || true)
+if [ -n "$data_changed" ] || [ -n "$sync_tool_changed" ]; then
+  echo "[pre-commit] Checking read-along offsets — node tools/check-audio-sync.js..."
+  node tools/check-audio-sync.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Read-along offset check FAILED — see output above."
+    echo "A shipped span no longer starts and ends on a word boundary, so"
+    echo "the highlight would paint mid-word. This is almost always STALE"
+    echo "TIMING DATA, not bad prose: re-align the named volumes with"
+    echo "  py -3.13 tools/batch-align.py --volkeys <vols>"
+    echo "NEVER hand-edit src/data/audio-sync.js — it is generated."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Read-along offsets OK."
+  echo ""
+fi
+
 # ─── Step 1c: data-gate self-test (T6) ──────────────────────────────
 # When the data gate itself (check_balance.py) or its test changes, run the
 # gate's unit tests so a regression in the GATE — the front-line black-screen

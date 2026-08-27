@@ -89,6 +89,15 @@ jobs:
         # gate; fails fast (cheap) before the heavier typecheck/test/build.
         run: npm run validate:data
 
+      - name: Check read-along offsets (audio-sync)
+        # node tools/check-audio-sync.js: every shipped AUDIO_SYNC span must
+        # start and end on a word boundary in the block's CURRENT rendered
+        # textContent. Catches the class where the timing data and the render
+        # domain drift apart and the wash paints mid-word — invisible to
+        # smoke.js (which only checks the row's block exists) and to
+        # validate:data (which has no AUDIO_SYNC coverage at all).
+        run: npm run check:audio-sync
+
       - name: Audit footnote rendering (CORP6 — dup / white verse numbers)
         # node tools/audit-footnotes.js --check: fails if any Format A footnote (or
         # WTLB / Blessed / Matthew dict) value would render a DUPLICATED or WHITE

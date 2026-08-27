@@ -137,6 +137,76 @@ function _altRowsFor(track) {
 }
 
 /**
+ * Verse rows for the Bible chapter now playing, in the same 5-tuple shape the
+ * letters use so nothing downstream needs a second code path.
+ *
+ * The shipped data is deliberately minimal — `BIBLE_SYNC_<EDITION>[book][ch]`
+ * is a positional array of integer CENTISECONDS, one slot per verse, `0`
+ * meaning "not proven, do not paint". 31,102 verses cost ~184 KB that way, and
+ * the file loads only when a Bible track is actually playing.
+ *
+ * The unit is a WHOLE VERSE, which is what makes this translation-proof. The
+ * default configuration is already cross-translation — bibleAudio defaults to
+ * brm-kjv (KJV) while the reader's text defaults to NKJV — and at verse
+ * granularity verse 5 is verse 5 in either. It also makes the restored-name
+ * editions a non-problem: they shift text by +6 characters per restored Name,
+ * which character offsets would have to chase and a whole-verse span ignores.
+ *
+ * So each row is `[seconds, verseNumber, -1, -1, 0]`: the -1 pair is the
+ * existing whole-block sentinel, and the "block index" column carries the
+ * verse NUMBER rather than a positional index — verse number is stable across
+ * translations where an index is not (WEB has no Acts 8:37, so its verse 38
+ * sits at index 37). A verse the rendered chapter lacks simply fails to
+ * resolve and paints nothing.
+ *
+ * @param {string} bookId
+ * @param {number} chapter
+ * @param {string} volKey  e.g. 'bible-brm-kjv'
+ * @returns {any[] | null}
+ */
+const _bibleRowCache = new Map();
+
+function _bibleRowsFor(bookId, chapter, volKey) {
+  // The expanded rows are CACHED, and that is not an optimisation. `rows` is a
+  // render-time value feeding the frags memo, which feeds the dependency array
+  // of the rAF loop; handing back a freshly allocated array each render would
+  // tear the frame loop down and rebuild it on every whole-second clock tick.
+  // The underlying table never mutates once its file has loaded, so one
+  // expansion per chapter is both correct and stable.
+  const g = /** @type {any} */ (globalThis);
+  const edition = volKey.slice('bible-'.length);
+  const table = g['BIBLE_SYNC_' + edition.toUpperCase().replace(/-/g, '_')];
+  const cacheKey = volKey + ':' + bookId + ':' + chapter;
+  const hit = _bibleRowCache.get(cacheKey);
+  // The cached rows are only valid for the TABLE they were expanded from.
+  // Holding them by key alone would serve a previous table's timings after
+  // the edition's file was replaced — and it silently did exactly that
+  // between tests, which is the cheap version of the same bug.
+  if (hit && hit.table === table) return hit.rows;
+  const book = table && table[bookId];
+  const cs = book && book[String(chapter)];
+  if (!Array.isArray(cs) || !cs.length) return null;   // not loaded yet — do NOT cache the miss
+  const rows = [];
+  for (let i = 0; i < cs.length; i++) {
+    if (cs[i] > 0) rows.push([cs[i] / 100, i + 1, -1, -1, 0]);
+  }
+  const out = rows.length ? rows : null;
+  _bibleRowCache.set(cacheKey, { table, rows: out });
+  return out;
+}
+
+/** @param {() => void} cb */
+function _bibleSyncSubscribe(cb) {
+  const store = /** @type {any} */ (globalThis).__bibleSyncStore;
+  return store ? store.subscribe(cb) : () => {};
+}
+
+function _bibleSyncVersion() {
+  const store = /** @type {any} */ (globalThis).__bibleSyncStore;
+  return store ? store.getVersion() : 0;
+}
+
+/**
  * The alignment rows that belong to the recording ACTUALLY PLAYING — not
  * merely to this letter. AUDIO_SYNC is keyed by "volKey:letterId", but a
  * letter can have several complete readings (AUDIO_ALTERNATES: different
@@ -148,10 +218,22 @@ function _altRowsFor(track) {
  *
  * @param {string} key
  * @param {any} track
+ * @param {number} [chapter] - the VIEWED chapter, for Bible surfaces only
  * @returns {any[] | null}
  */
-function _syncFor(key, track) {
+function _syncFor(key, track, chapter) {
   const g = /** @type {any} */ (globalThis);
+  // Bible first, and never through the letters' primary-asset check below —
+  // that reads AUDIO_MANIFEST, while Bible recordings live in
+  // BIBLE_AUDIO_MANIFEST, so every Bible track would fail it.
+  if (chapter) {
+    // A book queues its WHOLE remaining run, so the chapter on screen and the
+    // chapter in the speakers drift apart as it plays. Painting this chapter's
+    // verses to another chapter's clock is the most confident kind of wrong.
+    if (AudioPlayer.bibleChapterOfTrack(track) !== chapter) return null;
+    const [volKey, bookId] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
+    return _bibleRowsFor(bookId, chapter, volKey);
+  }
   const alt = _altRowsFor(track);
   if (alt) return alt;
   const rows = (g.AUDIO_SYNC && g.AUDIO_SYNC[key]) || null;
@@ -412,21 +494,28 @@ function _follow(range, mainRef, userScrollAt, glideRef) {
  */
 function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag) {
   lastFrag.current = i;
-  if (i < 0) { /** @type {any} */ (CSS).highlights.delete(HL_NAME); return; }
+  const clear = () => { /** @type {any} */ (CSS).highlights.delete(HL_NAME); };
+  if (i < 0) { clear(); return; }
   const [, bi, cs, ce] = frags[i];
   const blockEl = mainRef.current && mainRef.current.querySelector('[data-hl-key="' + hlKeyFn(letterId, bi) + '"]');
-  if (!blockEl) return;
+  // EVERY give-up path clears. A row whose block is missing or whose offsets no
+  // longer resolve must leave the reader with NO wash, not with the previous
+  // clause still lit while the voice has moved on — a stale highlight reads as
+  // a confident wrong answer, where nothing reads as honest silence. Only the
+  // i < 0 case used to clear, so one unresolvable row froze the wash in place
+  // until the next resolvable one.
+  if (!blockEl) { clear(); return; }
   let range;
   if (ce === -1) {
     // Format B sentinel — paint the whole paragraph block.
     range = blockEl.ownerDocument.createRange();
-    try { range.selectNodeContents(blockEl); } catch (_e) { return; }
+    try { range.selectNodeContents(blockEl); } catch (_e) { clear(); return; }
   } else {
     range = rangeIn(blockEl, cs, ce);
   }
-  if (!range) return;
+  if (!range) { clear(); return; }
   const H = /** @type {any} */ (globalThis).Highlight;
-  if (typeof H !== 'function') return;
+  if (typeof H !== 'function') { clear(); return; }
   /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
   if (readAlongFollow) _follow(range, mainRef, userScrollAt, glideRef);
 }
@@ -439,8 +528,10 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  * @param {(id: string, i: number) => string} props.hlKeyFn - letterHlKey / wtlbHlKey
  * @param {boolean} [props.readAlongOn] - settings.readAlongHighlight (paint)
  * @param {boolean} [props.readAlongFollow] - settings.readAlongFollow (scroll)
+ * @param {number} [props.chapter] - Bible surfaces only: the chapter on screen.
+ *   Its presence is what selects the verse-timing path; letters omit it.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0 }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
@@ -466,17 +557,32 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // consequence by design — the wash now stays put when you pause instead of
   // vanishing, which is also the feedback a tap needs. The rAF driver below
   // still runs only while `active`, so a paused reader costs no frames.
-  const rows = (loaded && readAlongOn) ? _syncFor(key, track) : null;
+  // The verse timings are their own lazy file, fetched the first time a Bible
+  // recording is actually playing with read-along on. A reader who never
+  // presses Listen, or who has the wash switched off, never downloads it.
+  const needBibleSync = !!chapter && loaded && readAlongOn;
+  React.useEffect(() => {
+    if (!needBibleSync) return;
+    const load = /** @type {any} */ (globalThis)['__loadBibleSync'];
+    if (typeof load === 'function') load(volKey);
+  }, [needBibleSync, volKey]);
+  const corpusVersion = React.useSyncExternalStore(_bibleSyncSubscribe, _bibleSyncVersion);
+
+  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
-  // nothing to them.
-  const perAsset = !!rows && rows === _altRowsFor(track);
+  // nothing to them. Bible rows are per CHAPTER and likewise always part 0.
+  const perAsset = !!rows && (!!chapter || rows === _altRowsFor(track));
   const frags = React.useMemo(() => {
     if (!rows || !rows.length) return null;
     const want = perAsset ? 0 : part;
     const only = rows.filter((f) => (f[4] || 0) === want);
     return only.length ? only : null;
-  }, [rows, part, perAsset]);
+    // corpusVersion: _syncFor reads a global the lazy loader installs later, so
+    // the arrival of that file has to be a render input or the first chapter a
+    // reader listens to never paints.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, part, perAsset, corpusVersion]);
 
   // USER INTENT REVOKES THE LEASE (header rule 2). Capture + passive, matching
   // use-autoscroll's own yield listeners so it cannot be starved by the pager's
@@ -565,8 +671,14 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     const onClick = (e) => {
       if (downHadSelection || selectionLive()) return;           // selecting, or dismissing one
       if (Math.abs(e.clientX - downX) > 10 || Math.abs(e.clientY - downY) > 10) return;   // drag/scroll
+      // The three icon classes are NOT decoration. LinkIcon, BookmarkIcon and
+      // the annotation engine's note icon each render a bare <span onClick>
+      // with no role, and their stopPropagation runs on the REACT synthetic
+      // event — dispatched from React's root container, long after the native
+      // click has bubbled past this listener. So the seek fires first and
+      // cannot be stopped: tapping a note icon jumped the audio.
       if (e.target && e.target.closest
-          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref')) return;
+          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) return;
       const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY);
       if (i < 0) return;                                          // untimed text — stay silent
       AudioPlayer.seek(frags[i][0]);

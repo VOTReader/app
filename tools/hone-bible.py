@@ -29,6 +29,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _alignlib as al                                              # noqa: E402
 
 BIBLE = os.path.join(al.WORK, "bible")
+_MMS = {}
+_WL = {}
+
+
+def _mms(s):
+    """One MMS leg per settings hash. Chapters are short, so re-instantiating
+    (and re-loading wav2vec2) per chapter would cost more than the alignment."""
+    return _MMS.setdefault(al.settings_hash(s), al.MMSLeg(s))
+
+
+def _whisper(s):
+    return _WL.setdefault(al.settings_hash(s), al.WhisperLeg(s))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
@@ -50,47 +62,8 @@ def main():
         s["mms_star_gap"] = True
     os.makedirs(BIBLE, exist_ok=True)
 
-    vdata = json.load(open(a.verses, encoding="utf-8"))
-    verses = vdata["verses"]
-    stem = os.path.splitext(os.path.basename(a.audio))[0]
-    wav = al.to_wav16k(a.audio, os.path.join(BIBLE, stem + ".16k.wav"))
-    print(f"{a.out_tag}: {len(verses)} verses, audio {a.audio}")
-    print(f"family {s['family']}  settings {al.settings_hash(s)}  lead_in {s['lead_in']}")
-
-    units = [{"owner": vi, "tokens": al.spoken_words(v["text"]),
-              "text": v["text"], "ident": {"n": v["n"]}}
-             for vi, v in enumerate(verses)]
-
-    print("leg A: MMS_FA forced alignment ...")
-    A = al.MMSLeg(s).align(wav, units)
-    print(f"  {len(A)}/{len(verses)} verses placed")
-
-    print(f"leg B: {s['whisper_model']} + global match ...")
-    wl = al.WhisperLeg(s)
-    tx = wl.transcribe_words(wav, os.path.join(BIBLE, a.out_tag + ".tx.json"))
-    nrm = al.match_normalizer(s, tx["words"])
-    cols, owners = [], []
-    for u in units:
-        for t in u["tokens"]:
-            cols.append(nrm(t))
-            owners.append(u["owner"])
-    B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
-    print(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
-
-    snap = al.make_snap(al.silence_intervals(wav))
-    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl), snap_fn=snap)
-    n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
-    n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
-    n_review = sum(1 for r in rows if r["status"] == "REVIEW")
-
-    out = {"tag": a.out_tag, "book": vdata.get("book"), "chapter": vdata.get("chapter"),
-           "family": s["family"], "settings_hash": al.settings_hash(s),
-           "settings": s, "audio": a.audio,
-           "confirmed": n_conf, "probed": n_probed, "review": n_review,
-           "verses": rows}
-    path = os.path.join(BIBLE, a.out_tag + ".json")
-    json.dump(out, open(path, "w", encoding="utf-8"), indent=1)
-    print(f"\nCONFIRMED {n_conf}  PROBED {n_probed}  REVIEW {n_review}  -> {path}")
+    out = run_chapter(a.verses, a.audio, a.out_tag, s)
+    rows = out["verses"]
     print(f"\n{'v':>3} {'t':>8} {'A':>8} {'B':>8}  {'Δ':>5}  status")
     for r in rows:
         f = lambda x: f"{x:8.2f}" if x is not None else "       —"          # noqa: E731
@@ -99,6 +72,74 @@ def main():
         flag = " ~interp" if r.get("interpolated") else (" ^clamp" if r.get("clamped") else "")
         print(f"{r['n']:>3} {f(r.get('t'))} {f(r.get('tA'))} {f(r.get('tB'))}  {d}  {r['status']}{flag}")
     return 0
+
+
+def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
+    """Align ONE chapter and write its belt. Extracted from main() so the batch
+    runner can drive thousands of chapters without shelling out per chapter —
+    the whisper and MMS models then load once for the whole run instead of once
+    per chapter, which is most of the wall clock on short Bible audio."""
+    say = (lambda *_a, **_k: None) if quiet else print
+    out_dir = out_dir or BIBLE
+    os.makedirs(out_dir, exist_ok=True)
+    vdata = json.load(open(verses_path, encoding="utf-8"))
+    verses = vdata["verses"]
+    stem = os.path.splitext(os.path.basename(audio))[0]
+    wav = al.to_wav16k(audio, os.path.join(out_dir, stem + ".16k.wav"))
+    say(f"{out_tag}: {len(verses)} verses, audio {audio}")
+    say(f"family {s['family']}  settings {al.settings_hash(s)}  lead_in {s['lead_in']}")
+
+    units = [{"owner": vi, "tokens": al.spoken_words(v["text"]),
+              "text": v["text"], "ident": {"n": v["n"]}}
+             for vi, v in enumerate(verses)]
+
+    say("leg A: MMS_FA forced alignment ...")
+    A = _mms(s).align(wav, units)
+    say(f"  {len(A)}/{len(verses)} verses placed")
+
+    say(f"leg B: {s['whisper_model']} + global match ...")
+    wl = _whisper(s)
+    tx = wl.transcribe_words(wav, os.path.join(out_dir, out_tag + ".tx.json"))
+    nrm = al.match_normalizer(s, tx["words"])
+    cols, owners = [], []
+    for u in units:
+        for t in u["tokens"]:
+            cols.append(nrm(t))
+            owners.append(u["owner"])
+    B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
+    say(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
+
+    snap = al.make_snap(al.silence_intervals(wav))
+    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl),
+                   snap_fn=snap, end_t=tx.get("dur"))
+    n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
+    n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
+    n_review = sum(1 for r in rows if r["status"] == "REVIEW")
+
+    # versesHash + audioSize join settings_hash in the resume key. Settings
+    # alone was the 2026-08-12 lesson: the fragment domain changed without the
+    # settings moving, every belt still looked "current", and a resumed run
+    # silently replayed timings addressed to the old text. A cache key must
+    # cover every INPUT, and the reference text and the recording are two.
+    out = {"tag": out_tag, "book": vdata.get("book"), "chapter": vdata.get("chapter"),
+           "bookId": vdata.get("bookId"), "verseCount": len(verses),
+           "family": s["family"], "settings_hash": al.settings_hash(s),
+           "versesHash": al.sha10(json.dumps([[v["n"], v["text"]] for v in verses],
+                                             ensure_ascii=False, separators=(",", ":"))),
+           "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
+           "confirmed": n_conf, "probed": n_probed, "review": n_review,
+           "verses": rows}
+    path = os.path.join(out_dir, out_tag + ".json")
+    json.dump(out, open(path, "w", encoding="utf-8"), indent=1)
+    say(f"\nCONFIRMED {n_conf}  PROBED {n_probed}  REVIEW {n_review}  -> {path}")
+    # The 16 kHz scratch wav is ~32 kB per second of audio and nothing
+    # downstream reads it. Left behind, a full three-edition Bible campaign
+    # (277 hours) would strand roughly 32 GB.
+    try:
+        os.remove(wav)
+    except OSError:
+        pass
+    return out
 
 
 if __name__ == "__main__":

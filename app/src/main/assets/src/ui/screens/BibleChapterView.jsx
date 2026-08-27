@@ -5,8 +5,20 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+  const bodyRef = React.useRef(null);
+  // The verse-number key builder read-along paints through. useCallback is NOT
+  // cosmetic here: hlKeyFn sits in the dependency array of the rAF loop, the
+  // safety-net repaint and the tap-to-seek listener. LetterView and
+  // WtlbEntryView pass module-level function identities, so those arrays are
+  // stable; a fresh arrow per render would tear the frame loop down on every
+  // whole-second clock tick.
+  const bibleKeyFn = React.useCallback(
+    (bookId, verseNum) => bibleHlKey(bookId, chapter.num, verseNum),
+    [chapter.num],
+  );
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
   // books-restored.js has an entry for this chapter, swap the chrome.
@@ -189,7 +201,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         );
       })()}
       <div className="page-wrapper">
-        <div className="chapter-body">
+        <div className="chapter-body" ref={bodyRef}>
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"
@@ -301,6 +313,20 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           </div>
         </div>
       </div>
+      {/* Read-along, on the same !inert contract as LetterView: the swipe peek
+          renders a REAL BibleChapterView clone, and two live mounts would fight
+          over the single global ::highlight(vot-reading) registration. */}
+      {!inert && bibleAudio && (
+        <ReadAlongHighlight
+          volKey={bibleAudio.volKey}
+          letterId={book.id}
+          chapter={chapter.num}
+          mainRef={bodyRef}
+          hlKeyFn={bibleKeyFn}
+          readAlongOn={readAlongOn}
+          readAlongFollow={readAlongFollow}
+        />
+      )}
     </ScreenLayout>
   );
 }

@@ -347,6 +347,30 @@
         return !body.querySelector('[data-hl-key="letter:' + letterId + ':' + r[1] + '"]');
       }).length;
       if (missing) return false;
+      // 2b. THE OFFSETS, against the LIVE DOM. "The block exists" was the only
+      // thing this step checked for months, and it is exactly what let the
+      // 2026-08-12 domain drift ship: the block was always there, the wash
+      // just painted the wrong characters inside it. Walk the real text nodes
+      // the way rangeIn does and require each span to land on whole words.
+      for (var ri = 0; ri < Math.min(rows.length, 20); ri++) {
+        var row = rows[ri];
+        if (row[2] === -1) continue;                       // Format B whole-paragraph sentinel
+        var el = body.querySelector('[data-hl-key="letter:' + letterId + ':' + row[1] + '"]');
+        var full = el.textContent || '';
+        if (row[3] > full.length) return false;            // offsets outside the rendered text
+        var span = full.slice(row[2], row[3]);
+        if (!span.trim() || span !== span.trim()) return false;          // empty or edge whitespace
+        // Poetry lines are separate divs, so their textContent concatenates
+        // with NO separator ("their dross" + "And take") — a boundary at a
+        // line join sits between two word characters and is perfectly legal.
+        var joins = {}, acc = 0;
+        var plines = el.querySelectorAll('.poetry-line');
+        for (var pi = 0; pi < plines.length; pi++) { acc += (plines[pi].textContent || '').length; joins[acc] = 1; }
+        var edgeOk = function (off) {
+          return off <= 0 || off >= full.length || joins[off] || /\s/.test(full.charAt(off - 1)) || /\s/.test(full.charAt(off));
+        };
+        if (!edgeOk(row[2]) || !edgeOk(row[3])) return false;            // paints mid-word
+      }
       // typeof guards: `Highlight` is an undeclared identifier below the API's
       // support floor, so a bare reference would throw rather than skip.
       if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight !== 'function') return true;

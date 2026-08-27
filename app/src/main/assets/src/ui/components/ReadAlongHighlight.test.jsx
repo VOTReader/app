@@ -635,6 +635,24 @@ describe('tap-to-seek', () => {
     expect(AudioPlayer.getState().time).toBe(2);
   });
 
+  /* The inline icons are bare <span onClick> with no role, and they stop
+     propagation on the REACT synthetic event — which React dispatches from its
+     root container, long after the native click has already bubbled past this
+     component's native listener. So their stopPropagation cannot save them:
+     the seek fires first. Only the selector can. */
+  it.each(['verse-link-icon', 'inline-bookmark-icon', 'hl-note-icon'])(
+    'a tap on .%s does not seek the audio', (cls) => {
+      mount(); play(); clockTo(2);
+      caretAtChar(0, 20);
+      const block = document.querySelectorAll('[data-hl-key]')[0];
+      const icon = document.createElement('span');
+      icon.className = cls;
+      block.appendChild(icon);
+      tapBody(icon);
+      expect(AudioPlayer.getState().time).toBe(2);
+    },
+  );
+
   it('a tap in another block seeks to that block clause', () => {
     mount(); play(); clockTo(2);
     caretAtChar(1, 3);
@@ -656,5 +674,148 @@ describe('tap-to-seek', () => {
     delete document.caretPositionFromPoint;
     const main = document.querySelector('.letter-body');
     expect(fragmentAtPoint(SYNC['vol1:letter-a'], main, 'letter-a', letterHlKey, 5, 5)).toBe(-1);
+  });
+});
+
+/* A row can fail to resolve for reasons the data gate cannot see from disk: a
+   block that this particular render did not emit, offsets past the rendered
+   text, the Highlight constructor missing. Whatever the cause, the reader must
+   be left with NO wash. Leaving the previous clause lit while the voice moves
+   on is the worst of both worlds — it looks like a confident answer and it is
+   wrong, and it persists until the next resolvable row. */
+describe('an unresolvable row clears the wash instead of freezing it', () => {
+  it('clears when the row names a block this letter does not render', () => {
+    globalThis.AUDIO_SYNC = {
+      'vol1:letter-a': [
+        [2, 0, 0, 14, 0],
+        [5, 9, 0, 10, 0],          // block 9 does not exist
+      ],
+    };
+    mount(); play();
+    clockTo(3);
+    expect(painted()).toBe('Sentence one. ');
+    clockTo(6);
+    expect(painted()).toBeNull();
+  });
+
+  it('clears when the offsets run past the rendered text', () => {
+    globalThis.AUDIO_SYNC = {
+      'vol1:letter-a': [
+        [2, 0, 0, 14, 0],
+        [5, 0, 14, 999, 0],        // ce beyond BLOCK0's 34 characters
+      ],
+    };
+    mount(); play();
+    clockTo(3);
+    expect(painted()).toBe('Sentence one. ');
+    clockTo(6);
+    expect(painted()).toBeNull();
+  });
+});
+
+/* Bible read-along. Same component, three differences that matter: the rows
+   come from a per-edition lazy table rather than AUDIO_SYNC, the "block index"
+   column is a verse NUMBER (stable across translations where a positional
+   index is not), and the unit is the whole verse — which is what lets KJV
+   audio paint over NKJV text, the app's own default pairing. */
+describe('ReadAlongHighlight — Bible chapters', () => {
+  const VERSE1 = 'In the beginning was the Word, and the Word was with God.';
+  const VERSE2 = 'The same was in the beginning with God.';
+  const bibleKey = (bookId, n) => 'bible:' + bookId + ':1:' + n;
+
+  function BibleHost({ chapter = 1, readAlongOn = true }) {
+    const mainRef = React.useRef(null);
+    return (
+      <div className="screen-scroll">
+        <div className="chapter-body" ref={mainRef}>
+          <span data-hl-key={bibleKey('john', 1)}>{VERSE1}</span>
+          <span data-hl-key={bibleKey('john', 2)}>{VERSE2}</span>
+        </div>
+        <ReadAlongHighlight
+          volKey="bible-brm-kjv"
+          letterId="john"
+          chapter={chapter}
+          mainRef={mainRef}
+          hlKeyFn={(bookId, n) => 'bible:' + bookId + ':' + chapter + ':' + n}
+          readAlongOn={readAlongOn}
+          readAlongFollow={false}
+        />
+      </div>
+    );
+  }
+
+  const mountBible = (props) => {
+    const out = render(<BibleHost {...props} />);
+    scroller = out.container.querySelector('.screen-scroll');
+    scroller.getBoundingClientRect = () => BOX;
+    Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true, configurable: true });
+    return out;
+  };
+
+  const playChapter = (n) => act(() => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: n });
+  });
+
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:john': [
+        ['brm2_john_001', '', 'Chapter 1'],
+        ['brm2_john_002', '', 'Chapter 2'],
+        ['brm2_john_003', '', 'Chapter 3'],
+      ],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['john', 'John']];
+    // Integer centiseconds, positional by verse; 0 means "not proven".
+    globalThis.BIBLE_SYNC_BRM_KJV = { john: { 1: [500, 1200] } };
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+    delete globalThis.BIBLE_SYNC_BRM_KJV;
+  });
+
+  it('paints the WHOLE verse the voice is reading', () => {
+    mountBible(); playChapter(1);
+    clockTo(6);
+    expect(painted()).toBe(VERSE1);
+    clockTo(13);
+    expect(painted()).toBe(VERSE2);
+  });
+
+  it('paints nothing when the chapter playing is not the chapter on screen', () => {
+    // A book queues its whole remaining run, so this is the ordinary case
+    // after four minutes of listening — not an edge case.
+    mountBible({ chapter: 1 }); playChapter(3);
+    clockTo(6);
+    expect(painted()).toBeNull();
+  });
+
+  it('paints nothing for a verse this translation does not render', () => {
+    globalThis.BIBLE_SYNC_BRM_KJV = { john: { 1: [500, 1200, 1900] } };   // a verse 3 the page lacks
+    mountBible(); playChapter(1);
+    clockTo(20);
+    expect(painted()).toBeNull();
+  });
+
+  it('skips a verse the belt could not prove rather than guessing', () => {
+    globalThis.BIBLE_SYNC_BRM_KJV = { john: { 1: [0, 1200] } };           // verse 1 unproven
+    mountBible(); playChapter(1);
+    clockTo(6);
+    expect(painted()).toBeNull();
+    clockTo(13);
+    expect(painted()).toBe(VERSE2);
+  });
+
+  it('honours the read-along setting', () => {
+    mountBible({ readAlongOn: false }); playChapter(1);
+    clockTo(6);
+    expect(painted()).toBeNull();
+  });
+
+  it('never paints a letter timeline over a Bible chapter', () => {
+    delete globalThis.BIBLE_SYNC_BRM_KJV;
+    mountBible(); playChapter(1);
+    clockTo(6);
+    expect(painted()).toBeNull();
   });
 });

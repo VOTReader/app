@@ -525,7 +525,62 @@ def probe(wav_path, t, expect_text, s, whisper_leg):
     return (matched >= max(2, len(want) - 2)) and content_ok, heard[:12]
 
 
-def belt(A, B, units, s, probe_fn, snap_fn=None):
+def _interpolate_runs(rows, end_t=None, weights=None):
+    """Give every unproven-but-spoken unit its own onset, spread across the gap.
+
+    A RUN, not a row at a time. The previous form asked each missing row for the
+    midpoint of its bracketing anchors, so k consecutive misses all received the
+    SAME timestamp — and since the app takes the last row with t <= now, k-1 of
+    them were unreachable and the wash still skipped the whole passage. Spreading
+    the run proportionally by spoken length is what actually makes an unproven
+    clause paint (owner directive 2026-08-26: no part of a letter should fail to
+    highlight).
+
+    Weighted by token count, because a nine-word clause takes about three times
+    as long to speak as a three-word one and an even split would drift audibly
+    across a long gap. UNSPOKEN units are excluded and consume NO time: the
+    recording verifiably does not contain their words, so budgeting a slice of
+    the gap to them would push every following clause late.
+
+    A trailing run needs an end. end_t (the transcript duration) supplies it;
+    without one the run is left unproven rather than guessed, since the only
+    other anchor would be the start of the gap and that collapses the run again.
+    """
+    n = len(rows)
+    i = 0
+    while i < n:
+        r = rows[i]
+        if r.get("t") is not None or r.get("status") == "UNSPOKEN":
+            i += 1
+            continue
+        j = i
+        while j < n and rows[j].get("t") is None and rows[j].get("status") != "UNSPOKEN":
+            j += 1
+        prev_t = next((rows[k]["t"] for k in range(i - 1, -1, -1)
+                       if rows[k].get("t") is not None), None)
+        nxt_t = next((rows[k]["t"] for k in range(j, n)
+                      if rows[k].get("t") is not None), None)
+        if nxt_t is None:
+            nxt_t = end_t
+        if prev_t is None or nxt_t is None or nxt_t <= prev_t:
+            i = j
+            continue
+        run = rows[i:j]
+        w = [max(1, (weights[k] if weights else 1)) for k in range(i, j)]
+        # The gap also has to hold the last PROVEN clause, whose own duration we
+        # do not know; giving the run the whole span would start it too early.
+        # One extra weight-slot for that clause is the cheapest honest guess.
+        total = sum(w) + w[0]
+        span = nxt_t - prev_t
+        acc = w[0]
+        for x, wi in zip(run, w):
+            x["t"] = round(prev_t + span * (acc / total), 2)
+            x["interpolated"] = True
+            acc += wi
+        i = j
+
+
+def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
     """Adjudicate leg A against leg B, unit by unit.
 
     A: MMSLeg.align output, B: nw_rows output, both keyed by unit['owner'].
@@ -543,9 +598,12 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
                verify pass's signed probe deltas proved min() early-biased.
     PROBED_A/B legs disagree; an independent transcription at that start heard
                the unit's opening words. A is asked first — it is the precision leg.
-    REVIEW     neither candidate survived its probe. The row still carries a t,
-               interpolated between its neighbours and flagged `interpolated`, so a
-               gap is visible in QA instead of silently painting a guess.
+    REVIEW     neither candidate survived its probe. The row carries a t spread
+               across the gap between its proven neighbours (see
+               _interpolate_runs) and flagged `interpolated`. Since 2026-08-26
+               these DO ship: the owner would rather a clause paint a little
+               loose than not paint at all, and a whole passage going dark is
+               the more visible defect. UNSPOKEN still never ships.
     Ordering: snap_fn, then settings onset_bias_s (per-family empirical shift for
     music-bed editions), then monotonic clamp, then lead_in (defaults 0.0 — data
     ships true onsets; the perceptual lead lives in the app/sample constant)."""
@@ -608,19 +666,7 @@ def belt(A, B, units, s, probe_fn, snap_fn=None):
         rows.append(row)
 
     if s.get("interpolate_missing", True):
-        for i, r in enumerate(rows):
-            if r.get("t") is not None or r.get("status") == "UNSPOKEN":
-                continue
-            prev_t = next((rows[j]["t"] for j in range(i - 1, -1, -1)
-                           if rows[j].get("t") is not None and not rows[j].get("interpolated")), None)
-            nxt_t = next((rows[j]["t"] for j in range(i + 1, len(rows))
-                          if rows[j].get("t") is not None), None)
-            if prev_t is not None and nxt_t is not None:
-                r["t"] = round((prev_t + nxt_t) / 2, 2)
-                r["interpolated"] = True
-            elif prev_t is not None:
-                r["t"] = prev_t
-                r["interpolated"] = True
+        _interpolate_runs(rows, end_t, [len(u.get("tokens") or []) for u in units])
 
     bias = float(s.get("onset_bias_s", 0.0))
     last = -1.0
@@ -800,6 +846,11 @@ def settings_for(family, **overrides):
     s["family"] = family
     s.update({k: v for k, v in overrides.items() if v is not None})
     return s
+
+
+def sha10(blob):
+    """Ten hex chars of sha1 — the project's standard short fingerprint."""
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:10]
 
 
 def settings_hash(sdict):

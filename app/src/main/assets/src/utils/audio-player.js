@@ -674,6 +674,21 @@ function _chapterOfTrack(track) {
 }
 
 /**
+ * Which Bible chapter a track is, or 0 when it is not a per-chapter Bible
+ * recording. Exported because read-along must answer the same question — a
+ * book queues its whole remaining run, so the reader can be looking at
+ * Genesis 3 while Genesis 1 plays, and painting then would be a confident lie.
+ * Exported rather than re-parsed there: the label format is this module's, and
+ * a second copy of the regex is a second thing to drift.
+ *
+ * @param {Track | null | undefined} track
+ * @returns {number}
+ */
+function bibleChapterOfTrack(track) {
+  return _chapterOfTrack(track);
+}
+
+/**
  * A recording finished playing to its end (owner directive 2026-08-09: a full
  * listen counts like a full read — the item's read count increments). Fired
  * from 'ended' BEFORE next() advances; range-compilation sections carry key
@@ -2194,6 +2209,7 @@ export const AudioPlayer = {
   playSection,
   playBibleBook,
   bibleChapterStart,
+  bibleChapterOfTrack,
   playTrack,
   toggle,
   next,

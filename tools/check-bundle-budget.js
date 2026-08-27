@@ -26,7 +26,8 @@ import { statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets', 'dist');
+const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets');
+const DIST = join(ASSETS, 'dist');
 
 /* file → max bytes. Measured 2026-08-10 with `ls -la dist/`, ceiling ≈ +15%.
    `measured` is kept beside each ceiling so the next reader can see how much
@@ -48,6 +49,15 @@ const BUDGETS = [
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   { file: 'bundle-a-matthew.js', measured: 492357, max: 567000 },
   { file: 'bundle-a-vot.js', measured: 2432537, max: 2798000 },
+  // ── raw src/data files the app fetches directly (never bundled) ──
+  // Bible read-along verse timings, one per audio edition, loaded only while a
+  // Bible recording is playing. The ceiling is set from the PROJECTED full
+  // edition (31,102 verses at ~5.6 bytes each plus book/chapter keys ≈ 184 KB),
+  // not from whatever tranche has shipped so far — otherwise the second and
+  // third editions could quietly double it one book at a time.
+  { file: 'src/data/bible-sync-brm-kjv.js', measured: 184000, max: 215000, optional: true },
+  { file: 'src/data/bible-sync-wop-nkjv.js', measured: 184000, max: 215000, optional: true },
+  { file: 'src/data/bible-sync-web-ebible.js', measured: 184000, max: 215000, optional: true },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';
@@ -55,9 +65,17 @@ const kb = (n) => (n / 1000).toFixed(1) + ' KB';
 const over = [];
 const missing = [];
 for (const b of BUDGETS) {
+  // A path with a separator is relative to the assets root (a raw src/data
+  // file the app fetches directly); a bare name is a dist/ bundle.
+  const path = b.file.includes('/') ? join(ASSETS, b.file) : join(DIST, b.file);
   let size;
-  try { size = statSync(join(DIST, b.file)).size; }
-  catch (_e) { missing.push(b.file); continue; }
+  try { size = statSync(path).size; }
+  catch (_e) {
+    // `optional` covers editions that have not been aligned yet: a ceiling
+    // should be in place BEFORE the first tranche lands, not after.
+    if (!b.optional) missing.push(b.file);
+    continue;
+  }
   if (size > b.max) over.push({ ...b, size });
 }
 

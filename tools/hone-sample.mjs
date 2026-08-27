@@ -28,6 +28,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { runInNewContext } from 'vm';
 import { resolve, dirname, join, extname } from 'path';
 import { fileURLToPath } from 'url';
+import { blockDomainText } from './audio-fragments-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
@@ -168,7 +169,12 @@ for (const spec of specs) {
 
 // --------------------------------------------------------------- render ---
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const segText = (s) => (!s || s.t === 'stanza-break') ? '' : String(s.v == null ? '' : s.v);
+// NOT a local segment join. This page slices spans at offsets measured in the
+// block's DOM textContent domain, so it must render THAT domain — a naive
+// segments.join('') drops the collision-guard space Segments injects between
+// adjacent segments, and every span then draws shifted by exactly the drift
+// the 2026-08-12 fix removed (a correct letter looks broken here, a broken one
+// looks plausible). One definition, in audio-fragments-lib.
 
 function spanOpen(fi) {
   const r = rows.get(fi);
@@ -221,17 +227,15 @@ if (fmt === 'B') {
 } else {
   (letter.blocks || []).forEach((b, bi) => {
     if (b.type === 'para' || b.type === 'intro' || b.type === 'closing-fn') {
-      const text = (b.segments || []).map(segText).join('');
-      body += `<p class="para">${renderBlockText(text, bi)}</p>\n`;
+      body += `<p class="para">${renderBlockText(blockDomainText(b).text, bi)}</p>\n`;
     } else if (b.type === 'poetry') {
-      let pos = 0;
+      const { text, lineBounds } = blockDomainText(b);
       const lines = [];
-      if (b.lines) for (const line of b.lines) {
-        const lt = (line || []).map(segText).join('');
-        lines.push({ cs: pos, ce: pos + lt.length, lt });
-        pos += lt.length;
+      let pos = 0;
+      for (const ce of [...lineBounds, text.length].sort((x, y) => x - y)) {
+        lines.push({ cs: pos, ce, lt: text.slice(pos, ce) });
+        pos = ce;
       }
-      const text = lines.map((l) => l.lt).join('');
       body += '<div class="poetry">' + lines.map((l) => `<div class="pline">${renderBlockText(text, bi, l)}</div>`).join('\n') + '</div>\n';
     } else if (b.type === 'closing') {
       body += `<p class="closing">${renderBlockText(String(b.text || ''), bi)}</p>\n`;

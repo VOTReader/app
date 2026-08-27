@@ -291,7 +291,7 @@ def run_belt(key, s, asset=None):
 
         snap = al.make_snap(al.silence_intervals(wav))
         rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, whisper),
-                       snap_fn=snap)
+                       snap_fn=snap, end_t=tx.get("dur"))
         ratio = {}
         for u in units:
             b = B.get(u["owner"])
@@ -369,12 +369,17 @@ def run_belt(key, s, asset=None):
                 row["clamped"] = True
             row["ship_t"] = t
             last_t = t
-            # Interpolated REVIEW guesses are QA-visible but NEVER shipped —
-            # the app paints only belt-proven onsets (owner: no wrong highlight;
-            # a skipped clause just doesn't paint until the next proven one).
-            if not row.get("interpolated"):
-                tuples.append([t, f["bi"], f["cs"], f["ce"], row["part"]] if fmt == "A"
-                              else [t, f["pi"], -1, -1, row["part"]])
+            # Interpolated rows DO ship (owner directive 2026-08-26). The old
+            # rule — paint only belt-proven onsets — meant an unproven clause
+            # went dark and the wash jumped over it, which reads as the feature
+            # being broken. An onset spread across the gap by _interpolate_runs
+            # is a little loose but always in the right passage, and that is the
+            # trade the owner asked for. UNSPOKEN rows are still never shipped:
+            # those words are provably absent from the recording, so painting
+            # them would wash text the voice is not reading. They carry no t at
+            # all and never reach here.
+            tuples.append([t, f["bi"], f["cs"], f["ce"], row["part"]] if fmt == "A"
+                          else [t, f["pi"], -1, -1, row["part"]])
         results.append(row)
 
     # COVERAGE MEASURES THE ALIGNMENT, NOT THE PAGE. Units proven absent from

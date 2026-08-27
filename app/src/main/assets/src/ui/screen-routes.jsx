@@ -1056,6 +1056,8 @@ export function buildScreenRoutes({
         surpriseAnchor={surpriseAnchor}
         backHint={backHint} onTapThroughBack={tapThroughBack}
         onLinkOpen={openLinkSidebar}
+        readAlongOn={sharedViewProps.readAlongOn}
+        readAlongFollow={sharedViewProps.readAlongFollow}
       />
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
