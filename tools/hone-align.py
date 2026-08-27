@@ -226,6 +226,12 @@ def run_legacy(key, s):
             if t >= last_t:
                 f = frags[r["fi"]]
                 r["ship_t"] = t
+                # LEGACY PATH ONLY (see the docstring: byte-stability harness
+                # for the retired align-audio.py output). It still emits the
+                # -1/-1 whole-paragraph sentinel because that is what the data
+                # it reproduces contained; run_belt below is what ships, and it
+                # emits real Format B offsets. Do not "fix" this to match --
+                # the point of this path is that its output does not move.
                 tuples.append([t, f["bi"], f["cs"], f["ce"], r["part"]] if fmt == "A"
                               else [t, f["pi"], -1, -1, r["part"]])
                 last_t = t

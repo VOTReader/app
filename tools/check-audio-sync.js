@@ -199,6 +199,7 @@ function checkTimeline(key, itemKey, rows) {
   const lastT = new Map();
   const spansByBlock = new Map();
   const blockCache = new Map();
+  const paraCache = new Map();
 
   for (const row of rows) {
     if (!Array.isArray(row) || row.length < 4) { note(failures, key, 'MALFORMED-ROW', { row }); continue; }
@@ -232,13 +233,13 @@ function checkTimeline(key, itemKey, rows) {
         if (!(cs === -1 && ce === -1)) note(failures, key, 'HALF-SENTINEL', { row });
         continue;
       }
-      const spoken = formatBSpoken(item.paragraphs[bi].text);
+      if (!paraCache.has(bi)) paraCache.set(bi, formatBSpoken(item.paragraphs[bi].text));
+      const spoken = paraCache.get(bi);
       if (!(cs >= 0 && ce > cs && ce <= spoken.length)) {
         note(failures, key, 'OUT-OF-BOUNDS', { row, len: spoken.length });
         continue;
       }
       timedChars += ce - cs;
-      touchedChars += 0;                                  // counted per paragraph below
       if (emitProbeText) (probeRows[key] = probeRows[key] || []).push([t, bi, cs, ce, part, spoken.slice(cs, ce)]);
       if (!spanClean(spoken, cs, ce, EMPTY_BOUNDS)) {
         note(failures, key, 'DRIFTED-OTHER', {
@@ -307,6 +308,10 @@ function checkTimeline(key, itemKey, rows) {
     const dom = blockCache.get(bi);
     if (dom) touchedChars += dom.text.length;
   }
+  // Format B's denominator, counted once per paragraph rather than once per
+  // row -- adding it per row would grow the numerator and not the denominator,
+  // and the reported coverage would climb past 100% as soon as WTLB shipped.
+  for (const spoken of paraCache.values()) touchedChars += spoken.length;
 }
 
 // ------------------------------------------------------------------- run --
