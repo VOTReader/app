@@ -216,6 +216,37 @@ def load_wav_16k(path):
     return torch.from_numpy(pcm.astype("float32") / 32768.0).unsqueeze(0), 16000
 
 
+_PCM_CACHE = {"path": None, "pcm": None}
+
+
+def pcm_16k(path):
+    """The whole recording as float32 mono at 16 kHz, cached for one file.
+
+    Probes used to be cut with a separate `ffmpeg -ss ... -t 7` process each.
+    On a corpus run that is tens of thousands of process launches -- Volume One
+    alone probed 8-80 times per letter -- and Windows does not survive it: the
+    2026-08-26 batch died at letter 26 of 172 with 0xC0000142
+    (STATUS_DLL_INIT_FAILED), the session's desktop heap exhausted by the spawn
+    rate. ffmpeg itself was fine; a fresh shell ran the very same command.
+
+    Slicing an array we already have costs no process at all, and the file is
+    already 16 kHz mono s16le because to_wav16k made it that way -- exactly what
+    faster-whisper wants, so no resampling either.
+    """
+    import wave
+    import numpy as np
+    if _PCM_CACHE["path"] == path:
+        return _PCM_CACHE["pcm"]
+    with wave.open(path, "rb") as w:
+        assert w.getframerate() == 16000 and w.getnchannels() == 1 and w.getsampwidth() == 2,             f"expected 16k mono s16le, got {w.getframerate()}/{w.getnchannels()}ch/{w.getsampwidth() * 8}bit"
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+    arr = pcm.astype("float32") / 32768.0
+    # One entry: the legs walk a single recording at a time, and a 35-minute
+    # letter is ~134 MB as float32 -- worth holding once, never twice.
+    _PCM_CACHE["path"], _PCM_CACHE["pcm"] = path, arr
+    return arr
+
+
 def cuda_dll_dirs():
     """Windows: cuBLAS/cuDNN ship inside the wheels, not on PATH. ctranslate2 loads
     them with LoadLibrary, so the directories have to be registered first."""
@@ -274,9 +305,12 @@ class WhisperLeg:
             json.dump(data, open(cache_path, "w", encoding="utf-8"))
         return data
 
-    def transcribe_probe(self, clip_path):
-        """Bare transcription of a probe clip — no prompt, no VAD, no word stamps."""
-        segs, _ = self.model().transcribe(clip_path, language="en",
+    def transcribe_probe(self, clip):
+        """Bare transcription of a probe clip — no prompt, no VAD, no word stamps.
+
+        `clip` is a float32 numpy array at 16 kHz (faster-whisper accepts one
+        directly), or a path for callers that still hand over a file."""
+        segs, _ = self.model().transcribe(clip, language="en",
                                           beam_size=self.s["probe_beam"],
                                           temperature=0.0,
                                           condition_on_previous_text=False)
@@ -490,13 +524,13 @@ def probe(wav_path, t, expect_text, s, whisper_leg):
     The window is deliberately long: a dramatised reading pauses mid-verse
     ("Then God said," [beat, actor change] "Let there be...") and a short window
     hears only the first half and fails a perfectly good stamp."""
-    clip = os.path.join(WORK, "_probe-%d.wav" % os.getpid())
-    os.makedirs(WORK, exist_ok=True)
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(max(0, t - 0.2)),
-                    "-t", str(s["probe_len"]), "-i", wav_path,
-                    "-ar", "16000", "-ac", "1", clip], check=True)
+    pcm = pcm_16k(wav_path)
+    a = int(max(0.0, t - 0.2) * 16000)
+    b = min(len(pcm), a + int(s["probe_len"] * 16000))
     nrm = normalizer(s)
-    segs = whisper_leg.transcribe_probe(clip)
+    if b <= a:
+        return False, []
+    segs = whisper_leg.transcribe_probe(pcm[a:b])
     heard = [nrm(w) for seg in segs for w in seg.text.split() if nrm(w)]
     # Deut-15 lesson (BRM prior art): scripture is formulaic — an anchor made
     # only of function words matches almost anywhere and false-confirms bad
