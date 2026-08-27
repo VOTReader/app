@@ -70,10 +70,11 @@ function defaultBookTitle(id) {
  * @param {string} text raw paragraph text
  * @param {{ refs?: Array<{ref: string, trailing: boolean, num: number|null}>,
  *           footnotesMode?: boolean, bookTitle?: (id: string) => string }} opts
- * @returns {{ text: string, runs: Array<{raw: number, rawEnd: number, dom: number, domEnd: number, copy: boolean}> }}
+ * @returns {{ text: string, runs: Array<{raw: number, rawEnd: number, dom: number, domEnd: number, copy: boolean}>, lineBounds: Set<number> }}
  */
 function walk(text, opts) {
   const runs = [];
+  const lineBounds = new Set();
   let dom = '';
   const state = { refIndex: 0 };
 
@@ -119,19 +120,32 @@ function walk(text, opts) {
         push(start, seg.length, '[' + title + ' ' + Number(nav[2]) + ']', false);
         continue;
       }
-      // Plain text: renderText splits on \n and emits <br/>, which contributes
-      // nothing to textContent. Every soft break is therefore a deletion.
+      // Plain text: renderText splits on the break and emits <br/>, which
+      // contributes nothing to textContent, so every soft break is a deletion.
       let cursor = start;
-      for (const piece of seg.split('\n')) {
+      const pieces = seg.split('\n');
+      for (let k = 0; k < pieces.length; k++) {
+        const piece = pieces[k];
         if (piece) push(cursor, piece.length, piece, true);
         cursor += piece.length;
-        if (cursor < start + seg.length) { push(cursor, 1, '', false); cursor += 1; }
+        if (k < pieces.length - 1) {
+          push(cursor, 1, '', false);
+          // The two lines now meet with NOTHING between them in textContent —
+          // exactly the way Format A poetry lines do. Record the seam: a span
+          // boundary there joins two word characters and is perfectly legal,
+          // and a word-boundary check that does not know it rejects every
+          // line in the corpus.
+          lineBounds.add(dom.length);
+          cursor += 1;
+        }
       }
     }
   };
 
   emit(text, 0);
-  return { text: dom, runs };
+  lineBounds.delete(0);
+  lineBounds.delete(dom.length);
+  return { text: dom, runs, lineBounds };
 }
 
 /**
@@ -153,10 +167,10 @@ export function formatBDomText(text, opts) {
  *
  * @param {string} text
  * @param {object} [opts]
- * @returns {{ text: string, toDom: (rawOffset: number, isEnd?: boolean) => number }}
+ * @returns {{ text: string, lineBounds: Set<number>, toDom: (rawOffset: number, isEnd?: boolean) => number }}
  */
 export function formatBOffsetMap(text, opts) {
-  const { text: dom, runs } = walk(String(text == null ? '' : text), opts || {});
+  const { text: dom, runs, lineBounds } = walk(String(text == null ? '' : text), opts || {});
   /**
    * @param {number} off raw offset
    * @param {boolean} [isEnd] true for a span's exclusive end, which must land
@@ -178,5 +192,5 @@ export function formatBOffsetMap(text, opts) {
     }
     return Math.max(0, Math.min(dom.length, out));
   };
-  return { text: dom, toDom };
+  return { text: dom, lineBounds, toDom };
 }

@@ -24,6 +24,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 import { formatBDomText, formatBOffsetMap } from './format-b-dom-text.js';
+import { formatBFragments } from '../../../../../../tools/audio-fragments-lib.mjs';
 import { WtlbEntryView } from '../ui/screens/WtlbEntryView.jsx';
 import { wtlbHlKey } from './hl-keys.js';
 
@@ -218,5 +219,74 @@ describe('THE CONTRACT — the projection equals what WtlbEntryView renders', ()
     expect(paragraphs).toBeGreaterThan(1200);         // the corpus really loaded
     expect(bad.slice(0, 6)).toEqual([]);
     expect(bad.length).toBe(0);
-  });
+  }, 120000);
+});
+
+/* THE END-TO-END SWEEP. The previous contract proves the projection reproduces
+   the rendered TEXT. This one proves the thing that actually ships: every
+   fragment the aligner will be given, projected onto the live DOM, selects a
+   whole-word run of exactly the words that fragment covers.
+   
+   It is the difference between "the map is accurate" and "the map is accurate
+   AND the route drawn on it goes where it says". 365 entries and ~4,700
+   fragments go out on this in one batch, so both have to hold before a single
+   GPU-hour is spent. */
+describe('THE ROUTE — every extractor fragment paints its own words', () => {
+  const ctx2 = {};
+  for (const f of ['wtlb-one.js', 'wtlb-two.js', 'the-blessed.js']) {
+    runInNewContext(readFileSync(resolve(DATA, f), 'utf8'), ctx2, { filename: f });
+  }
+  const all = [...(ctx2.WTLB_ONE || []), ...(ctx2.WTLB_TWO || []), ...(ctx2.THE_BLESSED || [])].filter(Boolean);
+
+  it.each([true, false])('holds for every fragment with footnotesMode=%s', (footnotesMode) => {
+    const bad = [];
+    let checked = 0;
+    for (const entry of all) {
+      const refsPer = refAnalysis(entry.paragraphs || [], footnotesMode);
+      let live;
+      try { live = renderedParagraphs(entry, footnotesMode); } catch (_e) {
+        bad.push(`${entry.id}: render threw`); cleanup(); continue;
+      }
+      const maps = (entry.paragraphs || []).map((p, pi) => formatBOffsetMap(p.text, { refs: refsPer[pi], footnotesMode }));
+      for (const f of formatBFragments(entry)) {
+        const dom = live[f.pi];
+        const m = maps[f.pi];
+        if (dom == null || !m) continue;
+        checked++;
+        const a = m.toDom(f.cs);
+        const b = m.toDom(f.ce, true);
+        const span = dom.slice(a, b);
+        // "Does not split a WORD", which is the right rule in the DOM domain.
+        // The gate uses the stricter after-whitespace form, but it checks the
+        // SPOKEN domain where an unspoken bracket is already a space; here the
+        // bracket is really on screen, so `[The Lord answered]` legitimately
+        // washes its words and not its brackets.
+        const W = /[A-Za-z0-9’']/;
+        const edgeOk = (off) => off <= 0 || off >= dom.length || m.lineBounds.has(off)
+          || !W.test(dom.charAt(off - 1)) || !W.test(dom.charAt(off));
+        if (!edgeOk(a) || !edgeOk(b)) {
+          bad.push(`${entry.id} p${f.pi} [${f.cs},${f.ce}) -> [${a},${b}) cuts a word: ${JSON.stringify(span.slice(0, 50))}`);
+          continue;
+        }
+        // The words the fragment covers must be the words that get painted --
+        // except where the renderer SUBSTITUTED something, since a reference
+        // shown as a footnote number cannot contain its own words. Those spans
+        // still have their boundaries checked above.
+        const rawSpan = (entry.paragraphs[f.pi].text || '').slice(f.cs, f.ce);
+        if (rawSpan.includes('{{')) continue;
+        const wordsOf = (t) => (t.match(/[A-Za-z']+/g) || []).join(' ').toLowerCase();
+        const want = wordsOf(f.text);
+        const got = wordsOf(span);
+        if (want && got !== want) {
+          bad.push(`${entry.id} p${f.pi} words differ
+    fragment: ${JSON.stringify(want.slice(0, 70))}
+    painted:  ${JSON.stringify(got.slice(0, 70))}`);
+        }
+      }
+      cleanup();
+    }
+    expect(checked).toBeGreaterThan(4000);
+    expect(bad.slice(0, 5)).toEqual([]);
+    expect(bad.length).toBe(0);
+  }, 120000);
 });
