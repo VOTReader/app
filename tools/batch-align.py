@@ -42,6 +42,40 @@ ha = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ha)
 
 
+def _rss_gb():
+    """Resident set in GB, or 0.0 where the platform will not say.
+
+    GetCurrentProcess returns a POINTER-sized pseudo-handle (-1); leaving
+    ctypes to default its restype to 32-bit int truncates it and the call fails
+    silently, returning 0 forever -- a metric that always reads zero is worse
+    than no metric, because it looks like good news.
+    """
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+        k = ctypes.windll.kernel32
+        k.GetCurrentProcess.restype = ctypes.c_void_p
+        c = PMC()
+        c.cb = ctypes.sizeof(c)
+        if not k.K32GetProcessMemoryInfo(ctypes.c_void_p(k.GetCurrentProcess()),
+                                         ctypes.byref(c), c.cb):
+            return 0.0
+        return c.WorkingSetSize / (1024 ** 3)
+    except Exception:                                               # noqa: BLE001
+        return 0.0
+
+
 def belt_path(key, asset=None):
     safe = key.replace(":", "__")
     if asset:
@@ -129,7 +163,12 @@ def main():
                            d.get("confirmed", 0), d.get("probed", 0), d.get("review", 0),
                            tag, unspoken))
         if n % 5 == 0 or n == len(keys):
-            print(f"  [{n}/{len(keys)}] {key} done")
+            # Resident memory rides the progress line. The 2026-08-26 run grew
+            # from 7.8 GB to 15.3 GB and then stopped completing anything --
+            # one core pinned, no belt for 45 minutes -- because run_belt built
+            # a fresh whisper + MMS leg per letter. That is fixed, but a creep
+            # that is invisible is a creep nobody catches twice.
+            print(f"  [{n}/{len(keys)}] {key} done   rss {_rss_gb():.1f} GB", flush=True)
 
     rep_path = os.path.join(REPORTS, f"batch-{'-'.join(sorted(vols))}.txt")
     with open(rep_path, "w", encoding="utf-8") as f:

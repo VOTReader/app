@@ -173,12 +173,34 @@ def align_greedy(words, frags, nrm, first_window=260):
     return out
 
 
+_MMS = {}
+_WL = {}
+
+
+def _legs(s):
+    """ONE whisper leg and ONE MMS leg per settings hash, for the whole process.
+
+    run_belt used to build both per letter. Nothing reloads them explicitly, but
+    ctranslate2's WhisperModel and torchaudio's wav2vec2 hold native memory that
+    CPython does not free promptly, so a batch accumulated a fresh ~4 GB of
+    models every letter: the 2026-08-26 overnight run grew from 7.8 GB to 15.3 GB
+    resident over ~20 letters and then stopped completing anything at all --
+    one core pinned, no belt written for 45 minutes. The letter it was stuck on
+    finishes in 87 seconds in a fresh process.
+
+    hone-bible.py has had this since it was written; batch-align is the caller
+    that made it matter here.
+    """
+    h = al.settings_hash(s)
+    return (_WL.setdefault(h, al.WhisperLeg(s)), _MMS.setdefault(h, al.MMSLeg(s)))
+
+
 def run_legacy(key, s):
     """Leg B only, exactly as the pre-_alignlib lab ran it — the archived-output
     byte-stability harness. New work uses run_belt()."""
     frags, fmt = fragments_for(key)
     tracks, _rend = resolve_tracks(key)
-    whisper = al.WhisperLeg(s)
+    whisper, _mms = _legs(s)
     print(f"{key}: {len(frags)} fragments, {len(tracks)} part(s), format {fmt}  [LEGACY leg-B]")
 
     results, tuples = [], []
@@ -258,7 +280,7 @@ def run_belt(key, s, asset=None):
     tracks, rend = resolve_tracks(key, asset)
     n = len(frags)
     toks = [al.spoken_words(f["text"]) for f in frags]
-    whisper, mms = al.WhisperLeg(s), al.MMSLeg(s)
+    whisper, mms = _legs(s)
     print(f"{key}: {len(frags)} fragments, {len(tracks)} part(s), format {fmt}, {rend}")
     print(f"family {s['family']}  settings {al.settings_hash(s)}  lead_in {s['lead_in']}")
 
