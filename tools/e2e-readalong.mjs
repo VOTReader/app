@@ -222,6 +222,69 @@ const READ_PAINT = `(() => {
  * desk's title button), so the harness reaches the reading screen the way a
  * listener does instead of inventing a navigation path that could drift.
  */
+/**
+ * volKey -> the corpus globals that hold it.
+ *
+ * Scoping by volume is not tidiness: ids COLLIDE across collections. Both
+ * wtlb1 and blessed carry an entry called "introduction", so an opener that
+ * takes the first id match anywhere silently reads the wrong entry and then
+ * every offset comparison downstream is nonsense -- which is exactly what
+ * happened, and it looked like a projection bug.
+ */
+const CORPUS_GLOBALS = {
+  one: ['LETTERS_V1_PREFACE', 'LETTERS_V1'],
+  two: ['LETTERS'],
+  three: ['LETTERS_V3_PREFACE', 'LETTERS_V3'],
+  four: ['LETTERS_V4_PREFACE', 'LETTERS_V4'],
+  five: ['LETTERS_V5_PREFACE', 'LETTERS_V5'],
+  six: ['LETTERS_V6_PREFACE', 'LETTERS_V6'],
+  seven: ['LETTERS_V7_PREFACE', 'LETTERS_V7'],
+  timothy: ['LETTERS_TIMOTHY_PREFACE', 'LETTERS_TIMOTHY'],
+  flock: ['LETTERS_FLOCK_PREFACE', 'LETTERS_FLOCK'],
+  rebuke: ['LETTERS_REBUKE_PREFACE', 'LETTERS_REBUKE'],
+  wtlb1: ['WTLB_ONE'],
+  wtlb2: ['WTLB_TWO'],
+  blessed: ['THE_BLESSED'],
+  holydays: ['HOLY_DAYS'],
+};
+
+/** WTLB One/Two, The Blessed, and the paragraph-shaped Holy Days entries. */
+const FORMAT_B_VOLS = new Set(['wtlb1', 'wtlb2', 'blessed']);
+
+/**
+ * Open a Format B entry with its audio playing. Same audio-to-text bridge as
+ * the letters; only the corpus it looks in and the shape of its text differ.
+ */
+async function openEntry(page, volKey, entryId) {
+  await page.evaluate(() => { window.__loadVotCorpus(); });
+  await page.waitForFunction('window.__votCorpus && window.__votCorpus.loaded', { timeout: 30000 });
+  const found = await page.evaluate((id, names) => {
+    for (const name of names) {
+      const v = window[name];
+      if (!v) continue;
+      for (const e of (Array.isArray(v) ? v : [v])) {
+        if (e && e.id === id && e.paragraphs) { window.__votE2EEntry = e; return true; }
+      }
+    }
+    return false;
+  }, entryId, CORPUS_GLOBALS[volKey] || []);
+  if (!found) return { ok: false, reason: 'entry not in corpus (or has no paragraphs)' };
+  const queued = await page.evaluate((vk) => {
+    AudioPlayer.playLetter({ volKey: vk, letter: window.__votE2EEntry, collectionLabel: 'e2e' });
+    const st = AudioPlayer.getState();
+    return !!st.queue[st.qi];
+  }, volKey);
+  if (!queued) return { ok: false, reason: 'no track queued' };
+  const opened = await page.evaluate(() => {
+    if (typeof window.__openAudioText !== 'function') return false;
+    const st = AudioPlayer.getState();
+    window.__openAudioText(st.queue[st.qi]);
+    return true;
+  });
+  if (!opened) return { ok: false, reason: '__openAudioText missing' };
+  return { ok: true, reason: '' };
+}
+
 async function openLetter(page, volKey, letterId) {
   // Deliberately several small evaluates rather than one async block. Loading
   // the lazy corpus and opening the reader both tear down and rebuild the
@@ -229,18 +292,14 @@ async function openLetter(page, volKey, letterId) {
   // back as "Promise was collected" rather than a result.
   await page.evaluate(() => { window.__loadVotCorpus(); });
   await page.waitForFunction('window.__votCorpus && window.__votCorpus.loaded', { timeout: 30000 });
-  const found = await page.evaluate((id) => {
-    const corpora = ['LETTERS_V1_PREFACE', 'LETTERS_V1', 'LETTERS', 'LETTERS_V3_PREFACE', 'LETTERS_V3',
-      'LETTERS_V4_PREFACE', 'LETTERS_V4', 'LETTERS_V5_PREFACE', 'LETTERS_V5', 'LETTERS_V6_PREFACE',
-      'LETTERS_V6', 'LETTERS_V7_PREFACE', 'LETTERS_V7', 'LETTERS_TIMOTHY_PREFACE', 'LETTERS_TIMOTHY',
-      'LETTERS_FLOCK_PREFACE', 'LETTERS_FLOCK', 'LETTERS_REBUKE_PREFACE', 'LETTERS_REBUKE'];
-    for (const name of corpora) {
+  const found = await page.evaluate((id, names) => {
+    for (const name of names) {
       const v = window[name];
       if (!v) continue;
       for (const l of (Array.isArray(v) ? v : [v])) if (l && l.id === id) { window.__votE2ELetter = l; return true; }
     }
     return false;
-  }, letterId);
+  }, letterId, CORPUS_GLOBALS[volKey] || []);
   if (!found) return { ok: false, reason: 'letter not in corpus' };
   // Start the audio, then use the app's OWN bridge to jump the reader to the
   // text that is playing — the listening desk's title button. Reaching the
@@ -468,12 +527,58 @@ async function run() {
 
     for (const key of (bibleSpec && !opt('keys', '') ? [] : keys)) {
       const [volKey, letterId] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
-      const opened = await openLetter(page, volKey, letterId);
+      const isB = FORMAT_B_VOLS.has(volKey);
+      const opened = isB ? await openEntry(page, volKey, letterId) : await openLetter(page, volKey, letterId);
       if (!opened.ok) { failures.push({ key, kind: 'NAV', detail: opened.reason }); continue; }
       await sleep(700);
 
       /* ── ASSERTION A: the modelled domain IS the rendered domain ────── */
-      const domCheck = await page.evaluate((id) => {
+      const domCheck = await page.evaluate((id, formatB) => {
+        if (formatB) {
+          // The Format B analogue: the rendered text must equal what
+          // formatBDomText projects, since that projection is what the paint
+          // path trusts to place a corpus offset.
+          const entry = window.__votE2EEntry;
+          const proj = window.formatBDomText;
+          if (typeof proj !== 'function') return { err: 'formatBDomText not on window' };
+          // The route's footnotesMode is not exposed, so rather than guess:
+          // project BOTH ways and require the render to match one of them, the
+          // SAME one across the whole entry. That still fails a broken
+          // projection; it only declines to assume which mode is on.
+          const scan = (fm) => {
+            const refNum = {};
+            let n = 0;
+            return (entry.paragraphs || []).map((p) => {
+              const arr = [];
+              const re = /\{\{ref:([^}]+)\}\}/g;
+              let m;
+              while ((m = re.exec(p.text)) !== null) {
+                const ref = m[1].trim();
+                const after = p.text.slice(m.index + m[0].length);
+                const stripped = after.replace(/\{\{(?:ref|nav):[^}]+\}\}/g, '');
+                const trailing = !/\w/.test(stripped) && !/\{\{(?:ref|nav):/.test(after);
+                let num = null;
+                if (fm && !trailing) { if (!(ref in refNum)) { n++; refNum[ref] = n; } num = refNum[ref]; }
+                arr.push({ ref, trailing, num });
+              }
+              return arr;
+            });
+          };
+          const results = [true, false].map((fm) => {
+            const refs = scan(fm);
+            const badB = [];
+            (entry.paragraphs || []).forEach((p, pi) => {
+              const el = document.querySelector('[data-hl-key="wtlb:' + id + ':' + pi + '"]');
+              if (!el) return;
+              const got = el.textContent || '';
+              const want = proj(p.text, { refs: refs[pi] || [], footnotesMode: fm });
+              if (got !== want) badB.push({ bi: pi, wantLen: want.length, gotLen: got.length, want: want.slice(0, 70), got: got.slice(0, 70) });
+            });
+            return badB;
+          });
+          const win = results[0].length <= results[1].length ? 0 : 1;
+          return { bad: results[win], blocks: (entry.paragraphs || []).length, fmMode: win === 0 };
+        }
         const letter = window.__votE2ELetter;
         const seg = window.segmentsDomText;
         if (typeof seg !== 'function') return { err: 'segmentsDomText not on window' };
@@ -492,7 +597,7 @@ async function run() {
           }
         });
         return { bad, blocks: (letter.blocks || []).length };
-      }, letterId);
+      }, letterId, isB);
       if (domCheck.err) { failures.push({ key, kind: 'HARNESS', detail: domCheck.err }); continue; }
       for (const b of domCheck.bad) {
         failures.push({
@@ -515,8 +620,29 @@ async function run() {
       /* ── ASSERTION B: seek to each row, read what painted ───────────── */
       const rows = (ctx.AUDIO_SYNC[key] || []).filter((r) => (r[4] || 0) === 0);
       const limit = opt('rows', '') === 'all' ? rows.length : Math.min(rows.length, Number(opt('rows', 40)));
-      const sampled = await page.evaluate(async (rowsIn, lead, readSrc, id) => {
+      const sampled = await page.evaluate(async (rowsIn, lead, readSrc, id, formatB, fmMode) => {
         const readPaint = new Function('return ' + readSrc);
+        const maps = {};
+        if (formatB) {
+          const entry = window.__votE2EEntry;
+          const refNum = {};
+          let n = 0;
+          (entry.paragraphs || []).forEach((p, pi) => {
+            const arr = [];
+            const re = /\{\{ref:([^}]+)\}\}/g;
+            let m;
+            while ((m = re.exec(p.text)) !== null) {
+              const ref = m[1].trim();
+              const after = p.text.slice(m.index + m[0].length);
+              const stripped = after.replace(/\{\{(?:ref|nav):[^}]+\}\}/g, '');
+              const trailing = !/\w/.test(stripped) && !/\{\{(?:ref|nav):/.test(after);
+              let num = null;
+              if (fmMode && !trailing) { if (!(ref in refNum)) { n++; refNum[ref] = n; } num = refNum[ref]; }
+              arr.push({ ref, trailing, num });
+            }
+            maps[pi] = window.formatBOffsetMap(p.text, { refs: arr, footnotesMode: fmMode });
+          });
+        }
         const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const out = [];
         for (let i = 0; i < rowsIn.length; i++) {
@@ -525,7 +651,20 @@ async function run() {
           AudioPlayer.seek(Math.max(0, t - lead + 0.02));
           await frame();
           const p = readPaint();
-          const el = document.querySelector('[data-hl-key="letter:' + id + ':' + rowsIn[i][1] + '"]');
+          const el = document.querySelector('[data-hl-key="' + (formatB ? 'wtlb:' : 'letter:') + id + ':' + rowsIn[i][1] + '"]');
+          // FORMAT B: the row's offsets are CORPUS offsets. Slicing the
+          // rendered text with them directly is precisely the mistake the
+          // projection exists to prevent, so project first -- the same call
+          // the paint path makes.
+          let cs = rowsIn[i][2];
+          let ce = rowsIn[i][3];
+          let lineJoins = null;
+          if (formatB && maps[rowsIn[i][1]]) {
+            const mp = maps[rowsIn[i][1]];
+            cs = mp.toDom(rowsIn[i][2]);
+            ce = mp.toDom(rowsIn[i][3], true);
+            lineJoins = mp.lineBounds;
+          }
           // Whole-word test against the LIVE text. "painted === slice(cs,ce)"
           // is true by construction — rangeIn walks the very same string — so
           // it can never see a bad offset. This can: a boundary must sit at an
@@ -540,12 +679,13 @@ async function run() {
             const plines = el.querySelectorAll('.poetry-line');
             for (let k = 0; k < plines.length; k++) { acc += (plines[k].textContent || '').length; joins[acc] = 1; }
             const okAt = (off) => off <= 0 || off >= full.length || joins[off]
+              || (lineJoins && lineJoins.has(off))
               || /\s/.test(full.charAt(off - 1)) || /\s/.test(full.charAt(off));
-            edgeOk = okAt(rowsIn[i][2]) && okAt(rowsIn[i][3]);
+            edgeOk = okAt(cs) && okAt(ce);
           }
           out.push({
             i,
-            want: el ? (el.textContent || '').slice(rowsIn[i][2], rowsIn[i][3]) : null,
+            want: el ? (el.textContent || '').slice(cs, ce) : null,
             got: p.text == null ? null : p.text,
             key: p.key || null,
             size: p.size,
@@ -554,12 +694,12 @@ async function run() {
           });
         }
         return out;
-      }, rows.slice(0, limit), LEAD_S, READ_PAINT, letterId);
+      }, rows.slice(0, limit), LEAD_S, READ_PAINT, letterId, isB, domCheck.fmMode !== false);
 
       let painted = 0;
       for (const s of sampled) {
         const row = rows[s.i];
-        const wantKey = 'letter:' + letterId + ':' + row[1];
+        const wantKey = (isB ? 'wtlb:' : 'letter:') + letterId + ':' + row[1];
         if (s.got == null) { failures.push({ key, kind: 'NOTHING-PAINTED', detail: `row ${s.i} at t=${row[0]}` }); continue; }
         painted++;
         if (s.size !== 1) failures.push({ key, kind: 'MULTI-RANGE', detail: `row ${s.i}: ${s.size} ranges registered` });
