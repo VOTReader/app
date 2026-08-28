@@ -294,6 +294,10 @@ def main():
             continue
         share = proven_share(d)
         done += 1
+        # Same periodic release as the letters runner: models stay, the
+        # per-recording arrays around them do not.
+        if done % 25 == 0:
+            al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
             review.append((tag, share))

@@ -162,6 +162,11 @@ def main():
             report.append((label, cov, shipped, total,
                            d.get("confirmed", 0), d.get("probed", 0), d.get("review", 0),
                            tag, unspoken))
+        # Every 25 items, drop the per-recording arrays and let torch return
+        # its blocks. The MODELS stay -- reloading those per item is the fault
+        # the singletons exist to avoid -- but everything around them grows.
+        if n % 25 == 0:
+            al.release_caches()
         if n % 5 == 0 or n == len(keys):
             # Resident memory rides the progress line. The 2026-08-26 run grew
             # from 7.8 GB to 15.3 GB and then stopped completing anything --

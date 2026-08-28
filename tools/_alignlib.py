@@ -631,6 +631,24 @@ def _interpolate_runs(rows, end_t=None, weights=None):
         i = j
 
 
+def release_caches():
+    """Drop the per-recording PCM cache and hand torch's allocator back its
+    blocks. The models are deliberately kept -- reloading them per item is the
+    fault this exists to avoid -- but the arrays around them accumulate, and a
+    352-item run finished at 9.7 GB resident where a 172-item one finished at
+    1.5. Called periodically by the batch runners; harmless if torch is absent.
+    """
+    _PCM_CACHE["path"], _PCM_CACHE["pcm"] = None, None
+    import gc
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:                                               # noqa: BLE001
+        pass
+
+
 def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
     """Adjudicate leg A against leg B, unit by unit.
 

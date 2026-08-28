@@ -79,11 +79,22 @@ def tx_cache(fid, s):
     return os.path.join(WORK, "tx-hone", s["whisper_model"], fid + ".json")
 
 
+_FRAGS_ALL = {}
+
+
 def fragments_for(key):
-    frag_all = json.load(open(os.path.join(WORK, "fragments-all.json"), encoding="utf-8"))
-    if key not in frag_all:
+    """Fragments for one key, with the 1.9 MB index parsed ONCE per process.
+
+    batch-align asks for this twice per key -- once to fingerprint the belt's
+    inputs, once inside run_belt -- so a 352-entry run re-read and re-parsed the
+    whole file about seven hundred times. Correct, and pure waste: the file does
+    not change while a batch runs, and re-extracting it is a deliberate step.
+    """
+    if not _FRAGS_ALL:
+        _FRAGS_ALL.update(json.load(open(os.path.join(WORK, "fragments-all.json"), encoding="utf-8")))
+    if key not in _FRAGS_ALL:
         raise SystemExit(f"no fragments for key {key!r}")
-    e = frag_all[key]
+    e = _FRAGS_ALL[key]
     return e["fragments"], e["format"]
 
 
