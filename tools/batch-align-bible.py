@@ -111,7 +111,7 @@ def verses_json(ed, book_id, chapter, out_dir):
     r = subprocess.run(
         ["node", os.path.join(BASE, "extract-bible-verses.mjs"), book_id, str(chapter),
          path, "--translation", EDITIONS[ed]["translation"]],
-        capture_output=True, text=True, cwd=ROOT)
+        capture_output=True, encoding="utf-8", errors="replace", cwd=ROOT)
     if r.returncode != 0 or not os.path.exists(path):
         raise RuntimeError((r.stderr or r.stdout).strip()[:160])
     return path

@@ -294,13 +294,30 @@ class WhisperLeg:
             hallucination_silence_threshold=s["hallucination_silence_threshold"])
         nrm = normalizer(s)
         words = []
-        for seg in segs:
-            for w in (seg.words or []):
-                n = nrm(w.word)
-                if n:
-                    words.append([n, round(w.start, 2), round(w.end, 2)])
+        truncated = False
+        # transcribe() returns a GENERATOR: decoding happens as it is consumed,
+        # so an upstream fault surfaces here rather than at the call. Faster-
+        # whisper's find_alignment can raise IndexError ("size of axis is 0")
+        # when a segment yields no alignment frames -- a library edge case, not
+        # our audio. Keep what was decoded and mark it: leg B is a WITNESS
+        # matched by Needleman-Wunsch against the known text, so a transcript
+        # missing its tail still places most units, and the belt's probes
+        # adjudicate the rest. Losing the whole letter to one bad segment is
+        # the worse outcome, and with thousands of items queued it would happen
+        # again. NOT cached, so a fixed library gets a clean run next time.
+        try:
+            for seg in segs:
+                for w in (seg.words or []):
+                    n = nrm(w.word)
+                    if n:
+                        words.append([n, round(w.start, 2), round(w.end, 2)])
+        except (IndexError, ValueError) as e:
+            truncated = True
+            print(f"    leg B truncated after {len(words)} words: {type(e).__name__}: {str(e)[:90]}")
         data = {"words": words, "dur": round(info.duration, 1)}
-        if cache_path:
+        if truncated:
+            data["truncated"] = True
+        if cache_path and not truncated:
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
             json.dump(data, open(cache_path, "w", encoding="utf-8"))
         return data
@@ -730,11 +747,19 @@ def silence_intervals(wav, noise_db=-32, min_d=0.25):
     cache = wav + ".sil.json"
     if os.path.exists(cache):
         return json.load(open(cache, encoding="utf-8"))
+    # encoding= + errors=, never text=True. text=True decodes with the LOCALE
+    # codec (cp1252 here), and ffmpeg echoes the source file's metadata: one
+    # smart quote in an ID3 tag emits a byte cp1252 cannot map, the decode
+    # raises inside subprocess's reader THREAD, Python swallows it, and stderr
+    # comes back None while returncode stays 0. Three volume-seven letters
+    # failed exactly this way on 2026-08-26 -- silently, and only the ones
+    # whose tags happened to contain such a byte.
     r = subprocess.run(["ffmpeg", "-i", wav, "-af",
                         f"silencedetect=noise={noise_db}dB:d={min_d}", "-f", "null", "-"],
-                       capture_output=True, text=True)
-    starts = [float(m) for m in re.findall(r"silence_start: ([0-9.]+)", r.stderr)]
-    ends = [float(m) for m in re.findall(r"silence_end: ([0-9.]+)", r.stderr)]
+                       capture_output=True, encoding="utf-8", errors="replace")
+    err = r.stderr or ""
+    starts = [float(m) for m in re.findall(r"silence_start: ([0-9.]+)", err)]
+    ends = [float(m) for m in re.findall(r"silence_end: ([0-9.]+)", err)]
     ivals = [[s0, e0] for s0, e0 in zip(starts, ends) if e0 > s0]
     json.dump(ivals, open(cache, "w", encoding="utf-8"))
     return ivals
