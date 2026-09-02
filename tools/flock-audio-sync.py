@@ -35,6 +35,11 @@ own (deploymentTargetSelector.xml on every device pick), and that alone kept
 the tree dirty from 08-11 and blocked the 08-16, 08-23 and 08-30 runs. The
 churning file is untracked and ignored now; the pathspec keeps any sibling
 from doing it again.
+
+ALERT (2026-09-01): a failure also posts a one-line, signal-only alert to Corbin's
+private Discord through D:/AgentBackbone/notify.py (one-way webhook, no content,
+fails soft to AgentBackbone/reports/ when Discord is down). The attention file and
+the log stay the record; the alert only says that there is something to read.
 Manual run: python tools/flock-audio-sync.py [--dry-run]
 """
 import datetime
@@ -46,6 +51,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG = os.path.join(ROOT, "tools", "_flock-audio-sync.log")
 ATTN = os.path.join(ROOT, "FLOCK-SYNC-ATTENTION.txt")
+NOTIFY = "D:/AgentBackbone/notify.py"   # one-way Discord webhook: signals only, fails soft
 MANIFEST = os.path.join(ROOT, "app", "src", "main", "assets", "src", "data", "audio-manifest.js")
 SW = os.path.join(ROOT, "app", "src", "main", "assets", "service-worker.js")
 CACHE = os.path.join(ROOT, "app", "src", "main", "assets", "src", "search", "cache.js")
@@ -116,6 +122,22 @@ def clear_attention():
     if os.path.exists(ATTN):
         os.remove(ATTN)
         log("cleared FLOCK-SYNC-ATTENTION.txt left by an earlier failure")
+
+
+def alert(title, body):
+    """Tell Corbin a run failed, through AgentBackbone's one-way Discord webhook.
+    Signal-only payload (what happened, never content), and it NEVER raises: a
+    notifier outage must not change what this script does or reports."""
+    try:
+        if not os.path.exists(NOTIFY):
+            log(f"alert skipped: {NOTIFY} not found")
+            return
+        r = subprocess.run([sys.executable, NOTIFY, "--title", title, "--body", body,
+                            "--level", "alert"], capture_output=True, text=True, timeout=60)
+        log("alert sent to Discord" if r.returncode == 0 else
+            f"alert not delivered (notify.py exit {r.returncode}); queued in AgentBackbone/reports")
+    except Exception as ex:   # fail-soft by contract
+        log(f"alert failed softly: {ex}")
 
 
 def reconcile_with_origin():
@@ -221,6 +243,10 @@ def main():
             f.write(f"flock-audio-sync FAILED {datetime.datetime.now():%Y-%m-%d %H:%M}\n"
                     f"Cleanup: {cleanup}\nError:\n{e}\n"
                     f"Full log: tools/_flock-audio-sync.log\n")
+        first = (str(e).splitlines() or [type(e).__name__])[0][:240]
+        alert("flock-audio-sync FAILED",
+              f"{datetime.datetime.now():%Y-%m-%d %H:%M}: {first}. Cleanup: {cleanup}. "
+              "See FLOCK-SYNC-ATTENTION.txt in the VOTReader-studio repo root.")
         return 1
 
 
