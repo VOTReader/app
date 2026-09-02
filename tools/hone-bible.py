@@ -85,7 +85,15 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
     vdata = json.load(open(verses_path, encoding="utf-8"))
     verses = vdata["verses"]
     stem = os.path.splitext(os.path.basename(audio))[0]
-    wav = al.to_wav16k(audio, os.path.join(out_dir, stem + ".16k.wav"))
+    # Every per-chapter cache is keyed by the mp3's byte size (the same value
+    # the belt's resume key carries), so a re-cut chapter cannot inherit the
+    # previous file's transcript, silence map or scratch wav. The wav is
+    # normally deleted below; one left behind by a crash is rebuilt, not reused.
+    stamp = os.path.getsize(audio)
+    wav_path = os.path.join(out_dir, stem + ".16k.wav")
+    if os.path.exists(wav_path):
+        os.remove(wav_path)
+    wav = al.to_wav16k(audio, wav_path)
     say(f"{out_tag}: {len(verses)} verses, audio {audio}")
     say(f"family {s['family']}  settings {al.settings_hash(s)}  lead_in {s['lead_in']}")
 
@@ -99,7 +107,7 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
 
     say(f"leg B: {s['whisper_model']} + global match ...")
     wl = _whisper(s)
-    tx = wl.transcribe_words(wav, os.path.join(out_dir, out_tag + ".tx.json"))
+    tx = wl.transcribe_words(wav, os.path.join(out_dir, out_tag + ".tx.json"), stamp=stamp)
     nrm = al.match_normalizer(s, tx["words"])
     cols, owners = [], []
     for u in units:
@@ -109,7 +117,7 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
     B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
     say(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
 
-    snap = al.make_snap(al.silence_intervals(wav))
+    snap = al.make_snap(al.silence_intervals(wav, stamp=stamp))
     rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl),
                    snap_fn=snap, end_t=tx.get("dur"))
     n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")

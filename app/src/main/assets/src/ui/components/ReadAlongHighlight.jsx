@@ -4,8 +4,11 @@
    Karaoke-style read-along: while THIS letter's track is playing, the
    sentence currently being read gets a soft gold wash and the view
    follows it. Timing data comes from AUDIO_SYNC (generated offline by
-   tools/align-audio.py; lazy corpus global like AUDIO_MANIFEST, riding
-   bundle-a-vot):
+   tools/batch-align.py), a classic-script global like AUDIO_MANIFEST — but
+   since c41 it is its OWN lazy file, src/data/audio-sync.js, fetched through
+   utils/sync-loaders.js the first time THIS letter's track is loaded with
+   the wash on (see the loader effects in the component), never as a member
+   of bundle-a-vot:
 
      AUDIO_SYNC["volKey:letterId"] = [[startSec, blockIndex, charStart,
                                        charEnd, partIndex], …] (by startSec)
@@ -86,6 +89,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
 
 const HL_NAME = 'vot-reading';
 /** How long a deliberate user scroll suspends follow-scroll. */
@@ -193,17 +197,6 @@ function _bibleRowsFor(bookId, chapter, volKey) {
   const out = rows.length ? rows : null;
   _bibleRowCache.set(cacheKey, { table, rows: out });
   return out;
-}
-
-/** @param {() => void} cb */
-function _bibleSyncSubscribe(cb) {
-  const store = /** @type {any} */ (globalThis).__bibleSyncStore;
-  return store ? store.subscribe(cb) : () => {};
-}
-
-function _bibleSyncVersion() {
-  const store = /** @type {any} */ (globalThis).__bibleSyncStore;
-  return store ? store.getVersion() : 0;
 }
 
 /**
@@ -578,11 +571,23 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // presses Listen, or who has the wash switched off, never downloads it.
   const needBibleSync = !!chapter && loaded && readAlongOn;
   React.useEffect(() => {
-    if (!needBibleSync) return;
-    const load = /** @type {any} */ (globalThis)['__loadBibleSync'];
-    if (typeof load === 'function') load(volKey);
+    if (needBibleSync) loadBibleSync(volKey);
   }, [needBibleSync, volKey]);
-  const corpusVersion = React.useSyncExternalStore(_bibleSyncSubscribe, _bibleSyncVersion);
+  // The letter timings are their own lazy file too (c41): asked for the moment
+  // THIS letter's track is loaded with the wash on, and not otherwise — a
+  // reader who never presses Listen, or keeps the wash off, never downloads
+  // ~150 KB of timings. `loaded`, not `active`, so a paused letter still gets
+  // its rows for tap-to-seek.
+  const needLetterSync = !chapter && loaded && readAlongOn;
+  React.useEffect(() => {
+    if (needLetterSync) loadAudioSync();
+  }, [needLetterSync]);
+  // Both files land as globals that _syncFor reads at render, so their ARRIVAL
+  // has to be a render input (the c36 lesson): one number folded from both
+  // stores, carried into the frags memo deps below.
+  const bibleVersion = React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
+  const letterVersion = React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
+  const corpusVersion = bibleVersion + letterVersion;
 
   const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly

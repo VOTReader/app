@@ -295,6 +295,25 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     expect(await corpus.match('https://app.test/dist/bundle-a-bible.js')).toBeTruthy();
   });
 
+  it('routes a lazily fetched src/data timings file through the corpus cache (c41)', async () => {
+    // audio-sync.js left bundle-a-vot for a lazy src/data fetch. It must be
+    // pinned under vot-corpus-<CORPUS_VERSION> like every other corpus asset —
+    // which is also why tools/check-corpus-version.js fingerprints it — and
+    // never land in a core bucket the CACHE_VERSION hash cannot see.
+    const fetched = { ok: true, redirected: false, clone: () => ({ body: 'timings' }) };
+    const sw = bootSW({ fetchImpl: async () => fetched });
+    const res = await fetchEvent(sw, getReq('https://app.test/src/data/audio-sync.js'));
+    expect(res).toBe(fetched);
+    const names = await sw.caches.keys();
+    const corpusName = names.find((k) => k.startsWith('vot-corpus-'));
+    expect(corpusName).toBeTruthy();
+    const corpus = await sw.caches.open(corpusName);
+    expect(await corpus.match('https://app.test/src/data/audio-sync.js')).toBeTruthy();
+    for (const core of names.filter((k) => k.startsWith('vot-core-'))) {
+      expect(await (await sw.caches.open(core)).match('https://app.test/src/data/audio-sync.js')).toBeFalsy();
+    }
+  });
+
   it('does NOT cache a REDIRECTED corpus response (SW-4)', async () => {
     const fetched = { ok: true, redirected: true, clone: () => ({}) };
     const sw = bootSW({ fetchImpl: async () => fetched });

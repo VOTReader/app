@@ -149,8 +149,10 @@ jobs:
         # coverage thresholds in vitest.config.js. Zero-tolerance: any
         # failing test OR any coverage % below the locked baseline fails
         # CI. Thresholds ratchet UPWARD only — see vitest.config.js
-        # comments for the rule. Pre-commit uses the no-coverage `test`
-        # script to keep the commit prompt fast (~2s vs ~3s with coverage).
+        # comments for the rule. Pre-commit runs this same `test:coverage`
+        # script (C2-D [D1], 2026-08-10), so the floors are enforced at the
+        # commit prompt as well as here; `npm run test` stays coverage-free
+        # for the dev loop only.
         run: npm run test:coverage
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
@@ -211,6 +213,16 @@ jobs:
         # or if service-worker.js precaches a src/ path the scan cannot see.
         run: npm run check:runtime-assets
 
+      - name: Verify every runtime-injected asset survives the APK ignore list
+        # app/build.gradle.kts trims packaged assets via ignoreAssetsPatterns, a
+        # basename match with no negative-include. `<dir>src` once removed the nine
+        # alternate translations and Studies (~36 MB) and nothing failed loudly:
+        # the loader's onerror fell back to NKJV. The pre-commit hook has run this
+        # gate since; CI never did, so a --no-verify commit or a push from another
+        # machine went unchecked here. The gate also refuses to pass vacuously now
+        # (tools/check-apk-assets.test.js: no gradle block, or zero derived paths).
+        run: npm run check:apk-assets
+
       - name: Verify every CSS custom-property reference resolves (C2-D [D8])
         # An undeclared var() with no fallback is invalid at computed-value
         # time — the whole declaration drops, so a border becomes `none`
@@ -242,7 +254,7 @@ jobs:
           find app/src/main/assets/src -name '*.jsx' -print0 | xargs -0 -r -n1 npx esbuild --outfile=/dev/null --log-level=warning
 
       - name: Smoke render walk (headless — U16)
-        # smoke-lite (above) is structural-only; this runs the REAL 12-screen
+        # smoke-lite (above) is structural-only; this runs the REAL 13-screen
         # render walk + both annotation round-trips (tools/smoke.js) in headless
         # Chrome against the built bundles, catching the black-screen class no
         # other gate sees. Puppeteer's Chrome was fetched by `npm ci`;

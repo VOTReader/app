@@ -33,6 +33,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
 import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
+import { resetSyncLoadersForTests } from '../../utils/sync-loaders.js';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -912,5 +913,116 @@ describe('ReadAlongHighlight — Format B paints through the offset projection',
     mountB(); playB();
     clockTo(3);
     expect(painted()).toBe(formatBDomText(RAW, { refs: REFS, footnotesMode: true }));
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The lazy timings (c41)
+   ═══════════════════════════════════════════════════════════════════════
+   audio-sync.js left bundle-a-vot on 2026-09-01: the letter timings are
+   their own src/data/ file, fetched through utils/sync-loaders.js the first
+   time a letter recording is loaded with the wash on — the shape the Bible
+   verse timings already used. These pin the contract the move rests on: the
+   component ASKS for the file at the right moment and not otherwise, and
+   the file's arrival is a render input (the c36 lesson — a global read once
+   by a dep-less effect never repaints the first letter a reader listens to).
+
+   The real loader module runs; only index.html's __makeLazyLoader factory is
+   faked, recording what was asked for and handing back a corpus whose
+   notify() the test can fire. */
+describe('ReadAlongHighlight — the lazy timings', () => {
+  let made;
+  const installFactory = () => {
+    made = [];
+    globalThis.__makeLazyLoader = (name, path, finishFn) => {
+      const listeners = new Set();
+      let version = 0;
+      const corpus = {
+        loaded: false,
+        error: false,
+        subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); },
+        getVersion() { return version; },
+        notify() { this.loaded = true; version += 1; listeners.forEach((cb) => cb()); },
+      };
+      const l = { name, path, finishFn, corpus, load: vi.fn(() => Promise.resolve()) };
+      made.push(l);
+      return l;
+    };
+  };
+  const loaderFor = (path) => made.find((l) => l.path === path) || null;
+  const loadsOf = (path) => { const l = loaderFor(path); return l ? l.load.mock.calls.length : 0; };
+
+  beforeEach(() => { resetSyncLoadersForTests(); installFactory(); });
+  afterEach(() => { resetSyncLoadersForTests(); delete globalThis.__makeLazyLoader; });
+
+  it('asks for audio-sync.js the moment this letter track is loaded with the wash on', () => {
+    mount();
+    expect(loadsOf('src/data/audio-sync.js')).toBe(0);      // mounting alone fetches nothing
+    play();
+    const l = loaderFor('src/data/audio-sync.js');
+    expect(l).not.toBeNull();
+    expect(l.name).toBe('audio-sync');
+    expect(l.finishFn).toBeNull();
+    expect(l.load).toHaveBeenCalled();
+  });
+
+  it('never asks while the wash is switched off — a reader who never wants it never pays', () => {
+    mount({ readAlongOn: false });
+    play();
+    clockTo(3);
+    expect(loadsOf('src/data/audio-sync.js')).toBe(0);
+  });
+
+  it('asks for the EDITION file, not the letter file, when a Bible chapter plays', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1']] };
+    globalThis.BIBLE_AUDIO_BOOKS = [['john', 'John']];
+    try {
+      function BibleHost() {
+        const mainRef = React.useRef(null);
+        return (
+          <div className="screen-scroll">
+            <div className="chapter-body" ref={mainRef}>
+              <span data-hl-key="bible:john:1:1">In the beginning was the Word.</span>
+            </div>
+            <ReadAlongHighlight
+              volKey="bible-brm-kjv"
+              letterId="john"
+              chapter={1}
+              mainRef={mainRef}
+              hlKeyFn={(bookId, n) => 'bible:' + bookId + ':1:' + n}
+              readAlongOn
+              readAlongFollow={false}
+            />
+          </div>
+        );
+      }
+      const out = render(<BibleHost />);
+      scroller = out.container.querySelector('.screen-scroll');
+      scroller.getBoundingClientRect = () => BOX;
+      Object.defineProperty(scroller, 'scrollTop', { value: 0, writable: true, configurable: true });
+      act(() => {
+        AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: 1 });
+      });
+      expect(loadsOf('src/data/bible-sync-brm-kjv.js')).toBeGreaterThan(0);
+      expect(loadsOf('src/data/audio-sync.js')).toBe(0);
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+    }
+  });
+
+  it('paints when the file lands AFTER the track started — no remount, the arrival is a render input', () => {
+    delete globalThis.AUDIO_SYNC;                             // the file has not arrived yet
+    mount();
+    play();
+    clockTo(3);
+    expect(painted()).toBeNull();                             // nothing to paint from
+    const l = loaderFor('src/data/audio-sync.js');
+    expect(l.load).toHaveBeenCalled();
+    act(() => {
+      globalThis.AUDIO_SYNC = SYNC;                           // the classic script ran…
+      l.corpus.notify();                                      // …and the loader said so
+    });
+    expect(painted()).toBe('Sentence one. ');
   });
 });

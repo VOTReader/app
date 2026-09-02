@@ -281,10 +281,20 @@ class WhisperLeg:
                                        compute_type=self.s["compute_type"])
         return self._model
 
-    def transcribe_words(self, wav_path, cache_path=None):
-        """-> {'words': [[token, start, end], ...], 'dur': float}. Cached verbatim."""
+    def transcribe_words(self, wav_path, cache_path=None, stamp=None):
+        """-> {'words': [[token, start, end], ...], 'dur': float}. Cached verbatim.
+
+        `stamp` identifies the AUDIO the cache was made from (the Bible belt
+        passes the chapter mp3's byte size). A cache carrying a different stamp
+        is ignored and rewritten. Without it a re-cut chapter -- same tag, new
+        bytes -- was re-belted (audioSize is in the resume key) but leg B read
+        the old transcript back and every stamp it produced described audio
+        that no longer existed. Callers with immutable inputs (the letters,
+        keyed by release asset id) pass nothing and keep the old behaviour."""
         if cache_path and os.path.exists(cache_path):
-            return json.load(open(cache_path, encoding="utf-8"))
+            cached = json.load(open(cache_path, encoding="utf-8"))
+            if stamp is None or cached.get("stamp") == stamp:
+                return cached
         s = self.s
         segs, info = self.model().transcribe(
             wav_path, language="en", word_timestamps=True,
@@ -315,6 +325,8 @@ class WhisperLeg:
             truncated = True
             print(f"    leg B truncated after {len(words)} words: {type(e).__name__}: {str(e)[:90]}")
         data = {"words": words, "dur": round(info.duration, 1)}
+        if stamp is not None:
+            data["stamp"] = stamp
         if truncated:
             data["truncated"] = True
         if cache_path and not truncated:
@@ -757,14 +769,25 @@ def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
     return rows
 
 
-def silence_intervals(wav, noise_db=-32, min_d=0.25):
+def silence_intervals(wav, noise_db=-32, min_d=0.25, stamp=None):
     """[(start, end), ...] from ffmpeg silencedetect, cached beside the wav.
     Calibration note: WOP's continuous music bed yields NO intervals — by design
-    (its gaps are music; onset_bias_s handles that family instead)."""
+    (its gaps are music; onset_bias_s handles that family instead).
+
+    `stamp`: same contract as WhisperLeg.transcribe_words -- the cache is keyed
+    by the wav PATH, and the Bible belt deletes the wav after every chapter and
+    rebuilds it from the mp3 next time, so a re-cut chapter would have snapped
+    to the old file's silences. Stamped caches are a dict; the legacy bare-list
+    shape is still honoured when no stamp is asked for."""
     import subprocess
     cache = wav + ".sil.json"
     if os.path.exists(cache):
-        return json.load(open(cache, encoding="utf-8"))
+        cached = json.load(open(cache, encoding="utf-8"))
+        if isinstance(cached, dict):
+            if stamp is None or cached.get("stamp") == stamp:
+                return cached.get("ivals", [])
+        elif stamp is None:
+            return cached
     # encoding= + errors=, never text=True. text=True decodes with the LOCALE
     # codec (cp1252 here), and ffmpeg echoes the source file's metadata: one
     # smart quote in an ID3 tag emits a byte cp1252 cannot map, the decode
@@ -779,8 +802,57 @@ def silence_intervals(wav, noise_db=-32, min_d=0.25):
     starts = [float(m) for m in re.findall(r"silence_start: ([0-9.]+)", err)]
     ends = [float(m) for m in re.findall(r"silence_end: ([0-9.]+)", err)]
     ivals = [[s0, e0] for s0, e0 in zip(starts, ends) if e0 > s0]
-    json.dump(ivals, open(cache, "w", encoding="utf-8"))
+    json.dump({"stamp": stamp, "ivals": ivals} if stamp is not None else ivals,
+              open(cache, "w", encoding="utf-8"))
     return ivals
+
+
+def rss_gb():
+    """Resident set in GB, or 0.0 where the platform will not say.
+
+    GetCurrentProcess returns a POINTER-sized pseudo-handle (-1); leaving
+    ctypes to default its restype to 32-bit int truncates it and the call fails
+    silently, returning 0 forever -- a metric that always reads zero is worse
+    than no metric, because it looks like good news. Shared by both batch
+    runners so the Bible progress line reads the same as the letters'."""
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+        k = ctypes.windll.kernel32
+        k.GetCurrentProcess.restype = ctypes.c_void_p
+        c = PMC()
+        c.cb = ctypes.sizeof(c)
+        if not k.K32GetProcessMemoryInfo(ctypes.c_void_p(k.GetCurrentProcess()),
+                                         ctypes.byref(c), c.cb):
+            return 0.0
+        return c.WorkingSetSize / (1024 ** 3)
+    except Exception:                                               # noqa: BLE001
+        return 0.0
+
+
+def vram_free_gb():
+    """Free GPU memory in GB, or None without CUDA. A run started on top of a
+    game or a resident LLM server does not fail cleanly: it crawls, then OOMs
+    hours in. The batch runners refuse to start below a floor instead."""
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        free, _total = torch.cuda.mem_get_info()
+        return free / (1024 ** 3)
+    except Exception:                                               # noqa: BLE001
+        return None
 
 
 def make_snap(intervals, back_off=0.05, max_snap=1.5):

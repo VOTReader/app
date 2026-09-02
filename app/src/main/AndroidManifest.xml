@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Microphone — required for in-app voice recording (journal voice memos).
@@ -50,9 +51,20 @@
          no longer blocks DEVICE-TO-DEVICE transfer — only cloud backup. The
          rules file excludes every domain from both, so the local-only data
          policy holds on every Android version. See res/xml/data_extraction_rules.xml. -->
+    <!-- enableOnBackInvokedCallback: predictive back. Android 16 (targetSdk 36)
+         turns this on by default and stops delivering onBackPressed() /
+         KEYCODE_BACK; declaring it makes Android 13-15 take the same
+         OnBackInvokedCallback path. Back is already routed through the AndroidX
+         OnBackPressedDispatcher in MainActivity (no onBackPressed override
+         anywhere), so behaviour is identical on every level; this only pins
+         the intent so a future targetSdk change cannot silently flip it.
+         tools:ignore="UnusedAttribute": the attribute is API 33+ and minSdk is
+         26 — lint's note that it is ignored below 33 is exactly the point. -->
     <application
         android:name=".VOTReaderApp"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
+        tools:ignore="UnusedAttribute"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/full_backup_content"
         android:usesCleartextTraffic="false"

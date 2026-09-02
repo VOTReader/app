@@ -40,6 +40,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(BASE)
@@ -159,14 +160,22 @@ def chapters_for(args, idx, books_meta):
     return sorted(set(want), key=lambda bc: (order.get(bc[0], 999), bc[1]))
 
 
-def ship(ed, belts_dir):
-    """Rebuild src/data/bible-sync-<edition>.js from every belt on disk."""
+def ship(ed, belts_dir, want_settings=None, idx=None):
+    """Rebuild src/data/bible-sync-<edition>.js from the CURRENT belts on disk.
+
+    A belt ships only when it was made with today's settings AND describes the
+    audio that is on disk right now (its audioSize equals the local mp3's).
+    Before 2026-09-01 the shipper took every belt it found, so a settings
+    change followed by a partial run, or a re-cut chapter that had not been
+    re-belted yet, would have shipped timings for audio nobody would hear.
+    Dropped belts are counted by reason so a short ship is never silent."""
     table = {}
     kept = dropped = verses_timed = verses_total = 0
+    stale_settings = stale_audio = no_audio = 0
     for name in sorted(os.listdir(belts_dir)):
         # Belts only. The same directory holds each chapter's cached whisper
         # transcript (<tag>.tx.json) and its silence map (<tag>.16k.wav.sil.json),
-        # and the latter is a bare LIST — a shipper that reads every .json in
+        # and the latter may be a bare LIST — a shipper that reads every .json in
         # the folder crashes on it.
         if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name:
             continue
@@ -177,6 +186,17 @@ def ship(ed, belts_dir):
         book_id, chapter = d.get("bookId"), d.get("chapter")
         if not book_id or not chapter or not rows:
             continue
+        if want_settings and d.get("settings_hash") != want_settings:
+            stale_settings += 1
+            continue
+        if idx is not None:
+            entry = idx.get((book_id, chapter))
+            if not entry:
+                no_audio += 1
+                continue
+            if d.get("audioSize") != os.path.getsize(entry[0]):
+                stale_audio += 1
+                continue
         if proven_share(d) < MIN_PROVEN:
             dropped += 1
             continue
@@ -220,7 +240,9 @@ def ship(ed, belts_dir):
     path = os.path.join(DATA, "bible-sync-" + ed + ".js")
     open(path, "w", encoding="utf-8", newline="\n").write(out)
     size = os.path.getsize(path)
-    print(f"\nship: {kept} chapters ({dropped} below the {MIN_PROVEN:.0%} proven gate), "
+    print(f"\nship: {kept} chapters ({dropped} below the {MIN_PROVEN:.0%} proven gate; "
+          f"not shipped: {stale_settings} other settings, {stale_audio} audio changed since the belt, "
+          f"{no_audio} no local audio), "
           f"{verses_timed}/{verses_total} verses timed -> {path} ({size // 1024} KB)")
     return path
 
@@ -236,6 +258,8 @@ def main():
     ap.add_argument("--limit", type=int, help="stop after N chapters (calibration runs)")
     ap.add_argument("--write-audio-index", action="store_true",
                     help="write assetId -> local path and exit (the e2e harness reads it)")
+    ap.add_argument("--min-free-vram-gb", type=float, default=5.0,
+                    help="refuse to start alignment with less free GPU memory than this (0 disables)")
     a = ap.parse_args()
     if not (a.chapters or a.books or a.all):
         ap.error("one of --chapters / --books / --all is required")
@@ -264,36 +288,81 @@ def main():
     work = chapters_for(a, idx, books_meta)
     if a.limit:
         work = work[:a.limit]
-    print(f"batch-align-bible {ed}: {len(work)} chapters  family {cfg['family']}  settings {want_settings}")
+    print(f"batch-align-bible {ed}: {len(work)} chapters  family {cfg['family']}  settings {want_settings}  "
+          f"started {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+    if a.min_free_vram_gb > 0:
+        free = al.vram_free_gb()
+        if free is not None and free < a.min_free_vram_gb:
+            print(f"PREFLIGHT: only {free:.1f} GB of GPU memory free (< {a.min_free_vram_gb} GB); "
+                  f"something else holds the card. Not starting.", flush=True)
+            return 3
 
     done = skipped = failed = 0
     review = []
+    per_book = {}
+    t_run = time.time()
+    progress_path = os.path.join(belts, "progress.json")
+
+    def note(book_id, key):
+        b = per_book.setdefault(book_id, {"done": 0, "skipped": 0, "failed": 0, "review": []})
+        if key in b:
+            b[key] += 1
+
+    def book_summary(book_id):
+        b = per_book.get(book_id)
+        if b and (b["done"] or b["failed"]):
+            rv = f"  review {b['review']}" if b["review"] else ""
+            print(f"  book {book_id}: {b['done']} aligned, {b['skipped']} current, "
+                  f"{b['failed']} failed{rv}   elapsed {(time.time() - t_run) / 60:.1f} min", flush=True)
+
+    def checkpoint(last_tag):
+        # A machine-readable heartbeat for whoever is watching a 19-hour run.
+        try:
+            json.dump({"edition": ed, "started": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t_run)),
+                       "updated": time.strftime('%Y-%m-%d %H:%M:%S'), "work": len(work),
+                       "done": done, "skipped": skipped, "failed": failed, "last": last_tag,
+                       "review": review, "rss_gb": round(al.rss_gb(), 2)},
+                      open(progress_path, "w", encoding="utf-8"), indent=1)
+        except OSError:
+            pass
+
+    last_book = None
     for n, (book_id, chapter) in enumerate(work, 1):
+        if last_book is not None and book_id != last_book:
+            book_summary(last_book)
+        last_book = book_id
         entry = idx.get((book_id, chapter))
         audio = entry[0] if entry else None
         tag = f"{book_id}_{chapter:03d}"
         if not audio:
-            print(f"  [{n}/{len(work)}] {tag}  NO AUDIO")
+            print(f"  [{n}/{len(work)}] {tag}  NO AUDIO", flush=True)
             failed += 1
+            note(book_id, "failed")
             continue
         belt_path = os.path.join(belts, tag + ".json")
         try:
             vpath = verses_json(ed, book_id, chapter, verses_dir)
         except RuntimeError as e:
-            print(f"  [{n}/{len(work)}] {tag}  NO VERSES  {e}")
+            print(f"  [{n}/{len(work)}] {tag}  NO VERSES  {e}", flush=True)
             failed += 1
+            note(book_id, "failed")
             continue
         if not a.force and is_current(belt_path, want_settings, vpath, audio):
             skipped += 1
+            note(book_id, "skipped")
             continue
+        t0 = time.time()
         try:
             d = hb.run_chapter(vpath, audio, tag, dict(s), out_dir=belts, quiet=True)
         except Exception as e:                                      # noqa: BLE001
-            print(f"  [{n}/{len(work)}] {tag}  ERROR {str(e).splitlines()[0][:110]}")
+            print(f"  [{n}/{len(work)}] {tag}  ERROR {str(e).splitlines()[0][:110]}", flush=True)
             failed += 1
+            note(book_id, "failed")
+            checkpoint(tag)
             continue
         share = proven_share(d)
         done += 1
+        note(book_id, "done")
         # Same periodic release as the letters runner: models stay, the
         # per-recording arrays around them do not.
         if done % 25 == 0:
@@ -301,16 +370,23 @@ def main():
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
             review.append((tag, share))
+            per_book[book_id]["review"].append(tag)
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
-              f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}", flush=True)
+              f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
+              f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB", flush=True)
+        checkpoint(tag)
+    if last_book is not None:
+        book_summary(last_book)
 
-    print(f"\ndone {done}  skipped(current) {skipped}  failed {failed}")
+    print(f"\ndone {done}  skipped(current) {skipped}  failed {failed}  "
+          f"elapsed {(time.time() - t_run) / 60:.1f} min", flush=True)
+    checkpoint("END")
     if review:
         print("below the silent-ship bar:")
         for tag, share in sorted(review, key=lambda r: r[1]):
             print(f"  {share:.3f}  {tag}")
     if not a.no_ship:
-        ship(ed, belts)
+        ship(ed, belts, want_settings, idx)
     return 1 if failed else 0
 
 

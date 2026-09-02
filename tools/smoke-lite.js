@@ -36,7 +36,7 @@
    What's deliberately OUT of scope for v1:
      - .js parse check (already covered by CI syntax-check)
      - runtime initialization checks (would need jsdom or node-vm shim)
-     - the 12-screen render walk (browser-only by design — that's smoke's job)
+     - the 13-screen render walk (browser-only by design — that's smoke's job)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import fs from 'node:fs';

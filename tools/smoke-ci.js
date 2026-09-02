@@ -5,7 +5,7 @@
  * scripture-resolution presence). It renders ZERO screens, so the black-screen
  * class — a screen that builds clean but renders blank because a refactor moved
  * a helper out from under it — can slip every gate. This runs the REAL
- * 12-screen render walk + both annotation round-trips (tools/smoke.js) against
+ * 13-screen render walk + both annotation round-trips (tools/smoke.js) against
  * the BUILT bundles in headless Chrome, the cheapest enforced coverage over the
  * 83-file ui/ tree without 83 component tests.
  *
@@ -128,7 +128,7 @@ async function runAttempt(url) {
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      // The whole 12-screen walk + 2 annotation round-trips runs as ONE
+      // The whole 13-screen walk + 2 annotation round-trips runs as ONE
       // page.evaluate(votSmoke) — ~18s locally. On a loaded/wedged shared CI
       // runner that single CDP call can stall and surface a flaky
       // "Runtime.callFunctionOn timed out" with NO real failure (the walk is
