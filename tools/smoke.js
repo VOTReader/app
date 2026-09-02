@@ -323,7 +323,10 @@
       // contract WITHOUT playing anything (the walk stays silent and needs no
       // network). Three things, all of which fail SILENTLY in production —
       // nothing ever paints, and no console.error is emitted:
-      //   1. the AUDIO_SYNC corpus is actually wired into bundle-a-vot;
+      //   1. the lazy timings LOAD and populate AUDIO_SYNC (c41: audio-sync.js
+      //      is its own src/data file fetched by utils/sync-loaders.js, not a
+      //      bundle-a-vot member — a deploy that drops the file, or an APK
+      //      ignore pattern that excludes it, fails HERE and not on a phone);
       //   2. every block a fragment names exists in the DOM under the exact
       //      hl-key ReadAlongHighlight builds (letter:<id>:<blockIndex>) —
       //      i.e. the alignment rows and the renderer still agree;
@@ -340,7 +343,9 @@
       var firstBlock = body.querySelector('[data-hl-key^="letter:"]');
       if (!firstBlock) return false;
       var letterId = firstBlock.getAttribute('data-hl-key').split(':')[1];
-      var sync = resolve('AUDIO_SYNC');
+      if (typeof window.__loadAudioSync !== 'function') return false;
+      await window.__loadAudioSync();                  // resolves on success AND on failure —
+      var sync = resolve('AUDIO_SYNC');                // so the global, not the promise, is the proof
       var rows = sync && sync['one:' + letterId];
       if (!rows || !rows.length) return false;
       var missing = rows.filter(function (r) {

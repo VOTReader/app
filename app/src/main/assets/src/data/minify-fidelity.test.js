@@ -45,7 +45,7 @@ const BUNDLES = [
       'letters-timothy.js', 'letters-flock.js', 'lords-rebuke.js',
       'wtlb-one.js', 'wtlb-two.js', 'wtlb-scriptures.js',
       'the-blessed.js', 'holy-days.js', 'hidden-manna.js',
-      'audio-manifest.js', 'audio-sync.js',
+      'audio-manifest.js',   // audio-sync.js: a lazy src/data file since c41, not a member
     ],
   },
 ];

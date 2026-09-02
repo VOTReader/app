@@ -29,6 +29,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { deriveRuntimeSrcAssets } from './list-runtime-src-assets.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -48,9 +49,27 @@ const CORPUS_BUNDLES = ['bundle-a-bible.js', 'bundle-a-matthew.js', 'bundle-a-vo
 // is raw-injected + precached into the same STABLE corpus cache, so a
 // regenerated dataset must bump CORPUS_VERSION or cached clients keep the old
 // graph forever. Named explicitly — it doesn't match the bible-*.js glob.
-const DATA_CORPUS = readdirSync(dataDir)
-  .filter((f) => /^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
-  .sort();
+// c41 (2026-09-01): UNION the glob with every src/data file a runtime loader in
+// src/ actually fetches — tools/list-runtime-src-assets.js is the one scanner
+// the deploy and the SW precache already agree on. audio-sync.js became a lazy
+// file that day and matches neither the glob nor the explicit name, so without
+// this it would have been pinned stale in every installed client on its next
+// regeneration — exactly what this gate exists to prevent. Union, NOT
+// replacement: the glob stays as an independent belt so the two gates cannot
+// go blind together.
+const RUNTIME_DATA = deriveRuntimeSrcAssets().assets
+  .filter((p) => p.startsWith('src/data/'))
+  .map((p) => p.slice('src/data/'.length));
+const DATA_CORPUS = [...new Set(
+  readdirSync(dataDir)
+    .filter((f) => /^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
+    .concat(RUNTIME_DATA)
+)].sort();
+for (const name of DATA_CORPUS) {
+  if (!existsSync(resolve(dataDir, name))) {
+    fail('A runtime loader in src/ fetches src/data/' + name + ' but it does not exist on disk.');
+  }
+}
 const args = process.argv.slice(2);
 const checkOnly = args.includes('--check');
 
@@ -207,7 +226,7 @@ if (lock.version === corpusVersion) {
     '    every already-installed client would keep the OLD bytes forever.\n' +
     '    Covered here:\n' +
     `      - the lazy corpus bundles      (${CORPUS_BUNDLES.join(', ')})\n` +
-    `      - runtime src/data corpus files (${DATA_CORPUS.length}: bible-*.js, scripture-web-data.js)\n` +
+    `      - runtime src/data corpus files (${DATA_CORPUS.length}: bible-*.js, scripture-web-data.js, audio-sync.js — the glob UNION every src/data file a src/ loader fetches)\n` +
     `      - the vendored reading fonts    (${READING_FONTS.length} woff2 in fonts/reading/)\n` +
     '    Bump CORPUS_VERSION in\n' +
     `    app/src/main/assets/service-worker.js  (e.g. ${corpusVersion} -> ${nextVersion(corpusVersion)}),\n` +

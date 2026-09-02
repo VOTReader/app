@@ -14,7 +14,12 @@
  *
  * index.html's own <script>/<link> tags are NOT the whole runtime surface.
  * This gate reads the DYNAMIC injections out of the source and proves each
- * one survives the ignore list.
+ * one survives the ignore list. Two loader shapes are recognised: the
+ * translation loader's `el.src = 'src/data/…'` and, since c41, the app's own
+ * lazy-loader primitive `__makeLazyLoader(name, 'src/data/…', …)` used by
+ * src/utils/sync-loaders.js for the read-along timing files — a shape this
+ * gate could not see before, which would have let a "dead weight" exclusion
+ * of audio-sync.js break read-along on the APK with every gate green.
  *
  * Run: node tools/check-apk-assets.js
  * Exits non-zero (and explains) when a needed asset would be excluded.
@@ -50,6 +55,13 @@ function collectInjectedPaths() {
       for (const m of src.matchAll(/\.src\s*=\s*['"]([^'"]+\.js)['"]/g)) found.add(m[1]);
       // script.src = 'src/data/bible-' + code + '.js'  → expand the family
       for (const m of src.matchAll(/\.src\s*=\s*['"]([^'"]*\/)([a-z-]*)-['"]\s*\+/gi)) {
+        found.add({ dir: m[1], prefix: m[2] + '-' });
+      }
+      // __makeLazyLoader('audio-sync', 'src/data/audio-sync.js', null) — the
+      // app's own loader primitive (index.html), used by src/utils/sync-loaders.js
+      // for the read-along timing files. Same two shapes as `.src =` above.
+      for (const m of src.matchAll(/__makeLazyLoader\(\s*[^,()]+,\s*['"]([^'"]+\.js)['"]/g)) found.add(m[1]);
+      for (const m of src.matchAll(/__makeLazyLoader\(\s*[^,()]+,\s*['"]([^'"]*\/)([a-z-]*)-['"]\s*\+/gi)) {
         found.add({ dir: m[1], prefix: m[2] + '-' });
       }
     }
@@ -109,8 +121,12 @@ if (!patterns) {
 
 const needed = [];
 for (const entry of collectInjectedPaths()) {
-  if (typeof entry === 'string') needed.push(entry);
-  else needed.push(...expandFamily(entry));
+  for (const rel of (typeof entry === 'string' ? [entry] : expandFamily(entry))) {
+    // One file can be reached twice — an exact literal AND a family prefix, or
+    // two prefixes (bible- and bible-sync- both cover the Bible timings). Count
+    // it once so the reported total is the number of files, not of matches.
+    if (!needed.includes(rel)) needed.push(rel);
+  }
 }
 
 if (needed.length === 0) {

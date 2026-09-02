@@ -48,7 +48,11 @@ const BUDGETS = [
   { file: 'bundle-f.js', measured: 57610, max: 66400 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   { file: 'bundle-a-matthew.js', measured: 492357, max: 567000 },
-  { file: 'bundle-a-vot.js', measured: 2432537, max: 2798000 },
+  // c41 (2026-09-01): audio-sync.js LEFT this bundle for a lazy src/data fetch
+  // (−401,579 B minified). Re-baselined DOWN so the collapse detector keeps its
+  // teeth; the old `measured` 2,432,537 was already stale against the
+  // 2,657,855 on disk before the move.
+  { file: 'bundle-a-vot.js', measured: 2256281, max: 2600000 },
   // ── raw src/data files the app fetches directly (never bundled) ──
   // Bible read-along verse timings, one per audio edition, loaded only while a
   // Bible recording is playing. The ceiling is set from the PROJECTED full
@@ -58,6 +62,14 @@ const BUDGETS = [
   { file: 'src/data/bible-sync-brm-kjv.js', measured: 184000, max: 215000, optional: true },
   { file: 'src/data/bible-sync-wop-nkjv.js', measured: 184000, max: 215000, optional: true },
   { file: 'src/data/bible-sync-web-ebible.js', measured: 184000, max: 215000, optional: true },
+  // The letter read-along timings (AUDIO_SYNC / AUDIO_SYNC_ALT), lazy since c41:
+  // loaded only while a letter recording plays with the wash on. The ceiling is
+  // set from the PROJECTED full corpus, not today's tranche: 617 keys / 497,951 B
+  // raw today; flock 62 + rebuke 31 + holydays 16 still unaligned at ~52 rows ×
+  // ~20 B ≈ +113 KB, the Volume Two re-align ≈ +18 KB, alternates ≈ +10% →
+  // ~630 KB raw, +15%. Served RAW on purpose: 156 KB vs 150 KB gzipped, and a
+  // minify step would put a second copy of the bytes on disk.
+  { file: 'src/data/audio-sync.js', measured: 497951, max: 730000 },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';
