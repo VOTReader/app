@@ -363,10 +363,14 @@ def main():
         share = proven_share(d)
         done += 1
         note(book_id, "done")
-        # Same periodic release as the letters runner: models stay, the
-        # per-recording arrays around them do not.
-        if done % 25 == 0:
-            al.release_caches()
+        # After EVERY chapter, not every 25. The 2026-09-02 campaign ran at
+        # 0.17x realtime for 27 chapters, then Deuteronomy 28 (737 s, the first
+        # chunked emission of the night) filled torch's allocator cache to the
+        # card's 16 GB and every chapter after it ran 7x slower (1.3x realtime):
+        # Windows WDDM spills allocations past the ceiling into system memory
+        # over PCIe and torch never gives the cache back on its own. Returning
+        # it costs milliseconds; the models stay resident either way.
+        al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
             review.append((tag, share))
