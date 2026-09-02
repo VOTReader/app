@@ -106,6 +106,13 @@ quality-uplift-plan.txt
 # Untracked starting W1.2 Tier A.
 .idea/appInsightsSettings.xml
 .idea/caches/
+# deploymentTargetSelector.xml = the run config's last-picked device. Android
+# Studio rewrites its timestamp on every device pick, so as a TRACKED file it
+# kept the tree dirty from 2026-08-11 and the weekly flock-audio sync refused
+# to run three Sundays running (its dirty check is `git status --porcelain
+# -uno`). Untracked 2026-09-01; the older Studio name is covered too.
+.idea/deploymentTargetSelector.xml
+.idea/deploymentTargetDropDown.xml
 
 # one-shot audit intermediates (regenerate via tools/_audit-extract-html.py + _audit-dump-app.mjs)
 tools/_audit-app.json

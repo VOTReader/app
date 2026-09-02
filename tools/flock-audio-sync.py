@@ -1,7 +1,8 @@
 """Weekly flock-audio ingestion: new AI/Benjamin readings flow into the app.
 
-Runs Sundays 06:00 via the Windows scheduled task 'vot-audio-app-sync',
-90 minutes after 'vot-weekly-sync' (FlockSync) has mirrored the flock's
+Runs Sundays 19:30 via the Windows scheduled task 'vot-audio-app-sync'
+(moved from 06:00 on 2026-08-10: the machine is off early mornings), 90
+minutes after 'vot-weekly-sync' (FlockSync, 18:00) has mirrored the flock's
 Drive folders. This stage is the APP side:
 
   1. tools/fetch-drive-audio.py      refresh the Drive audio listing
@@ -24,7 +25,16 @@ Divergence policy: behind-only fast-forwards; local-ahead proceeds and pushes
 the gated local commits along; true divergence rebases our commits on origin
 and a conflicted rebase aborts cleanly to the attention file. Staging is by
 EXPLICIT path list — never add -A. A gated commit that fails only its PUSH is
-kept local (one pull --rebase retry), never thrown away.
+kept local (one pull --rebase retry), never thrown away. A real run that
+gets through with nothing left unpushed REMOVES the attention file, so its
+presence always means the latest run failed (before 2026-09-01 it lingered).
+
+DIRTY CHECK (2026-09-01): "another session is mid-work" is judged on modified
+TRACKED files outside .idea/. Android Studio rewrites IDE state there on its
+own (deploymentTargetSelector.xml on every device pick), and that alone kept
+the tree dirty from 08-11 and blocked the 08-16, 08-23 and 08-30 runs. The
+churning file is untracked and ignored now; the pathspec keeps any sibling
+from doing it again.
 Manual run: python tools/flock-audio-sync.py [--dry-run]
 """
 import datetime
@@ -89,6 +99,24 @@ OWN_PATHS = [
     "app/src/main/assets/index.html",          # build:csp re-hashes inline scripts
 ]
 
+# What counts as "another session is mid-work": modified TRACKED files outside
+# .idea/. IDE state there churns on its own and never means a human or agent is
+# mid-commit (see DIRTY CHECK in the header).
+DIRTY_PATHSPEC = ["--", ".", ":(exclude).idea/"]
+
+
+def tracked_changes():
+    """Porcelain lines for modified tracked files, IDE state excluded."""
+    return git("status", "--porcelain", "-uno", *DIRTY_PATHSPEC).splitlines()
+
+
+def clear_attention():
+    """The attention file exists to say 'the latest run failed'. A run that got
+    through makes that false, so remove it rather than leave a stale alarm."""
+    if os.path.exists(ATTN):
+        os.remove(ATTN)
+        log("cleared FLOCK-SYNC-ATTENTION.txt left by an earlier failure")
+
 
 def reconcile_with_origin():
     """Fetch, then bring main up to date without ever discarding local commits.
@@ -119,7 +147,7 @@ def main():
     base = None
     committed = False
     try:
-        if git("status", "--porcelain", "-uno").strip():   # tracked files only — our own log is untracked
+        if tracked_changes():   # tracked files only (our log is untracked); .idea/ excluded
             raise RuntimeError("repo dirty — another session is mid-work; refusing to run")
         reconcile_with_origin()
         base = git("rev-parse", "HEAD").strip()            # AFTER reconcile — the true pre-run point
@@ -128,7 +156,14 @@ def main():
         run(["node", os.path.join("tools", "gen-audio-manifest.mjs")])
 
         if not git("diff", "--name-only", "--", MANIFEST).strip():
-            log("no new audio — manifest unchanged; done")
+            unpushed = int(git("rev-list", "--count", "origin/main..HEAD").strip() or 0)
+            if unpushed:
+                # No push happens without new audio, so anything local stays local
+                # and an attention file saying "push it manually" is still true.
+                log(f"no new audio — manifest unchanged; {unpushed} local commit(s) remain unpushed; done")
+            else:
+                log("no new audio — manifest unchanged; done")
+                clear_attention()
             return 0
         added = git("diff", "--numstat", "--", MANIFEST).split("\t")[0]
         log(f"manifest changed (+{added} lines) — new recordings found")
@@ -143,7 +178,7 @@ def main():
         run("npm run build", shell_npm=True, timeout=1800)
         # Explicit staging — never add -A: a concurrent session's stray files
         # (or our own attention note, as in c30) must not ride this commit.
-        foreign = [ln for ln in git("status", "--porcelain", "-uno").splitlines()
+        foreign = [ln for ln in tracked_changes()
                    if not any(ln[3:].startswith(p) for p in OWN_PATHS)]
         if foreign:
             raise RuntimeError("unexpected tracked changes outside OWN_PATHS: "
@@ -161,6 +196,7 @@ def main():
             git("pull", "--rebase", "origin", "main")
             git("push", "origin", "main")
         log(f"pushed c{new_v} — done")
+        clear_attention()
         return 0
     except Exception as e:
         log(f"FAILED: {e}")
