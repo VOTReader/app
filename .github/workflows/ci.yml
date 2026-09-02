@@ -211,6 +211,16 @@ jobs:
         # or if service-worker.js precaches a src/ path the scan cannot see.
         run: npm run check:runtime-assets
 
+      - name: Verify every runtime-injected asset survives the APK ignore list
+        # app/build.gradle.kts trims packaged assets via ignoreAssetsPatterns, a
+        # basename match with no negative-include. `<dir>src` once removed the nine
+        # alternate translations and Studies (~36 MB) and nothing failed loudly:
+        # the loader's onerror fell back to NKJV. The pre-commit hook has run this
+        # gate since; CI never did, so a --no-verify commit or a push from another
+        # machine went unchecked here. The gate also refuses to pass vacuously now
+        # (tools/check-apk-assets.test.js: no gradle block, or zero derived paths).
+        run: npm run check:apk-assets
+
       - name: Verify every CSS custom-property reference resolves (C2-D [D8])
         # An undeclared var() with no fallback is invalid at computed-value
         # time — the whole declaration drops, so a border becomes `none`
