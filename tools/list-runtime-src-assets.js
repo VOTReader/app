@@ -32,7 +32,7 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
 import { resolve, dirname, join, relative } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assetsDir = resolve(root, 'app/src/main/assets');
@@ -108,54 +108,65 @@ function swPrecachedSrcPaths() {
   return [...sw.matchAll(/'\.\/(src\/[^']+)'/g)].map((m) => m[1]);
 }
 
-const args = process.argv.slice(2);
-const check = args.includes('--check');
-const siteIdx = args.indexOf('--site');
-const site = siteIdx >= 0 ? args[siteIdx + 1] : null;
+/** The CLI: print the derived list, or --check it (optionally against a staged site). */
+function main() {
+  const args = process.argv.slice(2);
+  const check = args.includes('--check');
+  const siteIdx = args.indexOf('--site');
+  const site = siteIdx >= 0 ? args[siteIdx + 1] : null;
 
-const { assets, unresolved } = deriveRuntimeSrcAssets();
+  const { assets, unresolved } = deriveRuntimeSrcAssets();
 
-if (!check) {
-  for (const a of assets) console.log(a);
-  process.exit(0);
-}
-
-let failed = false;
-const fail = (msg) => { console.error('[runtime-src-assets] ' + msg); failed = true; };
-
-if (!assets.length) fail('derived ZERO runtime src/ assets — the scanner is broken.');
-
-for (const u of unresolved) {
-  fail(`could not resolve the runtime path prefix 'src/${u.frag}' referenced in ${relative(root, u.file)}. Add a matching file or teach this tool the new loader shape.`);
-}
-
-// Every derived asset must exist on disk.
-for (const a of assets) {
-  if (!existsSync(resolve(assetsDir, a))) fail(`derived asset does not exist on disk: ${a}`);
-}
-
-// The SW's precache list and this scan must agree. A src/ path the SW precaches
-// but nothing loads means a dead precache entry; the reverse (handled above by
-// the deploy assertion) means a file that ships but never gets cached offline.
-const derived = new Set(assets);
-for (const p of swPrecachedSrcPaths()) {
-  if (!derived.has(p)) {
-    fail(`service-worker.js precaches '${p}' but no runtime loader in src/ references it — either it is dead weight in CORPUS_PRECACHE, or the loader uses a shape this tool cannot see (which means the deploy would drop the file).`);
+  if (!check) {
+    for (const a of assets) console.log(a);
+    process.exit(0);
   }
-}
 
-// When given a staged site, assert every derived asset actually landed there.
-// This is the check that would have caught scripture-web-data.js being dropped.
-if (site) {
+  let failed = false;
+  const fail = (msg) => { console.error('[runtime-src-assets] ' + msg); failed = true; };
+
+  if (!assets.length) fail('derived ZERO runtime src/ assets — the scanner is broken.');
+
+  for (const u of unresolved) {
+    fail(`could not resolve the runtime path prefix 'src/${u.frag}' referenced in ${relative(root, u.file)}. Add a matching file or teach this tool the new loader shape.`);
+  }
+
+  // Every derived asset must exist on disk.
   for (const a of assets) {
-    if (!existsSync(resolve(root, site, a))) {
-      fail(`runtime asset MISSING from the staged site (${site}/${a}) — it would 404 on the live PWA.`);
+    if (!existsSync(resolve(assetsDir, a))) fail(`derived asset does not exist on disk: ${a}`);
+  }
+
+  // The SW's precache list and this scan must agree. A src/ path the SW precaches
+  // but nothing loads means a dead precache entry; the reverse (handled above by
+  // the deploy assertion) means a file that ships but never gets cached offline.
+  const derived = new Set(assets);
+  for (const p of swPrecachedSrcPaths()) {
+    if (!derived.has(p)) {
+      fail(`service-worker.js precaches '${p}' but no runtime loader in src/ references it — either it is dead weight in CORPUS_PRECACHE, or the loader uses a shape this tool cannot see (which means the deploy would drop the file).`);
     }
   }
+
+  // When given a staged site, assert every derived asset actually landed there.
+  // This is the check that would have caught scripture-web-data.js being dropped.
+  if (site) {
+    for (const a of assets) {
+      if (!existsSync(resolve(root, site, a))) {
+        fail(`runtime asset MISSING from the staged site (${site}/${a}) — it would 404 on the live PWA.`);
+      }
+    }
+  }
+
+  if (failed) {
+    console.error(`[runtime-src-assets] FAILED. Derived ${assets.length} runtime src/ asset(s).`);
+    process.exit(1);
+  }
+  console.log(`[runtime-src-assets] ok — ${assets.length} runtime src/ asset(s)${site ? ` all present in ${site}/` : ''}.`);
 }
 
-if (failed) {
-  console.error(`[runtime-src-assets] FAILED. Derived ${assets.length} runtime src/ asset(s).`);
-  process.exit(1);
-}
-console.log(`[runtime-src-assets] ok — ${assets.length} runtime src/ asset(s)${site ? ` all present in ${site}/` : ''}.`);
+// Run the CLI only when invoked AS A SCRIPT. tools/check-corpus-version.js
+// imports deriveRuntimeSrcAssets() (c41) so the corpus fingerprint covers every
+// lazily fetched src/data file — an import must not print the list and exit 0,
+// which would make the corpus gate pass without checking anything.
+const invokedAsScript = !!process.argv[1]
+  && pathToFileURL(resolve(process.argv[1])).href.toLowerCase() === import.meta.url.toLowerCase();
+if (invokedAsScript) main();

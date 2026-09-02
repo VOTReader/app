@@ -130,20 +130,35 @@ class AudioKeepAliveService : Service() {
             ensureChannel()
             syncSession()
             val notification = buildNotification()
-            // API 29+ takes the foreground-service TYPE in the call itself; the
-            // manifest declaration alone is what API 26-28 has. From API 34 the
-            // typed form is mandatory for mediaPlayback (and is backed by the
-            // FOREGROUND_SERVICE_MEDIA_PLAYBACK permission in the manifest).
-            // Re-calling startForeground on an update is the documented way to
-            // refresh a foreground notification — idempotent, not a restart.
-            if (usesTypedForeground(Build.VERSION.SDK_INT)) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+            // FGS-UPDATE (2026-09-01): only ENTER the foreground state when it is
+            // required — a start intent (startForegroundService demands a matching
+            // startForeground within 5 s) or a PLAYING snapshot. An update or
+            // command that lands while PAUSED is a plain startService on an
+            // already-started service; calling startForeground there is a
+            // background foreground-service start on API 31+ whenever the app is
+            // not visible and not on a temp allowlist, which throws
+            // ForegroundServiceStartNotAllowedException and — via the catch below —
+            // tears the paused card and its session down. notify() alone refreshes
+            // the detached card and has no such limit. The DETACH below stays
+            // unconditional: the pause EDGE (still attached) needs it, and it is a
+            // no-op once detached. Pinned by AudioKeepAliveServiceUpdateTest.
+            val enterForeground = intent?.action == null || npPlaying
+            if (enterForeground) {
+                // API 29+ takes the foreground-service TYPE in the call itself; the
+                // manifest declaration alone is what API 26-28 has. From API 34 the
+                // typed form is mandatory for mediaPlayback (and is backed by the
+                // FOREGROUND_SERVICE_MEDIA_PLAYBACK permission in the manifest).
+                // Re-calling startForeground on a PLAYING update is the documented
+                // way to refresh a foreground notification — idempotent, not a restart.
+                if (usesTypedForeground(Build.VERSION.SDK_INT)) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             }
             if (!npPlaying) {
                 // PAUSED: standard media-app demotion. The service stays up

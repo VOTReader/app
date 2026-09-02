@@ -80,6 +80,13 @@ import { writeContainer, readContainer, isContainerMagic } from '../utils/backup
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
 import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
 import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js';
+// Read-along timing loaders (c41). Published under the window names the old
+// index.html block used, so smoke/e2e keep a handle and any classic-script
+// caller still works; the component imports the module directly.
+import {
+  loadAudioSync as __loadAudioSync, audioSyncStore as __audioSyncStore,
+  loadBibleSync as __loadBibleSync, bibleSyncStore as __bibleSyncStore,
+} from '../utils/sync-loaders.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
@@ -240,6 +247,7 @@ Object.assign(window, {
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
   AudioPlayer, audioTrackUrl,
+  __loadAudioSync, __audioSyncStore, __loadBibleSync, __bibleSyncStore,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll,

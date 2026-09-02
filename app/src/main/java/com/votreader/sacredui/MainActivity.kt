@@ -54,6 +54,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewAssetLoader.InternalStoragePathHandler
 import androidx.webkit.WebViewClientCompat
+import androidx.webkit.WebViewFeature
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -885,9 +886,19 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // errors (images, fonts) deliberately do NOT touch the
                 // splash — only the main frame gates it.
                 if (request.isForMainFrame) {
+                    // androidx.webkit contract: getDescription is feature-gated
+                    // (lint RequiresFeature). The feature is framework-backed from
+                    // API 23, so at minSdk 26 it is always present; the check is
+                    // one boolean and keeps the call honest to the compat API.
+                    val description =
+                        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_DESCRIPTION)) {
+                            error.description
+                        } else {
+                            "unavailable"
+                        }
                     Timber.w(
                         "Main-frame load failed (%s) for %s — releasing splash hold",
-                        error.description, request.url
+                        description, request.url
                     )
                     view.postDelayed({ vm.splashHolding = false }, 80L)
                 }

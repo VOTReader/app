@@ -14,10 +14,25 @@
  *
  * index.html's own <script>/<link> tags are NOT the whole runtime surface.
  * This gate reads the DYNAMIC injections out of the source and proves each
- * one survives the ignore list.
+ * one survives the ignore list. Two loader shapes are recognised: the
+ * translation loader's `el.src = 'src/data/…'` and, since c41, the app's own
+ * lazy-loader primitive `__makeLazyLoader(name, 'src/data/…', …)` used by
+ * src/utils/sync-loaders.js for the read-along timing files — a shape this
+ * gate could not see before, which would have let a "dead weight" exclusion
+ * of audio-sync.js break read-along on the APK with every gate green.
  *
  * Run: node tools/check-apk-assets.js
  * Exits non-zero (and explains) when a needed asset would be excluded.
+ *
+ * NON-VACUITY FLOORS (2026-09-01, tools/check-apk-assets.test.js): both sides
+ * of this check are derived by regex over source text, and a regex that stops
+ * matching finds nothing rather than failing. So the gate REFUSES to pass when
+ * the ignoreAssetsPatterns block cannot be found (a reformat of
+ * build.gradle.kts would otherwise disarm it silently) and when the source
+ * scan derives zero runtime-injected paths (a loader refactor to
+ * setAttribute('src', ...) would otherwise leave it checking an empty list
+ * forever). Same standard as smoke-lite's linkage check and
+ * list-runtime-src-assets --check, which already fail on an empty scan.
  */
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
@@ -40,6 +55,13 @@ function collectInjectedPaths() {
       for (const m of src.matchAll(/\.src\s*=\s*['"]([^'"]+\.js)['"]/g)) found.add(m[1]);
       // script.src = 'src/data/bible-' + code + '.js'  → expand the family
       for (const m of src.matchAll(/\.src\s*=\s*['"]([^'"]*\/)([a-z-]*)-['"]\s*\+/gi)) {
+        found.add({ dir: m[1], prefix: m[2] + '-' });
+      }
+      // __makeLazyLoader('audio-sync', 'src/data/audio-sync.js', null) — the
+      // app's own loader primitive (index.html), used by src/utils/sync-loaders.js
+      // for the read-along timing files. Same two shapes as `.src =` above.
+      for (const m of src.matchAll(/__makeLazyLoader\(\s*[^,()]+,\s*['"]([^'"]+\.js)['"]/g)) found.add(m[1]);
+      for (const m of src.matchAll(/__makeLazyLoader\(\s*[^,()]+,\s*['"]([^'"]*\/)([a-z-]*)-['"]\s*\+/gi)) {
         found.add({ dir: m[1], prefix: m[2] + '-' });
       }
     }
@@ -88,14 +110,32 @@ function isExcluded(relPath, patterns) {
 
 const patterns = readIgnorePatterns();
 if (!patterns) {
-  console.log('[apk-assets] no ignoreAssetsPatterns block found — nothing to check.');
-  process.exit(0);
+  console.error('[apk-assets] FAIL — no `ignoreAssetsPatterns += listOf(` block found in');
+  console.error('app/build.gradle.kts, so there is nothing to check the runtime assets');
+  console.error('against. If the list moved to another DSL form (.addAll, = listOf, a');
+  console.error('different indent), teach readIgnorePatterns() the new shape; if the list');
+  console.error('is gone, retire this gate deliberately. A gate that finds no list must');
+  console.error('not report success.');
+  process.exit(1);
 }
 
 const needed = [];
 for (const entry of collectInjectedPaths()) {
-  if (typeof entry === 'string') needed.push(entry);
-  else needed.push(...expandFamily(entry));
+  for (const rel of (typeof entry === 'string' ? [entry] : expandFamily(entry))) {
+    // One file can be reached twice — an exact literal AND a family prefix, or
+    // two prefixes (bible- and bible-sync- both cover the Bible timings). Count
+    // it once so the reported total is the number of files, not of matches.
+    if (!needed.includes(rel)) needed.push(rel);
+  }
+}
+
+if (needed.length === 0) {
+  console.error('[apk-assets] FAIL — the source scan derived 0 runtime-injected paths, so');
+  console.error('this gate would be checking an empty list. The lazy loaders inject their');
+  console.error('scripts as `el.src = "src/data/..."`; if one was refactored to');
+  console.error('setAttribute("src", ...) or a template literal, teach collectInjectedPaths()');
+  console.error('the new shape. A gate that checks nothing must not report success.');
+  process.exit(1);
 }
 
 const missing = [];

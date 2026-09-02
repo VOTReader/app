@@ -615,6 +615,15 @@ async function run() {
         failures.push({ key, kind: 'NO-DURATION', detail: misses.size ? `audio not cached: ${[...misses].join(', ')}` : 'metadata never arrived' });
         continue;
       }
+      // The letter timings are their own lazy file (c41); the component asks for
+      // it the moment this track is loaded with the wash on, so give that fetch
+      // a moment to land — the mirror of the Bible leg's NO-VERSE-TIMINGS wait.
+      try {
+        await page.waitForFunction((k) => !!(window.AUDIO_SYNC && window.AUDIO_SYNC[k]), { timeout: 20000 }, key);
+      } catch (_e) {
+        failures.push({ key, kind: 'NO-LETTER-TIMINGS', detail: 'audio-sync.js never provided ' + key });
+        continue;
+      }
       await page.evaluate(() => AudioPlayer.toggle());          // pause: sampling, not listening
 
       /* ── ASSERTION B: seek to each row, read what painted ───────────── */

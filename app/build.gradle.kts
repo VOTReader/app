@@ -135,6 +135,9 @@ android {
             "letters-timothy.js", "letters-flock.js", "lords-rebuke.js",
             "wtlb-one.js", "wtlb-two.js", "wtlb-scriptures.js",
             "the-blessed.js", "holy-days.js", "hidden-manna.js",
+            // audio-manifest.js rides bundle-a-vot too (2026-09-01). audio-sync.js is in
+            // the same position but stays loose on purpose: the c41 lazy-load needs it.
+            "audio-manifest.js",
             // src/data ES modules (bundled into dist/bundle-b / -d).
             "scripture-resolution.js", "translations.js",
             "journal-helpers.js", "letter-linking.js",

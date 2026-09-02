@@ -22,7 +22,7 @@
         ErrorBoundary's gold panel; smoke catches the empty screen.
      3. An annotation round-trip that crashes or corrupts on the
         next/prev nav (the original regression that motivated this).
-   A globals audit + a 12-screen render walk + an annotation round-
+   A globals audit + a 13-screen render walk + an annotation round-
    trip catches all of that in ~20 seconds, deterministically, before
    it ships.
 
@@ -38,7 +38,7 @@
                           next/prev) — ALWAYS restores localStorage it
                           touched, even on failure.
      report.tabs         multi-tab round-trip (tabsOn only) — enable tabs,
-                          open two tabs, walk 12 screens in one, switch
+                          open two tabs, walk 13 screens in one, switch
                           back, assert the other held its state. ALWAYS
                           restores vot-state, even on failure.
    `mutating:false` skips the annotation round-trips (pure read-only).
@@ -323,7 +323,10 @@
       // contract WITHOUT playing anything (the walk stays silent and needs no
       // network). Three things, all of which fail SILENTLY in production —
       // nothing ever paints, and no console.error is emitted:
-      //   1. the AUDIO_SYNC corpus is actually wired into bundle-a-vot;
+      //   1. the lazy timings LOAD and populate AUDIO_SYNC (c41: audio-sync.js
+      //      is its own src/data file fetched by utils/sync-loaders.js, not a
+      //      bundle-a-vot member — a deploy that drops the file, or an APK
+      //      ignore pattern that excludes it, fails HERE and not on a phone);
       //   2. every block a fragment names exists in the DOM under the exact
       //      hl-key ReadAlongHighlight builds (letter:<id>:<blockIndex>) —
       //      i.e. the alignment rows and the renderer still agree;
@@ -340,7 +343,9 @@
       var firstBlock = body.querySelector('[data-hl-key^="letter:"]');
       if (!firstBlock) return false;
       var letterId = firstBlock.getAttribute('data-hl-key').split(':')[1];
-      var sync = resolve('AUDIO_SYNC');
+      if (typeof window.__loadAudioSync !== 'function') return false;
+      await window.__loadAudioSync();                  // resolves on success AND on failure —
+      var sync = resolve('AUDIO_SYNC');                // so the global, not the promise, is the proof
       var rows = sync && sync['one:' + letterId];
       if (!rows || !rows.length) return false;
       var missing = rows.filter(function (r) {
@@ -668,21 +673,21 @@
   //
   // DESTRUCTIVE — READ BEFORE RUNNING. This MUTATES the live app: it
   // enables the Tabs setting, opens two extra tabs, and walks the active
-  // tab through all 12 screens. localStorage['vot-state'] is snapshotted
+  // tab through all 13 screens. localStorage['vot-state'] is snapshotted
   // and restored automatically, so a page RELOAD returns to the pre-test
   // state — but the un-reloaded live session stays visibly mutated (Tabs
   // on, two extra tabs). ALWAYS reload after running. Never inject
   // votSmoke({ tabsOn:true }) into a real user's session for a casual
   // debugging check — it will rearrange their tab layout until they reload.
   //
-  // Why it exists: the 12-screen walk + both annotation round-trips run
+  // Why it exists: the 13-screen walk + both annotation round-trips run
   // with tabs OFF, so the tab state machine itself (open / switch /
   // per-tab isolation) has zero automated coverage — only the in-App
   // tabField stability probe catches setter-identity churn. End to end:
   //   1. enable Tabs via the Settings UI toggle
   //   2. open a fresh tab (X), navigate it to a KNOWN screen (Volumes idx)
   //   3. open a second fresh tab (Y)
-  //   4. run the full 12-screen walk inside tab Y
+  //   4. run the full 13-screen walk inside tab Y
   //   5. switch back to tab X and assert it STILL holds the Volumes index
   //      — proving navigating one tab never corrupts another tab's state.
   // Do NOT add a page reload inside this function — the snapshot lives in
@@ -741,7 +746,7 @@
       await sleep(600);
       var yOnHome = onHome();
 
-      // 4. Run the full 12-screen walk inside tab Y.
+      // 4. Run the full 13-screen walk inside tab Y.
       var walk = await walkScreens();
       var walkCrashed = walk.filter(function (s) { return s.crashed; }).length;
       var walkUnreached = walk.filter(function (s) { return !s.reached && !s.crashed; }).length;

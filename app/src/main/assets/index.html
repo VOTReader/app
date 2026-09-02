@@ -43,7 +43,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-emQk5bC6mTed2DJNhIR200LWAFNcUM0wUQXRdo7vpYk=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-kRMrGhQxgZ9pxkXKG4DFwvXjAFjiVW5hlhoPVCkOpgg=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-CQoPAKAyRdgBaY5sn0DYqNzrQaG8r8lNKpbAPsNOh6I=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-kRMrGhQxgZ9pxkXKG4DFwvXjAFjiVW5hlhoPVCkOpgg=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -249,33 +249,12 @@
     var screensF = window.__makeLazyLoader('screens-f', 'dist/bundle-f.js', null);
     window.__screensF = screensF.corpus;
     window.__loadScreensF = screensF.load;
-    // Bible read-along verse timings — one file per audio edition, fetched only
-    // when a Bible recording is actually PLAYING with the wash switched on. A
-    // reader who never presses Listen never pays for it, which is why this is
-    // not folded into bundle-a-bible (already 5 MB) or the cold-boot path. The
-    // src/data/ filename is load-bearing: it puts the file in the corpus
-    // fingerprint (check-corpus-version), the service worker's stable corpus
-    // cache, and both the deploy and APK asset lists, with no new gate code.
-    var bibleSync = {};
-    var bibleSyncVersion = 0;
-    var bibleSyncListeners = new Set();
-    window.__bibleSyncStore = {
-      subscribe: function(cb) { bibleSyncListeners.add(cb); return function() { bibleSyncListeners.delete(cb); }; },
-      getVersion: function() { return bibleSyncVersion; }
-    };
-    window.__loadBibleSync = function(volKey) {
-      if (typeof volKey !== 'string' || !/^bible-[a-z0-9-]+$/.test(volKey)) return;
-      if (!bibleSync[volKey]) {
-        var ed = volKey.slice('bible-'.length);
-        var l = window.__makeLazyLoader('bible-sync-' + ed, 'src/data/bible-sync-' + ed + '.js', null);
-        bibleSync[volKey] = l;
-        l.corpus.subscribe(function() {
-          bibleSyncVersion += 1;
-          bibleSyncListeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn('bible-sync subscriber threw', e); } });
-        });
-      }
-      bibleSync[volKey].load().catch(function() {});
-    };
+    // The read-along timing files (src/data/audio-sync.js and the per-edition
+    // bible-sync-<edition>.js) are lazy too, but their loaders live in
+    // src/utils/sync-loaders.js (bundle-d), NOT here: the deploy and the APK
+    // gate derive what ships by scanning src/ for the path literals, and
+    // neither scans this file. The Bible loader lived here until c41 and
+    // shipped only by accident of translations.js's bible- prefix.
   })();
   </script>
 

@@ -148,8 +148,14 @@ A_VOT = [
     # tools/gen-audio-manifest.mjs. Rides the VOT corpus: every screen that can
     # show a play button has this bundle loaded by definition.
     'src/data/audio-manifest.js',
-    # Read-along sentence timings (forced-alignment pipeline output).
-    'src/data/audio-sync.js',
+    # src/data/audio-sync.js (the read-along clause timings) is NOT a member any
+    # more (2026-09-01, c41). It is fetched lazily by src/utils/sync-loaders.js
+    # the first time a letter recording plays with the wash on — the shape the
+    # Bible timings (bible-sync-<edition>.js) already used. Every reader who
+    # opened ANY letter was parsing ~400 KB of timings whether or not they ever
+    # pressed Play, and this bundle was 140 KB from its ceiling with the
+    # flock/rebuke/holydays batch still to align. Do not add it back: the
+    # runtime-assets and apk-assets gates now derive it from the loader module.
 ]
 
 # Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
