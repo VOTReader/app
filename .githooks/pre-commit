@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook — six pre-flight checks gated on what's staged:
+# pre-commit hook — pre-flight checks gated on what's staged (5d runs always):
 #
 #   1. check_balance.py        when corpus data files change
 #      Catches black-screen failure modes that brace-balance alone misses:
@@ -24,12 +24,12 @@
 #      project on any source change. Zero-tolerance: any type error
 #      fails the commit.
 #
-#   4. vitest run (Q5.1)     when any .js/.jsx source file changes
-#      `npm run test` runs the full vitest suite once. ~2.3s for
-#      the initial harness; will grow as Q5.2+ lands real tests.
-#      jsdom environment; React-as-global + window.__* stubs in
-#      vitest.setup.js. Zero-tolerance: any failing test fails the
-#      commit.
+#   4. vitest + coverage floors (Q5.1 / C2-D [D1])   when any .js/.jsx source file changes
+#      `npm run test:coverage` runs the full vitest suite once WITH the v8
+#      coverage floors in vitest.config.js (~66s measured 2026-08-10 for
+#      3,941 tests). jsdom environment; React-as-global + window.__* stubs
+#      in vitest.setup.js. Zero-tolerance: a failing test OR a floor breach
+#      fails the commit. `npm run test` stays coverage-free for the dev loop.
 #
 #   5. python tools/build.py  when any bundle-source file changes
 #      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
@@ -49,9 +49,9 @@
 #   git config core.hooksPath .githooks
 # (See CLAUDE.md for the one-line setup.)
 #
-# All five checks are skipped automatically when no relevant file is
-# staged, so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run
-# without any delay.
+# Every check except 5d (ASSET_INTEGRITY, unconditional) is skipped
+# automatically when no relevant file is staged, so commits to CLAUDE.md /
+# PLAN.txt / docs run with almost no delay.
 
 exec 1>&2  # all output to stderr so it appears during commit
 
