@@ -162,11 +162,20 @@ export function JournalEditorScreen(props) {
   var dragZoneEnterTsRef = useRef(0);   // when the finger entered the current edge zone (speed ramp)
   var dragCtl = useRef(null);           // the shared createPressDrag instance
 
+  // Is this screen still on-screen? The block-delete Undo toast is body-level
+  // and lives 6 s, so it OUTLIVES the editor whenever the reader taps Done /
+  // Home / Search inside the window — and its Undo button stays live over the
+  // next screen. React state setters on an unmounted fiber are silent no-ops,
+  // so restore() needs this to know which of its two paths to take (see
+  // deleteBlock).
+  var mountedRef = useRef(true);
+
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
   // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
   // nothing can be parked; commitSave() still flushes any debounced edit.
   useEffect(function() {
     return function() {
+      mountedRef.current = false;
       if (dragCtl.current) dragCtl.current.destroy();
       if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
       commitSave();
@@ -374,18 +383,31 @@ export function JournalEditorScreen(props) {
       var removed = removedSnap;
       if (!removed) return;
       var undone = false;
+      // Splice `removed` back in at its old index, replacing the pristine
+      // default paragraph that deleting the LAST block left behind (restoring
+      // alongside it would leave a stray empty block). Shared by both restore
+      // paths so they can never drift apart.
+      var withRestored = function(arr) {
+        var next = (arr || []).slice();
+        if (next.length === 1 && next[0] && next[0].type === 'p' && !((next[0].text || '').trim())) next = [];
+        next.splice(Math.min(idx, next.length), 0, removed);
+        return next;
+      };
       var restore = function() {
-        undone = true;
+        undone = true;               // both paths: the deferred media delete stays skipped
         hideToast('vot-toast-undo');
-        setBlocks(function(arr) {
-          var next = arr.slice();
-          // Deleting the last block left the pristine default paragraph —
-          // replace it instead of restoring alongside it.
-          if (next.length === 1 && next[0] && next[0].type === 'p' && !((next[0].text || '').trim())) next = [];
-          next.splice(Math.min(idx, next.length), 0, removed);
-          return next;
-        });
-        scheduleSave();
+        if (mountedRef.current) { setBlocks(withRestored); scheduleSave(); return; }
+        // TWO PATHS because the toast outlives the screen BY DESIGN: the
+        // reader may tap Done/Home/Search and still reach for Undo over the
+        // next screen. This editor is gone, so setBlocks would be a silent
+        // no-op — and the unmount flush has already written the block-less
+        // entry durably. Restore through the store instead; its bump re-renders
+        // the hub and the viewer. Read the CURRENT entry rather than the
+        // pre-delete snapshot so nothing written since is clobbered.
+        var eid = entryIdRef.current;
+        var cur = eid ? JournalStore.get(eid) : null;
+        if (!cur) return;            // entry deleted meanwhile — nothing to restore into
+        JournalStore.update(eid, { blocks: withRestored(cur.blocks) });
       };
       var label = removed.type === 'audio' ? 'Voice memo removed.'
         : removed.type === 'image' ? 'Image removed.' : 'Block deleted.';

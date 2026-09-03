@@ -9,7 +9,12 @@
      - media cleanup is DEFERRED past the undo window and SKIPPED when
        the user undid;
      - media cleanup still fires (same only-when-unreferenced rules)
-       when the user did NOT undo. */
+       when the user did NOT undo;
+     - the toast is body-level and outlives the screen by design, so Undo
+       must still restore the block after Done/Home/Search unmounted the
+       editor. The silent failure was setBlocks on an unmounted fiber: a
+       no-op, while hideToast made the tap look like it had worked and the
+       durable entry (written by the unmount flush) stayed block-less. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, cleanup } from '@testing-library/react';
@@ -67,6 +72,42 @@ function deleteFirstBlock() {
   fireEvent.click(document.querySelector('[data-testid="confirm-del"]'));
   flushTimers(1); // the macrotask that shows the toast + arms cleanup
 }
+
+describe('JournalEditorScreen — [16] Undo survives the screen it was raised on', () => {
+  it('restores the block through the store after the editor unmounted', () => {
+    const entry = openEntry([
+      JournalHelpers.newBlock('p', { text: 'first' }),
+      JournalHelpers.newBlock('p', { text: 'second' }),
+    ]);
+    deleteFirstBlock();
+
+    // Done / Home / Search: the screen unmounts and its cleanup durably
+    // writes the block-less entry. The body-level toast stays up, with a
+    // live Undo button, over whatever screen came next.
+    cleanup();
+    expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['second']);
+
+    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['first', 'second']);
+  });
+
+  it('is a quiet no-op when the entry itself is gone by the time Undo is tapped', () => {
+    const entry = openEntry([
+      JournalHelpers.newBlock('p', { text: 'first' }),
+      JournalHelpers.newBlock('p', { text: 'second' }),
+    ]);
+    deleteFirstBlock();
+    cleanup();
+    JournalStore.remove(entry.id);      // deleted from the hub while the toast was up
+    globalThis.hideToast.mockClear();
+
+    expect(() => {
+      act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    }).not.toThrow();
+    expect(globalThis.hideToast).toHaveBeenCalledWith('vot-toast-undo');
+    expect(JournalStore.get(entry.id)).toBeNull();   // not resurrected
+  });
+});
 
 describe('JournalEditorScreen — [16] session undo', () => {
   it('delete shows the Undo toast; Undo restores the block at its index', () => {
