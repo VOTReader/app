@@ -39,17 +39,17 @@ try {
   // Triple-click mid-paragraph — the everyday "select this paragraph" gesture.
   const p0 = await page.$('#p0');
   const box = await p0.boundingBox();
-  await page.mouse.click(box.x + 40, box.y + 10, { clickCount: 3 });
+  for (const n of [1, 2, 3]) await page.mouse.click(box.x + 40, box.y + 10, { clickCount: n, delay: 20 });
   out.tripleClickMid = await page.evaluate(describeRange);
   // Triple-click on the LAST paragraph (no following block to spill into).
   const p1 = await page.$('#p1');
   const b1 = await p1.boundingBox();
-  await page.mouse.click(b1.x + 40, b1.y + 10, { clickCount: 3 });
+  for (const n of [1, 2, 3]) await page.mouse.click(b1.x + 40, b1.y + 10, { clickCount: n, delay: 20 });
   out.tripleClickLast = await page.evaluate(describeRange);
   // Double-click on the word inside <em> — a boundary on an inline edge.
   const em = await page.$('#p0 em');
   const be = await em.boundingBox();
-  await page.mouse.click(be.x + be.width / 2, be.y + be.height / 2, { clickCount: 2 });
+  for (const n of [1, 2]) await page.mouse.click(be.x + be.width / 2, be.y + be.height / 2, { clickCount: n, delay: 20 });
   out.doubleClickEm = await page.evaluate(describeRange);
   // Drag from the first word across the <em> to the end of the fn-ref sup.
   await page.mouse.move(box.x + 2, box.y + 10);

@@ -66,6 +66,8 @@ let puts;
     the store must be put back to a cold-boot 'pending' between tests — the
     control would otherwise leave it 'loaded' and the RED could not time out. */
 function resetStateStoreToColdBoot() {
+  StateStore._resetForTests();
+  return;
   const s = /** @type {any} */ (StateStore);
   s._state = 'pending';
   s._hydratePromise = null;
