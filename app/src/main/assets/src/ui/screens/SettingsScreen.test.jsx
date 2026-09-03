@@ -415,6 +415,35 @@ describe('v3 export manifest limit', () => {
       text: expect.stringMatching(/over the 16 MiB restore limit/),
     }));
   });
+
+  /* storage-backup-2: a store still 'pending'/'degraded' at the export tap
+     gets its own message — "your storage may be failing" is wrong (nothing
+     failed; hydration just hasn't finished) and would send the reader
+     chasing a fault that isn't there. */
+  it('tells the reader to wait, not that storage is failing, when a store has not loaded yet', async () => {
+    const build = vi.fn(async () => ({ ok: false, reason: 'not-loaded', problems: ['vot-annotations'] }));
+    const toast = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildV3Manifest: build,
+      showToast: toast,
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: vi.fn(), pickImportFile: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+      },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/hasn.t finished loading/),
+    }));
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/storage may be failing/),
+    }));
+  });
 });
 
 describe('wipe dialog — registered with the modal registry (Wave 0)', () => {

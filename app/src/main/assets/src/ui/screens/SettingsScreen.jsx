@@ -869,11 +869,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         diagnosticLog: diagnosticLog,
       });
       if (!built.ok) {
-        // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
-        // rather than write a misleading, incomplete backup. (No media-limit case:
-        // v3 streams, so there is no size cap.)
         hideToast(_TOAST_ID);
-        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        if (built.reason === 'not-loaded') {
+          // A store was still 'pending'/'degraded' at the export tap — its
+          // session writes live only in its overlay/queue, so reading IDB
+          // straight would ship a backup missing them under a "saved" toast.
+          _showToast("Storage hasn't finished loading; a backup taken now would be missing this session's changes. Try again in a moment.");
+        } else {
+          // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
+          // rather than write a misleading, incomplete backup. (No media-limit case:
+          // v3 streams, so there is no size cap.)
+          _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        }
         return;
       }
       if (built.manifestBytes > MANIFEST_MAX_BYTES) {
@@ -939,11 +946,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         diagnosticLog: diagnosticLog,
       });
       if (!built.ok) {
-        // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
-        // rather than write a misleading, incomplete backup. (No media-limit
-        // case: v3 streams, so there is no size cap.)
         hideToast(_TOAST_ID);
-        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        if (built.reason === 'not-loaded') {
+          // A store was still 'pending'/'degraded' at the export tap — its
+          // session writes live only in its overlay/queue, so reading IDB
+          // straight would ship a backup missing them under a "saved" toast.
+          _showToast("Storage hasn't finished loading; a backup taken now would be missing this session's changes. Try again in a moment.");
+        } else {
+          // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
+          // rather than write a misleading, incomplete backup. (No media-limit
+          // case: v3 streams, so there is no size cap.)
+          _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        }
         return;
       }
       if (built.manifestBytes > MANIFEST_MAX_BYTES) {
