@@ -18,6 +18,15 @@
  * The same attempt finishes with a worst-case reading-toolbar geometry audit
  * at 360x800 so overflow hidden by the app shell cannot silently clip controls.
  *
+ * Every uncaught page error raised while the page is open is part of the
+ * verdict (foldPageErrors, 2026-09-03). React's ErrorBoundary only sees render;
+ * a TypeError thrown from a click handler, a store subscriber, a timer or an
+ * async effect during the walk leaves the screen painted and isCrashed() blind,
+ * and until 2026-09-03 this harness collected those errors and printed them
+ * only after the walk had already failed for another reason — so they passed
+ * green. RED-proved: a `setTimeout(() => { throw ... }, 4000)` appended to
+ * dist/bundle-b.js exited 0 with a PASS line on the old verdict.
+ *
  * Local: `npm run smoke:ci`. CI: a step after `npm run build`.
  */
 
@@ -114,6 +123,18 @@ async function auditCompactReadingNav(page) {
     const hasHome = labels.some((label) => /^Home$/i.test(String(label)));
     return { ok: clipped.length === 0 && hasBack && hasHome, clipped, hasBack, hasHome, items };
   });
+}
+
+// Fold the page's uncaught errors into the walk's verdict. Exported for
+// tools/smoke-ci.test.js; pure, so the verdict rule is pinned without a browser.
+export function foldPageErrors(report, pageErrors) {
+  if (!pageErrors || pageErrors.length === 0) return report;
+  const n = pageErrors.length;
+  const first = String(pageErrors[0]).split('\n')[0];
+  report.ok = false;
+  report.pageErrors = pageErrors.slice();
+  report.summary += ` | ${n} UNCAUGHT PAGE ERROR${n === 1 ? '' : 'S'} — first: ${first}`;
+  return report;
 }
 
 // One full smoke attempt against a FRESH browser: load → wait for mount →
@@ -226,6 +247,9 @@ async function main() {
       // A real report is AUTHORITATIVE: a genuine render failure (ok === false)
       // must NOT be retried (that would mask a real regression). Done either way.
       const { report, pageErrors } = result;
+      // A pageerror is a genuine failure, not a wedged runner: fold it into the
+      // verdict here, on the authoritative (never retried) report.
+      foldPageErrors(report, pageErrors);
       console.log('[smoke-ci] ' + report.summary);
       if (report.ok) {
         exitCode = 0;
@@ -242,4 +266,7 @@ async function main() {
   process.exit(exitCode);
 }
 
-main();
+// Run only when invoked as a script; the unit test imports foldPageErrors.
+const invokedDirectly = !!process.argv[1]
+  && resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+if (invokedDirectly) main();
