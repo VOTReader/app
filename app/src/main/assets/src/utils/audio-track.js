@@ -57,7 +57,19 @@ const RELEASE_PREFIXES = Object.freeze([
  *  (not in the lazy manifest) so Settings can list editions before the Bible
  *  corpus loads. `volKey` prefixes every BIBLE_AUDIO_MANIFEST key; anything
  *  starting with 'bible-' routes to a Bible release. Future voices:
- *  add an entry + manifest rows + release assets — nothing else. */
+ *  add an entry + manifest rows + release assets — nothing else.
+ *
+ *  TWO NAMES, AND THEY ARE NOT INTERCHANGEABLE. The KEY of this registry is
+ *  the EDITION ID — the aligner's spelling (tools/batch-align-bible.py's own
+ *  EDITIONS keys) — and it is what names the read-along timing file
+ *  `src/data/bible-sync-<id>.js` and its global `BIBLE_SYNC_<ID>`. The
+ *  `volKey` names audio manifests, queues and settings, and nothing else.
+ *  They coincide for brm-kjv and wop-nkjv and DIVERGE for web-ebible
+ *  (volKey 'bible-web'), which is exactly why slicing 'bible-' off a volKey
+ *  to guess an edition id is a silent 404 waiting for the WEB alignment.
+ *  Cross that boundary only through bibleSyncEditionFor/bibleSyncGlobalFor
+ *  below; utils/audio-track.editions.test.js gates the two lists against the
+ *  shipper so they cannot drift apart again. */
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
@@ -122,6 +134,37 @@ export function bibleAudioEdition(setting) {
   return (typeof setting === 'string' && Object.prototype.hasOwnProperty.call(BIBLE_AUDIO_EDITIONS, setting))
     ? BIBLE_AUDIO_EDITIONS[/** @type {keyof typeof BIBLE_AUDIO_EDITIONS} */ (setting)]
     : null;
+}
+
+/**
+ * The EDITION ID whose entry carries this volKey, or null. This is the
+ * translation between the two names the registry holds: 'bible-web' is the
+ * queue's name for a recording whose timings ship as 'web-ebible'.
+ *
+ * @param {unknown} volKey - e.g. 'bible-web'
+ * @returns {string | null} e.g. 'web-ebible'
+ */
+export function bibleSyncEditionFor(volKey) {
+  if (typeof volKey !== 'string' || !volKey) return null;
+  for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
+    if (BIBLE_AUDIO_EDITIONS[/** @type {keyof typeof BIBLE_AUDIO_EDITIONS} */ (id)].volKey === volKey) return id;
+  }
+  return null;
+}
+
+/**
+ * The classic-script global a shipped timings file declares for this volKey's
+ * edition — `BIBLE_SYNC_<ID>`, the edition id upper-cased with its hyphens as
+ * underscores, exactly as tools/batch-align-bible.py writes it. Null for a
+ * volKey no edition claims, which a caller must read as "paint nothing"
+ * rather than indexing the globals with an empty name.
+ *
+ * @param {unknown} volKey - e.g. 'bible-web'
+ * @returns {string | null} e.g. 'BIBLE_SYNC_WEB_EBIBLE'
+ */
+export function bibleSyncGlobalFor(volKey) {
+  const id = bibleSyncEditionFor(volKey);
+  return id ? 'BIBLE_SYNC_' + id.toUpperCase().replace(/-/g, '_') : null;
 }
 
 const ASSET_NAME = /^[A-Za-z0-9_-]+\.mp3$/;

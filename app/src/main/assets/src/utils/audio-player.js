@@ -1251,15 +1251,29 @@ function _resumeAt(track) {
 }
 
 /**
- * Seek once the element can honor it. `loadedmetadata` is the earliest safe
- * moment — a currentTime assignment before that is ignored or throws. This IS
- * the boot-restore timing contract; every deferred seek in this module uses it.
+ * Seek once the element can honor it. HAVE_METADATA is the earliest safe
+ * moment — a currentTime assignment before that is ignored or throws — but it
+ * is a STATE, not only an event, and the two are not interchangeable. A
+ * prewarm(…) points the idle element at the track with preload='metadata', so
+ * `loadedmetadata` fires with nobody listening; _start() then deliberately
+ * keeps that src, no second load runs, and the event never comes again. A
+ * listener armed at that point would never fire and the seek would be lost
+ * (the reader's hour-deep letter restarting at zero). So: seek NOW when the
+ * element already has metadata, and defer to the event only when it doesn't.
+ * This IS the boot-restore timing contract; every deferred seek in this
+ * module goes through here.
  *
  * @param {number} at
  * @returns {void}
  */
 function _seekOnMetadata(at) {
   if (!(at > 0) || !_el) return;
+  // HAVE_METADATA (1) or better — duration and the seekable ranges are known,
+  // which is the whole precondition the event was standing in for.
+  if (_el.readyState >= 1) {
+    try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
+    return;
+  }
   _el.addEventListener('loadedmetadata', () => {
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
   }, { once: true });

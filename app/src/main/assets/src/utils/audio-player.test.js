@@ -9,6 +9,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { AUDIO_RESUME_REWIND_SEC } from './audio-track.js';
+
 /** Mimics the bits of HTMLAudioElement this module touches. */
 class FakeAudio extends EventTarget {
   constructor() {
@@ -17,6 +19,10 @@ class FakeAudio extends EventTarget {
     this._src = '';
     this.srcHistory = [];
     this.currentTime = 0;
+    // HAVE_NOTHING. A prewarm's preload='metadata' raises this to
+    // HAVE_METADATA (1) behind the app's back, which is exactly the state
+    // the deferred-seek tests below have to be able to describe.
+    this.readyState = 0;
     this.duration = 0;
     this.paused = true;
     this.played = false;
@@ -31,7 +37,7 @@ class FakeAudio extends EventTarget {
   // The load algorithm also resets playbackRate to defaultPlaybackRate, which
   // is why _start() must apply the chosen rate AFTER pointing at the track.
   get src() { return this._src; }
-  set src(v) { this._src = v; this.srcHistory.push(v); this.currentTime = 0; this.playbackRate = this.defaultPlaybackRate; }
+  set src(v) { this._src = v; this.srcHistory.push(v); this.currentTime = 0; this.readyState = 0; this.playbackRate = this.defaultPlaybackRate; }
   play() { this.played = true; this.paused = false; return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() { this.loadCalls++; }
@@ -1986,6 +1992,36 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(el().src).toBe(URL_OF('idC'));
     expect(el().played).toBe(true);
+  });
+
+  /* The prewarm that made the tap instant used to eat the durable resume.
+     preload='metadata' fires `loadedmetadata` while nobody is listening;
+     _start() then deliberately keeps the warmed src, so no second load runs
+     and the event never comes again. The once-listener the resume seek arms
+     was dead on arrival and an hour into a letter started over at zero.
+     Silent: the bar looked healthy, the position store still held the row. */
+  it('honors the durable resume on a letter that was already prewarmed', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (value) => {
+        const url = typeof value === 'string' ? value : (value && value.url) || '';
+        return url === URL_OF('idA1') ? { t: 600, d: 3600 } : null;
+      },
+      setPosition() {},
+      clearPosition() {},
+    };
+
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    // What a real element looks like after a metadata preload: the browser
+    // announced the duration with the app not yet listening.
+    el().readyState = 1;
+    el().duration = 3600;
+    el().dispatchEvent(new Event('loadedmetadata'));
+
+    const assignsBefore = el().srcHistory.length;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+
+    expect(el().currentTime).toBe(600 - AUDIO_RESUME_REWIND_SEC);
+    expect(el().srcHistory.length).toBe(assignsBefore);   // prewarm reuse intact
   });
 });
 

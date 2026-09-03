@@ -29,7 +29,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 
-import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayer, trackUrl } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
 import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
@@ -362,6 +362,73 @@ describe('ReadAlongHighlight — alignment belongs to the asset, not the letter'
     play();
     clockTo(6);
     expect(painted()).toBe('Sentence number two.');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The PART playing (the queue lies about it)
+   ─────────────────────────────────────────────────────────────────────────
+   A multi-part letter's rows carry a part column, and the component paints
+   only the rows of the part in the speakers. It used to read that part off
+   the QUEUE — the count of same-key items sitting behind the current one —
+   which two shipping paths make wrong: playCollection applies a
+   startPartIndex by SLICING (element 0 IS part 2) and a restored bar rebuilds
+   a queue of ONE. Both said part 0, so a letter started at part 2 painted
+   part 1's timeline over it: confidently wrong, and silent — a real wash,
+   moving, on the wrong sentences. Both parts here start at the same second,
+   so nothing but the part index can decide which one paints.
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('ReadAlongHighlight — the part playing comes from the asset', () => {
+  const A1 = 'idA1';
+  const A2 = 'idA2';
+
+  beforeEach(() => {
+    globalThis.AUDIO_MANIFEST = { 'vol1:letter-a': [[A1, 'B', 'Part 1'], [A2, 'B', 'Part 2']] };
+    globalThis.AUDIO_SYNC = {
+      'vol1:letter-a': [
+        [2, 0, 0, 14, 0],    // part 1 → block 0's first sentence
+        [2, 1, 0, 22, 1],    // part 2 → the whole second block
+      ],
+    };
+  });
+
+  it('paints part 2 when playCollection sliced the queue down to it', () => {
+    mount();
+    act(() => {
+      AudioPlayer.playCollection({
+        volKey: 'vol1',
+        items: [{ id: 'letter-a', title: 'A Letter' }],
+        collectionLabel: 'Volume One',
+        startId: 'letter-a',
+        startPartIndex: 1,
+      });
+    });
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(0);                       // the queue cannot say "part 2"…
+    expect(s.queue[0].url).toContain(A2);       // …but the asset can
+    clockTo(6);
+    expect(painted()).toBe(BLOCK1);
+  });
+
+  it('paints part 2 for a restored bar whose whole queue is that one part', () => {
+    mount();
+    act(() => {
+      AudioPlayer.playTrack({
+        key: 'vol1:letter-a', title: 'A Letter', sub: 'Volume One',
+        url: trackUrl(A2), readerCode: 'B', partLabel: 'Part 2',
+      });
+    });
+    expect(AudioPlayer.getState().queue.length).toBe(1);
+    clockTo(6);
+    expect(painted()).toBe(BLOCK1);
+  });
+
+  it('still paints part 1 when the letter is played from its beginning', () => {
+    mount();
+    play();
+    expect(AudioPlayer.getState().queue[0].url).toContain(A1);
+    clockTo(6);
+    expect(painted()).toBe('Sentence one. ');
   });
 });
 
@@ -725,7 +792,7 @@ describe('ReadAlongHighlight — Bible chapters', () => {
   const VERSE2 = 'The same was in the beginning with God.';
   const bibleKey = (bookId, n) => 'bible:' + bookId + ':1:' + n;
 
-  function BibleHost({ chapter = 1, readAlongOn = true }) {
+  function BibleHost({ chapter = 1, readAlongOn = true, volKey = 'bible-brm-kjv' }) {
     const mainRef = React.useRef(null);
     return (
       <div className="screen-scroll">
@@ -734,7 +801,7 @@ describe('ReadAlongHighlight — Bible chapters', () => {
           <span data-hl-key={bibleKey('john', 2)}>{VERSE2}</span>
         </div>
         <ReadAlongHighlight
-          volKey="bible-brm-kjv"
+          volKey={volKey}
           letterId="john"
           chapter={chapter}
           mainRef={mainRef}
@@ -754,8 +821,8 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     return out;
   };
 
-  const playChapter = (n) => act(() => {
-    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: n });
+  const playChapter = (n, volKey = 'bible-brm-kjv') => act(() => {
+    AudioPlayer.playBibleBook({ volKey, bookId: 'john', label: 'KJV', chapterNum: n });
   });
 
   beforeEach(() => {
@@ -819,6 +886,36 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     mountBible(); playChapter(1);
     clockTo(6);
     expect(painted()).toBeNull();
+  });
+
+  it('paints a WEB chapter off its own edition id, not a slice of the volKey', () => {
+    // web-ebible is the edition whose id diverges from its volKey's tail
+    // ('bible-web' slices to 'web', not 'web-ebible') — the case that proves
+    // the lookup goes through the registry rather than a string op.
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-web:john': [
+        ['web2_john_001', '', 'Chapter 1'],
+        ['web2_john_002', '', 'Chapter 2'],
+      ],
+    };
+    globalThis.BIBLE_SYNC_WEB_EBIBLE = { john: { 1: [500, 1200] } };
+    mountBible({ volKey: 'bible-web' });
+    playChapter(1, 'bible-web');
+    clockTo(6);
+    expect(painted()).toBe(VERSE1);
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
+
+  it('never falls back to the volKey-sliced global name once an edition diverges from it', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    };
+    globalThis.BIBLE_SYNC_WEB = { john: { 1: [500, 1200] } };   // the WRONG (sliced) global name
+    mountBible({ volKey: 'bible-web' });
+    playChapter(1, 'bible-web');
+    clockTo(6);
+    expect(painted()).toBeNull();
+    delete globalThis.BIBLE_SYNC_WEB;
   });
 });
 

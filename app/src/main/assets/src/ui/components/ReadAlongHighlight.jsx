@@ -89,6 +89,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { bibleSyncGlobalFor } from '../../utils/audio-track.js';
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
 
 const HL_NAME = 'vot-reading';
@@ -147,7 +148,10 @@ function _altRowsFor(track) {
  * The shipped data is deliberately minimal — `BIBLE_SYNC_<EDITION>[book][ch]`
  * is a positional array of integer CENTISECONDS, one slot per verse, `0`
  * meaning "not proven, do not paint". 31,102 verses cost ~184 KB that way, and
- * the file loads only when a Bible track is actually playing.
+ * the file loads only when a Bible track is actually playing. EDITION here is
+ * the `BIBLE_AUDIO_EDITIONS` registry id (bibleSyncGlobalFor names the global
+ * from it) — never derived from `volKey` by string surgery, because the two
+ * diverge for web-ebible ('bible-web').
  *
  * The unit is a WHOLE VERSE, which is what makes this translation-proof. The
  * default configuration is already cross-translation — bibleAudio defaults to
@@ -165,7 +169,8 @@ function _altRowsFor(track) {
  *
  * @param {string} bookId
  * @param {number} chapter
- * @param {string} volKey  e.g. 'bible-brm-kjv'
+ * @param {string} volKey  e.g. 'bible-brm-kjv' — translated to its EDITION id
+ *   by bibleSyncGlobalFor (utils/audio-track.js), never sliced by hand.
  * @returns {any[] | null}
  */
 const _bibleRowCache = new Map();
@@ -178,8 +183,9 @@ function _bibleRowsFor(bookId, chapter, volKey) {
   // The underlying table never mutates once its file has loaded, so one
   // expansion per chapter is both correct and stable.
   const g = /** @type {any} */ (globalThis);
-  const edition = volKey.slice('bible-'.length);
-  const table = g['BIBLE_SYNC_' + edition.toUpperCase().replace(/-/g, '_')];
+  // A volKey no edition claims is not our problem to guess about — it reads
+  // as "no table", the same as one that just hasn't loaded yet.
+  const table = g[bibleSyncGlobalFor(volKey) || ''];
   const cacheKey = volKey + ':' + bookId + ':' + chapter;
   const hit = _bibleRowCache.get(cacheKey);
   // The cached rows are only valid for the TABLE they were expanded from.
@@ -197,6 +203,32 @@ function _bibleRowsFor(bookId, chapter, volKey) {
   const out = rows.length ? rows : null;
   _bibleRowCache.set(cacheKey, { table, rows: out });
   return out;
+}
+
+/**
+ * Which PART of a multi-part letter this track is: the position of its asset
+ * in AUDIO_MANIFEST[key]. The manifest array index IS the part index by
+ * construction (tools/gen-audio-manifest.mjs emits a letter's parts in order),
+ * and it is the very column the sync rows carry — tools/check-audio-sync.js
+ * reads `f[4]` as an index into this same array. -1 when the asset is not in
+ * this letter's manifest run: an alternate rendition, a Bible chapter, a
+ * section compilation, or a manifest that has not landed yet.
+ *
+ * The QUEUE cannot answer this question. playCollection applies a
+ * startPartIndex by SLICING (so queue[0] IS part 2) and _restoreFromSaved
+ * rebuilds a queue of ONE, so a walk backwards over same-key items reports
+ * part 0 for a recording that is nothing of the kind.
+ *
+ * @param {string} key
+ * @param {any} track
+ * @returns {number}
+ */
+function _partOf(key, track) {
+  const g = /** @type {any} */ (globalThis);
+  const assetId = _assetIdOf(track);
+  const parts = (g.AUDIO_MANIFEST && g.AUDIO_MANIFEST[key]) || null;
+  if (!assetId || !Array.isArray(parts)) return -1;
+  return parts.findIndex((p) => p && p[0] === assetId);
 }
 
 /**
@@ -231,11 +263,8 @@ function _syncFor(key, track, chapter) {
   if (alt) return alt;
   const rows = (g.AUDIO_SYNC && g.AUDIO_SYNC[key]) || null;
   if (!rows) return null;
-  const assetId = _assetIdOf(track);
-  const parts = (g.AUDIO_MANIFEST && g.AUDIO_MANIFEST[key]) || null;
-  if (!assetId || !Array.isArray(parts)) return null;
-  for (const p of parts) { if (p && p[0] === assetId) return rows; }
-  return null;
+  // The primary-rendition proof and the part index are the same manifest scan.
+  return _partOf(key, track) >= 0 ? rows : null;
 }
 
 /**
@@ -552,11 +581,20 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const userScrollAt = React.useRef(0);
   const glide = React.useRef(/** @type {number | null} */ (null));
 
-  // Multi-part letters: the part now playing is the position of the current
-  // queue item within this letter's same-key run. Walks only that contiguous
-  // run, so it is O(parts) — never the whole collection queue.
-  let part = 0;
-  for (let j = st.qi - 1; j >= 0 && st.queue[j] && st.queue[j].key === key; j--) part++;
+  // Multi-part letters: the part now playing, derived from the ASSET the
+  // manifest registers — not from where the track sits in the queue. Two
+  // shipping paths hand this component a queue whose element 0 IS the second
+  // part (playCollection's startPartIndex slices; a restored bar rebuilds a
+  // queue of one), and the old backwards walk answered 0 for both, painting
+  // part 1's timeline over part 2's audio. The walk survives only as the
+  // fallback for a track the manifest does not know — an alternate rendition,
+  // a Bible chapter, a section compilation — all of which take the perAsset
+  // route below and want 0 anyway. O(parts) either way.
+  let part = _partOf(key, track);
+  if (part < 0) {
+    part = 0;
+    for (let j = st.qi - 1; j >= 0 && st.queue[j] && st.queue[j].key === key; j--) part++;
+  }
 
   // Two reads off the frozen lazy corpus — cheap, and `rows` keeps a stable
   // identity, so the filter below re-allocates only when the letter, the part,
