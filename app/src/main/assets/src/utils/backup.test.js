@@ -195,6 +195,41 @@ describe('buildExportPayload', () => {
     expect(res.reason).toBe('media-limit');
   });
 
+  /* storage-backup-2: whenSaved()'s result was AWAITED then DISCARDED — a
+     store whose last IDB put REJECTED (StorageHealthBanner's own remedy is
+     "Export your data now") shipped its last-good snapshot under a
+     "Backup saved." toast. whenSaved() resolves false (never rejects) for
+     that store; the barrier must now report it as a read-failure instead
+     of silently reading stale IDB bytes. */
+  it('ABORTS loud when a store write was not durable (whenSaved false — U6)', async () => {
+    const flaky = { store: { whenSaved: () => Promise.resolve(false) }, method: 'replaceAll' };
+    const res = await buildExportPayload({
+      storesMap: { 'vot-annotations': flaky }, flagMap: {},
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('read-failure');
+    expect(res.problems).toContain('vot-annotations');
+  });
+
+  /* A store still 'pending'/'degraded' keeps this session's writes ONLY in
+     its in-memory overlay/queue (cached-store.js _shouldDefer) — an IDB-only
+     read would miss them entirely, not just the last write. Must abort
+     BEFORE reading, with its own reason so the UI can say "try again" rather
+     than "your storage is failing". */
+  it('ABORTS loud (not-loaded) when a store is still pending/degraded', async () => {
+    const degraded = { store: { getState: () => 'degraded' }, method: 'replaceAll' };
+    const res = await buildExportPayload({
+      storesMap: { 'vot-annotations': degraded }, flagMap: {},
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('not-loaded');
+    expect(res.problems).toContain('vot-annotations');
+  });
+
   it('exposes a sane default media limit', () => {
     expect(DEFAULT_MEDIA_LIMIT_BYTES).toBe(100 * 1024 * 1024);
   });
@@ -273,6 +308,34 @@ describe('buildV3Manifest', () => {
     expect(res.reason).toBe('read-failure');
     expect(res.problems).toContain('vot-bookmarks');
     expect(res.manifest).toBeUndefined();
+  });
+
+  /* storage-backup-2 — same two U6 gaps as buildExportPayload (see its
+     tests): a discarded whenSaved() false, and no guard for a store still
+     mid-hydration. Both must abort loud rather than stream a stale/partial
+     v3 container. */
+  it('ABORTS loud when a store write was not durable (whenSaved false — U6)', async () => {
+    const flaky = { store: { whenSaved: () => Promise.resolve(false) }, method: 'replaceAll' };
+    const res = await buildV3Manifest({
+      storesMap: { 'vot-annotations': flaky }, flagMap: {},
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      mediaStore: fakeMedia({}), storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('read-failure');
+    expect(res.problems).toContain('vot-annotations');
+  });
+
+  it('ABORTS loud (not-loaded) when a store is still pending/degraded', async () => {
+    const degraded = { store: { getState: () => 'degraded' }, method: 'replaceAll' };
+    const res = await buildV3Manifest({
+      storesMap: { 'vot-annotations': degraded }, flagMap: {},
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      mediaStore: fakeMedia({}), storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('not-loaded');
+    expect(res.problems).toContain('vot-annotations');
   });
 
   it('builder → writeContainer → readContainer round-trips stores + media byte-exact', async () => {

@@ -161,6 +161,16 @@ export var JournalStore = extendStore(
      * other top-level fields (title, notebookIds, mood). Returns the
      * fresh entry record.
      *
+     * IDENTITY CONTRACT — a caller-supplied `id` (and `created`/`updated`)
+     * is HONOURED, not overwritten. This is what makes add() idempotent
+     * under deferred hydration: the entry is built BEFORE _shouldDefer,
+     * and _shouldDefer re-invokes add() with the built entry as the seed
+     * twice more (once onto the pending overlay, once at replay). Minting
+     * unconditionally gave those two re-invocations fresh ids while the
+     * caller was already holding the first one, so every later update()
+     * addressed an entry that existed in no cache and the reader's work
+     * was lost. Honouring the seed keeps all three passes on one identity.
+     *
      * @param {Partial<JournalEntry> | null | undefined} [seed]
      * @returns {JournalEntry}
      */
@@ -169,15 +179,15 @@ export var JournalStore = extendStore(
       var ts = Date.now();
       /** @type {JournalEntry} */
       var entry = {
-        id: jrnId(),
+        id: seed.id || jrnId(),
         title: seed.title || '',
         blocks: Array.isArray(seed.blocks) ? seed.blocks.slice() : (typeof JournalHelpers !== 'undefined' ? JournalHelpers.defaultBlocks() : []),
         mood: seed.mood || null,
         tags: Array.isArray(seed.tags) ? seed.tags.slice() : [],
         notebookIds: Array.isArray(seed.notebookIds) ? seed.notebookIds.slice() : [],
         pinned: !!seed.pinned,
-        created: ts,
-        updated: ts
+        created: seed.created || ts,
+        updated: seed.updated || ts
       };
       if (this._shouldDefer('add', entry)) return entry;
       var data = this._load();

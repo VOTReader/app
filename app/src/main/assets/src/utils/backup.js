@@ -119,8 +119,33 @@ async function _defaultStorageEstimate() {
  *   | { ok: true, payload: any }
  *   | { ok: false, reason: 'media-limit' }
  *   | { ok: false, reason: 'read-failure', problems: string[] }
+ *   | { ok: false, reason: 'not-loaded', problems: string[] }
  * )} BuildExportResult
  */
+
+/**
+ * Names of stores/flags NOT in the 'loaded' state (still 'pending' or
+ * dropped to 'degraded') — a store in either state keeps this session's
+ * writes ONLY in its in-memory overlay/queue (cached-store.js
+ * `_shouldDefer`), so a builder that reads straight from IDB after the
+ * durability barrier would miss them and ship a stale-but-valid-looking
+ * snapshot. No `getState()` counts as loaded (LS-only stores, plain test
+ * fakes never model hydration state).
+ * @param {StoresMap} storesMap
+ * @param {FlagMap} flagMap
+ * @returns {string[]}
+ */
+function _unloadedStores(storesMap, flagMap) {
+  /** @type {string[]} */
+  const bad = [];
+  for (const [name, entry] of Object.entries(storesMap)) {
+    if (typeof entry.store.getState === 'function' && entry.store.getState() !== 'loaded') bad.push(name);
+  }
+  for (const [name, s] of Object.entries(flagMap)) {
+    if (typeof s.getState === 'function' && s.getState() !== 'loaded') bad.push(name);
+  }
+  return bad;
+}
 
 /**
  * Read every store + flag + media blob into a V2 backup payload. Reads
@@ -129,7 +154,12 @@ async function _defaultStorageEstimate() {
  * Fails LOUD (U6): if ANY store read or the media loop throws, returns
  * `{ ok:false, reason:'read-failure', problems }` instead of a
  * silently-incomplete-but-valid-looking payload — the caller must abort,
- * never write a half backup. Media over the limit returns
+ * never write a half backup. A store still 'pending'/'degraded' at the
+ * start, or whose write turns out not to be durable (`whenSaved()` false —
+ * the bounded write-retry exhausted or is still outstanding), also aborts
+ * loud: `{ ok:false, reason:'not-loaded', problems }` or the same
+ * `'read-failure'` respectively, rather than shipping the last-good IDB
+ * snapshot under a "Backup saved." toast. Media over the limit returns
  * `{ ok:false, reason:'media-limit' }`.
  *
  * @param {BuildExportCtx} ctx
@@ -145,15 +175,31 @@ export async function buildExportPayload(ctx) {
     storageEstimate = _defaultStorageEstimate,
   } = ctx;
 
+  // U6/W2.2: a store still 'pending' or 'degraded' keeps this session's
+  // writes only in its overlay/queue — the reads below go STRAIGHT TO IDB,
+  // so exporting mid-hydration would ship a stale snapshot while
+  // StorageHealthBanner is telling the reader to export NOW. Fail before
+  // doing any work.
+  const unloaded = _unloadedStores(storesMap, flagMap);
+  if (unloaded.length) return { ok: false, reason: 'not-loaded', problems: unloaded };
+
   // S1: flush any in-flight store writes to IDB BEFORE reading. Stores _save()
   // fire-and-forget and the loops below read STRAIGHT FROM IDB (the durable
   // truth), so an edit made moments before Export could otherwise be missed from
-  // the ONLY backup. whenSaved() awaits the captured put and never rejects.
+  // the ONLY backup. whenSaved() resolves false when that store's last put
+  // REJECTED (never rejects itself) — capture and report those BY NAME instead
+  // of discarding the result, so a failed write aborts the export instead of
+  // silently shipping the last-good snapshot (mirrors _awaitDurability / the
+  // v3-apply durability barrier's write-failure counting).
   // Mirrors the import durability barrier (applyImportPayload).
-  await Promise.all(
-    Object.values(storesMap).map(({ store }) => _whenSaved(store))
-      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
-  );
+  const _saveNames = [...Object.keys(storesMap), ...Object.keys(flagMap)];
+  const _saveTargets = [...Object.values(storesMap).map(({ store }) => store), ...Object.values(flagMap)];
+  const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
+  /** @type {string[]} */
+  const exportProblems = [];
+  saveResults.forEach((ok, i) => {
+    if (!ok) { console.warn('export: store write not durable', _saveNames[i]); exportProblems.push(_saveNames[i]); }
+  });
 
   // (a) data: LS boot-shim only. V1 clients reading this file see just
   //     theme + fontStyle restored (intentional limitation).
@@ -170,8 +216,6 @@ export async function buildExportPayload(ctx) {
   // for the ONLY backup mechanism, so any failure aborts loudly below.
   /** @type {Record<string, any>} */
   const stores = {};
-  /** @type {string[]} */
-  const exportProblems = [];
   for (const name of Object.keys(storesMap)) {
     try {
       const v = await idbAdapter.get(name, 'v');
@@ -254,7 +298,10 @@ export async function buildExportPayload(ctx) {
  *
  * Same loud-abort contract as buildExportPayload (U6): any store/media read
  * failure returns { ok:false, reason:'read-failure', problems } so the caller
- * never writes a silently-incomplete backup.
+ * never writes a silently-incomplete backup. A store still 'pending'/
+ * 'degraded', or whose write turns out not to be durable, aborts loud the
+ * same way (see buildExportPayload's doc — the two share `_unloadedStores` +
+ * the whenSaved-capture, not yet the whole read).
  *
  * The flush + store/data read here intentionally MIRRORS buildExportPayload's
  * rather than sharing a helper yet — v2 stays untouched while v3 is built
@@ -263,7 +310,8 @@ export async function buildExportPayload(ctx) {
  *
  * @param {BuildExportCtx} ctx
  * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}> }
- *   | { ok:false, reason:'read-failure', problems:string[] }>}
+ *   | { ok:false, reason:'read-failure', problems:string[] }
+ *   | { ok:false, reason:'not-loaded', problems:string[] }>}
  */
 export async function buildV3Manifest(ctx) {
   const {
@@ -274,12 +322,22 @@ export async function buildV3Manifest(ctx) {
     storageEstimate = _defaultStorageEstimate,
   } = ctx;
 
+  // U6/W2.2: same not-loaded guard as buildExportPayload — see its doc comment.
+  const unloaded = _unloadedStores(storesMap, flagMap);
+  if (unloaded.length) return { ok: false, reason: 'not-loaded', problems: unloaded };
+
   // S1: flush in-flight writes before reading STRAIGHT FROM IDB — the only backup
-  // must not miss an edit made moments before export. whenSaved never rejects.
-  await Promise.all(
-    Object.values(storesMap).map(({ store }) => _whenSaved(store))
-      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
-  );
+  // must not miss an edit made moments before export. whenSaved resolves false
+  // (never rejects) when a store's last put REJECTED — capture + report those BY
+  // NAME instead of discarding the result (see buildExportPayload's doc).
+  const _saveNames = [...Object.keys(storesMap), ...Object.keys(flagMap)];
+  const _saveTargets = [...Object.values(storesMap).map(({ store }) => store), ...Object.values(flagMap)];
+  const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
+  /** @type {string[]} */
+  const exportProblems = [];
+  saveResults.forEach((ok, i) => {
+    if (!ok) { console.warn('export: store write not durable', _saveNames[i]); exportProblems.push(_saveNames[i]); }
+  });
 
   /** @type {Record<string, string>} */
   const data = {};
@@ -288,8 +346,6 @@ export async function buildV3Manifest(ctx) {
   // Stores + flags from IDB; collect read failures (U6) — abort loudly below.
   /** @type {Record<string, any>} */
   const stores = {};
-  /** @type {string[]} */
-  const exportProblems = [];
   for (const name of Object.keys(storesMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = v; }
     catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
