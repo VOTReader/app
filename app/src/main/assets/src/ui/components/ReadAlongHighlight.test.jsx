@@ -29,7 +29,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 
-import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayer, trackUrl } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
 import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
@@ -362,6 +362,73 @@ describe('ReadAlongHighlight — alignment belongs to the asset, not the letter'
     play();
     clockTo(6);
     expect(painted()).toBe('Sentence number two.');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The PART playing (the queue lies about it)
+   ─────────────────────────────────────────────────────────────────────────
+   A multi-part letter's rows carry a part column, and the component paints
+   only the rows of the part in the speakers. It used to read that part off
+   the QUEUE — the count of same-key items sitting behind the current one —
+   which two shipping paths make wrong: playCollection applies a
+   startPartIndex by SLICING (element 0 IS part 2) and a restored bar rebuilds
+   a queue of ONE. Both said part 0, so a letter started at part 2 painted
+   part 1's timeline over it: confidently wrong, and silent — a real wash,
+   moving, on the wrong sentences. Both parts here start at the same second,
+   so nothing but the part index can decide which one paints.
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('ReadAlongHighlight — the part playing comes from the asset', () => {
+  const A1 = 'idA1';
+  const A2 = 'idA2';
+
+  beforeEach(() => {
+    globalThis.AUDIO_MANIFEST = { 'vol1:letter-a': [[A1, 'B', 'Part 1'], [A2, 'B', 'Part 2']] };
+    globalThis.AUDIO_SYNC = {
+      'vol1:letter-a': [
+        [2, 0, 0, 14, 0],    // part 1 → block 0's first sentence
+        [2, 1, 0, 22, 1],    // part 2 → the whole second block
+      ],
+    };
+  });
+
+  it('paints part 2 when playCollection sliced the queue down to it', () => {
+    mount();
+    act(() => {
+      AudioPlayer.playCollection({
+        volKey: 'vol1',
+        items: [{ id: 'letter-a', title: 'A Letter' }],
+        collectionLabel: 'Volume One',
+        startId: 'letter-a',
+        startPartIndex: 1,
+      });
+    });
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(0);                       // the queue cannot say "part 2"…
+    expect(s.queue[0].url).toContain(A2);       // …but the asset can
+    clockTo(6);
+    expect(painted()).toBe(BLOCK1);
+  });
+
+  it('paints part 2 for a restored bar whose whole queue is that one part', () => {
+    mount();
+    act(() => {
+      AudioPlayer.playTrack({
+        key: 'vol1:letter-a', title: 'A Letter', sub: 'Volume One',
+        url: trackUrl(A2), readerCode: 'B', partLabel: 'Part 2',
+      });
+    });
+    expect(AudioPlayer.getState().queue.length).toBe(1);
+    clockTo(6);
+    expect(painted()).toBe(BLOCK1);
+  });
+
+  it('still paints part 1 when the letter is played from its beginning', () => {
+    mount();
+    play();
+    expect(AudioPlayer.getState().queue[0].url).toContain(A1);
+    clockTo(6);
+    expect(painted()).toBe('Sentence one. ');
   });
 });
 
