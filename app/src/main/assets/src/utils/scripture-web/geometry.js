@@ -15,6 +15,12 @@
    `tanh` ceiling that saturates at the top of the view — every apex stays
    reachable at every zoom. `localize` (0 at overview → 1 zoomed in) drives
    the crossover, and the same factor fades arcs merely flying overhead.
+
+   TWO laws live here now, for the same reason. The fly-over fade is the
+   second: at full localize it reaches zero, so an arc with neither foot near
+   the viewport is not on the screen at all, and the picker must agree or it
+   focuses something invisible. `flyOverGLSL` is the shader's copy;
+   `arcAnchored` + `flyOverDim` are pick.js's.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** Ceiling softness: larger = arcs stay circular longer before flattening. */
@@ -83,6 +89,69 @@ float arcRadiusY(float rx, float ceil, float squash, float localize){
   float semi = r*squash;
   float capped = ceil * tanh(r/(max(ceil,1.)*${CEIL_SOFTNESS}));
   return mix(semi, capped, localize);
+}`;
+
+/**
+ * How far outside the viewport a foot may sit and still count as anchoring
+ * its arc to the passage on screen. Device px, matching uRes.x's frame.
+ */
+export const FLYOVER_MARGIN = 24;
+
+/**
+ * 1 when either foot of an arc is within `margin` of the viewport, else 0.
+ * An exact JS mirror of the shader's `step()` pair — GLSL's step(e, x) is
+ * `x >= e ? 1 : 0`, so both edges are inclusive here too.
+ *
+ * @param {number} x0 — left foot, device px
+ * @param {number} x1 — right foot, device px
+ * @param {number} width — viewport width, device px (the shader's uRes.x)
+ * @param {number} [margin]
+ * @returns {0|1}
+ */
+export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
+  const near = (x) => (x >= -margin && x <= width + margin ? 1 : 0);
+  return /** @type {0|1} */ (Math.max(near(x0), near(x1)));
+}
+
+/**
+ * The alpha multiplier the shader applies to a fly-over: 1 while the reader
+ * is at overview, falling to the fly-over floor as they localize, and to
+ * EXACTLY 0 at full depth so hundreds of flattened apexes stop smearing
+ * across the view. Anything this returns 0 for is not painted, and therefore
+ * must not be pickable.
+ *
+ * MUST stay identical to flyOverGLSL below and to the shader that inlines it.
+ *
+ * @param {number} anchored — arcAnchored(), 0 or 1
+ * @param {number} localize — localizeFactor()
+ */
+export function flyOverDim(anchored, localize) {
+  const t = smoothstep(0.55, 1, localize);
+  const flyFloor = 0.1 + (0 - 0.1) * t;
+  const floored = flyFloor + (1 - flyFloor) * anchored;
+  return 1 + (floored - 1) * localize;
+}
+
+/** GLSL's smoothstep, for the two laws that must mirror the shader exactly. */
+function smoothstep(e0, e1, x) {
+  let t = (x - e0) / (e1 - e0);
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * The same two functions as GLSL ES 3.00, for the vertex shader to inline.
+ * Kept beside their JS twins so the pair can never drift apart unnoticed.
+ */
+export const flyOverGLSL = `
+float arcAnchored(float x0, float x1, float width){
+  float m = ${FLYOVER_MARGIN}.;
+  return max(step(-m, x0)*step(x0, width + m),
+             step(-m, x1)*step(x1, width + m));
+}
+float flyOverDim(float anchored, float localize){
+  float flyFloor = mix(.10, 0., smoothstep(.55, 1., localize));
+  return mix(1., mix(flyFloor, 1., anchored), localize);
 }`;
 
 /**

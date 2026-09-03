@@ -30,6 +30,7 @@ import {
   arcsTouching, findWebReference,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, GENRE_NAMES, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import {
@@ -464,88 +465,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [graph, mode, linkVersion, studiesTick, schedule]);
 
   // ── gestures — imperative, never React state per frame ──────────────────
+  // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
+  // it can be exercised with real dispatched DOM events instead of only a
+  // screenshot. This effect just owns the mount guard and hands over refs.
   React.useEffect(() => {
     const el = wrapRef.current;
     if (!el || !graph) return;
-    const pointers = new Map();
-    let drag = null, pinch = null, moved = false, lastTap = 0;
-
-    const dpr = () => viewRef.current.DPR;
-    const down = (e) => {
-      // A tap on the chrome is the chrome's alone. Without this, pressing
-      // "Essential" also picked whatever thread happened to run beneath the
-      // button — the pointer events bubble up from the button into this
-      // root-level gesture surface (the on-device double-activation report).
-      if (e.target && e.target.closest &&
-          e.target.closest('.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, button')) return;
-      // setPointerCapture throws NotFoundError if the pointer is already gone
-      // (or synthetic). Losing capture costs us nothing — the document-level
-      // listeners still see the move — but letting it throw here would abort
-      // the handler and leave the gesture dead.
-      try { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); } catch (_e) { /* capture is optional */ }
-      const pt = loc(e);
-      pointers.set(e.pointerId, pt);
-      moved = false;
-      if (pointers.size === 2) {
-        const [p, q] = Array.from(pointers.values());
-        const mid = (p.x + q.x) / 2;
-        pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: camRef.current.ppv,
-                  mid, verse: xToVerse(camRef.current, viewRef.current.W, mid * dpr()) };
-        drag = null;
-      } else {
-        drag = { x: pt.x, camx: camRef.current.x };
-      }
-    };
-    const move = (e) => {
-      const pt = loc(e);
-      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pt);
-      const cam = camRef.current, W = viewRef.current.W;
-      if (pinch && pointers.size === 2) {
-        const [p, q] = Array.from(pointers.values());
-        cam.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
-        clampCamera(cam, W, MAX_ZOOM);
-        cam.x = pinch.verse - (pinch.mid * dpr() - W / 2) / cam.ppv;
-        clampCamera(cam, W, MAX_ZOOM);
-        moved = true; schedule(); return;
-      }
-      if (drag) {
-        if (Math.abs(pt.x - drag.x) > 3) moved = true;
-        cam.x = drag.camx - (pt.x - drag.x) * dpr() / cam.ppv;
-        clampCamera(cam, W, MAX_ZOOM);
-        schedule(); return;
-      }
-      if (e.pointerType === 'mouse') handlersRef.current.hover(pt.x, pt.y);
-    };
-    const up = (e) => {
-      pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinch = null;
-      if (drag && !moved) {
-        const pt = loc(e);
-        const now = Date.now();
-        if (now - lastTap < 300) { handlersRef.current.doubleTap(pt.x); lastTap = 0; }
-        else { lastTap = now; handlersRef.current.tap(pt.x, pt.y); }
-      }
-      drag = null;
-    };
-    const cancel = (e) => { pointers.delete(e.pointerId); drag = null; pinch = null; };
-    const wheel = (e) => {
-      e.preventDefault();
-      const cam = camRef.current, W = viewRef.current.W;
-      zoomAbout(cam, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), MAX_ZOOM);
-      schedule();
-    };
-    el.addEventListener('pointerdown', down);
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', cancel);
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => {
-      el.removeEventListener('pointerdown', down);
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-      el.removeEventListener('pointercancel', cancel);
-      el.removeEventListener('wheel', wheel);
-    };
+    return attachWebGestures(el, {
+      loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current,
+      view: () => viewRef.current, handlers: () => handlersRef.current,
+      schedule, maxZoom: MAX_ZOOM, clampCamera, zoomAbout, xToVerse,
+    });
   }, [graph, schedule, loc]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {

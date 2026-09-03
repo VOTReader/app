@@ -9,8 +9,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH,
+  CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN,
   localizeFactor, squashFactor, arcRadiusY, arcRadiusGLSL, arcDistance,
+  arcAnchored, flyOverDim, flyOverGLSL,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
 } from './geometry.js';
@@ -249,7 +250,14 @@ describe('pickArc agrees with the drawn curve', () => {
   });
 
   it('still finds arcs when zoomed deep, with localize engaged', () => {
-    const cam = createCamera(g.total);
+    // Every arc here has a foot on verse 20, which the camera holds at screen
+    // centre — so all four stay ANCHORED however deep the zoom goes, and what
+    // this pins is the tanh ceiling alone. Fly-overs are a separate law: past
+    // localize .55 the shader fades them out, and the picker follows (see
+    // "the fly-over cull is a hit-test law" below), so sampling one here
+    // would only re-test that.
+    const anchoredGraph = makeGraph([[20, 21], [19, 20], [12, 20], [20, 28]]);
+    const cam = createCamera(anchoredGraph.total);
     clampCamera(cam, 1000, 5000);
     for (const zoom of [8, 40, 300, 3000]) {
       cam.ppv = fitPPV(cam, 1000) * zoom;
@@ -257,11 +265,13 @@ describe('pickArc agrees with the drawn curve', () => {
       clampCamera(cam, 1000, 5000);
       const view = VIEW({ localize: localizeFactor(zoom) });
       let found = 0;
-      for (let i = 0; i < g.count; i++) {
-        for (const t of [0.25, 0.5, 0.75]) {
-          const [px, py] = pointOnArc(g, cam, view, i, t);
+      for (let i = 0; i < anchoredGraph.count; i++) {
+        // Deep in, a foot is the only part of a long arc still on screen, so
+        // sample the near-foot parameters as well as the apex.
+        for (const t of [0.02, 0.25, 0.5, 0.75, 0.98]) {
+          const [px, py] = pointOnArc(anchoredGraph, cam, view, i, t);
           if (px < -50 || px > 1050 || py < -50 || py > 650) continue;
-          const hit = pickArc(g, cam, view, px, py, 6);
+          const hit = pickArc(anchoredGraph, cam, view, px, py, 6);
           expect(hit, `zoom ${zoom} arc ${i} t=${t}`).not.toBeNull();
           found++;
         }
@@ -324,6 +334,88 @@ describe('pickArc agrees with the drawn curve', () => {
     };
     expect(at('famous')).toBeNull();
     expect(at('essential')).toBeNull();
+  });
+});
+
+describe('visibility law', () => {
+  // The JS twins of the shader's fly-over lines. GLSL's step(e, x) is
+  // `x >= e ? 1 : 0`, so both margins are inclusive — an arc whose foot sits
+  // EXACTLY on the margin is still drawn, and must therefore still be picked.
+  it('anchors an arc when either foot is inside the frame', () => {
+    expect(arcAnchored(200, 800, 1000)).toBe(1);
+    expect(arcAnchored(-4000, 300, 1000)).toBe(1);
+    expect(arcAnchored(700, 9000, 1000)).toBe(1);
+  });
+
+  it('treats the margin as inclusive, on both edges', () => {
+    expect(FLYOVER_MARGIN).toBe(24);
+    expect(arcAnchored(-24, 9000, 1000)).toBe(1);
+    expect(arcAnchored(-24.001, 9000, 1000)).toBe(0);
+    expect(arcAnchored(-9000, 1024, 1000)).toBe(1);
+    expect(arcAnchored(-9000, 1024.001, 1000)).toBe(0);
+    expect(arcAnchored(-9000, 9000, 1000, 9000)).toBe(1);
+  });
+
+  it('leaves everything painted at overview, however far the feet are', () => {
+    expect(flyOverDim(0, 0)).toBe(1);
+    expect(flyOverDim(1, 0)).toBe(1);
+  });
+
+  it('never dims an anchored arc, at any depth', () => {
+    for (const loc of [0, 0.55, 0.8, 1]) expect(flyOverDim(1, loc)).toBe(1);
+  });
+
+  it('fades a fly-over through the floor and reaches EXACTLY zero at depth', () => {
+    // Only the full zero makes an arc unpickable, so it has to be exact
+    // rather than a rounding-close approximation.
+    expect(flyOverDim(0, 0.55)).toBeCloseTo(0.505, 10);
+    expect(flyOverDim(0, 0.8)).toBeCloseTo(0.23336, 5);
+    expect(flyOverDim(0, 1)).toBe(0);
+  });
+
+  it('publishes the margin and the floor to the GLSL the shader inlines', () => {
+    expect(flyOverGLSL).toContain('float m = ' + FLYOVER_MARGIN + '.;');
+    expect(flyOverGLSL).toContain('mix(.10, 0., smoothstep(.55, 1., localize))');
+    expect(flyOverGLSL).toContain('mix(1., mix(flyFloor, 1., anchored), localize)');
+  });
+});
+
+describe('the fly-over cull is a hit-test law, not only a draw law', () => {
+  // At full localize the shader fades an arc with NEITHER foot within 24 device
+  // px of the viewport to alpha 0 — it is not on the screen at all. The picker
+  // used to ignore that, so on the real 63k-arc asset a tap deep in a passage
+  // silently focused a fly-over the reader could not see and spotlit nothing.
+  // A narrow frame with a low ceiling keeps one fly-over's apex on screen at
+  // BOTH localize steps, so the only thing changing between the legs is the cull.
+  const FLY = (over) => Object.assign({
+    width: 400, height: 600, base: 520, ceil: 200, localize: 0,
+    squash: squashFactor(200, 400), density: 'famous', rulerDepth: 40,
+  }, over);
+  /** [18,22] flies over the frame (feet at -30 and 430); [20,22] is anchored. */
+  const g = makeGraph([[18, 22], [20, 22]]);
+  const cam = createCamera(g.total);
+  cam.ppv = 115;
+  clampCamera(cam, 400, 5000);
+
+  it('will not pick a fly-over the shader has faded to nothing', () => {
+    const view = FLY({ localize: 1 });
+    const [px, py] = pointOnArc(g, cam, view, 0, 0.5);
+    expect(px).toBeGreaterThan(0);
+    expect(px).toBeLessThan(view.width);
+    expect(pickArc(g, cam, view, px, py, 6)).toBeNull();
+  });
+
+  it('still picks that same arc at overview, where it is painted', () => {
+    const view = FLY({ localize: 0 });
+    const [px, py] = pointOnArc(g, cam, view, 0, 0.5);
+    expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 0 });
+  });
+
+  it('keeps an anchored arc pickable at full localize', () => {
+    // One foot inside the frame is enough — the shader draws it, so we pick it.
+    const view = FLY({ localize: 1 });
+    const [px, py] = pointOnArc(g, cam, view, 1, 0.5);
+    expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 1 });
   });
 });
 

@@ -17,13 +17,14 @@
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
-   The height law is NOT written here. It is imported from
-   utils/scripture-web/geometry.js as GLSL and inlined, because the CPU hit
-   test uses the same law — if the two ever drift, arcs stop being tappable
-   where they look tappable. A test asserts this shader contains it.
+   Neither the height law nor the fly-over cull is written here. Both are
+   imported from utils/scripture-web/geometry.js as GLSL and inlined, because
+   the CPU hit test applies the same two laws — if either drifts, arcs stop
+   being tappable where they look tappable, or start being tappable where
+   nothing is drawn. Tests assert this shader contains them.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { arcRadiusGLSL } from '../../utils/scripture-web/geometry.js';
+import { arcRadiusGLSL, flyOverGLSL } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
 
@@ -45,6 +46,7 @@ uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 out vec4 vCol; out float vEdge;
 ${arcRadiusGLSL}
+${flyOverGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -82,11 +84,9 @@ void main(){
   // depth they are culled outright — the tanh ceiling flattens every big
   // arc's apex to the same height, so hundreds of fly-overs otherwise stack
   // into horizontal smears across the view (the on-device report).
-  float m = 24.;
-  float anchored = max(step(-m, x0)*step(x0, uRes.x + m),
-                       step(-m, x1)*step(x1, uRes.x + m));
-  float flyFloor = mix(.10, 0., smoothstep(.55, 1., uLocalize));
-  dim *= mix(1., mix(flyFloor, 1., anchored), uLocalize);
+  // The law lives in geometry.js, inlined above, because pick.js applies the
+  // same test — an arc faded to nothing here must not win a tap there.
+  dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
 
   vec3 col;
   if (uColorMode < .5) {
