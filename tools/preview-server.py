@@ -9,6 +9,14 @@ pick the rebuild up. That cost real verification time more than once.
 This server sends `Cache-Control: no-store` on every response, so every
 reload fetches fresh bytes. Dev-only; never shipped to the Android APK.
 
+It listens on 127.0.0.1 ONLY. Until 2026-09-03 it bound `("", PORT)`, and an
+empty host is INADDR_ANY: the whole served tree, directory listings included,
+answered on every interface for anyone on the Wi-Fi. A dev server that can
+LAN-expose the tree is a defect (the project's other dev servers,
+tools/smoke-ci.js and tools/e2e-readalong.mjs, already listen on loopback).
+test_preview_server.py holds this contract in pre-commit and CI; there is
+deliberately no host argument.
+
 Usage (see .claude/launch.json):
     python tools/preview-server.py <port> <directory>
 """
@@ -16,6 +24,7 @@ Usage (see .claude/launch.json):
 import http.server
 import sys
 
+HOST = "127.0.0.1"  # loopback only, by contract -- see the module docstring
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8090
 DIRECTORY = sys.argv[2] if len(sys.argv) > 2 else "."
 
@@ -44,6 +53,7 @@ class Server(http.server.ThreadingHTTPServer):
 
 
 if __name__ == "__main__":
-    with Server(("", PORT), NoCacheHandler) as httpd:
-        print(f"preview-server: no-store cache headers, :{PORT} serving {DIRECTORY}")
+    with Server((HOST, PORT), NoCacheHandler) as httpd:
+        host, port = httpd.server_address[:2]
+        print(f"preview-server: no-store cache headers, {host}:{port} serving {DIRECTORY}")
         httpd.serve_forever()

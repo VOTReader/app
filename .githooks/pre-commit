@@ -10,6 +10,10 @@
 #      fields, block/segment/align types, footnote<->nkjv integrity,
 #      prev/next chains, study chapterId resolution — the "valid JS but
 #      invalid letter" class that check_balance.py can't see.
+#   1c. test_preview_server.py   when tools/preview-server.py or its test changes
+#      The preview server must listen on 127.0.0.1 only; it bound every
+#      interface until 2026-09-03 and nothing said so. A dev server that
+#      can LAN-expose the tree is a defect. CI runs this on every push.
 #
 #   2. lint-staged (Q3.5)    when any .js/.jsx source file changes
 #      Runs `eslint --max-warnings 0` ONLY on staged source files.
@@ -182,6 +186,28 @@ if [ -n "$gate_changed" ]; then
     exit 1
   fi
   echo "[pre-commit] Data-gate tests OK."
+  echo ""
+fi
+
+# ─── Step 1c: the preview server's bind contract ────────────────────
+# tools/preview-server.py must listen on 127.0.0.1 only (test_preview_server.py
+# spawns it and proves the LAN address refuses). Runs whenever the server or
+# the test itself is staged; ci.yml runs it on every push beside
+# test_check_balance.
+preview_changed=$(echo "$staged" | grep -E '^(tools/preview-server\.py|test_preview_server\.py)$' || true)
+if [ -n "$preview_changed" ]; then
+  echo "[pre-commit] Preview server changed — proving it binds loopback only (test_preview_server.py)..."
+  python -m unittest test_preview_server
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Preview-server bind test FAILED — the server must listen on"
+    echo "127.0.0.1 only. Fix tools/preview-server.py, re-stage, then retry."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Preview server binds loopback only."
   echo ""
 fi
 

@@ -206,7 +206,7 @@ node --version    # expect v20+
 npx esbuild --version    # expect 0.28+
 # 4. rebuild bundles from source (proves the build pipeline works)
 npm run build
-# 5. preview: serve via tools/preview-server.py (NOT plain python -m http.server)
+# 5. preview: serve via tools/preview-server.py (NOT plain python -m http.server); it listens on 127.0.0.1 only
 #    .claude/launch.json already points the preview tool at it.
 #    Open index.html, paste tools/smoke.js into preview_eval, call votSmoke()
 #    expect PASS line: globals ok, data ok, screens 0 crashed,
@@ -215,7 +215,7 @@ npm run build
 
 If Node is missing on Windows: `winget install OpenJS.NodeJS.LTS`. Use bash/git-bash for npm commands (PowerShell execution policy blocks `npm.ps1`).
 
-**Preview cache gotcha:** `tools/preview-server.py` sends `Cache-Control: no-store` so reloads always fetch fresh bundles. The plain `python -m http.server` caches `dist/bundle-*.js` heuristically and serves stale bundles after a rebuild — don't use it.
+**Preview cache gotcha:** `tools/preview-server.py` sends `Cache-Control: no-store` so reloads always fetch fresh bundles. The plain `python -m http.server` caches `dist/bundle-*.js` heuristically and serves stale bundles after a rebuild — don't use it. The preview server binds **127.0.0.1 only** (`test_preview_server.py`, pre-commit + CI): a dev server that can LAN-expose the tree is a defect, so don't add a host flag.
 
 ---
 
