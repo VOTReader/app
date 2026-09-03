@@ -101,12 +101,21 @@ jobs:
         # PWA. BLD3 (2026-08-09, external audit): check_balance + smoke-lite added —
         # the en-dash / smart-quote data classes aren't JS syntax errors, so no
         # other deploy gate saw them, and a module-graph cycle or globals-mirror
-        # drift black-screens just the same. Still CI-only BY DESIGN: smoke:ci
-        # (needs the puppeteer browser + is flake-prone), coverage thresholds,
-        # app-size, and type-scale (quality ratchets — they can't corrupt the
-        # published artifact); ci.yml runs all of those on the same push. A
-        # non-zero exit aborts the deploy before anything is published — the site
-        # stays on the prior good version (the safe failure mode).
+        # drift black-screens just the same. 2026-09-03: check:audio-sync and
+        # check:css-tokens join -- both were CI-only by omission, not by design,
+        # and both corrupt the published artifact (a stale read-along span paints
+        # mid-word on the live PWA; an undeclared var() drops its whole
+        # declaration). What stays CI-only BY DESIGN, listed exactly so the two
+        # lists can be diffed against ci.yml mechanically: smoke:ci (needs the
+        # puppeteer browser + is flake-prone), the coverage floors (test:coverage
+        # -- `npm run test` below is the same suite without them), app-size,
+        # bundle-budget and type-scale (quality ratchets -- they can't corrupt the
+        # published artifact), check:apk-assets (APK-only), the src/ syntax pass
+        # (`npm run build` parses the same files), and the gate self-tests
+        # test_check_balance / test_preview_server (dev tooling, not the
+        # artifact). ci.yml runs all of those on the same push. A non-zero exit
+        # aborts the deploy before anything is published -- the site stays on the
+        # prior good version (the safe failure mode).
         run: |
           pip install -r requirements-dev.txt   # esprima — check_balance's authoritative JS parse
           python check_balance.py        # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
@@ -115,6 +124,8 @@ jobs:
           npm run check:search-index     # MS_INDEX_VERSION bumped if index-shaping code changed (stale IDB index)
           npm run check:corpus           # CORPUS_VERSION covers the corpus bundles, src/data corpus files AND fonts/reading
           npm run validate:data          # Format A/B/C/D schema integrity
+          npm run check:audio-sync       # read-along spans start/end on word boundaries in the CURRENT render domain (the stale-timing class)
+          npm run check:css-tokens       # every CSS var() resolves -- an undeclared token drops its whole declaration
           npm run check:footnotes        # CORP6 — no dup/white footnote verse numbers
           npm run check:csp              # index.html inline-script CSP hashes in sync
           npm run lint -- --max-warnings 0   # BLD2 — 0 errors + 0 warnings
