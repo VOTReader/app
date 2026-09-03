@@ -127,6 +127,40 @@ describe('app.css — gold :focus-visible ring coverage', () => {
   });
 });
 
+describe('app.css — Scripture Web panel scrolling (scripture-web-2/8)', () => {
+  // `.sw-root` is `touch-action: none` (it owns pan/zoom); a panel with
+  // real content — the detail sheet, the connection chooser, Nearby's list
+  // — needs its OWN touch-action or a finger landing on it pans the canon
+  // underneath instead of scrolling the panel.
+  it('the detail sheet scrolls by touch instead of the root swallowing the gesture', () => {
+    const block = ruleBlock(CSS, '.sw-sheet');
+    expect(block).toContain('touch-action: pan-y');
+    expect(block).toContain('overscroll-behavior: contain');
+  });
+  it('the chooser and Nearby list scroll by touch the same way', () => {
+    // The literal selector text, not bare '.sw-choice' — the rotated
+    // max-height override below also mentions '.sw-choice' and sits
+    // earlier in the file, so a loose search would find that block instead.
+    const block = ruleBlock(CSS, '.sw-choice, .sw-list');
+    expect(block).toContain('touch-action: pan-y');
+    expect(block).toContain('overscroll-behavior: contain');
+  });
+  it('a rotated phone caps panels against the rotated root (100vw tall), not the physical viewport', () => {
+    // The base rules cap these in vh (52vh / 46vh / 62vh) against the
+    // PHYSICAL viewport height, but `.sw-root.sw-rotated` is `height: 100vw`
+    // — so at depth the panel is sized taller than the instrument and
+    // overflows before touch-action ever gets a chance to help.
+    const sheetBlock = ruleBlock(CSS, '.sw-root.sw-rotated .sw-sheet');
+    expect(sheetBlock).not.toBeNull();
+    expect(sheetBlock).toContain('max-height: 46vw');
+    // .sw-choice and .sw-list share one comma-joined rule (not ruleBlock —
+    // the selector list itself, not a declaration, is what's being pinned).
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).toMatch(
+      /\.sw-root\.sw-rotated \.sw-choice,\s*\.sw-root\.sw-rotated \.sw-list\s*\{\s*max-height:\s*62vw;\s*\}/);
+  });
+});
+
 describe('app.css — .sr-only utility', () => {
   it('exists with the standard visually-hidden pattern', () => {
     const block = ruleBlock(CSS, '.sr-only');

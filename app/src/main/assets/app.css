@@ -6806,6 +6806,11 @@
       font-family: var(--font-body); color: var(--cream-dim);
       max-height: 52vh; overflow-y: auto;
       box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+      /* The gesture layer treats this panel as chrome and leaves its wheel/
+         touch alone (gestures.js SW_CHROME_SELECTOR) — these are what
+         actually let a finger or wheel scroll it instead of the root's
+         `touch-action: none` swallowing the gesture (scripture-web-2/8). */
+      touch-action: pan-y; overscroll-behavior: contain;
     }
     .sw-sheet-close {
       position: absolute; top: 8px; right: 8px;
@@ -6900,7 +6905,12 @@
     .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-select { padding-left: 10px; padding-right: 20px; }
     .sw-root.sw-rotated .sw-context { max-width: 300px; }
-    .sw-root.sw-rotated .sw-sheet { width: min(560px, calc(100% - 24px)); }
+    /* The rotated root is `width: 100vh; height: 100vw` (the CSS rotation
+       swaps the axes), so a panel capped in vh against the PHYSICAL
+       viewport overflows before touch-action ever gets a chance to help —
+       cap it in vw, against the rotated root's own height, instead. */
+    .sw-root.sw-rotated .sw-sheet { width: min(560px, calc(100% - 24px)); max-height: 46vw; }
+    .sw-root.sw-rotated .sw-choice, .sw-root.sw-rotated .sw-list { max-height: 62vw; }
     @media (max-width: 1100px) and (orientation: landscape) {
       .sw-controls { gap: 5px; padding: 5px; }
       .sw-btn { padding-left: 10px; padding-right: 10px; }
@@ -6961,6 +6971,9 @@
       width: min(620px, calc(100% - 24px)); max-height: 62vh; overflow-y: auto;
       padding: 14px; background: var(--bg3); border: 1px solid var(--gold-border);
       border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+      /* Same reasoning as .sw-sheet: chrome to the gesture layer, so these
+         are what make Nearby's 36 rows actually scrollable by touch. */
+      touch-action: pan-y; overscroll-behavior: contain;
     }
     .sw-choice-list { display: grid; gap: 6px; margin-top: 12px; }
     .sw-choice-row {
