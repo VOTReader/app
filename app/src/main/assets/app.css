@@ -2620,35 +2620,157 @@
       body.light .surprise-fab svg {
         filter:drop-shadow(0 0 2px rgba(162,122,34,0.3));
       }
-    /* ── SETTINGS SCREEN ── */
-    .settings-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; padding:2.5rem 1.5rem; }
-    .settings-header { width:100%; max-width:32.5rem; text-align:center; margin-bottom:2.5rem; }
-    .settings-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.6rem; }
-    .settings-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-24); color:var(--cream); margin-bottom:1.5rem; }
-    .settings-ornament { display:flex; align-items:center; gap:0.75rem; margin:0 auto; max-width:280px; }
-    .settings-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
-    .settings-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
-    .settings-ornament-diamond { width:6px; height:6px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
-    .settings-section { width:100%; max-width:32.5rem; margin-bottom:1.5rem; }
-    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
-    .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
-    /* ── Accordion groups (Settings redesign 2026-07-31) ──────────────────
-       Each section is a 52px tappable header card; the body (the familiar
-       .settings-card) mounts below it only while open. The header reuses
-       .settings-section-label but promotes it to the tap-target size. */
-    .settings-group-head { display:flex; align-items:center; width:100%; gap:0.6rem; min-height:52px; padding:0.6rem 0.9rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; cursor:pointer; text-align:left; transition:border-color 0.2s ease, background 0.2s ease; }
-    @media (hover:hover){ .settings-group-head:hover { border-color:var(--gold-dim); } }
-    .settings-section.open > .settings-group-head { border-color:var(--gold-dim); background:linear-gradient(var(--gold-faint), var(--gold-faint)) var(--bg2); }
-    .settings-group-titles { display:flex; flex-direction:column; gap:0.3rem; flex:1; min-width:0; }
-    .settings-group-head .settings-section-label { margin-bottom:0; font-size:var(--fs-12); color:var(--gold); }
-    .settings-group-head .settings-section-label::after { content:none; }
-    .settings-group-sub { font-family:var(--font-body); font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .settings-group-chevron { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; transition:transform 0.2s ease; flex-shrink:0; }
+    /* ── SETTINGS SCREEN ──
+       A reader's preference folio: the left margin explains the current
+       reading profile; the right ledger owns the controls. Fixed-pixel
+       structural tracks keep the layout stable when Text Size reaches 300%.
+       The responsive cut returns it to one column on phones/tablets. */
+    .settings-screen {
+      min-height:100%; width:100%; box-sizing:border-box;
+      display:grid; grid-template-columns:minmax(200px,232px) minmax(0,1fr);
+      align-items:start; gap:clamp(24px,4vw,46px);
+      padding:clamp(34px,5vw,58px) clamp(20px,4vw,42px) 80px;
+    }
+    .settings-header {
+      position:sticky; top:24px; min-width:0; text-align:left;
+      padding:3px 0 20px 19px; border-left:1px solid var(--gold-border);
+    }
+    .settings-monogram {
+      display:flex; align-items:center; justify-content:center;
+      width:42px; height:42px; margin-bottom:1.35rem;
+      border:1px solid var(--gold-border); border-radius:50%;
+      font-family:'Cinzel Decorative',serif; font-size:var(--fsc-18); color:var(--gold);
+      background:radial-gradient(circle at 50% 42%,var(--gold-faint),transparent 68%);
+    }
+    .settings-eyebrow {
+      font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.12em;
+      color:var(--gold-dim); margin-bottom:0.45rem;
+    }
+    .settings-title {
+      font-family:'Cinzel Decorative',serif; font-size:var(--fs-30); font-weight:500;
+      line-height:1.1; color:var(--cream); margin:0 0 0.9rem;
+    }
+    .settings-intro {
+      max-width:24ch; margin:0 0 1.5rem; font-family:var(--font-body);
+      font-size:var(--fs-15); line-height:1.55; color:var(--cream-muted);
+    }
+    .settings-summary { margin:0 0 1.1rem; padding:0; }
+    .settings-summary > div {
+      display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);
+      align-items:baseline; gap:0.75rem; padding:0.55rem 0;
+      border-top:1px solid var(--border);
+    }
+    .settings-summary > div:last-child { border-bottom:1px solid var(--border); }
+    .settings-summary dt {
+      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.08em;
+      color:var(--cream-muted);
+    }
+    .settings-summary dd {
+      min-width:0; margin:0; font-family:var(--font-body); font-size:var(--fs-13);
+      line-height:1.3; color:var(--gold); text-align:right; overflow-wrap:anywhere;
+    }
+    .settings-save-note {
+      display:flex; align-items:center; gap:0.5rem; margin:0;
+      font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted);
+    }
+    .settings-save-note > span {
+      width:6px; height:6px; border-radius:50%; flex-shrink:0;
+      background:var(--gold-dim); box-shadow:0 0 0 3px var(--gold-faint);
+    }
+    .settings-groups { min-width:0; width:100%; }
+    .settings-section { width:100%; margin:0 0 0.65rem; }
+    .settings-section-label {
+      font-family:'Cinzel',serif; font-size:var(--fs-14); font-weight:500;
+      letter-spacing:0.055em; color:var(--cream); display:block;
+    }
+    /* ── Accordion ledger ─────────────────────────────────────────────────
+       Icons encode each domain; connected rows beneath keep this from
+       becoming a generic grid of independent dashboard cards. */
+    .settings-group-head {
+      display:flex; align-items:center; width:100%; gap:0.85rem; min-height:66px;
+      padding:0.72rem 0.85rem 0.72rem 0.72rem; color:inherit;
+      background:linear-gradient(100deg,var(--bg3),var(--bg2) 68%);
+      border:1px solid var(--border); border-radius:12px; cursor:pointer;
+      text-align:left; transition:border-color 0.18s ease, background 0.18s ease;
+    }
+    @media (hover:hover){
+      .settings-group-head:hover { border-color:var(--gold-border); }
+      .settings-group-head:hover .settings-group-icon { color:var(--gold-bright); }
+    }
+    .settings-section.open > .settings-group-head {
+      border-color:var(--gold-border);
+      background:linear-gradient(100deg,var(--gold-faint),transparent 58%),var(--bg3);
+    }
+    .settings-group-icon {
+      display:flex; align-items:center; justify-content:center; width:40px; height:40px;
+      flex:0 0 40px; border-right:1px solid var(--border); color:var(--gold-dim);
+      transition:color 0.18s ease;
+    }
+    .settings-section.open .settings-group-icon { color:var(--gold); }
+    .settings-group-icon svg {
+      width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.45;
+      stroke-linecap:round; stroke-linejoin:round;
+    }
+    .settings-group-titles { display:flex; flex-direction:column; gap:0.2rem; flex:1; min-width:0; }
+    .settings-group-sub {
+      font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-muted);
+      line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .settings-group-chevron {
+      display:flex; align-items:center; justify-content:center; width:28px; height:28px;
+      color:var(--cream-muted); flex-shrink:0; transition:transform 0.18s ease,color 0.18s ease;
+    }
+    .settings-group-chevron svg {
+      width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5;
+      stroke-linecap:round; stroke-linejoin:round;
+    }
     .settings-group-chevron.open { transform:rotate(180deg); color:var(--gold); }
-    .settings-group-body { margin-top:0.55rem; }
-    /* Collapsed groups sit tighter than the old always-open sections. */
-    .settings-section { margin-bottom:0.7rem; }
-    .settings-section.open { margin-bottom:1.3rem; }
+    .settings-group-body { margin-top:0.45rem; }
+    .settings-section.open { margin-bottom:1rem; }
+    .settings-screen.settings-large-type {
+      grid-template-columns:minmax(0,36rem); justify-content:center; gap:0;
+    }
+    .settings-screen.settings-large-type .settings-header {
+      position:static; width:100%; box-sizing:border-box; margin-bottom:2rem;
+      padding:0 0 0 18px;
+    }
+    .settings-screen.settings-large-type .settings-intro { max-width:44ch; }
+    .settings-screen.settings-large-type .settings-group-sub { white-space:normal; }
+    @media (max-width:900px) {
+      .settings-screen { grid-template-columns:minmax(0,36rem); justify-content:center; gap:0; }
+      .settings-header {
+        position:static; width:100%; box-sizing:border-box; margin-bottom:2rem;
+        padding:0 0 0 18px;
+      }
+      .settings-monogram { margin-bottom:1rem; }
+      .settings-intro { max-width:44ch; margin-bottom:1.2rem; }
+      .settings-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .settings-summary > div,
+      .settings-summary > div:last-child {
+        display:block; min-width:0; padding:0.55rem 0.65rem;
+        border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+        border-right:1px solid var(--border);
+      }
+      .settings-summary > div:first-child { padding-left:0; }
+      .settings-summary > div:last-child { border-right:0; }
+      .settings-summary dd { margin-top:0.2rem; text-align:left; }
+      .settings-screen.settings-large-type .settings-summary { display:block; }
+      .settings-screen.settings-large-type .settings-summary > div,
+      .settings-screen.settings-large-type .settings-summary > div:last-child {
+        display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);
+        padding:0.55rem 0; border-right:0;
+      }
+      .settings-screen.settings-large-type .settings-summary dd { margin-top:0; text-align:right; }
+    }
+    @media (max-width:500px) {
+      .settings-screen { padding:28px 15px 64px; }
+      .settings-header { margin-bottom:1.5rem; }
+      .settings-title { font-size:var(--fs-24); }
+      .settings-intro { font-size:var(--fs-14); }
+      .settings-group-head { min-height:62px; gap:0.65rem; padding-left:0.55rem; }
+      .settings-group-icon { width:36px; flex-basis:36px; }
+      .settings-group-sub { white-space:normal; }
+    }
     /* ── Reading Font picker (2026-07-31) ─────────────────────────────────
        A standard SelectField dropdown sheet; option names render in their
        font via the bundled 'p-<id>' preview subsets (name glyphs only —
@@ -2659,7 +2781,7 @@
        by thin dividers, and each row's long description is hidden by default
        and revealed on demand by the ⓘ button. Far denser than the old
        one-bordered-box-per-row layout. */
-    .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
+    .settings-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
     .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(232,192,80,0.13); }
     .settings-card > .settings-row:last-child { border-bottom:none; }
     /* Danger zone (Clear All Personal Data) — visibly set apart from the
@@ -2674,7 +2796,7 @@
     .settings-row-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; padding:0.62rem 0.95rem; min-height:46px; row-gap:8px; }
     .settings-row-grow { flex:1 1 auto; min-width:0.5rem; }
     .settings-row-text { flex:1; min-width:0; }
-    .settings-row-label { font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.05em; color:var(--cream); }
+    .settings-row-label { font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.025em; color:var(--cream); }
     .settings-row-value { font-size:var(--fs-13); color:var(--gold); font-style:italic; text-align:right; }
     .settings-row-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; line-height:1.45; padding:0 0.95rem 0.72rem; }
     /* Structured ⓘ content (the Bible Translation explainer passes a node,

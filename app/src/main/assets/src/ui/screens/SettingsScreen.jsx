@@ -208,25 +208,70 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
   );
 }
 
-/* SettingsGroup — collapsible section shell (Settings redesign 2026-07-31).
-   Every section is an accordion group: a 48px tappable header (Cinzel
-   label + one-line plain-language summary + chevron) over an unmounted-
+/* SettingsGroup — collapsible section shell (Settings redesign 2026-07-31,
+   visual refresh 2026-09-03). Every section is an accordion group: a
+   generous tappable header (meaningful icon + Cinzel label + one-line
+   plain-language summary + chevron) over an unmounted-
    while-closed body. Unmounted, not hidden — the auto-scroll disclosure
    discipline: closed content is out of tab order and screen-reader order,
    and the screen opens as a compact 8-line overview instead of a wall.
    Module scope so React identity is stable across SettingsScreen renders. */
-function SettingsGroup({ label, sub, open, onToggle, children = null }) {
+function SettingsGroupIcon({ id }) {
+  let paths = null;
+  switch (id) {
+    case 'appearance':
+      paths = <><circle cx="12" cy="12" r="3.25" /><path d="M12 2.75v2M12 19.25v2M2.75 12h2M19.25 12h2M5.45 5.45l1.4 1.4M17.15 17.15l1.4 1.4M18.55 5.45l-1.4 1.4M6.85 17.15l-1.4 1.4" /></>;
+      break;
+    case 'reading':
+      paths = <path d="M3.5 5.5c3.4-.45 6.15.35 8.5 2.4 2.35-2.05 5.1-2.85 8.5-2.4v12.75c-3.25-.35-6 .48-8.5 2.5-2.5-2.02-5.25-2.85-8.5-2.5V5.5ZM12 7.9v12.85" />;
+      break;
+    case 'listening':
+      paths = <path d="M4.25 13.25v-1.5a7.75 7.75 0 0 1 15.5 0v1.5M4.25 13.25h2.5v6h-2.5a1.5 1.5 0 0 1-1.5-1.5v-3a1.5 1.5 0 0 1 1.5-1.5ZM19.75 13.25h-2.5v6h2.5a1.5 1.5 0 0 0 1.5-1.5v-3a1.5 1.5 0 0 0-1.5-1.5Z" />;
+      break;
+    case 'autoscroll':
+      paths = <><path d="M12 3.25v17.5M7.75 16.5 12 20.75l4.25-4.25" /><path d="M5 7.25h4M15 7.25h4M5 11.5h4M15 11.5h4" /></>;
+      break;
+    case 'topnav':
+      paths = <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9.25h18M7 7.15h.01M10 7.15h.01M17 7.15h.01" /></>;
+      break;
+    case 'features':
+      paths = <><circle cx="9.5" cy="10" r="5.25" /><path d="m13.25 13.75 4.5 4.5M15.5 5.25h4.25v4.25M18.75 13.5v5.25H13.5" /></>;
+      break;
+    case 'garden':
+      paths = <><path d="M3 19.25 9.2 10l3.15 4.25 2.55-3.35 6.1 8.35H3Z" /><path d="M14.5 7.75c.25-2.35 1.65-3.85 4.25-4.5-.1 2.65-1.5 4.15-4.25 4.5Zm0 0c-.2 1.3-.85 2.4-1.95 3.3" /></>;
+      break;
+    case 'data':
+      paths = <><ellipse cx="12" cy="5.5" rx="7.5" ry="2.75" /><path d="M4.5 5.5v6c0 1.5 3.35 2.75 7.5 2.75s7.5-1.25 7.5-2.75v-6M4.5 11.5v6c0 1.5 3.35 2.75 7.5 2.75s7.5-1.25 7.5-2.75v-6" /></>;
+      break;
+    case 'progress':
+      paths = <><circle cx="12" cy="12" r="8.75" /><path d="m7.75 12.1 2.7 2.7 5.8-6.1" /></>;
+      break;
+    default:
+      paths = <path d="M5 12h14M12 5v14" />;
+  }
   return (
-    <div className={'settings-section' + (open ? ' open' : '')}>
-      <button type="button" className="settings-group-head" aria-expanded={open} onClick={onToggle}>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {paths}
+    </svg>
+  );
+}
+
+function SettingsGroup({ sectionId, label, sub, open, onToggle, children = null }) {
+  const bodyId = `settings-group-${sectionId}`;
+  return (
+    <section className={'settings-section' + (open ? ' open' : '')} data-settings-group={sectionId}>
+      <button type="button" className="settings-group-head" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+        <span className="settings-group-icon"><SettingsGroupIcon id={sectionId} /></span>
         <span className="settings-group-titles">
           <span className="settings-section-label">{label}</span>
           {sub && <span className="settings-group-sub">{sub}</span>}
         </span>
-        <span className={'settings-group-chevron' + (open ? ' open' : '')} aria-hidden="true">▾</span>
+        <span className={'settings-group-chevron' + (open ? ' open' : '')} aria-hidden="true">
+          <svg viewBox="0 0 16 16" focusable="false"><path d="m4 6 4 4 4-4" /></svg>
+        </span>
       </button>
-      {open && <div className="settings-group-body">{children}</div>}
-    </div>
+      {open && <div className="settings-group-body" id={bodyId}>{children}</div>}
+    </section>
   );
 }
 
@@ -503,7 +548,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const groupProps = (id) => ({ open: openGroups.has(id), onToggle: () => toggleGroup(id) });
+  const groupProps = (id) => ({ sectionId: id, open: openGroups.has(id), onToggle: () => toggleGroup(id) });
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text
@@ -1546,6 +1591,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     }
   };
 
+  const textScalePercent = Math.round(clampFontScale(settings.fontScale || '1') * 100);
+  const selectedFont = (typeof readingFontById === 'function')
+    ? readingFontById(settings.fontStyle || 'classic')
+    : null;
+  const selectedFontLabel = selectedFont ? selectedFont.label : 'System Serif';
+
   return (
     <ScreenLayout
       navChildren={LibraryNav({
@@ -1555,16 +1606,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      <div className="settings-screen">
-        <div className="settings-header">
-          <div className="settings-eyebrow">VOTReader</div>
+      <div className={'settings-screen' + (textScalePercent >= 180 ? ' settings-large-type' : '')}>
+        <header className="settings-header">
+          <div className="settings-monogram" aria-hidden="true">V</div>
+          <div className="settings-eyebrow">VOTReader preferences</div>
           <h1 className="settings-title">Settings</h1>
-          <div className="settings-ornament">
-            <div className="settings-ornament-line" />
-            <div className="settings-ornament-diamond" />
-            <div className="settings-ornament-line r" />
-          </div>
-        </div>
+          <p className="settings-intro">
+            Shape the way you read, listen, and move through the library.
+          </p>
+          <dl className="settings-summary" aria-label="Current reading preferences">
+            <div><dt>Theme</dt><dd>{theme === 'light' ? 'Light' : 'Dark'}</dd></div>
+            <div><dt>Text</dt><dd>{textScalePercent === 100 ? 'Standard' : textScalePercent + '%'}</dd></div>
+            <div><dt>Typeface</dt><dd>{selectedFontLabel}</dd></div>
+          </dl>
+          <p className="settings-save-note"><span aria-hidden="true" />Changes save on this device</p>
+        </header>
+
+        <div className="settings-groups">
 
         <SettingsGroup label="Appearance" sub="Theme, text size & reading font" {...groupProps('appearance')}>
           <div className="settings-card">
@@ -2123,6 +2181,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </div>
           )}
         </SettingsGroup>
+        </div>
       </div>
     </ScreenLayout>
   );
