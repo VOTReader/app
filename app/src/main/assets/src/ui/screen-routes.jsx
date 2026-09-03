@@ -702,6 +702,14 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
+    // Link-outs from the index / viewer / web screens do NOT write navOrigin.
+    // These screens' own Back IS goNavOrigin, and goHighlightsIndex & friends
+    // already snapshotted the reading position there when the index opened —
+    // a self-referential { screen: <own screen> } write would erase that
+    // snapshot and leave Back pointing at the screen already showing (one dead
+    // press, then Home). navigateToLink owns the destination's return path
+    // through the fromLetter entry it pushes (the pill / tapThroughBack /
+    // handleAndroidBack), so there is nothing here for navOrigin to carry.
     'highlights-index': () => typeof HighlightsScreen !== 'undefined' && _kickVot(
       <HighlightsScreen
         onSettings={goSettings}
@@ -709,7 +717,6 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'highlights-index' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
           }
         }}
@@ -749,7 +756,6 @@ export function buildScreenRoutes({
         tapThroughBack={tapThroughBack}
         onNavigateToLink={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'journal-viewer' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Journal' });
           }
         }}
@@ -791,7 +797,6 @@ export function buildScreenRoutes({
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'notes-index' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Notes' });
           }
         }}
@@ -808,13 +813,11 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'links-index' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
         }}
         onNavigateToTarget={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'links-index' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
         }}
@@ -831,7 +834,6 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            setNavOrigin({ screen: 'bookmarks-index' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
           }
         }}
@@ -1221,7 +1223,6 @@ export function buildScreenRoutes({
         <ScriptureWebScreen
           navigateToLink={(endpoint, meta) => {
             if (!endpoint) return;
-            setNavOrigin({ screen: 'scripture-web' });
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
           }}
           onBack={() => setScreen('library')}

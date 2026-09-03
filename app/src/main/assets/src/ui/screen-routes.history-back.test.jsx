@@ -24,11 +24,24 @@
    consumed fromSearch. Both ChapterIndex onBack props + their backLabel
    tooltips now mirror the hardware-back branches in use-android-back.js.
 
+   navigation-tabs-1 (link-outs must not overwrite navOrigin): six index /
+   viewer / web routes captured a self-referential navOrigin
+   (`{ screen: <own screen> }`, no returnOrigin) immediately before handing
+   off to navigateToLink. The index screens' own Back IS goNavOrigin, and
+   goNotesIndex & friends had already snapshotted the reading position into
+   navOrigin when the index opened — so the link-out silently destroyed the
+   UX3 return-to-reading path and left Back pointing at the screen already
+   showing (one dead press, then Home). navigateToLink owns the return path
+   through its fromLetter entry, so the write was pure loss; the tests below
+   pin its absence, and pin that journal-viewer's onOpenNotebook — a real
+   cross-screen origin consumed by notes-index's Back — still writes one.
+
    The ROUTES factory only closes over the prop bag, so these tests build
    real routes with a stub bag and invoke the route fns — element creation
    is enough (no DOM render): onSelect/onBack/backLabel are plain props.
    Cross-bundle globals the touched routes reference (HistoryScreen,
-   ChapterIndex, MATTHEW, COL_BY_KEY, COL_BY_INDEX_SC) are stubbed here.
+   ChapterIndex, MATTHEW, COL_BY_KEY, COL_BY_INDEX_SC, and the link-out
+   screens) are stubbed here.
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -40,6 +53,14 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).LibraryScreen = () => null;
   /** @type {any} */ (globalThis).HomeScreen = () => null;
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
+  // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
+  // rendered unguarded by their routes, so they must exist as real globals.
+  /** @type {any} */ (globalThis).NotesIndexScreen = () => null;
+  /** @type {any} */ (globalThis).LinksScreen = () => null;
+  /** @type {any} */ (globalThis).BookmarksScreen = () => null;
+  /** @type {any} */ (globalThis).HighlightsScreen = () => null;
+  /** @type {any} */ (globalThis).JournalViewerScreen = () => null;
+  /** @type {any} */ (globalThis).ScriptureWebScreen = () => null;
   /** @type {any} */ (globalThis).MATTHEW = { title: 'Matthew', chapters: [{ num: 1 }] };
   /** @type {any} */ (globalThis).COL_BY_INDEX_SC = new Map([
     ['vot-one-index', { volKey: 'one', letterScreen: 'vot-one-letter' }],
@@ -57,6 +78,12 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).LibraryScreen;
   delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
+  delete /** @type {any} */ (globalThis).NotesIndexScreen;
+  delete /** @type {any} */ (globalThis).LinksScreen;
+  delete /** @type {any} */ (globalThis).BookmarksScreen;
+  delete /** @type {any} */ (globalThis).HighlightsScreen;
+  delete /** @type {any} */ (globalThis).JournalViewerScreen;
+  delete /** @type {any} */ (globalThis).ScriptureWebScreen;
   delete /** @type {any} */ (globalThis).MATTHEW;
   delete /** @type {any} */ (globalThis).COL_BY_INDEX_SC;
   delete /** @type {any} */ (globalThis).COL_BY_KEY;
@@ -92,6 +119,11 @@ function makeRoutes(overrides = {}) {
     activeReadKey: null, lastReadChapters: {},
     isRead: vi.fn(() => false),
     settings: {},
+    // link-out routes (navigation-tabs-1)
+    setNoteSheetTarget: vi.fn(),
+    journalEntryId: 'j1', goJournalViewer: vi.fn(),
+    backHint: null, tapThroughBack: vi.fn(),
+    updateSetting: vi.fn(),
     ...overrides,
   });
   return { routes: buildScreenRoutes(props), props };
@@ -368,5 +400,68 @@ describe('screen-routes — Listening Library and Milestones return to their act
       sourceLetterTitle: 'Listening Library',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
     });
+  });
+});
+
+describe('screen-routes — link-outs never overwrite the captured navOrigin (navigation-tabs-1)', () => {
+  // The origin goNotesIndex & friends snapshotted when the index opened: the
+  // reading screen the user must land back on after the destination's Back.
+  const READING_ORIGIN = { screen: 'vot-one-letter', letterId: 'wide-path' };
+  const ENDPOINT = { screen: 'vot-letter', letterId: 'the-narrow-way' };
+
+  /** @type {Array<[string, string, string]>} screen, link-out prop, default pill title */
+  const LINK_OUTS = [
+    ['highlights-index', 'onNavigateToSource', 'My Highlights'],
+    ['notes-index', 'onNavigateToSource', 'My Notes'],
+    ['links-index', 'onNavigateToSource', 'My Links'],
+    ['links-index', 'onNavigateToTarget', 'My Links'],
+    ['bookmarks-index', 'onNavigateToSource', 'My Bookmarks'],
+    ['journal-viewer', 'onNavigateToLink', 'My Journal'],
+    ['scripture-web', 'navigateToLink', 'The Scripture Web'],
+  ];
+
+  for (const [screenName, propName, title] of LINK_OUTS) {
+    it(`${screenName} ${propName} delegates to navigateToLink and leaves navOrigin alone`, () => {
+      const { routes, props } = makeRoutes({ navOrigin: READING_ORIGIN });
+      routes[screenName]().props[propName](ENDPOINT);
+      expect(props.navigateToLink).toHaveBeenCalledWith(ENDPOINT, { sourceLetterTitle: title });
+      // navigateToLink's fromLetter entry owns the return path; writing a
+      // self-referential origin here only destroys the reading snapshot.
+      expect(props.setNavOrigin).not.toHaveBeenCalled();
+    });
+
+    it(`${screenName} ${propName} forwards an explicit meta unchanged`, () => {
+      const { routes, props } = makeRoutes({ navOrigin: READING_ORIGIN });
+      const meta = { sourceLetterTitle: 'Some Letter', silent: true };
+      routes[screenName]().props[propName](ENDPOINT, meta);
+      expect(props.navigateToLink).toHaveBeenCalledWith(ENDPOINT, meta);
+      expect(props.setNavOrigin).not.toHaveBeenCalled();
+    });
+
+    it(`${screenName} ${propName} is a no-op for a missing endpoint`, () => {
+      const { routes, props } = makeRoutes({ navOrigin: READING_ORIGIN });
+      routes[screenName]().props[propName](null);
+      expect(props.navigateToLink).not.toHaveBeenCalled();
+      expect(props.setNavOrigin).not.toHaveBeenCalled();
+    });
+  }
+
+  it('journal-viewer → notebook STILL captures its origin (a real cross-screen hop)', () => {
+    // The keeper: notes-index's own Back IS goNavOrigin, so this write is the
+    // thing that gets consumed. Deleting it would strand the user in Notes.
+    const handoff = { set: vi.fn(), clear: vi.fn(), get: vi.fn() };
+    const prev = /** @type {any} */ (window).navHandoff;
+    /** @type {any} */ (window).navHandoff = handoff;
+    try {
+      const { routes, props } = makeRoutes({ navOrigin: READING_ORIGIN });
+      routes['journal-viewer']().props.onOpenNotebook('nb1', 'Morning Pages');
+      expect(handoff.set).toHaveBeenCalledWith('notesReturnCtx', {
+        tab: 'notebooks', drilledNbId: 'nb1', backPill: { title: 'Morning Pages' },
+      });
+      expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'journal-viewer' });
+      expect(props.setScreen).toHaveBeenCalledWith('notes-index');
+    } finally {
+      /** @type {any} */ (window).navHandoff = prev;
+    }
   });
 });
