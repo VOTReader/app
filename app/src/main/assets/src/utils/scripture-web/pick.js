@@ -11,12 +11,18 @@
    the visible set is always far smaller than that because the density prefix
    and the bucket loop bound it.
 
-   The one invariant that matters: this must use the SAME height law the
-   vertex shader draws with, or arcs become untappable exactly where they
-   look tappable. Both call geometry.arcRadiusY.
+   The one invariant that matters: this must use the SAME laws the vertex
+   shader draws with. There are TWO of them, and geometry.js owns both.
+   Height (geometry.arcRadiusY) — or arcs become untappable exactly where
+   they look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
+   the reverse: at full localize an arc with neither foot near the viewport
+   paints alpha 0, and picking it silently focuses a line nobody can see.
+   Visible equals pickable, in both directions.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { arcDistance, arcRadiusY, verseToX, xToVerse } from './geometry.js';
+import {
+  arcAnchored, arcDistance, arcRadiusY, flyOverDim, verseToX, xToVerse,
+} from './geometry.js';
 import { bucketDrawCount } from './decode.js';
 
 /**
@@ -74,6 +80,11 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         const x1 = (g.to[i] - camX) * ppv + half;
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
+        // Pickable iff painted. `width` is device px — the shader's uRes.x
+        // frame — so this is the fly-over fade the GPU applies, evaluated
+        // exactly. Only a full zero is skipped: an arc still showing the
+        // partial fly-over floor is dim, but it is there to be tapped.
+        if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
         const ry = arcRadiusY((x1 - x0) * 0.5, ceil, squash, localize);
         const d = arcDistance(px, py, x0, x1, base, ry, tol);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
