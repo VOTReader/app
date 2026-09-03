@@ -89,6 +89,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { bibleSyncGlobalFor } from '../../utils/audio-track.js';
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
 
 const HL_NAME = 'vot-reading';
@@ -147,7 +148,10 @@ function _altRowsFor(track) {
  * The shipped data is deliberately minimal — `BIBLE_SYNC_<EDITION>[book][ch]`
  * is a positional array of integer CENTISECONDS, one slot per verse, `0`
  * meaning "not proven, do not paint". 31,102 verses cost ~184 KB that way, and
- * the file loads only when a Bible track is actually playing.
+ * the file loads only when a Bible track is actually playing. EDITION here is
+ * the `BIBLE_AUDIO_EDITIONS` registry id (bibleSyncGlobalFor names the global
+ * from it) — never derived from `volKey` by string surgery, because the two
+ * diverge for web-ebible ('bible-web').
  *
  * The unit is a WHOLE VERSE, which is what makes this translation-proof. The
  * default configuration is already cross-translation — bibleAudio defaults to
@@ -165,7 +169,8 @@ function _altRowsFor(track) {
  *
  * @param {string} bookId
  * @param {number} chapter
- * @param {string} volKey  e.g. 'bible-brm-kjv'
+ * @param {string} volKey  e.g. 'bible-brm-kjv' — translated to its EDITION id
+ *   by bibleSyncGlobalFor (utils/audio-track.js), never sliced by hand.
  * @returns {any[] | null}
  */
 const _bibleRowCache = new Map();
@@ -178,8 +183,9 @@ function _bibleRowsFor(bookId, chapter, volKey) {
   // The underlying table never mutates once its file has loaded, so one
   // expansion per chapter is both correct and stable.
   const g = /** @type {any} */ (globalThis);
-  const edition = volKey.slice('bible-'.length);
-  const table = g['BIBLE_SYNC_' + edition.toUpperCase().replace(/-/g, '_')];
+  // A volKey no edition claims is not our problem to guess about — it reads
+  // as "no table", the same as one that just hasn't loaded yet.
+  const table = g[bibleSyncGlobalFor(volKey) || ''];
   const cacheKey = volKey + ':' + bookId + ':' + chapter;
   const hit = _bibleRowCache.get(cacheKey);
   // The cached rows are only valid for the TABLE they were expanded from.

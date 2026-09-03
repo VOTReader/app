@@ -792,7 +792,7 @@ describe('ReadAlongHighlight — Bible chapters', () => {
   const VERSE2 = 'The same was in the beginning with God.';
   const bibleKey = (bookId, n) => 'bible:' + bookId + ':1:' + n;
 
-  function BibleHost({ chapter = 1, readAlongOn = true }) {
+  function BibleHost({ chapter = 1, readAlongOn = true, volKey = 'bible-brm-kjv' }) {
     const mainRef = React.useRef(null);
     return (
       <div className="screen-scroll">
@@ -801,7 +801,7 @@ describe('ReadAlongHighlight — Bible chapters', () => {
           <span data-hl-key={bibleKey('john', 2)}>{VERSE2}</span>
         </div>
         <ReadAlongHighlight
-          volKey="bible-brm-kjv"
+          volKey={volKey}
           letterId="john"
           chapter={chapter}
           mainRef={mainRef}
@@ -821,8 +821,8 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     return out;
   };
 
-  const playChapter = (n) => act(() => {
-    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: n });
+  const playChapter = (n, volKey = 'bible-brm-kjv') => act(() => {
+    AudioPlayer.playBibleBook({ volKey, bookId: 'john', label: 'KJV', chapterNum: n });
   });
 
   beforeEach(() => {
@@ -886,6 +886,36 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     mountBible(); playChapter(1);
     clockTo(6);
     expect(painted()).toBeNull();
+  });
+
+  it('paints a WEB chapter off its own edition id, not a slice of the volKey', () => {
+    // web-ebible is the edition whose id diverges from its volKey's tail
+    // ('bible-web' slices to 'web', not 'web-ebible') — the case that proves
+    // the lookup goes through the registry rather than a string op.
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-web:john': [
+        ['web2_john_001', '', 'Chapter 1'],
+        ['web2_john_002', '', 'Chapter 2'],
+      ],
+    };
+    globalThis.BIBLE_SYNC_WEB_EBIBLE = { john: { 1: [500, 1200] } };
+    mountBible({ volKey: 'bible-web' });
+    playChapter(1, 'bible-web');
+    clockTo(6);
+    expect(painted()).toBe(VERSE1);
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
+
+  it('never falls back to the volKey-sliced global name once an edition diverges from it', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    };
+    globalThis.BIBLE_SYNC_WEB = { john: { 1: [500, 1200] } };   // the WRONG (sliced) global name
+    mountBible({ volKey: 'bible-web' });
+    playChapter(1, 'bible-web');
+    clockTo(6);
+    expect(painted()).toBeNull();
+    delete globalThis.BIBLE_SYNC_WEB;
   });
 });
 
