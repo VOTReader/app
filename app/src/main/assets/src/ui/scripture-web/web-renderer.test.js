@@ -9,7 +9,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
-import { arcRadiusGLSL, CEIL_SOFTNESS } from '../../utils/scripture-web/geometry.js';
+import {
+  arcRadiusGLSL, CEIL_SOFTNESS, flyOverDim, flyOverGLSL,
+} from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
@@ -61,12 +63,26 @@ describe('shader shape', () => {
 });
 
 describe('deep-zoom declutter', () => {
+  it('inlines the SHARED fly-over law rather than restating it', () => {
+    // Hand-written here, the fade could reach zero a hair before or after the
+    // picker's copy did, and taps would land on arcs painted at alpha 0 — the
+    // very thing the shared law exists to prevent. Nothing on screen would
+    // look wrong.
+    expect(SHADER_SOURCE.vertex).toContain(flyOverGLSL);
+  });
+
+  it('calls that law for the fly-over fade, in the viewport frame', () => {
+    // uRes.x is device px, the same frame pick.js measures its feet in.
+    expect(SHADER_SOURCE.vertex).toMatch(
+      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uLocalize\);/);
+  });
+
   it('fades fly-over arcs to NOTHING at full depth, not to a residual band', () => {
     // The tanh ceiling flattens every large arc apex to the same height, so
     // at depth hundreds of fly-overs stacked into horizontal smears across
     // the screen (the on-device report). The floor must reach zero.
-    expect(SHADER_SOURCE.vertex).toContain('float flyFloor = mix(.10, 0., smoothstep(.55, 1., uLocalize));');
-    expect(SHADER_SOURCE.vertex).toContain('dim *= mix(1., mix(flyFloor, 1., anchored), uLocalize);');
+    expect(flyOverDim(0, 1)).toBe(0);
+    expect(flyOverGLSL).toContain('mix(.10, 0., smoothstep(.55, 1., localize))');
   });
 });
 
