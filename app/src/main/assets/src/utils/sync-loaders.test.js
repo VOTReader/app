@@ -111,6 +111,19 @@ describe('sync-loaders — the Bible timings', () => {
     expect(byPath('src/data/bible-sync-brm-kjv.js').load).toHaveBeenCalledTimes(2);
   });
 
+  it('the path is built from the EDITION id, never a slice of the volKey', async () => {
+    // web-ebible is the case that proves it: volKey 'bible-web' slices to
+    // 'web', which is a different string from its edition id.
+    await loadBibleSync('bible-web');
+    expect(globalThis.__makeLazyLoader).toHaveBeenCalledWith('bible-sync-web-ebible', 'src/data/bible-sync-web-ebible.js', null);
+  });
+
+  it('a well-formed but unregistered edition key creates no loader and resolves', async () => {
+    await expect(loadBibleSync('bible-nope')).resolves.toBeUndefined();
+    expect(globalThis.__makeLazyLoader).not.toHaveBeenCalled();
+    expect(made).toHaveLength(0);
+  });
+
   it('admits only bible-<edition> keys — never a prototype name or a letter volKey', async () => {
     const bad = ['toString', 'constructor', '__proto__', 'one', 'wtlb1', 'bible-', 'bible-BRM', 'bible-brm kjv', '', undefined, null, 42];
     for (const k of bad) {

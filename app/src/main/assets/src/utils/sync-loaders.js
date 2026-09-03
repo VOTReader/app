@@ -16,6 +16,14 @@
                                        file per recorded edition
                                        (tools/batch-align-bible.py).
 
+   <edition> IS THE EDITION ID, NEVER THE VOLKEY. The shipper names both the
+   file and the global from its own EDITIONS key, and for the WEB recording
+   those two names differ: volKey 'bible-web', edition 'web-ebible'. This
+   module used to slice 'bible-' off the volKey, which happens to be right for
+   brm-kjv and wop-nkjv and would have asked for bible-sync-web.js — a clean,
+   silent 404 — the night WEB shipped. bibleSyncEditionFor() in
+   utils/audio-track.js owns the translation; nothing here guesses.
+
    Both ride index.html's __makeLazyLoader, the factory behind the corpus
    bundles: one cached in-flight download per file, a script tag with
    async=false, and a corpus object whose subscribe()/getVersion() notify on
@@ -38,6 +46,8 @@
    Absent the factory (jsdom, boot order) every export is a no-op: nothing is
    constructed and nothing is fetched by accident.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { bibleSyncEditionFor } from './audio-track.js';
 
 /**
  * @typedef {Object} LazyCorpus
@@ -105,19 +115,23 @@ export const audioSyncStore = {
 };
 
 /**
- * Fetch one recorded edition's verse timings: loadBibleSync('bible-brm-kjv')
- * → src/data/bible-sync-brm-kjv.js → BIBLE_SYNC_BRM_KJV. The key guard is the
- * contract: only `bible-<edition>` builds a path, so a letter volKey or a
- * prototype name can never reach the network or the Map.
+ * Fetch one recorded edition's verse timings: loadBibleSync('bible-web') →
+ * src/data/bible-sync-web-ebible.js → BIBLE_SYNC_WEB_EBIBLE. The volKey is
+ * translated to its EDITION id by bibleSyncEditionFor (utils/audio-track.js)
+ * — never sliced here — because the two names diverge for that very edition.
+ * The key guard admits only `bible-<something>` syntax; an unregistered or
+ * malformed volKey resolves without ever creating a loader or touching the
+ * Map, so a letter volKey or a prototype name can never reach the network.
  * @param {unknown} volKey
  * @returns {Promise<void>}
  */
 export function loadBibleSync(volKey) {
   if (typeof volKey !== 'string' || !/^bible-[a-z0-9-]+$/.test(volKey)) return Promise.resolve();
+  const ed = bibleSyncEditionFor(volKey);
+  if (!ed) return Promise.resolve();
   let l = _bible.get(volKey);
   if (!l) {
     if (!_hasFactory()) return Promise.resolve();
-    const ed = volKey.slice('bible-'.length);
     // The prefix is a LITERAL in this call on purpose — see the header.
     l = /** @type {any} */ (globalThis).__makeLazyLoader('bible-sync-' + ed, 'src/data/bible-sync-' + ed + '.js', null);
     _bible.set(volKey, /** @type {LazyLoader} */ (l));
