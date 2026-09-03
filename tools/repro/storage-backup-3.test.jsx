@@ -62,7 +62,28 @@ function AppShape() {
 let resolveGet;
 let puts;
 
+/** StateStore is a module singleton and _hydrate() memoises its promise, so
+    the store must be put back to a cold-boot 'pending' between tests — the
+    control would otherwise leave it 'loaded' and the RED could not time out. */
+function resetStateStoreToColdBoot() {
+  const s = /** @type {any} */ (StateStore);
+  s._state = 'pending';
+  s._hydratePromise = null;
+  s._cache = null;
+  s._pendingCache = null;
+  s._defaultRef = null;
+  s._queue = [];
+  s._base = null;
+  s._replaying = false;
+  s._applyingPending = false;
+  s._lastWrite = null;
+  if (s._writeRetryTimer) clearTimeout(s._writeRetryTimer);
+  s._writeRetryTimer = null;
+  s._writeRetryAttempt = 0;
+}
+
 beforeEach(() => {
+  resetStateStoreToColdBoot();
   localStorage.clear();
   sessionStorage.clear();
   localStorage.setItem('vot-scrollheal-1', '1');   // keep the one-time heal out of the picture
