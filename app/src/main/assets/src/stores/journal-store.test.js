@@ -245,6 +245,42 @@ describe('JournalStore.remove() — cross-store cascade', () => {
 });
 
 /* ──────────────────────────────────────────────────────────────
+   The id add() hands back must be the id the entry KEEPS. add() built
+   the entry (minting `id`/`created`/`updated`) and only then reached
+   _shouldDefer, so under pending/degraded hydration the overlay
+   re-invocation minted a SECOND id and the replay a THIRD — while the
+   caller (hooks/use-journal-mutations.js) had already handed the first
+   one to the editor. Every later update() addressed an id that never
+   existed in any cache, so the reader's first journal entry of the
+   session was written and then silently lost. Nothing surfaced it: the
+   editor shows its own local blocks either way.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore.add() — the id the caller gets is the id that survives', () => {
+  it('keeps one id and one entry across the pending overlay AND the replay', () => {
+    // beforeEach restores forceLoaded for every sibling case, so dropping
+    // this store back to 'pending' here is contained.
+    JournalStore._resetForTests();          // idb-backed, no forceLoaded → 'pending'
+    expect(JournalStore.getState()).toBe('pending');
+
+    // What createAndEditJournal does: take the entry, hand its id onward.
+    const e = JournalStore.add({ title: 't' });
+
+    // The editor's first save, addressed to that id, must land on the overlay.
+    JournalStore.update(e.id, { title: 'edited' });
+    expect(JournalStore.get(e.id)).not.toBeNull();
+    expect(JournalStore.get(e.id).title).toBe('edited');
+
+    // Hydration completes with an empty IDB snapshot; the queue replays.
+    JournalStore._rebaseAndPromote({ list: [] });
+    expect(JournalStore.getState()).toBe('loaded');
+    expect(JournalStore.count()).toBe(1);              // not two, not three
+    expect(JournalStore.get(e.id)).not.toBeNull();
+    expect(JournalStore.get(e.id).title).toBe('edited');
+    expect(JournalStore.get(e.id).created).toBe(e.created);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────
    D6 — the cross-store cascade must be ATOMIC under degraded/pending
    hydration. _scanAssociated reads the loaded TARGET stores by key
    prefix, so without a guard the cascade fires DURABLY during the
