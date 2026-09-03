@@ -32,8 +32,12 @@ const KEY = 'index';
 /* m2 (2026-08-04): the Matthew Study Bible's 1,071 verses now reach the
    index — the builder had been looping over a `sections` key matthew.js
    never had, so every cached index built before this is missing them and
-   MUST be discarded rather than reused. */
-export const MS_INDEX_VERSION = 'm2';
+   MUST be discarded rather than reused.
+   m3 (2026-09-03): Hidden Manna left the index (owner policy — Matthew study
+   chain only). Every index cached before this still CONTAINS its titles and
+   bodies, so the builder change alone would keep serving the leak to every
+   installed client forever; the bump is what discards them. */
+export const MS_INDEX_VERSION = 'm3';
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
@@ -72,7 +76,9 @@ export function dataSignature(translation) {
     'v4:' + ln(g('LETTERS_V4')), 'v5:' + ln(g('LETTERS_V5')), 'v6:' + ln(g('LETTERS_V6')), 'v7:' + ln(g('LETTERS_V7')),
     'tm:' + ln(g('LETTERS_TIMOTHY')), 'fl:' + ln(g('LETTERS_FLOCK')), 'rb:' + ln(g('LETTERS_REBUKE')),
     'w1:' + ln(g('WTLB_ONE')), 'w2:' + ln(g('WTLB_TWO')), 'bl:' + ln(g('THE_BLESSED')),
-    'hd:' + ln(g('HOLY_DAYS')), 'hm:' + ln(g('HIDDEN_MANNA')), 'bs:' + ln(g('BIBLE_STUDIES')),
+    // No 'hm:' component — Hidden Manna is not indexed, so its length can no
+    // longer shape the index and must not invalidate the cache.
+    'hd:' + ln(g('HOLY_DAYS')), 'bs:' + ln(g('BIBLE_STUDIES')),
   ].join('|');
 }
 
