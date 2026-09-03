@@ -120,9 +120,17 @@ describe('buildDocs (narrow index scope)', () => {
     expect(docs.some((d) => d.kind === 'holy-day' && d.title === 'Passover')).toBe(true);
   });
 
-  it('treats Hidden Manna as a folded letter doc', () => {
-    const hm = docs.find((d) => d.volumeId === 'hidden-manna');
-    expect(hm).toMatchObject({ kind: 'letter', title: 'Woe to Dallas' });
+  // search-1: Hidden Manna is reachable ONLY through the Matthew study chain
+  // (CLAUDE.md owner policy). The builder used to fold it in like any other
+  // letter collection, so its full title + body sat in the public index and
+  // surfaced under a "Hidden Manna" heading in Search's default All view --
+  // the chips hid it, which is exactly why the leak went unnoticed. The
+  // fixture global stays DEFINED on purpose: the assertion is that the builder
+  // ignores HIDDEN_MANNA when it is present, not that the corpus is absent.
+  it('never indexes Hidden Manna, even with the corpus loaded', () => {
+    expect(docs.every((d) => d.volumeId !== 'hidden-manna')).toBe(true);
+    expect(docs.some((d) => (d.text || '').includes('Woe to the great city'))).toBe(false);
+    expect(docs.some((d) => d.title === 'Woe to Dallas')).toBe(false);
   });
 
   it('emits one bible-study doc per chapter with a combined title + body', () => {

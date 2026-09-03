@@ -1240,7 +1240,7 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 | 43 | Three `setInterval` polls for scroll container | Polls wait for `__scrollEl` global (set by React ref callback). Polls are cheap (300ms, single ref comparison) |
 | 44 | `-webkit-overflow-scrolling: touch` deprecated | Harmless. Removing could break momentum scrolling on older iOS WebViews |
 | 45 | React 18.2.0 one minor behind | Upgrade carries risk for zero functional gain in this app |
-| 46 | Hidden Manna not in search token map | Intentional by design — Hidden Manna is not publicly indexed |
+| 46 | Hidden Manna not in search token map | Intentional by design. The claim was aspirational until 2026-09-03 (search-1): the index builder folded Hidden Manna's titles and bodies into the full-text index, and the SRCH_GROUP_META row rendered them under a "Hidden Manna" heading in Search's default All view — only the filter chips hid it. The builder now emits nothing for it, `MS_INDEX_VERSION` m2→m3 discards every cached index that still holds it, and index-builder.test.js pins the absence with the corpus loaded |
 | 47 | 17 `window.*` globals | These are the React↔imperative bridge for Android WebView back handler, scroll container, and inter-component communication |
 | 48 | Magic timeout values | Informational. Named constants would help readability but change no behavior |
 
