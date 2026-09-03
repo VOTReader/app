@@ -12,7 +12,8 @@
                          BODY in `text`. (Folded — no separate *-title doc.)
      • Bible Study     → one doc per study chapter (title + body).
    NOT emitted (so never matchable): footnote refs, chapter titles/summaries,
-   section headings (inline topic breaks), study notes, cross-references.
+   section headings (inline topic breaks), study notes, cross-references, and
+   the Hidden Manna collection (owner policy — Matthew study chain only).
 
    Each doc carries a `corpus` ('scriptures' | 'volumes') discriminator so the
    single MiniSearch index can be scoped with a filter. Verse text comes from
@@ -252,10 +253,12 @@ export function buildDocs(options) {
   if (typeof THE_BLESSED !== 'undefined') pushEntryCollection(THE_BLESSED, 'blessed', 'blessed', 'The Blessed');
   if (typeof HOLY_DAYS !== 'undefined') pushEntryCollection(HOLY_DAYS, 'holy-day', 'holydays', 'Holy Days');
 
-  // ─── Hidden Manna — VOLUMES (same shape as a letter collection) ───
-  if (typeof HIDDEN_MANNA !== 'undefined' && Array.isArray(HIDDEN_MANNA)) {
-    pushLetterCollection(HIDDEN_MANNA, 'hidden-manna', 'Hidden Manna');
-  }
+  // Hidden Manna is deliberately NOT emitted. Owner policy (CLAUDE.md): it is
+  // reachable only through the Matthew study chain — never the public index,
+  // search or home tile. It used to be folded in here like any other letter
+  // collection, title and body, and the corpus IS loaded when the index builds,
+  // so leaving the collection out of the loop above is not enough on its own:
+  // the absence is the enforcement, and index-builder.test.js pins it.
 
   // ─── Bible Studies — VOLUMES (one doc per study chapter: title + body) ───
   if (typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES)) {
