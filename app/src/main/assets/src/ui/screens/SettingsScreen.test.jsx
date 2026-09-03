@@ -786,6 +786,33 @@ describe('settings groups — collapsible accordion', () => {
   });
 });
 
+describe('settings folio summary', () => {
+  it('surfaces the active theme, text scale, and reading typeface', () => {
+    renderSettings({ fontScale: '1.5', fontStyle: 'literata' }, { theme: 'light' }, { expandGroups: false });
+    const summary = document.querySelector('.settings-summary');
+    expect(summary).toBeTruthy();
+    expect(summary.textContent).toContain('Light');
+    expect(summary.textContent).toContain('150%');
+    expect(summary.textContent).toContain('Literata');
+  });
+
+  it('switches to the large-type layout at the accessibility threshold', () => {
+    const { container } = renderSettings({ fontScale: '1.75' }, {}, { expandGroups: false });
+    expect(container.querySelector('.settings-screen').classList.contains('settings-large-type')).toBe(false);
+    cleanup();
+    const large = renderSettings({ fontScale: '1.8' }, {}, { expandGroups: false });
+    expect(large.container.querySelector('.settings-screen').classList.contains('settings-large-type')).toBe(true);
+  });
+
+  it('links each accordion header to its mounted body', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    const appearance = groupHead('Appearance');
+    expect(appearance.getAttribute('aria-controls')).toBe('settings-group-appearance');
+    fireEvent.click(appearance);
+    expect(document.getElementById('settings-group-appearance')).toBeTruthy();
+  });
+});
+
 /* Redesign: settings whose DEPENDENCY is off are unmounted, not greyed —
    the auto-scroll discipline applied screen-wide. */
 describe('dependency-gated rows unmount with their dependency', () => {

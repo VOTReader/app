@@ -2621,34 +2621,52 @@
         filter:drop-shadow(0 0 2px rgba(162,122,34,0.3));
       }
     /* ── SETTINGS SCREEN ── */
-    .settings-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; padding:2.5rem 1.5rem; }
-    .settings-header { width:100%; max-width:32.5rem; text-align:center; margin-bottom:2.5rem; }
-    .settings-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.6rem; }
-    .settings-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-24); color:var(--cream); margin-bottom:1.5rem; }
-    .settings-ornament { display:flex; align-items:center; gap:0.75rem; margin:0 auto; max-width:280px; }
-    .settings-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
-    .settings-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
-    .settings-ornament-diamond { width:6px; height:6px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
-    .settings-section { width:100%; max-width:32.5rem; margin-bottom:1.5rem; }
-    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
+    .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(2rem,5vw,4.25rem) clamp(1rem,4vw,3rem) 5rem; }
+    .settings-header { width:100%; max-width:62rem; margin:0 auto clamp(2rem,5vw,3.6rem); text-align:left; }
+    .settings-header-mark { width:2.1rem; height:2.1rem; display:grid; place-items:center; margin-bottom:1.1rem; border:1px solid var(--gold-border); border-radius:50%; color:var(--gold); font-family:'Cinzel Decorative',serif; font-size:var(--fs-16); line-height:1; }
+    .settings-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.26em; text-transform:uppercase; color:var(--gold); opacity:0.84; margin-bottom:0.5rem; }
+    .settings-title { font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
+    .settings-intro { max-width:38rem; margin:0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-16); line-height:1.55; }
+    .settings-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:clamp(1.8rem,4vw,2.8rem) 0 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .settings-summary-item { min-width:0; padding:1rem clamp(0.8rem,2.5vw,1.6rem) 1.15rem; }
+    .settings-summary-item + .settings-summary-item { border-left:1px solid var(--border); }
+    .settings-summary dt { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-muted); letter-spacing:0.05em; margin:0 0 0.35rem; }
+    .settings-summary dd { margin:0; font-family:var(--font-body); font-size:clamp(var(--fs-18),2.4vw,var(--fs-24)); color:var(--gold); line-height:1.2; overflow-wrap:anywhere; }
+    .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
+    .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
+    .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
+    .settings-section { width:100%; margin-bottom:0.75rem; }
+    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
-    /* ── Accordion groups (Settings redesign 2026-07-31) ──────────────────
-       Each section is a 52px tappable header card; the body (the familiar
-       .settings-card) mounts below it only while open. The header reuses
-       .settings-section-label but promotes it to the tap-target size. */
-    .settings-group-head { display:flex; align-items:center; width:100%; gap:0.6rem; min-height:52px; padding:0.6rem 0.9rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; cursor:pointer; text-align:left; transition:border-color 0.2s ease, background 0.2s ease; }
-    @media (hover:hover){ .settings-group-head:hover { border-color:var(--gold-dim); } }
-    .settings-section.open > .settings-group-head { border-color:var(--gold-dim); background:linear-gradient(var(--gold-faint), var(--gold-faint)) var(--bg2); }
-    .settings-group-titles { display:flex; flex-direction:column; gap:0.3rem; flex:1; min-width:0; }
-    .settings-group-head .settings-section-label { margin-bottom:0; font-size:var(--fs-12); color:var(--gold); }
+    /* ── Accordion groups ───────────────────────────────────────────────────
+       The header is a folio index row: a quiet hairline, one icon, a title,
+       and a short description. The body remains unmounted while closed. */
+    .settings-group-head { display:flex; align-items:center; width:100%; gap:0.85rem; min-height:4.3rem; padding:0.7rem 1rem; background:linear-gradient(105deg,var(--bg3),var(--bg2)); border:1px solid var(--border); border-radius:0.7rem; cursor:pointer; text-align:left; color:inherit; transition:border-color 0.2s ease, background 0.2s ease, transform 0.2s ease; }
+    @media (hover:hover){ .settings-group-head:hover { border-color:var(--gold-dim); transform:translateY(-1px); } }
+    .settings-group-head:focus-visible { outline:2px solid var(--gold); outline-offset:3px; }
+    .settings-section.open > .settings-group-head { border-color:var(--gold-border); background:linear-gradient(105deg,var(--gold-faint),var(--bg3)); }
+    .settings-group-icon { display:grid; place-items:center; flex:0 0 auto; width:2.15rem; height:2.15rem; border:1px solid var(--gold-border); border-radius:0.55rem; color:var(--gold); background:var(--bg2); }
+    .settings-group-icon svg { width:1.2rem; height:1.2rem; }
+    .settings-group-titles { display:flex; flex-direction:column; gap:0.22rem; flex:1; min-width:0; }
+    .settings-group-head .settings-section-label { margin:0; font-size:var(--fs-13); letter-spacing:0.12em; color:var(--cream); }
     .settings-group-head .settings-section-label::after { content:none; }
-    .settings-group-sub { font-family:var(--font-body); font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .settings-group-chevron { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; transition:transform 0.2s ease; flex-shrink:0; }
+    .settings-group-sub { font-family:var(--font-body); font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .settings-group-chevron { display:grid; place-items:center; flex:0 0 auto; width:1.6rem; height:1.6rem; color:var(--gold-dim); transition:transform 0.2s ease, color 0.2s ease; }
+    .settings-group-chevron svg { width:1rem; height:1rem; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
     .settings-group-chevron.open { transform:rotate(180deg); color:var(--gold); }
-    .settings-group-body { margin-top:0.55rem; }
-    /* Collapsed groups sit tighter than the old always-open sections. */
-    .settings-section { margin-bottom:0.7rem; }
+    .settings-group-body { margin-top:0.65rem; }
     .settings-section.open { margin-bottom:1.3rem; }
+    .settings-screen.settings-large-type .settings-summary { display:block; }
+    .settings-screen.settings-large-type .settings-summary-item { display:grid; grid-template-columns:minmax(6rem,0.5fr) 1fr; gap:0.75rem; align-items:baseline; border-left:none; border-bottom:1px solid var(--border); }
+    .settings-screen.settings-large-type .settings-summary-item:last-child { border-bottom:none; }
+    .settings-screen.settings-large-type .settings-summary dd { font-size:var(--fs-20); }
+    @media (max-width:520px) {
+      .settings-screen { padding-left:1rem; padding-right:1rem; }
+      .settings-summary-item { padding-left:0.7rem; padding-right:0.7rem; }
+      .settings-summary dt { font-size:var(--fs-13); }
+      .settings-summary dd { font-size:var(--fs-18); }
+      .settings-group-head { padding-left:0.75rem; padding-right:0.75rem; }
+    }
     /* ── Reading Font picker (2026-07-31) ─────────────────────────────────
        A standard SelectField dropdown sheet; option names render in their
        font via the bundled 'p-<id>' preview subsets (name glyphs only —
