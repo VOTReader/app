@@ -255,9 +255,14 @@ export function useThumbnails({
     if (!tabsEnabled) return undefined;
     let cancelled = false;
     const ok = (u) => typeof u === 'string' && u.length >= 1000;
-    // Only the currently-open tabs' rows — idbReadAll deletes everything else
-    // in the same cursor pass, so the debounced GC effect below never has a
-    // mount-time backlog to clean up (boot-performance-5).
+    // Only the currently-open tabs' rows reach React state — idbReadAll skips
+    // the rest (boot-performance-5). It does NOT delete them, and must not:
+    // `tabs` comes from the persisted vot-state, which can mount on boot
+    // DEFAULTS (storage-backup-3 — a 3 s hydration timeout drops it to
+    // 'degraded' and one synthetic tab renders), so a delete keyed off this
+    // list would wipe every real thumbnail before the true state arrived.
+    // Dead rows are the debounced GC effect's job below: it depends on
+    // [tabs, tabThumbnails], so it re-runs once the real tabs hydrate.
     const liveKeys = tabs.map((t) => tabContentKey(t));
     idbReadAll(liveKeys).then((thumbs) => {
       if (cancelled) return;
