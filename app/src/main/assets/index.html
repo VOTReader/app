@@ -43,7 +43,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-y6Fm5brG6xLmw2z8g7CF79Y4nf8+zvR+rxLaIJYHdSo=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-TSCHUeYHT4U2HKXpT/OlGXsF+3bPNdp0A3WeuXNs7u0=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -179,6 +179,15 @@
       _setError: function() { this.error = true; this._bump(); }
     };
     var load = function() {
+      // KEEP THIS FIRST — the takeover guard below depends on it (Verifier,
+      // service-worker-1, 2026-09-04). Returning the cached promise before the
+      // guard is what makes the guard cost a reader nothing: a corpus already
+      // loaded or in flight never reaches the reload. That is what confines the
+      // interruption to a genuine ASK — the render-phase kicks (_kickVot at
+      // screen-routes.jsx:459 fires on many routes) hit this line, because a
+      // reader inside a VOT letter already holds that corpus, and use-surprise
+      // only calls load() from a user action with an empty pool. Hoist the
+      // guard above this and every route change becomes a reload.
       if (corpus._promise) return corpus._promise;
       // service-worker-1: a new worker has claim()ed this page and deleted the
       // OLD core cache, but the page was deliberately kept on the build it
