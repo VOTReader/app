@@ -25,11 +25,20 @@ import kotlin.test.assertTrue
  * The native max-duration backstop, and the data-loss trap inside it.
  *
  * When MediaRecorder reaches setMaxDuration it STOPS AND FINALISES THE FILE
- * ITSELF, then reports MEDIA_RECORDER_INFO_MAX_DURATION_REACHED. A second stop()
- * from that state throws IllegalStateException — and [NativeAudioRecorder.stop]'s
- * catch for that throw deletes the temp file. So adding setMaxDuration without
- * the `if (!autoStopped)` guard would destroy the very recording the backstop
- * fired to protect: a full-length memo, deleted at the exact moment the cap hit.
+ * ITSELF, then reports MEDIA_RECORDER_INFO_MAX_DURATION_REACHED. `stop()` is
+ * DOCUMENTED to throw IllegalStateException when called from a non-recording
+ * state, and [NativeAudioRecorder.stop]'s catch for that throw deletes the temp
+ * file — so on any platform that honours the contract, setMaxDuration without the
+ * `if (!autoStopped)` guard destroys the very recording the backstop fired to
+ * protect.
+ *
+ * HOW MUCH OF THAT IS MEASURED (emulator-5554, API 34, 2026-09-04): the info
+ * callback fires and the recorder does enter a non-recording state, both observed
+ * in logcat. The throw does NOT happen there — API 34 logs `stop while neither
+ * recording nor paused` and returns, and an A/B with the guard neutered kept the
+ * file either way. This suite therefore asserts the DOCUMENTED contract, which is
+ * what an OEM or another API level may well enforce; it is not a replay of
+ * behaviour seen on API 34.
  *
  * WHY THIS TEST CARRIES ITS OWN SHADOW. Robolectric's real ShadowMediaRecorder
  * cannot express that trap — its `stop()` is `{ state = STATE_INITIAL; return; }`

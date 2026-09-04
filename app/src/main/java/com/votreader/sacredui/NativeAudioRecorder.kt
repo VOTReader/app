@@ -46,9 +46,26 @@ class NativeAudioRecorder(private val context: Context) {
     /** A hardware/server error killed the session — the MPEG-4 file never got
      *  its moov atom, so it is unplayable and must not be handed to JS. */
     @Volatile private var recorderFailed = false
-    /** [MAX_DURATION_MS] was reached: MediaRecorder stopped and finalised the
-     *  file ITSELF. Calling stop() again throws, and the old catch deleted the
-     *  file on that throw — a full-length memo lost to its own backstop. */
+    /**
+     * [MAX_DURATION_MS] was reached: MediaRecorder stopped and finalised the file
+     * ITSELF, and `stop()` must not call `stop()` on it again.
+     *
+     * MEASURED on emulator-5554 (API 34) rather than assumed, 2026-09-04 — and the
+     * measurement CORRECTED the reason this exists. Confirmed: the info callback
+     * fires (`MediaWriter: Recorder event msg:2, ext1:800`) and the recorder does
+     * enter a non-recording state (`StagefrightRecorder: stop while neither
+     * recording nor paused`). NOT confirmed: that a second `stop()` throws. On
+     * API 34 it does not — it logs that warning and returns, and an A/B with this
+     * guard neutered produced a 75,821-byte playable file either way.
+     *
+     * So this is defence against the DOCUMENTED contract (`MediaRecorder.stop()`
+     * is specified to throw IllegalStateException from an invalid state, which
+     * `stop()`'s catch would turn into a deleted file), not against a loss proven
+     * on this platform. AOSP's leniency here is an implementation detail no OEM or
+     * API level is obliged to share, and skipping a redundant stop on an
+     * already-stopped recorder is right regardless. Evidence:
+     * `evidence/journal6-maxduration-logcat.txt`.
+     */
     @Volatile private var autoStopped = false
 
     /**
@@ -208,8 +225,11 @@ class NativeAudioRecorder(private val context: Context) {
             return Result.Failure("recorder_error")
         }
         // Skip stop() when the recorder already stopped ITSELF at the native
-        // backstop: the file is complete, and a second stop() throws straight into
-        // the delete path below — which would destroy a full-length memo.
+        // backstop: the file is complete. Where the platform honours the documented
+        // IllegalStateException for a stop() from a non-recording state, the throw
+        // would land in the delete path below and destroy a full-length memo. API 34
+        // does not throw (measured — see [autoStopped]), so this is contract defence
+        // rather than a fix for a loss proven here.
         if (!autoStopped) {
             try {
                 mr.stop()
