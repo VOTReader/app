@@ -325,6 +325,52 @@ describe('service-worker install — corpus precache failures (service-worker-4)
   });
 });
 
+/* service-worker-5 (2026-09-04): a refused install (ASSET_INTEGRITY disagrees
+   with the published bundles, or a CRITICAL asset 404s) used to pin every
+   client on the PREVIOUS build with no signal reaching the page at all — the
+   only trace was a console.warn in a devtools panel a phone cannot open.
+   Failing the install is still correct (the old worker keeps serving); the
+   page should at least get to say something. */
+describe('service-worker install — refused install reports itself (service-worker-5)', () => {
+  it('posts INSTALL_REFUSED with the url + hash prefixes when a CRITICAL asset fails integrity', async () => {
+    const sw = bootSW({ corrupt: ['./dist/bundle-a.js'] });
+    await expect(install(sw)).rejects.toThrow(/integrity check failed/);
+    expect(sw.postedMessages.length).toBe(1);
+    const [msg] = sw.postedMessages;
+    expect(msg.type).toBe('INSTALL_REFUSED');
+    expect(msg.url).toBe('./dist/bundle-a.js');
+    expect(msg.expected).toMatch(/^[0-9a-f]{12}$/);
+    expect(msg.actual).toMatch(/^[0-9a-f]{12}$/);
+    expect(msg.expected).not.toBe(msg.actual);
+    expect(msg.message).toContain('./dist/bundle-a.js');
+  });
+
+  it('posts INSTALL_REFUSED (no hash prefixes) when a CRITICAL asset 404s', async () => {
+    const sw = bootSW({ fail: ['./dist/bundle-a.js'] });
+    await expect(install(sw)).rejects.toThrow();
+    expect(sw.postedMessages.length).toBe(1);
+    const [msg] = sw.postedMessages;
+    expect(msg.type).toBe('INSTALL_REFUSED');
+    expect(msg.url).toBe('./dist/bundle-a.js');
+    expect(msg.expected).toBeNull();
+    expect(msg.actual).toBeNull();
+  });
+
+  it('does not post INSTALL_REFUSED on a clean install', async () => {
+    const sw = bootSW();
+    await install(sw);
+    expect(sw.postedMessages.filter((m) => m.type === 'INSTALL_REFUSED')).toEqual([]);
+  });
+
+  it('still fails the install after reporting it — the previous worker keeps serving', async () => {
+    const sw = bootSW({ corrupt: ['./dist/bundle-a.js'] });
+    await expect(install(sw)).rejects.toBeTruthy();
+    const name = (await sw.caches.keys()).find((k) => k.startsWith('vot-core-'));
+    const core = name ? await sw.caches.open(name) : null;
+    if (core) expect(await core.match('./dist/bundle-a.js')).toBeFalsy();
+  });
+});
+
 describe('service-worker fetch + activate runtime (TEST-2)', () => {
   it('serves a cached core asset from cache — no network hit', async () => {
     const netCalls = [];

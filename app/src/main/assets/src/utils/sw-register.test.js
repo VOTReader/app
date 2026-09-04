@@ -18,6 +18,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerServiceWorker } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
+import { _resetToasts } from './toast.js';
 
 describe('registerServiceWorker — controllerchange reload', () => {
   let controllerChangeHandler;
@@ -248,5 +249,64 @@ describe('registerServiceWorker — PRECACHE_INCOMPLETE diagnostic (service-work
     registerServiceWorker();
     messageHandler({ data: { type: 'SOMETHING_ELSE' } });
     expect(DiagnosticLog.entries()).toEqual([]);
+  });
+});
+
+/* service-worker-5 (2026-09-04): the page-side half of a refused install —
+   record it via DiagnosticLog (Settings' export) AND show a toast naming the
+   asset, since the SW console is unreachable on a phone (the s12 lesson
+   again: "new work committed, nothing changing on screen"). */
+describe('registerServiceWorker — INSTALL_REFUSED diagnostic + toast (service-worker-5)', () => {
+  let messageHandler;
+  let origSW;
+
+  beforeEach(() => {
+    messageHandler = null;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') messageHandler = cb; },
+        register: () => Promise.resolve({
+          waiting: null, installing: null, addEventListener: () => {}, update: () => {},
+        }),
+      },
+    });
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+
+  it('records a refused install via DiagnosticLog and shows a toast naming the asset', () => {
+    registerServiceWorker();
+    messageHandler({
+      data: {
+        type: 'INSTALL_REFUSED',
+        message: '[sw] integrity check failed for ./dist/bundle-a.js after a refetch — refusing to install this build so the previous one keeps serving.',
+        url: './dist/bundle-a.js',
+        expected: 'abc123def456',
+        actual: '999999999999',
+      },
+    });
+    const entry = DiagnosticLog.entries().find((e) => e.tag === 'sw' && e.lvl === 'E' && e.msg.includes('install refused'));
+    expect(entry, JSON.stringify(DiagnosticLog.entries())).toBeTruthy();
+    expect(entry.msg).toContain('./dist/bundle-a.js');
+    expect(entry.msg).toContain('abc123def456');
+    const toastEl = document.getElementById('vot-toast-sw-refused');
+    expect(toastEl, 'expected an INSTALL_REFUSED toast element').toBeTruthy();
+    expect(toastEl.textContent).toContain('./dist/bundle-a.js');
+  });
+
+  it('ignores an unrelated message type (no toast, no DiagnosticLog entry)', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'SOMETHING_ELSE' } });
+    expect(DiagnosticLog.entries()).toEqual([]);
+    expect(document.getElementById('vot-toast-sw-refused')).toBeFalsy();
   });
 });
