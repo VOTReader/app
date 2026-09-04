@@ -23,7 +23,18 @@ import puppeteer from 'puppeteer';
 const URL = 'http://127.0.0.1:8097/index.html';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await puppeteer.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  // 31 s on a quiet machine, but the read walk is a long chain of CDP calls and
+  // a loaded shared runner stalls one of them: measured 191 s and a
+  // 'ProtocolError: Runtime.callFunctionOn timed out' against puppeteer's 180 s
+  // default, with no real failure behind it. A gate that flakes teaches people to
+  // re-run instead of read, so the ceiling is explicit and generous against the
+  // measured time (~8x) but still bounded, the same reasoning as smoke-ci.js and
+  // e2e-readalong.mjs, which both already set it.
+  protocolTimeout: 240000,
+});
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
