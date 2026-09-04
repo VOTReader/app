@@ -49,10 +49,12 @@ describe('reduced-motion', () => {
     expect(scrollBehavior()).toBe('instant');
   });
 
-  /* Embedded WebViews have shipped without matchMedia, and some throw on an
-     unrecognized query. Motion is the safe default there: a smooth scroll is
-     a comfort loss, a thrown TypeError inside a click handler is a dead
-     button. */
+  /* Absent or throwing matchMedia falls back to MOTION. Not because motion is
+     safer — the try/catch is what stops the throw, whichever value returns —
+     but because the three pre-existing readers of this query all fall back
+     to motion, and one predicate must not answer two ways in one app. See
+     the module header. Unreachable on chrome108; pinned so the fallback
+     cannot drift silently. */
   it('falls back to motion when matchMedia is absent', () => {
     setMatchMedia(undefined);
     expect(prefersReducedMotion()).toBe(false);
