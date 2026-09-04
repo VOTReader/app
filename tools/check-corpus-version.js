@@ -29,7 +29,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { deriveRuntimeSrcAssets } from './list-runtime-src-assets.js';
+import { deriveRuntimeSrcAssets, bundledSrcFiles } from './list-runtime-src-assets.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -57,12 +57,23 @@ const CORPUS_BUNDLES = ['bundle-a-bible.js', 'bundle-a-matthew.js', 'bundle-a-vo
 // regeneration — exactly what this gate exists to prevent. Union, NOT
 // replacement: the glob stays as an independent belt so the two gates cannot
 // go blind together.
+//
+// service-worker-2 (2026-09-04): the glob alone is too broad — it also matches
+// src/data/bible-audio-manifest.js, which tools/build.py CONCATENATES into
+// bundle-a (a CORE asset, already busted by CACHE_VERSION's content hash, not
+// this gate). Subtract bundledSrcFiles() — the same "what does build.py fold
+// into a bundle" derivation list-runtime-src-assets.js already uses to keep
+// its own runtime-asset list honest — so a bundle-a member editing its bytes
+// no longer forces a needless CORPUS_VERSION bump (and the ~15 MB re-download
+// that comes with it).
+const bundled = bundledSrcFiles();
 const RUNTIME_DATA = deriveRuntimeSrcAssets().assets
   .filter((p) => p.startsWith('src/data/'))
   .map((p) => p.slice('src/data/'.length));
 const DATA_CORPUS = [...new Set(
   readdirSync(dataDir)
-    .filter((f) => /^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
+    .filter((f) => (/^bible-[a-z-]+\.js$/.test(f) || f === 'scripture-web-data.js')
+      && !bundled.has('src/data/' + f))
     .concat(RUNTIME_DATA)
 )].sort();
 for (const name of DATA_CORPUS) {

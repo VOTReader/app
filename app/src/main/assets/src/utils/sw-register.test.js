@@ -1,9 +1,14 @@
-/* sw-register tests — P7pwa visibility-gated controllerchange reload.
+/* sw-register tests — controllerchange reload.
    ──────────────────────────────────────────────────────────────────
    Mocks navigator.serviceWorker (capturing the controllerchange handler),
-   window.location, and document.visibilityState, then drives the handler in
-   each visibility state. The existing service-worker.test.js covers the SW's
-   own install/fetch logic and is untouched.
+   window.location, and document.visibilityState, then drives the handler.
+   Reload is unconditional on any controllerchange once the page already had
+   a controller (service-worker-1, 2026-09-04) — visibility and boot timing
+   used to gate a deferred reload, which left a visible mid-session reader
+   running OLD eager bundles under a NEW controller for as long as they kept
+   reading (see sw-register.js's module header). The existing
+   service-worker.test.js covers the SW's own install/fetch logic and is
+   untouched.
 
    jsdom's location.reload is non-configurable, so we replace window.location
    wholesale (the `location` property on window IS configurable) with a stub
@@ -12,8 +17,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerServiceWorker } from './sw-register.js';
+import { DiagnosticLog } from './diagnostic-log.js';
+import { _resetToasts } from './toast.js';
 
-describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
+describe('registerServiceWorker — controllerchange reload', () => {
   let controllerChangeHandler;
   let reloadSpy;
   let origSW, origLocation, origVisibility;
@@ -47,7 +54,7 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
   }
 
-  it('reloads immediately during the boot window (invisible — still first paint)', () => {
+  it('reloads immediately when the page is visible', () => {
     setVisibility('visible');
     registerServiceWorker();
     expect(typeof controllerChangeHandler).toBe('function');
@@ -62,23 +69,21 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  /* INVISIBLE-RELOAD: past the boot window with the app in the foreground, the
-     user is mid-letter — reloading there yanks them out. Wait for the next
-     background instead; they come back to the new build. */
-  it('defers a mid-session VISIBLE reload until the app is backgrounded', () => {
+  /* service-worker-1 (2026-09-04): this used to be "defers a mid-session
+     VISIBLE reload until the app is backgrounded" — waiting for the tab to
+     background before reloading a visible reader. That wait had no upper
+     bound: the reader's already-parsed OLD eager bundles (bundle-a/b/c/d)
+     kept running under the NEW controller for as long as they stayed put, and
+     a lazy corpus/screen load in that window would be NEW code against OLD
+     globals. Build correctness now wins — reload fires the moment the
+     controller changes, visible or not. */
+  it('reloads immediately even well after boot, still visible', () => {
     vi.useFakeTimers();
     try {
       setVisibility('visible');
       registerServiceWorker();
-      vi.advanceTimersByTime(60_000);         // well past BOOT_GRACE_MS
+      vi.advanceTimersByTime(60_000);
       controllerChangeHandler();
-      expect(reloadSpy).not.toHaveBeenCalled();
-      // still visible → still no reload
-      document.dispatchEvent(new Event('visibilitychange'));
-      expect(reloadSpy).not.toHaveBeenCalled();
-      // user leaves the app → reload now, unseen
-      setVisibility('hidden');
-      document.dispatchEvent(new Event('visibilitychange'));
       expect(reloadSpy).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -104,19 +109,6 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     registerServiceWorker();
     controllerChangeHandler();
     expect(reloadSpy).not.toHaveBeenCalled();
-  });
-
-  it('reloads a long-backgrounded app immediately (past the boot window, still hidden)', () => {
-    vi.useFakeTimers();
-    try {
-      setVisibility('hidden');
-      registerServiceWorker();
-      vi.advanceTimersByTime(60_000);
-      controllerChangeHandler();
-      expect(reloadSpy).toHaveBeenCalledTimes(1);   // a real update is never suppressed
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('registers with updateViaCache:none so the SW script is never HTTP-cached', () => {
@@ -210,5 +202,111 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
     } finally {
       delete (/** @type {any} */ (document)).visibilityState;
     }
+  });
+});
+
+/* service-worker-4 (2026-09-04): the SW's install-time corpus precache now
+   posts PRECACHE_INCOMPLETE when the best-effort loop misses a file — this
+   is the page-side half, recording it via DiagnosticLog so Settings' export
+   carries a trace instead of the failure vanishing the moment the tab closes. */
+describe('registerServiceWorker — PRECACHE_INCOMPLETE diagnostic (service-worker-4)', () => {
+  let messageHandler;
+  let origSW;
+
+  beforeEach(() => {
+    messageHandler = null;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') messageHandler = cb; },
+        register: () => Promise.resolve({
+          waiting: null, installing: null, addEventListener: () => {}, update: () => {},
+        }),
+      },
+    });
+    DiagnosticLog.clear();
+  });
+
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    DiagnosticLog.clear();
+  });
+
+  it('records install-time corpus precache failures via DiagnosticLog', () => {
+    registerServiceWorker();
+    expect(typeof messageHandler).toBe('function');
+    messageHandler({ data: { type: 'PRECACHE_INCOMPLETE', count: 2, urls: ['./a.js', './b.js'] } });
+    const entry = DiagnosticLog.entries().find((e) => e.tag === 'sw' && e.msg.includes('corpus precache incomplete'));
+    expect(entry, JSON.stringify(DiagnosticLog.entries())).toBeTruthy();
+    expect(entry.msg).toContain('2 file(s)');
+    expect(entry.msg).toContain('./a.js');
+    expect(entry.msg).toContain('./b.js');
+  });
+
+  it('ignores an unrelated message type', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'SOMETHING_ELSE' } });
+    expect(DiagnosticLog.entries()).toEqual([]);
+  });
+});
+
+/* service-worker-5 (2026-09-04): the page-side half of a refused install —
+   record it via DiagnosticLog (Settings' export) AND show a toast naming the
+   asset, since the SW console is unreachable on a phone (the s12 lesson
+   again: "new work committed, nothing changing on screen"). */
+describe('registerServiceWorker — INSTALL_REFUSED diagnostic + toast (service-worker-5)', () => {
+  let messageHandler;
+  let origSW;
+
+  beforeEach(() => {
+    messageHandler = null;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') messageHandler = cb; },
+        register: () => Promise.resolve({
+          waiting: null, installing: null, addEventListener: () => {}, update: () => {},
+        }),
+      },
+    });
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+
+  it('records a refused install via DiagnosticLog and shows a toast naming the asset', () => {
+    registerServiceWorker();
+    messageHandler({
+      data: {
+        type: 'INSTALL_REFUSED',
+        message: '[sw] integrity check failed for ./dist/bundle-a.js after a refetch — refusing to install this build so the previous one keeps serving.',
+        url: './dist/bundle-a.js',
+        expected: 'abc123def456',
+        actual: '999999999999',
+      },
+    });
+    const entry = DiagnosticLog.entries().find((e) => e.tag === 'sw' && e.lvl === 'E' && e.msg.includes('install refused'));
+    expect(entry, JSON.stringify(DiagnosticLog.entries())).toBeTruthy();
+    expect(entry.msg).toContain('./dist/bundle-a.js');
+    expect(entry.msg).toContain('abc123def456');
+    const toastEl = document.getElementById('vot-toast-sw-refused');
+    expect(toastEl, 'expected an INSTALL_REFUSED toast element').toBeTruthy();
+    expect(toastEl.textContent).toContain('./dist/bundle-a.js');
+  });
+
+  it('ignores an unrelated message type (no toast, no DiagnosticLog entry)', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'SOMETHING_ELSE' } });
+    expect(DiagnosticLog.entries()).toEqual([]);
+    expect(document.getElementById('vot-toast-sw-refused')).toBeFalsy();
   });
 });
