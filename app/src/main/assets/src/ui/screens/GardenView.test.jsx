@@ -45,6 +45,17 @@ const mkPos = (over = {}) => ({
   ...over,
 });
 
+// Raw touch-event simulation (matches ScreenLayout.test.jsx's fireTouch): the
+// gesture handlers are wired via a mount-time addEventListener, not a React
+// synthetic prop, so a real DOM event with `touches`/`changedTouches` defined
+// is required — RTL's fireEvent has no built-in touch-list support.
+function fireTouch(target, type, touches, changedTouches) {
+  const ev = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(ev, 'touches', { value: touches, configurable: true });
+  Object.defineProperty(ev, 'changedTouches', { value: changedTouches || touches, configurable: true });
+  target.dispatchEvent(ev);
+}
+
 const renderGarden = (props = {}) => render(
   <GardenView page={1} onPageChange={() => {}} onBack={() => {}} theme="dark" onThemeChange={() => {}} tier="std" {...props} />,
 );
@@ -197,5 +208,62 @@ describe('GardenView — accessible names (Wave 0)', () => {
     renderGarden({ page: 5 });
     fireEvent.click(screen.getByRole('button', { name: '5 / 209' }));
     expect(screen.getByRole('spinbutton', { name: 'Jump to page' })).toBeTruthy();
+  });
+});
+
+describe('GardenView — pinch must not leak into the swipe test (gap-garden-viewer-and-image-cache-5)', () => {
+  // g.tapStartX/Y is written only by onTouchStart's single-finger branch and
+  // was never invalidated once a second finger arrives and the gesture
+  // becomes a pinch. A pinch that zooms back to exactly scale 1 and then has
+  // its two fingers lift ONE AT A TIME (not simultaneously) used to compare
+  // the LAST finger's lift position against the FIRST finger's original
+  // touch-down position — a large, meaningless "distance" that read as a
+  // horizontal swipe and flipped the page right after a pinch gesture.
+  const area = () => document.querySelector('.garden-image-area');
+
+  it('a pinch ending at scale 1 with a sequential finger-lift does not fire a page flip', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+
+    fireTouch(area(), 'touchstart', [{ clientX: 100, clientY: 200 }]); // finger A down
+    fireTouch(area(), 'touchstart', [{ clientX: 100, clientY: 200 }, { clientX: 300, clientY: 200 }]); // finger B down -> pinch
+    fireTouch(area(), 'touchmove', [{ clientX: 50, clientY: 200 }, { clientX: 350, clientY: 200 }]); // zoom in
+    fireTouch(area(), 'touchmove', [{ clientX: 100, clientY: 200 }, { clientX: 300, clientY: 200 }]); // pinch back to scale 1
+    fireTouch(area(), 'touchend', [{ clientX: 300, clientY: 200 }], [{ clientX: 100, clientY: 200 }]); // finger A lifts first (B remains)
+    fireTouch(area(), 'touchend', [], [{ clientX: 210, clientY: 200 }]); // finger B lifts last, having drifted
+
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('a plain single-finger swipe still works after a completed pinch gesture', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+
+    // A full pinch gesture that completes normally (both fingers lift together).
+    fireTouch(area(), 'touchstart', [{ clientX: 100, clientY: 200 }]);
+    fireTouch(area(), 'touchstart', [{ clientX: 100, clientY: 200 }, { clientX: 300, clientY: 200 }]);
+    fireTouch(area(), 'touchmove', [{ clientX: 50, clientY: 200 }, { clientX: 350, clientY: 200 }]);
+    fireTouch(area(), 'touchmove', [{ clientX: 100, clientY: 200 }, { clientX: 300, clientY: 200 }]);
+    fireTouch(area(), 'touchend', [], [{ clientX: 100, clientY: 200 }, { clientX: 300, clientY: 200 }]);
+
+    // A separate, later single-finger swipe must still flip the page.
+    fireTouch(area(), 'touchstart', [{ clientX: 300, clientY: 200 }]);
+    fireTouch(area(), 'touchend', [], [{ clientX: 200, clientY: 200 }]);
+
+    expect(onPageChange).toHaveBeenCalledWith(6); // dx = 200-300 = -100 -> gardenSwipeDir(-100,0) = 1
+
+  });
+
+  it('touchcancel only resets gesture state — it never evaluates a swipe or double-tap', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+
+    fireTouch(area(), 'touchstart', [{ clientX: 100, clientY: 200 }]);
+    fireTouch(area(), 'touchcancel', [], [{ clientX: 250, clientY: 200 }]); // interrupted mid-drag
+
+    expect(onPageChange).not.toHaveBeenCalled();
   });
 });
