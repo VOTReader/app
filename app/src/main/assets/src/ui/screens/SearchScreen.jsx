@@ -111,6 +111,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       setBuildInfo({ ready: false, building: false, progress: null, error: "Search couldn't start. Try closing and reopening the app — your data is safe." });
       return undefined;
     }
+    // search-3/4: build for the reader's OWN translation, matching what the
+    // search effect below already requests — before this, mount always built
+    // NKJV regardless of settings.translation, so a non-NKJV reader's first
+    // search saw a translation mismatch and paid a SECOND ~10s build (no
+    // progress bar) that silently overwrote the first in the single-entry IDB
+    // cache, and index-builder.js had nothing loaded to read the alt text
+    // from anyway. One agreed-on translation = one build, cache hits.
+    const translation = settings.translation || 'nkjv';
     if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return undefined;}
     // A cold build runs ~10s; backing out of Search mid-build must not keep
     // reporting progress into an unmounted screen. The build itself continues
@@ -120,13 +128,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
-    Promise.all([loadBible, loadMatthew, loadVot])
+    const loadTr = (typeof window.loadTranslation === 'function') ? window.loadTranslation(translation).catch(() => {}) : Promise.resolve();
+    Promise.all([loadBible, loadMatthew, loadVot, loadTr])
       .then(() => E.init({
+        translation,
         onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
       }))
       .then(() => { if (!cancelled) setBuildInfo({ ready: true, building: false, progress: null }); })
       .catch((err) => { if (!cancelled) setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design (matches the corpus loaders above): Search and Settings are separate routed screens, so a translation change is only ever seen on the NEXT mount, which reads settings.translation fresh.
   }, []);
 
   // Focus input on mount

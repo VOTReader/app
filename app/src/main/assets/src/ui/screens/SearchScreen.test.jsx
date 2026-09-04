@@ -362,4 +362,21 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     errSpy.mockRestore();
     vi.useRealTimers();
   });
+
+  /* search-3 + search-4: the mount build must load AND build the reader's own
+     translation, so it agrees with the translation the search effect already
+     requests (settings.translation) — one build per session, not an NKJV
+     build nobody asked for followed by a silent second rebuild. */
+  it('search-3/4: loads and builds the index for settings.translation, not always NKJV', async () => {
+    /** @type {any} */ (window).loadTranslation = vi.fn(() => Promise.resolve());
+    const initCalls = [];
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn((opts) => { initCalls.push(opts); return Promise.resolve(); });
+    const props = { ...baseProps(), settings: { translation: 'kjv' } };
+    render(<SearchScreen {...props} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(/** @type {any} */ (window).loadTranslation).toHaveBeenCalledWith('kjv');
+    expect(initCalls[0]).toMatchObject({ translation: 'kjv' });
+    delete /** @type {any} */ (window).loadTranslation;
+  });
 });

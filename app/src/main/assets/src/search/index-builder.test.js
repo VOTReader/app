@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { buildDocs } from './index-builder.js';
 
 const VOT_DATA = {
@@ -174,5 +174,62 @@ describe('Matthew Study Bible indexing', () => {
     const mt = docs.filter((d) => d.corpus === 'volumes' && d.bookId === 'matthew');
     expect(mt.some((d) => d.text.includes('nested shape verse'))).toBe(true);
     /** @type {any} */ (globalThis).MATTHEW = prev;
+  });
+});
+
+/* ── search-3: scriptures index a non-NKJV translation's own wording, with a
+   sparse Restored-Name overlay falling through to its registry BASE (not
+   straight to the corpus's NKJV v.text) ────────────────────────────────────
+   The old code read ONLY window['BIBLE_' + translation.toUpperCase()] with a
+   linear per-verse scan and no base-chain hop, so a verse the sparse overlay
+   doesn't carry silently kept the NKJV wording forever — even with the base
+   translation fully loaded. Mirrors the overlay -> base -> NKJV chain
+   data/translations.js:translateVerse already proves (translations.test.js). */
+describe('buildDocs translation resolution (search-3)', () => {
+  let prevData;
+  beforeAll(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
+  });
+  afterAll(() => {
+    window.VotSearchData = prevData;
+    for (const k of Object.keys(GLOBALS)) delete globalThis[k];
+  });
+  afterEach(() => {
+    delete /** @type {any} */ (globalThis).TRANSLATION_OPTIONS;
+    delete /** @type {any} */ (globalThis).BIBLE_KJV;
+    delete /** @type {any} */ (globalThis).BIBLE_RKJV;
+  });
+
+  it("indexes a plain alternate translation's own wording, not the NKJV v.text", () => {
+    /** @type {any} */ (globalThis).BIBLE_KJV = { genesis: { 1: [
+      { n: 1, text: 'In the beginning KJV wording.' },
+      { n: 2, text: 'And the KJV earth was without form.' },
+    ] } };
+    const docs = buildDocs({ translation: 'kjv' });
+    const v1 = docs.find((d) => d.kind === 'verse' && d.bookId === 'genesis' && d.verseNum === 1);
+    expect(v1.text).toBe('In the beginning KJV wording.');
+  });
+
+  it('a sparse Restored-Name overlay falls through a verse it does not carry to its registry BASE, not the corpus NKJV text', () => {
+    /** @type {any} */ (globalThis).TRANSLATION_OPTIONS = [
+      { id: 'nkjv', label: 'NKJV', desc: 'x' },
+      { id: 'kjv', label: 'KJV', desc: 'x' },
+      { id: 'rkjv', label: 'KJV-R', desc: 'x', base: 'kjv' },
+    ];
+    /** @type {any} */ (globalThis).BIBLE_KJV = { genesis: { 1: [
+      { n: 1, text: 'In the beginning KJV wording.' },
+      { n: 2, text: 'And the KJV earth was without form.' },
+    ] } };
+    // rkjv only restores verse 2 — verse 1 has no overlay entry.
+    /** @type {any} */ (globalThis).BIBLE_RKJV = { genesis: { 1: [
+      { n: 2, text: 'And the earth was without form, YahuWah restored.' },
+    ] } };
+    const docs = buildDocs({ translation: 'rkjv' });
+    const v1 = docs.find((d) => d.kind === 'verse' && d.bookId === 'genesis' && d.verseNum === 1);
+    const v2 = docs.find((d) => d.kind === 'verse' && d.bookId === 'genesis' && d.verseNum === 2);
+    expect(v1.text).toBe('In the beginning KJV wording.'); // base hop — NOT the corpus's raw NKJV text
+    expect(v2.text).toBe('And the earth was without form, YahuWah restored.'); // overlay wins
   });
 });
