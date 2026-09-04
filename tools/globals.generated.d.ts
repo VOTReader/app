@@ -412,6 +412,7 @@ declare const highlightExcerptInDom: any;
 declare const hlId: any;
 declare const html2canvas: any;
 declare const hydrateAllStores: any;
+declare const idbAllKeys: any;
 declare const idbDelete: any;
 declare const idbPut: any;
 declare const idbReadAll: any;

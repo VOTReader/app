@@ -411,6 +411,7 @@ export const projectGlobals = {
   hlId: "readonly",
   html2canvas: "readonly",
   hydrateAllStores: "readonly",
+  idbAllKeys: "readonly",
   idbDelete: "readonly",
   idbPut: "readonly",
   idbReadAll: "readonly",
