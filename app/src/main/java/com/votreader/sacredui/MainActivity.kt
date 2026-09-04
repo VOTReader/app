@@ -38,6 +38,7 @@ import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
@@ -538,17 +539,23 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         webView = createConfiguredWebView()
         setContentView(webView)
 
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-            // #1: do NOT hard-set vm.currentScale = 1f here. restoreState restores
-            // the WebView's own zoom and onScaleChanged owns the truth from there; a
-            // config-change restore keeps the (surviving) ViewModel's real scale, and
-            // a process-death restore starts from the 1f default anyway. Overwriting
-            // with 1f would strand hit-tests / screenshots on the wrong scale if zoom
-            // were ever re-enabled (disabled today, so this is latent-correctness
-            // hardening, matching deviceToCssPx's scale-awareness).
-        } else {
-            // Fresh cold start (not a config-change restore). All UI assets
+        // restoreState returns null when the bundle carries no COMMITTED WebView
+        // navigation — and onSaveInstanceState calls saveState() unconditionally, so
+        // a process death before the first commit saves a bundle that is non-null but
+        // empty. Discarding this return value took the restore branch, restored
+        // nothing, and never fell through to loadUrl: a permanent black screen on
+        // resume. Treat "restored nothing" exactly like a cold start.
+        //
+        // #1: do NOT hard-set vm.currentScale = 1f on the restore path. restoreState
+        // restores the WebView's own zoom and onScaleChanged owns the truth from
+        // there; a config-change restore keeps the (surviving) ViewModel's real
+        // scale, and a process-death restore starts from the 1f default anyway.
+        // Overwriting with 1f would strand hit-tests / screenshots on the wrong scale
+        // if zoom were ever re-enabled (disabled today, so this is latent-correctness
+        // hardening, matching deviceToCssPx's scale-awareness).
+        val restored = savedInstanceState?.let { webView.restoreState(it) }
+        if (restored == null) {
+            // Cold start, or a restore that restored nothing. All UI assets
             // are bundled in the APK and served locally by WebViewAssetLoader,
             // so HTTP-caching the `src/*.js` module files buys nothing but
             // costs correctness: after an APK update the WebView would keep
@@ -604,6 +611,64 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      * they attach to a specific WebView; the back-press dispatcher stays in
      * onCreate (Activity-scoped, reads the [webView] field at fire time).
      */
+
+    /**
+     * Every WebSettings choice the reader depends on, in one place so the JVM can
+     * assert them — several are security decisions (file/content access off, mixed
+     * content never) that were previously unreachable from a unit test, and
+     * [textZoom] is load-bearing for the app's own Text Size control.
+     *
+     * Extracted from [createConfiguredWebView] rather than inlined so a test can
+     * poison a setting first and prove this actively sets it. Asserting a value
+     * that merely matches Robolectric's default proves nothing.
+     */
+    @VisibleForTesting
+    internal fun applyReaderWebSettings(s: WebSettings) {
+        @Suppress("SetJavaScriptEnabled")
+        s.javaScriptEnabled = true
+        s.domStorageEnabled = true
+        // a11y-ux-6: PIN the WebView's text zoom at 100. Without this, Android's
+        // Display -> Font size multiplies every computed px on top of the app's own
+        // --font-scale (Settings -> Text Size, 80-300%), so the two stack: at system
+        // 1.3x the reading text measured 23.4px instead of 18px while --font-scale
+        // still read "1". It also defeats the px chrome pin — .top-nav drifted
+        // 91.1 -> 101.1px across system 1.0x -> 1.5x. Text Size is this app's text
+        // scaling control and this makes it the only one, rather than one of two
+        // that multiply. (Reproduced on emulator-5554 / WebView 113 before the fix.)
+        s.textZoom = 100
+        // Both OFF. file:// reads could expose any file on disk the app
+        // process has rights to. allowContentAccess gates loading a
+        // content:// URL from PAGE MARKUP (<img src="content://…">), which
+        // nothing in this app does — it is NOT what feeds the file chooser.
+        //
+        // Neither consumer needs it, and the second was PROVEN on-device
+        // rather than reasoned about (2026-07-30, Pixel/Android 17,
+        // WebView 150.0.7871.124, this flag false):
+        //   - IMPORT hands JS base64 read in Kotlin (see onCreate), so it
+        //     never touched this setting to begin with.
+        //   - JOURNAL IMAGE INSERT (<input type="file"> ->
+        //     onShowFileChooser) still works: the photo picker opened, the
+        //     picked content:// URI came back through filePathCallback, and
+        //     the page read the File to completion — 10,623,375 of
+        //     10,623,375 bytes via FileReader.readAsArrayBuffer. The URI
+        //     arrives with its own read grant from the chooser result; this
+        //     setting is not in that path.
+        // Re-run that check if the chooser wiring or the WebView major
+        // changes: set true only with evidence, not on suspicion.
+        s.allowFileAccess = false
+        s.allowContentAccess = false
+        s.cacheMode = WebSettings.LOAD_DEFAULT
+        s.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        // Audio playback (journal voice memos) must start without a user
+        // gesture for the preview play button to work right after recording.
+        s.mediaPlaybackRequiresUserGesture = false
+        s.setSupportZoom(false)
+        s.builtInZoomControls = false
+        s.displayZoomControls = false
+        s.loadWithOverviewMode = false
+        s.useWideViewPort = false
+    }
+
     // setOnTouchListener (below) feeds a GestureDetector but returns false --
     // it never consumes the event, so the WebView keeps its own click +
     // accessibility handling intact, and the ClickableViewAccessibility lint
@@ -612,42 +677,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private fun createConfiguredWebView(): WebView {
         val wv = WebView(this)
 
-        wv.settings.apply {
-            @Suppress("SetJavaScriptEnabled")
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            // Both OFF. file:// reads could expose any file on disk the app
-            // process has rights to. allowContentAccess gates loading a
-            // content:// URL from PAGE MARKUP (<img src="content://…">), which
-            // nothing in this app does — it is NOT what feeds the file chooser.
-            //
-            // Neither consumer needs it, and the second was PROVEN on-device
-            // rather than reasoned about (2026-07-30, Pixel/Android 17,
-            // WebView 150.0.7871.124, this flag false):
-            //   - IMPORT hands JS base64 read in Kotlin (see onCreate), so it
-            //     never touched this setting to begin with.
-            //   - JOURNAL IMAGE INSERT (<input type="file"> ->
-            //     onShowFileChooser) still works: the photo picker opened, the
-            //     picked content:// URI came back through filePathCallback, and
-            //     the page read the File to completion — 10,623,375 of
-            //     10,623,375 bytes via FileReader.readAsArrayBuffer. The URI
-            //     arrives with its own read grant from the chooser result; this
-            //     setting is not in that path.
-            // Re-run that check if the chooser wiring or the WebView major
-            // changes: set true only with evidence, not on suspicion.
-            allowFileAccess = false
-            allowContentAccess = false
-            cacheMode = WebSettings.LOAD_DEFAULT
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            // Audio playback (journal voice memos) must start without a user
-            // gesture for the preview play button to work right after recording.
-            mediaPlaybackRequiresUserGesture = false
-            setSupportZoom(false)
-            builtInZoomControls = false
-            displayZoomControls = false
-            loadWithOverviewMode = false
-            useWideViewPort = false
-        }
+        applyReaderWebSettings(wv.settings)
 
         // #3: native-reader polish. OVER_SCROLL_NEVER drops the edge glow/stretch
         // (this is a single-page reader — no pull-to-refresh), so scrolling feels
