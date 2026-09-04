@@ -5,6 +5,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
   const currentRef = React.useRef(null);
@@ -24,7 +25,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   React.useEffect(() => {
     if (!currentRef.current) return undefined;
     const timer = setTimeout(() => {
-      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 120);
     return () => clearTimeout(timer);
   }, []);

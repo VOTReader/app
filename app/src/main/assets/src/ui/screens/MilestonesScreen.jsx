@@ -9,6 +9,7 @@
    reachable from Library. */
 
 import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 /** Subscribe to one cross-bundle store by name (absent store = inert).
  *  RETURNS the version so the caller can key work on it. */
@@ -58,7 +59,7 @@ export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onS
   /** Jump to a category heading. Same scrollIntoView the index screens use. */
   const jumpTo = (id) => {
     const el = (typeof document !== 'undefined') ? document.getElementById('ms-cat-' + id) : null;
-    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   };
 
   return (
