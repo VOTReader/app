@@ -15,7 +15,11 @@
      - "Day" = local-timezone calendar date (YYYY-MM-DD)
      - Streak +1 if the new entry's date is exactly one calendar day after
        lastEntryDate. Same-day entries don't advance the streak.
-     - Streak resets to 1 if a day was skipped.
+     - Streak resets to 1 if a day was skipped. A NON-POSITIVE day delta
+       (same-day, a backwards device-clock step, or a westward date-line
+       crossing) leaves currentStreak + lastEntryDate untouched instead —
+       only totalEntries (a real entry WAS created) and milestones still
+       update. Mirrors ReadingStreakStore.recordReadingDay.
      - On app load (recomputeFromLoad), if today is later than
        lastEntryDate + 1 day, streak is broken (set to 0) — so the hub
        shows "Streak broken, journal today to restart" honestly.
@@ -146,17 +150,20 @@ export var JournalStatsStore = extendStore(
       data.totalEntries = (data.totalEntries || 0) + 1;
       if (!data.lastEntryDate) {
         data.currentStreak = 1;
+        data.lastEntryDate = today;
       } else {
         var delta = _jrnDaysBetween(data.lastEntryDate, today);
-        if (delta === 0) {
-          // Same-day entry — streak unchanged.
-        } else if (delta === 1) {
-          data.currentStreak = (data.currentStreak || 0) + 1;
-        } else {
-          data.currentStreak = 1;
+        // Only a forward-moving day can affect the streak or move the date
+        // cursor. Same-day (delta===0) or a backwards clock/date-line step
+        // (delta<0) leaves currentStreak + lastEntryDate alone — resetting
+        // to 1 here would let a clock glitch destroy real streak history
+        // (mirrors ReadingStreakStore.recordReadingDay). totalEntries above
+        // already counts the entry regardless — it really was created.
+        if (delta > 0) {
+          data.currentStreak = (delta === 1) ? (data.currentStreak || 0) + 1 : 1;
+          data.lastEntryDate = today;
         }
       }
-      data.lastEntryDate = today;
       if (data.currentStreak > (data.longestStreak || 0)) {
         data.longestStreak = data.currentStreak;
       }

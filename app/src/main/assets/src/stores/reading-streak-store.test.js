@@ -18,6 +18,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingStreakStore } from './reading-streak-store.js';
+import { _jrnDateStr } from './journal-stats-store.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -120,6 +121,39 @@ describe('ReadingStreakStore — recomputeFromLoad', () => {
     const s = ReadingStreakStore.recomputeFromLoad();
     expect(s.currentStreak).toBe(0);
     expect(ReadingStreakStore.getVersion()).toBe(before);
+  });
+});
+
+describe('ReadingStreakStore — backwards clock / date-line guard', () => {
+  // gap-reading-measurement-and-achievements-3: _jrnDaysBetween returns a
+  // signed delta, and the old guard (`data.lastReadDate === today`) only
+  // caught an EXACT same-day repeat by string equality — a backwards step
+  // (NTP correction across midnight, a manual clock fix, a flight west
+  // across the date line) produces a DIFFERENT date string with a NEGATIVE
+  // delta, fell into the "else" branch, and reset the streak to 1.
+  it('a backwards device-clock step leaves currentStreak, longestStreak, lastReadDate, and totalDays untouched', () => {
+    const data = ReadingStreakStore._load();
+    data.currentStreak = 300;
+    data.longestStreak = 300;
+    data.lastReadDate = _jrnDateStr(_tsRelative(0));   // "today"
+    data.totalDays = 300;
+    ReadingStreakStore._save();
+
+    // The new commit's "today" is chronologically BEFORE lastReadDate.
+    ReadingStreakStore.recordReadingDay(_tsRelative(-1));
+
+    const s = ReadingStreakStore.get();
+    expect(s.currentStreak).toBe(300);
+    expect(s.longestStreak).toBe(300);
+    expect(s.lastReadDate).toBe(_jrnDateStr(_tsRelative(0)));
+    expect(s.totalDays).toBe(300);
+  });
+
+  it('does not write or bump the version on a backwards step', () => {
+    ReadingStreakStore.recordReadingDay(_tsRelative(0));
+    const v = ReadingStreakStore.getVersion();
+    ReadingStreakStore.recordReadingDay(_tsRelative(-1));
+    expect(ReadingStreakStore.getVersion()).toBe(v);
   });
 });
 
