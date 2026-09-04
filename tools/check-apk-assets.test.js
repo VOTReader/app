@@ -84,8 +84,8 @@ afterEach(() => { for (const m of mirrors.splice(0)) rmSync(m, { recursive: true
 
 /**
  * A throwaway repo mirror: the real gate script, a gradle file, one loader
- * module, and the data file the loader names (so the gate's "missing on
- * disk" warning path stays out of these cases).
+ * module, and the data file the loader names (so the gate's missing-on-disk
+ * failure stays out of the cases that are about the ignore list).
  */
 function mirror({ gradle, loader, dataFiles = ['bible-studies.js'] }) {
   const root = mkdtempSync(join(tmpdir(), 'vot-apk-assets-'));
@@ -124,6 +124,13 @@ describe('check-apk-assets — the harness drives the real gate (positive contro
     const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_LITERAL }));
     expect(r.status, r.all).toBe(0);
     expect(r.stdout).toMatch(/\[apk-assets\] OK — 1 runtime-injected/);
+  });
+
+  it('FAILS when a runtime-injected asset does not exist on disk', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_LITERAL, dataFiles: [] }));
+    expect(r.status, 'a missing injected file only warned and the gate still passed:\n' + r.all).toBe(1);
+    expect(r.stderr).toMatch(/\[apk-assets\] FAIL/);
+    expect(r.stderr).toContain('src/data/bible-studies.js');
   });
 });
 

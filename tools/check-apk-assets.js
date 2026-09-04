@@ -147,8 +147,12 @@ for (const rel of needed) {
 }
 
 if (missing.length) {
-  console.warn('[apk-assets] WARN: runtime-injected path not found on disk:');
-  for (const m of missing) console.warn('   ' + m);
+  console.error('\n[apk-assets] FAIL — these are injected at RUNTIME but do not exist on disk:\n');
+  for (const m of missing) console.error('   ' + m);
+  console.error('\nA loader names a file that was renamed or deleted. The app would still');
+  console.error('build and boot, then fail silently at the feature. Fix the loader string');
+  console.error('or restore the file.\n');
+  process.exit(1);
 }
 
 if (violations.length) {
