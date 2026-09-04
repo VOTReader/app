@@ -91,6 +91,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { bibleSyncGlobalFor } from '../../utils/audio-track.js';
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
+import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 
 const HL_NAME = 'vot-reading';
 /** How long a deliberate user scroll suspends follow-scroll. */
@@ -422,13 +423,6 @@ function _leaseHeld() {
   return c.contains('autoscroll-running') || c.contains('scroll-restoring');
 }
 
-function _reducedMotion() {
-  try {
-    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch (_e) { return false; }   // matchMedia absent in some embedded webviews
-}
-
 /**
  * Drop any glide we own. Called on user intent, on a retarget, and on unmount.
  *
@@ -455,7 +449,7 @@ function _glideTo(el, to, glideRef) {
   _cancelGlide(glideRef);
   const from = el.scrollTop || 0;
   if (to === from) return;
-  if (_reducedMotion() || typeof requestAnimationFrame !== 'function') { el.scrollTop = to; return; }
+  if (prefersReducedMotion() || typeof requestAnimationFrame !== 'function') { el.scrollTop = to; return; }
   let t0 = null;
   let wrote = from;
   const step = (ts) => {

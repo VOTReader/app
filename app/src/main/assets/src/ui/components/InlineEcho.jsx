@@ -2,13 +2,15 @@
    InlineEcho — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { scrollBehavior } from '../../utils/reduced-motion.js';
+
 export function InlineEcho({ scriptures, votNotes }) {
   if (!scriptures.length && !votNotes.length) return null;
   const scrollToRef = (ref) => {
     const ranges = parseRefRanges(ref);
     if (ranges.length > 0) {
       const target = document.getElementById(`v-${ranges[0].end}`);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (target) target.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }
   };
   return (
