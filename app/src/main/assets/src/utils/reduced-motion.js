@@ -39,9 +39,18 @@
    Calls that pass no behavior at all already default to 'auto' and are
    reached by the CSS block — leave them alone.
 
-   Absent/throwing matchMedia (some embedded WebViews) falls back to MOTION,
-   not to reduced: a smooth scroll is a comfort loss, an exception thrown
-   inside a click handler is a dead button.
+   Absent/throwing matchMedia falls back to MOTION, not to reduced. The
+   try/catch is what keeps a click handler from throwing; it does not argue
+   for either return value. The reason to answer 'smooth' is CONSISTENCY:
+   the three pre-existing readers of this query — use-autoscroll.js,
+   use-pager-gesture.js and ReadAlongHighlight.jsx — all fall back to motion,
+   and one predicate giving two different answers in one app is the drift
+   this module exists to stop. If matchMedia is unreadable the OS preference
+   is unreadable app-wide, so a vestibular reader in that environment is
+   already getting pager animation and autoscroll motion; instant scrolls
+   alone would be inconsistency, not protection. The branch is also
+   unreachable on the chrome108 target — `prefers-reduced-motion` has been
+   supported since Chrome 74. Do not spend more on it.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
