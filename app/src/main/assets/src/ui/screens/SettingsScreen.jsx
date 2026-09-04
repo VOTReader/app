@@ -1604,15 +1604,27 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // onblocked never hangs the UI; vot-thumbs + the two search-index
       // caches (Classic + MiniSearch) are regenerable caches and get a
       // 1s timeout each.
+      const NONCRITICAL_DB_NAMES = ['vot-thumbs', 'vot-search-cache', 'vot-minisearch-cache'];
       const deleteResults = await Promise.all([
         _deleteIdbDatabase('votreader', true),
         _deleteIdbDatabase('vot-journal-media', true),
-        _deleteIdbDatabase('vot-thumbs', false),
-        _deleteIdbDatabase('vot-search-cache', false),
-        _deleteIdbDatabase('vot-minisearch-cache', false),
+        ...NONCRITICAL_DB_NAMES.map((name) => _deleteIdbDatabase(name, false)),
       ]);
       if (!deleteResults[0] || !deleteResults[1]) {
         throw new Error('A personal-data database could not be deleted');
+      }
+      // storage-backup-4: indexes 2+ (the regenerable caches) used to be
+      // discarded outright — a silently-surviving database (e.g. an open
+      // connection blocking the delete with no onversionchange to close it,
+      // per thumb-store.js) looked byte-identical to a clean wipe. The wipe
+      // still succeeds either way (these three are caches, not user data —
+      // "Clear All" must not fail loud over a database that will just
+      // regenerate on next use), but a failure is now at least visible in a
+      // diagnostic export instead of invisible.
+      const failedCaches = NONCRITICAL_DB_NAMES.filter((_name, i) => !deleteResults[2 + i]);
+      if (failedCaches.length) {
+        console.warn('clear all: non-critical database(s) failed to delete:', failedCaches.join(', '));
+        try { if (window.DiagnosticLog) window.DiagnosticLog.warn('settings', 'Clear All: failed to delete ' + failedCaches.join(', ')); } catch (_e) { /* best-effort */ }
       }
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // Wave-0: was alert('All personal data cleared…') — a native blocking
