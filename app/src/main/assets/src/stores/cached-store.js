@@ -84,6 +84,7 @@ function _cloneSnapshot(v) {
  *   schemaVersion?: number,
  *   migrations?: Record<number, (old: any) => any>,
  *   crossTabMerge?: (base: any, ours: any, theirs: any) => any,
+ *   discardQueueOnRebase?: boolean,
  * }} CachedStoreOpts
  */
 
@@ -133,6 +134,7 @@ function _cloneSnapshot(v) {
  *   _save(): void,
  *   _saveMerged(): void,
  *   _crossTabMerge: ((base: T | null, ours: T | null, theirs: T | null) => T) | null,
+ *   _discardQueueOnRebase: boolean,
  *   _warnedNoLocks: boolean,
  *   _base: T | null,
  *   _lastWrite: Promise<any> | null,
@@ -242,6 +244,24 @@ export function CachedStore(storageKey, defaultVal, opts) {
    * @type {((base: any, ours: any, theirs: any) => any) | null}
    */
   const crossTabMerge = (typeof opts.crossTabMerge === 'function') ? opts.crossTabMerge : null;
+  /**
+   * storage-backup-3: opt-in for stores whose mutation contract is
+   * FULL-REPLACEMENT (StateStore.set(fullState) is the only example today),
+   * not incremental (add/remove/update). For those, a queue accumulated
+   * before the FIRST successful hydration can never be safely replayed onto
+   * real loaded data: every queued op was built from the pending/degraded
+   * overlay's synthetic defaults (useSavedState returns {} while this store
+   * isn't 'loaded' yet — see use-saved-state.js), never from the record
+   * _rebaseAndPromote just loaded. "Replaying" it is really "overwrite the
+   * just-recovered truth with stale defaults" (the degraded-then-recovered
+   * data-loss finding). See _rebaseAndPromote for the discard condition —
+   * it only applies when real prior data was actually loaded, so a fresh
+   * install (nothing to protect) keeps today's replay-on-top behavior.
+   * Default false/unset: every other store keeps replaying its queue
+   * exactly as before (Vector 1 — late-stomp prevention — is untouched).
+   * @type {boolean}
+   */
+  const discardQueueOnRebase = opts.discardQueueOnRebase === true;
   /** Meta-store key holding this store's persisted schema version. */
   const schemaMetaKey = 'schema:' + idbStoreName;
   /** Linear-backoff schedule (ms) for background IDB retries when
@@ -299,6 +319,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _migrations: migrations,
     _schemaMetaKey: schemaMetaKey,
     _crossTabMerge: crossTabMerge,
+    _discardQueueOnRebase: discardQueueOnRebase,
     _warnedNoLocks: false,   // STOR5: one-shot guard for the locks-unavailable trace
     /** STORE-1: the IDB snapshot this tab last synced with — the common
      *  ancestor for the 3-way cross-tab merge (set at hydrate + after each
@@ -833,7 +854,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * `_pendingCache` because the real cache is now authoritative.
      */
     _rebaseAndPromote(loadedData) {
-      this._cache = /** @type {any} */ ((loadedData !== undefined && loadedData !== null) ? loadedData : copyDefault());
+      const hadRealData = (loadedData !== undefined && loadedData !== null);
+      this._cache = /** @type {any} */ (hadRealData ? loadedData : copyDefault());
       // STORE-1: snapshot the just-synced IDB state as the 3-way merge base
       // BEFORE the queue replays onto _cache (a CLONE, so replay's in-place
       // mutation of _cache can't bleed into base). For non-merge stores this
@@ -847,7 +869,23 @@ export function CachedStore(storageKey, defaultVal, opts) {
       if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(_anyStoreDegraded());
       this._pendingCache = null;
       this._defaultRef = null;
-      this._replayQueueOnto();
+      // storage-backup-3: a full-replacement store (_discardQueueOnRebase)
+      // discards rather than replays when there is real prior data to
+      // protect — every queued op predates this store's FIRST successful
+      // load, so it was built from synthetic pending/degraded defaults, not
+      // from `loadedData`. Replaying it would overwrite the just-recovered
+      // record with those defaults (the data-loss this finding is about).
+      // A fresh install (hadRealData false) has nothing to protect, so it
+      // keeps the ordinary replay-on-top path — the queue there holds the
+      // FIRST real write, not a stale echo. Every other store (the flag is
+      // unset) is completely unaffected: Vector 1 late-stomp prevention
+      // (cached-store.test.js) still replays incremental ops on top of a
+      // freshly-loaded record exactly as before.
+      if (this._discardQueueOnRebase && hadRealData) {
+        this._queue = [];
+      } else {
+        this._replayQueueOnto();
+      }
       // Flush the rebased state (single batched save).
       this._save();
       // Single batched bump. _replayQueueOnto already cleared _replaying,

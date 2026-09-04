@@ -50,6 +50,18 @@
    _save() then overwrites LS with the reduced shim. User data
    survives the migration boundary; LS shape converges to the shim
    shape after one save cycle.
+
+   DEGRADED-BOOT REBASE (storage-backup-3): usePersistedState's mount
+   effect always echoes App's in-memory union back through set() — on a
+   normal boot that union already IS the just-hydrated record, but on a
+   degraded-then-recovered boot (hydration exceeded hydrationTimeoutMs)
+   it is synthetic hook defaults, because useSavedState() returns {}
+   while this store isn't 'loaded' yet. That set() call still queues
+   (CachedStore's pending/degraded contract), but `discardQueueOnRebase:
+   true` below tells _rebaseAndPromote to DROP the queue instead of
+   replaying it once real IDB data exists — a full-replacement set()
+   has no safe way to "rebase" onto real data it never saw. A fresh
+   install (no real data) is unaffected — see cached-store.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -102,6 +114,12 @@ export const StateStore = extendStore(
     // achievements) it was permanent loss. mergeStateStore splits the two —
     // see its doc comment for why the halves get opposite policies.
     crossTabMerge: mergeStateStore,
+    // storage-backup-3: set() is full-replacement, so a degraded-then-
+    // recovered hydration must NOT replay a pre-load queue onto the real
+    // record — see cached-store.js's _rebaseAndPromote for the discard
+    // condition (never applies to a fresh install, which has no real data
+    // to protect).
+    discardQueueOnRebase: true,
   }),
   {
     /**

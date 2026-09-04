@@ -71,8 +71,13 @@ export function summarizeBackupManifest(manifest) {
  *
  * @param {ReturnType<typeof summarizeBackupManifest>} s
  * @param {string} integrity  'ok' | 'absent' | 'mismatch' | 'malformed' |
- *                            'trailing' — web readContainer / native verify
- *                            vocabularies both map onto these.
+ *                            'trailing' | 'truncated' — web readContainer /
+ *                            native verify vocabularies both map onto these.
+ *                            'truncated' (storage-backup-1: a media frame
+ *                            ended early — readContainer salvaged the
+ *                            manifest anyway) falls through to the same
+ *                            catch-all warning as 'malformed'/'trailing'
+ *                            below; its wording already fits.
  * @param {'v3'|'legacy'} kind
  * @returns {{ message: string, level: 'ok' | 'warn' }}
  */

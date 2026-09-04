@@ -101,3 +101,38 @@ describe('ThumbStore — error resilience', () => {
     await expect(idbReadAll()).resolves.toEqual({});
   });
 });
+
+/** Settings -> Clear All My Data's exact call, isolated from the screen. */
+function deleteThumbDatabase() {
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(THUMB_DB);
+    req.onsuccess = () => resolve('success');
+    req.onblocked = () => resolve('blocked');
+    req.onerror = () => resolve('error');
+  });
+}
+
+describe('ThumbStore — storage-backup-4: Clear All My Data must actually delete vot-thumbs', () => {
+  it('REPRO: deleteDatabase succeeds (not blocked) while a connection from openThumbDB is still live', async () => {
+    const db = await openThumbDB();
+    expect(db).not.toBeNull();
+    // Without an onversionchange handler, this open connection blocks the
+    // delete exactly the way SettingsScreen's Clear All does in production —
+    // openThumbDB's promise is cached for the life of the page, so by the
+    // time the owner taps Clear All a connection is always still open.
+    expect(await deleteThumbDatabase()).toBe('success');
+  });
+
+  it('a later openThumbDB() call reopens a fresh, working connection after the database was deleted', async () => {
+    await openThumbDB();
+    await deleteThumbDatabase();
+    // The cached promise must have been dropped by onversionchange, or this
+    // resolves the STALE (now-closed) connection instead of a live one.
+    const db2 = await openThumbDB();
+    expect(db2).not.toBeNull();
+    expect(db2.name).toBe(THUMB_DB);
+    await idbPut('proof', 'alive');
+    const all = await idbReadAll();
+    expect(all.proof).toBe('alive');
+  });
+});
