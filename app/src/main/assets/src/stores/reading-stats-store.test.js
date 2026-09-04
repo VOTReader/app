@@ -171,6 +171,54 @@ describe('replaceAll (backup restore path)', () => {
     expect(p.nanBlocks).toBeUndefined();
   });
 
+  /* gap-reading-measurement-and-achievements-2: replaceAll validated only
+     `progress` at the import trust boundary; wordsByDay and wpmSamples went
+     in raw. A hand-edited or corrupt .votbak could seed a non-numeric
+     wordsByDay value (breaks wordsForDays' consumers) or a wpmSamples entry
+     with a zero/non-numeric w or ms (Infinity/NaN rates survive the numeric
+     sort and drag measuredWpm's median off). */
+  it('coerces imported wordsByDay at the import boundary: key shape, sign, rounding, non-finite', () => {
+    ReadingStatsStore.replaceAll({
+      wordsByDay: {
+        '2026-09-01': /** @type {any} */ ('abc'),  // non-numeric — dropped
+        'not-a-date': 500,         // bad key shape — dropped
+        '2026-09-02': -7,          // negative — clamped to 0
+        '2026-09-03': 12.6,        // rounds
+        '2026-09-04': Infinity,    // non-finite — dropped
+      },
+    });
+    expect(ReadingStatsStore.get().wordsByDay).toEqual({ '2026-09-02': 0, '2026-09-03': 13 });
+  });
+
+  it('bounds imported wordsByDay to MAX_DAY_KEYS at import time (oldest pruned)', () => {
+    const many = {};
+    for (let i = 0; i < 405; i++) {
+      const d = new Date(2020, 0, 1 + i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      many[key] = 1;
+    }
+    ReadingStatsStore.replaceAll({ wordsByDay: many });
+    const keys = Object.keys(ReadingStatsStore.get().wordsByDay);
+    expect(keys.length).toBeLessThanOrEqual(400);
+    expect(keys).not.toContain('2020-01-01');
+  });
+
+  it('coerces imported wpmSamples so a poisoned sample cannot corrupt measuredWpm', () => {
+    ReadingStatsStore.replaceAll({
+      wpmSamples: [
+        { w: 100, ms: 0 },     // ms not > 0 — dropped
+        /** @type {any} */ ({ w: 'x', ms: 'y' }),   // non-numeric — dropped
+        { w: 200, ms: 60000 },
+        { w: 210, ms: 60000 },
+        { w: 220, ms: 60000 },
+        { w: 230, ms: 60000 },
+        { w: 240, ms: 60000 },
+      ],
+    });
+    expect(ReadingStatsStore.get().wpmSamples).toHaveLength(5);
+    expect(ReadingStatsStore.measuredWpm()).toBe(220);   // clean median — no Infinity/NaN
+  });
+
   /* Every subscriber (MyProgressScreen.jsx:118, SettingsScreen.jsx:405) reads
      this store through useSyncExternalStore(subscribe, getVersion). CachedStore's
      contract is "_bump() AFTER _save()" — a mutation that saves without bumping
