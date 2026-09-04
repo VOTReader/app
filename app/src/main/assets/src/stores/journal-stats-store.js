@@ -169,6 +169,7 @@ export var JournalStatsStore = extendStore(
       }
       var newlyUnlocked = this._checkMilestones(data);
       this._save();
+      this._bump(); // F12: subscribers must see the new entry/streak/milestone
       return newlyUnlocked;
     },
 
@@ -187,6 +188,7 @@ export var JournalStatsStore = extendStore(
       if (delta >= 2 && data.currentStreak > 0) {
         data.currentStreak = 0;
         this._save();
+        this._bump(); // F12: subscribers must see the broken streak
       }
       return data;
     },
@@ -208,6 +210,7 @@ export var JournalStatsStore = extendStore(
       // boundary is the cheap, correct fix. longestStreak is history — kept.
       if (data.totalEntries === 0) data.currentStreak = 0;
       this._save();
+      this._bump(); // F12: subscribers must see the decremented total
     },
 
     /**
