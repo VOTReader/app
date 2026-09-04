@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
 import android.util.Base64
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.util.UUID
@@ -106,12 +107,7 @@ class NativeAudioRecorder(private val context: Context) {
                 Timber.w("recorder error what=%d extra=%d — session died mid-recording", what, extra)
                 recorderFailed = true
             }
-            mr.setOnInfoListener { _, what, _ ->
-                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
-                    Timber.i("recorder reached the %d ms native backstop and stopped itself", MAX_DURATION_MS)
-                    autoStopped = true
-                }
-            }
+            mr.setOnInfoListener { _, what, _ -> onRecorderInfo(what) }
             // Native backstop for recording length. The real cap is the JS-side
             // 300 s timer in JournalRecordingSheet; this sits 30 s above it so JS
             // still owns the normal stop, and this only catches the case JS cannot
@@ -133,6 +129,24 @@ class NativeAudioRecorder(private val context: Context) {
             recordFile?.let { try { it.delete() } catch (_: Exception) {} }
             recordFile = null
             Result.Failure(e.message ?: "start_failed")
+        }
+    }
+
+    /**
+     * MediaRecorder's OnInfoListener body, extracted from the lambda so the JVM can
+     * reach it: Robolectric's ShadowMediaRecorder records the listener but never
+     * fires it, so the lambda's contents are unreachable from a unit test.
+     *
+     * Only MEDIA_RECORDER_INFO_MAX_DURATION_REACHED means "the recorder stopped and
+     * finalised the file itself" — the other info codes (max filesize, and whatever
+     * an OEM adds) must NOT set [autoStopped], or a still-running recorder would
+     * never get its stop() and the memo would never be finalised.
+     */
+    @VisibleForTesting
+    internal fun onRecorderInfo(what: Int) {
+        if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+            Timber.i("recorder reached the %d ms native backstop and stopped itself", MAX_DURATION_MS)
+            autoStopped = true
         }
     }
 
