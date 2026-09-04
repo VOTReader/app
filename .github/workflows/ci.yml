@@ -136,11 +136,18 @@ jobs:
         run: npm run check:audio-manifest
 
       - name: Audit footnote rendering (CORP6 — dup / white verse numbers)
-        # node tools/audit-footnotes.js --check: fails if any Format A footnote (or
-        # WTLB / Blessed / Matthew dict) value would render a DUPLICATED or WHITE
-        # verse number (the dup / bad-key / fallback classes). validate:data's
+        # node tools/audit-footnotes.js --check: fails if any value that renders
+        # through VerseWithNumbers would show a DUPLICATED or WHITE verse number
+        # (the dup / bad-key / fallback classes). validate:data's
         # validateFootnoteMarkers covers the no-marker case; this is the unique
         # signal for the dup + label-suffixed-key cases. Runs with the data gates.
+        # COVERAGE, corrected 2026-09-04 (data-corpus-7): the seven volumes,
+        # lords-rebuke, letters-timothy, letters-flock, hidden-manna AND
+        # holy-days (mixed-format, so `nkjv` or `scriptures` — its 21 values were
+        # unchecked before), plus the wtlb-scriptures / the-blessed /
+        # matthew-nkjv dicts. NOT the Matthew Study Bible's per-chapter
+        # `scriptures`: those are { ref, cite } anchors into MATTHEW_NKJV, not
+        # verse text, and validate-schemas.js gates their shape and their refs.
         run: npm run check:footnotes
 
       - name: Test + run the data gate (check_balance.py — T6)
@@ -155,6 +162,13 @@ jobs:
         # esprima (the authoritative JS-syntax check) is pinned in
         # requirements-dev.txt; installing it makes the esprima cases real, not
         # skipped. Cheap + deterministic — runs before the heavier build.
+        # test_requirements.py rides the same call (2026-09-04, process-hygiene-6):
+        # the weekly Task Scheduler job runs fetch-drive-audio ->
+        # gen-audio-manifest -> mirror-audio-release unattended, so a
+        # third-party import that requirements-dev.txt does not pin is a
+        # ModuleNotFoundError at step 1 and audio ingestion stops indefinitely
+        # while the repo stays green. It reads imports with `ast`, installs
+        # nothing, and keeps the heavy OCR dependencies out of that path.
         # test_preview_server.py rides the same unittest call (2026-09-03):
         # tools/preview-server.py must bind 127.0.0.1 only. It bound every
         # interface for months and nothing said so; a dev server that can
@@ -162,7 +176,7 @@ jobs:
         # push instead of assumed.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server -v
+          python -m unittest test_check_balance test_preview_server test_requirements -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)

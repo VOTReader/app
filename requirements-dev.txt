@@ -1,8 +1,28 @@
-# Python dev dependencies for VOTReader-studio's data gates.
-# Install once per clone:  pip install -r requirements-dev.txt
+# Python dependencies for VOTReader-studio's data gates and the scheduled
+# audio pipeline. Install once per clone:  pip install -r requirements-dev.txt
 #
+# Pinned, because these run UNATTENDED. The weekly Task Scheduler job
+# (tools/flock-audio-sync.py) drives fetch-drive-audio -> gen-audio-manifest ->
+# mirror-audio-release with nobody watching: an undeclared import raises
+# ModuleNotFoundError at step 1, the run aborts before the manifest is touched,
+# and audio ingestion stops indefinitely against a green-looking repo. A
+# routine `pip install -U`, a Python 3.14 that starts a fresh site-packages, or
+# a machine rebuild is all it takes. test_requirements.py holds this file to
+# the imports on that path. Versions measured 2026-09-04 in the exact
+# interpreter the scheduled task uses,
+# C:\Users\corbi\AppData\Local\Programs\Python\Python313\python.exe.
+
 # esprima — the AUTHORITATIVE JS-syntax check in check_balance.py (the
 # pre-commit data gate). Without it, check_balance silently degrades to a
-# weak brace/quote heuristic that misses real syntax errors (B5). Pinned so
-# every machine that runs the gate behaves identically.
+# weak brace/quote heuristic that misses real syntax errors (B5).
 esprima==4.0.1
+
+# gdown — Google Drive downloads. Consumers: tools/fetch-drive-audio.py (the
+# listing) and tools/mirror-audio-release.py (the asset pull). The fragile one:
+# it tracks Drive's undocumented download flow and breaks on Drive-side changes,
+# so an unpinned upgrade is a live risk to the weekly job, not a theoretical one.
+gdown==6.1.0
+
+# requests — HTTP for the release mirror and its verifier. Consumers:
+# tools/mirror-audio-release.py, tools/verify-audio-release.py.
+requests==2.33.1

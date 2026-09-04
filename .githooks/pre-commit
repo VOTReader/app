@@ -260,6 +260,33 @@ if [ -n "$gate_changed" ]; then
   echo ""
 fi
 
+# The scheduled audio pipeline's Python dependencies must stay declared and
+# pinned. The weekly Task Scheduler job runs fetch-drive-audio ->
+# gen-audio-manifest -> mirror-audio-release unattended, so an undeclared
+# import is a ModuleNotFoundError at step 1 and audio ingestion stops
+# indefinitely against a green repo (process-hygiene-6, 2026-09-04). Fires when
+# a requirements file, a scheduled-path script or the test itself is staged.
+reqs_changed=$(echo "$staged" | grep -E '^(requirements-(dev|ocr)\.txt|test_requirements\.py|tools/(flock-audio-sync|fetch-drive-audio|mirror-audio-release|verify-audio-release)\.py)$' || true)
+if [ -n "$reqs_changed" ]; then
+  echo "[pre-commit] Checking the scheduled pipeline's Python pins (test_requirements.py)..."
+  python -m unittest test_requirements
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Dependency pin check FAILED — see output above."
+    echo "A script on the SCHEDULED path imports something requirements-dev.txt"
+    echo "does not pin. The weekly audio job runs unattended, so that is a"
+    echo "silent stop, not a warning. Add the pin (measured version, with a"
+    echo "comment naming the consumer), or move the import off that path."
+    echo "OCR-only dependencies belong in requirements-ocr.txt."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Dependency pins OK."
+  echo ""
+fi
+
 # ─── Step 1c: the preview server's bind contract ────────────────────
 # tools/preview-server.py must listen on 127.0.0.1 only (test_preview_server.py
 # spawns it and proves the LAN address refuses). Runs whenever the server or

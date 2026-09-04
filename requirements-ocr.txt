@@ -1,0 +1,14 @@
+# OPTIONAL — the OCR / PDF pipeline only. Deliberately NOT in
+# requirements-dev.txt: nothing in the data gates or the weekly audio job
+# imports these, and they are heavy. Keeping the weekly path minimal is the
+# point, so install them only when working on the PDF tooling:
+#     pip install -r requirements-ocr.txt
+#
+# Versions measured 2026-09-04 in the same interpreter as requirements-dev.txt.
+
+# PyMuPDF — `import fitz`. Consumers: tools/vot-pdf-extract.py (text-layer
+# extraction) and tools/vot-pdf-render.py.
+PyMuPDF==1.27.2.3
+
+# pypdfium2 — page rasterisation. Consumers: ocr_pipeline.py, render_pdf_pages.py.
+pypdfium2==5.12.1
