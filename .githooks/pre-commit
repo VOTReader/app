@@ -635,25 +635,33 @@ if [ -n "$bundle_source_changed" ]; then
     exit 1
   fi
 
-  # ─── Step 5c: packaged-APK asset gate ─────────────────────────────
-  # ignoreAssetsPatterns (app/build.gradle.kts) is basename-matched with no
-  # negative-include, so it is easy to exclude an asset the app injects at
-  # RUNTIME (<script src="src/data/...">) rather than via index.html. That
-  # already shipped once: `<dir>src` dropped the nine alternate Bible
-  # translations + bible-studies.js from the APK, and the loader's onerror
-  # made it fail SILENTLY (every translation fell back to NKJV).
-  echo "[pre-commit] Checking packaged-APK assets vs runtime injections..."
-  node tools/check-apk-assets.js
-  status=$?
-  if [ $status -ne 0 ]; then
-    echo ""
-    echo "---------------------------------------------------------------"
-    echo "APK ASSET gate FAILED — see message above. Narrow the pattern in"
-    echo "app/build.gradle.kts so the runtime-injected file still ships."
-    echo "Emergency bypass (not recommended): git commit --no-verify"
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
+fi
+
+# ─── Step 5c: packaged-APK asset gate (UNCONDITIONAL) ───────────────
+# ignoreAssetsPatterns (app/build.gradle.kts) is basename-matched with no
+# negative-include, so it is easy to exclude an asset the app injects at
+# RUNTIME (<script src="src/data/...">) rather than via index.html. That
+# already shipped once: `<dir>src` dropped the nine alternate Bible
+# translations + bible-studies.js from the APK, and the loader's onerror
+# made it fail SILENTLY (every translation fell back to NKJV).
+#
+# Unconditional, like Step 5d, and for the same reason: this gate reads
+# app/build.gradle.kts, and until 2026-09-04 it sat inside the bundle-source
+# branch, whose trigger is anchored to app/src/main/assets/ and so cannot
+# match app/build.gradle.kts at all. Editing ignoreAssetsPatterns — the one
+# file the gate exists to police — armed nothing. It runs in well under a
+# second, so there is nothing to buy by gating it on a trigger.
+echo "[pre-commit] Checking packaged-APK assets vs runtime injections..."
+node tools/check-apk-assets.js
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "---------------------------------------------------------------"
+  echo "APK ASSET gate FAILED — see message above. Narrow the pattern in"
+  echo "app/build.gradle.kts so the runtime-injected file still ships."
+  echo "Emergency bypass (not recommended): git commit --no-verify"
+  echo "---------------------------------------------------------------"
+  exit 1
 fi
 
 # ─── Step 5d: ASSET_INTEGRITY truth check (UNCONDITIONAL) ───────────
@@ -694,7 +702,7 @@ fi
 #
 # We test on test-source changes too — a flaky test file or a new test
 # that breaks the suite should fail at the commit prompt, not in CI.
-kotlin_changed=$(echo "$staged" | grep -E '^(app/src/(main|test)/.*\.kt|app/build\.gradle\.kts|gradle/libs\.versions\.toml)$' || true)
+kotlin_changed=$(echo "$staged" | grep -E '^(app/src/(main|test)/.*\.kt|app/src/main/AndroidManifest\.xml|app/src/main/res/.*|app/build\.gradle\.kts|gradle/libs\.versions\.toml)$' || true)
 
 if [ -n "$kotlin_changed" ]; then
   echo "[pre-commit] Kotlin sources or gradle config changed — running ./gradlew :app:testDebugUnitTest..."
