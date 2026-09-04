@@ -139,7 +139,7 @@ function compile(gl, type, src) {
  *
  * @param {HTMLCanvasElement} canvas
  * @param {import('../../utils/scripture-web/decode.js').ScriptureGraph} graph
- * @param {{onContextRestored?: () => void}} [opts]
+ * @param {{onContextRestored?: () => void, onContextLost?: () => void}} [opts]
  * @returns {object|null}
  */
 export function createRenderer(canvas, graph, opts = {}) {
@@ -247,8 +247,15 @@ export function createRenderer(canvas, graph, opts = {}) {
   // "everything washes out" report). preventDefault() tells the browser we
   // want a restore; every GL object is dead after one, so the OWNER must
   // rebuild the renderer — onContextRestored is its hook for that.
+  // onContextLost is the OWNER's hook for the loss itself — a loss that
+  // never restores (Chrome gives up after repeated resets) otherwise goes
+  // unreported and draw() just returns silently forever (scripture-web-7).
   let lost = false;
-  const onLost = (e) => { e.preventDefault(); lost = true; };
+  const onLost = (e) => {
+    e.preventDefault();
+    lost = true;
+    if (typeof opts.onContextLost === 'function') opts.onContextLost();
+  };
   const onRestored = () => {
     lost = false;
     if (typeof opts.onContextRestored === 'function') opts.onContextRestored();
