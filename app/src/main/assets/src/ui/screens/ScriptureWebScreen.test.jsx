@@ -9,7 +9,7 @@
    real decodeGraph()/ensureScriptureWebData() without fabricating a base64
    corpus payload.
 */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
 
@@ -17,9 +17,18 @@ const baseProps = () => ({
   navigateToLink: () => {}, onBack: () => {}, settings: {}, updateSetting: () => {},
 });
 
+const ORIG_W = window.innerWidth, ORIG_H = window.innerHeight;
+const setViewport = (w, h) => {
+  Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+};
+
 afterEach(() => {
   cleanup();
   delete window.SCRIPTURE_WEB_DATA;
+  vi.unstubAllGlobals();
+  setViewport(ORIG_W, ORIG_H);
+  delete window.screen.orientation;
 });
 
 describe('scripture-web-5 — Try again re-decodes the graph', () => {
@@ -37,5 +46,24 @@ describe('scripture-web-5 — Try again re-decodes the graph', () => {
     // screen sits on the loading state forever with no way back.
     expect(screen.queryByText('Weaving the web…')).toBeNull();
     expect(screen.getByText('The Scripture Web couldn’t load.')).toBeTruthy();
+  });
+});
+
+describe('scripture-web-6 — the landscape hint gates on portrait-ness, not on `rotated`', () => {
+  it('shows "Best in landscape" after a rejected lock, even though rotated is cleared', async () => {
+    // Portrait + a coarse (touch) pointer: rotated starts true, the mount
+    // effect attempts screen.orientation.lock('landscape').
+    setViewport(400, 800);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    // The Android WebView rejects lock() (locking requires fullscreen) —
+    // the exact scenario the finding names.
+    window.screen.orientation = { lock: () => Promise.reject(new Error('locking requires fullscreen')) };
+
+    render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    // showPortraitFallback ran: orientationHint is true, but it also cleared
+    // rotated — the render gate `orientationHint && rotated` can never pass.
+    expect(screen.getByText('Best in landscape')).toBeTruthy();
   });
 });
