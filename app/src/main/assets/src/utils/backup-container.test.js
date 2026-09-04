@@ -153,24 +153,96 @@ describe('BAK-INTEGRITY: manifest CRC-32 (corruption detection)', () => {
   });
 });
 
-describe('integrity + error detection (only-backup path — must fail loud)', () => {
+describe('BAK-1 (storage-backup-1): a media-frame problem salvages the manifest instead of throwing it away', () => {
+  it('REPRO: a fully intact manifest + earlier media survive when the LAST media frame is truncated', async () => {
+    // The exact finding scenario: the manifest carries every structured store
+    // (journal, notes, bookmarks — here represented by vot-notes/vot-journal)
+    // and sits at the FRONT of the container, byte-complete; only the
+    // TRAILING media frame (a truncated cloud-sync / full-SD-card copy) is
+    // short. Losing the manifest to that would make the owner's 99%-
+    // restorable backup unreachable.
+    const good = pattern(500, 1);
+    const bad = pattern(300, 2);
+    const manifest = {
+      app: 'VOTReader', exportVersion: 3,
+      stores: { 'vot-notes': { g1: { text: 'hello' } }, 'vot-journal': { list: [{ id: 'j1' }] } },
+      media: [{ id: 'good', size: good.length }, { id: 'bad', size: bad.length }],
+    };
+    const { blob } = await pack(manifest, [{ blob: blobOf(good) }, { blob: blobOf(bad) }]);
+    const truncated = blob.slice(0, blob.size - 50); // cuts into the LAST (bad) frame only
+    const read = await readContainer(truncated); // must NOT throw
+    expect(read.integrity).toBe('truncated');
+    expect(read.manifest).toEqual(manifest);                 // the manifest is fully intact
+    expect(read.entries.map((e) => e.id)).toEqual(['good']); // the earlier, complete frame is salvaged
+    expect(eqBytes(await bytesOf(read.entries[0].blob), good)).toBe(true);
+  });
+
+  it('a truncated frame header (cut before the length prefix even completes) also salvages', async () => {
+    const good = pattern(50, 3);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'good', size: good.length }, { id: 'bad', size: 20 }] };
+    const { blob } = await pack(manifest, [{ blob: blobOf(good) }, { blob: blobOf(pattern(20, 4)) }]);
+    // Cut off with only part of the SECOND frame's 8-byte length prefix present.
+    const cutAt = blob.size - 20 - 4; // 20-byte 2nd frame body + 4 (of 8) header bytes
+    const read = await readContainer(blob.slice(0, cutAt));
+    expect(read.integrity).toBe('truncated');
+    expect(read.manifest).toEqual(manifest);
+    expect(read.entries.map((e) => e.id)).toEqual(['good']);
+  });
+
+  it('a lone (only) media frame being truncated still salvages the manifest, with zero entries', async () => {
+    const m1 = pattern(500, 9);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: m1.length }] };
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    const read = await readContainer(blob.slice(0, blob.size - 10));
+    expect(read.integrity).toBe('truncated');
+    expect(read.manifest).toEqual(manifest);
+    expect(read.entries).toEqual([]);
+  });
+
+  it('a frame-length / manifest-size mismatch (corruption) salvages rather than discarding the manifest', async () => {
+    const m1 = pattern(10, 2);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: 999 }] }; // lies: real frame is 10
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    const read = await readContainer(blob);
+    expect(read.integrity).toBe('truncated');
+    expect(read.manifest).toEqual(manifest);
+    expect(read.entries).toEqual([]); // the check still fires — the bad entry is excluded, not trusted
+  });
+
+  it('a manifest media entry with no numeric size is excluded (not trusted) but no longer kills the read (BAK-2)', async () => {
+    const m1 = pattern(40, 4);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a' }] }; // size omitted
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    const read = await readContainer(blob);
+    expect(read.integrity).toBe('truncated');
+    expect(read.manifest).toEqual(manifest);
+    expect(read.entries).toEqual([]); // still never trusts a frame with no declared size
+  });
+
+  it('warns to the console identifying which media entry broke the stream', async () => {
+    const m1 = pattern(10, 2);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'the-bad-one', size: 999 }] };
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await readContainer(blob);
+      expect(warn.mock.calls.some((a) => /the-bad-one/.test(String(a[0])))).toBe(true);
+    } finally { warn.mockRestore(); }
+  });
+});
+
+describe('integrity + error detection (only-backup path — must fail loud when NOTHING is recoverable)', () => {
   it('rejects an oversized declared manifest before reading it into memory', async () => {
     const blob = new Blob([CONTAINER_MAGIC, encodeUint64BE(MAX_V3_MANIFEST_BYTES + 1)]);
     await expect(readContainer(blob)).rejects.toThrow(/manifest exceeds the 16 MiB safety limit/);
   });
 
-  it('throws on a truncated media frame', async () => {
-    const m1 = pattern(500, 9);
-    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: m1.length }] };
-    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
-    await expect(readContainer(blob.slice(0, blob.size - 10))).rejects.toThrow(/truncated/);
-  });
-
-  it('throws on a frame-length / manifest-size mismatch (corruption)', async () => {
-    const m1 = pattern(10, 2);
-    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: 999 }] }; // lies: real frame is 10
-    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
-    await expect(readContainer(blob)).rejects.toThrow(/size mismatch/);
+  it('throws on a truncated MANIFEST itself (unlike a truncated media frame, nothing here is salvageable)', async () => {
+    const manifest = { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] };
+    const mBytes = new TextEncoder().encode(JSON.stringify(manifest));
+    // Declare the full manifest length but supply fewer bytes than that.
+    const blob = new Blob([CONTAINER_MAGIC, encodeUint64BE(mBytes.length), mBytes.slice(0, mBytes.length - 5)]);
+    await expect(readContainer(blob)).rejects.toThrow(/truncated manifest/);
   });
 
   it('throws on bad magic (a legacy JSON file is not a v3 container)', async () => {
@@ -187,13 +259,6 @@ describe('integrity + error detection (only-backup path — must fail loud)', ()
     const bad = new TextEncoder().encode('{ x');
     const blob = new Blob([CONTAINER_MAGIC, encodeUint64BE(bad.length), bad]);
     await expect(readContainer(blob)).rejects.toThrow(/not valid JSON/);
-  });
-
-  it('throws on a manifest media entry with no numeric size — the integrity check must not be bypassable (BAK-2)', async () => {
-    const m1 = pattern(40, 4);
-    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a' }] }; // size omitted
-    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
-    await expect(readContainer(blob)).rejects.toThrow(/no numeric size/);
   });
 
   it('warns (but still reads the real frames) on unexpected trailing bytes (BAK-4)', async () => {
