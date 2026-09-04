@@ -9,7 +9,10 @@
 
    Search pipeline (faithful to the audited multi-signal ranking, with BM25 as
    the per-unit scorer + native fuzzy/prefix):
-     1. parse → command / reference / named-passage short-circuit to a nav card
+     1. parse → command / an explicit chapter-and-verse ref / a letter ref
+        short-circuit to a nav card; a bare book name or named-passage key is
+        ALSO an ordinary word, so those two ALSO fall through to the pipeline
+        below over the raw query (search-2)
      2. stop-word filter + synonym expansion → search "units"
      3. one MiniSearch BM25 search per unit (literal = fuzzy+prefix; synonym =
         exact-only), accumulating per-doc score + a term-coverage bitmask
@@ -26,6 +29,7 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
+import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans } from './snippet.js';
@@ -142,11 +146,21 @@ async function search(query, options) {
 
   const parsed = parseReference(query, { corpus });
   if (!parsed) return { parsed: null, results: [] };
-  // Command + structured references (bible / book / letter / named-passage) are
-  // answered by a direct-nav card built in the UI — skip text search entirely.
-  if (parsed.kind !== 'text') return { parsed, results: [], parsedTerms: [], textQuery: null };
-
-  const p = parsed;
+  // A command, an explicit chapter/verse Bible ref (always carries a chapter
+  // — see ref-parser.js), or a compound letter ref ("V2L5") are unambiguous
+  // destinations with no useful text-search reading (nobody types "Rom 8:28"
+  // to full-text search that literal string) — a direct-nav card is the
+  // whole answer, so skip the pipeline. golden.test.js pins this for "gen 1".
+  if (parsed.kind === 'command' || parsed.kind === 'ref-bible' || parsed.kind === 'ref-letter') {
+    return { parsed, results: [], parsedTerms: [], textQuery: null };
+  }
+  // A bare book name ("genesis") or named-passage key ("resurrection") is
+  // ALSO a perfectly ordinary word — 25 named-passage keys and most book
+  // names are single tokens (search-2) — so these two kinds fall through and
+  // run the pipeline too, over the raw query via parseTextQuery. `parsed`
+  // stays the ref-book/named-passage result (returned below) so the UI still
+  // renders its direct-nav card above the text groups.
+  const p = (parsed.kind === 'text') ? parsed : parseTextQuery(query);
   const D = searchData();
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.slice()).concat(p.must);
   const useStop = options.useStopWords !== false;

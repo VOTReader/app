@@ -111,6 +111,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       setBuildInfo({ ready: false, building: false, progress: null, error: "Search couldn't start. Try closing and reopening the app — your data is safe." });
       return undefined;
     }
+    // search-3/4: build for the reader's OWN translation, matching what the
+    // search effect below already requests — before this, mount always built
+    // NKJV regardless of settings.translation, so a non-NKJV reader's first
+    // search saw a translation mismatch and paid a SECOND ~10s build (no
+    // progress bar) that silently overwrote the first in the single-entry IDB
+    // cache, and index-builder.js had nothing loaded to read the alt text
+    // from anyway. One agreed-on translation = one build, cache hits.
+    const translation = settings.translation || 'nkjv';
     if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return undefined;}
     // A cold build runs ~10s; backing out of Search mid-build must not keep
     // reporting progress into an unmounted screen. The build itself continues
@@ -120,13 +128,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
-    Promise.all([loadBible, loadMatthew, loadVot])
+    const loadTr = (typeof window.loadTranslation === 'function') ? window.loadTranslation(translation).catch(() => {}) : Promise.resolve();
+    Promise.all([loadBible, loadMatthew, loadVot, loadTr])
       .then(() => E.init({
+        translation,
         onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
       }))
       .then(() => { if (!cancelled) setBuildInfo({ ready: true, building: false, progress: null }); })
       .catch((err) => { if (!cancelled) setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design (matches the corpus loaders above): Search and Settings are separate routed screens, so a translation change is only ever seen on the NEXT mount, which reads settings.translation fresh.
   }, []);
 
   // Focus input on mount
@@ -198,13 +209,27 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     };
   }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
 
+  // SRCH6: reference/command parsing needs only window.VotSearchData (bundle-a,
+  // always present) — no index — so it runs synchronously on every query
+  // change, independent of buildInfo.ready. Before this, the direct-nav card
+  // and the command dispatch below both waited on state.parsed, which the
+  // debounced text-search effect above only ever set once ready — so a cold
+  // ~10s build blocked "john 3:16" and "/rebuild index" alike, though neither
+  // touches the index.
+  const parsedRef = React.useMemo(() => {
+    const q = (query || '').trim();
+    if (!q) return null;
+    const E = pickEngine();
+    return E ? E.parse(q, { corpus: settings.searchCorpus || 'all' }) : null;
+  }, [query, settings.searchCorpus]);
+
   // Handle command-kind parsed results
   React.useEffect(() => {
-    if (state.parsed && state.parsed.kind === 'command') {
-      if (onCommand) onCommand(state.parsed.action);
+    if (parsedRef && parsedRef.kind === 'command') {
+      if (onCommand) onCommand(parsedRef.action);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
-  }, [state.parsed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when the synchronous parse result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsedRef.action. Closure always picks up the latest onCommand at the point parsedRef actually changes.
+  }, [parsedRef]);
 
   // [8] Result filter chips + canonical sort — client-side views over the
   // fetched set (the corpus pills above narrow what is SEARCHED; these
@@ -260,7 +285,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // Engine-gated: Scriptures corpus shows only bible/book/named-passage refs;
   // Volumes corpus shows only letter refs. No crossover.
   const directEntries = React.useMemo(() => {
-    const p = state.parsed;
+    const p = parsedRef;
     if (!p) return [];
     const curCorpus = settings.searchCorpus || 'all';
     const allowBible = curCorpus === 'all' || curCorpus === 'scriptures';
@@ -275,7 +300,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       out.push({ __direct: true, __corpus: curCorpus, __label: p.bookTitle, __sub: 'Open book index', ref: p });
     }
     return out;
-  }, [state.parsed, settings.searchCorpus]);
+  }, [parsedRef, settings.searchCorpus]);
 
   // Top results: best 5 cross-corpus hits shown before groups (All mode only,
   // only for text queries — ref queries already have directEntries cards)
@@ -552,6 +577,15 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             {directEntries.map((d, i) => (
               <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
             ))}
+          </div>
+        )}
+
+        {/* SRCH6: the direct card above renders immediately (parsing needs no
+            index), but text results below it still wait on the cold build —
+            without this note, the card alone reads as the whole answer. */}
+        {directEntries.length > 0 && buildInfo.building && (
+          <div className="srch-progress srch-indexing-note" role="status" aria-live="polite">
+            <span>Indexing text search…</span>
           </div>
         )}
 

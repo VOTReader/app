@@ -36,8 +36,14 @@ const KEY = 'index';
    m3 (2026-09-03): Hidden Manna left the index (owner policy — Matthew study
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
-   installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm3';
+   installed client forever; the bump is what discards them.
+   m4 (2026-09-04): non-NKJV verse text now resolves overlay -> registry base
+   -> NKJV, the same chain the reader uses (search-3). Every index cached
+   before this under a non-NKJV signature was built when SearchScreen never
+   loaded the alt-translation script at all, so it is NKJV text wearing a
+   kjv/web/etc. signature — and a sparse Restored-Name overlay's base hop
+   (rkjv -> kjv) didn't exist yet either way; both must be discarded. */
+export const MS_INDEX_VERSION = 'm4';
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */

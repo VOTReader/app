@@ -24,6 +24,37 @@
 
 import { searchData } from './search-data.js';
 
+/**
+ * The registry `base` translation code for a sparse overlay (rkjv -> kjv), or
+ * null. Mirrors data/translations.js's private `_baseOf` — duplicated rather
+ * than imported because that module ships in bundle-d and this one in
+ * bundle-e (separate esbuild IIFEs; no shared module graph), and the two only
+ * need to agree on the read-only TRANSLATION_OPTIONS registry shape, which
+ * data/translations.test.js already pins.
+ * @param {string} code
+ * @returns {string|null}
+ */
+function baseTranslationOf(code) {
+  if (typeof TRANSLATION_OPTIONS === 'undefined') return null;
+  const opt = TRANSLATION_OPTIONS.find((o) => o.id === code);
+  return (opt && opt.base) || null;
+}
+
+/**
+ * {verseNum -> text} lookup for one chapter of an alt-translation global
+ * (`window.BIBLE_<CODE>`), built once per chapter instead of once per verse.
+ * @param {Object|null} altBook
+ * @param {number} chNum
+ * @returns {Map<number,string>|null}
+ */
+function verseTextIndex(altBook, chNum) {
+  const arr = altBook && altBook[chNum];
+  if (!Array.isArray(arr)) return null;
+  const idx = new Map();
+  for (let i = 0; i < arr.length; i++) if (arr[i]) idx.set(arr[i].n, arr[i].text);
+  return idx;
+}
+
 /** @param {string} bookId */
 function bookTestament(bookId) {
   const D = searchData();
@@ -208,30 +239,32 @@ export function buildDocs(options) {
 
   // ─── 66 Bible books — SCRIPTURES (incl. matthew-plain registered in BOOKS) ───
   if (typeof BOOKS !== 'undefined') {
+    // Resolve alt-translation text with the same overlay -> registry base ->
+    // NKJV chain the reader uses (data/translations.js:translateVerse). A
+    // sparse Restored-Name overlay (rkjv) carries only its changed verses, so
+    // a verse it doesn't touch must fall through to the BASE translation
+    // (kjv) — never straight to the corpus's raw NKJV v.text (search-3).
+    const baseCode = (translation !== 'nkjv') ? baseTranslationOf(translation) : null;
     const altData = (translation !== 'nkjv') ? window['BIBLE_' + translation.toUpperCase()] : null;
+    const baseData = baseCode ? window['BIBLE_' + baseCode.toUpperCase()] : null;
     const bookIds = Object.keys(BOOKS);
     for (let bi = 0; bi < bookIds.length; bi++) {
       const book = BOOKS[bookIds[bi]];
       if (!book || !Array.isArray(book.chapters)) continue;
       const altBook = altData ? altData[book.id] : null;
+      const baseBook = baseData ? baseData[book.id] : null;
       for (let ch = 0; ch < book.chapters.length; ch++) {
         const chapter = book.chapters[ch];
         if (!chapter) continue;
+        const altIdx = verseTextIndex(altBook, chapter.num);
+        const baseIdx = verseTextIndex(baseBook, chapter.num);
         const sections = chapter.sections || [];
         for (let sj = 0; sj < sections.length; sj++) {
           const section = sections[sj];
           const verses = section.verses || [];
           for (let vj = 0; vj < verses.length; vj++) {
             const v = verses[vj];
-            let text = v.text;
-            if (altBook) {
-              const altCh = altBook[chapter.num];
-              if (Array.isArray(altCh)) {
-                for (let avi = 0; avi < altCh.length; avi++) {
-                  if (altCh[avi] && altCh[avi].n === v.n) { text = altCh[avi].text; break; }
-                }
-              }
-            }
+            const text = (altIdx && altIdx.get(v.n)) || (baseIdx && baseIdx.get(v.n)) || v.text;
             pushVerse('scriptures', book.id, book.title, chapter.num, v.n, text, section.heading || '');
           }
         }

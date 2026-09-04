@@ -36,7 +36,19 @@ export function parseTextQuery(q) {
   const parts = q.match(/"[^"]+"|\S+/g) || [];
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
-    if (p.charAt(0) === '"' && p.charAt(p.length - 1) === '"') { phrase = p.slice(1, -1); continue; }
+    if (p.charAt(0) === '"' && p.charAt(p.length - 1) === '"') {
+      const quoted = p.slice(1, -1);
+      // F28: `phrase` is one slot. A second quoted phrase used to overwrite the
+      // first, so the reader's first phrase vanished with no signal. Keep the
+      // first as the phrase (it is the one the engine can enforce as adjacent —
+      // engine.js:285 indexOf's it whole) and push every later phrase's words
+      // onto `must`, which engine.js already concatenates onto the term list
+      // (:165) and requires against the combined text (:288). Every phrase then
+      // constrains the result set; only the first keeps its adjacency.
+      if (phrase === null) phrase = quoted;
+      else for (const w of quoted.split(/\s+/)) { if (w) must.push(w.toLowerCase()); }
+      continue;
+    }
     if (p.charAt(0) === '-' && p.length > 1) { mustNot.push(p.slice(1).toLowerCase()); continue; }
     if (p.charAt(0) === '+' && p.length > 1) { must.push(p.slice(1).toLowerCase()); continue; }
     const up = p.toUpperCase();
