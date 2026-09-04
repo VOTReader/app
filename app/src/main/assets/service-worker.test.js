@@ -78,10 +78,12 @@ function realBytes(url) {
   try { return new Uint8Array(readFileSync(fp)); } catch { return null; }
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1 } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
+  const warnLog = [];      // every console.warn call, as its argument list
+  const postedMessages = [];   // every message posted to an open client
   const installFetch = async (req) => {
     const url = typeof req === 'string' ? req : req.url;
     if (req && req.cache) cacheModes.push(req.cache);
@@ -104,19 +106,24 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null } = 
   const fetchFn = fetchImpl || installFetch;
   const caches = new FakeCaches(installFetch);
   const claimed = { count: 0 };
+  // service-worker-4: fake connected clients, so install's PRECACHE_INCOMPLETE
+  // broadcast (self.clients.matchAll) has somewhere to land.
+  const fakeClients = Array.from({ length: clientCount }, () => ({
+    postMessage: (msg) => postedMessages.push(msg),
+  }));
   const self = {
     addEventListener: (t, fn) => { handlers[t] = fn; },
     location: { origin: 'https://app.test' },
     skipWaiting: () => {},
-    clients: { claim: async () => { claimed.count += 1; } },
+    clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
   };
   // `crypto` is passed EXPLICITLY rather than left to resolve off globalThis:
   // the SW's integrity check needs crypto.subtle.digest, and under jsdom the
   // global `crypto` does not reliably carry .subtle. Node's webcrypto always does.
   // eslint-disable-next-line no-new-func
   const run = new Function('self', 'caches', 'fetch', 'console', 'Request', 'crypto', SW_SRC);
-  run(self, caches, fetchFn, { log() {}, warn() {}, error() {} }, FakeRequest, webcrypto);
-  return { handlers, caches, claimed, cacheModes, attempts };
+  run(self, caches, fetchFn, { log() {}, warn: (...args) => warnLog.push(args), error() {} }, FakeRequest, webcrypto);
+  return { handlers, caches, claimed, cacheModes, attempts, warnLog, postedMessages };
 }
 
 // Drive the fetch handler: returns the promise passed to respondWith, or
@@ -270,6 +277,51 @@ describe('service-worker install (P1pwa / P2pwa)', () => {
     expect(typeof sw.handlers.activate).toBe('function');
     expect(typeof sw.handlers.message).toBe('function');
     expect(typeof sw.handlers.fetch).toBe('function');
+  });
+});
+
+/* service-worker-4 (2026-09-04): the corpus precache loop (CORPUS_PRECACHE +
+   READING_FONT_PRECACHE) is best-effort by design — a miss must not fail
+   install — but it used to swallow every failure with NO counter, NO
+   console.warn, NO client message. Install still resolved and Settings
+   reported the new CACHE_VERSION as if everything were healthy, while the
+   reader was silently not offline-capable: corpusFirst's miss branch would
+   only 503 much later, offline, with nothing pointing back at install time.
+   Mirrors the CORE best-effort path's warn (lines above) and additionally
+   posts PRECACHE_INCOMPLETE to every open client. */
+describe('service-worker install — corpus precache failures (service-worker-4)', () => {
+  it('does not warn or message clients when every corpus asset precaches cleanly', async () => {
+    const sw = bootSW();
+    await install(sw);
+    expect(sw.warnLog.filter((args) => String(args[0]).includes('corpus asset'))).toEqual([]);
+    expect(sw.postedMessages).toEqual([]);
+  });
+
+  it('warns with the count and list, and still resolves install, on a corpus miss', async () => {
+    const sw = bootSW({ fail: ['./dist/bundle-a-bible.js'] });
+    await expect(install(sw)).resolves.toBeUndefined();
+    const warned = sw.warnLog.find((args) => String(args[0]).includes('corpus asset(s) not precached'));
+    expect(warned, 'expected a corpus-precache warning; got: ' + JSON.stringify(sw.warnLog)).toBeTruthy();
+    expect(warned[0]).toContain('1 corpus asset(s) not precached');
+    expect(warned[1]).toEqual(['./dist/bundle-a-bible.js']);
+  });
+
+  it('posts PRECACHE_INCOMPLETE to every open client on a corpus miss', async () => {
+    const sw = bootSW({ fail: ['./dist/bundle-a-bible.js'], clientCount: 2 });
+    await install(sw);
+    expect(sw.postedMessages.length).toBe(2);   // one per open client
+    for (const msg of sw.postedMessages) {
+      expect(msg).toEqual({ type: 'PRECACHE_INCOMPLETE', count: 1, urls: ['./dist/bundle-a-bible.js'] });
+    }
+  });
+
+  it('lists every failed URL when more than one corpus asset misses', async () => {
+    const failing = ['./dist/bundle-a-bible.js', './src/data/bible-studies.js'];
+    const sw = bootSW({ fail: failing });
+    await install(sw);
+    const [msg] = sw.postedMessages;
+    expect(msg.count).toBe(2);
+    expect(msg.urls.sort()).toEqual([...failing].sort());
   });
 });
 

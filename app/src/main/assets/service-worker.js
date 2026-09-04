@@ -401,14 +401,34 @@ self.addEventListener('install', (event) => {
     // fetches for first paint. 4 stays under the browser's per-host limit.
     const precacheQueue = CORPUS_PRECACHE.concat(READING_FONT_PRECACHE);
     let precacheIdx = 0;
+    // service-worker-4 (2026-09-04): this loop used to swallow every failure
+    // with no counter, no console.warn, no client message — install still
+    // resolved, the worker activated, and Settings reported the new
+    // CACHE_VERSION as if everything were healthy while the reader was
+    // silently NOT offline-capable (corpusFirst's miss branch 503s later, on
+    // a plane, with no earlier signal at all). Mirror the CORE best-effort
+    // path above: collect what failed, warn with the count and list, and
+    // additionally tell every open client — corpus misses have no other
+    // surface (unlike CORE, corpusFirst never revalidates a hit, so a miss
+    // here can stay invisible for the CORPUS_VERSION's entire lifetime).
+    const corpusFailed = [];
     await Promise.allSettled(Array.from({ length: 4 }, async () => {
       while (precacheIdx < precacheQueue.length) {
         const url = precacheQueue[precacheIdx++];
         try {
           if (!(await corpus.match(url))) await corpus.add(freshReq(url));
-        } catch (_e) { /* best-effort — corpusFirst still caches on first use */ }
+        } catch (_e) {
+          corpusFailed.push(url); // best-effort — corpusFirst still caches on first use
+        }
       }
     }));
+    if (corpusFailed.length) {
+      console.warn('[sw] install: ' + corpusFailed.length + ' corpus asset(s) not precached:', corpusFailed);
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
+      for (const client of clientsList) {
+        client.postMessage({ type: 'PRECACHE_INCOMPLETE', count: corpusFailed.length, urls: corpusFailed });
+      }
+    }
   })());
 });
 
