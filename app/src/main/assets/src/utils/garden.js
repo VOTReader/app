@@ -81,12 +81,24 @@ function _gardenEvict(key) {
   delete gardenImageCache[key];
 }
 
-/** Mark `key` most-recently-used; evict the oldest beyond the key's per-tier cap (PERF-2). */
+/** Mark `key` most-recently-used; evict the oldest beyond the key's per-tier cap (PERF-2).
+ *  gap-garden-viewer-and-image-cache-3: _gardenLru is ONE global list that can hold a MIX
+ *  of tiers right after the owner switches Garden quality in Settings (old tier's bitmaps
+ *  haven't aged out yet). Each tier's cap assumes every resident bitmap is sized for THAT
+ *  tier, so a foreign-tier leftover riding along under the new tier's cap blows the memory
+ *  budget the cap exists to enforce (e.g. 4 Ultra @ ~112 MB stacked under Mobile's cap of
+ *  12). Evict every foreign-tier key UNCONDITIONALLY on each touch, before applying the
+ *  current tier's cap to what's left. */
 function _gardenTouch(key) {
   const i = _gardenLru.indexOf(key);
   if (i >= 0) _gardenLru.splice(i, 1);
   _gardenLru.push(key);
-  const cap = gardenTierLimits(String(key).split(':')[0]).cap;
+  const tier = String(key).split(':')[0];
+  for (let j = _gardenLru.length - 2; j >= 0; j--) {
+    const k = _gardenLru[j];
+    if (String(k).split(':')[0] !== tier) { _gardenLru.splice(j, 1); _gardenEvict(k); }
+  }
+  const cap = gardenTierLimits(tier).cap;
   while (_gardenLru.length > cap) {
     const oldest = _gardenLru.shift();
     if (oldest !== undefined && oldest !== key) _gardenEvict(oldest);
