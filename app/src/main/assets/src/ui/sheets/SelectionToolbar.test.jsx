@@ -197,6 +197,45 @@ describe('SelectionToolbar — zero-width annotation guard (annotation-selection
     act(() => { fire(yellowBtn, 'click'); });
     expect(/** @type {any} */ (globalThis).AnnotationStore.add).not.toHaveBeenCalled();
   });
+
+  /* The bail must ALSO release suppressRef, and nothing else in the file
+     noticed: the Verifier deleted the `setTimeout(() => { suppressRef.current
+     = false; }, 300)` line, left the guard, and got 45/45 green. The line is
+     load-bearing — applyHighlight sets suppressRef true at :629 (handleNote,
+     whose guard this one is modelled on, never does), and with it stuck true
+     the guards at :393, :461 and :467 all return early, so the toolbar never
+     appears again. No other reset rescues it: :708 needs a successful
+     highlight, :750 is removeHighlight, and :1034 is a pointer-up on a toolbar
+     that is not visible. One punctuation-only selection would wedge the
+     selection toolbar for the rest of the session. */
+  it('releases the suppress flag after the bail, so the next selection still raises the toolbar', async () => {
+    const c = readingContainer('bible:test:1:1', 'He said — and the crowd, "Amen," — went away.');
+    /** @type {any} */ (globalThis).snapSelectionRange = realSnapSelectionRange;
+    mount();
+
+    // 1. The punctuation-only selection that bails.
+    stubSelection(rangeOver(c, 7, 10)); // " — " -> snaps to {10,10}
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    const yellowBtn = document.querySelector('.sel-color-btn[data-color="yellow"]');
+    act(() => { fire(yellowBtn, 'click'); });
+    expect(/** @type {any} */ (globalThis).AnnotationStore.add).not.toHaveBeenCalled();
+
+    // 2. Past the 300 ms reset the bail schedules.
+    await act(async () => { await new Promise((r) => setTimeout(r, 350)); });
+
+    // 3. A normal word selection must still be able to raise the toolbar.
+    stubSelection(rangeOver(c, 11, 14)); // "and"
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    expect(document.querySelector('.sel-color-btn[data-color="yellow"]')).not.toBeNull();
+  });
 });
 
 describe('SelectionToolbar — footnote markers excluded from stored text (annotation-selection-6)', () => {
