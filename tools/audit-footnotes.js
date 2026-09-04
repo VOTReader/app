@@ -15,6 +15,12 @@
      whiteBadKey   — ref key has an apparent range but parseRefRange can't read it (label-suffixed key) → all WHITE ❌
      whiteFallback — multi-verse range but split collapsed to one block → all WHITE ❌
 
+   COVERAGE (corrected 2026-09-04, data-corpus-7): the FILES table below — the
+   seven volumes, lords-rebuke, letters-timothy, letters-flock, hidden-manna and
+   holy-days — plus the flat dicts in DICT_SOURCES. holy-days.js was in NEITHER
+   list, so its 21 values (18 of them in the two Passover entries) went
+   unchecked; it is mixed-format, so the walk reads `nkjv` or `scriptures`.
+
    Usage: node tools/audit-footnotes.js
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -45,6 +51,11 @@ const FILES = [
   { file: 'letters-timothy.js', arrayVar: 'LETTERS_TIMOTHY', prefaceVar: 'LETTERS_TIMOTHY_PREFACE' },
   { file: 'letters-flock.js',   arrayVar: 'LETTERS_FLOCK',   prefaceVar: 'LETTERS_FLOCK_PREFACE' },
   { file: 'hidden-manna.js',    arrayVar: 'HIDDEN_MANNA',    prefaceVar: null },
+  // Holy Days is a MIXED-format collection — each entry inherits Format A or
+  // Format B from its `type`, so an entry carries `nkjv` or `scriptures` and
+  // the walk below reads either. Its 21 values were unchecked until 2026-09-04
+  // (data-corpus-7); the two Passover entries alone hold 18 of them.
+  { file: 'holy-days.js',       arrayVar: 'HOLY_DAYS',       prefaceVar: null },
 ];
 
 function loadVar(file, varName) {
@@ -94,11 +105,15 @@ for (const f of FILES) {
   const all = Array.isArray(letters) ? letters.slice() : [];
   if (preface && typeof preface === 'object') all.push(preface);
   for (const letter of all) {
-    const nkjv = letter && letter.nkjv;
-    if (!nkjv || typeof nkjv !== 'object') continue;
-    for (const ref of Object.keys(nkjv)) {
-      total++;
-      cats[categorize(ref, nkjv[ref])].push({ file: f.file, ref, sample: String(nkjv[ref]).replace(/\s+/g, ' ') });
+    // `nkjv` (Format A) and `scriptures` (Format B) are the same ref -> text
+    // dict down the same VerseWithNumbers render path. Read both, so a
+    // mixed-format collection cannot hide half its values from this gate.
+    for (const bag of [letter && letter.nkjv, letter && letter.scriptures]) {
+      if (!bag || typeof bag !== 'object') continue;
+      for (const ref of Object.keys(bag)) {
+        total++;
+        cats[categorize(ref, bag[ref])].push({ file: f.file, ref, sample: String(bag[ref]).replace(/\s+/g, ' ') });
+      }
     }
   }
 }
@@ -109,6 +124,15 @@ const DICT_SOURCES = [
   { file: 'the-blessed.js',     varName: 'THE_BLESSED_SCRIPTURES', label: 'Blessed' },
   { file: 'matthew-nkjv.js',    varName: 'MATTHEW_NKJV', label: 'Matthew' },
 ];
+
+// NOT audited here, deliberately (checked 2026-09-04, data-corpus-7): the
+// Matthew Study Bible's per-chapter `scriptures` look like a fourth dict but
+// are an ARRAY of { ref, cite } — a verse anchor plus either a KEY INTO
+// MATTHEW_NKJV (already audited above) or plain commentary. There is no verse
+// text in them to render a gold number from, so running them through
+// categorize() would only manufacture 193 meaningless "single" rows. Their
+// shape is gated by validate-schemas.js (validateStudyBible ->
+// validateAnnotationArray) and their refs by its Bible-ref resolution pass.
 const dictCats = {};
 for (const src of DICT_SOURCES) {
   const c = { single: 0, compound: 0, goldMarkers: 0, goldHeuristic: 0, dup: 0, whiteBadKey: 0, whiteFallback: 0 };
@@ -124,7 +148,6 @@ for (const src of DICT_SOURCES) {
   }
   dictCats[src.label] = c;
 }
-
 const problems = cats.dup.length + cats.whiteBadKey.length + cats.whiteFallback.length;
 const fixable = cats.goldHeuristic.length;
 let dictHard = 0;
