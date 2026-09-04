@@ -402,6 +402,14 @@ class AudioKeepAliveService : Service() {
          * and clearing there would wipe the new start's flag. It does not widen
          * the resurrection hole `running` guards — after a stop both flags are
          * false, so a trailing update is still dropped.
+         *
+         * The one window this leaves open is not reachable, and is written down
+         * here so the next reader does not have to re-derive it: a start that is
+         * enqueued but whose [onCreate] never runs would strand the flag true.
+         * Every way that happens closes it anyway — a throw from
+         * `startForegroundService` leaves it false (it is set only after the
+         * call returns), an explicit stop clears it, and process death resets
+         * the companion along with everything else.
          */
         @Volatile
         private var startPending = false
