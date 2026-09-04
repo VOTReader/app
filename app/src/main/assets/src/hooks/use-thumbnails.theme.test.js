@@ -270,3 +270,29 @@ describe('useThumbnails — dual-theme variants', () => {
     expect(document.body.classList.contains('capturing-thumb')).toBe(false);
   });
 });
+
+/* boot-performance-5 — the mount-time IDB load had no tabsEnabled gate and
+   no restriction to live keys: idbReadAll() cursored the ENTIRE vot-thumbs
+   store into React state on every boot, tabs on or off. */
+describe('useThumbnails — mount-read is gated + scoped (boot-performance-5)', () => {
+  it('a tabs-off session reads nothing from IDB on mount', async () => {
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps({ tabsEnabled: false }) });
+    await flush();
+    expect(g.idbReadAll).not.toHaveBeenCalled();
+  });
+
+  it('the mount read is scoped to the live tabs, not the whole store', async () => {
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps() }); // tabs: [{id:'a'}] → key-a
+    await flush();
+    expect(g.idbReadAll).toHaveBeenCalledWith(['key-a']);
+  });
+
+  it('flipping tabsEnabled true later runs the read it skipped at mount', async () => {
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ tabsEnabled: false }) });
+    await flush();
+    expect(g.idbReadAll).not.toHaveBeenCalled();
+    rerender(hookProps({ tabsEnabled: true }));
+    await flush();
+    expect(g.idbReadAll).toHaveBeenCalledWith(['key-a']);
+  });
+});
