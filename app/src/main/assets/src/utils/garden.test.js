@@ -10,6 +10,7 @@ import {
   gardenCrawled,
   GARDEN_CACHE_MAX,
   gardenTierLimits,
+  gardenClearCache,
 } from './garden.js';
 
 describe('getGardenTier', () => {
@@ -115,5 +116,26 @@ describe('gardenPreload — cross-tier eviction on a tier switch (gap-garden-vie
     const residentUltra = Object.keys(gardenImageCache).filter((k) => k.startsWith('ultra:'));
     expect(residentUltra).toEqual([]);
     expect(Object.keys(gardenImageCache).length).toBeLessThanOrEqual(mobileCap);
+  });
+});
+
+describe('gardenClearCache — memory-trim purge (gap-garden-viewer-and-image-cache-4)', () => {
+  it('drops every decoded bitmap but leaves the crawled done-markers alone', () => {
+    for (let p = 1; p <= 3; p++) gardenPreload(p, 'native');
+    expect(Object.keys(gardenImageCache).filter((k) => k.startsWith('native:')).length).toBe(3);
+
+    gardenClearCache();
+
+    expect(Object.keys(gardenImageCache).filter((k) => k.startsWith('native:'))).toEqual([]);
+    // The done-marker survives the purge — a re-open serves from the HTTP/
+    // native disk cache instead of re-crawling from page 1.
+    for (let p = 1; p <= 3; p++) expect(gardenCrawled.has(gardenCacheKey(p, 'native'))).toBe(true);
+  });
+
+  it('a page preloaded again after the purge is fetched fresh (not treated as still resident)', () => {
+    gardenPreload(9, 'native');
+    gardenClearCache();
+    gardenPreload(9, 'native');
+    expect(gardenImageCache[gardenCacheKey(9, 'native')]).toBeTruthy();
   });
 });

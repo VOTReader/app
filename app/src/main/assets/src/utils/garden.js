@@ -106,6 +106,19 @@ function _gardenTouch(key) {
 }
 
 /**
+ * gap-garden-viewer-and-image-cache-4 — drop every decoded bitmap and empty
+ * the LRU. Called by the Android memory-trim signal (window.__onTrimMemory
+ * in stores/_entry-b.js) to release the app's single largest heap consumer
+ * (an Ultra-tier page is ~112 MB) under memory pressure. Deliberately leaves
+ * gardenCrawled alone — the crawl's done-marker survives so a re-fetch is
+ * served from the HTTP/native disk cache instead of re-crawling from page 1.
+ * @returns {void}
+ */
+export function gardenClearCache() {
+  while (_gardenLru.length) _gardenEvict(/** @type {string} */ (_gardenLru.shift()));
+}
+
+/**
  * Resolve a tier id to its full record, falling back to the default tier
  * if the id is unknown (never returns undefined).
  *
