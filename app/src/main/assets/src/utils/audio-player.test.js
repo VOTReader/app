@@ -405,6 +405,41 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(AudioPlayer.getState().time).toBe(12.5);
   });
 
+  /* read-along's tap-to-seek is armed on the boot-restored bar (rows/tap are
+     gated on `loaded`, not `active`, precisely so a paused reader can tap to
+     reposition) — but _el is null until the first toggle() rebuild, and
+     seek() used to be a flat no-op with no element. A tap on a just-launched
+     app silently did nothing. */
+  it('seek on a boot-restored bar (no element yet) moves the pending-restore position instead of no-op', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+      track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+    }));
+    await load();
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    expect(el()).toBe(null);                    // the no-op trap: nothing built yet
+
+    AudioPlayer.seek(340);                      // a tap on a timed clause well past the saved 90s
+    expect(AudioPlayer.getState().time).toBe(340);      // the wash moves immediately
+    expect(el()).toBe(null);                    // still no element — a seek must not itself rebuild
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(340);   // survives closing right after
+
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();                     // the first real tap rebuilds
+      await new Promise((r) => setTimeout(r, 0));
+      el().duration = 600;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(340);       // starts where the tap landed, not the saved 90
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
   it('toggle pauses a playing track and resumes a paused one; no-ops when idle', () => {
     AudioPlayer.toggle(); // idle — must not throw or build an element
     expect(el()).toBe(null);

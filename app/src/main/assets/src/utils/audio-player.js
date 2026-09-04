@@ -1992,11 +1992,32 @@ function prev() {
 /**
  * Seek within the current track. Clamped to [0, duration].
  *
+ * A boot-restored bar has no element yet (toggle() rebuilds it lazily on the
+ * first tap), but read-along's tap-to-seek is deliberately armed on it too —
+ * rows are gated on `loaded`, not `active`, so a paused reader can reposition
+ * before ever pressing play. With no element there is nothing to assign
+ * currentTime on, so that case writes the target into the pending-restore
+ * descriptor instead: the displayed clock moves right away, the snapshot is
+ * re-persisted so closing the app immediately after still remembers it, and
+ * the eventual rebuild's own _seekOnMetadata starts there.
+ *
  * @param {number} seconds
  * @returns {void}
  */
 function seek(seconds) {
-  if (!_el) return;
+  if (!_el) {
+    if (!_pendingRestore) return;
+    // The real duration isn't known yet (no element, no metadata) — only the
+    // lower bound is enforced; the eventual rebuild clamps against the real
+    // element itself.
+    const t = Math.max(0, Number(seconds) || 0);
+    _pendingRestore.time = t;
+    _state.time = t;
+    _lastTick = Math.floor(t);
+    _notify();
+    _persist();
+    return;
+  }
   const max = _state.duration || _el.duration || 0;
   const t = Math.max(0, Math.min(seconds || 0, max || 0));
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }
