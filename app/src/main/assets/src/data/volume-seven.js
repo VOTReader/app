@@ -10920,7 +10920,7 @@ var LETTERS_V7 = [
       }
     },
     "nkjv": {
-      "Jeremiah 20:11 (KJV)": "But the LORD\nis with me as a mighty terrible one: therefore my persecutors shall stumble, and they shall not prevail: they shall be greatly ashamed; for they shall not prosper:\ntheir everlasting confusion shall never be forgotten."
+      "Jeremiah 20:11 (KJV)": "But the LORD is with me as a mighty terrible one: therefore my persecutors shall stumble, and they shall not prevail: they shall be greatly ashamed; for they shall not prosper: their everlasting confusion shall never be forgotten."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/the-holy-one-of-israel-is-coming-down",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=A7DPLvy4H8Q&list=PLE8FlkxQPQkP4Ljrix_obl1uYSx1VNyqE&index=46",
@@ -11490,7 +11490,7 @@ var LETTERS_V7 = [
       }
     },
     "nkjv": {
-      "Matthew 13:15 (KJV)": "For this people’s heart is waxed gross, and\ntheir ears are dull of hearing, and their eyes they have closed; lest at any time they should see with\ntheir eyes, and hear with\ntheir ears, and should understand with\ntheir\n heart, and should be converted, and I should heal them."
+      "Matthew 13:15 (KJV)": "For this people’s heart is waxed gross, and their ears are dull of hearing, and their eyes they have closed; lest at any time they should see with their eyes, and hear with their ears, and should understand with their heart, and should be converted, and I should heal them."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/i-shall-remove-my-hand-and-my-spirit-shall-be-withdrawn-and-that-purposed-from-the-beginning-shall-be-done-it-shall-be-accomplished-swiftly",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=PUowi1iW1iA&list=PLE8FlkxQPQkP4Ljrix_obl1uYSx1VNyqE&index=49",

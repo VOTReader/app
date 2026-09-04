@@ -1,6 +1,6 @@
 """validate-bible-sync — the Bible read-along data file, checked the way a gate would.
 
-  py -3.13 tools/validate-bible-sync.py [--edition brm-kjv] [--data <path>]
+  py -3.13 tools/validate-bible-sync.py [--edition brm-kjv] [--data <path>] [--structural]
 
 Read-only. For every chapter in src/data/bible-sync-<edition>.js:
   - the array has exactly one slot per verse of the CURRENT reference corpus
@@ -13,8 +13,15 @@ Read-only. For every chapter in src/data/bible-sync-<edition>.js:
 and every belt that clears the gate has a chapter in the file (nothing silently
 dropped). Exit 1 on any problem; the summary names each one.
 
+--structural (CI, any clone without the belts or the audio): only the checks that
+need nothing but the repo -- one slot per verse of the current corpus, integer
+non-negative slots, onsets never stepping backwards. The belt / audio / rebuild
+checks are the pre-commit hook's job on the machine that aligned. The summary
+line says which mode ran so a log can never be mistaken for the full gate.
+
 This is the gate the pipeline lacked when c40 shipped: check-audio-sync covers
-the letters, validate-schemas never looks at this file.
+the letters, validate-schemas never looks at this file. Wired into pre-commit
+(full) and CI (structural) in c43.
 """
 import argparse
 import importlib.util
@@ -49,7 +56,32 @@ def ffprobe_dur(path):
         return None
 
 
-def fresh_verses(bab, ed, book, ch, tmp):
+def flat_translation_map(translation):
+    """The whole bible-<code>.js map in one read (the flat-map translations only).
+    Byte-for-byte the same verses the per-chapter extractor returns for these files
+    (it reads the same global and only String()s the text), so hashing them here is
+    hashing what the belts were stamped with -- but 1,189 node spawns become one
+    json.loads. NKJV (books.js, Format C with sections) still goes through the
+    extractor: that shape and the matthew-plain alias live there."""
+    if translation == "nkjv":
+        return None
+    path = os.path.join(DATA, f"bible-{translation}.js")
+    prefix = "var BIBLE_" + translation.upper() + " = "
+    src = open(path, encoding="utf-8").read()
+    if not src.startswith(prefix):
+        return None
+    body = src[len(prefix):].rstrip()
+    if not body.endswith(";"):
+        return None
+    return json.loads(body[:-1])
+
+
+def fresh_verses(bab, ed, book, ch, tmp, flat=None):
+    if flat is not None:
+        rows = flat.get("matthew-plain" if book == "matthew" else book, {}).get(str(ch))
+        if rows is None:
+            return None
+        return sorted(({"n": r["n"], "text": str(r["text"])} for r in rows), key=lambda r: r["n"])
     path = os.path.join(tmp, f"{book}_{ch:03d}.json")
     r = subprocess.run(["node", os.path.join(BASE, "extract-bible-verses.mjs"), book, str(ch), path,
                         "--translation", bab.EDITIONS[ed]["translation"]],
@@ -80,12 +112,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--edition", default="brm-kjv")
     ap.add_argument("--data", help="data file to check (default src/data/bible-sync-<edition>.js)")
+    ap.add_argument("--structural", action="store_true",
+                    help="corpus-shape checks only: no belts, no local audio, no ffprobe (CI)")
     a = ap.parse_args()
     ed = a.edition
     bab = load(os.path.join(BASE, "batch-align-bible.py"), "batch_align_bible")
     want = al.settings_hash(al.settings_for(bab.EDITIONS[ed]["family"]))
-    idx = bab.audio_index(ed)
+    structural = a.structural
+    idx = {} if structural else bab.audio_index(ed)
     belts_dir = os.path.join(BASE, "_align-work", "bible", ed)
+    flat = flat_translation_map(bab.EDITIONS[ed]["translation"])
     data_path = a.data or os.path.join(DATA, f"bible-sync-{ed}.js")
     src = open(data_path, encoding="utf-8").read()
     var = "BIBLE_SYNC_" + ed.upper().replace("-", "_")
@@ -104,7 +140,7 @@ def main():
             tag = f"{book}_{ch:03d}"
             chapters += 1
             shipped.add((book, ch))
-            verses = fresh_verses(bab, ed, book, ch, tmp)
+            verses = fresh_verses(bab, ed, book, ch, tmp, flat)
             if verses is None:
                 problems.append((tag, "reference verses could not be extracted"))
                 continue
@@ -120,6 +156,8 @@ def main():
                     problems.append((tag, f"onset steps backwards at verse {i + 1}"))
                 if v:
                     last = v
+            if structural:
+                continue
             entry = idx.get((book, ch))
             if not entry:
                 problems.append((tag, "no local audio for this chapter"))
@@ -146,7 +184,7 @@ def main():
                 problems.append((tag, "shipped array != rebuilt from belt"))
     # every gate-clearing current belt must be in the file
     missing = []
-    for name in os.listdir(belts_dir):
+    for name in ([] if structural else os.listdir(belts_dir)):
         if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name or name.startswith(("CAMPAIGN", "progress", "audio-index")):
             continue
         d = json.load(open(os.path.join(belts_dir, name), encoding="utf-8"))
@@ -160,13 +198,17 @@ def main():
     for tag in sorted(missing):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
 
+    mode = "STRUCTURAL (corpus shape only; belts + audio not checked)" if structural else "FULL"
     print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, {zeros} zero  "
-          f"(settings {want}, audio index {len(idx)} chapters)")
+          f"(settings {want}, audio index {len(idx)} chapters, mode {mode})")
     if problems:
         print(f"FAIL: {len(problems)} problem(s)")
         for tag, why in problems[:200]:
             print(f"  {tag:22s} {why}")
         return 1
+    if structural:
+        print("OK (structural): every chapter has one integer slot per corpus verse and onsets never step back")
+        return 0
     print("OK: every chapter matches its corpus, its audio and its belt; every current belt is shipped")
     return 0
 

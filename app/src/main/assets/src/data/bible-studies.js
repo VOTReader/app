@@ -58185,7 +58185,7 @@ var BIBLE_STUDIES = [
           "Isaiah 33:14": "The sinners in Zion are afraid; Fearfulness has seized the hypocrites: “Who among us shall dwell with the devouring fire? Who among us shall dwell with everlasting burnings?”",
           "Revelation 19:3": "Again they said, “Alleluia! Her smoke rises up forever and ever!”",
           "Revelation 22:5": "There shall be no night there: They need no lamp nor light of the sun, for the Lord God gives them light. And they shall reign forever and ever.",
-          "Revelation 20:10 (KJV)": "And the devil that deceived them was cast into the lake of fire and brimstone, where the beast and the false prophet\nare, and shall be tormented day and night for ever and ever.",
+          "Revelation 20:10 (KJV)": "And the devil that deceived them was cast into the lake of fire and brimstone, where the beast and the false prophet are, and shall be tormented day and night for ever and ever.",
           "Hebrews 1:2": "has in these last days spoken to us by His Son, whom He has appointed heir of all things, through whom also He made the worlds;",
           "Revelation 20:10": "The devil, who deceived them, was cast into the lake of fire and brimstone where the beast and the false prophet are. And they will be tormented day and night forever and ever.",
           "Jude 1:6": "And the angels who did not keep their proper domain, but left their own abode, He has reserved in everlasting chains under darkness for the judgment of the great day;",

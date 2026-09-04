@@ -1972,7 +1972,7 @@ var LETTERS_V3 = [
       }
     },
     "nkjv": {
-      "Zechariah 14:12 (HNV)": "This will be the plague with which Yahweh will strike all the peoples who have fought against Jerusalem: their flesh will consume away while they stand on their feet, and their eyes will consume away in their sockets, and their tongue will consume away in their mouth."
+      "Zechariah 14:12 (HNV)": "This will be the plague with which the LORD will strike all the peoples who have fought against Jerusalem: their flesh will consume away while they stand on their feet, and their eyes will consume away in their sockets, and their tongue will consume away in their mouth."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/culmination",
     "soundcloudUrl": "https://soundcloud.com/the-volumes-of-truth/culmination?in=the-volumes-of-truth/sets/volume-three",
@@ -5155,7 +5155,7 @@ var LETTERS_V3 = [
       "Matthew 18:21-22": "21. Then Peter came to Him and said, “Lord, how often shall my brother sin against me, and I forgive him? Up to seven times?” 22. Jesus said to him, “I do not say to you, up to seven times, but up to seventy times seven.",
       "Matthew 10:37-39": "37. He who loves father or mother more than Me is not worthy of Me. And he who loves son or daughter more than Me is not worthy of Me. 38. And he who does not take his cross and follow after Me is not worthy of Me. 39. He who finds his life will lose it, and he who loses his life for My sake will find it.",
       "Mark 12:30-31": "30. And you shall love the LORD your God with all your heart, with all your soul, with all your mind, and with all your strength.’ This is the first commandment. 31. And the second, like it, is this: ‘You shall love your neighbor as yourself.’ There is no other commandment greater than these.”",
-      "2 Timothy 2:5 (KJV)": "And if a man also strive for masteries,\nyet is he not crowned, except he strive lawfully.",
+      "2 Timothy 2:5 (KJV)": "And if a man also strive for masteries, yet is he not crowned, except he strive lawfully.",
       "1 John 3:24 (NKJV)": "Now he who keeps His commandments abides in Him, and He in him. And by this we know that He abides in us, by the Spirit whom He has given us.",
       "Matthew 16:25": "For whoever desires to save his life will lose it, but whoever loses his life for My sake will find it.",
       "2 Corinthians 6:17": "Therefore “Come out from among them And be separate, says the Lord. Do not touch what is unclean, And I will receive you.”"

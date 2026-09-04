@@ -17,8 +17,8 @@
  * The bundle->sources lists mirror A_BIBLE / A_MATTHEW / A_VOT in tools/build.py.
  * Keep them in sync: CI rebuilds + `git diff --exit-code` catch a stale bundle,
  * and a file missing here is a coverage gap (never a false pass). The pure-data
- * bundle-a members (books-restored/matthew-plain/matthew-nkjv, PF2) are not
- * covered here — they ship inside bundle-a alongside the UMD vendors (which read
+ * bundle-a member (bible-audio-manifest, PF2) is not covered here — it ships
+ * inside bundle-a alongside the UMD vendors (which read
  * top-level `this` and can't load in a bare vm); their staleness is caught by
  * the CI rebuild + diff, their minify by this same esbuild path.
  */
@@ -35,7 +35,7 @@ const DIST = resolve(HERE, '..', '..', 'dist'); // .../assets/dist
 // Mirror of tools/build.py A_BIBLE / A_MATTHEW / A_VOT.
 const BUNDLES = [
   { dist: 'bundle-a-bible.js', sources: ['books.js', 'books-restored.js', 'matthew-plain.js'] },
-  { dist: 'bundle-a-matthew.js', sources: ['matthew.js'] },
+  { dist: 'bundle-a-matthew.js', sources: ['matthew.js', 'matthew-nkjv.js'] },  // matthew-nkjv.js joined a-matthew in c43
   {
     dist: 'bundle-a-vot.js',
     sources: [

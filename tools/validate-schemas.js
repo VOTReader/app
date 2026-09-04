@@ -1002,8 +1002,12 @@ const VALID_STUDY_BLOCK_TYPES = new Set(['heading', 'para', 'poetry']);
  * @param {boolean} [sparse] - sparse overlay (bible-rnkjv/rkjv): verse gaps
  *   are the DESIGN (only changed verses are present), so the gap warning is
  *   suppressed; ascending order stays an error.
+ * @param {boolean} [quietGaps] - the caller runs validateTranslationVerseSet
+ *   against the KJV reference, which sees every missing verse (both chapter
+ *   edges included) and errors unless allowlisted — so the adjacent-pair
+ *   warning here would only repeat the 36 allowlisted Textus Receptus gaps.
  */
-function validateVerseArray(verses, prefix, errors, warnings, sparse) {
+function validateVerseArray(verses, prefix, errors, warnings, sparse, quietGaps) {
   let lastN = null;
   for (let vi = 0; vi < verses.length; vi++) {
     const v = verses[vi];
@@ -1022,7 +1026,7 @@ function validateVerseArray(verses, prefix, errors, warnings, sparse) {
     if (lastN !== null) {
       if (v.n <= lastN) {
         errors.push(`${prefix}: verse numbering not ascending — n=${v.n} follows n=${lastN}`);
-      } else if (v.n > lastN + 1 && !sparse) {
+      } else if (v.n > lastN + 1 && !sparse && !quietGaps) {
         warnings.push(`${prefix}: verse gap — n jumps from ${lastN} to ${v.n}`);
       }
     }
@@ -1035,7 +1039,8 @@ function validateVerseArray(verses, prefix, errors, warnings, sparse) {
  * the sparse Restored-Name overlays bible-rnkjv/rkjv).
  * Shape: { bookId: { "<chapNum>": [ { n: number, text: string } ] } }
  * @param {object} map
- * @param {{ strict?: boolean, fileName?: string, sparse?: boolean }} [opts]
+ * @param {{ strict?: boolean, fileName?: string, sparse?: boolean, quietGaps?: boolean }} [opts]
+ *   quietGaps: the caller also runs validateTranslationVerseSet (see validateVerseArray)
  * @returns {{ errors: string[], warnings: string[] }}
  */
 export function validateTranslationMap(map, opts = {}) {
@@ -1066,7 +1071,7 @@ export function validateTranslationMap(map, opts = {}) {
         errors.push(`${cp}: chapter value is not an array of verses`);
         continue;
       }
-      validateVerseArray(verses, cp, errors, warnings, opts.sparse);
+      validateVerseArray(verses, cp, errors, warnings, opts.sparse, opts.quietGaps);
     }
   }
 
@@ -1657,6 +1662,289 @@ export function validateTranslationCompleteness(map, reference, opts = {}) {
   return { errors, warnings };
 }
 
+// ── c43 corpus gates (2026-09-03) ────────────────────────────────────────
+// Three holes the 2026-09-01 review found in the translation data and its
+// footnote quotations, closed here as pure functions the CLI runner wires in:
+//   validateKjvInvariants      — the KJV reference keeps its canon AND its
+//                                small-caps divine name (LORD / GOD / JEHOVAH)
+//   validateTranslationVerseSet — every translation carries the reference's
+//                                verse set, at BOTH chapter edges, allowlisted
+//                                only with a named versification reason
+//   validateTaggedDictValues   — a footnote value tagged with a bundled
+//                                translation is that translation's text
+
+/** The KJV as shipped: 66 books, 1,189 chapters, 31,102 verses. */
+export const KJV_CANON = Object.freeze({ books: 66, chapters: 1189, verses: 31102 });
+
+/**
+ * Floors on the KJV's small-caps divine name. The 1769 text prints LORD for
+ * the Tetragrammaton ~6,600 times, GOD in "Lord GOD" ~300 times and JEHOVAH
+ * four times; the 2026-05-28 regeneration from getbible v2 (case-flattened)
+ * collapsed them to 6 / 2 / 1 and no gate noticed for three months. Measured
+ * after the c43 restore: LORD 6,574, GOD 310, JEHOVAH 5. The floors sit a
+ * little under that so a future regeneration from a faithful source (which may
+ * differ by a handful of gloss / superscription cases) still passes — a source
+ * that flattens case fails by thousands. Never lower these to make a regen pass.
+ */
+export const KJV_DIVINE_NAME_FLOORS = Object.freeze({ LORD: 6500, GOD: 300, JEHOVAH: 4 });
+
+/**
+ * The KJV reference's own invariants: canonical totals + the divine-name floors.
+ * @param {any} map  BIBLE_KJV
+ * @param {{ fileName?: string, canon?: {books:number,chapters:number,verses:number}|null,
+ *           floors?: Record<string, number> }} [opts]  canon:null skips the totals (fixtures)
+ * @returns {{ errors: string[], warnings: string[], counts: Record<string, number> }}
+ */
+export function validateKjvInvariants(map, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || 'bible-kjv.js';
+  const canon = 'canon' in opts ? opts.canon : KJV_CANON;
+  const floors = opts.floors || KJV_DIVINE_NAME_FLOORS;
+  /** @type {Record<string, number>} */
+  const counts = { books: 0, chapters: 0, verses: 0 };
+  if (!map || typeof map !== 'object' || Array.isArray(map)) {
+    errors.push(`${fileName}: expected a translation map object`);
+    return { errors, warnings, counts };
+  }
+  const res = {};
+  for (const w of Object.keys(floors)) { counts[w] = 0; res[w] = new RegExp('\\b' + w + '\\b', 'g'); }
+  for (const book of Object.values(map)) {
+    if (!book || typeof book !== 'object' || Array.isArray(book)) continue;
+    counts.books++;
+    for (const ch of Object.values(book)) {
+      if (!Array.isArray(ch)) continue;
+      counts.chapters++;
+      for (const v of ch) {
+        counts.verses++;
+        const t = v && typeof v.text === 'string' ? v.text : '';
+        for (const w of Object.keys(floors)) {
+          const m = t.match(res[w]);
+          if (m) counts[w] += m.length;
+        }
+      }
+    }
+  }
+  if (canon) {
+    for (const k of ['books', 'chapters', 'verses']) {
+      if (counts[k] !== canon[k]) errors.push(`${fileName}: ${counts[k]} ${k}, the KJV canon has ${canon[k]} — a regeneration dropped or added ${k}`);
+    }
+  }
+  for (const [w, floor] of Object.entries(floors)) {
+    if (counts[w] < floor) {
+      errors.push(`${fileName}: "${w}" appears ${counts[w]} times, below the floor of ${floor}. The KJV prints the divine name in small caps (LORD for YHWH, GOD in "Lord GOD", JEHOVAH); a case-flattened source collapsed it on 2026-05-28. Restore the casing (see c43: the pre-regen blob, token-aligned) — do not lower the floor.`);
+    }
+  }
+  return { errors, warnings, counts };
+}
+
+/**
+ * The sixteen verses the Textus Receptus carries and the critical-text
+ * translations (ASV, BSB, and four of them the WEB / HNV) omit or leave empty.
+ * Keyed `bookId chapter:verse` in the Format E ids (Matthew is matthew-plain).
+ * Any translation may lack these; nothing else is allowlisted for every file.
+ */
+export const TEXTUS_RECEPTUS_ONLY_VERSES = Object.freeze([
+  'matthew-plain 17:21', 'matthew-plain 18:11', 'matthew-plain 23:14',
+  'mark 7:16', 'mark 9:44', 'mark 9:46', 'mark 11:26', 'mark 15:28',
+  'luke 17:36', 'luke 23:17',
+  'john 5:4',
+  'acts 8:37', 'acts 15:34', 'acts 24:7', 'acts 28:29',
+  'romans 16:24',
+]);
+
+/**
+ * Real versification differences, ruled on by the owner (review finding
+ * data-corpus-4, decided 2026-09-04: route A). Recorded here so they stay
+ * VISIBLE on every run instead of silently absent: the WEB and HNV print the
+ * Romans doxology at 14:24-26, so their 16:25-27 have no text (the HNV ships
+ * 16:25 as an empty string). The reader does NOT lose the doxology —
+ * translations.js `_VERSIFICATION_ALIAS` renders those 14:24-26 rows under the
+ * 16:25-27 references — so the verse-set difference is permanent and expected,
+ * allowed for exactly these two files and nothing else. Add a row only for a
+ * genuine versification difference with a `why` that names the evidence; a
+ * translation that is simply MISSING a verse must error, not be listed here.
+ */
+export const VERSIFICATION_DIFFERENCES = Object.freeze([
+  { file: 'bible-web.js', missing: ['romans 16:25', 'romans 16:26', 'romans 16:27'], extra: ['romans 14:24', 'romans 14:25', 'romans 14:26'], why: 'WEB prints the doxology at 14:24-26; translations.js _VERSIFICATION_ALIAS renders those rows at 16:25-27 (data-corpus-4, decided)' },
+  { file: 'bible-hnv.js', missing: ['romans 16:25', 'romans 16:26', 'romans 16:27'], extra: ['romans 14:24', 'romans 14:25', 'romans 14:26'], why: 'HNV prints the doxology at 14:24-26 (16:25 ships empty); translations.js _VERSIFICATION_ALIAS renders those rows at 16:25-27 (data-corpus-4, decided)' },
+]);
+
+/**
+ * The verse-set allowlist for one translation file: the Textus Receptus verses
+ * (every file) plus that file's own versification differences.
+ * @param {string} fileName  e.g. 'bible-web.js'
+ * @returns {{ missing: Set<string>, extra: Set<string> }}
+ */
+export function verseSetAllowlist(fileName) {
+  const missing = new Set(TEXTUS_RECEPTUS_ONLY_VERSES);
+  const extra = new Set();
+  for (const p of VERSIFICATION_DIFFERENCES) {
+    if (p.file !== fileName) continue;
+    for (const k of p.missing || []) missing.add(k);
+    for (const k of p.extra || []) extra.add(k);
+  }
+  return { missing, extra };
+}
+
+/**
+ * A translation map must carry the reference's VERSE SET, chapter by chapter —
+ * not just its books and chapters (validateTranslationCompleteness) and not
+ * just "no gap between two verses it does have" (validateVerseArray). That gap
+ * check starts its comparison at the second verse and never looks past the
+ * last, so a chapter that begins at verse 2 or stops one verse short passed
+ * for months (ASV Song of Solomon 1:1, WEB/HNV Romans 16:25-27), and its 36
+ * standing warnings for the Textus Receptus verses buried anything new. Here:
+ * every reference verse must be present with non-empty text and every verse
+ * present must be in the reference; an exception is an ERROR unless the
+ * allowlist names it with a versification reason.
+ *
+ * @param {any} map        the translation under test
+ * @param {any} reference  BIBLE_KJV
+ * @param {{ fileName?: string, allow?: { missing: Set<string>, extra: Set<string> } }} [opts]
+ * @returns {{ errors: string[], warnings: string[], checked: number, allowed: number }}
+ */
+export function validateTranslationVerseSet(map, reference, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+  const allow = opts.allow || verseSetAllowlist(fileName);
+  let checked = 0;
+  let allowed = 0;
+  if (!map || typeof map !== 'object' || Array.isArray(map)) {
+    errors.push(`${fileName}: expected a translation map object`);
+    return { errors, warnings, checked, allowed };
+  }
+  if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+    warnings.push(`${fileName}: no KJV reference — verse-set check skipped`);
+    return { errors, warnings, checked, allowed };
+  }
+  for (const bookId of Object.keys(reference)) {
+    const refBook = reference[bookId];
+    const tBook = map[bookId];
+    if (!refBook || typeof refBook !== 'object' || !tBook || typeof tBook !== 'object') continue; // completeness owns missing books
+    for (const chNum of Object.keys(refBook)) {
+      const refCh = refBook[chNum];
+      const tCh = tBook[chNum];
+      if (!Array.isArray(refCh) || !Array.isArray(tCh)) continue; // completeness owns missing chapters
+      const have = new Map();
+      for (const v of tCh) if (v && typeof v.n === 'number') have.set(v.n, v);
+      const refNs = new Set();
+      for (const rv of refCh) {
+        if (!rv || typeof rv.n !== 'number') continue;
+        refNs.add(rv.n);
+        checked++;
+        const key = `${bookId} ${chNum}:${rv.n}`;
+        const tv = have.get(rv.n);
+        const empty = tv && (typeof tv.text !== 'string' || tv.text.trim() === '');
+        if (!tv || empty) {
+          if (allow.missing.has(key)) { allowed++; continue; }
+          errors.push(`${fileName}: ${key} is ${tv ? 'present but EMPTY' : 'missing'} (the KJV reference has it) — the reader would see NKJV text under this translation's header; allowlist it in tools/validate-schemas.js only with a versification reason`);
+        }
+      }
+      for (const n of have.keys()) {
+        if (refNs.has(n)) continue;
+        const key = `${bookId} ${chNum}:${n}`;
+        if (allow.extra.has(key)) { allowed++; continue; }
+        errors.push(`${fileName}: ${key} is an extra verse the KJV reference does not have — BibleChapterView walks the NKJV verse list, so it can never render`);
+      }
+    }
+  }
+  return { errors, warnings, checked, allowed };
+}
+
+/** Translation tags a footnote key may carry that name a BUNDLED bible-<code>.js. */
+export const BUNDLED_TRANSLATION_TAGS = Object.freeze(['ASV', 'BSB', 'HNV', 'KJV', 'LSV', 'WEB', 'YLT']);
+const _BUNDLED_TAG_RE = /\s*\((ASV|BSB|HNV|KJV|LSV|WEB|YLT)\)\s*$/i;
+/** Quote + whitespace normalization for comparing a quoted verse to its source. */
+function _normVerseText(s) {
+  return String(s).replace(/[‘’ʼ]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+}
+/** Join the bundled verse texts for one passage, or null when any verse is absent. */
+function _bundledPassage(map, bookId, chapter, verse, verseEnd) {
+  const ch = bookId && map && map[bookId] && map[bookId][String(chapter)];
+  if (!Array.isArray(ch)) return null;
+  const nums = verse == null ? ch.map((v) => v.n) : Array.from({ length: (verseEnd || verse) - verse + 1 }, (_, i) => verse + i);
+  const out = [];
+  for (const n of nums) {
+    const v = ch.find((x) => x && x.n === n);
+    if (!v || typeof v.text !== 'string') return null;
+    out.push(v.text);
+  }
+  return out.join(' ');
+}
+
+/**
+ * A footnote dict value whose KEY carries a bundled-translation tag
+ * ("1 Corinthians 3:11 (HNV)") must be that translation's own text for that
+ * passage — the sheet header names the translation, so the body must be it.
+ * Three HNV-tagged values shipped WEB/NKJV wording ("Jesus Christ" for
+ * "Yeshua the Messiah", "Hades" for "Sheol", "Yahweh" for "the LORD") and
+ * nothing noticed. Compared after collapsing whitespace, unifying curly quotes
+ * and dropping the "N. " verse markers a multi-verse value carries; a literal
+ * newline in the value is its own error. Compound keys ("Psalm 40:7-8, Hebrews
+ * 10:7 (KJV)") are split the way the renderer splits them; each " | " part may
+ * carry a "Label — " prefix whose OWN tag decides its translation, and a
+ * labelled part without a tag is the NKJV default (not checked here).
+ *
+ * @param {any[]} dicts  the owner's ref->text dicts (nkjv / scriptures)
+ * @param {{ where?: string, translation: (tag: string) => any,
+ *           bookIdFor?: (rawBook: string) => string|null }} opts
+ *   translation: returns the bundled map for a tag (or null → skipped with a warning)
+ *   bookIdFor:   raw book name → Format E book id (defaults to findBook)
+ * @returns {{ errors: string[], warnings: string[], checked: number, skipped: number }}
+ */
+export function validateTaggedDictValues(dicts, opts) {
+  const errors = [];
+  const warnings = [];
+  const where = (opts && opts.where) || '(unknown)';
+  const translation = opts && opts.translation;
+  const bookIdFor = (opts && opts.bookIdFor) || findBook;
+  let checked = 0;
+  let skipped = 0;
+  for (const dict of dicts || []) {
+    if (!dict || typeof dict !== 'object' || Array.isArray(dict)) continue;
+    for (const [key, value] of Object.entries(dict)) {
+      const km = String(key).match(_BUNDLED_TAG_RE);
+      if (!km || typeof value !== 'string') continue;
+      const keyTag = km[1].toUpperCase();
+      checked++;
+      if (/\n/.test(value)) errors.push(`[${where}] "${key}": the value carries a literal newline — footnote values are single-line strings`);
+      const parts = splitCompoundRef(key.replace(_BUNDLED_TAG_RE, ''));
+      if (parts.length === 0) { errors.push(`[${where}] "${key}": the reference does not parse`); continue; }
+      const valueParts = value.includes(' | ') ? value.split(' | ') : [value];
+      if (parts.length > 1 && valueParts.length !== parts.length) {
+        errors.push(`[${where}] "${key}": ${parts.length} passages in the key but ${valueParts.length} " | " parts in the value`);
+        continue;
+      }
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i].parsed;
+        let body = valueParts[i] == null ? '' : valueParts[i];
+        let tag = keyTag;
+        const lm = body.match(/^([^|]{1,80}?)\s—\s([\s\S]*)$/);
+        if (lm) {
+          body = lm[2];
+          const lt = lm[1].match(_BUNDLED_TAG_RE);
+          if (lt) tag = lt[1].toUpperCase();
+          else if (parts.length > 1) tag = null; // a labelled, untagged part reads NKJV
+        }
+        if (!tag) { skipped++; continue; }
+        const map = typeof translation === 'function' ? translation(tag) : null;
+        if (!map) { warnings.push(`[${where}] "${key}": bundled ${tag} unavailable — not compared`); continue; }
+        const bookId = bookIdFor(p.rawBook);
+        const expected = _bundledPassage(map, bookId, p.chapter, p.verse, p.verseEnd);
+        if (expected == null) { errors.push(`[${where}] "${key}": ${parts[i].ref} does not resolve in the bundled ${tag}`); continue; }
+        const got = _normVerseText(body.replace(/(?:^|(?<=\s))\d{1,3}\.\s+/g, ' '));
+        const want = _normVerseText(expected);
+        if (got !== want) {
+          errors.push(`[${where}] "${key}": the value is not the bundled ${tag} text for ${parts[i].ref}\n         dict: ${got.slice(0, 160)}\n         ${tag.padEnd(4)}: ${want.slice(0, 160)}`);
+        }
+      }
+    }
+  }
+  return { errors, warnings, checked, skipped };
+}
+
 // ── CLI runner ───────────────────────────────────────────────────
 
 /** @type {Array<{file: string, arrayVar: string, prefaceVar?: string}>} */
@@ -1953,15 +2241,32 @@ function runCli() {
     try { map = loadVar(resolve(dataDir, entry.file), entry.varName); }
     catch (e) { loadErr(label, e.message); continue; }
     if (!map || typeof map !== 'object' || Array.isArray(map)) { loadErr(label, `variable "${entry.varName}" is not an object`); continue; }
-    const result = validateTranslationMap(map, { strict, fileName: label, sparse: entry.sparse });
+    // c43: a full translation checked against the KJV reference gets the
+    // verse-set gate below, which owns every gap (both edges) with an
+    // allowlist — so the adjacent-pair warning is silenced for it.
+    const fullVsRef = !!xlatRef && entry.varName !== 'BIBLE_KJV' && !entry.sparse;
+    const result = validateTranslationMap(map, { strict, fileName: label, sparse: entry.sparse, quietGaps: fullVsRef });
+    let verseSetNote = '';
     // CORP2: also require every KJV book/chapter to be present (kjv-vs-kjv is
     // trivially complete, so skip it; sparse overlays are incomplete BY DESIGN
     // and get the inverse subset check instead). Merged into `result` so it
     // counts + prints on the same line.
-    if (xlatRef && entry.varName !== 'BIBLE_KJV' && !entry.sparse) {
+    if (fullVsRef) {
       const comp = validateTranslationCompleteness(map, xlatRef, { fileName: label });
       result.errors.push(...comp.errors);
       result.warnings.push(...comp.warnings);
+      // c43: the verse SET, both chapter edges, allowlisted only with a reason.
+      const vs = validateTranslationVerseSet(map, xlatRef, { fileName: label });
+      result.errors.push(...vs.errors);
+      result.warnings.push(...vs.warnings);
+      verseSetNote = `, verse set vs KJV: ${vs.checked} checked, ${vs.allowed} allowlisted`;
+    }
+    if (entry.varName === 'BIBLE_KJV') {
+      // c43: the reference itself — canon totals + the small-caps divine name.
+      const inv = validateKjvInvariants(map, { fileName: label });
+      result.errors.push(...inv.errors);
+      result.warnings.push(...inv.warnings);
+      verseSetNote = `, canon ${inv.counts.books}/${inv.counts.chapters}/${inv.counts.verses}, LORD ${inv.counts.LORD} GOD ${inv.counts.GOD} JEHOVAH ${inv.counts.JEHOVAH}`;
     }
     if (xlatRef && entry.sparse) {
       const sub = validateOverlaySubset(map, xlatRef, { fileName: label });
@@ -1970,7 +2275,7 @@ function runCli() {
     }
     const nBooks = Object.keys(map).length;
     add(result, nBooks);
-    emit(result, label, nBooks, 'books', '');
+    emit(result, label, nBooks, 'books', verseSetNote);
   }
   {
     const label = 'matthew.js';
@@ -2197,6 +2502,31 @@ function runCli() {
         }
       }
       totals.errors += refErrors;
+      // c43: a value tagged with a bundled translation must BE that translation.
+      {
+        const xlatCache = { KJV: xlatRef || null };
+        const translation = (tag) => {
+          if (!(tag in xlatCache)) {
+            try { xlatCache[tag] = loadVar(resolve(dataDir, `bible-${tag.toLowerCase()}.js`), `BIBLE_${tag}`) || null; }
+            catch (_e) { xlatCache[tag] = null; }
+          }
+          return xlatCache[tag];
+        };
+        let tagChecked = 0;
+        let tagSkipped = 0;
+        let tagErrors = 0;
+        for (const { where, dicts } of refOwners) {
+          const r = validateTaggedDictValues(dicts, { where, translation });
+          tagChecked += r.checked;
+          tagSkipped += r.skipped;
+          for (const e of r.errors) console.error(`  ERROR: ${e}`);
+          for (const w of r.warnings) console.warn(`  WARN:  ${w}`);
+          tagErrors += r.errors.length;
+          totals.warnings += r.warnings.length;
+        }
+        totals.errors += tagErrors;
+        console.log(`  ${tagChecked} translation-tagged footnote values compared with their bundled translation (${tagSkipped} labelled NKJV parts skipped) — ${tagErrors === 0 ? 'OK' : 'FAIL'} (${tagErrors} differ)`);
+      }
       totals.items += checked;
       console.log(`  ${checked} refs checked across ${refOwners.length} content owners — ${refErrors === 0 ? 'OK' : 'FAIL'} (${refErrors} unresolvable)`);
       delete globalThis.window.__ALL_BOOKS;
