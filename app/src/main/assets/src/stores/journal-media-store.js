@@ -498,6 +498,28 @@ export var JournalMediaStore = (function() {
      * we use it so the baked pixels are upright. Falls back to the
      * <img> path otherwise.
      *
+     * journal-5: createImageBitmap used to be called with NO size hint, so
+     * the decoder built the FULL-RESOLUTION bitmap before encodeFrom ever
+     * got a chance to downscale it — a 50 MP phone shot (8160x6120,
+     * ordinary for a current flagship) is 8160*6120*4 = ~191 MB of RGBA
+     * momentarily alive in the renderer heap, on top of whatever the
+     * journal editor + loaded corpora + object-URL cache already hold.
+     * `resizeWidth` (below) tells the decoder to build the SMALL bitmap
+     * directly — giving only ONE of resizeWidth/resizeHeight is what keeps
+     * this aspect-ratio-correct: per spec, the browser computes the other
+     * dimension from the SOURCE's own aspect ratio (which it already knows
+     * from the file header), not from anything this function guesses.
+     * Passing BOTH would stretch/distort every non-square photo instead.
+     * resizeWidth alone exactly hits the target for a landscape or square
+     * source (width is already the longer side); for a portrait source the
+     * decode comes out larger than the final target on its short axis, but
+     * still a large multiple smaller than the un-hinted full decode — the
+     * existing canvas draw below finishes the exact final crop either way.
+     * `maxDecodedPixels` is the backstop for the aspect ratios this hint
+     * doesn't fully tame (or hosts where it's silently ignored — the <img>
+     * fallback has no resize-hint mechanism at all): reject rather than
+     * hand the canvas a decode that's still unreasonably large.
+     *
      * @param {File | Blob} fileOrBlob
      * @param {{ maxDim?: number, quality?: number }} [opts]
      *   maxDim defaults to 1600; quality defaults to 0.8.
@@ -507,6 +529,11 @@ export var JournalMediaStore = (function() {
       opts = opts || {};
       var maxDim = opts.maxDim || 1600;
       var quality = opts.quality || 0.8;
+      // journal-5: 4x the area of a perfect maxDim-by-maxDim square covers
+      // every ordinary camera aspect ratio (up to ~2:1) with room to spare —
+      // at the default maxDim=1600 that's 10.24M px (~41 MB of RGBA), still
+      // far below the 191 MB un-hinted worst case.
+      var maxDecodedPixels = maxDim * maxDim * 4;
 
       /**
        * @param {CanvasImageSource & {width: number, height: number}} source
@@ -517,16 +544,34 @@ export var JournalMediaStore = (function() {
        */
       function encodeFrom(source, w, h, cleanup) {
         return new Promise(function(resolve, reject) {
-          if (!w || !h) { cleanup && cleanup(); reject(new Error('Image has zero dimensions')); return; }
+          // journal-5: every failure below is about the DECODED bitmap or the
+          // canvas/encode step, never about which createImageBitmap options
+          // were used — retrying the decode with different options cannot
+          // fix a zero-dimension bitmap, an oversized one, or a missing 2D
+          // context any more than the first attempt could. `terminal` tells
+          // the two .catch() handlers downstream (the imageOrientation retry
+          // and the <img>-fallback) to propagate these instead of treating
+          // them like a decode failure worth retrying — a genuinely oversized
+          // image must never fall through to imgPath()'s <img> decode, which
+          // has no resize-hint mechanism at all and would recreate the exact
+          // full-resolution decode this fix exists to prevent.
+          function fail(message) {
+            cleanup && cleanup();
+            var err = /** @type {any} */ (new Error(message));
+            err.terminal = true;
+            reject(err);
+          }
+          if (!w || !h) { fail('Image has zero dimensions'); return; }
+          if (w * h > maxDecodedPixels) { fail('Image is too large to process (' + w + 'x' + h + ')'); return; }
           var scale = Math.min(1, maxDim / Math.max(w, h));
           var nw = Math.max(1, Math.round(w * scale));
           var nh = Math.max(1, Math.round(h * scale));
           var canvas = document.createElement('canvas');
           canvas.width = nw; canvas.height = nh;
           var ctx = canvas.getContext('2d');
-          if (!ctx) { cleanup && cleanup(); reject(new Error('Canvas 2D unavailable')); return; }
+          if (!ctx) { fail('Canvas 2D unavailable'); return; }
           try { ctx.drawImage(source, 0, 0, nw, nh); }
-          catch (_e) { cleanup && cleanup(); reject(new Error('Image draw failed')); return; }
+          catch (_e) { fail('Image draw failed'); return; }
           if (!canvas.toBlob) {
             // Pre-toBlob WebView fallback: dataURL → Blob.
             cleanup && cleanup();
@@ -536,12 +581,12 @@ export var JournalMediaStore = (function() {
               var arr = new Uint8Array(bin.length);
               for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
               resolve({ blob: new Blob([arr], { type: 'image/jpeg' }), width: nw, height: nh });
-            } catch (_e2) { reject(new Error('Image encoding failed')); }
+            } catch (_e2) { fail('Image encoding failed'); }
             return;
           }
           canvas.toBlob(function(blob) {
             cleanup && cleanup();
-            if (!blob || !blob.size) { reject(new Error('Image encoding failed')); return; }
+            if (!blob || !blob.size) { var err = /** @type {any} */ (new Error('Image encoding failed')); err.terminal = true; reject(err); return; }
             resolve({ blob: blob, width: nw, height: nh });
           }, 'image/jpeg', quality);
         });
@@ -552,22 +597,33 @@ export var JournalMediaStore = (function() {
         return Promise.reject(new Error('Image file is empty'));
       }
 
+      // journal-5: resizeQuality 'high' is supported far below the chrome108
+      // floor (native since Chromium 51) — no compat concern raising it from
+      // the implicit default ('low').
       var canBitmap = (typeof createImageBitmap === 'function');
       if (canBitmap) {
-        return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image' })
+        return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image', resizeWidth: maxDim, resizeQuality: 'high' })
           .then(function(bmp) {
             return encodeFrom(bmp, bmp.width, bmp.height, function() {
               try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
             });
           })
-          .catch(function() {
+          .catch(function(err) {
+            if (err && err.terminal) throw err;   // journal-5: encodeFrom's own failure — not retryable
             // imageOrientation option unsupported or decode failed — retry
-            // without the option, then fall back to the <img> path.
-            return createImageBitmap(fileOrBlob).then(function(bmp) {
+            // without it, then fall back to the <img> path. The resize hint
+            // is kept here: it is what prevents the full-resolution decode,
+            // and losing correct EXIF orientation on this rare fallback is a
+            // far smaller cost than a 191 MB decode on the (likely still
+            // orientation-capable) host that only balked at one option.
+            return createImageBitmap(fileOrBlob, { resizeWidth: maxDim, resizeQuality: 'high' }).then(function(bmp) {
               return encodeFrom(bmp, bmp.width, bmp.height, function() {
                 try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
               });
-            }).catch(function() { return imgPath(); });
+            }).catch(function(err2) {
+              if (err2 && err2.terminal) throw err2;   // journal-5: same — never fall through to a full <img> decode
+              return imgPath();
+            });
           });
       }
       return imgPath();

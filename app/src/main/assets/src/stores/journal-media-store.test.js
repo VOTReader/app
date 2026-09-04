@@ -40,7 +40,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 /** @type {any} */ (globalThis).Blob = NodeBlob;
 
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
 import { JournalMediaStore } from './journal-media-store.js';
 
 beforeAll(async () => {
@@ -389,6 +389,96 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
       URL.createObjectURL = origCreate;
       URL.revokeObjectURL = origRevoke;
     }
+  });
+});
+
+describe('JournalMediaStore — compressImage() (journal-5: decode-time downscale + byte ceiling)', () => {
+  /** @type {any} */
+  let fakeCanvas;
+  /** @type {any} */
+  let createElementSpy;
+
+  /** Stub document.createElement('canvas') so encodeFrom's draw+encode step
+   *  is observable without a real 2D context (jsdom has none). */
+  function installFakeCanvas() {
+    fakeCanvas = {
+      width: 0, height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      toBlob: vi.fn((cb) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }))),
+    };
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'canvas') return fakeCanvas;
+      return realCreate(tag);
+    });
+  }
+
+  afterEach(() => {
+    if (createElementSpy) { createElementSpy.mockRestore(); createElementSpy = null; }
+    delete /** @type {any} */ (globalThis).createImageBitmap;
+  });
+
+  it('REPRO: passes resizeWidth + resizeQuality to createImageBitmap so the decoder never builds the full-resolution bitmap', async () => {
+    installFakeCanvas();
+    const bmp = { width: 1600, height: 1200, close: vi.fn() };
+    const cib = vi.fn().mockResolvedValue(bmp);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+
+    expect(cib).toHaveBeenCalledTimes(1);
+    const optsArg = cib.mock.calls[0][1];
+    expect(optsArg.resizeWidth).toBe(1600);
+    expect(optsArg.resizeQuality).toBe('high');
+    // Orientation correction is still requested on the primary attempt.
+    expect(optsArg.imageOrientation).toBe('from-image');
+  });
+
+  it('a decode that is STILL oversized (an aspect ratio the resize hint alone cannot tame) is rejected before the canvas ever sees it', async () => {
+    installFakeCanvas();
+    // The finding's own worst case: a 50 MP shot's raw dimensions, as if the
+    // resize hint had no effect (an old host silently ignoring it, or the
+    // portrait-orientation overshoot this hint's aspect-ratio math allows).
+    const bmp = { width: 8160, height: 6120, close: vi.fn() };
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bmp);
+
+    await expect(JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 }))
+      .rejects.toThrow(/too large to process/);
+
+    // The ceiling check runs BEFORE any canvas work — no 191 MB draw is attempted.
+    expect(fakeCanvas.getContext).not.toHaveBeenCalled();
+    // The oversized bitmap is still released, not leaked.
+    expect(bmp.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('a properly downscaled bitmap (within the ceiling) still succeeds end to end', async () => {
+    installFakeCanvas();
+    const bmp = { width: 1600, height: 1200, close: vi.fn() };
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bmp);
+
+    const out = await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+    expect(out.blob.type).toBe('image/jpeg');
+    expect(bmp.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('the imageOrientation retry (unsupported option) keeps the resize hint, only dropping orientation', async () => {
+    installFakeCanvas();
+    const bmp = { width: 1600, height: 1200, close: vi.fn() };
+    const cib = vi.fn()
+      .mockRejectedValueOnce(new Error('imageOrientation unsupported'))
+      .mockResolvedValueOnce(bmp);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+
+    expect(cib).toHaveBeenCalledTimes(2);
+    const retryOpts = cib.mock.calls[1][1];
+    expect(retryOpts.resizeWidth).toBe(1600);
+    expect(retryOpts.resizeQuality).toBe('high');
+    expect(retryOpts.imageOrientation).toBeUndefined();
   });
 });
 
