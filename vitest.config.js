@@ -336,6 +336,54 @@ export default defineConfig({
         'app/src/main/assets/src/search/ref-parser.js': {
           statements: 77, branches: 60, functions: 95, lines: 82,
         },
+
+        // tests-gates-1 (2026-09-04). The aggregate floors had 31.5% headroom and
+        // only 7 of 131 measured files carried a per-file floor, so the five
+        // heaviest modules could lose their ENTIRE suites and the gate stayed
+        // green: delete audio-player.test.js alone and the statement aggregate
+        // falls 87.65 -> 79.99, still 20 points clear of the 60 floor; delete the
+        // top five together and it lands at 68.01, still green. Those five are
+        // audio playback, the Android bridge, autoscroll, the annotation render
+        // engine and the CachedStore data plane — the parts whose silent
+        // regression costs the most. Nine files now carry floors, locked one
+        // point below their measured coverage (search/engine.js is the tenth and
+        // already had one). Same discipline as the rest: ratchet up, never down.
+        'app/src/main/assets/src/utils/audio-player.js': {
+          // measured 91.33 / 83.23 / 91.03 / 97.38
+          statements: 90, branches: 82, functions: 90, lines: 96,
+        },
+        'app/src/main/assets/src/utils/platform-bridge.js': {
+          // measured 91.50 / 73.18 / 90.57 / 94.15
+          statements: 90, branches: 72, functions: 89, lines: 93,
+        },
+        'app/src/main/assets/src/hooks/use-autoscroll.js': {
+          // measured 81.38 / 73.40 / 84.00 / 92.29
+          statements: 80, branches: 72, functions: 83, lines: 91,
+        },
+        'app/src/main/assets/src/renderer/annotation-engine.jsx': {
+          // measured 86.53 / 76.01 / 84.75 / 89.50
+          statements: 85, branches: 75, functions: 83, lines: 88,
+        },
+        'app/src/main/assets/src/stores/cached-store.js': {
+          // measured 86.26 / 80.33 / 93.44 / 91.86
+          statements: 85, branches: 79, functions: 92, lines: 90,
+        },
+        'app/src/main/assets/src/utils/backup.js': {
+          // measured 92.07 / 86.61 / 97.44 / 94.10
+          statements: 91, branches: 85, functions: 96, lines: 93,
+        },
+        'app/src/main/assets/src/utils/storage-health.js': {
+          // measured 93.40 / 90.04 / 96.97 / 96.57
+          statements: 92, branches: 89, functions: 95, lines: 95,
+        },
+        'app/src/main/assets/src/hooks/use-pager-gesture.js': {
+          // measured 90.46 / 80.99 / 93.48 / 96.50
+          statements: 89, branches: 79, functions: 92, lines: 95,
+        },
+        'app/src/main/assets/src/data/scripture-resolution.js': {
+          // measured 92.15 / 78.21 / 96.08 / 95.81
+          statements: 91, branches: 77, functions: 95, lines: 94,
+        },
       },
     },
   },
