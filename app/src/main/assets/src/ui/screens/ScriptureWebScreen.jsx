@@ -230,6 +230,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(true);
     return () => {
       if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(false);
+      // The mount effect above may have locked landscape (requestLandscape);
+      // leaving without unlocking strands every OTHER screen rotated (F27).
+      // No orientation API, and unlock() rejecting/throwing when nothing was
+      // locked, are both normal — swallow either.
+      try { screen.orientation.unlock(); } catch (_e) { /* nothing to unlock */ }
     };
   }, []);
 

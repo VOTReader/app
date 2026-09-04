@@ -142,3 +142,22 @@ describe('scripture-web-7 — a WebGL context loss with no restore falls back', 
     expect(screen.queryByText('The web can’t be drawn right now.')).toBeNull();
   });
 });
+
+describe('F27 — the immersive-mode unmount effect unlocks screen orientation', () => {
+  it('calls screen.orientation.unlock() on unmount', () => {
+    const unlock = vi.fn();
+    window.screen.orientation = { lock: () => Promise.resolve(), unlock };
+    const { unmount } = render(<ScriptureWebScreen {...baseProps()} />);
+    expect(unlock).not.toHaveBeenCalled();
+
+    unmount();
+    expect(unlock).toHaveBeenCalledTimes(1);
+  });
+
+  it('unmounts without throwing when there is no orientation API at all', () => {
+    // window.screen.orientation is absent by default (afterEach deletes it) —
+    // the try/catch is what keeps a device lacking the API from crashing here.
+    const { unmount } = render(<ScriptureWebScreen {...baseProps()} />);
+    expect(() => unmount()).not.toThrow();
+  });
+});
