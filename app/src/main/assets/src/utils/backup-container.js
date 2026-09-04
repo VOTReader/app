@@ -161,13 +161,27 @@ export async function writeContainer(manifest, mediaEntries, write) {
  * are slices of the source — NOT read into memory until the caller reads them,
  * so this stays bounded even for a GB archive.
  *
- * Throws on bad magic, a truncated frame, or a frame length that disagrees with
- * the manifest's declared `size` (corruption detection).
+ * Throws only when NOTHING is recoverable: bad magic, a truncated/oversized
+ * manifest, or unparseable manifest JSON. A media-frame problem (a short
+ * frame header, a frame that runs past EOF, or a manifest/frame `size`
+ * disagreement) does NOT throw (storage-backup-1): the manifest above is
+ * already fully read and parsed by that point, carrying every structured
+ * store (journal, notes, bookmarks, links, reading stats, settings) — losing
+ * it to a damaged TRAILING media blob would throw away a 99%-restorable
+ * backup. Enumeration just stops there and returns the manifest plus
+ * whatever media entries were read cleanly so far, tagged integrity
+ * 'truncated'. This mirrors the Android native import path, where applyV3's
+ * `for await` loop over the frame stream already catches exactly this class
+ * of mid-stream failure and salvages the frames staged before it
+ * (backup.js's media-apply loop) — readContainer was the one place that
+ * pre-validated eagerly and threw before its caller ever got that chance.
  *
  * @param {Blob} blob - the whole container file (a File from the picker)
  * @returns {Promise<{ manifest: any, entries: Array<{id: any, meta: any, blob: Blob}>, integrity: string }>}
  *   integrity: 'ok' (CRC verified) | 'mismatch' (corrupt) | 'absent' (older backup,
- *   no CRC) | 'trailing' (unexpected non-CRC trailing bytes). Never throws on these.
+ *   no CRC) | 'trailing' (unexpected non-CRC trailing bytes) | 'truncated' (the
+ *   media stream ended early — manifest + earlier good frames still returned).
+ *   Never throws on these.
  */
 export async function readContainer(blob) {
   if (blob.size < CONTAINER_MAGIC.length + 8) {
@@ -194,28 +208,40 @@ export async function readContainer(blob) {
 
   const media = manifest && Array.isArray(manifest.media) ? manifest.media : [];
   const entries = [];
+  // BAK-1 (storage-backup-1): a media-frame problem stops enumeration and
+  // salvages rather than throwing — see the function doc comment above.
+  // Sequential position tracking means a broken frame's byte range can't be
+  // trusted, so we cannot skip ahead to try the NEXT frame; every entry up
+  // to (not including) the broken one is still returned.
+  let truncReason = '';
   for (let i = 0; i < media.length; i++) {
-    if (off + 8 > blob.size) throw new Error('backup-container: truncated frame header at media[' + i + ']');
+    if (off + 8 > blob.size) { truncReason = 'truncated frame header at media[' + i + ']'; break; }
     const len = decodeUint64BE(await _sliceBytes(blob, off, off + 8));
-    off += 8;
-    const dataStart = off;
-    off += len;
-    if (off > blob.size) throw new Error('backup-container: truncated media frame for ' + (media[i] && media[i].id));
+    const dataStart = off + 8;
+    const frameEnd = dataStart + len;
+    if (frameEnd > blob.size) { truncReason = 'truncated media frame for ' + (media[i] && media[i].id); break; }
     // BAK-2: every v3 manifest media entry MUST declare a numeric size — it is the
-    // codec's primary corruption check (frame length vs declared size). A missing or
-    // non-numeric size is itself corruption (the v3 builder always emits blob.size),
-    // so fail loud instead of silently accepting whatever length the frame claims.
+    // codec's primary corruption check (frame length vs declared size). A missing,
+    // non-numeric, or disagreeing size is itself corruption (the v3 builder always
+    // emits blob.size and an agreeing length) — treated the same as a short frame:
+    // salvage everything before it rather than failing the whole read.
     if (!media[i] || typeof media[i].size !== 'number') {
-      throw new Error('backup-container: media[' + i + '] has no numeric size in the manifest (corrupt)');
+      truncReason = 'media[' + i + '] has no numeric size in the manifest (corrupt)'; break;
     }
     if (media[i].size !== len) {
-      throw new Error('backup-container: size mismatch for ' + media[i].id + ' (manifest ' + media[i].size + ', frame ' + len + ')');
+      truncReason = 'size mismatch for ' + media[i].id + ' (manifest ' + media[i].size + ', frame ' + len + ')'; break;
     }
+    off = frameEnd;
     entries.push({
       id: media[i].id,
       meta: media[i],
       blob: blob.slice(dataStart, dataStart + len),
     });
+  }
+  if (truncReason) {
+    console.warn('[backup-container] ' + truncReason + ' — salvaging the manifest + '
+      + entries.length + ' of ' + media.length + ' good media frame(s).');
+    return { manifest, entries, integrity: 'truncated' };
   }
   // BAK-INTEGRITY: the container MAY carry a trailing 4-byte CRC-32 of the manifest
   // bytes (new exports do; older ones end exactly at EOF). Verify it if present — a
