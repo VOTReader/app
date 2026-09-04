@@ -317,25 +317,52 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   return null;
 }
 
-export function JournalImageBlock({ mediaId, caption }) {
-  var useState = React.useState;
-  var useEffect = React.useEffect;
-  const [src, setSrc] = useState(null);
-  useEffect(function() {
+/**
+ * The three states a journal media block can be in — journal-3 clause (c).
+ *
+ * `JournalMediaStore.objectUrl` resolves null for BOTH "still looking" and
+ * "there is no such record", so a block that keys off the url alone has to
+ * pick one meaning and is wrong the other way round: treat null as missing
+ * and every entry accuses the store of losing data on its first frame; treat
+ * it as loading and a genuinely absent recording paints a full player that
+ * does nothing when tapped. That second one is what shipped, and it is the
+ * lie this hook exists to end. Both blocks share it so they cannot drift.
+ *
+ * No mediaId at all is MISSING: there are no bytes and no lookup coming.
+ * An absent JournalMediaStore stays LOADING — that is an environment we
+ * cannot see into, not evidence about the user's data, and accusing the
+ * store on the strength of it would be the same overreach in the other
+ * direction.
+ *
+ * @param {string | undefined} mediaId
+ * @returns {{ url: string | null, missing: boolean }}
+ */
+function useMediaUrl(mediaId) {
+  const [state, setState] = React.useState({ url: null, missing: false });
+  React.useEffect(function() {
     var cancelled = false;
-    if (mediaId && typeof JournalMediaStore !== 'undefined') {
-      JournalMediaStore.objectUrl(mediaId).then(function(url) {
-        if (!cancelled) setSrc(url || null);
-      });
-    }
+    if (!mediaId) { setState({ url: null, missing: true }); return undefined; }
+    if (typeof JournalMediaStore === 'undefined') { setState({ url: null, missing: false }); return undefined; }
+    setState({ url: null, missing: false });   // a new id is loading again, not missing
+    JournalMediaStore.objectUrl(mediaId).then(function(url) {
+      if (!cancelled) setState({ url: url || null, missing: !url });
+    });
     return function() { cancelled = true; };
   }, [mediaId]);
+  return state;
+}
 
+export function JournalImageBlock({ mediaId, caption }) {
+  var media = useMediaUrl(mediaId);
+
+  // The placeholder used to read "Image unavailable" for BOTH the in-flight
+  // lookup and a record that is gone. Only the second is a fact worth telling
+  // the user, and it has to reach the accessibility tree as text.
   return (
     <div className="jrn-embed-image">
-      {src
-        ? <img src={src} alt={caption || ''} />
-        : <div style={{ width: '100%', height: '180px', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dim)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>Image unavailable</div>}
+      {media.url
+        ? <img src={media.url} alt={caption || ''} />
+        : <div className={media.missing ? 'jrn-img-missing' : 'jrn-img-loading'} style={{ width: '100%', height: '180px', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dim)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>{media.missing ? 'Image missing' : ''}</div>}
       {caption && <div className="jrn-img-caption" style={{ padding: '8px 14px' }}>{caption}</div>}
     </div>
   );
@@ -352,21 +379,12 @@ export function JournalAudioBlock(props) {
   var editable = !!props.editable;
   var confirming = !!props.confirming;
 
-  const [src, setSrc] = useState(null);
+  var media = useMediaUrl(mediaId);
+  var src = media.url;
   var audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [curTime, setCurTime] = useState(0);
-
-  useEffect(function() {
-    var cancelled = false;
-    if (mediaId && typeof JournalMediaStore !== 'undefined') {
-      JournalMediaStore.objectUrl(mediaId).then(function(url) {
-        if (!cancelled) setSrc(url || null);
-      });
-    }
-    return function() { cancelled = true; };
-  }, [mediaId]);
 
   function toggle(e) {
     if (e) { e.stopPropagation(); }
@@ -454,6 +472,49 @@ export function JournalAudioBlock(props) {
   // duration prop must not advertise aria-valuemax=0 while valuenow grows.
   var dur = duration || (audioRef.current && audioRef.current.duration) || 0;
   var timeStr = JournalHelpers.formatDuration(curTime || 0) + ' / ' + JournalHelpers.formatDuration(dur);
+
+  // journal-3 clause (c) — the bytes are gone, so say so and offer nothing
+  // that would do nothing.
+  //
+  // What this deliberately does NOT render, and why: no play button (a control
+  // that does nothing is the defect); no duration, because `duration` is a
+  // claim about bytes that are gone; no waveform, and with it no role="slider"
+  // or tabIndex, because a slider over nothing is worse than no slider. The
+  // caption stays — the user's own words about the memo are still theirs — and
+  // "Recording missing" is TEXT, not a visual difference, so a screen-reader
+  // user is not told a memo exists with no way to learn it does not.
+  //
+  // No recovery or discard affordance here either. Recovery lives in the
+  // Journal Hub banner, which sees every unclaimed record at once; a second
+  // path at the block is how "missing" quietly becomes "deleted". `deleteUI`
+  // below is NOT that — it removes this block from the entry the user is
+  // editing, and dropping it would strand a dead block with no way to clear
+  // it. The visual treatment is Design & Performance's; this is the contract.
+  if (media.missing) {
+    return (
+      <div className={'jrn-embed-audio is-missing' + (editable ? ' is-editable' : '')}>
+        {editable && confirming ? (
+          <ConfirmStrip
+            className="jrn-aud-confirm"
+            question="Remove this voice memo?"
+            yesLabel="Yes, remove"
+            onCancel={props.onCancelDelete}
+            onConfirm={props.onConfirmDelete}
+          />
+        ) : (
+          <>
+            <div className="jrn-aud-body">
+              <div className="jrn-aud-meta">
+                <span>{caption || 'Voice memo'}</span>
+              </div>
+              <div className="jrn-aud-missing">Recording missing</div>
+            </div>
+            {deleteUI}
+          </>
+        )}
+      </div>
+    );
+  }
 
   // When the user has tapped delete, the whole audio block collapses to a
   // ConfirmStrip banner so the standardized Cancel / Yes, remove buttons
