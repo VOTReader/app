@@ -91,16 +91,24 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [loadError, setLoadError] = React.useState(null);
   const [noWebGL, setNoWebGL] = React.useState(false);
   const [glRetry, setGlRetry] = React.useState(0);
+  const [dataRetry, setDataRetry] = React.useState(0);
   // A canon needs its width. On a phone held upright the screen is CSS-rotated
   // into landscape — no Android orientation flip, the page just lays itself
   // out sideways (owner call). Pointer coords are mapped back through loc().
   const [rotated, setRotated] = React.useState(
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth &&
     window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  // Physical aspect ratio only — NOT gated on touch or on whether the CSS
+  // rotation applied. showPortraitFallback clears `rotated` in the same
+  // callback that raises the hint, so the hint's render gate must key off
+  // this instead or it can never show (scripture-web-6).
+  const [isPortrait, setIsPortrait] = React.useState(
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
   React.useEffect(() => {
     const onResize = () => {
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
       setRotated(window.innerHeight > window.innerWidth && coarse);
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -200,9 +208,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const theme = settings && settings.theme;
 
   // ── load the graph asset (lazy, injected script, precached by the SW) ──
+  // dataRetry is in the dep array so Try again's forced refetch happens
+  // INSIDE the effect that owns the subscription (mirrors glRetry below) —
+  // without it the button's ensureScriptureWebData(true) call is a promise
+  // nobody holds, and the screen hangs on "Weaving the web…" forever.
   React.useEffect(() => {
     let alive = true;
-    ensureScriptureWebData()
+    ensureScriptureWebData(dataRetry > 0)
       .then((data) => {
         if (!alive) return;
         const g = decodeGraph(data);
@@ -211,13 +223,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       })
       .catch((e) => { if (alive) setLoadError(e && e.message ? e.message : String(e)); });
     return () => { alive = false; };
-  }, []);
+  }, [dataRetry]);
 
   // Immersive while the web is open — it is a full-bleed instrument.
   React.useEffect(() => {
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(true);
     return () => {
       if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(false);
+      // The mount effect above may have locked landscape (requestLandscape);
+      // leaving without unlocking strands every OTHER screen rotated (F27).
+      // No orientation API, and unlock() rejecting/throwing when nothing was
+      // locked, are both normal — swallow either.
+      try { screen.orientation.unlock(); } catch (_e) { /* nothing to unlock */ }
     };
   }, []);
 
@@ -392,16 +409,31 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!glc || !uic) return;
     let renderer = null;
     let disposed = false;
+    let lossTimer = 0;
     const build = () => createRenderer(glc, graph, {
       // After a GPU reset every GL object is dead. Rebuild the whole
       // renderer on the same (restored) context and repaint — this is what
       // turns the on-device "wash-out until app restart" into a blink.
       onContextRestored: () => {
+        if (lossTimer) { window.clearTimeout(lossTimer); lossTimer = 0; }
         if (disposed) return;
         try { renderer && renderer.dispose(); } catch (_e) { /* already dead */ }
         renderer = build();
         rendererRef.current = renderer;
         schedule();
+      },
+      // A loss Chrome never restores (it gives up after repeated resets)
+      // otherwise leaves the instrument permanently dead with no report —
+      // draw() just returns silently forever. Give a restore ~3s, then
+      // fall back to the same noWebGL panel the "unavailable" path uses,
+      // whose Try again already rebuilds via glRetry.
+      onContextLost: () => {
+        if (disposed) return;
+        if (lossTimer) window.clearTimeout(lossTimer);
+        lossTimer = window.setTimeout(() => {
+          lossTimer = 0;
+          if (!disposed) setNoWebGL(true);
+        }, 3000);
       },
     });
     try {
@@ -441,6 +473,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
     return () => {
       disposed = true;
+      if (lossTimer) window.clearTimeout(lossTimer);
       if (ro) ro.disconnect(); else window.removeEventListener('resize', resize);
       glc.removeEventListener('webglcontextrestored', onRestored);
       renderer.dispose();
@@ -746,7 +779,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-fallback">
         <div className="sw-fallback-title">The Scripture Web couldn’t load.</div>
         <div className="sw-fallback-body">{loadError}</div>
-        <button type="button" className="sw-btn" onClick={() => { setLoadError(null); ensureScriptureWebData(true); }}>Try again</button>
+        <button type="button" className="sw-btn" onClick={() => { setLoadError(null); setDataRetry((n) => n + 1); }}>Try again</button>
       </div>
     );
   }
@@ -900,7 +933,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         Select a line to see its references; Nearby opens a keyboard-friendly list.
       </div>
     </div>
-    {orientationHint && rotated && (
+    {orientationHint && isPortrait && (
       <div className="sw-orientation-note" role="status">
         <strong>Best in landscape</strong>
         <span>Turn your device sideways to read the full canon clearly.</span>
