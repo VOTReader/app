@@ -170,9 +170,21 @@ function writeLock() {
 
 // ── Corpus bundles match the locked hash → in sync. ──
 if (lock && lock.hash === digest) {
-  if (lock.version !== corpusVersion && !checkOnly) {
+  if (lock.version !== corpusVersion) {
     // Version bumped without a corpus change (deliberate forced re-download).
-    // Keep the lock's version field consistent.
+    // The auto-update form keeps the lock's version field consistent; --check
+    // must REPORT the disagreement rather than shrug at it. Until 2026-09-04
+    // this comparison was guarded `&& !checkOnly`, so with the lock rolled back
+    // to c42 and everything else at c43 the gate printed "corpus unchanged
+    // (CORPUS_VERSION=c43) — OK" and exited 0. The digest still protects
+    // clients, but the lock's record could silently disagree with the source in
+    // CI, which matters most when corpus bumps stack.
+    if (checkOnly) {
+      fail(`tools/corpus-version.lock records version ${lock.version}, but service-worker.js says CORPUS_VERSION=${corpusVersion}.
+    The corpus bytes match the lock's hash, so nothing is stale — the lock's VERSION field is
+    simply out of date. Run \`node tools/check-corpus-version.js\` (no --check; it is the auto-update
+    form) and commit the regenerated tools/corpus-version.lock.`);
+    }
     writeLock();
     console.log(`[corpus-version] CORPUS_VERSION=${corpusVersion} (corpus unchanged) — lock version synced.`);
   } else {
