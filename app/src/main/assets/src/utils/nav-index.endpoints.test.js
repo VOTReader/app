@@ -220,6 +220,14 @@ describe('buildSourceEndpoint — where the link was made FROM', () => {
     expect(withSel).toMatchObject({ start: 10, end: 24, text: 'a quoted phrase' });
     const without = buildSourceEndpoint('letter:the-wide-path:0', null);
     expect('start' in without).toBe(false);
+
+    // Every branch spreads the excerpt the same way (annotation-selection-3):
+    // bible and study used to skip it, so Link on a Bible/Study-verse
+    // selection persisted a source endpoint with no start/end/text at all.
+    const bibleSel = buildSourceEndpoint('bible:john:3:16', 'John 3:16', 10, 24, 'a quoted phrase');
+    expect(bibleSel).toMatchObject({ start: 10, end: 24, text: 'a quoted phrase' });
+    const studySel = buildSourceEndpoint('study:matthew-5:3', 'Matthew 5:3', 10, 24, 'a quoted phrase');
+    expect(studySel).toMatchObject({ start: 10, end: 24, text: 'a quoted phrase' });
   });
 
   it('carries studyId + studyChapterId when the source turns out to be a study chapter', () => {
