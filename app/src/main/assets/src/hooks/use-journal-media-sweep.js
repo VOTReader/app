@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useJournalMediaSweep — one-time journal media orphan sweep (boot, +4 s)
+   useJournalMediaSweep — one-time journal media hygiene sweep (boot, +4 s)
    ═══════════════════════════════════════════════════════════════════════
    Extracted verbatim from App() 2026-08-02 (composition-root headroom —
    the one App() effect with ZERO closure dependencies).
@@ -12,14 +12,46 @@
    still references it; only truly unreferenced blobs are pruned. Deferred
    4 s so it never competes with the first paint.
 
+   storage-backup-5 (added 2026-09-04): the SAME deferred slot also sweeps
+   JournalMediaStore's import-staging store. A v3 restore killed mid-stream
+   (process kill, crash, power loss) durably stages blobs there and then
+   never runs commitImportReplace/commitImportMerge — the only things that
+   ever clear it — so the duplicate sits forever: invisible to Your Data (a
+   separate IDB object store from live media, not counted or listed
+   anywhere) and reclaimed only by chance, if the owner happens to import
+   again later. Safe to clear here because RESTORE_INFLIGHT_KEY is written
+   BEFORE the first staging write and removed only once a restore completes
+   or provably never started (SettingsScreen.jsx's _applyConfirmedImport;
+   see use-restore-guard.js) — its absence at boot means no import is live
+   in this tab OR a sibling tab (localStorage is shared same-origin), so
+   whatever is still in staging belongs to a session that's already gone.
+   abortImportReplace() is a plain clearStore() — a no-op when staging is
+   already empty, which is the common case on every ordinary boot.
+
    PARAMS: none. WINDOW: none. Reads the JournalStore / JournalMediaStore
    bare globals (bundle-b), both typeof-guarded.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Mount-only: schedule the orphan sweep once, 4 s after boot. */
+import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
+
+/** Mount-only: schedule the hygiene sweep once, 4 s after boot. */
 export function useJournalMediaSweep() {
   React.useEffect(() => {
     const t = setTimeout(() => {
+      // storage-backup-5: stale import-staging left by a restore that never
+      // reached its commit. Independent of the orphan sweep below (a
+      // different object store) — runs even if JournalStore isn't ready yet.
+      try {
+        if (typeof JournalMediaStore !== 'undefined') {
+          let inflight = null;
+          try { inflight = localStorage.getItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* privacy mode */ }
+          if (!inflight) {
+            JournalMediaStore.abortImportReplace()
+              .catch((e) => console.warn('Stale import-staging sweep failed', e));
+          }
+        }
+      } catch (e) { console.warn('Stale import-staging sweep threw', e); }
+
       try {
         if (typeof JournalStore === 'undefined' || typeof JournalMediaStore === 'undefined') return;
         // U1: only sweep when the journal store is fully hydrated. If it is
