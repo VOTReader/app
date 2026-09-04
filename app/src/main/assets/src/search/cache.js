@@ -82,7 +82,20 @@ export function dataSignature(translation) {
   ].join('|');
 }
 
-function openDb() {
+/**
+ * Open a fresh connection to the MiniSearch cache DB. Not cached at module
+ * scope — every caller below closes its connection as soon as its own
+ * transaction completes, unlike thumb-store.js/idb-adapter.js/journal-
+ * media-store.js, which hold one connection open for the page's life. That
+ * keeps the exposure window narrow, but not zero: a call still in flight
+ * when Settings -> Clear All My Data runs
+ * indexedDB.deleteDatabase('vot-minisearch-cache') would otherwise fire
+ * onblocked with no recovery until reload (storage-backup-4's exact defect,
+ * just on a shorter fuse). Exported so the contract is directly testable,
+ * same as thumb-store.js's openThumbDB.
+ * @returns {Promise<IDBDatabase>}
+ */
+export function openDb() {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') { reject(new Error('no-indexeddb')); return; }
     const req = indexedDB.open(DB_NAME, 1);
@@ -90,7 +103,11 @@ function openDb() {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => { try { db.close(); } catch (_e) { /* best-effort close */ } };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
 }

@@ -639,6 +639,43 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       localStorage.removeItem('vot-clear-probe');
     }
   });
+
+  it('storage-backup-4: a non-critical cache (vot-thumbs) failing to delete still completes the wipe, but is logged', async () => {
+    const toastSpy = vi.fn();
+    const diagWarnSpy = vi.fn();
+    const deleteSpy = vi.spyOn(indexedDB, 'deleteDatabase').mockImplementation((name) => {
+      const req = {};
+      queueMicrotask(() => {
+        // Only vot-thumbs fails (e.g. no onversionchange on an old cached
+        // connection) — every user-data database and the other two caches
+        // delete cleanly.
+        if (name === 'vot-thumbs') req.onblocked && req.onblocked();
+        else req.onsuccess && req.onsuccess();
+      });
+      return req;
+    });
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      showToast: toastSpy,
+      DiagnosticLog: { warn: diagWarnSpy, error: () => {}, all: () => [], clear: () => {} },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.click(screen.getByText('Delete Everything'));
+
+    // The wipe still succeeds — vot-thumbs is a regenerable cache, not user
+    // data, so Clear All must not fail loud over it.
+    await vi.waitFor(() => {
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'All personal data cleared. Reloading…' })
+      );
+    });
+    expect(deleteSpy).toHaveBeenCalledWith('vot-thumbs');
+    // But the silent survivor is no longer silent — it's visible in a
+    // diagnostic export.
+    expect(diagWarnSpy).toHaveBeenCalledWith('settings', expect.stringContaining('vot-thumbs'));
+  });
 });
 
 describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)', () => {

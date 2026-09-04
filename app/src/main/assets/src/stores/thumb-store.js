@@ -37,17 +37,32 @@ export let _thumbDbPromise = /** @type {Promise<IDBDatabase | null> | null} */ (
  */
 export function openThumbDB() {
   if (_thumbDbPromise) return _thumbDbPromise;
-  _thumbDbPromise = new Promise((resolve) => {
+  const p = new Promise((resolve) => {
     try {
       const req = indexedDB.open(THUMB_DB, 1);
       req.onupgradeneeded = (e) => {
         const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
         if (!db.objectStoreNames.contains(THUMB_STORE)) db.createObjectStore(THUMB_STORE);
       };
-      req.onsuccess = (e) => resolve(/** @type {IDBOpenDBRequest} */ (e.target).result);
+      req.onsuccess = (e) => {
+        const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
+        // storage-backup-4: without this, the connection stays open for the
+        // life of the page and indexedDB.deleteDatabase('vot-thumbs')
+        // (Settings → Clear All My Data) fires onblocked instead of
+        // onsuccess — the delete never runs and every tab thumbnail
+        // silently survives the wipe. Mirrors idb-adapter.js / journal-
+        // media-store.js: close on versionchange so the delete can proceed,
+        // and drop the cached promise so the next openThumbDB() reopens.
+        db.onversionchange = () => {
+          try { db.close(); } catch (_e) { /* best-effort close */ }
+          if (_thumbDbPromise === p) _thumbDbPromise = null;
+        };
+        resolve(db);
+      };
       req.onerror = () => resolve(null);
     } catch (_e) {resolve(null);}
   });
+  _thumbDbPromise = p;
   return _thumbDbPromise;
 }
 
