@@ -91,6 +91,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [loadError, setLoadError] = React.useState(null);
   const [noWebGL, setNoWebGL] = React.useState(false);
   const [glRetry, setGlRetry] = React.useState(0);
+  const [dataRetry, setDataRetry] = React.useState(0);
   // A canon needs its width. On a phone held upright the screen is CSS-rotated
   // into landscape — no Android orientation flip, the page just lays itself
   // out sideways (owner call). Pointer coords are mapped back through loc().
@@ -200,9 +201,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const theme = settings && settings.theme;
 
   // ── load the graph asset (lazy, injected script, precached by the SW) ──
+  // dataRetry is in the dep array so Try again's forced refetch happens
+  // INSIDE the effect that owns the subscription (mirrors glRetry below) —
+  // without it the button's ensureScriptureWebData(true) call is a promise
+  // nobody holds, and the screen hangs on "Weaving the web…" forever.
   React.useEffect(() => {
     let alive = true;
-    ensureScriptureWebData()
+    ensureScriptureWebData(dataRetry > 0)
       .then((data) => {
         if (!alive) return;
         const g = decodeGraph(data);
@@ -211,7 +216,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       })
       .catch((e) => { if (alive) setLoadError(e && e.message ? e.message : String(e)); });
     return () => { alive = false; };
-  }, []);
+  }, [dataRetry]);
 
   // Immersive while the web is open — it is a full-bleed instrument.
   React.useEffect(() => {
@@ -746,7 +751,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-fallback">
         <div className="sw-fallback-title">The Scripture Web couldn’t load.</div>
         <div className="sw-fallback-body">{loadError}</div>
-        <button type="button" className="sw-btn" onClick={() => { setLoadError(null); ensureScriptureWebData(true); }}>Try again</button>
+        <button type="button" className="sw-btn" onClick={() => { setLoadError(null); setDataRetry((n) => n + 1); }}>Try again</button>
       </div>
     );
   }
