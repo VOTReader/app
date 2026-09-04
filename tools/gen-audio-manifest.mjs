@@ -50,6 +50,13 @@ const COVERAGE = resolve(HERE, 'audio-manifest-coverage.json');
 // md5Checksum covers the ID3 tags this hash strips — so the map has to be produced
 // from D:\VOT-Archive. Absent, nothing is collapsed and the run is what it always was.
 const HASHES = resolve(HERE, '_audio-drive-hashes.json');
+// relpath<TAB>seconds<TAB>bytes for every letter-side mp3 in D:\VOT-Archive —
+// copy of _source-manifests/letter-durations.tsv. OPTIONAL, and a REPORT only:
+// it settles, in the run's own output, the question of whether a reader who has
+// both a whole-letter track and section tracks recorded the letter twice. They
+// did not; the sections are that same recording chunked, with a spoken
+// section-title intro on each. See renditions-census.md.
+const DURATIONS = resolve(HERE, '_letter-durations.tsv');
 
 // ── corpus load (same vm technique as validate-schemas.js) ──────────────
 const DATA_FILES = [
@@ -98,6 +105,14 @@ const normkey = (s) => String(s)
   .replace(/[^a-z0-9]+/g, '');
 const tokens = (s) => new Set(String(s).replace(/[‎‏‘’“”']/g, '').toLowerCase().match(/[a-z0-9]+/g) || []);
 const stripParens = (s) => String(s).replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+// "(Part 2)" is a different LETTER, not a parenthetical aside. Spelled either way.
+const PART_WORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+const partOf = (s) => {
+  const m = /\(\s*part\s+(\d+|one|two|three|four|five|six|seven)\s*[-)]/i.exec(String(s));
+  if (!m) return null;
+  const v = m[1].toLowerCase();
+  return /^\d+$/.test(v) ? +v : PART_WORD[v];
+};
 
 /**
  * Staged title comparison. File titles truncate with "…", drop
@@ -108,6 +123,14 @@ function titleMatches(fileTitle, letterTitle) {
   const a = normkey(fileTitle), b = normkey(letterTitle);
   if (!a || !b) return false;
   if (a === b) return true;
+  // A part marker names the letter; every stage below throws it away.
+  // stripParens deletes it outright, and the token subset never sees it, so
+  // "I Am Calling You Out! (Part 2)…" matched Part 1 just as well as Part 2 —
+  // ambiguous, dropped, and Timothy's ten section recordings of Part 2 were
+  // reported as unreachable. When both sides say which part they are and differ,
+  // they are different letters whatever the rest of the title does.
+  const pa = partOf(fileTitle), pb = partOf(letterTitle);
+  if (pa != null && pb != null && pa !== pb) return false;
   const n = Math.min(a.length, b.length);
   if (n >= 20 && (a.startsWith(b.slice(0, n)) || b.startsWith(a.slice(0, n)))) return true;
   const ap = normkey(stripParens(fileTitle)), bp = normkey(stripParens(letterTitle));
@@ -252,6 +275,15 @@ function resolveLetter(parsed) {
 const listing = JSON.parse(readFileSync(LISTING, 'utf8'));
 let AUDIO_HASHES = {};
 try { AUDIO_HASHES = JSON.parse(readFileSync(HASHES, 'utf8')); } catch { /* optional */ }
+/** relpath -> seconds, for the report line at the bottom. */
+const SECONDS = new Map();
+try {
+  for (const line of readFileSync(DURATIONS, 'utf8').split('\n').slice(1)) {
+    const [relpath, secs] = line.split('\t');
+    if (relpath && secs) SECONDS.set(relpath, +secs);
+  }
+} catch { /* optional */ }
+const secondsById = new Map();
 // Ids the manifest on disk already ships. Duplicate copies are byte-identical,
 // so re-picking between them changes nothing a listener hears and costs a fresh
 // mirror upload; the dedup keeps the incumbent when it can.
@@ -270,6 +302,7 @@ for (const f of listing) {
   if (SKIP_RE.test(path)) { skipped++; continue; }
   if (seenIds.has(f.id)) continue; // multi-parent dupe
   seenIds.add(f.id);
+  if (SECONDS.has(path)) secondsById.set(f.id, SECONDS.get(path));
   const name = path.split('/').pop();
   files.push({
     name, id: f.id,
@@ -313,13 +346,21 @@ let matched = 0;
 // number in the sidecar that does not come from the generator's own opinion —
 // it is what breaks the circularity a sidecar-only gate would have.
 const tally = { listing: {}, unmapped: {} };
-// The unmapped files by ID, not just by count. Two jobs: the gate can prove
-// each one is a real listing record that reaches no rendition (a count alone is
-// a free variable a hand-edit can inflate to hide a theft), and a human can see
-// exactly which recordings never make it into the app.
-const unmappedIds = [];
+// The unmapped files by ID, NAME and REASON, not just by count. `unmapped` is
+// the one free variable in the identity below — a hand-edit can inflate it to
+// balance a theft — so each entry has to justify itself to the gate, and a bare
+// id cannot: a stolen id is a real listing record that reaches no rendition too.
+// The name and the reason are what make it checkable:
+//   'bonus'      the filename says "Bonus Track", a thing the corpus has no
+//                letter for. Provable from the name alone, in CI, with no
+//                listing and no resolver — and unmintable for a stolen letter
+//                file, whose name carries an ordinal instead.
+//   'unresolved' the resolver could not place it. Not provable from the name,
+//                so the gate pins the set: a recording no listener can reach is
+//                exactly the event that should stop the line and get a human.
+const unmappedFiles = [];
 const bump = (bag, r) => { bag[r] = (bag[r] || 0) + 1; };
-const dropped = (f, r) => { bump(tally.unmapped, r); unmappedIds.push(f.id); };
+const dropped = (f, r, why) => { bump(tally.unmapped, r); unmappedFiles.push({ id: f.id, name: f.name, why }); };
 for (const f of files) bump(tally.listing, parseReader(f.name));
 
 for (const f of files) {
@@ -331,7 +372,7 @@ for (const f of files) {
       ? ctx.HOLY_DAYS.filter((l) => titleMatches(p.title, l.title)) : cands;
     if (!p || loose.length !== 1) {
       problems.push(`UNMATCHED  16. Holy Days/${f.name}${p ? ` (title "${p.title}" -> ${loose.length} candidates)` : ''}`);
-      dropped(f, parseReader(f.name));
+      dropped(f, parseReader(f.name), 'unresolved');
       continue;
     }
     key = `holydays:${loose[0].id}`;
@@ -345,12 +386,12 @@ for (const f of files) {
       shape = { kind: 'compilation' };
     } else {
       const p = parseName(f.name);
-      if (!p) { problems.push(`UNPARSEABLE  ${f.name}`); dropped(f, parseReader(f.name)); continue; }
+      if (!p) { problems.push(`UNPARSEABLE  ${f.name}`); dropped(f, parseReader(f.name), 'unresolved'); continue; }
       const r = resolveLetter(p);
       if (!r || r.err) {
         (r && (r.err.includes('bonus') || r.err === 'no title match') && p.bonus
           ? notes : problems).push(`${p.bonus ? 'BONUS-SKIPPED' : 'UNMATCHED'}  ${f.name}${r ? ` — ${r.err}` : ''}`);
-        dropped(f, p.reader);
+        dropped(f, p.reader, p.bonus ? 'bonus' : 'unresolved');
         continue;
       }
       if (r.note) notes.push(`${r.note}: ${f.name}`);
@@ -512,7 +553,9 @@ writeFileSync(COVERAGE,
   '{' + '\n' +
   ' "note": ' + JSON.stringify('Auto-generated by tools/gen-audio-manifest.mjs. DO NOT EDIT. Ground truth for tools/check-audio-manifest.js: for every letter, how many candidate recordings each reader supplied. A reader listed here MUST be offered a rendition of that letter.') + ',\n' +
   ' "listingRecords": ' + listing.length + ',\n' +
-  ' "totals": ' + JSON.stringify({ listing: tally.listing, unmapped: tally.unmapped, compilations, unmappedIds: unmappedIds.sort() }) + ',\n' +
+  ' "totals": ' + JSON.stringify({ listing: tally.listing, unmapped: tally.unmapped, compilations }) + ',\n' +
+  ' "unmappedFiles": [\n' + unmappedFiles.sort((a, b) => (a.id < b.id ? -1 : 1))
+    .map((u) => '  ' + JSON.stringify(u)).join(',\n') + '\n ],\n' +
   ' "collapsedByHash": ' + JSON.stringify(collapsedByHash) + ',\n' +
   ' "letters": {\n' + covLines.join(',\n') + '\n }\n}\n');
 
@@ -550,6 +593,45 @@ console.log(`audio-manifest: ${keys.length} letters with audio (${matched} files
   const overlap = [...altIds].filter((id) => primIds.has(id));
   if (overlap.length) console.log(`  WARNING: ${overlap.length} alternate ids also appear as primaries — mirror/emit logic needs review: ${overlap.slice(0, 5).join(', ')}`);
   console.log(`  coverage sidecar: ${COVERAGE}`);
+
+  // Whole-letter track AND section tracks, same reader, same letter: a second
+  // reading, or the same reading chunked? Settled 2026-09-04 by envelope
+  // cross-correlation across every such case in D:\VOT-Archive — all chunkings,
+  // each section carrying a spoken section-title intro of +13 to +37 s. The
+  // number is printed here so the next person to notice the overlap reads the
+  // answer instead of re-deriving it. A REPORT, not a rule: nothing branches on
+  // it, and a sum that stopped overshooting would be the interesting case.
+  //
+  // Grouped by the generator's own `kind`, which comes from " - Section N_" in
+  // the filename. NOT by the numeric suffix: the first section is written
+  // "TLR.026_" in some volumes and "V3.009.1_" in others, and grouping on that
+  // flips the sign of the delta.
+  const overshoots = [];
+  for (const e of acc.values()) {
+    const byReader = new Map();
+    for (const c of e.cand) {
+      if (!byReader.has(c.reader)) byReader.set(c.reader, { full: null, sections: [] });
+      const g = byReader.get(c.reader);
+      if (c.kind === 'full') g.full = c;
+      else if (c.kind === 'section') g.sections.push(c);
+    }
+    for (const g of byReader.values()) {
+      if (!g.full || g.sections.length < 2) continue;
+      const whole = secondsById.get(g.full.id);
+      const parts = g.sections.map((c) => secondsById.get(c.id));
+      if (!whole || parts.some((s) => !s)) continue;
+      const total = parts.reduce((n, s) => n + s, 0);
+      overshoots.push((total - whole) / parts.length);
+    }
+  }
+  if (overshoots.length) {
+    overshoots.sort((a, b) => a - b);
+    const med = overshoots[overshoots.length >> 1];
+    console.log(`  full-plus-sections: ${overshoots.length} (letter, reader) case(s); the sections overshoot the whole-letter ` +
+                `track by a median ${med.toFixed(0)} s per section — a chunking with a spoken section title, not a second reading`);
+  } else if (!SECONDS.size) {
+    console.log('  full-plus-sections: SKIPPED — no durations (copy D:\\VOT-Archive\\_source-manifests\\letter-durations.tsv to tools/_letter-durations.tsv)');
+  }
 }
 for (const [k, v] of perCol) {
   const missing = v.total - v.have;
