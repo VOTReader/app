@@ -1124,8 +1124,11 @@ const PERSIST_KEY = 'vot-audio-pos';
  * listener chose to begin), so a rebuilt queue never regrows the tracks that
  * were deliberately left behind it. `startReader` records the voice chosen for
  * the start letter, so the rebuild resumes on that rendition and not the
- * manifest's primary one.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null } | null} */
+ * manifest's primary one. `startPartIndex` is that same horizon one grain
+ * finer — how far into the start item's own parts (a Bible book's chapters, a
+ * multi-part letter) the listener had gone, since those parts all share one
+ * `startKey` and the item-level horizon alone cannot see past index 0.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -1353,6 +1356,7 @@ function _persist(at) {
       startKey: src.startKey || undefined,
       startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
       startReader: src.startReader || undefined,
+      startPartIndex: typeof src.startPartIndex === 'number' && src.startPartIndex > 0 ? src.startPartIndex : undefined,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
 }
@@ -1395,6 +1399,7 @@ function _restoreFromSaved() {
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
+      startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : 0,
     });
     _state.queue = [track];
     _state.qi = 0;
@@ -1431,7 +1436,13 @@ function _withRestoredAlternate(restore, queue, saved) {
     if (!rendition) return queue;
     let end = at;
     while (end < queue.length && queue[end].key === restore.key) end++;
-    return queue.slice(0, at).concat(rendition.tracks, queue.slice(end));
+    // Same part-index horizon playCollection applies to its own reader swap
+    // (2026-09-04): swapping in the alternate's tracks whole would regrow
+    // the parts the primary run above had just been trimmed to.
+    const tracks = restore.startPartIndex > 0
+      ? rendition.tracks.slice(Math.min(restore.startPartIndex, rendition.tracks.length - 1))
+      : rendition.tracks;
+    return queue.slice(0, at).concat(tracks, queue.slice(end));
   } catch (_e) { return queue; }
 }
 
@@ -1538,6 +1549,16 @@ async function _rebuildRestoredQueue() {
   if (r.startKey && r.mode !== 'custom' && r.mode !== 'section') {
     const horizon = queue.findIndex((item) => item.key === r.startKey);
     if (horizon > 0) queue = queue.slice(horizon);
+    // Same horizon, one grain finer (2026-09-04): a Bible book's chapters (or
+    // a multi-part letter's parts) all share one key, so the item-level slice
+    // above resolves to index 0 and trims nothing — startPartIndex is the
+    // only record of how far into that run the listener had gone. Mirrors
+    // playCollection's own clamped spi slice exactly.
+    if (r.startPartIndex > 0) {
+      let run = 0;
+      while (run < queue.length && queue[run].key === r.startKey) run++;
+      queue = queue.slice(Math.min(r.startPartIndex, Math.max(0, run - 1)));
+    }
   }
   let resumeAt = r.time || 0;
   if (!queue.length) {
@@ -1568,7 +1589,7 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null });
+  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || 0 });
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -1739,6 +1760,7 @@ function playCollection(opts) {
     if (at >= 0) { startKey = wanted; queue = queue.slice(at); }
   }
   let startReader = null;
+  let startPartIndex = 0;
   if (startKey) {
     const startItem = items.find((item) => item && item.id === o.startId);
     // No explicit voice = the listener's default one, where this letter has a
@@ -1759,7 +1781,8 @@ function playCollection(opts) {
     if (spi > 0) {
       let run = 0;
       while (run < queue.length && queue[run].key === startKey) run++;
-      queue = queue.slice(Math.min(spi, run - 1));
+      startPartIndex = Math.min(spi, run - 1);
+      queue = queue.slice(startPartIndex);
     }
   }
   // R8b — a NEW queue replacing this one is a boundary like any other:
@@ -1767,7 +1790,11 @@ function playCollection(opts) {
   // throttle window) every time the listener starts something else.
   _rememberOutgoingPosition();
   _setPendingRestore(null);
-  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader });
+  // startPartIndex rides the source alongside startKey (2026-09-04) so the
+  // snapshot can record it too — without it, a reboot's horizon slice only
+  // knows the START ITEM, not how far into its parts the listener had gone,
+  // and a Bible book's chapters all share one key.
+  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader, startPartIndex });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();

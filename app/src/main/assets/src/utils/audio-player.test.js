@@ -849,6 +849,37 @@ describe('audio-player — a library row continues (playTrack rebuilds around it
     });
   });
 
+  /* The same startPartIndex gap as a Bible book, reached through the OTHER
+     writer: a multi-part letter continued on an alternate reader. The rebuild
+     path is _withRestoredAlternate, not the plain startKey slice, since the
+     saved URL belongs to a rendition the corpus-order rebuild doesn't build
+     by default — it too must clamp to the part the row named. */
+  it('a row continued on an alternate reader mid-part persists that horizon and rebuilds it after a reboot', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playTrack(row({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA2v'), readerCode: 'V', partLabel: 'Part 2' }));
+      el().dispatchEvent(new Event('playing'));
+      el().pause();   // forces an immediate persist
+      const before = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(before.startReader).toBe('V');
+      expect(before.startPartIndex).toBe(1);   // Part 2 = index 1
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // V's Part 1 stays behind the horizon — only V's Part 2 + Letter C rebuild.
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA2v'), URL_OF('idC')]);
+      expect(st.qi).toBe(0);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
   it('honors the remembered position of the row it rebuilt around', () => {
     globalThis.AudioPositionsStore = { getPosition: () => ({ t: 200, d: 900 }), setPosition: vi.fn(), clearPosition: vi.fn() };
     withRegistry(() => {
@@ -1749,6 +1780,40 @@ describe('audio-player — durable resume (position survives restart)', () => {
     expect(localStorage.getItem('vot-audio-pos')).toBe(null);
     await load();
     expect(AudioPlayer.getState().status).toBe('idle');
+  });
+
+  /* startKey alone is the wrong grain for a Bible book (or a multi-part
+     letter): every chapter shares ONE key, so the horizon slice in
+     _rebuildRestoredQueue resolves to index 0 and trims nothing — a reboot
+     regrew every chapter the listener had deliberately started past. */
+  it('a Bible book started at a mid chapter persists its part horizon and rebuilds forward-only after a reboot', async () => {
+    const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:jonah': [
+        ['brm1_jonah_001', '', 'Chapter 1'], ['brm1_jonah_002', '', 'Chapter 2'],
+        ['brm1_jonah_003', '', 'Chapter 3'], ['brm1_jonah_004', '', 'Chapter 4'],
+        ['brm1_jonah_005', '', 'Chapter 5'],
+      ],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    try {
+      AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV', chapterNum: 3 });
+      el().dispatchEvent(new Event('playing'));
+      tick(10);
+      expect(saved().startKey).toBe('bible-brm-kjv:jonah');
+      expect(saved().startPartIndex).toBe(2);   // chapter 3 = index 2
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // Forward-only: chapters 1-2 stay behind the horizon; only 3-5 rebuild.
+      expect(st.queue.map((t) => t.url)).toEqual([OT('brm1_jonah_003'), OT('brm1_jonah_004'), OT('brm1_jonah_005')]);
+      expect(st.qi).toBe(0);
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+    }
   });
 });
 
