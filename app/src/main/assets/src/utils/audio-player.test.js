@@ -608,6 +608,43 @@ describe('audio-player — sleep at end of track', () => {
     AudioPlayer.stop();
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
   });
+
+  /* _sleepAtTrackEndFire pauses WITHOUT advancing qi (the queue must survive
+     intact), but that left _persist() writing the boot snapshot with qi still
+     on the finished track and time = its own near-end clock. The positions
+     map is protected from this by _finishedUrl; the boot snapshot was not.
+     On the next launch _rebuildRestoredQueue seeks straight back to that
+     clock (its own authority there — the 97% tail rule never applies), so a
+     finished recording immediately re-fires 'ended' and double-advances. */
+  it('advances the boot snapshot past the finished recording instead of parking it at the tail', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 300;
+    el().currentTime = 298;
+    el().dispatchEvent(new Event('timeupdate'));   // _state.time tracks near the end
+    AudioPlayer.setSleepAtTrackEnd();
+
+    el().dispatchEvent(new Event('ended'));         // the preface (queue[0]) finishes
+
+    const snapshot = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(snapshot.qi).toBe(1);              // past the finished preface, not parked on it
+    expect(snapshot.time).toBe(0);
+    expect(snapshot.key).toBe('vol1:letter-a');
+  });
+
+  it('clears the boot snapshot instead when the finished recording was the last in the queue', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });   // queue of 1
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.toggle();                                    // pause — establishes a snapshot exists
+    expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+    AudioPlayer.toggle();                                    // resume
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.setSleepAtTrackEnd();
+
+    el().dispatchEvent(new Event('ended'));
+
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);
+  });
 });
 
 describe('audio-player — listen completion counts', () => {
