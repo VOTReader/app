@@ -125,6 +125,85 @@ export function JournalHubScreen(props) {
 
   var allEntries = JournalStore.all();
 
+  // ─── Unclaimed recordings (journal-3 clause (b)) ───────────
+  // Skipping the prune is only half of "never deleted, and always visible".
+  // A record nothing references and nothing shows is preserved and invisible,
+  // which the user cannot tell apart from lost. This is where the whole set
+  // can be seen at once, which is also why recovery lives here rather than on
+  // the block that is missing its bytes: one path, with everything in view.
+  var _unclaimed = useState([]);
+  var unclaimed = _unclaimed[0]; var setUnclaimed = _unclaimed[1];
+  var _discarding = useState(null);
+  var discarding = _discarding[0]; var setDiscarding = _discarding[1];
+
+  var storeVersion = JournalStore.getVersion();
+  React.useEffect(function() {
+    var cancelled = false;
+    if (typeof JournalMediaStore === 'undefined' || !JournalMediaStore.unclaimed) return undefined;
+    // marker AND unreferenced — the marker alone is not authoritative, since
+    // it is written in one transaction and cleared in another.
+    JournalMediaStore.unclaimed(JournalStore.collectAllMediaIds())
+      .then(function(rows) { if (!cancelled) setUnclaimed(rows || []); })
+      .catch(function() { /* a failed read must not take the hub down */ });
+    return function() { cancelled = true; };
+  }, [storeVersion]);
+
+  function recoverUnclaimed(rec) {
+    // No samples: the waveform degrades to a flat bar. Inventing samples would
+    // draw a picture of audio nobody has measured.
+    JournalStore.add({
+      title: '',
+      blocks: [{ type: 'audio', mediaId: rec.id, duration: rec.duration || 0, samples: null }],
+    });
+    if (JournalMediaStore.markLinked) JournalMediaStore.markLinked(rec.id);
+    setUnclaimed(function(list) { return list.filter(function(r) { return r.id !== rec.id; }); });
+  }
+
+  function discardUnclaimed(rec) {
+    JournalMediaStore.delete(rec.id);
+    setDiscarding(null);
+    setUnclaimed(function(list) { return list.filter(function(r) { return r.id !== rec.id; }); });
+  }
+
+  function renderUnclaimed() {
+    if (!unclaimed.length) return null;
+    var n = unclaimed.length;
+    return (
+      <div className="jrn-unclaimed">
+        <div className="jrn-unclaimed-head">
+          {n === 1
+            ? '1 recording was saved but never attached to an entry.'
+            : n + ' recordings were saved but never attached to an entry.'}
+        </div>
+        {unclaimed.map(function(rec) {
+          var when = (typeof JournalHelpers !== 'undefined' && JournalHelpers.longDate)
+            ? JournalHelpers.longDate(rec.created) : '';
+          var len = (typeof JournalHelpers !== 'undefined' && JournalHelpers.formatDuration)
+            ? JournalHelpers.formatDuration(rec.duration || 0) : '';
+          return (
+            <div className="jrn-unclaimed-row" key={rec.id}>
+              <span className="jrn-unclaimed-when">{when}{len ? ' · ' + len : ''}</span>
+              {discarding === rec.id ? (
+                <ConfirmStrip
+                  className="jrn-unclaimed-confirm"
+                  question="Delete this recording?"
+                  yesLabel="Yes, delete"
+                  onCancel={function() { setDiscarding(null); }}
+                  onConfirm={function() { discardUnclaimed(rec); }}
+                />
+              ) : (
+                <span className="jrn-unclaimed-actions">
+                  <button className="jrn-unclaimed-recover" onClick={function() { recoverUnclaimed(rec); }}>Recover</button>
+                  <button className="jrn-unclaimed-discard" onClick={function() { setDiscarding(rec.id); }}>Discard</button>
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   function deleteEntry(id) { JournalStore.remove(id); }
   function togglePin(id) { JournalStore.togglePin(id); }
 
@@ -276,6 +355,7 @@ export function JournalHubScreen(props) {
           <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} onClick={function() { setTab('all'); }}>All Entries</button>
           <button className={'jrn-tab' + (tab === 'pinned' ? ' active' : '')} onClick={function() { setTab('pinned'); }}>Pinned</button>
         </div>
+        {renderUnclaimed()}
         {tab === 'all' && renderEntries(allEntries, false)}
         {tab === 'pinned' && renderEntries(pinnedEntries, true)}
         <button

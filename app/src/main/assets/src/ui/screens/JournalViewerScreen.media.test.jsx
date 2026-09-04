@@ -19,8 +19,9 @@
    JournalViewerScreen.menu.test.jsx uses. */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react';
 import { JournalAudioBlock, JournalImageBlock } from './JournalViewerScreen.jsx';
+import { JournalHubScreen } from './JournalHubScreen.jsx';
 
 /**
  * objectUrl resolves `url` (null = no url could be minted).
@@ -155,5 +156,87 @@ describe('JournalImageBlock — the bytes are gone', () => {
 
     expect(screen.getByText(/image missing/i)).toBeTruthy();
     expect(screen.getByText('The old gate')).toBeTruthy();
+  });
+});
+
+/* R5 — journal-3 (b), the other half of "never deleted, and always visible".
+   Skipping prune is only half the invariant: a record nothing references and
+   nothing shows is preserved and invisible, which is indistinguishable from
+   lost as far as the user is concerned. The Hub is where the whole set can be
+   seen at once, which is also why recovery lives here and not on the block. */
+describe('JournalHubScreen — unclaimed recordings are offered back', () => {
+  function setupHub({ unclaimed = [], entries = [] } = {}) {
+    const added = [];
+    window.ScreenLayout = ({ children, navChildren }) => (<div><div>{navChildren}</div>{children}</div>);
+    window.LibraryNav = (opts) => <>{(opts && opts.rightExtras) || null}</>;
+    window.JournalStore = {
+      subscribe: () => () => {},
+      getVersion: () => 1,
+      all: () => entries.slice(),
+      collectAllMediaIds: () => [],
+      add: vi.fn((seed) => { added.push(seed); return { id: 'e-new', ...seed }; }),
+      togglePin: vi.fn(),
+      remove: vi.fn(),
+    };
+    window.JournalHelpers = {
+      entryDisplayTitle: (e) => e.title || 'Untitled',
+      previewText: () => '',
+      attachmentSummary: () => [],
+      shortDate: () => 'Sep 4',
+      shortTime: () => '5:00 PM',
+      longDate: () => 'September 4, 2026',
+      formatDuration: (n) => '0:' + String(Math.round(n || 0)).padStart(2, '0'),
+    };
+    window.JournalMediaStore = {
+      unclaimed: vi.fn(() => Promise.resolve(unclaimed)),
+      markLinked: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(() => Promise.resolve()),
+    };
+    window.ConfirmStrip = ({ question, onConfirm }) => (
+      <div><span>{question}</span><button onClick={onConfirm}>Yes, delete</button></div>
+    );
+    return { added };
+  }
+
+  afterEach(() => {
+    delete window.ScreenLayout;
+    delete window.LibraryNav;
+    delete window.JournalStore;
+    delete window.JournalHelpers;
+    delete window.JournalMediaStore;
+    delete window.ConfirmStrip;
+  });
+
+  it('R5: shows a banner for an unclaimed recording, and Recover builds an entry carrying it', async () => {
+    const { added } = setupHub({
+      unclaimed: [{ id: 'm_lost', type: 'audio', duration: 8, created: 1757000000000, unlinked: true }],
+    });
+    await act(async () => { render(<JournalHubScreen />); });
+
+    expect(screen.getByText(/saved but never attached/i)).toBeTruthy();
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /recover/i })); });
+
+    expect(added.length).toBe(1);
+    const blocks = added[0].blocks;
+    expect(blocks.some((b) => b.type === 'audio' && b.mediaId === 'm_lost')).toBe(true);
+    expect(window.JournalMediaStore.markLinked).toHaveBeenCalledWith('m_lost');
+  });
+
+  it('renders nothing when there is nothing unclaimed', async () => {
+    setupHub({ unclaimed: [] });
+    await act(async () => { render(<JournalHubScreen />); });
+    expect(screen.queryByText(/saved but never attached/i)).toBeNull();
+  });
+
+  it('Discard is confirm-gated and deletes the record', async () => {
+    setupHub({ unclaimed: [{ id: 'm_lost', type: 'audio', duration: 8, created: 1757000000000, unlinked: true }] });
+    await act(async () => { render(<JournalHubScreen />); });
+
+    fireEvent.click(screen.getByRole('button', { name: /discard/i }));
+    expect(window.JournalMediaStore.delete).not.toHaveBeenCalled();   // gated, not immediate
+
+    await act(async () => { fireEvent.click(screen.getByText('Yes, delete')); });
+    expect(window.JournalMediaStore.delete).toHaveBeenCalledWith('m_lost');
   });
 });
