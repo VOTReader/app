@@ -21,7 +21,10 @@
      - "Day" = local-timezone calendar date (YYYY-MM-DD)
      - Streak +1 when the new reading day is exactly one calendar day
        after lastReadDate. Same-day commits are no-ops.
-     - Streak resets to 1 when a day was skipped.
+     - Streak resets to 1 when a day was skipped. A NON-POSITIVE day delta
+       (same-day, a backwards device-clock step, or a westward date-line
+       crossing) is a no-op too — never a reset — so a clock glitch can't
+       destroy real streak history.
      - On app load (recomputeFromLoad), if today is 2+ days past
        lastReadDate the streak is broken (set to 0) — reading today
        restarts it at 1.
@@ -67,16 +70,18 @@ export var ReadingStreakStore = extendStore(
       if (this._shouldDefer('recordReadingDay', ts)) return;
       var data = this._load();
       var today = _jrnDateStr(ts);
-      if (data.lastReadDate === today) return; // same-day — nothing to do
       if (!data.lastReadDate) {
         data.currentStreak = 1;
       } else {
         var delta = _jrnDaysBetween(data.lastReadDate, today);
-        if (delta === 1) {
-          data.currentStreak = (data.currentStreak || 0) + 1;
-        } else {
-          data.currentStreak = 1;
-        }
+        // Non-positive delta: same-day (delta===0, the common case — many
+        // dwell commits per day), OR a backwards device-clock step / a
+        // westward date-line crossing (delta<0). Both are a no-op: bailing
+        // here leaves currentStreak, lastReadDate and totalDays untouched
+        // instead of letting the "else" below treat a clock glitch like a
+        // skipped day and destroy real streak history.
+        if (delta <= 0) return;
+        data.currentStreak = (delta === 1) ? (data.currentStreak || 0) + 1 : 1;
       }
       data.lastReadDate = today;
       data.totalDays = (data.totalDays || 0) + 1;

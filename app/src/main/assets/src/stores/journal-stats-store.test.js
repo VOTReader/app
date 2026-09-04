@@ -180,6 +180,30 @@ describe('JournalStatsStore — recordNewEntry (streak math)', () => {
     expect(stats.longestStreak).toBe(3);    // preserved
   });
 
+  // gap-reading-measurement-and-achievements-3: ReadingStreakStore's sibling
+  // bug, same shape — a backwards device-clock step or westward date-line
+  // crossing produces a NEGATIVE delta, which the old "else" branch treated
+  // like any other non-1 gap and reset the streak to 1. totalEntries must
+  // still count the entry that was really created; only the streak fields
+  // and the date cursor must stay put.
+  it('a backwards device-clock step is a no-op for the streak (totalEntries still counts the entry)', () => {
+    const data = JournalStatsStore._load();
+    data.totalEntries = 5;
+    data.currentStreak = 300;
+    data.longestStreak = 300;
+    data.lastEntryDate = _jrnDateStr(_tsRelative(0));   // "today"
+    JournalStatsStore._save();
+
+    // The new entry's "today" is chronologically BEFORE lastEntryDate.
+    JournalStatsStore.recordNewEntry(_tsRelative(-1));
+
+    const stats = JournalStatsStore.get();
+    expect(stats.totalEntries).toBe(6);
+    expect(stats.currentStreak).toBe(300);
+    expect(stats.longestStreak).toBe(300);
+    expect(stats.lastEntryDate).toBe(_jrnDateStr(_tsRelative(0)));
+  });
+
   it('longestStreak advances when a new streak exceeds it', () => {
     // Build a 2-day streak via direct manipulation, then add a new
     // entry that takes the streak to 3.
