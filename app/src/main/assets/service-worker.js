@@ -336,13 +336,21 @@ async function addVerified(cache, url) {
     await cache.add(freshReq(url));
     return;
   }
+  // service-worker-5 (2026-09-04): swUrl/swExpected/swActual ride the thrown
+  // Error so a CRITICAL-asset failure (below) can report exactly which asset
+  // and hashes refused the install, without re-deriving them from the
+  // message string. lastActual survives past the loop for the final throw.
+  let lastActual = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(freshReq(url));
-    if (!res.ok) throw new Error('[sw] ' + url + ' HTTP ' + res.status);
+    if (!res.ok) {
+      throw Object.assign(new Error('[sw] ' + url + ' HTTP ' + res.status), { swUrl: url });
+    }
     // clone() BEFORE reading: a Response body is single-use, and cache.put must
     // receive the original so the stored entry keeps its real headers
     // (Content-Type especially — a bundle served as octet-stream will not run).
     const actual = await sha256Stripped(await res.clone().arrayBuffer());
+    lastActual = actual;
     if (actual === expected) {
       await cache.put(url, res);
       return;
@@ -351,8 +359,11 @@ async function addVerified(cache, url) {
       + ' (expected ' + expected.slice(0, 12) + ', got ' + actual.slice(0, 12) + ')'
       + (attempt === 0 ? ' — refetching once' : ''));
   }
-  throw new Error('[sw] integrity check failed for ' + url
-    + ' after a refetch — refusing to install this build so the previous one keeps serving.');
+  throw Object.assign(
+    new Error('[sw] integrity check failed for ' + url
+      + ' after a refetch — refusing to install this build so the previous one keeps serving.'),
+    { swUrl: url, swExpected: expected, swActual: lastActual }
+  );
 }
 
 self.addEventListener('install', (event) => {
@@ -360,77 +371,102 @@ self.addEventListener('install', (event) => {
   // controllerchange fires in sw-register.js, which reloads the page.
   self.skipWaiting();
   event.waitUntil((async () => {
-    const core = await caches.open(CORE_CACHE);
-    // Critical shell — all-or-nothing; a miss here SHOULD fail install.
-    await Promise.all(
-      CORE_ASSETS.filter((a) => CRITICAL_ASSETS.has(a)).map((u) => addVerified(core, u))
-    );
-    // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
-    // a renamed asset) doesn't abort the install and silently pin the old SW.
-    // NOTE: an integrity failure here does NOT fail the install — addVerified
-    // throws and allSettled turns it into the warning below. Deliberate: bundle-e/-f
-    // and offline.html are not needed to boot, so refusing a whole good update over
-    // one of them would trade a working new build for a broken screen.
-    //
-    // BE HONEST ABOUT THE COST, because it is not "no consequence": coreFirst is
-    // cache-first with NO cache-on-use, so an asset skipped here stays uncached for
-    // the ENTIRE life of this CACHE_VERSION. Online it is refetched from the network
-    // every time (slower, but correct). OFFLINE it is simply unavailable, so the
-    // lazy screens degrade to the _corpusView "Try again" affordance and
-    // offline.html falls back to the 503 branch in coreFirst. The next deploy
-    // re-attempts it. That is the right trade for a non-boot asset, but it is a real
-    // degradation and not a silent no-op — which is why it is warned, loudly.
-    const bestEffort = CORE_ASSETS.filter((a) => !CRITICAL_ASSETS.has(a));
-    const results = await Promise.allSettled(bestEffort.map((u) => addVerified(core, u)));
-    const failed = results
-      .map((r, i) => (r.status === 'rejected' ? bestEffort[i] : null))
-      .filter(Boolean);
-    if (failed.length) {
-      console.warn('[sw] install: ' + failed.length + ' best-effort asset(s) not cached:', failed);
-    }
-
-    // Full corpus into the STABLE corpus cache, so an app-version bump
-    // won't re-download ~10 MB (only a CORPUS_VERSION bump will). Best-
-    // effort: a miss (e.g. the user went offline mid-install) must NOT
-    // fail the install — corpusFirst still caches it on first use. Skip-
-    // if-present so a re-install never re-fetches what's already there.
-    const corpus = await caches.open(CORPUS_CACHE);
-    // Bounded concurrency (4 workers), not one flat allSettled: the list is
-    // ~60 URLs / ~9 MB, and firing them all at once saturates the link on
-    // the very visit that installs the SW — racing the page's own bundle
-    // fetches for first paint. 4 stays under the browser's per-host limit.
-    const precacheQueue = CORPUS_PRECACHE.concat(READING_FONT_PRECACHE);
-    let precacheIdx = 0;
-    // service-worker-4 (2026-09-04): this loop used to swallow every failure
-    // with no counter, no console.warn, no client message — install still
-    // resolved, the worker activated, and Settings reported the new
-    // CACHE_VERSION as if everything were healthy while the reader was
-    // silently NOT offline-capable (corpusFirst's miss branch 503s later, on
-    // a plane, with no earlier signal at all). Mirror the CORE best-effort
-    // path above: collect what failed, warn with the count and list, and
-    // additionally tell every open client — corpus misses have no other
-    // surface (unlike CORE, corpusFirst never revalidates a hit, so a miss
-    // here can stay invisible for the CORPUS_VERSION's entire lifetime).
-    const corpusFailed = [];
-    await Promise.allSettled(Array.from({ length: 4 }, async () => {
-      while (precacheIdx < precacheQueue.length) {
-        const url = precacheQueue[precacheIdx++];
-        try {
-          if (!(await corpus.match(url))) await corpus.add(freshReq(url));
-        } catch (_e) {
-          corpusFailed.push(url); // best-effort — corpusFirst still caches on first use
-        }
-      }
-    }));
-    if (corpusFailed.length) {
-      console.warn('[sw] install: ' + corpusFailed.length + ' corpus asset(s) not precached:', corpusFailed);
-      const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
-      for (const client of clientsList) {
-        client.postMessage({ type: 'PRECACHE_INCOMPLETE', count: corpusFailed.length, urls: corpusFailed });
-      }
+    try {
+      await installCore();
+    } catch (err) {
+      // service-worker-5 (2026-09-04): a refused install (a bad deploy, a
+      // partially purged edge, a truncated upload — see ASSET_INTEGRITY above)
+      // used to pin every client on the OLD build with ZERO signal reaching the
+      // page: the only trace was this console.warn, in a devtools panel a phone
+      // cannot open. Failing the install is still the right call (the previous
+      // worker keeps serving) — but the page should get to say SOMETHING.
+      console.warn('[sw] install refused:', err && err.message);
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      const payload = {
+        type: 'INSTALL_REFUSED',
+        message: String((err && err.message) || err),
+        url: (err && err.swUrl) || null,
+        expected: (err && err.swExpected) ? err.swExpected.slice(0, 12) : null,
+        actual: (err && err.swActual) ? err.swActual.slice(0, 12) : null,
+      };
+      for (const client of clientsList) client.postMessage(payload);
+      throw err; // still fail the install — the previous worker keeps serving
     }
   })());
 });
+
+/** The install body, split out so the try/catch above stays a thin wrapper. */
+async function installCore() {
+  const core = await caches.open(CORE_CACHE);
+  // Critical shell — all-or-nothing; a miss here SHOULD fail install.
+  await Promise.all(
+    CORE_ASSETS.filter((a) => CRITICAL_ASSETS.has(a)).map((u) => addVerified(core, u))
+  );
+  // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
+  // a renamed asset) doesn't abort the install and silently pin the old SW.
+  // NOTE: an integrity failure here does NOT fail the install — addVerified
+  // throws and allSettled turns it into the warning below. Deliberate: bundle-e/-f
+  // and offline.html are not needed to boot, so refusing a whole good update over
+  // one of them would trade a working new build for a broken screen.
+  //
+  // BE HONEST ABOUT THE COST, because it is not "no consequence": coreFirst is
+  // cache-first with NO cache-on-use, so an asset skipped here stays uncached for
+  // the ENTIRE life of this CACHE_VERSION. Online it is refetched from the network
+  // every time (slower, but correct). OFFLINE it is simply unavailable, so the
+  // lazy screens degrade to the _corpusView "Try again" affordance and
+  // offline.html falls back to the 503 branch in coreFirst. The next deploy
+  // re-attempts it. That is the right trade for a non-boot asset, but it is a real
+  // degradation and not a silent no-op — which is why it is warned, loudly.
+  const bestEffort = CORE_ASSETS.filter((a) => !CRITICAL_ASSETS.has(a));
+  const results = await Promise.allSettled(bestEffort.map((u) => addVerified(core, u)));
+  const failed = results
+    .map((r, i) => (r.status === 'rejected' ? bestEffort[i] : null))
+    .filter(Boolean);
+  if (failed.length) {
+    console.warn('[sw] install: ' + failed.length + ' best-effort asset(s) not cached:', failed);
+  }
+
+  // Full corpus into the STABLE corpus cache, so an app-version bump
+  // won't re-download ~10 MB (only a CORPUS_VERSION bump will). Best-
+  // effort: a miss (e.g. the user went offline mid-install) must NOT
+  // fail the install — corpusFirst still caches it on first use. Skip-
+  // if-present so a re-install never re-fetches what's already there.
+  const corpus = await caches.open(CORPUS_CACHE);
+  // Bounded concurrency (4 workers), not one flat allSettled: the list is
+  // ~60 URLs / ~9 MB, and firing them all at once saturates the link on
+  // the very visit that installs the SW — racing the page's own bundle
+  // fetches for first paint. 4 stays under the browser's per-host limit.
+  const precacheQueue = CORPUS_PRECACHE.concat(READING_FONT_PRECACHE);
+  let precacheIdx = 0;
+  // service-worker-4 (2026-09-04): this loop used to swallow every failure
+  // with no counter, no console.warn, no client message — install still
+  // resolved, the worker activated, and Settings reported the new
+  // CACHE_VERSION as if everything were healthy while the reader was
+  // silently NOT offline-capable (corpusFirst's miss branch 503s later, on
+  // a plane, with no earlier signal at all). Mirror the CORE best-effort
+  // path above: collect what failed, warn with the count and list, and
+  // additionally tell every open client — corpus misses have no other
+  // surface (unlike CORE, corpusFirst never revalidates a hit, so a miss
+  // here can stay invisible for the CORPUS_VERSION's entire lifetime).
+  const corpusFailed = [];
+  await Promise.allSettled(Array.from({ length: 4 }, async () => {
+    while (precacheIdx < precacheQueue.length) {
+      const url = precacheQueue[precacheIdx++];
+      try {
+        if (!(await corpus.match(url))) await corpus.add(freshReq(url));
+      } catch (_e) {
+        corpusFailed.push(url); // best-effort — corpusFirst still caches on first use
+      }
+    }
+  }));
+  if (corpusFailed.length) {
+    console.warn('[sw] install: ' + corpusFailed.length + ' corpus asset(s) not precached:', corpusFailed);
+    const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
+    for (const client of clientsList) {
+      client.postMessage({ type: 'PRECACHE_INCOMPLETE', count: corpusFailed.length, urls: corpusFailed });
+    }
+  }
+}
 
 // ── Activate: clean old versioned caches ────────────────────────
 

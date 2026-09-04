@@ -34,6 +34,7 @@
 
 import { PlatformBridge } from './platform-bridge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
+import { showToast } from './toast.js';
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -73,11 +74,29 @@ export function registerServiceWorker() {
   // no trace anywhere the owner could see — corpusFirst's miss branch would
   // only 503 much later, offline, with nothing pointing back at install time.
   // Record it so Settings' diagnostic export has a trace.
+  //
+  // service-worker-5 (2026-09-04): a REFUSED install (ASSET_INTEGRITY disagrees
+  // with the published bundles — a partially purged edge, a truncated upload)
+  // pins every client on the previous build forever, with no signal reaching
+  // the page at all — the s12 lesson again ("new work committed, nothing
+  // changing on screen"). Record it AND show a toast naming the asset, since
+  // the SW console is unreachable on a phone.
   navigator.serviceWorker.addEventListener('message', (event) => {
     const d = event && event.data;
     if (d && d.type === 'PRECACHE_INCOMPLETE') {
       DiagnosticLog.warn('sw', 'corpus precache incomplete at install: '
         + d.count + ' file(s) not cached: ' + (Array.isArray(d.urls) ? d.urls.join(', ') : ''));
+    } else if (d && d.type === 'INSTALL_REFUSED') {
+      DiagnosticLog.error('sw', 'install refused: ' + (d.message || ('integrity check failed for ' + d.url))
+        + (d.expected ? (' (expected ' + d.expected + ', got ' + d.actual + ')') : ''));
+      showToast({
+        id: 'vot-toast-sw-refused',
+        className: 'vot-toast',
+        text: 'A new version failed to install (' + (d.url || 'unknown asset')
+          + '). Still running the current version.',
+        ariaLive: 'assertive',
+        durationMs: 6000,
+      });
     }
   });
 
