@@ -530,6 +530,15 @@ function _sleepAtTrackEndFire() {
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
   if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
   _markPaused();
+  // The finished track has no place to resume. _markPaused()'s own _persist()
+  // (or, in a real browser, the 'pause' listener's — the spec fires 'pause'
+  // before 'ended', so it usually beats us here) just wrote the boot snapshot
+  // with the clock at THIS recording's own end. Overwrite it with the next
+  // queued track at 0, or clear it outright at the tail, so the next boot
+  // doesn't reseek straight back to 'ended' and double-advance.
+  const nextTrack = _state.queue[_state.qi + 1];
+  if (nextTrack) _persist({ qi: _state.qi + 1, time: 0 });
+  else _clearPersist();
   if (!wasLive) _notify();
   if (wasLive) _toast('Sleep timer ended. Playback paused.');
 }
@@ -744,6 +753,7 @@ function _countCompletion() {
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */
 function _start() {
+  _seekGen++;   // invalidates any deferred seek still waiting on the last track
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
   if (!isVotAudioUrl(track.url)) {
@@ -832,6 +842,7 @@ function prewarm(volKey, letterId) {
   el.preload = 'metadata';
   const url = _assetUrlFor(volKey, parts[0][0]);
   if (!url) return;
+  _seekGen++;   // same reassign-src-outside-_start() hazard as toggle()'s retry
   el.src = url;
   _prewarmKey = key;
 }
@@ -1113,8 +1124,11 @@ const PERSIST_KEY = 'vot-audio-pos';
  * listener chose to begin), so a rebuilt queue never regrows the tracks that
  * were deliberately left behind it. `startReader` records the voice chosen for
  * the start letter, so the rebuild resumes on that rendition and not the
- * manifest's primary one.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null } | null} */
+ * manifest's primary one. `startPartIndex` is that same horizon one grain
+ * finer — how far into the start item's own parts (a Bible book's chapters, a
+ * multi-part letter) the listener had gone, since those parts all share one
+ * `startKey` and the item-level horizon alone cannot see past index 0.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -1250,6 +1264,22 @@ function _resumeAt(track) {
   } catch (_e) { return 0; }
 }
 
+/** Bumped by every call that points the element at a new track (_start,
+ *  toggle()'s error retry, prewarm) — invalidates a still-pending deferred
+ *  seek armed for whatever was loading before. Without it, a seek armed for
+ *  a track whose metadata never arrived (slow network, or the reader moved on
+ *  before it did) survives that track and fires on the NEXT one's metadata
+ *  instead: a saved position from letter A landing on letter B, or a
+ *  noResume voice switch losing its "starts at 0" promise to the voice it
+ *  just replaced. */
+let _seekGen = 0;
+/** The 'loadedmetadata' handler _seekOnMetadata last armed, so a second
+ *  deferred seek before the first ever fires can drop it instead of leaving
+ *  two of our own listeners racing each other (playBibleBook deliberately
+ *  arms a chapter-tap seek AFTER playCollection's resume seek, to outrank
+ *  it — this keeps that down to one live listener instead of two). */
+let _pendingSeekHandler = /** @type {(() => void) | null} */ (null);
+
 /**
  * Seek once the element can honor it. HAVE_METADATA is the earliest safe
  * moment — a currentTime assignment before that is ignored or throws — but it
@@ -1263,6 +1293,11 @@ function _resumeAt(track) {
  * This IS the boot-restore timing contract; every deferred seek in this
  * module goes through here.
  *
+ * The deferred branch is generation-guarded (_seekGen): a still-pending
+ * listener from a track that never reached metadata must not fire on
+ * whatever the element loads next. Arming a new deferred seek also drops
+ * whichever one this function armed last, belt-and-braces on top of that.
+ *
  * @param {number} at
  * @returns {void}
  */
@@ -1274,19 +1309,34 @@ function _seekOnMetadata(at) {
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     return;
   }
-  _el.addEventListener('loadedmetadata', () => {
+  if (_pendingSeekHandler) { _el.removeEventListener('loadedmetadata', _pendingSeekHandler); }
+  const gen = _seekGen;
+  const handler = () => {
+    _pendingSeekHandler = null;
+    if (gen !== _seekGen) return;   // a newer track started — this seek is stale
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
-  }, { once: true });
+  };
+  _pendingSeekHandler = handler;
+  _el.addEventListener('loadedmetadata', handler, { once: true });
 }
 
-function _persist() {
+/**
+ * @param {{ qi: number, time: number } | null} [at] - persist a DIFFERENT
+ *   queue position than the one currently loaded. Sleep-at-track-end is the
+ *   one caller: the track that just finished has no place to resume, so it
+ *   advances the snapshot to the next queued track (or clears it outright at
+ *   the tail) instead of writing the just-finished track's own end-of-clock.
+ * @returns {void}
+ */
+function _persist(at) {
   // Durable per-recording memory rides the same call sites as the boot
   // snapshot, and ahead of its localStorage guard: the two are independent.
   _rememberCurrentPosition(false);
   try {
     if (typeof localStorage === 'undefined') return;
     const src = _pendingRestore || _source;
-    const track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+    const qi = at ? at.qi : (_pendingRestore ? _pendingRestore.qi : _state.qi);
+    const track = _pendingRestore ? _state.queue[0] : _state.queue[qi];
     const savedTrack = normalizeAudioTrack(track);
     if (!src || !savedTrack) return;
     const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
@@ -1298,14 +1348,15 @@ function _persist() {
     localStorage.setItem(PERSIST_KEY, JSON.stringify({
       v: 2,
       mode: src.mode, volKey: src.volKey, label: src.label,
-      qi: _pendingRestore ? _pendingRestore.qi : _state.qi,
+      qi,
       key: savedTrack.key,
-      time: Math.floor(_state.time || 0),
+      time: Math.floor((at ? at.time : _state.time) || 0),
       track: savedTrack,
       customQueue,
       startKey: src.startKey || undefined,
       startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
       startReader: src.startReader || undefined,
+      startPartIndex: typeof src.startPartIndex === 'number' && src.startPartIndex > 0 ? src.startPartIndex : undefined,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
 }
@@ -1348,6 +1399,7 @@ function _restoreFromSaved() {
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
+      startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : 0,
     });
     _state.queue = [track];
     _state.qi = 0;
@@ -1384,7 +1436,13 @@ function _withRestoredAlternate(restore, queue, saved) {
     if (!rendition) return queue;
     let end = at;
     while (end < queue.length && queue[end].key === restore.key) end++;
-    return queue.slice(0, at).concat(rendition.tracks, queue.slice(end));
+    // Same part-index horizon playCollection applies to its own reader swap
+    // (2026-09-04): swapping in the alternate's tracks whole would regrow
+    // the parts the primary run above had just been trimmed to.
+    const tracks = restore.startPartIndex > 0
+      ? rendition.tracks.slice(Math.min(restore.startPartIndex, rendition.tracks.length - 1))
+      : rendition.tracks;
+    return queue.slice(0, at).concat(tracks, queue.slice(end));
   } catch (_e) { return queue; }
 }
 
@@ -1491,6 +1549,16 @@ async function _rebuildRestoredQueue() {
   if (r.startKey && r.mode !== 'custom' && r.mode !== 'section') {
     const horizon = queue.findIndex((item) => item.key === r.startKey);
     if (horizon > 0) queue = queue.slice(horizon);
+    // Same horizon, one grain finer (2026-09-04): a Bible book's chapters (or
+    // a multi-part letter's parts) all share one key, so the item-level slice
+    // above resolves to index 0 and trims nothing — startPartIndex is the
+    // only record of how far into that run the listener had gone. Mirrors
+    // playCollection's own clamped spi slice exactly.
+    if (r.startPartIndex > 0) {
+      let run = 0;
+      while (run < queue.length && queue[run].key === r.startKey) run++;
+      queue = queue.slice(Math.min(r.startPartIndex, Math.max(0, run - 1)));
+    }
   }
   let resumeAt = r.time || 0;
   if (!queue.length) {
@@ -1521,7 +1589,7 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null });
+  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || 0 });
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -1692,6 +1760,7 @@ function playCollection(opts) {
     if (at >= 0) { startKey = wanted; queue = queue.slice(at); }
   }
   let startReader = null;
+  let startPartIndex = 0;
   if (startKey) {
     const startItem = items.find((item) => item && item.id === o.startId);
     // No explicit voice = the listener's default one, where this letter has a
@@ -1712,7 +1781,8 @@ function playCollection(opts) {
     if (spi > 0) {
       let run = 0;
       while (run < queue.length && queue[run].key === startKey) run++;
-      queue = queue.slice(Math.min(spi, run - 1));
+      startPartIndex = Math.min(spi, run - 1);
+      queue = queue.slice(startPartIndex);
     }
   }
   // R8b — a NEW queue replacing this one is a boundary like any other:
@@ -1720,7 +1790,11 @@ function playCollection(opts) {
   // throttle window) every time the listener starts something else.
   _rememberOutgoingPosition();
   _setPendingRestore(null);
-  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader });
+  // startPartIndex rides the source alongside startKey (2026-09-04) so the
+  // snapshot can record it too — without it, a reboot's horizon slice only
+  // knows the START ITEM, not how far into its parts the listener had gone,
+  // and a Bible book's chapters all share one key.
+  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader, startPartIndex });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
@@ -1863,6 +1937,7 @@ function toggle() {
     // seek back to where playback died once metadata is available (currentTime
     // can't be set before then).
     const resumeAt = _errorTime;
+    _seekGen++;   // this reassigns src outside _start() — invalidate stale deferred seeks too
     _el.src = track.url;
     _el.addEventListener('loadedmetadata', () => {
       try { /** @type {HTMLAudioElement} */ (_el).currentTime = resumeAt; } catch (_e) { /* unseekable — restart from 0 */ }
@@ -1917,11 +1992,32 @@ function prev() {
 /**
  * Seek within the current track. Clamped to [0, duration].
  *
+ * A boot-restored bar has no element yet (toggle() rebuilds it lazily on the
+ * first tap), but read-along's tap-to-seek is deliberately armed on it too —
+ * rows are gated on `loaded`, not `active`, so a paused reader can reposition
+ * before ever pressing play. With no element there is nothing to assign
+ * currentTime on, so that case writes the target into the pending-restore
+ * descriptor instead: the displayed clock moves right away, the snapshot is
+ * re-persisted so closing the app immediately after still remembers it, and
+ * the eventual rebuild's own _seekOnMetadata starts there.
+ *
  * @param {number} seconds
  * @returns {void}
  */
 function seek(seconds) {
-  if (!_el) return;
+  if (!_el) {
+    if (!_pendingRestore) return;
+    // The real duration isn't known yet (no element, no metadata) — only the
+    // lower bound is enforced; the eventual rebuild clamps against the real
+    // element itself.
+    const t = Math.max(0, Number(seconds) || 0);
+    _pendingRestore.time = t;
+    _state.time = t;
+    _lastTick = Math.floor(t);
+    _notify();
+    _persist();
+    return;
+  }
   const max = _state.duration || _el.duration || 0;
   const t = Math.max(0, Math.min(seconds || 0, max || 0));
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }

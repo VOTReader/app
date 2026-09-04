@@ -405,6 +405,41 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(AudioPlayer.getState().time).toBe(12.5);
   });
 
+  /* read-along's tap-to-seek is armed on the boot-restored bar (rows/tap are
+     gated on `loaded`, not `active`, precisely so a paused reader can tap to
+     reposition) — but _el is null until the first toggle() rebuild, and
+     seek() used to be a flat no-op with no element. A tap on a just-launched
+     app silently did nothing. */
+  it('seek on a boot-restored bar (no element yet) moves the pending-restore position instead of no-op', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+      track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+    }));
+    await load();
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    expect(el()).toBe(null);                    // the no-op trap: nothing built yet
+
+    AudioPlayer.seek(340);                      // a tap on a timed clause well past the saved 90s
+    expect(AudioPlayer.getState().time).toBe(340);      // the wash moves immediately
+    expect(el()).toBe(null);                    // still no element — a seek must not itself rebuild
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(340);   // survives closing right after
+
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();                     // the first real tap rebuilds
+      await new Promise((r) => setTimeout(r, 0));
+      el().duration = 600;
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(340);       // starts where the tap landed, not the saved 90
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
   it('toggle pauses a playing track and resumes a paused one; no-ops when idle', () => {
     AudioPlayer.toggle(); // idle — must not throw or build an element
     expect(el()).toBe(null);
@@ -608,6 +643,43 @@ describe('audio-player — sleep at end of track', () => {
     AudioPlayer.stop();
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
   });
+
+  /* _sleepAtTrackEndFire pauses WITHOUT advancing qi (the queue must survive
+     intact), but that left _persist() writing the boot snapshot with qi still
+     on the finished track and time = its own near-end clock. The positions
+     map is protected from this by _finishedUrl; the boot snapshot was not.
+     On the next launch _rebuildRestoredQueue seeks straight back to that
+     clock (its own authority there — the 97% tail rule never applies), so a
+     finished recording immediately re-fires 'ended' and double-advances. */
+  it('advances the boot snapshot past the finished recording instead of parking it at the tail', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    el().duration = 300;
+    el().currentTime = 298;
+    el().dispatchEvent(new Event('timeupdate'));   // _state.time tracks near the end
+    AudioPlayer.setSleepAtTrackEnd();
+
+    el().dispatchEvent(new Event('ended'));         // the preface (queue[0]) finishes
+
+    const snapshot = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(snapshot.qi).toBe(1);              // past the finished preface, not parked on it
+    expect(snapshot.time).toBe(0);
+    expect(snapshot.key).toBe('vol1:letter-a');
+  });
+
+  it('clears the boot snapshot instead when the finished recording was the last in the queue', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });   // queue of 1
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.toggle();                                    // pause — establishes a snapshot exists
+    expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+    AudioPlayer.toggle();                                    // resume
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.setSleepAtTrackEnd();
+
+    el().dispatchEvent(new Event('ended'));
+
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);
+  });
 });
 
 describe('audio-player — listen completion counts', () => {
@@ -810,6 +882,37 @@ describe('audio-player — a library row continues (playTrack rebuilds around it
       expect(s.queue[0].readerCode).toBe('V');
       expect(el().src).toBe(URL_OF('idA2v'));
     });
+  });
+
+  /* The same startPartIndex gap as a Bible book, reached through the OTHER
+     writer: a multi-part letter continued on an alternate reader. The rebuild
+     path is _withRestoredAlternate, not the plain startKey slice, since the
+     saved URL belongs to a rendition the corpus-order rebuild doesn't build
+     by default — it too must clamp to the part the row named. */
+  it('a row continued on an alternate reader mid-part persists that horizon and rebuilds it after a reboot', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playTrack(row({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA2v'), readerCode: 'V', partLabel: 'Part 2' }));
+      el().dispatchEvent(new Event('playing'));
+      el().pause();   // forces an immediate persist
+      const before = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(before.startReader).toBe('V');
+      expect(before.startPartIndex).toBe(1);   // Part 2 = index 1
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // V's Part 1 stays behind the horizon — only V's Part 2 + Letter C rebuild.
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA2v'), URL_OF('idC')]);
+      expect(st.qi).toBe(0);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
   });
 
   it('honors the remembered position of the row it rebuilt around', () => {
@@ -1694,6 +1797,40 @@ describe('audio-player — durable resume (position survives restart)', () => {
     await load();
     expect(AudioPlayer.getState().status).toBe('idle');
   });
+
+  /* startKey alone is the wrong grain for a Bible book (or a multi-part
+     letter): every chapter shares ONE key, so the horizon slice in
+     _rebuildRestoredQueue resolves to index 0 and trims nothing — a reboot
+     regrew every chapter the listener had deliberately started past. */
+  it('a Bible book started at a mid chapter persists its part horizon and rebuilds forward-only after a reboot', async () => {
+    const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:jonah': [
+        ['brm1_jonah_001', '', 'Chapter 1'], ['brm1_jonah_002', '', 'Chapter 2'],
+        ['brm1_jonah_003', '', 'Chapter 3'], ['brm1_jonah_004', '', 'Chapter 4'],
+        ['brm1_jonah_005', '', 'Chapter 5'],
+      ],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    try {
+      AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV', chapterNum: 3 });
+      el().dispatchEvent(new Event('playing'));
+      tick(10);
+      expect(saved().startKey).toBe('bible-brm-kjv:jonah');
+      expect(saved().startPartIndex).toBe(2);   // chapter 3 = index 2
+
+      await load();   // the reboot
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      // Forward-only: chapters 1-2 stay behind the horizon; only 3-5 rebuild.
+      expect(st.queue.map((t) => t.url)).toEqual([OT('brm1_jonah_003'), OT('brm1_jonah_004'), OT('brm1_jonah_005')]);
+      expect(st.qi).toBe(0);
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+    }
+  });
 });
 
 describe('audio-player — durable per-recording positions', () => {
@@ -2477,6 +2614,63 @@ describe('audio-player — voice switch honors its own promise (noResume)', () =
       el().duration = 240;
       el().dispatchEvent(new Event('loadedmetadata'));
       expect(el().currentTime).toBe(0);   // the switch RESTARTS — no mid-sentence drop
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+});
+
+describe('audio-player — a deferred seek cannot outlive the track it was armed for', () => {
+  /* _seekOnMetadata defers to 'loadedmetadata' when the element has no
+     metadata yet. There is one singleton element and (pre-fix) no generation
+     token, so a listener armed for a track whose metadata never arrived —
+     the reader moved on before it did — stayed registered and fired on
+     whatever loaded next instead, silently reseeking a track nobody asked
+     to resume. */
+  it('a second play with no saved position is not hijacked by a still-pending resume seek from the first', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === URL_OF('idA1') ? { t: 600, d: 3600 } : null),
+      setPosition() {}, clearPosition() {},
+    };
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+      expect(el().src).toBe(URL_OF('idA1'));   // A's resume seek is armed; A never sends loadedmetadata
+
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(el().src).toBe(URL_OF('idC'));
+      el().duration = 240;
+      el().dispatchEvent(new Event('loadedmetadata'));   // letter C's metadata — A's stale listener hears it too
+
+      expect(el().currentTime).toBe(0);   // NOT 595 — that seek belonged to letter A
+    } finally {
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+
+  it('a noResume edition switch mid-buffer is not reseeked by the chapter it replaced', () => {
+    const target = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/wop1_jonah_002.mp3';
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-wop-nkjv:jonah': [['wop1_jonah_001', '', 'Chapter 1'], ['wop1_jonah_002', '', 'Chapter 2']],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === target ? null : { t: 90, d: 300 }),
+      setPosition() {}, clearPosition() {},
+    };
+    try {
+      // Chapter 1 has a remembered position; its metadata never arrives.
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 1 });
+
+      // The listener switches chapter mid-buffer; noResume means "start this
+      // again", which must hold even though chapter 1's seek is still armed.
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 2, noResume: true });
+      expect(el().src).toBe(target);
+      el().duration = 240;
+      el().dispatchEvent(new Event('loadedmetadata'));
+
+      expect(el().currentTime).toBe(0);   // NOT chapter 1's remembered ~85s
     } finally {
       delete globalThis.BIBLE_AUDIO_MANIFEST;
       delete globalThis.BIBLE_AUDIO_BOOKS;
