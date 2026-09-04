@@ -4,6 +4,22 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
+/** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
+    bookmark decoration chrome (marker digit or icon glyph), not reading text.
+    hlDisplayText skips these so a stored annotation's `text` matches
+    computeAndShow's own .fn-ref/.hl-note-icon strip of selInfo.text — the
+    caller still advances its running offset over the skipped node, so
+    container-textContent coordinates (what computeOffset/applyDOMHighlights
+    index, footnote digits included) never shift. */
+function isAnnotationChrome(n, container) {
+  var el = n.parentElement;
+  while (el && el !== container) {
+    if (el.matches && el.matches('.fn-ref, .hl-note-icon, .verse-link-icon, .inline-bookmark-icon, .inline-link-icon')) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -12,7 +28,7 @@ function hlDisplayText(container, tcText, start, end) {
     var n = walker.currentNode;
     var nLen = n.textContent.length;
     var nEnd = off + nLen;
-    if (nEnd > start && off < end) {
+    if (nEnd > start && off < end && !isAnnotationChrome(n, container)) {
       var block = n.parentElement;
       while (block && block !== container && block.tagName !== 'DIV' && block.tagName !== 'P') block = block.parentElement;
       if (prevBlock && block !== prevBlock) parts.push('\n');
