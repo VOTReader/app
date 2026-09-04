@@ -41,6 +41,12 @@ function collect(dir, out) {
 const LITERAL = /font-?[sS]ize\s*:\s*["']?\s*[0-9.]+(rem|px)\b/g;
 // The token declarations themselves: `--fs-12: 0.75rem;` / `--fsc-12: 12px;`
 const TOKEN_DECL = /^\s*--fsc?-\d+\s*:/;
+// Blank out block comments (newlines kept, so line numbers hold) before the
+// literal scan — a doc comment quoting `font-size: 14px` is prose, not a
+// violation. check-css-tokens.js does the same.
+function stripBlockComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+}
 
 // Any reference to a scale token: `var(--fs-19)` / `var(--fsc-12)`.
 const TOKEN_REF = /var\(\s*(--fsc?-\d+)\s*[),]/g;
@@ -63,7 +69,7 @@ const violations = [];
 const phantoms = [];
 for (const file of files) {
   const rel = path.relative(path.join(__dirname, '..'), file).replace(/\\/g, '/');
-  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+  const lines = stripBlockComments(fs.readFileSync(file, 'utf8')).split(/\r?\n/);
   lines.forEach((line, i) => {
     TOKEN_REF.lastIndex = 0;
     let r;

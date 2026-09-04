@@ -360,7 +360,10 @@ console.log(`[audio-sync] ${rowsChecked} rows across ${nTimelines} timelines; ` 
   `${touchedChars ? Math.round((timedChars / touchedChars) * 1000) / 10 : 0}% of touched characters timed`);
 
 const notAllowed = (k) => !ALLOWED.has(k);
-const blocking = failures.filter((f) => notAllowed(f.key));
+// The register waives STALENESS only: a key queued for re-alignment can still
+// grow a new overlap or malformed row, and those block like anywhere else.
+const waivable = (f) => f.kind === 'STALE-DOMAIN' && ALLOWED.has(f.key);
+const blocking = failures.filter((f) => !waivable(f));
 const waived = failures.length - blocking.length;
 const stillListed = [...ALLOWED].filter((k) => !perKey.has(k)).sort();
 
