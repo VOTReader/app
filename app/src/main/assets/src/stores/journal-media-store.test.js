@@ -16,8 +16,13 @@
    a working Blob type.
 
    The store closes its cached connection on versionchange so Clear All
-   can delete this database. Per-test isolation still uses
-   `pruneOrphans([])` to keep the ordinary cases cheap.
+   can delete this database. Per-test isolation is an UNCONDITIONAL wipe
+   (allIds + delete), deliberately not `pruneOrphans([])`: prune is policy
+   and the isolation reset must not be. journal-3 makes prune skip records
+   carrying the `unlinked` marker, so a prune-based reset would silently
+   stop clearing exactly the records these tests seed — and the leak would
+   surface as a phantom failure in whichever case ran next in file order.
+   An isolation reset may never share code with the thing under test.
 
    Per [[user-data-paramount]] orphan pruning is one of the most
    dangerous "user data deleter" surfaces in the app: a bug here
@@ -56,12 +61,18 @@ beforeAll(async () => {
 });
 
 // Per-test isolation: wipe every blob before each case so accumulated
-// state from prior tests doesn't bleed into the next. pruneOrphans([])
-// goes through the store's own delete path so the URL cache stays
-// consistent with the underlying object store.
+// state from prior tests doesn't bleed into the next. Goes through the
+// store's own delete path so the URL cache stays consistent with the
+// underlying object store.
+//
+// NOT `pruneOrphans([])`, though it once was: prune carries policy
+// (journal-3 makes it skip `unlinked` records) and an isolation reset
+// must clear unconditionally, or the suite stops being isolated the day
+// that policy changes.
 beforeEach(async () => {
   await JournalMediaStore.abortImportReplace();
-  await JournalMediaStore.pruneOrphans([]);
+  var ids = await JournalMediaStore.allIds();
+  await Promise.all(ids.map(function(id) { return JournalMediaStore.delete(id); }));
 });
 
 /* Helper: build a small Blob with deterministic bytes so we can
@@ -364,7 +375,9 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
     URL.createObjectURL = () => 'blob:trim-' + (++n);
     URL.revokeObjectURL = (u) => { revoked.push(u); };
     try {
-      await JournalMediaStore.pruneOrphans([]); // clean slate
+      // Clean slate, unconditional — same reason as the beforeEach above.
+      var seeded = await JournalMediaStore.allIds();
+      await Promise.all(seeded.map(function(id) { return JournalMediaStore.delete(id); }));
       await JournalMediaStore.put({ id: 't1', type: 'image', blob: new Blob([new Uint8Array([1])]) });
       await JournalMediaStore.put({ id: 't2', type: 'image', blob: new Blob([new Uint8Array([2])]) });
       const u1 = await JournalMediaStore.objectUrl('t1'); // populate the LRU
