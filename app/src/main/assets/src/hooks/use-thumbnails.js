@@ -11,11 +11,12 @@
        theme class forced, so the Tabs overview always has the right-theme
        card and a theme switch never mixes dark+light walls)
      - setTabThumbnails   (returned so App's closeAllTabs can clear it)
-     - IDB load-on-mount  (idbReadAll — gated on tabsEnabled; reads + keeps
-                           only the live tabs' keys, deleting the rest —
-                           boot-performance-5)
-     - GC effect          (debounced, removes stale keys no longer tied
-                           to any open tab)
+     - IDB load-on-mount  (idbReadAll — gated on tabsEnabled; reads ONLY the
+                           live tabs' keys and deletes nothing; re-runs when
+                           the set of open tabs changes — boot-performance-5
+                           and its follow-up)
+     - GC effect          (debounced; sweeps the STORE's keys, not React
+                           state, and only once StateStore reports 'loaded')
      - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled;
                                    failed captures retry up to 3× @2.5s;
                                    takes { urgent } — non-urgent calls defer
@@ -58,12 +59,15 @@
 
    STORAGE:
      IndexedDB — written via idbPut(key, dataUrl); read via
-     idbReadAll(liveKeys) on mount, gated on tabsEnabled and re-run if it
-     flips true later — a tabs-off session reads nothing, and only the
-     currently-open tabs' rows are read (dead rows are deleted inline by
-     idbReadAll itself — boot-performance-5). Keys are content-signature
-     strings produced by tabContentKey(tab) — survive tab-index shifts
-     (close/reorder).
+     idbReadAll(liveKeys), gated on tabsEnabled and re-run when tabsEnabled
+     flips true OR the set of open tabs changes — a tabs-off session reads
+     nothing, and only the currently-open tabs' rows are read.
+     idbReadAll DELETES NOTHING: its key set derives from `tabs`, which can be
+     synthetic boot defaults on a degraded vot-state hydration, so a delete
+     there wiped the whole store (boot-performance-5 and its follow-up).
+     Dead rows die in the GC effect, which sweeps idbAllKeys() and runs only
+     once StateStore says 'loaded'. Keys are content-signature strings produced
+     by tabContentKey(tab) — survive tab-index shifts (close/reorder).
 
    WINDOW: none — no window.__* handler bridges wired. Content-tab captures
      go through PlatformBridge.takeThemedScreenshot(curTheme) — an html2canvas
@@ -249,6 +253,12 @@ export function useThumbnails({
   // blank forever (background tabs never recapture). Any variant under the
   // floor is dropped; an entry left empty is deleted → placeholder until the
   // next good capture.
+  // The open tabs' content keys as one primitive, so the read effect below can
+  // depend on the SET of tabs without depending on the `tabs` array identity
+  // (which changes on every render). Newline-joined because a content key can
+  // contain most punctuation but never a newline.
+  const liveKeySig = tabs.map((t) => tabContentKey(t)).join('\n');
+
   React.useEffect(() => {
     // boot-performance-5: tabs off ⇒ nothing to show, so read nothing. Re-runs
     // (and then actually reads) the moment tabsEnabled flips true.
@@ -263,7 +273,7 @@ export function useThumbnails({
     // list would wipe every real thumbnail before the true state arrived.
     // Dead rows are the debounced GC effect's job below: it depends on
     // [tabs, tabThumbnails], so it re-runs once the real tabs hydrate.
-    const liveKeys = tabs.map((t) => tabContentKey(t));
+    const liveKeys = liveKeySig ? liveKeySig.split('\n') : [];
     idbReadAll(liveKeys).then((thumbs) => {
       if (cancelled) return;
       const norm = {};
@@ -316,23 +326,66 @@ export function useThumbnails({
       });
     });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsEnabled gates AND re-triggers this read (boot-performance-5: tabs-off reads nothing; flipping tabsEnabled true runs it). `tabs` is read once per run to build the live-key filter — it must NOT retrigger this normalize/probe pipeline on every tab open/close, that's the debounced GC effect below.
-  }, [tabsEnabled]);
+    // tabsEnabled gates AND re-triggers this read; liveKeySig re-triggers it
+    // when the SET of open tabs changes. The comment that used to sit here said
+    // `tabs` must not retrigger the normalize/probe pipeline on every tab edit
+    // — that was written when this read was a full dump of every stored row. It
+    // reads only the live rows now, so the cost is a handful of keys, and NOT
+    // re-reading was itself the defect: on a degraded vot-state hydration the
+    // mount read runs against one synthetic tab, and with deps [tabsEnabled]
+    // alone the real tabs' thumbnails were never loaded for the rest of the
+    // session (Verifier, boot-performance-5 follow-up). Depending on the
+    // signature string rather than `tabs` is what keeps it from firing on every
+    // render — the array identity changes constantly, the key set does not.
+  }, [tabsEnabled, liveKeySig]);
 
   // ── Garbage-collect stale thumbnails ───────────────────────────────────
   // Debounced so we don't thrash during rapid tab edits.
+  //
+  // The sweep reads the STORE's keys, not React state. It used to derive
+  // deadKeys from Object.keys(tabThumbnails), which worked only while the
+  // mount read was a full dump: after boot-performance-5 scoped that read to
+  // live keys, a row whose tab closed in a PREVIOUS session never enters state
+  // and a state-derived sweep can never see it. `closeAllTabs` is the concrete
+  // path — it does setTabThumbnails({}), state only, so on the next boot those
+  // rows were neither loaded nor collected and the JPEGs stayed forever
+  // (Verifier, boot-performance-5 follow-up).
+  //
+  // THE INVARIANT, and it is the whole reason this is written the way it is:
+  // NO DELETE KEYED OFF `tabs` MAY RUN BEFORE `tabs` IS KNOWN TO BE REAL.
+  // `tabs` comes from the persisted vot-state, which mounts on synthetic boot
+  // defaults when hydration times out (storage-backup-3). Sweeping then would
+  // delete every real thumbnail — which is exactly what the first version of
+  // boot-performance-5 did, inline in the read. So the sweep asks StateStore
+  // whether it has actually loaded. No state store at all (LS-only mode, a
+  // test harness) counts as loaded: there is no deferred hydration to wait for.
   const thumbGcTimerRef = React.useRef(null);
   React.useEffect(() => {
     clearTimeout(thumbGcTimerRef.current);
     thumbGcTimerRef.current = setTimeout(() => {
+      const stateReal = typeof StateStore === 'undefined'
+        || typeof StateStore.getState !== 'function'
+        || StateStore.getState() === 'loaded';
+      if (!stateReal) return;
       const liveKeys = new Set(tabs.map((t) => tabContentKey(t)));
-      const deadKeys = Object.keys(tabThumbnails).filter((k) => !liveKeys.has(k));
-      if (deadKeys.length === 0) return;
-      deadKeys.forEach((k) => idbDelete(k));
+      // typeof guard for the same reason every other cross-bundle call in this
+      // file has one: idbAllKeys is a bundle-d global, and a harness that only
+      // stubs the reads should not crash on the sweep.
+      if (typeof idbAllKeys === 'function') {
+        idbAllKeys().then((keys) => {
+          const deadKeys = keys.filter((k) => !liveKeys.has(k));
+          if (deadKeys.length) deadKeys.forEach((k) => idbDelete(k));
+        });
+      }
+      // State still prunes independently — it can hold a key the store lost.
       setTabThumbnails((prev) => {
         const out = {};
-        for (const k of Object.keys(prev)) if (liveKeys.has(k)) out[k] = prev[k];
-        return out;
+        let changed = false;
+        for (const k of Object.keys(prev)) {
+          if (liveKeys.has(k)) out[k] = prev[k];
+          else changed = true;
+        }
+        return changed ? out : prev;
       });
     }, 2000);
     return () => clearTimeout(thumbGcTimerRef.current);

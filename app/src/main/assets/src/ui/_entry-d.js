@@ -91,7 +91,7 @@ import {
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
-  openThumbDB, idbPut, idbDelete, idbReadAll,
+  openThumbDB, idbPut, idbDelete, idbReadAll, idbAllKeys,
 } from '../stores/thumb-store.js';
 import {
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
@@ -250,7 +250,7 @@ Object.assign(window, {
   __loadAudioSync, __audioSyncStore, __loadBibleSync, __bibleSyncStore,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
-  openThumbDB, idbPut, idbDelete, idbReadAll,
+  openThumbDB, idbPut, idbDelete, idbReadAll, idbAllKeys,
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
   loadTranslation, loadBibleStudies, translateVerse,
   translationLabel, translationName,
