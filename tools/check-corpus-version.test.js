@@ -78,7 +78,27 @@ function runGate(root, args = []) {
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', all: (r.stdout || '') + (r.stderr || '') };
 }
 
-describe('check-corpus-version — bible- glob excludes bundle-a members (RED before service-worker-2, 2026-09-04; GREEN after)', () => {
+// Why this file needs its own timeout, and why it is not a global bump.
+//
+// Both cases here do REAL WORK before they can assert: mkdtemp a throwaway repo
+// mirror, write the corpus files into it, copy the gate in, then spawnSync a
+// fresh node process — twice per case, once to seed the lock and once to check
+// it. That is the design: the gate resolves ROOT from its own import.meta.url
+// and exports nothing, so driving it any other way would stop testing the thing
+// the pre-commit hook runs.
+//
+// Measured 2026-09-04 on this machine: 2.6 s for the file idle. Under the full
+// suite with other gate runs competing, both cases blew the 5 s default at
+// 19.4 s and 17.1 s — timeouts, not assertion failures, and they pass alone
+// immediately after. Same shape and same 30 s as tools/check-apk-assets.test.js,
+// which took two independent sightings to diagnose; this file has the identical
+// spawn-per-case design and would have cost the next person the same hour.
+//
+// Do NOT lower it back to the default and do NOT raise testTimeout globally:
+// every other suite in this repo is pure and should keep failing at 5 s.
+const SPAWN_TIMEOUT_MS = 30_000;
+
+describe('check-corpus-version — bible- glob excludes bundle-a members (RED before service-worker-2, 2026-09-04; GREEN after)', { timeout: SPAWN_TIMEOUT_MS }, () => {
   it('does not demand a CORPUS_VERSION bump when a bundle-a-concatenated file changes', () => {
     const { root, dataDir } = mirror();
     expect(runGate(root).status, 'lock seed').toBe(0);
