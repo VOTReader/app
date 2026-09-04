@@ -118,6 +118,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   var previewUrlRef = useRef(null);
   var previewAudioRef = useRef(null);
   var pendingSaveRef = useRef(false);      // Save tapped before recording finished
+  // journal-3 (a): the id of the record committed at finalize(), before the
+  // user has seen anything. Save links it; Discard deletes it.
+  var committedIdRef = useRef(null);
+  // journal-3: re-runs the fetch that failed, from attempt 0, against the same
+  // served url. Set only on the Android fetch path -- the file is still on disk
+  // for the TTL window, so this is a real second chance, not a re-record.
+  var retryFetchRef = useRef(null);
 
   // Cleanup helper — releases the bridge's recording resources + clears
   // UI intervals + frees the preview Blob URL. Idempotent; safe from any
@@ -176,6 +183,31 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       }
 
       // Common tail: given the resolved audio Blob, preview it (or auto-save).
+      // journal-3 clause (a): COMMIT, THEN PREVIEW. The durability line is
+      // JournalMediaStore.put() resolving -- STORE-3 makes it resolve on the
+      // transaction commit, not the request's onsuccess, so bytes before that
+      // line are volatile and bytes after it are user data.
+      //
+      // This used to hold the blob in memory through the whole preview stage
+      // and only put it when Save was tapped. Everything in between -- review,
+      // retry, composing an entry around it -- was a window in which the
+      // process dying lost a finished recording outright, with the bytes
+      // sitting on disk the entire time.
+      //
+      // THE TRADE, and it is deliberate: a take the user means to throw away
+      // is now written to disk first and deleted on discard, so a crash
+      // between those two leaves an unwanted recording in the Hub banner.
+      // That is the correct side to err on. User data is paramount here and
+      // export/import is the only backup: a visible unwanted recording costs
+      // one tap, an invisible lost one is unrecoverable. Do not "optimise"
+      // this order back.
+      //
+      // The record carries `unlinked: true` because no journal entry
+      // references it yet -- that marker is what stops the boot sweep pruning
+      // it as an orphan before the user has ever been shown it.
+      //
+      // Each call issues a NEW put, so a failed commit cannot resolve from a
+      // cached promise and look durable; the transaction is real every time.
       function finalize(audioBlob) {
         if (cancelled) return;
         if (!audioBlob || audioBlob.size === 0) {
@@ -183,22 +215,41 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           setStage('error');
           return;
         }
-        previewBlobRef.current = audioBlob;
-        try { previewUrlRef.current = URL.createObjectURL(audioBlob); } catch (_e) { /* best-effort */ }
         var d = Math.max(1, Math.round((durMs || 0) / 1000));
-        previewDurationRef.current = d;
-        setWaveFinal(samplesAccumRef.current.slice());
-        setSeconds(d);
-        if (pendingSaveRef.current) {
-          pendingSaveRef.current = false;
-          persistRecording();
-        } else {
-          setStage('preview');
-        }
+        JournalMediaStore.put({
+          type: 'audio',
+          blob: audioBlob,
+          mime: audioBlob.type || 'audio/webm',
+          duration: d,
+          unlinked: true
+        }).then(function(id) {
+          if (cancelled) return;
+          committedIdRef.current = id;
+          previewBlobRef.current = audioBlob;
+          // Keep the local object URL for playback: the bytes are durable
+          // either way, so re-reading them out of the store buys nothing.
+          try { previewUrlRef.current = URL.createObjectURL(audioBlob); } catch (_e) { /* best-effort */ }
+          previewDurationRef.current = d;
+          setWaveFinal(samplesAccumRef.current.slice());
+          setSeconds(d);
+          if (pendingSaveRef.current) {
+            pendingSaveRef.current = false;
+            persistRecording();
+          } else {
+            setStage('preview');
+          }
+        }).catch(function(err) {
+          if (cancelled) return;
+          // Storage-full now surfaces HERE rather than at save time, which is
+          // better: the user learns before composing an entry around it.
+          if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+          setError('Failed to save recording.');
+          setStage('error');
+        });
       }
       function fail(e) {
         console.warn('recording decode failed', e);
-        setError('Could not process the recording. Please try again.');
+        setError('Could not read the recording from the device.');
         setStage('error');
       }
 
@@ -228,12 +279,23 @@ export function JournalRecordingSheet({ onSave, onClose }) {
                 throw e;
               });
           };
-          fetchAttempt(0)
-            .then(function(fb) { finalize(fb && !fb.type ? new Blob([fb], { type: mime || 'audio/mp4' }) : fb); })
-            .catch(function(e) {
-              if (b64) { try { finalize(decodeB64()); return; } catch (_e2) { /* fall through */ } }
-              fail(e);
-            });
+          // The `if (b64)` fallback that used to sit in this catch is GONE.
+          // It could never run: native's own contract is "exactly one of the
+          // two is non-null on success", so on this path b64 is always null.
+          // A comment may only claim a guarantee if it can name the code that
+          // executes it, and that branch named nothing.
+          //
+          // Each call here starts a NEW fetch -- no settled promise is held
+          // anywhere -- so re-entering at attempt 0 is a genuine retry rather
+          // than a re-await of the same rejection. That is what makes the Try
+          // again button on the error stage real instead of decorative.
+          var runFetch = function() {
+            fetchAttempt(0)
+              .then(function(fb) { finalize(fb && !fb.type ? new Blob([fb], { type: mime || 'audio/mp4' }) : fb); })
+              .catch(function(e) { fail(e); });
+          };
+          retryFetchRef.current = runFetch;
+          runFetch();
           return;
         }
         // 3) Android legacy/base64 path.
@@ -425,6 +487,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
   function discard() {
     pendingSaveRef.current = false;
+    // journal-3 (a): the take was committed before the user ever saw it, so
+    // discarding has to delete it. An explicit user choice made at a confirm
+    // gate, not a silent drop -- the second half of the trade documented at
+    // finalize().
+    var id = committedIdRef.current;
+    committedIdRef.current = null;
+    if (id && JournalMediaStore.delete) JournalMediaStore.delete(id);
     cleanup();
     onClose && onClose();
   }
@@ -455,23 +524,26 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       ? samplesAccumRef.current
       : (waveFinal && waveFinal.length ? waveFinal : null);
     var samplesOut = downsampleWave(rawSamples, WAVE_STORE_BARS);
-    JournalMediaStore.put({
-      type: 'audio',
-      blob: blob,
-      mime: blob.type || 'audio/webm',
-      duration: previewDurationRef.current || seconds
-    }).then(function(id) {
-      onSave && onSave({
-        mediaId: id,
-        duration: previewDurationRef.current || seconds,
-        samples: samplesOut
-      });
-      cleanup();
-    }).catch(function(err) {
-      if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+    // journal-3 (a): the bytes were committed at finalize(). This links them.
+    var id = committedIdRef.current;
+    if (!id) {
       setError('Failed to save recording.');
       setStage('error');
+      return;
+    }
+    onSave && onSave({
+      mediaId: id,
+      duration: previewDurationRef.current || seconds,
+      samples: samplesOut
     });
+    // Best-effort, and safe in this direction only: the authoritative test for
+    // "unclaimed" is marker AND unreferenced, so a failed clear costs at most
+    // one spurious banner row if this entry is later deleted. Clearing the
+    // marker BEFORE onSave would hand the record to the sweep with nothing
+    // protecting it.
+    if (JournalMediaStore.markLinked) JournalMediaStore.markLinked(id);
+    committedIdRef.current = null;
+    cleanup();
   }
 
   function save() {
@@ -561,11 +633,23 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
   function renderContent() {
     if (stage === 'error') {
+      // journal-3: "Try again" re-fetches the SAME served file, which native
+      // still holds on disk for the TTL window -- a real second chance at the
+      // recording that just failed. The old copy read "Please try again",
+      // which meant record it again; the two must not be confusable, so the
+      // button says what it retries and the message no longer invites a
+      // re-record.
       return (
         <div>
           <div className="jrn-rec-error">{error || 'Recording failed.'}</div>
           <div className="jrn-rec-actions">
             <button className="jrn-rec-cancel" onClick={discard}>Close</button>
+            {retryFetchRef.current && (
+              <button
+                className="jrn-rec-confirm-btn"
+                onClick={function() { setError(''); setStage('recording'); retryFetchRef.current(); }}
+              >Try again</button>
+            )}
           </div>
         </div>
       );

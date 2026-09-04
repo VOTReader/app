@@ -334,6 +334,33 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
  * store on the strength of it would be the same overreach in the other
  * direction.
  *
+ * MISSING IS DERIVED FROM THE RECORD, NEVER FROM THE URL. `objectUrl`
+ * resolves null for three different facts, and only two of them are a loss:
+ *
+ *   1. no such record                                  → missing
+ *   2. a record with no blob                           → missing
+ *   3. URL.createObjectURL THREW on an intact blob     → NOT missing
+ *      (journal-media-store.js catches it and returns null)
+ *
+ * Collapsing them would paint "Recording missing" over bytes that are
+ * perfectly fine — and the block's delete control sits right beside that
+ * text, so it reads as a prompt to finish the job. The user removes the
+ * block, the record goes unreferenced and unmarked, and the boot sweep
+ * prunes it: real audio destroyed by a transient URL-minting failure. That
+ * is this design's own loss class, reached through an affordance we
+ * deliberately kept. The extra `get` only runs on the null path, where the
+ * block is already broken, so the healthy path pays nothing.
+ *
+ * A rejection is not evidence either. `objectUrl` propagates failures out of
+ * `get`/`openDb` — "IndexedDB not available", "database open blocked" are
+ * both real — and without the catch, setState never fires and the block
+ * spins forever.
+ *
+ * ponytail: case 3 renders as LOADING, i.e. a silently blank block, rather
+ * than earning a third visual state. Wrong in this direction costs a blank
+ * block; wrong in the other costs user data. The console.warn is what makes
+ * it diagnosable — add the third state if it is ever seen in the wild.
+ *
  * @param {string | undefined} mediaId
  * @returns {{ url: string | null, missing: boolean }}
  */
@@ -345,7 +372,17 @@ function useMediaUrl(mediaId) {
     if (typeof JournalMediaStore === 'undefined') { setState({ url: null, missing: false }); return undefined; }
     setState({ url: null, missing: false });   // a new id is loading again, not missing
     JournalMediaStore.objectUrl(mediaId).then(function(url) {
-      if (!cancelled) setState({ url: url || null, missing: !url });
+      if (cancelled) return undefined;
+      if (url) { setState({ url: url, missing: false }); return undefined; }
+      return JournalMediaStore.get(mediaId).then(function(rec) {
+        if (cancelled) return;
+        var gone = !rec || !rec.blob;
+        if (!gone) console.warn('journal media: record intact but no object URL', mediaId);
+        setState({ url: null, missing: gone });
+      });
+    }).catch(function(e) {
+      // An IDB error tells us about the database, not about the recording.
+      if (!cancelled) { console.warn('journal media lookup failed', mediaId, e); setState({ url: null, missing: false }); }
     });
     return function() { cancelled = true; };
   }, [mediaId]);
