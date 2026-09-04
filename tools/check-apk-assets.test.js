@@ -79,6 +79,28 @@ export function loadStudies() {
 }
 `;
 
+/**
+ * Why this file needs its own timeout, and why it is not a global bump.
+ *
+ * Every case here does REAL WORK before it can assert: mkdtemp a throwaway
+ * repo mirror, write five files into it, copy the gate in, then spawnSync a
+ * fresh node process and wait for it. Five cases, five processes. That is the
+ * design — the gate resolves ROOT from its own import.meta.url and exports
+ * nothing, so driving it any other way would stop testing the thing the
+ * pre-commit hook runs.
+ *
+ * Measured 2026-09-04 on this machine (24 cores): 100-822 ms per case idle,
+ * the first case paying node's cold start. Under a full 238-file suite it has
+ * been seen at 7.9-11.4 s (Verifier) and once past the 5 s default (Data
+ * Builder) — two independent sightings on different branches, so it is load,
+ * not a hang. 30 s is ~36x the idle worst case and ~2.6x the worst seen, and
+ * still fails fast if a spawn genuinely never returns.
+ *
+ * Do NOT "fix" this back to the default and do NOT raise testTimeout globally:
+ * every other suite in this repo is pure and should keep failing at 5 s.
+ */
+const SPAWN_TIMEOUT_MS = 30_000;
+
 const mirrors = [];
 afterEach(() => { for (const m of mirrors.splice(0)) rmSync(m, { recursive: true, force: true }); });
 
@@ -110,7 +132,7 @@ function runGate(root) {
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', all: (r.stdout || '') + (r.stderr || '') };
 }
 
-describe('check-apk-assets — the harness drives the real gate (positive controls)', () => {
+describe('check-apk-assets — the harness drives the real gate (positive controls)', { timeout: SPAWN_TIMEOUT_MS }, () => {
   it('FAILS when a runtime-injected asset is excluded by a <dir> pattern', () => {
     const gradle = GRADLE_WITH_BLOCK.replace('"<dir>ui",', '"<dir>ui", "<dir>data",');
     const r = runGate(mirror({ gradle, loader: LOADER_LITERAL }));
@@ -134,7 +156,7 @@ describe('check-apk-assets — the harness drives the real gate (positive contro
   });
 });
 
-describe('check-apk-assets — refuses to pass vacuously (RED against the old gate; GREEN since the floors landed 2026-09-01)', () => {
+describe('check-apk-assets — refuses to pass vacuously (RED against the old gate; GREEN since the floors landed 2026-09-01)', { timeout: SPAWN_TIMEOUT_MS }, () => {
   it('FAILS, not "nothing to check", when the ignoreAssetsPatterns block is not found', () => {
     const r = runGate(mirror({ gradle: GRADLE_WITHOUT_BLOCK, loader: LOADER_LITERAL }));
     expect(r.status, 'exit 0 with the block unmatched means the gate is disarmed:\n' + r.all).toBe(1);
