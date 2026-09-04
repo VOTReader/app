@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { dataSignature, loadCached, saveCached, clearCached, MS_INDEX_VERSION, CORPUS_CONTENT_VERSION } from './cache.js';
+import { dataSignature, loadCached, saveCached, clearCached, openDb, MS_INDEX_VERSION, CORPUS_CONTENT_VERSION } from './cache.js';
 
 describe('cache signature', () => {
   beforeEach(() => { for (const k of ['BOOKS', 'MATTHEW', 'LETTERS_V1', 'WTLB_ONE']) delete globalThis[k]; });
@@ -66,5 +66,20 @@ describe('cache IDB round-trip', () => {
     await saveCached('s', '{"y":2}');
     await clearCached();
     expect(await loadCached('s')).toBeNull();
+  });
+});
+
+describe('cache IDB — storage-backup-4 sibling: an open connection must not block Clear All', () => {
+  it('REPRO: deleteDatabase succeeds (not blocked) while a connection from openDb is still live', async () => {
+    const db = await openDb();
+    expect(db).toBeTruthy();
+    const outcome = await new Promise((resolve) => {
+      // Settings -> Clear All My Data's exact call for this database.
+      const req = indexedDB.deleteDatabase('vot-minisearch-cache');
+      req.onsuccess = () => resolve('success');
+      req.onblocked = () => resolve('blocked');
+      req.onerror = () => resolve('error');
+    });
+    expect(outcome).toBe('success');
   });
 });
