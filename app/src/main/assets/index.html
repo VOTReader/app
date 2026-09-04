@@ -43,7 +43,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-CQoPAKAyRdgBaY5sn0DYqNzrQaG8r8lNKpbAPsNOh6I=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-y6Fm5brG6xLmw2z8g7CF79Y4nf8+zvR+rxLaIJYHdSo=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -180,6 +180,19 @@
     };
     var load = function() {
       if (corpus._promise) return corpus._promise;
+      // service-worker-1: a new worker has claim()ed this page and deleted the
+      // OLD core cache, but the page was deliberately kept on the build it
+      // already parsed (sw-register.js: a visible reader is not yanked out of a
+      // letter). Every byte this loader would fetch now comes from the NEW
+      // build, so appending it would run new code against old already-parsed
+      // globals — a silent mixed-build state. Reload instead: the reader is
+      // interrupted only at the moment they ask for something that cannot be
+      // served safely, and they land on one coherent build.
+      if (window.__votSwTookOver) {
+        corpus._promise = new Promise(function() {});   // never settles; the reload takes over
+        window.location.reload();
+        return corpus._promise;
+      }
       // Retry: clear a prior error so subscribers flip back to the loading state.
       if (corpus.error) { corpus.error = false; corpus._bump(); }
       corpus._promise = new Promise(function(resolve, reject) {
