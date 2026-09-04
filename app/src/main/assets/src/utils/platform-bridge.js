@@ -62,6 +62,8 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => number} nativeRecordAmplitude
  * @property {() => void} nativeRecordStop
  * @property {() => void} nativeRecordCancel
+ * @property {(name: string) => string | null} nativeReadRecording
+ * @property {(name: string) => boolean} nativeDeleteRecording
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
  * @property {() => void} openFilePicker
@@ -136,6 +138,8 @@ const androidImpl = {
   nativeRecordAmplitude: () => /** @type {any} */ (window).AndroidBridge.nativeRecordAmplitude(),
   nativeRecordStop: () => /** @type {any} */ (window).AndroidBridge.nativeRecordStop(),
   nativeRecordCancel: () => /** @type {any} */ (window).AndroidBridge.nativeRecordCancel(),
+  nativeReadRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeReadRecording(name),
+  nativeDeleteRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeDeleteRecording(name),
   // Android takeScreenshot is sync (PixelCopy on a binder thread); wrap in
   // Promise.resolve to give consumers a uniform Promise<string> shape on
   // both platforms. Web returns html2canvas's genuine async Promise.
@@ -1050,6 +1054,11 @@ const webImpl = {
   nativeRecordAmplitude: webNativeRecordAmplitude,
   nativeRecordStop: webNativeRecordStop,
   nativeRecordCancel: webNativeRecordCancel,
+  // Web has no served-file dir: webNativeRecordStop hands the Blob straight to
+  // __onNativeRecordingComplete, so there is never a second route to fall back to
+  // and never a native copy to release. Inert, not unimplemented.
+  nativeReadRecording: () => null,
+  nativeDeleteRecording: () => false,
 
   // Category 4 — not-yet-implemented warnings (void returns only)
   haptic: notYetImplemented('haptic'),                       // future; haptic JS wiring not yet present

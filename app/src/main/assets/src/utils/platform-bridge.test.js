@@ -32,6 +32,8 @@ const METHODS = [
   'nativeRecordAmplitude',
   'nativeRecordStop',
   'nativeRecordCancel',
+  'nativeReadRecording',
+  'nativeDeleteRecording',
   'setZoomEnabled',
   'resetZoom',
   'getZoomScale',
@@ -79,6 +81,8 @@ function mockAndroidBridge() {
     nativeRecordAmplitude: vi.fn(() => 8192),
     nativeRecordStop: vi.fn(),
     nativeRecordCancel: vi.fn(),
+    nativeReadRecording: vi.fn(() => 'YWJj'),
+    nativeDeleteRecording: vi.fn(() => true),
     setZoomEnabled: vi.fn(),
     resetZoom: vi.fn(),
     getZoomScale: vi.fn(() => 1.5),
@@ -186,6 +190,10 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeRecordPause', [], 'ok'],
     ['nativeRecordResume', [], 'ok'],
     ['nativeRecordAmplitude', [], 8192],
+    // journal-3 2a: the second route to a finished memo, and the handshake that
+    // releases it. Passthroughs like the rest -- the validation is Kotlin-side.
+    ['nativeReadRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], 'YWJj'],
+    ['nativeDeleteRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], true],
     ['getZoomScale', [], 1.5],
     // takeScreenshot is the one async method on the bridge — Android wraps
     // its sync native call in Promise.resolve to give consumers a uniform
@@ -263,6 +271,14 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
   it('nativeRecordAmplitude returns 0 on web', () => {
     expect(bridge.nativeRecordAmplitude()).toBe(0);
+  });
+  it('the journal-3 2a recovery verbs are inert on web', () => {
+    // Web has no served-file dir: webNativeRecordStop hands the Blob straight to
+    // __onNativeRecordingComplete, so there is never a second route to fall back
+    // to and never a native copy to release. The VALUES matter — JS branches on
+    // null ("unrecoverable") and on false ("nothing was released").
+    expect(bridge.nativeReadRecording('b1b0e3a2-0000-4000-8000-000000000000.m4a')).toBeNull();
+    expect(bridge.nativeDeleteRecording('b1b0e3a2-0000-4000-8000-000000000000.m4a')).toBe(false);
   });
   it('takeScreenshot returns empty string when html2canvas cannot load', async () => {
     // U13: html2canvas is lazy-loaded via <script> on first web screenshot. In
