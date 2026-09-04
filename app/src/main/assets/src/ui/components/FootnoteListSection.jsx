@@ -2,6 +2,8 @@
    FootnoteListSection — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { scrollBehavior } from '../../utils/reduced-motion.js';
+
 export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);
   if (entries.length === 0) return null;
@@ -10,7 +12,7 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
     // it into view.
     try {
       const el = document.querySelector(`.fn-ref[data-fn-num="${num}"]`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
   };
   return (

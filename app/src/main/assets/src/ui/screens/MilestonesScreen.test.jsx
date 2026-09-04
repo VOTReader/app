@@ -186,6 +186,29 @@ describe('MilestonesScreen — jump chips', () => {
     fireEvent.click(chips[2]);
     expect(scrolled).toEqual([document.querySelectorAll('.milestones-cat-head h2')[2].id]);
   });
+
+  /* a11y-ux-4. The app.css `prefers-reduced-motion` block sets
+     `scroll-behavior: auto !important`, but per CSSOM-View that property is
+     only consulted when the call passes 'auto' — an explicit 'smooth'
+     argument wins over the CSS, !important included. So the jump has to read
+     the media query itself. This screen stands in for the eleven call sites
+     that used to hard-code 'smooth'. */
+  it('jumps without animation when the OS asks for reduced motion', () => {
+    const real = window.matchMedia;
+    window.matchMedia = (q) => ({ matches: q === '(prefers-reduced-motion: reduce)', media: q });
+    try {
+      setupGlobals();
+      renderScreen();
+      const opts = [];
+      for (const h of document.querySelectorAll('.milestones-cat-head h2')) {
+        h.scrollIntoView = function scrollIntoView(o) { opts.push(o); };
+      }
+      fireEvent.click([...document.querySelectorAll('.milestones-jump-chip')][0]);
+      expect(opts).toEqual([{ behavior: 'auto', block: 'start' }]);
+    } finally {
+      window.matchMedia = real;
+    }
+  });
 });
 
 /* The memo. collectAchievementSnapshot reads every store on each rebuild, so

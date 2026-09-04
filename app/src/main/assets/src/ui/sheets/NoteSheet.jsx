@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 /**
  * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props
@@ -287,7 +288,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 placeholder="Write your note…"
                 onFocus={() => {
                   setTimeout(() => {
-                    try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
+                    try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
                   }, 220);
                 }}
               />

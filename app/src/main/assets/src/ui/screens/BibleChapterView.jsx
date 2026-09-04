@@ -6,6 +6,7 @@ import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
@@ -39,7 +40,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     setHighlightedVerses(vs);
     const timer = setTimeout(() => {
       const el = document.getElementById(`v-${vs[0]}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
     const fadeTimer = setTimeout(() => setHighlightedVerses([]), 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };

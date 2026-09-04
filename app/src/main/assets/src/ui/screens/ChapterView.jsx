@@ -5,6 +5,7 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
@@ -52,7 +53,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
     setHighlightedVerses(vs);
     const timer = setTimeout(() => {
       const el = document.getElementById(`v-${vs[0]}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
     const fadeTimer = setTimeout(() => setHighlightedVerses([]), 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };

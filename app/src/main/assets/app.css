@@ -532,8 +532,18 @@
       }
       /* W10-lite — honor the OS "reduce motion" setting (vestibular a11y).
          Near-zero (not 0) keeps animationend/transitionend firing, so JS that
-         awaits a transition (sheet close, toast fade) never hangs; scroll jumps
-         become instant instead of smooth (lands at the same target). */
+         awaits a transition (sheet close, toast fade) never hangs.
+
+         SCOPE (a11y-ux-4, corrected 2026-09-04): `scroll-behavior: auto
+         !important` reaches CSS-DRIVEN scrolling ONLY — the
+         `html { scroll-behavior: smooth }` rule above, anchor jumps, and any
+         scrollIntoView/scrollTo call that passes no `behavior`. Per CSSOM-View
+         the `behavior` option resolves from this property only when it is
+         'auto'; an explicit 'smooth' argument WINS over the property,
+         !important included. JS call sites therefore read the query
+         themselves — src/utils/reduced-motion.js, `scrollBehavior()`. Add a
+         new animated scroll in JS and it needs that helper; this block will
+         not save it. */
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
           animation-duration: 0.01ms !important;

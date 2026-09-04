@@ -7,6 +7,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -161,7 +162,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     setSurpriseBlockId(foundId);
     const timer = setTimeout(() => {
       const el = document.getElementById(foundId);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
     const fadeTimer = setTimeout(() => setSurpriseBlockId(null), 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };

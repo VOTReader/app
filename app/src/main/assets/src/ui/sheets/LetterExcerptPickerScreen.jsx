@@ -2,6 +2,8 @@
    LetterExcerptPickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { scrollBehavior } from '../../utils/reduced-motion.js';
+
 export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
   const item = refineRequest.item;
@@ -150,7 +152,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   React.useEffect(() => {
     if (!findHitKey || !bodyRef.current) return;
     const el = bodyRef.current.querySelector('[data-block-key="' + findHitKey + '"]');
-    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
   }, [findHitKey]);
   const findStep = (dir) => {
     if (!findMatches.length) return;

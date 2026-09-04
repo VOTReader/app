@@ -2,6 +2,8 @@
    BibleStudyIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { scrollBehavior } from '../../utils/reduced-motion.js';
+
 export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled }) {
   const currentRef = React.useRef(null);
   const [expandedPart, setExpandedPart] = React.useState(null);
@@ -19,7 +21,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
   React.useEffect(() => {
     if (!currentRef.current) return undefined;
     const timer = setTimeout(() => {
-      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 180);
     return () => clearTimeout(timer);
   }, [expandedPart]);

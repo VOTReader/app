@@ -15,6 +15,7 @@ import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
   audioLibraryStore, hasTextDestination, trackMeta, trackName, useAudioPositions,
 } from '../components/AudioShelf.jsx';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -120,7 +121,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   };
   const scrollToBrowse = () => {
     const target = typeof document !== 'undefined' ? document.getElementById('audio-library-browse') : null;
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (target) target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   };
 
   return (
