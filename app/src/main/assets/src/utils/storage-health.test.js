@@ -744,36 +744,6 @@ describe('write-path integration', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   reassessIfCautious
-   ═══════════════════════════════════════════════════════════════════ */
-
-describe('reassessIfCautious', () => {
-  it('no-op when healthy', async () => {
-    const api = mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: true });
-    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
-    await StorageHealth.assess();
-    api.estimate.mockClear();
-
-    StorageHealth.reassessIfCautious();
-    // Should not have called assess (no new estimate call)
-    await vi.advanceTimersByTimeAsync(0);
-    expect(api.estimate).not.toHaveBeenCalled();
-  });
-
-  it('re-assesses when tier is caution', async () => {
-    const api = mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false });
-    StorageHealth._resetForTests({ platform: PLATFORM.FIREFOX, storageApi: api });
-    await StorageHealth.assess();
-    expect(StorageHealth.getReport().tier).toBe(TIER.CAUTION);
-    api.estimate.mockClear();
-
-    StorageHealth.reassessIfCautious();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(api.estimate).toHaveBeenCalled();
-  });
-});
-
-/* ═══════════════════════════════════════════════════════════════════
    requestPersistence
    ═══════════════════════════════════════════════════════════════════ */
 

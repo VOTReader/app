@@ -196,4 +196,19 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
     // nothing to assert — just no error + no spurious postMessage
     expect(reg.waiting).toBeNull();
   });
+
+  it('swallows a rejected reg.update() so an offline poll never surfaces as an unhandled rejection', async () => {
+    const reg = mockSW({});
+    const catchSpy = vi.fn();
+    reg.update = () => ({ catch: catchSpy });   // a rejecting promise, observably
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    try {
+      registerServiceWorker();
+      await flush();
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(catchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (/** @type {any} */ (document)).visibilityState;
+    }
+  });
 });

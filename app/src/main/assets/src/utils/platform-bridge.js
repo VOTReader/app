@@ -504,6 +504,10 @@ function webPickImportFile() {
         const file = ev.target.files && ev.target.files[0];
         resolve(file || null);
       };
+      // A dismissed picker fires no change event; without this the await in
+      // SettingsScreen's backup mutex never settles and Import stays busy.
+      // 'cancel' on <input type=file>: Chromium 113+, Firefox 91+, Safari 16.4+.
+      input.addEventListener('cancel', () => resolve(null));
       input.click();
     } catch (e) { reject(e); }
   });

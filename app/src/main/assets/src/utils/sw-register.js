@@ -135,7 +135,15 @@ export function registerServiceWorker() {
     });
 
     // Poll hourly + on tab-focus so long-lived tabs still catch updates.
-    const pokeUpdate = () => { try { reg.update(); } catch (_e) { /* non-fatal */ } };
+    // reg.update() REJECTS offline; unhandled, that rejection lands in
+    // index.html's unhandledrejection handler every hour and every tab-focus
+    // on a plane, filling the diagnostic ring with noise.
+    const pokeUpdate = () => {
+      try {
+        const p = reg.update();
+        if (p && typeof p.catch === 'function') p.catch(() => { /* offline — non-fatal */ });
+      } catch (_e) { /* non-fatal */ }
+    };
     setInterval(pokeUpdate, 60 * 60 * 1000);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {

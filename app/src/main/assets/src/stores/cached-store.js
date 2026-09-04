@@ -397,6 +397,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
           writePromise.then(function () {
             // STORE-4: the latest cache is durable — cancel any pending failure-retry.
             self._clearWriteRetry();
+            // A landed write lifts StorageHealth's READONLY override from an
+            // earlier failure — nothing else ever reports a success to it.
+            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
           }, function (err) {
             console.error('IDB write failed for', idbStoreName, err);
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
@@ -463,6 +466,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._lastWrite = p;
       p.then(function () {
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
+        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
       }, function (err) {
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
@@ -1098,6 +1102,10 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-state',
   'vot-audio-pos',
   'vot-audio-recent-open',
+  'vot-recent-searches',          // search/recent-searches.js
+  'vot-journal-draft',            // JournalEditorScreen
+  'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
+  'vot-restore-inflight',         // use-restore-guard
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
