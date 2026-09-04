@@ -971,6 +971,25 @@ describe('audio-player — reader-alternate renditions', () => {
     ]);
   });
 
+  it('ignores a completeness note appended to a rendition pair (2026-09-04 manifest shape)', () => {
+    // gen-audio-manifest.mjs now appends a THIRD element to a partial reader
+    // rendition — "1 of 2 parts". It is additive on purpose: this consumer
+    // reads [0] and [1], so a partial rendition must play exactly like any
+    // other. If this test ever fails, the manifest and the player have
+    // disagreed about the row shape and a listener loses a reading.
+    const saved = globalThis.AUDIO_ALTERNATES;
+    globalThis.AUDIO_ALTERNATES = {
+      'vol1:letter-a': [['V', [['idA1v', 'Part 1']], '1 of 2 parts']],
+    };
+    try {
+      const list = AudioPlayer.renditionsFor('vol1', { id: 'letter-a', title: 'Letter A' }, 'Volume One');
+      expect(list.map((r) => r.reader)).toEqual(['B', 'V']);
+      expect(list[1].tracks).toEqual([
+        { key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA1v'), readerCode: 'V', partLabel: 'Part 1' },
+      ]);
+    } finally { globalThis.AUDIO_ALTERNATES = saved; }
+  });
+
   it('is the primary alone without alternates, and empty when the letter has no audio', () => {
     const preface = AudioPlayer.renditionsFor('vol1', { id: 'preface', title: 'Preface' }, 'Volume One');
     expect(preface.map((r) => r.reader)).toEqual(['B']);
