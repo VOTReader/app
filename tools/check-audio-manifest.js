@@ -26,8 +26,16 @@
  * the one Corbin asked: did everyone who read this letter get offered?
  *
  * Checks
- *   1. NOTHING LOST     every reader who recorded a letter is offered a
- *                       rendition of it — as the primary or as an alternate.
+ *   1. NOTHING LOST     every reader THE COVERAGE FILE RECORDS for a letter is
+ *                       offered a rendition of it — as the primary or as an
+ *                       alternate. Note what that is not: the coverage file is
+ *                       written by the generator's MAPPING stage, so this catches
+ *                       a loss in COMPOSITION and cannot catch one in MAPPING.
+ *                       If the mapping stage stops attaching a file to its letter,
+ *                       that file legitimately becomes unmapped, carries its real
+ *                       id, and every count below still balances. See the
+ *                       ponytail: note at 2b — the Verifier built exactly that
+ *                       forgery on 2026-09-04 and it exits 0.
  *   2. NOT STALE        the manifest offers no reader the coverage file has
  *                       never heard of, and knows every letter it lists.
  *   2b. BOOKS BALANCE    for each reader, the per-letter rows plus the range
@@ -71,6 +79,7 @@ const GH = 'C:\\Program Files\\GitHub CLI\\gh.exe';
 
 const DRIVE_ID = /^[A-Za-z0-9_-]{25,}$/;
 
+let independentLegRan = false;
 const errors = [];
 const fail = (msg) => errors.push(msg);
 
@@ -217,6 +226,23 @@ if (!totals) {
     // balance a theft, so make it name its evidence: each id must be a real
     // letter-side listing record, carry the reader it is counted under, and
     // reach no rendition. Padding it then means naming a file that IS emitted.
+    //
+    // ponytail: these three conditions do not close it, and the Verifier proved
+    // that on 2026-09-04. Steal a reader whose candidate count equals the rows it
+    // ships, delete it from the manifest AND the sidecar, add its row count to
+    // totals.unmapped, and NAME the stolen ids in totals.unmappedIds: every named
+    // id is a real letter-side record, is no longer emitted, and carries that
+    // reader, so all three pass and the gate exits 0. That is not a hand-edit
+    // hazard, it is the regression shape — a mapping stage that stops attaching a
+    // file to its letter produces exactly this self-consistent state.
+    // UPGRADE PATH: an unmapped id must be JUSTIFIED, not merely real and
+    // non-emitted. The ids legitimately unmapped today are unmapped because their
+    // filename yields no letter key (UNPARSEABLE / UNMATCHED / BONUS-SKIPPED in
+    // gen-audio-manifest.mjs); a stolen id resolves. Asserting "an unmapped id
+    // must not resolve to a known letter" kills every forgery built so far, and
+    // costs importing the generator's parseName + resolveLetter and building its
+    // corpus context here — which is why it is not in this pass. It also would
+    // still need the listing, so it cannot run in CI either; see the headline.
     const listingById = new Map();
     for (const rec of JSON.parse(readFileSync(LISTING, 'utf8'))) {
       if (isLetterAudio(rec.path)) listingById.set(rec.id, rec.path);
@@ -240,6 +266,7 @@ if (!totals) {
         fail(`reader ${r}: ${a} unmapped claimed, but the named ids hold ${byReader[r] || 0}`);
       }
     }
+    independentLegRan = true;
     console.log(`[audio-manifest] books balance against ${Object.values(fromListing).reduce((n, x) => n + x, 0)} letter-side listing files (independent leg ran)`);
   } else {
     console.log('[audio-manifest] books balance — sidecar totals only; _audio-drive-listing.json not present (CI)');
@@ -287,4 +314,6 @@ if (errors.length) {
   console.error('');
   process.exit(1);
 }
-console.log('[audio-manifest] OK — every reader the coverage file records is offered, and the books balance.');
+console.log(independentLegRan
+  ? '[audio-manifest] OK — every reader the coverage file records is offered, and the books balance against the Drive listing.'
+  : '[audio-manifest] OK — every reader the coverage file records is offered, and the sidecar totals balance. The independent leg did NOT run (no _audio-drive-listing.json), so nothing here was checked against the generator INPUT.');
