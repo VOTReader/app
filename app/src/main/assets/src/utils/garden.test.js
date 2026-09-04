@@ -10,6 +10,7 @@ import {
   gardenCrawled,
   GARDEN_CACHE_MAX,
   gardenTierLimits,
+  gardenClearCache,
 } from './garden.js';
 
 describe('getGardenTier', () => {
@@ -95,5 +96,46 @@ describe('gardenPreload LRU + crawled set (PF5)', () => {
     const [tierId, pageStr] = residentKey.split(':');
     gardenPreload(Number(pageStr), tierId);
     expect(Object.keys(gardenImageCache).length).toBe(before);
+  });
+});
+
+describe('gardenPreload — cross-tier eviction on a tier switch (gap-garden-viewer-and-image-cache-3)', () => {
+  it('evicts every foreign-tier bitmap when the tier switches, instead of stacking both tiers', () => {
+    // Read the Garden at Ultra (cap 4) — fills to the Ultra cap.
+    const ultraCap = gardenTierLimits('ultra').cap;
+    for (let p = 1; p <= ultraCap * 2; p++) gardenPreload(p, 'ultra');
+    expect(Object.keys(gardenImageCache).filter((k) => k.startsWith('ultra:')).length).toBe(ultraCap);
+
+    // Switch to Mobile in Settings (cap 12) and reopen — mirrors GardenView's
+    // priority-preload effect re-running with the new tier.
+    const mobileCap = gardenTierLimits('mobile').cap;
+    for (let p = 1; p <= 8; p++) gardenPreload(p, 'mobile');
+
+    // The stale Ultra bitmaps (~112 MB each) must not ride along under Mobile's
+    // cap, which assumes every resident entry is Mobile-sized (~25 MB).
+    const residentUltra = Object.keys(gardenImageCache).filter((k) => k.startsWith('ultra:'));
+    expect(residentUltra).toEqual([]);
+    expect(Object.keys(gardenImageCache).length).toBeLessThanOrEqual(mobileCap);
+  });
+});
+
+describe('gardenClearCache — memory-trim purge (gap-garden-viewer-and-image-cache-4)', () => {
+  it('drops every decoded bitmap but leaves the crawled done-markers alone', () => {
+    for (let p = 1; p <= 3; p++) gardenPreload(p, 'native');
+    expect(Object.keys(gardenImageCache).filter((k) => k.startsWith('native:')).length).toBe(3);
+
+    gardenClearCache();
+
+    expect(Object.keys(gardenImageCache).filter((k) => k.startsWith('native:'))).toEqual([]);
+    // The done-marker survives the purge — a re-open serves from the HTTP/
+    // native disk cache instead of re-crawling from page 1.
+    for (let p = 1; p <= 3; p++) expect(gardenCrawled.has(gardenCacheKey(p, 'native'))).toBe(true);
+  });
+
+  it('a page preloaded again after the purge is fetched fresh (not treated as still resident)', () => {
+    gardenPreload(9, 'native');
+    gardenClearCache();
+    gardenPreload(9, 'native');
+    expect(gardenImageCache[gardenCacheKey(9, 'native')]).toBeTruthy();
   });
 });

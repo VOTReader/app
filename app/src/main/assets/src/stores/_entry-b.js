@@ -279,9 +279,18 @@ registerServiceWorker();
 // pressure signal (background LRU states). The biggest in-heap wins live on the
 // JS side, not in the native WebView resource cache — so purge the regenerable
 // caches here: the journal media object-URL LRU, where each entry pins a decoded
-// blob in heap. Safe by construction (objectUrl re-creates from IDB on the next
-// miss — a cache drop, not data loss). Guarded so a purge error can never crash
-// the app; a no-op on web/PWA (nothing calls it there).
+// blob in heap, AND the Garden decoded-image cache (gap-garden-viewer-and-image-
+// cache-4) — the app's single largest heap consumer (an Ultra-tier page is ~112
+// MB), previously untouched by this signal. Garden lives in bundle-d, a separate
+// esbuild entry from this bundle-b file, so it's reached via the window global
+// _entry-d.js already publishes rather than a direct import (a direct import
+// would bundle a SECOND copy of utils/garden.js with its own private cache
+// state — not the one GardenView actually populated). Both purges are safe by
+// construction (objectUrl re-creates from IDB on the next miss; a Garden page
+// re-decodes from the HTTP/native disk cache — a cache drop, not data loss, in
+// either case). Guarded so a purge error can never crash the app; a no-op on
+// web/PWA (nothing calls it there) and a no-op if bundle-d was never loaded.
 window.__onTrimMemory = function() {
   try { JournalMediaStore.releaseObjectUrls(); } catch (_e) { /* best-effort */ }
+  try { if (typeof gardenClearCache !== 'undefined') gardenClearCache(); } catch (_e) { /* best-effort */ }
 };

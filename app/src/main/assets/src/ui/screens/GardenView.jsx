@@ -43,6 +43,14 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   const zoomState = React.useRef({ scale: 1, tx: 0, ty: 0 });
   const gestureState = React.useRef({
     active: false, type: null,
+    // gap-garden-viewer-and-image-cache-5: true from the moment a 2nd finger
+    // lands until the LAST finger lifts. tapStartX/Y is only ever written by
+    // the single-finger touchstart branch, so once a pinch begins it goes
+    // stale; without this flag, lifting the fingers one at a time (instead of
+    // together) fell through to the swipe test with a real page still
+    // registered as 'pinch', which then compared the last finger's lift
+    // position against the FIRST finger's original touch-down point.
+    wasMultiTouch: false,
     startDist: 0, startScale: 1, startTx: 0, startTy: 0,
     midX: 0, midY: 0,
     panStartX: 0, panStartY: 0,
@@ -219,6 +227,11 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
 
     const onTouchStart = (e) => {
       const g = gestureState.current;
+      // gap-garden-viewer-and-image-cache-5: latch for the life of the whole
+      // gesture (cleared only once every finger has lifted, in onTouchEnd)
+      // so a pinch that degrades finger-by-finger can never be mistaken for
+      // a plain tap/swipe on its final lift.
+      if (e.touches.length >= 2) g.wasMultiTouch = true;
       if (e.touches.length === 2) {
         e.preventDefault();
         const [a, b] = e.touches;
@@ -282,8 +295,12 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
       }
 
       if (e.touches.length === 0) {
+        // Read before clearing — this IS the "was this gesture ever a pinch"
+        // check the swipe branch below gates on.
+        const wasMultiTouch = g.wasMultiTouch;
         g.active = false;
         g.type = null;
+        g.wasMultiTouch = false;
 
         if (e.changedTouches.length === 1) {
           const t = e.changedTouches[0];
@@ -314,7 +331,11 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
             // UX4: a horizontal drag at scale 1 flips the page. Read pageRef +
             // the onPageChange ref (this effect attached once with a stale
             // closure). Clamp to [1, GARDEN_TOTAL] like the arrow buttons do.
-            if (z.scale === 1) {
+            // gap-garden-viewer-and-image-cache-5: never a swipe candidate if
+            // a second finger was ever involved (wasMultiTouch) — a pinch
+            // whose fingers lift one at a time is not a swipe, however far
+            // the last finger ended up from the stale tapStartX/Y.
+            if (!wasMultiTouch && z.scale === 1) {
               const dir = gardenSwipeDir(t.clientX - g.tapStartX, t.clientY - g.tapStartY);
               if (dir) {
                 const nx = pageRef.current + dir;
@@ -323,13 +344,34 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
             }
           }
         }
-      } else if (e.touches.length === 1 && z.scale > 1) {
-        g.type = 'pan';
-        g.panStartX = e.touches[0].clientX;
-        g.panStartY = e.touches[0].clientY;
-        g.startTx = z.tx;
-        g.startTy = z.ty;
+      } else if (e.touches.length === 1) {
+        // A pinch degrading to one remaining finger. Re-anchor tapStartX/Y to
+        // the SURVIVING touch (gap-garden-viewer-and-image-cache-5) so that if
+        // this finger is the one that ends up lifting last, "moved" measures
+        // its own travel — not the distance from the other finger's original
+        // touch-down point.
+        g.tapStartX = e.touches[0].clientX;
+        g.tapStartY = e.touches[0].clientY;
+        if (z.scale > 1) {
+          g.type = 'pan';
+          g.panStartX = e.touches[0].clientX;
+          g.panStartY = e.touches[0].clientY;
+          g.startTx = z.tx;
+          g.startTy = z.ty;
+        }
       }
+    };
+
+    // A cancelled gesture (OS interrupt, system gesture, etc.) is NOT a
+    // completed tap/swipe/pinch — it must only reset state, never evaluate
+    // one (gap-garden-viewer-and-image-cache-5; touchend used to double as
+    // the touchcancel handler and would run the full swipe/double-tap check
+    // against whatever gesture data happened to be in flight).
+    const onTouchCancel = () => {
+      const g = gestureState.current;
+      g.active = false;
+      g.type = null;
+      g.wasMultiTouch = false;
     };
 
     const onWheel = (e) => {
@@ -353,14 +395,14 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     area.addEventListener('touchstart', onTouchStart, { passive: false });
     area.addEventListener('touchmove', onTouchMove, { passive: false });
     area.addEventListener('touchend', onTouchEnd);
-    area.addEventListener('touchcancel', onTouchEnd);
+    area.addEventListener('touchcancel', onTouchCancel);
     area.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
       area.removeEventListener('touchstart', onTouchStart);
       area.removeEventListener('touchmove', onTouchMove);
       area.removeEventListener('touchend', onTouchEnd);
-      area.removeEventListener('touchcancel', onTouchEnd);
+      area.removeEventListener('touchcancel', onTouchCancel);
       area.removeEventListener('wheel', onWheel);
     };
   }, [applyZoom, clampZoom]);
