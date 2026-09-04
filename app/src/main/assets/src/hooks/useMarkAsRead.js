@@ -219,7 +219,10 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   // 2026-08-09): the item's count increments on EVERY complete listen, same
   // as the detector's re-read increments. No stats-ledger record — the
   // ledger holds measured READING (words + visibility-honest time), and a
-  // listen is neither. Respects the markAsRead gate like any new mark.
+  // listen is neither — but the item's reading FRONTIER still clears (same
+  // as markRead's manual claim), so a finished listen can't leave an index
+  // card showing a read check next to a stale partial-read percentage.
+  // Respects the markAsRead gate like any new mark.
   //
   // TWO key spaces, because the player notifies for two kinds of recording
   // (2026-08-10): a letter resolves its collection's readKey through
@@ -233,6 +236,13 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   React.useEffect(() => {
     const credit = (key) => {
       setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+      // Same coherence markRead's manual claim already provides: a full
+      // listen supersedes any partial-read resume marker, so an index card
+      // can't show a read check AND a stale "N% left" frontier together.
+      if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
+        try { ReadingStatsStore.clearProgress(key); }
+        catch (e) { console.warn('reading-stats frontier clear failed', e); }
+      }
       // A full listen is as strong a "was here today" signal as a
       // completed read — keep the streak coherent with it.
       if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
