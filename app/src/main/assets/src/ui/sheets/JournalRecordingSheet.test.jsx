@@ -241,3 +241,60 @@ describe('JournalRecordingSheet — registry dismiss routes through requestDisca
     expect(screen.queryByText('Discard this recording?')).toBeNull();
   });
 });
+
+/* journal-3 — the Android fetch bridge (#1) must not lose a finished
+   recording to one transient fetch blip.
+   ─────────────────────────────────────────────────────────────────────
+   NativeAudioRecorder.stop() serves the file and keeps it on disk ~60s;
+   AppInterface.postNativeComplete then fires __onNativeRecordingComplete
+   with base64=null and a url (its own doc comment: "exactly one of the two
+   is non-null on success"). So on this path the `if (b64)` fallback below
+   the fetch is dead code — a single rejected fetch had nothing left to
+   fall back to and went straight to fail(), destroying the take. The fix
+   retries the same url a bounded number of times with a short backoff
+   (well inside the 60s window) before giving up. */
+describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    globalThis.fetch = realFetch;
+  });
+
+  it('retries a transient fetch failure with backoff and still finalizes the recording', async () => {
+    MockBridge.isAndroid = true;
+    let attempts = 0;
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => {
+      attempts++;
+      if (attempts < 2) return Promise.reject(new Error('network blip'));
+      return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })) });
+    }));
+    renderRecording(() => {});
+
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(attempts).toBeGreaterThan(1); // it actually retried, not one-and-done
+    // The recording must survive: no error stage, no lost take.
+    expect(screen.queryByText(/could not process the recording/i)).toBeNull();
+  });
+
+  it('gives up after a bounded number of retries on a persistent failure — loudly, not silently', async () => {
+    MockBridge.isAndroid = true;
+    let attempts = 0;
+    globalThis.fetch = vi.fn(() => { attempts++; return Promise.reject(new Error('server gone')); });
+    renderRecording(() => {});
+
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    expect(attempts).toBeGreaterThan(1);  // it did retry
+    expect(attempts).toBeLessThan(10);    // ...but bounded, not an infinite loop
+    expect(screen.getByText(/could not process the recording/i)).toBeTruthy(); // surfaced, not swallowed
+  });
+});

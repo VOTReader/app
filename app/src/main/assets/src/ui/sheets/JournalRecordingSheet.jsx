@@ -151,8 +151,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     //  • Web (J3): passes the Blob DIRECTLY as the 4th arg — no base64 round-trip.
     //  • Android (#1 fetch bridge): passes a `url` (5th arg) to the served .m4a;
     //    we fetch() it through native networking instead of parsing a ~6.7MB
-    //    base64 string off the bridge (which can freeze the renderer). Falls back
-    //    to base64 on any fetch error so a recording is never lost.
+    //    base64 string off the bridge (which can freeze the renderer). b64 is
+    //    ALWAYS null on this path (NativeAudioRecorder.stop()'s own contract:
+    //    "exactly one of the two is non-null on success"), so a base64 fallback
+    //    here would be dead code — the real defense against a transient fetch
+    //    blip is a bounded retry with backoff (journal-3). A fetch that still
+    //    fails after every retry has no JS-side recovery: the recording is lost
+    //    until a native re-read-by-name verb exists (tracked separately).
     //  • Android (legacy/fallback): passes base64 (1st arg) which we decode here.
     // Either way we end with one audio Blob and transition to preview (or auto-
     // save if Save was tapped while still recording).
@@ -201,10 +206,29 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         // 1) Web: the Blob is handed to us directly (avoids a redundant base64 copy).
         if (blob && typeof blob.size === 'number') { finalize(blob); return; }
         // 2) Android fetch bridge (#1): stream the served file in via the browser's
-        //    networking layer. On any failure, fall back to base64 if we also got it.
+        //    networking layer. NativeAudioRecorder.stop() keeps the finished file on
+        //    disk for ~60s, so a single transient fetch blip must not cost the whole
+        //    recording (JRNL-3/journal-3): retry the same url with a short bounded
+        //    backoff before giving up. b64 is always null on this path (native's own
+        //    "exactly one of the two" contract), so the fallback below is a no-op
+        //    safety net, not the real recovery — the retry IS the recovery. If every
+        //    attempt fails (a non-transient error, not a blip) the recording is still
+        //    lost here; a durable native re-read-by-name verb is the real backstop
+        //    and is tracked separately.
         if (url) {
-          fetch(url)
-            .then(function(r) { if (!r.ok) throw new Error('fetch ' + r.status); return r.blob(); })
+          var FETCH_RETRY_DELAYS_MS = [500, 1500]; // bounded: 2 retries, well inside the 60s disk window
+          var fetchAttempt = function(attempt) {
+            return fetch(url)
+              .then(function(r) { if (!r.ok) throw new Error('fetch ' + r.status); return r.blob(); })
+              .catch(function(e) {
+                if (attempt < FETCH_RETRY_DELAYS_MS.length) {
+                  return new Promise(function(resolve) { setTimeout(resolve, FETCH_RETRY_DELAYS_MS[attempt]); })
+                    .then(function() { return fetchAttempt(attempt + 1); });
+                }
+                throw e;
+              });
+          };
+          fetchAttempt(0)
             .then(function(fb) { finalize(fb && !fb.type ? new Blob([fb], { type: mime || 'audio/mp4' }) : fb); })
             .catch(function(e) {
               if (b64) { try { finalize(decodeB64()); return; } catch (_e2) { /* fall through */ } }
