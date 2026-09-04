@@ -123,6 +123,98 @@ describe('JournalRecordingSheet discard confirm', () => {
   });
 });
 
+/* journal-3 clause (a) — durable BEFORE preview.
+   ─────────────────────────────────────────────────────────────────
+   The sheet used to hold a finished recording in memory through the whole
+   preview stage and only `put` it when the user tapped Save. Everything
+   between native's stop() and that tap — reviewing, retrying, composing —
+   was a window in which the process dying lost the take outright, with the
+   bytes sitting on disk the whole time (P2).
+
+   The order now inverts: commit with the `unlinked` marker, THEN preview.
+   Discarding at preview deletes what was committed, which is an explicit
+   user choice rather than a silent drop.
+
+   The trade, deliberately taken: a take the user means to bin is written and
+   then deleted, so a crash between those two leaves it in the Hub banner. A
+   visible unwanted recording costs one tap; an invisible lost one is gone. */
+
+/** A JournalMediaStore stub that records what it was asked to store. */
+function stubMediaStore() {
+  const puts = [];
+  const deletes = [];
+  window.JournalMediaStore = {
+    put: vi.fn((rec) => { puts.push(rec); return Promise.resolve('media-1'); }),
+    delete: vi.fn((id) => { deletes.push(id); return Promise.resolve(); }),
+    markLinked: vi.fn(() => Promise.resolve()),
+  };
+  return { puts, deletes };
+}
+
+/** Mount, grant mic, record ~1.3s, then hand the sheet a finished web Blob. */
+async function renderThroughStop(props) {
+  const utils = render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} {...props} />);
+  act(() => { vi.advanceTimersByTime(10); });
+  act(() => { vi.advanceTimersByTime(1300); });
+  const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
+  await act(async () => {
+    window.__onNativeRecordingComplete(null, 4000, 'audio/webm', blob);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return utils;
+}
+
+describe('JournalRecordingSheet — durable before preview (journal-3)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    delete window.JournalMediaStore;
+  });
+
+  it('R1: the blob is in the media store, marked unlinked, by the time preview renders', async () => {
+    const { puts } = stubMediaStore();
+    await renderThroughStop();
+
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    expect(puts[0].type).toBe('audio');
+    expect(puts[0].blob.size).toBe(3);
+    // The marker is the whole point: until an entry references this record,
+    // the sweep must be able to tell "never linked" from "owner deleted".
+    expect(puts[0].unlinked).toBe(true);
+    // And it happened BEFORE the user can see or discard anything.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+
+  it('R2: discarding at preview deletes the record that was committed', async () => {
+    const { deletes } = stubMediaStore();
+    await renderThroughStop();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    fireEvent.click(screen.getByText('Yes, discard'));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(deletes).toEqual(['media-1']);
+  });
+
+  it('saving links the record rather than putting it a second time', async () => {
+    const onSave = vi.fn();
+    stubMediaStore();
+    await renderThroughStop({ onSave });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await Promise.resolve();
+    });
+
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);   // not twice
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].mediaId).toBe('media-1');
+    expect(window.JournalMediaStore.markLinked).toHaveBeenCalledWith('media-1');
+  });
+});
+
 /* Pause freezes the on-screen timer (owner-reported).
    ─────────────────────────────────────────────────────────────────
    The recorder pauses correctly, but the seconds counter kept climbing while
@@ -249,17 +341,29 @@ describe('JournalRecordingSheet — registry dismiss routes through requestDisca
    AppInterface.postNativeComplete then fires __onNativeRecordingComplete
    with base64=null and a url (its own doc comment: "exactly one of the two
    is non-null on success"). So on this path the `if (b64)` fallback below
-   the fetch is dead code — a single rejected fetch had nothing left to
+   the fetch was dead code — a single rejected fetch had nothing left to
    fall back to and went straight to fail(), destroying the take. The fix
    retries the same url a bounded number of times with a short backoff
-   (well inside the 60s window) before giving up. */
+   (well inside the 60s window) before giving up; that dead branch is now
+   deleted rather than merely documented.
+
+   These cases need a JournalMediaStore stub because finalize() commits
+   before preview now (clause (a)) — a successful fetch reaches the store. */
 describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
   const realFetch = globalThis.fetch;
-  beforeEach(() => { vi.useFakeTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    window.JournalMediaStore = {
+      put: vi.fn(() => Promise.resolve('media-1')),
+      delete: vi.fn(() => Promise.resolve()),
+      markLinked: vi.fn(() => Promise.resolve()),
+    };
+  });
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
     globalThis.fetch = realFetch;
+    delete window.JournalMediaStore;
   });
 
   it('retries a transient fetch failure with backoff and still finalizes the recording', async () => {
@@ -279,7 +383,7 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
 
     expect(attempts).toBeGreaterThan(1); // it actually retried, not one-and-done
     // The recording must survive: no error stage, no lost take.
-    expect(screen.queryByText(/could not process the recording/i)).toBeNull();
+    expect(screen.queryByText(/could not read the recording/i)).toBeNull();
   });
 
   it('gives up after a bounded number of retries on a persistent failure — loudly, not silently', async () => {
@@ -295,6 +399,37 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
 
     expect(attempts).toBeGreaterThan(1);  // it did retry
     expect(attempts).toBeLessThan(10);    // ...but bounded, not an infinite loop
-    expect(screen.getByText(/could not process the recording/i)).toBeTruthy(); // surfaced, not swallowed
+    // journal-3 reworded this: "Could not process the recording. Please try
+    // again." read as an instruction to RECORD IT AGAIN, which is the one
+    // thing the user must not do while the finished take is still on disk.
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy(); // surfaced, not swallowed
+
+    // ...and the error stage now offers the real second chance.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  /* The scripture-web-5 shape, checked deliberately rather than assumed: a
+     retry that re-awaits a settled promise passes its own test (the transport
+     is stubbed) and does nothing whatsoever in the app. Asserting the button
+     exists proves nothing about that; asserting that pressing it puts NEW
+     calls through the transport does. */
+  it('Try again re-issues the fetch instead of re-awaiting the failed one', async () => {
+    MockBridge.isAndroid = true;
+    let attempts = 0;
+    globalThis.fetch = vi.fn(() => { attempts++; return Promise.reject(new Error('server gone')); });
+    renderRecording(() => {});
+
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    const afterFirst = attempts;
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    expect(attempts).toBeGreaterThan(afterFirst);
   });
 });

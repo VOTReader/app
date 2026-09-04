@@ -22,9 +22,20 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { JournalAudioBlock, JournalImageBlock } from './JournalViewerScreen.jsx';
 
-/** objectUrl resolves `url` (null = the record is gone). */
-function setupGlobals(url) {
-  window.JournalMediaStore = { objectUrl: vi.fn(() => Promise.resolve(url)) };
+/**
+ * objectUrl resolves `url` (null = no url could be minted).
+ *
+ * `record` is what get() answers. The two are deliberately separate: the store
+ * returns null from objectUrl for THREE different facts — no such record, a
+ * record with no blob, and `URL.createObjectURL` throwing on a perfectly good
+ * blob (journal-media-store.js catches that and returns null). Only the first
+ * two are missing. The third is intact user data.
+ */
+function setupGlobals(url, record) {
+  window.JournalMediaStore = {
+    objectUrl: vi.fn(() => Promise.resolve(url)),
+    get: vi.fn(() => Promise.resolve(record === undefined ? null : record)),
+  };
   window.JournalHelpers = {
     formatDuration: (s) => {
       const t = Math.max(0, Math.round(s || 0));
@@ -92,6 +103,47 @@ describe('JournalAudioBlock — the bytes are gone', () => {
   it('says nothing while the lookup is still in flight', () => {
     setupGlobals(null);
     render(<JournalAudioBlock mediaId="m_slow" duration={72} caption="Morning walk" />);
+    expect(screen.queryByText(/recording missing/i)).toBeNull();
+  });
+});
+
+/* The hazard the Architect caught in the first cut of this fix, and it is
+   sharper than it looks because of what sits next to the missing state.
+
+   `objectUrl` returns null for three different facts, and deriving `missing`
+   from the url alone collapses them. The third — `URL.createObjectURL` threw
+   on an intact blob, which the store catches and turns into null — would then
+   paint "Recording missing" over bytes that are entirely fine. Beside it is
+   the block's delete control, which we deliberately kept, and which now reads
+   as a prompt to finish the job: the user removes the block, the record goes
+   unreferenced and unmarked, and the boot sweep prunes it. Real audio
+   destroyed by a transient URL-minting failure — this design's own loss class,
+   reached through the affordance we chose to keep.
+
+   So `missing` is derived from the RECORD, not from the url.
+
+   ponytail: a mintable-but-unmintable blob now renders as loading, i.e. a
+   silently blank block, and there is no third visual state for it. Wrong in
+   this direction costs a blank block; wrong in the other costs user data. The
+   console.warn is what makes it diagnosable. Add the third state if it is ever
+   seen in the wild. */
+describe('JournalAudioBlock — null is not always missing', () => {
+  it('does NOT say missing when the record is intact and only the URL failed', async () => {
+    setupGlobals(null, { id: 'm_ok', type: 'audio', blob: new Blob(['x']) });
+    await renderSettled(<JournalAudioBlock mediaId="m_ok" duration={72} caption="Morning walk" />);
+
+    expect(screen.queryByText(/recording missing/i)).toBeNull();
+  });
+
+  it('an IndexedDB failure is not evidence about the user data either', async () => {
+    window.JournalMediaStore = {
+      objectUrl: vi.fn(() => Promise.reject(new Error('database open blocked'))),
+      get: vi.fn(() => Promise.reject(new Error('database open blocked'))),
+    };
+    window.JournalHelpers = { formatDuration: () => '0:00' };
+    window.ConfirmStrip = () => null;
+    await renderSettled(<JournalAudioBlock mediaId="m_idb" duration={72} caption="Morning walk" />);
+
     expect(screen.queryByText(/recording missing/i)).toBeNull();
   });
 });
