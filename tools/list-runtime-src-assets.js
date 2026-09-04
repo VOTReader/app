@@ -57,7 +57,7 @@ function walk(dir, out = []) {
  * because the translation loader's prefix ('src/data/bible-' + code + '.js')
  * globs to bible-audio-manifest.js too, which lives in bundle-a.
  */
-function bundledSrcFiles() {
+export function bundledSrcFiles() {
   const py = readFileSync(resolve(root, 'tools/build.py'), 'utf-8');
   return new Set([...py.matchAll(/['"](src\/data\/[A-Za-z0-9._-]+\.js)['"]/g)].map((m) => m[1]));
 }
