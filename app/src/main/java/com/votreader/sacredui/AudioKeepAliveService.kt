@@ -86,6 +86,11 @@ class AudioKeepAliveService : Service() {
     override fun onCreate() {
         super.onCreate()
         running = true
+        // The pending start has landed; `running` is the authority from here.
+        // NOT cleared in onDestroy: a new setActive(true) can race an old
+        // instance's teardown, and clearing there would wipe the new start's
+        // flag and drop its first update all over again.
+        startPending = false
         // The QS card's square art. icon-512 ships in assets for the PWA
         // manifest — decode once, reuse for every notification refresh.
         artwork = try {
@@ -383,6 +388,25 @@ class AudioKeepAliveService : Service() {
         private var running = false
 
         /**
+         * True between [setActive]`(true)` and the service's [onCreate].
+         *
+         * `startForegroundService` is ASYNCHRONOUS — it enqueues the start and
+         * returns — so `running` is still false when the JS player sends its
+         * first now-playing update synchronously on the next line. Gating
+         * [updateNowPlaying] on `running` alone dropped exactly that update, and
+         * the first media card of a session showed the "Audio letter / The
+         * Volumes of Truth" placeholder instead of the real title.
+         *
+         * Cleared by [setActive]`(false)` and by [onCreate], NEVER by
+         * [onDestroy]: a fresh start can race a previous instance's teardown,
+         * and clearing there would wipe the new start's flag. It does not widen
+         * the resurrection hole `running` guards — after a stop both flags are
+         * false, so a trailing update is still dropped.
+         */
+        @Volatile
+        private var startPending = false
+
+        /**
          * True when [sdkInt] must pass the foreground-service TYPE to
          * `startForeground`. The typed overload is API 29 (Q); below that the
          * two-arg form is the only one that exists and the manifest's
@@ -421,7 +445,15 @@ class AudioKeepAliveService : Service() {
                 val intent = Intent(context, AudioKeepAliveService::class.java)
                 if (active) {
                     ContextCompat.startForegroundService(context, intent)
+                    // Only once the start is actually enqueued — a throw above
+                    // must not leave a pending flag behind. onCreate has not run
+                    // yet, so this is what lets the update JS sends on the very
+                    // next line through [updateNowPlaying]'s gate.
+                    startPending = true
                 } else {
+                    // Cleared BEFORE the call: stopService may throw, and the
+                    // intent to stop is already settled by then.
+                    startPending = false
                     context.stopService(intent)
                 }
             } catch (e: Throwable) {
@@ -432,9 +464,12 @@ class AudioKeepAliveService : Service() {
         /**
          * Refresh the now-playing snapshot (title/artist/playing/position/rate)
          * — the QS card, lock screen and notification all re-render from it.
-         * Gated on [running]: an update while the service is down is dropped
-         * (there is no card to refresh, and starting one here would post a
-         * notification over silence). While playing, our own foreground
+         * Gated on [running] OR [startPending]: an update while the service is
+         * down is dropped (there is no card to refresh, and starting one here
+         * would post a notification over silence), but one sent in the window
+         * between [setActive]`(true)` and the async [onCreate] is NOT — it rides
+         * the intent queue behind the start, which the platform delivers in call
+         * order, so it can never beat it. While playing, our own foreground
          * service holds the process at FGS procstate, so the plain
          * startService clears the background-start restriction. Never throws
          * (same contract as [setActive]).
@@ -448,7 +483,7 @@ class AudioKeepAliveService : Service() {
             durationMs: Long,
             rate: Float,
         ) {
-            if (!running) return
+            if (!running && !startPending) return
             try {
                 context.startService(
                     Intent(context, AudioKeepAliveService::class.java)
