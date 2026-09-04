@@ -30,6 +30,15 @@
  *                       rendition of it — as the primary or as an alternate.
  *   2. NOT STALE        the manifest offers no reader the coverage file has
  *                       never heard of, and knows every letter it lists.
+ *   2b. BOOKS BALANCE    for each reader, the per-letter rows plus the range
+ *                       compilations plus the unmapped files add up to the
+ *                       letter-side file count. Without this the gate is
+ *                       CIRCULAR — delete a reader from the manifest AND from
+ *                       the coverage file and both agree on a lie (the Verifier
+ *                       proved exactly that, 2026-09-04). The totals are
+ *                       re-derived from tools/_audio-drive-listing.json when it
+ *                       is present, which is the generator's INPUT and the only
+ *                       thing here it does not write itself.
  *   3. WELL FORMED      ids look like Drive file ids; no id repeats inside one
  *                       rendition; one rendition per reader per letter; every
  *                       reader code is one of B/T/V/M.
@@ -49,12 +58,13 @@ import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-import { READER_CODES, countByReader, formatReaderCounts } from './audio-renditions-lib.mjs';
+import { READER_CODES, countByReader, formatReaderCounts, readerFromFilename, isLetterAudio } from './audio-renditions-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const MANIFEST = resolve(ROOT, 'app/src/main/assets/src/data/audio-manifest.js');
 const COVERAGE = resolve(HERE, 'audio-manifest-coverage.json');
+const LISTING = resolve(HERE, '_audio-drive-listing.json');   // present on the generating machine, not in CI
 const REPO = 'VOTReader/votreader-assets';
 const TAG = 'audio-v1';
 const GH = 'C:\\Program Files\\GitHub CLI\\gh.exe';
@@ -163,6 +173,79 @@ for (const key of Object.keys(letters)) {
   if (!offered.has(key)) fail(`${key}: every reader's rendition vanished — the letter has candidates but ships no audio at all`);
 }
 
+// ── 2b. the books balance ───────────────────────────────────────────────
+// Every letter-side file in the Drive listing either reached a letter, is one
+// of the WTLB range compilations, or is recorded as unmapped. Summing the
+// per-letter rows makes a hand-edit of ANY of them show up here, which is what
+// stops this gate from being a conversation the generator has with itself.
+const totals = coverage.totals || null;
+if (!totals) {
+  fail('tools/audio-manifest-coverage.json has no `totals` — regenerate it; the gate cannot balance the books without it.');
+} else {
+  const summed = {};
+  for (const v of Object.values(letters)) {
+    for (const [r, n] of Object.entries(v.readers || {})) summed[r] = (summed[r] || 0) + n;
+  }
+  for (const r of READER_CODES) {
+    const lhs = (summed[r] || 0) + ((totals.unmapped || {})[r] || 0) + ((totals.compilations || {})[r] || 0);
+    const rhs = (totals.listing || {})[r] || 0;
+    if (lhs !== rhs) {
+      fail(`reader ${r}: ${summed[r] || 0} in letters + ${(totals.unmapped || {})[r] || 0} unmapped + ` +
+           `${(totals.compilations || {})[r] || 0} compilations = ${lhs}, but the listing holds ${rhs} ` +
+           `letter-side file(s). Something was edited by hand or the coverage file is stale.`);
+    }
+  }
+  // The independent leg: re-derive the listing counts from the listing itself.
+  if (existsSync(LISTING)) {
+    const seen = new Set();
+    const fromListing = {};
+    for (const rec of JSON.parse(readFileSync(LISTING, 'utf8'))) {
+      if (!isLetterAudio(rec.path) || seen.has(rec.id)) continue;
+      seen.add(rec.id);
+      const r = readerFromFilename(rec.path.split('/').pop());
+      fromListing[r] = (fromListing[r] || 0) + 1;
+    }
+    for (const r of READER_CODES) {
+      const a = (totals.listing || {})[r] || 0;
+      const b = fromListing[r] || 0;
+      if (a !== b) {
+        fail(`reader ${r}: the coverage file claims ${a} letter-side listing file(s), the listing itself has ${b} — ` +
+             'the coverage file was not written from this listing.');
+      }
+    }
+    // The unmapped count is the one free variable a hand-edit could inflate to
+    // balance a theft, so make it name its evidence: each id must be a real
+    // letter-side listing record, carry the reader it is counted under, and
+    // reach no rendition. Padding it then means naming a file that IS emitted.
+    const listingById = new Map();
+    for (const rec of JSON.parse(readFileSync(LISTING, 'utf8'))) {
+      if (isLetterAudio(rec.path)) listingById.set(rec.id, rec.path);
+    }
+    const ids = totals.unmappedIds || [];
+    const claimed = Object.values(totals.unmapped || {}).reduce((n, x) => n + x, 0);
+    if (ids.length !== claimed) {
+      fail(`the coverage file claims ${claimed} unmapped file(s) but names ${ids.length}`);
+    }
+    const byReader = {};
+    for (const id of ids) {
+      const path = listingById.get(id);
+      if (!path) { fail(`unmapped id ${id} is not a letter-side record in the listing`); continue; }
+      if (emitted.has(id)) { fail(`id ${id} is counted as unmapped but the manifest ships it`); continue; }
+      const r = readerFromFilename(path.split('/').pop());
+      byReader[r] = (byReader[r] || 0) + 1;
+    }
+    for (const r of READER_CODES) {
+      const a = (totals.unmapped || {})[r] || 0;
+      if (a !== (byReader[r] || 0)) {
+        fail(`reader ${r}: ${a} unmapped claimed, but the named ids hold ${byReader[r] || 0}`);
+      }
+    }
+    console.log(`[audio-manifest] books balance against ${Object.values(fromListing).reduce((n, x) => n + x, 0)} letter-side listing files (independent leg ran)`);
+  } else {
+    console.log('[audio-manifest] books balance — sidecar totals only; _audio-drive-listing.json not present (CI)');
+  }
+}
+
 // ── 3. spares, reported not failed ──────────────────────────────────────
 // A reader who supplied more candidates than their rendition uses is normal:
 // the duplicate upload in "0. ALL LETTERS", or a spare part-file for a letter
@@ -204,4 +287,4 @@ if (errors.length) {
   console.error('');
   process.exit(1);
 }
-console.log('[audio-manifest] OK — every reader who recorded a letter is offered on it.');
+console.log('[audio-manifest] OK — every reader the coverage file records is offered, and the books balance.');

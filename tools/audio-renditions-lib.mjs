@@ -25,6 +25,36 @@ export const READER_RANK = Object.freeze({ B: 3, T: 2, V: 1, M: 0 });
 export const READER_CODES = Object.freeze(['B', 'T', 'V', 'M']);
 
 /**
+ * The reader a filename claims. "(read by text-to-speech - Benjamin)" is
+ * BENJAMIN: he produced it, and his rank is what makes his readings supersede.
+ * @param {string} name  a file name or a path ending in one
+ * @returns {'B'|'T'|'V'|'M'}
+ */
+export function readerFromFilename(name) {
+  const m = /\(read by ([^)]+)\)/i.exec(String(name));
+  if (!m) return 'V';
+  const t = m[1].toLowerCase();
+  if (t.includes('benjamin') || t.includes('bejamin')) return 'B';
+  if (t.includes('timothy')) return 'T';
+  if (t.includes('ai')) return 'M';
+  return 'V';
+}
+
+/**
+ * The Drive folders that hold LETTER audio. Everything else is a different
+ * surface and never enters this manifest: the AI song variants, the Gospel of
+ * John movie audio, the Bible-Letter Studies (tracks span several study
+ * chapters) and the TSOT New Testament (Bible chapters).
+ */
+export const NON_LETTER_ROOT =
+  /^(AI Songs of the Letters|The Gospel of John Movie Audio|17\. Bible-Letter Studies|18\. TSOT New Testament)/;
+
+/** Is this listing path a letter-side mp3? */
+export function isLetterAudio(path) {
+  return /\.mp3$/i.test(path) && !NON_LETTER_ROOT.test(path);
+}
+
+/**
  * Compose reader R's own standalone rendition of a letter from its candidate
  * pool: same precedence as the primary flatten (full > sections > parts, one
  * addendum last), restricted to R's files, first-seen per slot (which is what
@@ -130,11 +160,19 @@ export function composeAlternates(cands, primaryList) {
     const ids = r.rows.map((row) => row.id);
     if (ids.length === primaryIds.size && ids.every((id) => primaryIds.has(id))) continue;
     const note = completenessNote(cands, r);
-    // One row and nothing missing: the ordinal is noise, drop it. One row out
-    // of five: the ordinal is the point, and it is also what lets the gate tell
-    // a whole-letter reading from a fragment by looking at the data alone.
-    const bare = !note && r.rows.length === 1;
-    const rows = r.rows.map((row) => (row.label && !bare ? [row.id, row.label] : [row.id]));
+    // One MAIN row and nothing missing: the ordinal is noise, drop it. One row
+    // out of five: the ordinal is the point, and it is also what lets the gate
+    // tell a whole-letter reading from a fragment by looking at the data alone.
+    // The addendum never counts — it is appended after the reading, so a lone
+    // part plus an addendum is still a lone part (`one:christmas` shipped a
+    // meaningless "Part 1" chip until this filter matched completenessNote's).
+    const bare = !note && r.rows.filter((row) => row.label !== 'Addendum').length === 1;
+    const rows = r.rows.map((row) => {
+      // "Addendum" is not an ordinal — it names what the row IS, and the reader
+      // needs it whether or not the reading is one part or five.
+      const keep = row.label && (row.label === 'Addendum' || !bare);
+      return keep ? [row.id, row.label] : [row.id];
+    });
     pairs.push(note ? [reader, rows, note] : [reader, rows]);
   }
   return pairs;
@@ -149,21 +187,27 @@ export function composeAlternates(cands, primaryList) {
  * collapsed, so a listing produced before hashes existed behaves exactly as it
  * always did.
  *
- * The survivor is the one a listener should get: a real collection folder
- * beats "0. ALL LETTERS", then the higher reader rank (the same audio labelled
- * two ways is one recording, and the stronger attribution is the true one),
- * then the id, so the choice is deterministic.
+ * The survivor is the one a listener should get. An id the CURRENT manifest
+ * already ships wins first: the copies are byte-identical audio, so re-picking
+ * between them changes nothing a listener hears and costs a fresh ~10 MB mirror
+ * upload for every regeneration. After that a real collection folder beats
+ * "0. ALL LETTERS", then the higher reader rank (the same audio labelled two
+ * ways is one recording, and the stronger attribution is the true one), then
+ * the id, so the choice is deterministic.
  *
  * @template {{id:string, hash?:string|null, fill?:boolean, reader?:string}} T
  * @param {T[]} records
+ * @param {Set<string>} [incumbent] ids the current manifest already ships
  * @returns {{ records: T[], collapsed: Array<{ kept: string, dropped: string, hash: string }> }}
  */
-export function dedupeByAudioHash(records) {
+export function dedupeByAudioHash(records, incumbent) {
   const at = new Map();          // hash -> { rec, slot } — the survivor and where it sits
   const out = [];
   const collapsed = [];
   const rank = (r) => READER_RANK[r && r.reader] ?? -1;
+  const held = (r) => !!(incumbent && incumbent.has(r.id));
   const better = (a, b) => {
+    if (held(a) !== held(b)) return held(a) ? a : b;       // stability beats provenance
     if (!!a.fill !== !!b.fill) return a.fill ? b : a;      // a real folder beats "0. ALL LETTERS"
     if (rank(a) !== rank(b)) return rank(a) > rank(b) ? a : b;
     return a.id <= b.id ? a : b;

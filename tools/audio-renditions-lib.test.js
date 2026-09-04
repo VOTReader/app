@@ -115,6 +115,19 @@ describe('fixture: a partial alternate (the rendition the old rules threw away)'
     expect(t[2]).toBe('1 of 2 sections');
   });
 
+  it('a lone part PLUS an addendum is still a lone part — no meaningless ordinal', () => {
+    // Shipped as a defect: rows.length was 2 because the addendum counted, so
+    // `one:christmas` gained a "Part 1" chip the voice picker had never shown.
+    const cands = [
+      cand('part', 1, 'V1', 'V'), cand('addendum', 0, 'Vadd', 'V'),
+      cand('full', 0, 'B1', 'B'),
+    ];
+    const pairs = composeAlternates(cands, [{ id: 'B1', label: null }]);
+    const v = pairs.find((p) => p[0] === 'V');
+    expect(v[1]).toEqual([['V1'], ['Vadd', 'Addendum']]);
+    expect(v[2]).toBeUndefined();
+  });
+
   it('a reader whose rows are a strict SUBSET of a mixed-reader primary is still offered', () => {
     // The primary flatten takes the best reader per slot, so it can be mixed:
     // Benjamin's section 1 + Timothy's section 2. Timothy's own rendition is a
@@ -154,6 +167,29 @@ describe('fixture: the same audio under two Drive ids (compare audio, not names)
       { id: 'c', hash: 'h2', reader: 'V' },
     ]);
     expect(records.map((r) => r.id)).toEqual(['dupWinner', 'c']);
+  });
+
+  it('keeps the id the manifest already ships, so a regeneration costs no mirror upload', () => {
+    // The copies are byte-identical audio. Re-picking between them changes
+    // nothing a listener hears and forces a fresh upload of every re-picked
+    // asset — which is exactly what happened before the incumbent tiebreak:
+    // two Benjamin readings moved to a differently-filed copy of the same
+    // recording and went missing from the release.
+    const recs = [
+      { id: 'nice-provenance', hash: 'abc', fill: false, reader: 'B' },
+      { id: 'already-shipped', hash: 'abc', fill: true, reader: 'B' },
+    ];
+    expect(dedupeByAudioHash(recs).records.map((r) => r.id)).toEqual(['nice-provenance']);
+    expect(dedupeByAudioHash(recs, new Set(['already-shipped'])).records.map((r) => r.id))
+      .toEqual(['already-shipped']);
+  });
+
+  it('falls back to provenance when NEITHER copy is already shipped', () => {
+    const recs = [
+      { id: 'fill', hash: 'abc', fill: true, reader: 'B' },
+      { id: 'real', hash: 'abc', fill: false, reader: 'B' },
+    ];
+    expect(dedupeByAudioHash(recs, new Set(['unrelated'])).records.map((r) => r.id)).toEqual(['real']);
   });
 
   it('collapses nothing when the listing carries no hashes — the pre-hash listing is unchanged', () => {
