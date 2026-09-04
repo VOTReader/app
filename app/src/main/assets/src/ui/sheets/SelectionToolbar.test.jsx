@@ -199,6 +199,37 @@ describe('SelectionToolbar — zero-width annotation guard (annotation-selection
   });
 });
 
+describe('SelectionToolbar — footnote markers excluded from stored text (annotation-selection-6)', () => {
+  it('strips a .fn-ref digit from the stored highlight text but keeps raw-textContent offsets', async () => {
+    // "as it is written." (17 chars) + fn-ref digit "2" (container-text index
+    // 17) + " Therefore" (10 chars) — three sibling text nodes under the same
+    // [data-hl-key] container, exactly how Segments.jsx renders a footnote
+    // marker inline (span.fn-ref, textContent = the digit).
+    const c = readingContainer('letter:test:1', 'as it is written.<span class="fn-ref">2</span> Therefore');
+    mount();
+    const r = document.createRange();
+    r.setStart(c.childNodes[0], 9);  // "written.2 Therefore" starts at "w"
+    r.setEnd(c.childNodes[2], 10);   // through the end of "Therefore"
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(r);
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r2) => setTimeout(r2, 250));
+    });
+    const yellowBtn = document.querySelector('.sel-color-btn[data-color="yellow"]');
+    expect(yellowBtn).not.toBeNull();
+    act(() => { fire(yellowBtn, 'click'); });
+    // Offsets (9-28) index the RAW textContent, footnote digit included — that
+    // coordinate space must not move. Only the stored display text drops the
+    // digit, matching computeAndShow's own .fn-ref strip for selInfo.text.
+    expect(/** @type {any} */ (globalThis).AnnotationStore.add).toHaveBeenCalledWith(
+      'letter:test:1',
+      expect.objectContaining({ start: 9, end: 28, text: 'written. Therefore' }),
+    );
+  });
+});
+
 describe('SelectionToolbar — long-press / right-click raises the toolbar (selection only)', () => {
   it('raises the toolbar when a long-press / right-click produced a text selection', () => {
     const c = readingContainer('bible:test:1:2', 'who bore witness to the word of God');
