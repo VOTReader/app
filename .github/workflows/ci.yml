@@ -133,6 +133,15 @@ jobs:
         # reading is gone from the app. Checked against
         # tools/audio-manifest-coverage.json, written by the generator's MAPPING
         # stage, so a loss in the COMPOSITION stage is visible. Offline.
+        #
+        # That sidecar alone would make the gate circular — edit both files the
+        # same way and they agree on a lie. So the books balance per reader, and
+        # every file in the free `unmapped` bucket has to justify itself by its
+        # own name or a pinned id (2026-09-04, after two Verifier forgeries).
+        # The Drive listing that would re-derive the totals is gitignored, so
+        # THIS run only gets the justification half — which is why that half is
+        # deliberately the strong one. tools/check-audio-manifest.unmapped.test.js
+        # pins it in exactly this shape.
         run: npm run check:audio-manifest
 
       - name: Audit footnote rendering (CORP6 — dup / white verse numbers)

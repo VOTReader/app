@@ -39,6 +39,15 @@
  *                       re-derived from tools/_audio-drive-listing.json when it
  *                       is present, which is the generator's INPUT and the only
  *                       thing here it does not write itself.
+ *   2c. UNMAPPED IS     the unmapped count is the one free variable 2b leaves,
+ *       JUSTIFIED       and naming the ids does not pin it: a stolen id is a
+ *                       real record that reaches no rendition too, which is the
+ *                       Verifier's second and complete forgery. So every
+ *                       unmapped file states WHY, and the gate holds the reason
+ *                       to evidence a forger cannot mint — "Bonus Track" in the
+ *                       filename, or a pinned id. Runs with or without the
+ *                       listing, since the listing is gitignored and CI would
+ *                       otherwise only get the half of the gate that can lie.
  *   3. WELL FORMED      ids look like Drive file ids; no id repeats inside one
  *                       rendition; one rendition per reader per letter; every
  *                       reader code is one of B/T/V/M.
@@ -195,6 +204,89 @@ if (!totals) {
            `letter-side file(s). Something was edited by hand or the coverage file is stale.`);
     }
   }
+  // ── 2c. every unmapped file JUSTIFIES itself ──────────────────────────
+  // `unmapped` is the only free variable in the identity above, so a hand-edit
+  // can inflate it to balance a theft. Naming the stolen ids does not expose
+  // that: a stolen id IS a real listing record, and once it has been deleted
+  // from the manifest it reaches no rendition either — the Verifier forged
+  // exactly that and the gate said OK. What a stolen id cannot do is JUSTIFY
+  // itself, so each entry now carries the reason it was dropped and the gate
+  // holds that reason to its own evidence. This runs with or without the Drive
+  // listing, because the listing is gitignored and CI would otherwise get the
+  // weak half of the gate.
+  //
+  // The residue: recordings the resolver could not place at all. There are two,
+  // and both are recordings of a title the corpus does not carry. They are
+  // PINNED rather than pattern-checked, because a recording no listener can
+  // reach is precisely the event that should stop the line and get a human —
+  // either the resolver is wrong (ten of Timothy's section recordings sat in
+  // this list until 2026-09-04) or the archive holds something the corpus does
+  // not. Adding to this list is a decision, not a formality.
+  const UNRESOLVED_KNOWN = {
+    '1GcaqLJmzHhk2JwcTAPRFqyBa-x-OQyXI': 'V7.045_My Anger Runs Deep — no letter of that title in Volume Seven',
+    '1pAj5SoKcOT0nOEeUGn6naI_PGnqocXE6': 'WTLB2.125_A Return to the Garden — no letter of that title in WTLB2',
+  };
+  const BONUS_NAME = /[._]Bonus Track[._]/i;
+
+  const unmappedFiles = coverage.unmappedFiles;
+  if (!Array.isArray(unmappedFiles)) {
+    fail('tools/audio-manifest-coverage.json has no `unmappedFiles` — regenerate it; the gate cannot justify the unmapped count without the name and reason of each file.');
+  } else {
+    const claimed = Object.values(totals.unmapped || {}).reduce((n, x) => n + x, 0);
+    if (unmappedFiles.length !== claimed) {
+      fail(`the coverage file claims ${claimed} unmapped file(s) but names ${unmappedFiles.length}`);
+    }
+    const byReader = {};
+    const seenUnmapped = new Set();
+    for (const u of unmappedFiles) {
+      if (!u || !DRIVE_ID.test(u.id || '') || typeof u.name !== 'string') {
+        fail(`malformed unmappedFiles entry: ${JSON.stringify(u)}`);
+        continue;
+      }
+      if (seenUnmapped.has(u.id)) { fail(`unmapped id ${u.id} is listed twice`); continue; }
+      seenUnmapped.add(u.id);
+      if (emitted.has(u.id)) { fail(`id ${u.id} is counted as unmapped but the manifest ships it`); continue; }
+      if (u.why === 'bonus') {
+        // Provable from the name alone: the corpus has no letter for a bonus
+        // track. A stolen letter recording carries an ordinal here instead,
+        // so this reason cannot be borrowed to hide one.
+        if (!BONUS_NAME.test(u.name)) {
+          fail(`${u.name} is dropped as a "bonus" track but its name is not a bonus track — a mapped recording cannot be excused this way`);
+          continue;
+        }
+      } else if (u.why === 'unresolved') {
+        if (!(u.id in UNRESOLVED_KNOWN)) {
+          fail(`${u.name} reaches no listener and is not a known unresolved recording. Either the resolver in ` +
+               `tools/gen-audio-manifest.mjs should place it, or it belongs in UNRESOLVED_KNOWN in this file with a reason.`);
+          continue;
+        }
+      } else {
+        fail(`unmapped file ${u.name} carries an unknown reason ${JSON.stringify(u.why)}`);
+        continue;
+      }
+      byReader[readerFromFilename(u.name)] = (byReader[readerFromFilename(u.name)] || 0) + 1;
+    }
+    for (const r of READER_CODES) {
+      const a = (totals.unmapped || {})[r] || 0;
+      if (a !== (byReader[r] || 0)) {
+        fail(`reader ${r}: ${a} unmapped claimed, but the justified files hold ${byReader[r] || 0}`);
+      }
+    }
+    // No "this pin is now stale" check on purpose: if the resolver starts
+    // placing a pinned id, the manifest ships it and the `emitted` test above
+    // catches any later attempt to call it unmapped. A dead entry costs a line.
+    //
+    // WHAT THIS STILL DOES NOT CATCH, stated plainly: in CI the `name` is the
+    // forger's own word. Steal a rendition and file its id under a name ending
+    // "Bonus Track_… (read by Timothy).mp3" and this check is satisfied, because
+    // CI holds nothing to compare the name against. Two things close it, and
+    // neither is this loop: the listing leg below rejects the invented name the
+    // next time the gate runs on the generating machine, and the coverage file
+    // is COMMITTED, so the deleted reader is a line in the diff a reviewer
+    // reads. What changed on 2026-09-04 is the cost: the forgery used to need
+    // no lie at all, only an id moved from one bucket to another.
+  }
+
   // The independent leg: re-derive the listing counts from the listing itself.
   if (existsSync(LISTING)) {
     const seen = new Set();
@@ -213,31 +305,19 @@ if (!totals) {
              'the coverage file was not written from this listing.');
       }
     }
-    // The unmapped count is the one free variable a hand-edit could inflate to
-    // balance a theft, so make it name its evidence: each id must be a real
-    // letter-side listing record, carry the reader it is counted under, and
-    // reach no rendition. Padding it then means naming a file that IS emitted.
+    // Each unmapped file must really BE the listing record it claims to be —
+    // the id present, letter-side, and carrying the filename the sidecar
+    // recorded. This is what stops an invented name from justifying itself.
     const listingById = new Map();
     for (const rec of JSON.parse(readFileSync(LISTING, 'utf8'))) {
       if (isLetterAudio(rec.path)) listingById.set(rec.id, rec.path);
     }
-    const ids = totals.unmappedIds || [];
-    const claimed = Object.values(totals.unmapped || {}).reduce((n, x) => n + x, 0);
-    if (ids.length !== claimed) {
-      fail(`the coverage file claims ${claimed} unmapped file(s) but names ${ids.length}`);
-    }
-    const byReader = {};
-    for (const id of ids) {
-      const path = listingById.get(id);
-      if (!path) { fail(`unmapped id ${id} is not a letter-side record in the listing`); continue; }
-      if (emitted.has(id)) { fail(`id ${id} is counted as unmapped but the manifest ships it`); continue; }
-      const r = readerFromFilename(path.split('/').pop());
-      byReader[r] = (byReader[r] || 0) + 1;
-    }
-    for (const r of READER_CODES) {
-      const a = (totals.unmapped || {})[r] || 0;
-      if (a !== (byReader[r] || 0)) {
-        fail(`reader ${r}: ${a} unmapped claimed, but the named ids hold ${byReader[r] || 0}`);
+    for (const u of (Array.isArray(unmappedFiles) ? unmappedFiles : [])) {
+      const path = listingById.get(u.id);
+      if (!path) { fail(`unmapped id ${u.id} is not a letter-side record in the listing`); continue; }
+      const real = path.split('/').pop();
+      if (real !== u.name) {
+        fail(`unmapped id ${u.id} is recorded as ${JSON.stringify(u.name)} but the listing calls it ${JSON.stringify(real)}`);
       }
     }
     console.log(`[audio-manifest] books balance against ${Object.values(fromListing).reduce((n, x) => n + x, 0)} letter-side listing files (independent leg ran)`);
