@@ -39,7 +39,12 @@
  */
 export function buildNavIndex() {
   const sig = Object.keys(_allBooks()).length
-    + ':' + (typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.length : 0)
+    // Total LETTERS across every collection, not COLLECTIONS.length (a static
+    // 15) — a lazy corpus (e.g. bundle-a-vot) landing more letters into an
+    // already-registered collection left that count unchanged, so the memo
+    // never rebuilt and the new letters stayed invisible to the picker
+    // until an app reload (F19).
+    + ':' + (typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.reduce((n, c) => n + colLetterArr(c).length, 0) : 0)
     + ':' + (Array.isArray(window.BIBLE_STUDIES) ? window.BIBLE_STUDIES.length : 0)
     + ':' + (_matthew() ? 1 : 0);
   if (window.__NAV_INDEX && window.__NAV_INDEX_SIG === sig) return window.__NAV_INDEX;

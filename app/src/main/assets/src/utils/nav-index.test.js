@@ -45,6 +45,20 @@ describe('buildNavIndex — signature-guarded memo', () => {
     // And the memo still memoizes when nothing changed.
     expect(buildNavIndex()).toBe(second);
   });
+
+  it('rebuilds when a collection gains a letter, not just when the collection COUNT changes (F19)', () => {
+    stubCorpora({ books: 1 });
+    g.colLetterArr = () => [];
+    const first = buildNavIndex();
+    expect(first.some((i) => i.kind === 'letter' && i.letterId === 'new-letter')).toBe(false);
+    // COLLECTIONS.length is still 1 — only the letters INSIDE that one
+    // collection grew, the way a lazy corpus (e.g. bundle-a-vot) landing more
+    // letters into an already-registered collection actually looks. A
+    // signature keyed on COLLECTIONS.length alone can't see this.
+    g.colLetterArr = () => [{ id: 'new-letter', num: 1, title: 'New Letter' }];
+    const second = buildNavIndex();
+    expect(second.some((i) => i.kind === 'letter' && i.letterId === 'new-letter')).toBe(true);
+  });
 });
 
 describe('contentDocToNavItem — MiniSearch doc → NavItem bridge', () => {
