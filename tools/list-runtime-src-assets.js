@@ -102,6 +102,25 @@ export function deriveRuntimeSrcAssets() {
   return { assets: [...found].sort(), unresolved };
 }
 
+/**
+ * Every root-level FILE the published site is allowed to carry, derived from
+ * the service worker's own CORE_ASSETS list — the app's single source of truth
+ * for what it caches — plus service-worker.js, which cannot appear in its own
+ * list, plus the control files GitHub Pages reads.
+ *
+ * Only root entries: a CORE_ASSETS path containing a slash lives in dist/,
+ * fonts/ or icons/, and those directories ship wholesale.
+ */
+export function allowedSiteRootFiles() {
+  const sw = readFileSync(resolve(assetsDir, 'service-worker.js'), 'utf-8');
+  const block = sw.match(/const CORE_ASSETS = \[([\s\S]*?)\];/);
+  if (!block) return null;
+  // Pages control files: not app assets, but legitimately published.
+  const names = new Set(['service-worker.js', 'CNAME', '.nojekyll']);
+  for (const m of block[1].matchAll(/'\.\/([^'/]+)'/g)) names.add(m[1]);
+  return names;
+}
+
 /** Every './src/...' path the service worker precaches, as an assets-relative path. */
 function swPrecachedSrcPaths() {
   const sw = readFileSync(resolve(assetsDir, 'service-worker.js'), 'utf-8');
@@ -152,6 +171,27 @@ function main() {
     for (const a of assets) {
       if (!existsSync(resolve(root, site, a))) {
         fail(`runtime asset MISSING from the staged site (${site}/${a}) — it would 404 on the live PWA.`);
+      }
+    }
+
+    // security-privacy-4 / service-worker-8: the deploy stages by EXCLUSION, so
+    // it publishes whatever it was not told to drop. Assert the root positively
+    // instead, in both directions — nothing extra, and nothing missing.
+    const allowed = allowedSiteRootFiles();
+    if (!allowed) {
+      fail('could not parse CORE_ASSETS out of service-worker.js, so the staged root cannot be checked.');
+    } else {
+      for (const name of readdirSync(resolve(root, site))) {
+        if (statSync(resolve(root, site, name)).isDirectory()) continue;
+        if (!allowed.has(name)) {
+          fail(`the staged site publishes a root file the app never asks for: ${name}. Either add it to CORE_ASSETS in service-worker.js, or exclude it in deploy-web.yml's staging step. Nothing reaches the public site by default.`);
+        }
+      }
+      for (const name of allowed) {
+        if (name === 'CNAME' || name === '.nojekyll') continue; // optional by nature
+        if (!existsSync(resolve(root, site, name))) {
+          fail(`CORE_ASSETS names '${name}' but it is MISSING from the staged site — the service worker would fail to install on every client.`);
+        }
       }
     }
   }

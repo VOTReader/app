@@ -21,8 +21,16 @@ name: Deploy Web (PWA → GitHub Pages)
 # loadBibleStudies) and are NOT bundled into dist/, so they must ship; the
 # staging step copies them back in after the broad src/ exclusion. (The main
 # corpus IS in the dist/ bundles, so the rest of src/ stays out.)
-# dist/, fonts/, icons/, and every root file (vendor libs, images, css,
-# index.html, manifest.json, service-worker.js, offline.html) ship as-is.
+# dist/, fonts/ and icons/ ship wholesale. Root files do NOT ship as-is: four
+# of them are concatenated into dist/bundle-a.js by tools/build.py and are
+# never loaded standalone (app.css — index.html links dist/app.min.css —
+# react.min.js, react-dom.min.js, search-data.js), and *.test.js is not app
+# code at all. Those 636 KB were published for months because this step asked
+# only what to EXCLUDE. It still excludes, but it no longer decides:
+# list-runtime-src-assets.js --check --site now asserts the staged root
+# POSITIVELY against the service worker's own CORE_ASSETS, in both directions,
+# so an unlisted file stops the deploy instead of reaching the public site,
+# and a missing one stops it instead of breaking every client's install.
 #
 # All in-app asset paths are relative (dist/bundle-a.js, fonts/..., etc.),
 # and the SW + manifest use ./ scope, so serving from the
@@ -174,6 +182,11 @@ jobs:
             --exclude='src' \
             --exclude='*.d.ts' \
             --exclude='*.lnk' \
+            --exclude='*.test.js' \
+            --exclude='/app.css' \
+            --exclude='/react.min.js' \
+            --exclude='/react-dom.min.js' \
+            --exclude='/search-data.js' \
             app/src/main/assets/ _site/
           # Copy back the src/ files the app loads at RUNTIME (the alternate
           # translations, bible-studies.js, scripture-web-data.js) after the
