@@ -416,12 +416,14 @@ describe('v3 export manifest limit', () => {
     }));
   });
 
-  /* storage-backup-2: a store still 'pending'/'degraded' at the export tap
-     gets its own message — "your storage may be failing" is wrong (nothing
-     failed; hydration just hasn't finished) and would send the reader
-     chasing a fault that isn't there. */
-  it('tells the reader to wait, not that storage is failing, when a store has not loaded yet', async () => {
-    const build = vi.fn(async () => ({ ok: false, reason: 'not-loaded', problems: ['vot-annotations'] }));
+  /* storage-backup-2 follow-up: a store that could not save its newest change
+     (failed IDB put, or hydration stuck at 'degraded') no longer blocks the
+     export — the builder returns ok:true with that store on `problems`, and
+     the backup goes out. The toast must caption it honestly rather than say a
+     flat "Backup saved." The reader arrives here from StorageHealthBanner's
+     "Export your data now", so an abort would have left them with nothing. */
+  const exportWith = async (built) => {
+    const build = vi.fn(async () => built);
     const toast = vi.fn();
     teardownSettingsGlobals();
     setupSettingsGlobals({
@@ -429,20 +431,45 @@ describe('v3 export manifest limit', () => {
       showToast: toast,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: vi.fn(), pickImportFile: () => null,
-        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        openFilePicker: () => {}, openExportSink: vi.fn(async () => ({ write: vi.fn(), close: vi.fn() })),
+        pickImportFile: () => null, clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
     renderSettings();
     fireEvent.click(screen.getByRole('button', { name: 'Export' }));
-
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-      text: expect.stringMatching(/hasn.t finished loading/),
-    }));
+    return toast;
+  };
+  const okManifest = (problems) => ({
+    ok: true,
+    manifest: { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] },
+    manifestBytes: 2048,
+    mediaEntries: [],
+    problems,
+  });
+
+  it('saves the backup and says what may be missing when a store could not save its newest change', async () => {
+    const toast = await exportWith(okManifest(['vot-annotations']));
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/Backup saved — 1 recent change may be missing/),
+    })));
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({
-      text: expect.stringMatching(/storage may be failing/),
+      text: expect.stringMatching(/Export aborted/),
     }));
+  });
+
+  it('plural when more than one store is behind', async () => {
+    const toast = await exportWith(okManifest(['vot-annotations', 'vot-journal']));
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/2 recent changes may be missing/),
+    })));
+  });
+
+  it('stays a plain "Backup saved." when nothing is behind', async () => {
+    const toast = await exportWith(okManifest([]));
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'Backup saved.',
+    })));
   });
 });
 
