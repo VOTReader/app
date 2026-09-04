@@ -1,14 +1,9 @@
-/* sw-register tests — controllerchange reload.
+/* sw-register tests — P7pwa visibility-gated controllerchange reload.
    ──────────────────────────────────────────────────────────────────
    Mocks navigator.serviceWorker (capturing the controllerchange handler),
-   window.location, and document.visibilityState, then drives the handler.
-   Reload is unconditional on any controllerchange once the page already had
-   a controller (service-worker-1, 2026-09-04) — visibility and boot timing
-   used to gate a deferred reload, which left a visible mid-session reader
-   running OLD eager bundles under a NEW controller for as long as they kept
-   reading (see sw-register.js's module header). The existing
-   service-worker.test.js covers the SW's own install/fetch logic and is
-   untouched.
+   window.location, and document.visibilityState, then drives the handler in
+   each visibility state. The existing service-worker.test.js covers the SW's
+   own install/fetch logic and is untouched.
 
    jsdom's location.reload is non-configurable, so we replace window.location
    wholesale (the `location` property on window IS configurable) with a stub
@@ -20,7 +15,7 @@ import { registerServiceWorker } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { _resetToasts } from './toast.js';
 
-describe('registerServiceWorker — controllerchange reload', () => {
+describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
   let controllerChangeHandler;
   let reloadSpy;
   let origSW, origLocation, origVisibility;
@@ -54,7 +49,7 @@ describe('registerServiceWorker — controllerchange reload', () => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
   }
 
-  it('reloads immediately when the page is visible', () => {
+  it('reloads immediately during the boot window (invisible — still first paint)', () => {
     setVisibility('visible');
     registerServiceWorker();
     expect(typeof controllerChangeHandler).toBe('function');
@@ -69,21 +64,23 @@ describe('registerServiceWorker — controllerchange reload', () => {
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  /* service-worker-1 (2026-09-04): this used to be "defers a mid-session
-     VISIBLE reload until the app is backgrounded" — waiting for the tab to
-     background before reloading a visible reader. That wait had no upper
-     bound: the reader's already-parsed OLD eager bundles (bundle-a/b/c/d)
-     kept running under the NEW controller for as long as they stayed put, and
-     a lazy corpus/screen load in that window would be NEW code against OLD
-     globals. Build correctness now wins — reload fires the moment the
-     controller changes, visible or not. */
-  it('reloads immediately even well after boot, still visible', () => {
+  /* INVISIBLE-RELOAD: past the boot window with the app in the foreground, the
+     user is mid-letter — reloading there yanks them out. Wait for the next
+     background instead; they come back to the new build. */
+  it('defers a mid-session VISIBLE reload until the app is backgrounded', () => {
     vi.useFakeTimers();
     try {
       setVisibility('visible');
       registerServiceWorker();
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(60_000);         // well past BOOT_GRACE_MS
       controllerChangeHandler();
+      expect(reloadSpy).not.toHaveBeenCalled();
+      // still visible → still no reload
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(reloadSpy).not.toHaveBeenCalled();
+      // user leaves the app → reload now, unseen
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
       expect(reloadSpy).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -109,6 +106,19 @@ describe('registerServiceWorker — controllerchange reload', () => {
     registerServiceWorker();
     controllerChangeHandler();
     expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('reloads a long-backgrounded app immediately (past the boot window, still hidden)', () => {
+    vi.useFakeTimers();
+    try {
+      setVisibility('hidden');
+      registerServiceWorker();
+      vi.advanceTimersByTime(60_000);
+      controllerChangeHandler();
+      expect(reloadSpy).toHaveBeenCalledTimes(1);   // a real update is never suppressed
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('registers with updateViaCache:none so the SW script is never HTTP-cached', () => {
