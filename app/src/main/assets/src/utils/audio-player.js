@@ -530,6 +530,15 @@ function _sleepAtTrackEndFire() {
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
   if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
   _markPaused();
+  // The finished track has no place to resume. _markPaused()'s own _persist()
+  // (or, in a real browser, the 'pause' listener's — the spec fires 'pause'
+  // before 'ended', so it usually beats us here) just wrote the boot snapshot
+  // with the clock at THIS recording's own end. Overwrite it with the next
+  // queued track at 0, or clear it outright at the tail, so the next boot
+  // doesn't reseek straight back to 'ended' and double-advance.
+  const nextTrack = _state.queue[_state.qi + 1];
+  if (nextTrack) _persist({ qi: _state.qi + 1, time: 0 });
+  else _clearPersist();
   if (!wasLive) _notify();
   if (wasLive) _toast('Sleep timer ended. Playback paused.');
 }
@@ -1308,14 +1317,23 @@ function _seekOnMetadata(at) {
   _el.addEventListener('loadedmetadata', handler, { once: true });
 }
 
-function _persist() {
+/**
+ * @param {{ qi: number, time: number } | null} [at] - persist a DIFFERENT
+ *   queue position than the one currently loaded. Sleep-at-track-end is the
+ *   one caller: the track that just finished has no place to resume, so it
+ *   advances the snapshot to the next queued track (or clears it outright at
+ *   the tail) instead of writing the just-finished track's own end-of-clock.
+ * @returns {void}
+ */
+function _persist(at) {
   // Durable per-recording memory rides the same call sites as the boot
   // snapshot, and ahead of its localStorage guard: the two are independent.
   _rememberCurrentPosition(false);
   try {
     if (typeof localStorage === 'undefined') return;
     const src = _pendingRestore || _source;
-    const track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+    const qi = at ? at.qi : (_pendingRestore ? _pendingRestore.qi : _state.qi);
+    const track = _pendingRestore ? _state.queue[0] : _state.queue[qi];
     const savedTrack = normalizeAudioTrack(track);
     if (!src || !savedTrack) return;
     const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
@@ -1327,9 +1345,9 @@ function _persist() {
     localStorage.setItem(PERSIST_KEY, JSON.stringify({
       v: 2,
       mode: src.mode, volKey: src.volKey, label: src.label,
-      qi: _pendingRestore ? _pendingRestore.qi : _state.qi,
+      qi,
       key: savedTrack.key,
-      time: Math.floor(_state.time || 0),
+      time: Math.floor((at ? at.time : _state.time) || 0),
       track: savedTrack,
       customQueue,
       startKey: src.startKey || undefined,
