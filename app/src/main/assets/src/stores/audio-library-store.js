@@ -199,7 +199,6 @@ export const AudioLibraryStore = extendStore(
       }
       data.saved.unshift({ ...normalized, savedAt: Date.now() });
       data.saved = data.saved.slice(0, MAX_SAVED_AUDIO_TRACKS);
-      this._cache = data;
       this._save();
       this._bump();
       return true;
