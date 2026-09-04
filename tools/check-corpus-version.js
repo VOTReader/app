@@ -222,7 +222,11 @@ if (!lock) {
 // Deliberately gated behind an explicit flag and loud output — this is the one
 // path that accepts a new digest at an UNCHANGED version, so using it when real
 // content changed would silently ship stale data to every cached client. Use it
-// only when you can say why the bytes cannot have changed.
+// only when you can say why the bytes cannot have changed. Note the test is the
+// BYTES, not the direction of the coverage change: narrowing the glob moves the
+// fingerprint just as widening it does, and both are re-baselines as long as no
+// corpus file changed. Prove that first — `git diff --name-only main HEAD` must
+// list no src/data file, no bundle-a*, and no reading font.
 if (args.includes('--rebaseline')) {
   if (checkOnly) fail('--rebaseline cannot be combined with --check.');
   const prev = lock.hash;
@@ -230,8 +234,12 @@ if (args.includes('--rebaseline')) {
   console.log(
     `[corpus-version] RE-BASELINED at CORPUS_VERSION=${corpusVersion} (NOT bumped).\n` +
     `    fingerprint ${prev} -> ${digest}\n` +
-    '    Use this ONLY when the fingerprint moved because the gate now covers MORE\n' +
-    '    files, not because corpus content changed. Clients keep their existing\n' +
+    '    Use this ONLY when the fingerprint moved because the gate now covers a\n' +
+    '    DIFFERENT set of files — more OR fewer — and not because corpus content\n' +
+    '    changed. Fewer counts: service-worker-2 (2026-09-04) narrowed the glob to\n' +
+    '    exclude bundle-a members and re-baselined here, correctly. The test is\n' +
+    '    never the direction, it is whether you can say why the bytes cannot have\n' +
+    '    changed. Clients keep their existing\n' +
     `    vot-corpus-${corpusVersion} bucket, which is correct precisely because the\n` +
     '    bytes they hold are unchanged.'
   );
@@ -256,7 +264,7 @@ if (lock.version === corpusVersion) {
     '    then rebuild + re-commit.\n' +
     '\n' +
     '    ONLY IF you know the bytes cannot have changed and this gate simply started\n' +
-    '    covering MORE files, re-baseline instead (no client re-download):\n' +
+    '    covering a DIFFERENT set of files, re-baseline instead (no client re-download):\n' +
     '      node tools/check-corpus-version.js --rebaseline'
   );
 }
