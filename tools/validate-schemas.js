@@ -1837,10 +1837,20 @@ export function validateTranslationVerseSet(map, reference, opts = {}) {
         checked++;
         const key = `${bookId} ${chNum}:${rv.n}`;
         const tv = have.get(rv.n);
-        const empty = tv && (typeof tv.text !== 'string' || tv.text.trim() === '');
-        if (!tv || empty) {
+        // A BLANK verse is NEVER allowlistable (data-corpus-6, 2026-09-04).
+        // The allowlist grants permission to be ABSENT, and the two are not the
+        // same thing: an absent verse falls through to the alias, the base hop
+        // and finally the NKJV, while a blank one used to be handed back and
+        // rendered as a numbered row with no scripture in it. Storing "we do
+        // not carry this verse" as an empty string also makes the file claim a
+        // verse it does not have. Leave the row out instead.
+        if (tv && (typeof tv.text !== 'string' || tv.text.trim() === '')) {
+          errors.push(`${fileName}: ${key} is present but BLANK — a verse this translation does not carry must be LEFT OUT, not stored as an empty string. The allowlist permits absence, never blankness; delete the row (${allow.missing.has(key) ? 'it is already allowlisted, so nothing else changes' : 'and allowlist the absence with a versification reason'}).`);
+          continue;
+        }
+        if (!tv) {
           if (allow.missing.has(key)) { allowed++; continue; }
-          errors.push(`${fileName}: ${key} is ${tv ? 'present but EMPTY' : 'missing'} (the KJV reference has it) — the reader would see NKJV text under this translation's header; allowlist it in tools/validate-schemas.js only with a versification reason`);
+          errors.push(`${fileName}: ${key} is missing (the KJV reference has it) — the reader would see NKJV text under this translation's header; allowlist it in tools/validate-schemas.js only with a versification reason`);
         }
       }
       for (const n of have.keys()) {
