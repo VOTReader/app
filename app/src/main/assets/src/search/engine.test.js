@@ -10,8 +10,8 @@ const VOT_DATA = {
   },
   BOOK_ABBREVS: { john: 'john', jn: 'john', genesis: 'genesis', gen: 'genesis', psalms: 'psalms', ps: 'psalms', psalm: 'psalms' },
   BOOK_DISPLAY: { john: 'John', genesis: 'Genesis', psalms: 'Psalms' },
-  NAMED_PASSAGES: [{ keys: ['shepherd psalm'], bookId: 'psalms', chapter: 23 }],
-  NAMED_PASSAGE_INDEX: { 'shepherd psalm': { bookId: 'psalms', chapter: 23 } },
+  NAMED_PASSAGES: [{ keys: ['shepherd psalm'], bookId: 'psalms', chapter: 23 }, { keys: ['resurrection'], bookId: 'john', chapter: 20 }],
+  NAMED_PASSAGE_INDEX: { 'shepherd psalm': { bookId: 'psalms', chapter: 23 }, resurrection: { bookId: 'john', chapter: 20 } },
   COMMANDS: [{ keys: ['/home'], action: 'home', label: 'Go home' }],
   COMMAND_MAP: { '/home': { action: 'home', label: 'Go home' } },
   VOLUME_TOKEN_MAP: { v1: { id: 'v1', screen: 'vot-one-letter', label: 'Volume One' } },
@@ -37,7 +37,12 @@ const GLOBALS = {
     ] }] }] },
   },
   // Title deliberately omits "mercy" so synonym matching (mercy→compassion) is testable.
-  LETTERS_V1: [{ id: 'compassion-letter', num: 1, title: 'Of Tender Compassion', blocks: [{ segments: [{ v: 'Great is the compassion of the Lord toward all His people.' }] }] }],
+  LETTERS_V1: [
+    { id: 'compassion-letter', num: 1, title: 'Of Tender Compassion', blocks: [{ segments: [{ v: 'Great is the compassion of the Lord toward all His people.' }] }] },
+    // search-2: a bare book name ("genesis") or single-word named-passage key
+    // ("resurrection") must ALSO reach this body text, not just the nav card.
+    { id: 'new-things-letter', num: 2, title: 'On New Things', blocks: [{ segments: [{ v: 'In Genesis we read of the beginning, and by the resurrection all things are made new.' }] }] },
+  ],
 };
 
 function refs(results) { return results.map((r) => r.doc.ref); }
@@ -57,7 +62,7 @@ describe('VotSearchMini engine', () => {
 
   it('builds an in-memory index and reports ready', () => {
     expect(VotSearchMini.getState().ready).toBe(true);
-    expect(VotSearchMini.getStats().docCount).toBe(5); // 3 verses + 1 verse + 1 letter
+    expect(VotSearchMini.getStats().docCount).toBe(6); // 4 verses (psalms 2 + john 1 + genesis 1) + 2 letters
   });
 
   it('finds a single-word verse hit', async () => {
@@ -108,6 +113,18 @@ describe('VotSearchMini engine', () => {
     const { parsed, results } = await VotSearchMini.search('/home');
     expect(parsed.kind).toBe('command');
     expect(results.length).toBe(0);
+  });
+
+  it('search-2: a bare book name ALSO runs the text pipeline, not just the nav card', async () => {
+    const { parsed, results } = await VotSearchMini.search('genesis');
+    expect(parsed.kind).toBe('ref-book');
+    expect(refs(results)).toContain('Volume One · Letter 2');
+  });
+
+  it('search-2: a single-word named-passage key ALSO runs the text pipeline', async () => {
+    const { parsed, results } = await VotSearchMini.search('resurrection');
+    expect(parsed.kind).toBe('named-passage');
+    expect(refs(results)).toContain('Volume One · Letter 2');
   });
 
   it('returns nothing for an all-stop-word query', async () => {
