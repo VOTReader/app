@@ -28,6 +28,7 @@ import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
 import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker.js';
 import { useRailMode } from './app/src/main/assets/src/hooks/use-rail-mode.js';
+import { suppressNextHistoryPush, clearSuppressNextHistoryPush } from './app/src/main/assets/src/hooks/use-history-sync.js';
 import { SheetHandle } from './app/src/main/assets/src/ui/components/SheetHandle.jsx';
 
 // (1) React as a global.
@@ -59,6 +60,13 @@ globalThis.useReadTracker = useReadTracker;
 //      (jsdom default) it returns false, so every existing sheet test keeps
 //      bottom-sheet modality; rail tests stub matchMedia wide.
 globalThis.useRailMode = useRailMode;
+// (1g) suppressNextHistoryPush / clearSuppressNextHistoryPush — the SAME
+//      free-variable reality as the rest of this list: _entry-b.js
+//      Object.assigns them onto window, and useAndroidBack's Escape/
+//      popstate handlers (and, as of navigation-tabs-2, several
+//      handleAndroidBack branches) call them as bare identifiers.
+globalThis.suppressNextHistoryPush = suppressNextHistoryPush;
+globalThis.clearSuppressNextHistoryPush = clearSuppressNextHistoryPush;
 
 // (2) window.__* bridges. Stub each as a no-op so hook bodies that touch
 //     them at attach time (window.__closeSheet = onClose, etc.) don't
