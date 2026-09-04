@@ -37,7 +37,7 @@ describe('reduced-motion', () => {
 
   it('flips the scroll behavior with the query', () => {
     stub(true);
-    expect(scrollBehavior()).toBe('auto');
+    expect(scrollBehavior()).toBe('instant');
     stub(false);
     expect(scrollBehavior()).toBe('smooth');
   });
@@ -46,7 +46,7 @@ describe('reduced-motion', () => {
     stub(false);
     expect(scrollBehavior()).toBe('smooth');
     stub(true);   // the reader flips it in OS settings mid-session
-    expect(scrollBehavior()).toBe('auto');
+    expect(scrollBehavior()).toBe('instant');
   });
 
   /* Embedded WebViews have shipped without matchMedia, and some throw on an

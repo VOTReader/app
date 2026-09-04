@@ -20,6 +20,22 @@
 
      el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
 
+   WHY IT RETURNS 'instant' AND NOT 'auto':
+
+     'auto' means "resolve from the computed `scroll-behavior`", and
+     app.css:481 sets `html { scroll-behavior: smooth }`. So 'auto' lands
+     instantly ONLY because the reduce block at ~:542 overrides that
+     property with `!important` — i.e. the JS fix would be load-bearing on a
+     CSS rule in another file. Narrow that block, scope it off `*`, or drop
+     the `!important`, and every call site here silently animates again with
+     every test still green, because a test can only assert the ARGUMENT
+     PASSED, not the behavior the browser resolved.
+
+     'instant' jumps regardless of the computed property, so the argument IS
+     the outcome and the test that asserts it is sufficient. Shipped in
+     Chrome 97; the build targets chrome108. `VolumeLetterIndex.jsx:24`
+     already used this idiom before any of this.
+
    Calls that pass no behavior at all already default to 'auto' and are
    reached by the CSS block — leave them alone.
 
@@ -43,8 +59,11 @@ export function prefersReducedMotion() {
 /**
  * The `behavior` to hand scrollIntoView / scrollTo / scrollBy.
  *
- * @returns {'auto' | 'smooth'}
+ * 'instant', not 'auto' — see the header. 'auto' would defer to the computed
+ * `scroll-behavior`, which app.css sets to `smooth` at the root.
+ *
+ * @returns {'instant' | 'smooth'}
  */
 export function scrollBehavior() {
-  return prefersReducedMotion() ? 'auto' : 'smooth';
+  return prefersReducedMotion() ? 'instant' : 'smooth';
 }

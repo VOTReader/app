@@ -204,7 +204,7 @@ describe('MilestonesScreen — jump chips', () => {
         h.scrollIntoView = function scrollIntoView(o) { opts.push(o); };
       }
       fireEvent.click([...document.querySelectorAll('.milestones-jump-chip')][0]);
-      expect(opts).toEqual([{ behavior: 'auto', block: 'start' }]);
+      expect(opts).toEqual([{ behavior: 'instant', block: 'start' }]);
     } finally {
       window.matchMedia = real;
     }

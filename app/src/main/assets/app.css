@@ -543,7 +543,14 @@
          !important included. JS call sites therefore read the query
          themselves — src/utils/reduced-motion.js, `scrollBehavior()`. Add a
          new animated scroll in JS and it needs that helper; this block will
-         not save it. */
+         not save it.
+
+         And the reverse: those JS sites pass 'instant', not 'auto', so they
+         do NOT depend on this rule. That is deliberate — `scroll-behavior:
+         auto` here is what makes an 'auto' argument land instantly, so a JS
+         fix written against 'auto' would break silently if this block were
+         ever narrowed or scoped off `*`. Narrow it if you need to; the
+         reduced-motion scroll jumps hold either way. */
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
           animation-duration: 0.01ms !important;
