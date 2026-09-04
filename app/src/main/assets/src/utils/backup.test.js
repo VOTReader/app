@@ -196,37 +196,59 @@ describe('buildExportPayload', () => {
   });
 
   /* storage-backup-2: whenSaved()'s result was AWAITED then DISCARDED — a
-     store whose last IDB put REJECTED (StorageHealthBanner's own remedy is
-     "Export your data now") shipped its last-good snapshot under a
-     "Backup saved." toast. whenSaved() resolves false (never rejects) for
-     that store; the barrier must now report it as a read-failure instead
-     of silently reading stale IDB bytes. */
-  it('ABORTS loud when a store write was not durable (whenSaved false — U6)', async () => {
+     store whose last IDB put REJECTED shipped its last-good snapshot under a
+     flat "Backup saved." toast, overstating what was in the file.
+     storage-backup-2 follow-up (Verifier, 2026-09-04): the first fix ABORTED
+     there, which was worse. A failed put is what raises StorageHealthBanner's
+     non-dismissable "Export your data now"; _lastWrite stays rejected until a
+     later put SUCCEEDS, and puts are failing because the disk is full — so the
+     abort made the only backup in the app deterministically unavailable in the
+     one state the app calls an emergency, under a "please try again" that
+     cannot work. The IDB read behind that store still returns the durable
+     truth, so the export must go out, carrying the store's name. */
+  it('still exports the readable data when a store write was not durable, and names it', async () => {
     const flaky = { store: { whenSaved: () => Promise.resolve(false) }, method: 'replaceAll' };
+    const readable = { 'vot-annotations': { 'v1:volume-one:christmas': [{ id: 'a1', text: 'kept' }] } };
     const res = await buildExportPayload({
       storesMap: { 'vot-annotations': flaky }, flagMap: {},
-      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      idbAdapter: fakeAdapter(readable),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.payload.stores['vot-annotations']).toEqual(readable['vot-annotations']);
+    expect(res.problems).toContain('vot-annotations');
+  });
+
+  /* 'degraded' is a HYDRATION failure: this session's writes live in the
+     overlay/queue (cached-store.js _shouldDefer), but the IDB read still
+     returns the durable truth. Withholding the only backup to protect the
+     reader from a missing session edit costs them everything instead of one
+     change, and a degraded store stays degraded until a background retry
+     happens to succeed — so "try again in a moment" was false too. Export,
+     and name the store. */
+  it('still exports the readable data when a store is degraded, and names it', async () => {
+    const degraded = { store: { getState: () => 'degraded' }, method: 'replaceAll' };
+    const readable = { 'vot-annotations': { 'v1:volume-one:christmas': [{ id: 'a1', text: 'kept' }] } };
+    const res = await buildExportPayload({
+      storesMap: { 'vot-annotations': degraded }, flagMap: {},
+      idbAdapter: fakeAdapter(readable),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.payload.stores['vot-annotations']).toEqual(readable['vot-annotations']);
+    expect(res.problems).toContain('vot-annotations');
+  });
+
+  /* The fatal kind is unchanged: a read that THREW means those bytes really
+     are absent, so the file must not be written at all. */
+  it('still ABORTS loud when a store read throws (U6)', async () => {
+    const res = await buildExportPayload({
+      storesMap: { 'vot-annotations': { store: {}, method: 'replaceAll' } }, flagMap: {},
+      idbAdapter: { get: async () => { throw new Error('IDB read failed'); } },
       mediaStore: emptyMedia, storageEstimate: noEstimate,
     });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('read-failure');
-    expect(res.problems).toContain('vot-annotations');
-  });
-
-  /* A store still 'pending'/'degraded' keeps this session's writes ONLY in
-     its in-memory overlay/queue (cached-store.js _shouldDefer) — an IDB-only
-     read would miss them entirely, not just the last write. Must abort
-     BEFORE reading, with its own reason so the UI can say "try again" rather
-     than "your storage is failing". */
-  it('ABORTS loud (not-loaded) when a store is still pending/degraded', async () => {
-    const degraded = { store: { getState: () => 'degraded' }, method: 'replaceAll' };
-    const res = await buildExportPayload({
-      storesMap: { 'vot-annotations': degraded }, flagMap: {},
-      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
-      mediaStore: emptyMedia, storageEstimate: noEstimate,
-    });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe('not-loaded');
     expect(res.problems).toContain('vot-annotations');
   });
 
@@ -310,31 +332,31 @@ describe('buildV3Manifest', () => {
     expect(res.manifest).toBeUndefined();
   });
 
-  /* storage-backup-2 — same two U6 gaps as buildExportPayload (see its
-     tests): a discarded whenSaved() false, and no guard for a store still
-     mid-hydration. Both must abort loud rather than stream a stale/partial
-     v3 container. */
-  it('ABORTS loud when a store write was not durable (whenSaved false — U6)', async () => {
+  /* storage-backup-2 + its follow-up — same contract as buildExportPayload
+     (see its tests for the closed loop this protects): a store whose write
+     did not land, and a store still mid-hydration, both still stream, with
+     their names on `problems`. Only a read that THREW aborts. */
+  it('still builds the manifest when a store write was not durable, and names it', async () => {
     const flaky = { store: { whenSaved: () => Promise.resolve(false) }, method: 'replaceAll' };
+    const readable = { 'vot-annotations': { 'v1:volume-one:christmas': [{ id: 'a1', text: 'kept' }] } };
     const res = await buildV3Manifest({
       storesMap: { 'vot-annotations': flaky }, flagMap: {},
-      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
+      idbAdapter: fakeAdapter(readable),
       mediaStore: fakeMedia({}), storageEstimate: noEstimate,
     });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe('read-failure');
+    expect(res.ok).toBe(true);
+    expect(res.manifest.stores['vot-annotations']).toEqual(readable['vot-annotations']);
     expect(res.problems).toContain('vot-annotations');
   });
 
-  it('ABORTS loud (not-loaded) when a store is still pending/degraded', async () => {
+  it('still builds the manifest when a store is degraded, and names it', async () => {
     const degraded = { store: { getState: () => 'degraded' }, method: 'replaceAll' };
     const res = await buildV3Manifest({
       storesMap: { 'vot-annotations': degraded }, flagMap: {},
       idbAdapter: fakeAdapter({ 'vot-annotations': { k: [] } }),
       mediaStore: fakeMedia({}), storageEstimate: noEstimate,
     });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe('not-loaded');
+    expect(res.ok).toBe(true);
     expect(res.problems).toContain('vot-annotations');
   });
 

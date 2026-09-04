@@ -32,6 +32,31 @@ const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 const MANIFEST_WARN_BYTES = 12 * 1024 * 1024;
 const MANIFEST_MAX_BYTES = 16 * 1024 * 1024;
 
+/**
+ * The toast after a backup is written. `problems` (ok:true, from
+ * buildV3Manifest) names the stores whose newest change never reached disk —
+ * a failed IDB put, or hydration still 'degraded'. The file itself is real and
+ * complete apart from those, so the reader gets a count and a reason instead
+ * of a flat "Backup saved." that overstates it or an abort that leaves them
+ * with nothing (storage-backup-2 follow-up). The store ids stay in the console
+ * warning backup.js already emits; a count is what the reader can act on.
+ * Sticky (duration 0) whenever there is anything to read.
+ * @param {string[]|undefined} problems
+ * @param {boolean} nearLimit
+ * @returns {{ text: string, sticky: boolean }}
+ */
+function _savedBackupToast(problems, nearLimit) {
+  const n = problems ? problems.length : 0;
+  const stale = n
+    ? ' — ' + n + ' recent change' + (n === 1 ? '' : 's') + ' may be missing; your device could not finish saving '
+      + (n === 1 ? 'it' : 'them') + ' before the backup was taken'
+    : '';
+  const limit = nearLimit
+    ? ' Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).'
+    : '';
+  return { text: 'Backup saved' + stale + '.' + limit, sticky: !!(n || nearLimit) };
+}
+
 function TextSizeSliderRow({ value, onChange }) {
   const v = clampFontScale(value);
   const pct = Math.round(v * 100);
@@ -894,17 +919,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       });
       if (!built.ok) {
         hideToast(_TOAST_ID);
-        if (built.reason === 'not-loaded') {
-          // A store was still 'pending'/'degraded' at the export tap — its
-          // session writes live only in its overlay/queue, so reading IDB
-          // straight would ship a backup missing them under a "saved" toast.
-          _showToast("Storage hasn't finished loading; a backup taken now would be missing this session's changes. Try again in a moment.");
-        } else {
-          // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
-          // rather than write a misleading, incomplete backup. (No media-limit case:
-          // v3 streams, so there is no size cap.)
-          _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
-        }
+        // buildV3Manifest fails LOUD (U6) only on a store or media read that
+        // THREW — those bytes really are absent, so abort rather than write a
+        // misleading, incomplete backup. A store that merely could not save its
+        // newest change still exports and comes back on built.problems below;
+        // refusing there would strand the reader in the one state the app tells
+        // them to export. (No media-limit case: v3 streams, so no size cap.)
+        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
         return;
       }
       if (built.manifestBytes > MANIFEST_MAX_BYTES) {
@@ -925,11 +946,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         await writeContainer(built.manifest, built.mediaEntries, sink.write);
         await sink.close();
         hideToast(_TOAST_ID);
-        if (built.manifestBytes > MANIFEST_WARN_BYTES) {
-          _showToast('Backup saved. Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).', 0);
-        } else {
-          _showToast('Backup saved.');
-        }
+        const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
+        if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
         return true;
       } catch (e) {
         hideToast(_TOAST_ID);
@@ -971,17 +989,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       });
       if (!built.ok) {
         hideToast(_TOAST_ID);
-        if (built.reason === 'not-loaded') {
-          // A store was still 'pending'/'degraded' at the export tap — its
-          // session writes live only in its overlay/queue, so reading IDB
-          // straight would ship a backup missing them under a "saved" toast.
-          _showToast("Storage hasn't finished loading; a backup taken now would be missing this session's changes. Try again in a moment.");
-        } else {
-          // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
-          // rather than write a misleading, incomplete backup. (No media-limit
-          // case: v3 streams, so there is no size cap.)
-          _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
-        }
+        // Same contract as _exportV3Web: a read that THREW aborts; a store that
+        // could not save its newest change still exports and is named on
+        // built.problems below.
+        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
         return;
       }
       if (built.manifestBytes > MANIFEST_MAX_BYTES) {
@@ -1011,11 +1022,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         mediaEntries: built.mediaEntries,
       });
       hideToast(_TOAST_ID);
-      if (built.manifestBytes > MANIFEST_WARN_BYTES) {
-        _showToast('Backup saved. Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).', 0);
-      } else {
-        _showToast('Backup saved.');
-      }
+      const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
+      if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
       return true;
     } catch (e) {
       console.warn('android v3 export failed', e);

@@ -115,11 +115,12 @@ async function _defaultStorageEstimate() {
  */
 
 /**
+ * `problems` on an `ok:true` result names the stores whose CONTENT may be one
+ * change behind — not a reason to withhold the backup, only to say so.
  * @typedef {(
- *   | { ok: true, payload: any }
+ *   | { ok: true, payload: any, problems: string[] }
  *   | { ok: false, reason: 'media-limit' }
  *   | { ok: false, reason: 'read-failure', problems: string[] }
- *   | { ok: false, reason: 'not-loaded', problems: string[] }
  * )} BuildExportResult
  */
 
@@ -131,6 +132,9 @@ async function _defaultStorageEstimate() {
  * durability barrier would miss them and ship a stale-but-valid-looking
  * snapshot. No `getState()` counts as loaded (LS-only stores, plain test
  * fakes never model hydration state).
+ *
+ * These names ride out on `problems` with `ok:true`: hydration failing is not
+ * a reason to refuse the only backup this app has (see the builders' doc).
  * @param {StoresMap} storesMap
  * @param {FlagMap} flagMap
  * @returns {string[]}
@@ -151,16 +155,26 @@ function _unloadedStores(storesMap, flagMap) {
  * Read every store + flag + media blob into a V2 backup payload. Reads
  * stores STRAIGHT FROM IDB (the durable truth), not the in-memory cache.
  *
- * Fails LOUD (U6): if ANY store read or the media loop throws, returns
+ * Fails LOUD (U6): if ANY store read or the media loop THROWS, returns
  * `{ ok:false, reason:'read-failure', problems }` instead of a
  * silently-incomplete-but-valid-looking payload — the caller must abort,
- * never write a half backup. A store still 'pending'/'degraded' at the
- * start, or whose write turns out not to be durable (`whenSaved()` false —
- * the bounded write-retry exhausted or is still outstanding), also aborts
- * loud: `{ ok:false, reason:'not-loaded', problems }` or the same
- * `'read-failure'` respectively, rather than shipping the last-good IDB
- * snapshot under a "Backup saved." toast. Media over the limit returns
+ * never write a half backup. Media over the limit returns
  * `{ ok:false, reason:'media-limit' }`.
+ *
+ * Loud, but never empty. A store whose write did not land (`whenSaved()`
+ * false — the bounded write-retry exhausted or is still outstanding) and a
+ * store still 'pending'/'degraded' are BOTH still exported: the IDB read
+ * behind them succeeds and returns the durable truth, so the payload comes
+ * back with `ok:true` and their names in `problems`, and the caller says
+ * "Backup saved — 1 recent change may be missing" instead of "Backup saved."
+ * Withholding the file here would be worse than a stale byte: a failed IDB
+ * put is exactly what raises StorageHealthBanner's non-dismissable "Export
+ * your data now", `_lastWrite` stays rejected until a later put SUCCEEDS, and
+ * puts are failing because the disk is full — so an abort makes export/import,
+ * the ONLY backup in this app, deterministically unavailable in the one state
+ * the app itself calls an emergency, with "please try again" that cannot work.
+ * A read that threw is different and still aborts: there the bytes really are
+ * missing (Verifier, storage-backup-2 follow-up, 2026-09-04).
  *
  * @param {BuildExportCtx} ctx
  * @returns {Promise<BuildExportResult>}
@@ -175,31 +189,32 @@ export async function buildExportPayload(ctx) {
     storageEstimate = _defaultStorageEstimate,
   } = ctx;
 
-  // U6/W2.2: a store still 'pending' or 'degraded' keeps this session's
-  // writes only in its overlay/queue — the reads below go STRAIGHT TO IDB,
-  // so exporting mid-hydration would ship a stale snapshot while
-  // StorageHealthBanner is telling the reader to export NOW. Fail before
-  // doing any work.
-  const unloaded = _unloadedStores(storesMap, flagMap);
-  if (unloaded.length) return { ok: false, reason: 'not-loaded', problems: unloaded };
+  // U6/W2.2: a store still 'pending' or 'degraded' keeps this session's writes
+  // only in its overlay/queue, and the reads below go STRAIGHT TO IDB — so the
+  // exported bytes are the durable truth minus this session's edits. Name it,
+  // ship it: `staleProblems` travels out on the ok:true result.
+  const staleProblems = _unloadedStores(storesMap, flagMap);
 
   // S1: flush any in-flight store writes to IDB BEFORE reading. Stores _save()
   // fire-and-forget and the loops below read STRAIGHT FROM IDB (the durable
   // truth), so an edit made moments before Export could otherwise be missed from
   // the ONLY backup. whenSaved() resolves false when that store's last put
-  // REJECTED (never rejects itself) — capture and report those BY NAME instead
-  // of discarding the result, so a failed write aborts the export instead of
-  // silently shipping the last-good snapshot (mirrors _awaitDurability / the
-  // v3-apply durability barrier's write-failure counting).
+  // REJECTED (never rejects itself) — a store in that state is one change
+  // behind on disk, which is a caption on the backup, not a reason to refuse it.
   // Mirrors the import durability barrier (applyImportPayload).
   const _saveNames = [...Object.keys(storesMap), ...Object.keys(flagMap)];
   const _saveTargets = [...Object.values(storesMap).map(({ store }) => store), ...Object.values(flagMap)];
   const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
+  saveResults.forEach((ok, i) => {
+    if (!ok && !staleProblems.includes(_saveNames[i])) {
+      console.warn('export: store write not durable', _saveNames[i]);
+      staleProblems.push(_saveNames[i]);
+    }
+  });
+
+  // Read failures are the separate, fatal kind: the bytes are genuinely absent.
   /** @type {string[]} */
   const exportProblems = [];
-  saveResults.forEach((ok, i) => {
-    if (!ok) { console.warn('export: store write not durable', _saveNames[i]); exportProblems.push(_saveNames[i]); }
-  });
 
   // (a) data: LS boot-shim only. V1 clients reading this file see just
   //     theme + fontStyle restored (intentional limitation).
@@ -285,7 +300,7 @@ export async function buildExportPayload(ctx) {
     stores: stores,
     media: media,
   };
-  return { ok: true, payload };
+  return { ok: true, payload, problems: staleProblems };
 }
 
 /**
@@ -298,10 +313,11 @@ export async function buildExportPayload(ctx) {
  *
  * Same loud-abort contract as buildExportPayload (U6): any store/media read
  * failure returns { ok:false, reason:'read-failure', problems } so the caller
- * never writes a silently-incomplete backup. A store still 'pending'/
- * 'degraded', or whose write turns out not to be durable, aborts loud the
- * same way (see buildExportPayload's doc — the two share `_unloadedStores` +
- * the whenSaved-capture, not yet the whole read).
+ * never writes a silently-incomplete backup. And the same never-empty rule: a
+ * store still 'pending'/'degraded', or whose write did not land, still exports
+ * and comes back on `problems` with `ok:true` (see buildExportPayload's doc for
+ * why refusing there would strand the reader). The two share `_unloadedStores`
+ * + the whenSaved-capture, not yet the whole read.
  *
  * The flush + store/data read here intentionally MIRRORS buildExportPayload's
  * rather than sharing a helper yet — v2 stays untouched while v3 is built
@@ -309,9 +325,8 @@ export async function buildExportPayload(ctx) {
  * tracked P5 cleanup (BACKUP-STREAMING-PLAN.txt), once v3 ships.
  *
  * @param {BuildExportCtx} ctx
- * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}> }
- *   | { ok:false, reason:'read-failure', problems:string[] }
- *   | { ok:false, reason:'not-loaded', problems:string[] }>}
+ * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}>, problems:string[] }
+ *   | { ok:false, reason:'read-failure', problems:string[] }>}
  */
 export async function buildV3Manifest(ctx) {
   const {
@@ -322,22 +337,27 @@ export async function buildV3Manifest(ctx) {
     storageEstimate = _defaultStorageEstimate,
   } = ctx;
 
-  // U6/W2.2: same not-loaded guard as buildExportPayload — see its doc comment.
-  const unloaded = _unloadedStores(storesMap, flagMap);
-  if (unloaded.length) return { ok: false, reason: 'not-loaded', problems: unloaded };
+  // U6/W2.2: same never-empty rule as buildExportPayload — an unhydrated store
+  // is named on `problems`, not a refusal. See its doc comment.
+  const staleProblems = _unloadedStores(storesMap, flagMap);
 
   // S1: flush in-flight writes before reading STRAIGHT FROM IDB — the only backup
   // must not miss an edit made moments before export. whenSaved resolves false
-  // (never rejects) when a store's last put REJECTED — capture + report those BY
-  // NAME instead of discarding the result (see buildExportPayload's doc).
+  // (never rejects) when a store's last put REJECTED — that store is one change
+  // behind on disk, so it rides out on `problems` too.
   const _saveNames = [...Object.keys(storesMap), ...Object.keys(flagMap)];
   const _saveTargets = [...Object.values(storesMap).map(({ store }) => store), ...Object.values(flagMap)];
   const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
+  saveResults.forEach((ok, i) => {
+    if (!ok && !staleProblems.includes(_saveNames[i])) {
+      console.warn('export: store write not durable', _saveNames[i]);
+      staleProblems.push(_saveNames[i]);
+    }
+  });
+
+  // Read failures are the separate, fatal kind: the bytes are genuinely absent.
   /** @type {string[]} */
   const exportProblems = [];
-  saveResults.forEach((ok, i) => {
-    if (!ok) { console.warn('export: store write not durable', _saveNames[i]); exportProblems.push(_saveNames[i]); }
-  });
 
   /** @type {Record<string, string>} */
   const data = {};
@@ -409,7 +429,7 @@ export async function buildV3Manifest(ctx) {
   // exposing the size lets the export UI warn while the data still lives on
   // this device instead of at restore time on a wiped phone.
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest)).length;
-  return { ok: true, manifest, manifestBytes, mediaEntries };
+  return { ok: true, manifest, manifestBytes, mediaEntries, problems: staleProblems };
 }
 
 /**
