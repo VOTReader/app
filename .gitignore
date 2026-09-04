@@ -125,6 +125,7 @@ _ocr_out/spanish/
 
 # Audio-manifest pipeline: regenerable Drive listing (fetch-drive-audio.py output)
 tools/_audio-drive-listing.json
+tools/_audio-drive-hashes.json
 tools/_drive-cookies.json
 tools/_gauth-profile/
 tools/_audio-mirror-staging/

@@ -34,6 +34,7 @@ import { fileURLToPath } from 'url';
 // tests, so the manifest and the gate that checks it cannot drift apart.
 import {
   READER_RANK, composeAlternates, countByReader, dedupeByAudioHash, formatReaderCounts,
+  readerFromFilename, isLetterAudio, NON_LETTER_ROOT,
 } from './audio-renditions-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,11 @@ const OUT = resolve(ASSETS, 'src', 'data', 'audio-manifest.js');
 // The gate's ground truth: every candidate this run MAPPED to a corpus item.
 // Committed (unlike the Drive listing) so check-audio-manifest.js runs in CI.
 const COVERAGE = resolve(HERE, 'audio-manifest-coverage.json');
+// { driveFileId: <sha1 of the mp3 frames> } from tools/audio-archive-hashes.py.
+// OPTIONAL: the generator sees a Drive listing, never the bytes, and Drive's own
+// md5Checksum covers the ID3 tags this hash strips — so the map has to be produced
+// from D:\VOT-Archive. Absent, nothing is collapsed and the run is what it always was.
+const HASHES = resolve(HERE, '_audio-drive-hashes.json');
 
 // ── corpus load (same vm technique as validate-schemas.js) ──────────────
 const DATA_FILES = [
@@ -131,16 +137,10 @@ const NUM_IDX = new Map(COLS.map((c) => {
 }));
 
 // ── filename parsing ─────────────────────────────────────────────────────
-function parseReader(tail) {
-  // "(read by text-to-speech - Benjamin)" -> Benjamin wins (he produced it).
-  const m = /\(read by ([^)]+)\)/i.exec(tail);
-  if (!m) return 'V';
-  const t = m[1].toLowerCase();
-  if (t.includes('benjamin') || t.includes('bejamin')) return 'B';
-  if (t.includes('timothy')) return 'T';
-  if (t.includes('ai')) return 'M';
-  return 'V';
-}
+// THE reader convention, shared with the gate so the two cannot disagree about
+// who read a file. "(read by text-to-speech - Benjamin)" is Benjamin: he
+// produced it, and his rank is what makes his readings supersede.
+const parseReader = readerFromFilename;
 
 /**
  * Parse one mp3 filename into
@@ -250,7 +250,14 @@ function resolveLetter(parsed) {
 
 // ── walk the listing ─────────────────────────────────────────────────────
 const listing = JSON.parse(readFileSync(LISTING, 'utf8'));
-const SKIP_RE = /^(AI Songs of the Letters|The Gospel of John Movie Audio|17\. Bible-Letter Studies|18\. TSOT New Testament)/;
+let AUDIO_HASHES = {};
+try { AUDIO_HASHES = JSON.parse(readFileSync(HASHES, 'utf8')); } catch { /* optional */ }
+// Ids the manifest on disk already ships. Duplicate copies are byte-identical,
+// so re-picking between them changes nothing a listener hears and costs a fresh
+// mirror upload; the dedup keeps the incumbent when it can.
+const INCUMBENT = new Set(String((() => { try { return readFileSync(OUT, 'utf8'); } catch { return ''; } })())
+  .match(/"[A-Za-z0-9_-]{25,}"/g)?.map((q) => q.slice(1, -1)) || []);
+const SKIP_RE = NON_LETTER_ROOT;   // shared with the gate (audio-renditions-lib.mjs)
 const ALL_LETTERS_RE = /^0\. ALL LETTERS/;
 const HOLY_RE = /^16\. Regarding The Holy Days/;
 
@@ -271,18 +278,15 @@ for (const f of listing) {
     // Optional: an audio-frame hash (ID3 stripped) supplied by the listing —
     // see vot_curate.py:audio_hash. Absent on a pre-hash listing, and then
     // nothing is collapsed and this run behaves exactly as it always did.
-    hash: f.hash || f.audioHash || null,
+    hash: f.hash || f.audioHash || AUDIO_HASHES[f.id] || null,
     reader: parseReader(name),         // dedup tiebreak only; the real parse is below
   });
 }
-// Compare AUDIO, not names (Machine Ops 2026-09-03): the archive holds files
-// that are byte-identical under different Drive ids, and two of them would
-// otherwise become two renditions of the same recording.
-const dedup = dedupeByAudioHash(files);
-const collapsedByHash = dedup.collapsed;
-files.length = 0;
-files.push(...dedup.records);
 // Per-collection folders first; "0. ALL LETTERS" fills what's still missing.
+// (Same-audio dedup happens PER LETTER, after resolution — see below. Doing it
+// globally loses letters: Holy Days is a ghost album of entries pulled from the
+// other volumes, so one recording legitimately serves two corpus items, and
+// collapsing across the corpus stripped the audio off eleven of them.)
 files.sort((a, b) => (a.fill === b.fill ? 0 : a.fill ? 1 : -1));
 
 /**
@@ -304,6 +308,19 @@ const problems = [];
 const notes = [];
 const better = (a, b) => !a || READER_RANK[b.reader] > READER_RANK[a.reader];
 let matched = 0;
+// Per-reader accounting over the WHOLE letter-side listing. The gate re-derives
+// `listing` from tools/_audio-drive-listing.json itself, so this is the one
+// number in the sidecar that does not come from the generator's own opinion —
+// it is what breaks the circularity a sidecar-only gate would have.
+const tally = { listing: {}, unmapped: {} };
+// The unmapped files by ID, not just by count. Two jobs: the gate can prove
+// each one is a real listing record that reaches no rendition (a count alone is
+// a free variable a hand-edit can inflate to hide a theft), and a human can see
+// exactly which recordings never make it into the app.
+const unmappedIds = [];
+const bump = (bag, r) => { bag[r] = (bag[r] || 0) + 1; };
+const dropped = (f, r) => { bump(tally.unmapped, r); unmappedIds.push(f.id); };
+for (const f of files) bump(tally.listing, parseReader(f.name));
 
 for (const f of files) {
   let key, track, shape;
@@ -314,6 +331,7 @@ for (const f of files) {
       ? ctx.HOLY_DAYS.filter((l) => titleMatches(p.title, l.title)) : cands;
     if (!p || loose.length !== 1) {
       problems.push(`UNMATCHED  16. Holy Days/${f.name}${p ? ` (title "${p.title}" -> ${loose.length} candidates)` : ''}`);
+      dropped(f, parseReader(f.name));
       continue;
     }
     key = `holydays:${loose[0].id}`;
@@ -327,11 +345,12 @@ for (const f of files) {
       shape = { kind: 'compilation' };
     } else {
       const p = parseName(f.name);
-      if (!p) { problems.push(`UNPARSEABLE  ${f.name}`); continue; }
+      if (!p) { problems.push(`UNPARSEABLE  ${f.name}`); dropped(f, parseReader(f.name)); continue; }
       const r = resolveLetter(p);
       if (!r || r.err) {
         (r && (r.err.includes('bonus') || r.err === 'no title match') && p.bonus
           ? notes : problems).push(`${p.bonus ? 'BONUS-SKIPPED' : 'UNMATCHED'}  ${f.name}${r ? ` — ${r.err}` : ''}`);
+        dropped(f, p.reader);
         continue;
       }
       if (r.note) notes.push(`${r.note}: ${f.name}`);
@@ -351,26 +370,46 @@ for (const f of files) {
   // for letters whose collection folder only has the TTS version, and skipping
   // the record outright made those readers unreachable in the app (fixed
   // 2026-09-04, FlockSync v2 §5.2).
+  // "0. ALL LETTERS" fills gaps only — a file from there never competes for a
+  // PRIMARY slot once the per-collection folders have supplied one. It is still
+  // a candidate: that folder holds readings by Benjamin and by Timothy for
+  // letters whose collection folder only has the TTS version, and dropping the
+  // record outright made those readers unreachable (fixed 2026-09-04, §5.2).
   const fillSkip = f.fill && acc.has(key);
 
   let e = acc.get(key);
-  if (!e) { e = { full: null, sections: new Map(), parts: new Map(), addenda: [], comps: new Map(), cand: [] }; acc.set(key, e); }
+  if (!e) { e = { full: null, sections: new Map(), parts: new Map(), addenda: [], comps: new Map(), cand: [], raw: [] }; acc.set(key, e); }
   matched++;
-  if (shape.kind !== 'compilation') e.cand.push({ kind: shape.kind, n: shape.n ?? 0, id: track.id, reader: track.reader });
-  if (fillSkip) continue;
-  if (shape.kind === 'compilation') {
-    const cur = e.comps.get(track.n);
-    if (better(cur, track)) e.comps.set(track.n, track);
-  } else if (shape.kind === 'full') {
-    if (better(e.full, track)) e.full = track;
-  } else if (shape.kind === 'section') {
-    const cur = e.sections.get(shape.n);
-    if (better(cur, track)) e.sections.set(shape.n, track);
-  } else if (shape.kind === 'part') {
-    const cur = e.parts.get(shape.n);
-    if (better(cur, track)) e.parts.set(shape.n, track);
-  } else if (shape.kind === 'addendum') {
-    if (e.addenda.length === 0 || better(e.addenda[0], track)) e.addenda = [track];
+  e.raw.push({ kind: shape.kind, n: shape.n ?? 0, id: track.id, reader: track.reader,
+               hash: f.hash, fill: !!f.fill, fillSkip, label: track.label, compN: track.n });
+}
+
+// ── second pass: same-audio dedup PER LETTER, then the primary slots ─────
+// The archive stores many recordings twice — the collection folder and the
+// "0. ALL LETTERS" mirror, under different Drive ids — and without the audio
+// hash the two look like two renditions of one letter. Collapsing them here,
+// AFTER resolution, is the difference between removing a duplicate upload and
+// removing a letter's only copy: dedupeByAudioHash sees one letter's candidates
+// and can never take a recording that some other letter also needs.
+const collapsedByHash = [];
+for (const [, e] of acc) {
+  const { records, collapsed } = dedupeByAudioHash(e.raw, INCUMBENT);
+  for (const c of collapsed) collapsedByHash.push(c);
+  for (const c of records) {
+    if (c.kind !== 'compilation') e.cand.push({ kind: c.kind, n: c.n, id: c.id, reader: c.reader });
+    if (c.fillSkip) continue;
+    const track = { id: c.id, reader: c.reader, n: c.compN, label: c.label };
+    if (c.kind === 'compilation') {
+      if (better(e.comps.get(track.n), track)) e.comps.set(track.n, track);
+    } else if (c.kind === 'full') {
+      if (better(e.full, track)) e.full = track;
+    } else if (c.kind === 'section') {
+      if (better(e.sections.get(c.n), track)) e.sections.set(c.n, track);
+    } else if (c.kind === 'part') {
+      if (better(e.parts.get(c.n), track)) e.parts.set(c.n, track);
+    } else if (c.kind === 'addendum') {
+      if (e.addenda.length === 0 || better(e.addenda[0], track)) e.addenda = [track];
+    }
   }
 }
 
@@ -448,10 +487,17 @@ writeFileSync(OUT, body);
 // slot rule drops those duplicates on purpose, so counting ids would drown the
 // real signal in ~830 duplicate uploads.
 const letters = {};
+const compilations = {};
 for (const [key, e] of acc) {
-  if (key.startsWith('__sections:')) continue;
+  if (key.startsWith('__sections:')) {
+    for (const c of e.raw) bump(compilations, c.reader);   // WTLB range compilations
+    continue;
+  }
+  // RAW counts, before the same-audio dedup, so the gate's identity holds:
+  // every letter-side file in the listing either reached a letter, is one of
+  // the range compilations, or is accounted for as unmapped.
   const byReader = {};
-  for (const c of e.cand) byReader[c.reader] = (byReader[c.reader] || 0) + 1;
+  for (const c of e.raw) byReader[c.reader] = (byReader[c.reader] || 0) + 1;
   // How many distinct main slots this letter HAS, across every reader — the
   // gate needs it to tell a whole-letter reading from a fragment, and the
   // manifest alone cannot say (a dropped row takes the evidence with it).
@@ -466,6 +512,7 @@ writeFileSync(COVERAGE,
   '{' + '\n' +
   ' "note": ' + JSON.stringify('Auto-generated by tools/gen-audio-manifest.mjs. DO NOT EDIT. Ground truth for tools/check-audio-manifest.js: for every letter, how many candidate recordings each reader supplied. A reader listed here MUST be offered a rendition of that letter.') + ',\n' +
   ' "listingRecords": ' + listing.length + ',\n' +
+  ' "totals": ' + JSON.stringify({ listing: tally.listing, unmapped: tally.unmapped, compilations, unmappedIds: unmappedIds.sort() }) + ',\n' +
   ' "collapsedByHash": ' + JSON.stringify(collapsedByHash) + ',\n' +
   ' "letters": {\n' + covLines.join(',\n') + '\n }\n}\n');
 
@@ -497,8 +544,8 @@ console.log(`audio-manifest: ${keys.length} letters with audio (${matched} files
   console.log(`  of those, ${partialRends} are PARTIAL and ship a completeness note`);
   if (collapsedByHash.length) {
     console.log(`  same-audio duplicates collapsed: ${collapsedByHash.length}`);
-  } else if (!listing.some((f) => f.hash || f.audioHash)) {
-    console.log('  same-audio dedup: SKIPPED — the listing carries no audio hashes');
+  } else if (!Object.keys(AUDIO_HASHES).length && !listing.some((f) => f.hash || f.audioHash)) {
+    console.log('  same-audio dedup: SKIPPED — no audio hashes (run tools/audio-archive-hashes.py)');
   }
   const overlap = [...altIds].filter((id) => primIds.has(id));
   if (overlap.length) console.log(`  WARNING: ${overlap.length} alternate ids also appear as primaries — mirror/emit logic needs review: ${overlap.slice(0, 5).join(', ')}`);
