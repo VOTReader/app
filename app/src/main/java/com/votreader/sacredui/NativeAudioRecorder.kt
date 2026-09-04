@@ -38,6 +38,18 @@ class NativeAudioRecorder(private val context: Context) {
     private var pausedAccumMs = 0L
     private var pauseStartMs = 0L
 
+    // Written from MediaRecorder's listener callbacks (its own event thread),
+    // read under [lock] in stop(). @Volatile rather than lock-guarded writes:
+    // a callback that blocked on a lock stop() already holds would serialise
+    // the mic's event thread behind file I/O for no gain.
+    /** A hardware/server error killed the session — the MPEG-4 file never got
+     *  its moov atom, so it is unplayable and must not be handed to JS. */
+    @Volatile private var recorderFailed = false
+    /** [MAX_DURATION_MS] was reached: MediaRecorder stopped and finalised the
+     *  file ITSELF. Calling stop() again throws, and the old catch deleted the
+     *  file on that throw — a full-length memo lost to its own backstop. */
+    @Volatile private var autoStopped = false
+
     /**
      * Begin recording. Returns Success on a healthy start; Failure with a
      * reason on permission denial or MediaRecorder configuration error.
@@ -69,6 +81,8 @@ class NativeAudioRecorder(private val context: Context) {
         recorder = null
         recordFile?.let { try { it.delete() } catch (_: Exception) {} }
         recordFile = null
+        recorderFailed = false
+        autoStopped = false
 
         return try {
             val f = File.createTempFile("votrec_", ".m4a", context.cacheDir)
@@ -83,6 +97,27 @@ class NativeAudioRecorder(private val context: Context) {
             mr.setAudioEncodingBitRate(96000)
             mr.setAudioSamplingRate(44100)
             mr.setOutputFile(f.absolutePath)
+            // OnErrorListener is MediaRecorder's ONLY notification channel for a
+            // session killed underneath it — an incoming call yanking the
+            // AudioRecord, an OEM audio-focus steal, a media-server death. Without
+            // it those failed in total silence and stop() handed JS a truncated
+            // file as a success.
+            mr.setOnErrorListener { _, what, extra ->
+                Timber.w("recorder error what=%d extra=%d — session died mid-recording", what, extra)
+                recorderFailed = true
+            }
+            mr.setOnInfoListener { _, what, _ ->
+                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                    Timber.i("recorder reached the %d ms native backstop and stopped itself", MAX_DURATION_MS)
+                    autoStopped = true
+                }
+            }
+            // Native backstop for recording length. The real cap is the JS-side
+            // 300 s timer in JournalRecordingSheet; this sits 30 s above it so JS
+            // still owns the normal stop, and this only catches the case JS cannot
+            // — a throttled/stalled foreground timer (background tab, doze) leaving
+            // the mic open indefinitely. Must be set before prepare().
+            mr.setMaxDuration(MAX_DURATION_MS)
             mr.prepare()
             mr.start()
             recorder = mr
@@ -147,15 +182,31 @@ class NativeAudioRecorder(private val context: Context) {
         if (pauseStartMs > 0L) {
             durMs -= System.currentTimeMillis() - pauseStartMs
         }
-        try {
-            mr.stop()
-        } catch (e: Exception) {
-            // stop() throws if stopped too fast (no valid frames written).
-            Timber.w(e, "nativeRecordStop stop() failed")
+        if (recorderFailed) {
+            // The session died mid-recording (OnErrorListener fired). An MPEG-4
+            // whose moov atom was never written is unplayable, so there is nothing
+            // to salvage — but JS now learns the recording FAILED instead of being
+            // handed a truncated file that looks fine until playback.
+            try { mr.reset() } catch (_: Exception) {}
             try { mr.release() } catch (_: Exception) {}
             try { f.delete() } catch (_: Exception) {}
             recordFile = null
-            return Result.Failure("stop_failed")
+            return Result.Failure("recorder_error")
+        }
+        // Skip stop() when the recorder already stopped ITSELF at the native
+        // backstop: the file is complete, and a second stop() throws straight into
+        // the delete path below — which would destroy a full-length memo.
+        if (!autoStopped) {
+            try {
+                mr.stop()
+            } catch (e: Exception) {
+                // stop() throws if stopped too fast (no valid frames written).
+                Timber.w(e, "nativeRecordStop stop() failed")
+                try { mr.release() } catch (_: Exception) {}
+                try { f.delete() } catch (_: Exception) {}
+                recordFile = null
+                return Result.Failure("stop_failed")
+            }
         }
         try { mr.release() } catch (_: Exception) {}
         val safeDur = if (durMs < 0L) 0L else durMs
@@ -191,6 +242,8 @@ class NativeAudioRecorder(private val context: Context) {
             val f = recordFile
             recorder = null
             recordFile = null
+            recorderFailed = false
+            autoStopped = false
             if (mr != null) {
                 try { mr.stop() } catch (_: Exception) {}
                 try { mr.release() } catch (_: Exception) {}
@@ -242,5 +295,10 @@ class NativeAudioRecorder(private val context: Context) {
         // A served memo is fetched by JS within a second of stop(); anything older
         // than this in recordings/ is an orphan from an interrupted session.
         const val RECORDING_TTL_MS = 60_000L
+
+        /** Native recording-length backstop, 30 s above JournalRecordingSheet's
+         *  300 s JS cap so JS owns the normal stop and this only fires when that
+         *  timer is throttled or stalled. */
+        const val MAX_DURATION_MS = 330_000
     }
 }
