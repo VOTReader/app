@@ -68,6 +68,19 @@ export function registerServiceWorker() {
     doReload();
   });
 
+  // service-worker-4 (2026-09-04): the install's corpus precache is
+  // best-effort (a miss must not fail the install), but a miss used to leave
+  // no trace anywhere the owner could see — corpusFirst's miss branch would
+  // only 503 much later, offline, with nothing pointing back at install time.
+  // Record it so Settings' diagnostic export has a trace.
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const d = event && event.data;
+    if (d && d.type === 'PRECACHE_INCOMPLETE') {
+      DiagnosticLog.warn('sw', 'corpus precache incomplete at install: '
+        + d.count + ' file(s) not cached: ' + (Array.isArray(d.urls) ? d.urls.join(', ') : ''));
+    }
+  });
+
   // updateViaCache:'none' — never serve service-worker.js itself out of the
   // HTTP cache. GitHub Pages sends max-age=600 on everything, so this is the
   // difference between "checked for an update" and "reused a 10-minute-old

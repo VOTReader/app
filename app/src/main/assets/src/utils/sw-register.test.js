@@ -17,6 +17,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerServiceWorker } from './sw-register.js';
+import { DiagnosticLog } from './diagnostic-log.js';
 
 describe('registerServiceWorker — controllerchange reload', () => {
   let controllerChangeHandler;
@@ -200,5 +201,52 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
     } finally {
       delete (/** @type {any} */ (document)).visibilityState;
     }
+  });
+});
+
+/* service-worker-4 (2026-09-04): the SW's install-time corpus precache now
+   posts PRECACHE_INCOMPLETE when the best-effort loop misses a file — this
+   is the page-side half, recording it via DiagnosticLog so Settings' export
+   carries a trace instead of the failure vanishing the moment the tab closes. */
+describe('registerServiceWorker — PRECACHE_INCOMPLETE diagnostic (service-worker-4)', () => {
+  let messageHandler;
+  let origSW;
+
+  beforeEach(() => {
+    messageHandler = null;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') messageHandler = cb; },
+        register: () => Promise.resolve({
+          waiting: null, installing: null, addEventListener: () => {}, update: () => {},
+        }),
+      },
+    });
+    DiagnosticLog.clear();
+  });
+
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    DiagnosticLog.clear();
+  });
+
+  it('records install-time corpus precache failures via DiagnosticLog', () => {
+    registerServiceWorker();
+    expect(typeof messageHandler).toBe('function');
+    messageHandler({ data: { type: 'PRECACHE_INCOMPLETE', count: 2, urls: ['./a.js', './b.js'] } });
+    const entry = DiagnosticLog.entries().find((e) => e.tag === 'sw' && e.msg.includes('corpus precache incomplete'));
+    expect(entry, JSON.stringify(DiagnosticLog.entries())).toBeTruthy();
+    expect(entry.msg).toContain('2 file(s)');
+    expect(entry.msg).toContain('./a.js');
+    expect(entry.msg).toContain('./b.js');
+  });
+
+  it('ignores an unrelated message type', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'SOMETHING_ELSE' } });
+    expect(DiagnosticLog.entries()).toEqual([]);
   });
 });
