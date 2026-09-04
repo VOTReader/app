@@ -2,13 +2,12 @@
    FootnoteListSection — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink, onGoToRef }) {
+export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);
   if (entries.length === 0) return null;
   const scrollToBubble = (num) => {
     // Find the first in-body bubble matching this footnote number and scroll
-    // it into view. Brief pulse handled by the bubble's `.active` state if
-    // the parent wires `highlightedFn`; we just do the scroll here.
+    // it into view.
     try {
       const el = document.querySelector(`.fn-ref[data-fn-num="${num}"]`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -21,7 +20,7 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
         <div
           key={num}
           id={`fn-item-${num}`}
-          className={`footnote-list-item${highlightedFn === num ? " pulse" : ""}`}
+          className="footnote-list-item"
           role="button"
           tabIndex={0}
           onClick={() => scrollToBubble(num)}

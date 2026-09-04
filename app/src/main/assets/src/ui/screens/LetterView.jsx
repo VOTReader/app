@@ -10,7 +10,6 @@ import { letterHlKey } from '../../utils/hl-keys.js';
 
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
-  const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
   const [_surpriseBlockId, setSurpriseBlockId] = React.useState(null); // value unread; setter drives the highlight-pulse effect
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
@@ -123,7 +122,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // candidate (different text-resolution contracts today).
 
   React.useEffect(() => {
-    setHighlightedFn(null);
     setSheetFn(null);
     setScripRef(null);
     setSurpriseBlockId(null);
@@ -223,18 +221,17 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     active: scripRef != null,
   });
 
-  const fnProps = { activeFn: sheetFn != null ? sheetFn : highlightedFn, onFnClick: handleFnClick, onScripClick: handleScripClick, onLetterClick, onInAppLink: wrappedInAppLink, studyMode, footnotes: studyMode ? letter.footnotes : null, highlightText: highlightExcerpt };
+  const fnProps = { activeFn: sheetFn, onFnClick: handleFnClick, onScripClick: handleScripClick, onLetterClick, onInAppLink: wrappedInAppLink, studyMode, footnotes: studyMode ? letter.footnotes : null, highlightText: highlightExcerpt };
 
   React.useEffect(() => {
     const root = mainRef.current;
     if (!root) return;
-    const active = sheetFn != null ? sheetFn : highlightedFn;
     root.querySelectorAll('.fn-ref.active').forEach((e) => e.classList.remove('active'));
-    if (active != null) {
-      const el = root.querySelector('.fn-ref[data-fn-num="' + String(active).replace(/"/g, '\\"') + '"]');
+    if (sheetFn != null) {
+      const el = root.querySelector('.fn-ref[data-fn-num="' + String(sheetFn).replace(/"/g, '\\"') + '"]');
       if (el) el.classList.add('active');
     }
-  }, [sheetFn, highlightedFn, letter.id]);
+  }, [sheetFn, letter.id]);
   const hasFn = letter.footnotes ? Object.keys(letter.footnotes).length > 0 : false;
   // "Says The Lord." standing alone as the letter's final block (closing /
   // closing-fn) — drives where the ✦ ornament-divider renders (see below).
@@ -482,7 +479,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
             )}
 
-            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} highlightedFn={highlightedFn} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} />}
+            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} />}
 
             {!closingEndsBody && (
               <div className="ornament-divider">
