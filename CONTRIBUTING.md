@@ -48,6 +48,15 @@ To verify a boot, paste `tools/smoke.js` into the page console and call
 console.error 0, resource404 0). `npm run smoke:ci` runs the same walk
 headless (puppeteer).
 
+`npm run e2e:read` and `npm run e2e:readalong` do **not** start a server of
+their own — they drive Chromium against `http://127.0.0.1:8097/index.html` and
+die on `net::ERR_CONNECTION_REFUSED` if nothing is listening. Start one first
+and leave it running:
+
+```bash
+python tools/preview-server.py 8097 app/src/main/assets
+```
+
 ### Android APK
 
 Build with Gradle:
