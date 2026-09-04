@@ -35,6 +35,11 @@
 #      in vitest.setup.js. Zero-tolerance: a failing test OR a floor breach
 #      fails the commit. `npm run test` stays coverage-free for the dev loop.
 #
+#   4b. vitest run tools/     when a tools/*.js|mjs script is staged and no
+#      app source is (Step 4 already covers it otherwise). tools/ sits
+#      outside tsconfig and the bundle-source list, so a gate script used to
+#      reach CI with no local run of its own *.test.js.
+#
 #   5. python tools/build.py  when any bundle-source file changes
 #      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
 #      output so the commit lands with bundles in sync with source.
@@ -361,6 +366,41 @@ if [ -n "$src_changed" ]; then
     echo "[pre-commit] App() size OK."
     echo ""
   fi
+fi
+
+# ─── Step 4b: a gate script's own tests (tools/*.test.js) ──────────
+# tools/ sits outside tsconfig.json and the bundle-source list, so a commit
+# that stages only a gate script (check-*.js, sync-*.js, smoke-*.js) reached
+# CI with no local run of the script's *.test.js suite — the very scripts
+# that catch silent regressions elsewhere. Step 4 already ran the whole
+# suite when app source changed; otherwise run just tools/.
+tools_changed=$(echo "$staged" | grep -E '^tools/.*\.(js|mjs)$' || true)
+if [ -n "$tools_changed" ] && [ -z "$src_changed" ]; then
+  if ! command -v npx >/dev/null 2>&1; then
+    for candidate in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$LOCALAPPDATA/Programs/Node.js" \
+        "$HOME/AppData/Roaming/npm"; do
+      if [ -x "$candidate/npx" ] || [ -x "$candidate/npx.cmd" ]; then
+        export PATH="$candidate:$PATH"
+        break
+      fi
+    done
+  fi
+  echo "[pre-commit] tools/ script staged — running the tools/ vitest suite..."
+  npx vitest run tools/
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "A tools/ test FAILED — see vitest output above."
+    echo "Fix the gate script or its test, re-stage, then retry the commit."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] tools/ tests OK."
+  echo ""
 fi
 
 # ─── Step 5: bundle rebuild + SW cache version ──────────────────────

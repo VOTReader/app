@@ -11,7 +11,8 @@
  *   + cross-reference  Format C verse counts vs the complete KJV
  *
  * Usage:
- *   node tools/validate-schemas.js [--strict]
+ *   node tools/validate-schemas.js [--strict] [--report-only]
+ *   Exits 1 on any error; --report-only prints the totals and exits 0 instead.
  *
  * Exports: validateFormatA / validateFormatB / validateHolyDays /
  *   validateFormatC / validateFormatD / validateAgainstReference /
@@ -2070,6 +2071,7 @@ function _createWordLedger() {
 function runCli() {
   const args = process.argv.slice(2);
   const strict = args.includes('--strict');
+  const reportOnly = args.includes('--report-only');
   const updateWordcounts = args.includes('--update-wordcounts');
   const wordLedger = _createWordLedger();
   const dataDir = resolve(
@@ -2597,7 +2599,7 @@ function runCli() {
   }
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);
-  if (strict && totals.errors > 0) process.exit(1);
+  if (totals.errors > 0 && !reportOnly) process.exit(1);
 }
 
 // Run CLI when executed directly
