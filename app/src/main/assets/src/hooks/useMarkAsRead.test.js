@@ -18,8 +18,20 @@ beforeEach(() => {
 afterEach(() => {
   delete window.COL_BY_KEY;
   delete window.ReadingStreakStore;
+  delete window.ReadingStatsStore;
   delete window.__votAudioListened;
 });
+
+/** A minimal real ReadingStatsStore stand-in: seeded frontiers actually
+ *  clear, so the test proves the END STATE (getProgress → null), not just
+ *  that clearProgress was called. */
+function fakeStatsStore(seedProgress) {
+  const progress = { ...seedProgress };
+  return {
+    clearProgress: (key) => { delete progress[key]; },
+    getProgress: (key) => (Object.prototype.hasOwnProperty.call(progress, key) ? progress[key] : null),
+  };
+}
 
 describe('useReadProgress — audio listen bridge', () => {
   it('increments the item count on every completed listen', () => {
@@ -58,6 +70,20 @@ describe('useReadProgress — audio listen bridge', () => {
     const { unmount } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
     unmount();
     expect(window.__votAudioListened).toBe(null);
+  });
+
+  // gap-reading-measurement-and-achievements-4: an audio-credited read never
+  // cleared the item's frontier, so an index card could show a read check
+  // AND "62% left" at the same time — markRead's manual branch already
+  // clears the frontier on a claim; the listen-credit path did not.
+  it('clears a stored frontier when an audio listen credits the same key', () => {
+    window.ReadingStatsStore = fakeStatsStore({ 'v1:vol-one:the-wide-path': { b: 10, c: [0, 1], t: 1 } });
+    renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+    expect(window.ReadingStatsStore.getProgress('v1:vol-one:the-wide-path')).not.toBeNull();
+
+    act(() => window.__votAudioListened('one', 'the-wide-path'));
+
+    expect(window.ReadingStatsStore.getProgress('v1:vol-one:the-wide-path')).toBeNull();
   });
 });
 
@@ -99,5 +125,18 @@ describe('useReadProgress — audio listen bridge: Bible chapters', () => {
     const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: false }));
     act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 1));
     expect(result.current.readItems).toEqual({});
+  });
+
+  // gap-reading-measurement-and-achievements-4, bible-* leg: the credit path
+  // is shared between the volume/letter key space and the chapter key
+  // space — the frontier clear must reach both, not just the first one
+  // exercised above.
+  it('clears a stored frontier for the bible-* chapter key space too', () => {
+    window.ReadingStatsStore = fakeStatsStore({ 'v1:jonah:3': { b: 4, c: [0], t: 1 } });
+    renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+
+    act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 3));
+
+    expect(window.ReadingStatsStore.getProgress('v1:jonah:3')).toBeNull();
   });
 });

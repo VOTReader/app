@@ -94,6 +94,67 @@ var WPM_MIN = 30;
 var WPM_MAX = 1500;
 // A measured pace is only shown once it rests on this many samples.
 var WPM_MIN_SAMPLES = 5;
+// wordsByDay keys are _jrnDateStr output — shape-check only (no calendar
+// validity check; a malformed key is simply unusable as a day bucket).
+var DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Coerce an imported `wordsByDay` map into the shape recordCompletion
+ * writes: keys matching the YYYY-MM-DD shape, values rounded to a
+ * non-negative integer, non-finite values dropped (a bad Number() coercion
+ * would otherwise fold to 0 via `|| 0` while Infinity survives it truthy).
+ * Bounded to MAX_DAY_KEYS at import rather than waiting for the next
+ * completion to prune it.
+ *
+ * @param {any} raw
+ * @returns {Record<string, number>}
+ */
+function _normalizeWordsByDay(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  /** @type {Record<string, number>} */
+  var out = {};
+  var keys = Object.keys(raw);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (!DAY_KEY_RE.test(k)) continue;
+    var n = Number(raw[k]);
+    if (!isFinite(n)) continue;
+    out[k] = Math.max(0, Math.round(n));
+  }
+  var outKeys = Object.keys(out);
+  if (outKeys.length > MAX_DAY_KEYS) {
+    outKeys.sort();  // YYYY-MM-DD sorts chronologically
+    for (var j = 0; j < outKeys.length - MAX_DAY_KEYS; j++) delete out[outKeys[j]];
+  }
+  return out;
+}
+
+/**
+ * Coerce an imported `wpmSamples` array into exactly the shape
+ * recordPaceSample writes: `{ w, ms }` pairs with both fields finite and
+ * positive. A malformed sample (a zero/non-numeric w or ms) would otherwise
+ * survive into measuredWpm()'s rate math as Infinity or NaN — both sort
+ * predictably enough to land in the middle and corrupt the median. Bounded
+ * to the most recent MAX_WPM_SAMPLES AFTER filtering, so the surviving
+ * samples are all valid evidence rather than up to 50 raw entries some of
+ * which then get thrown away.
+ *
+ * @param {any} raw
+ * @returns {Array<{ w: number, ms: number }>}
+ */
+function _normalizeWpmSamples(raw) {
+  if (!Array.isArray(raw)) return [];
+  /** @type {Array<{ w: number, ms: number }>} */
+  var out = [];
+  for (var i = 0; i < raw.length; i++) {
+    var s = raw[i];
+    if (!s || typeof s !== 'object') continue;
+    var w = Number(s.w), ms = Number(s.ms);
+    if (!(isFinite(w) && w > 0 && isFinite(ms) && ms > 0)) continue;
+    out.push({ w: w, ms: ms });
+  }
+  return out.slice(-MAX_WPM_SAMPLES);
+}
 
 /**
  * Coerce an imported `progress` map into exactly the shape recordProgress
@@ -412,15 +473,17 @@ export var ReadingStatsStore = extendStore(
         totalActiveMs: d.totalActiveMs || 0,
         totalCompletions: d.totalCompletions || 0,
         rereads: d.rereads || 0,
-        wordsByDay: (d.wordsByDay && typeof d.wordsByDay === 'object') ? d.wordsByDay : {},
-        wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples.slice(-MAX_WPM_SAMPLES) : [],
         // Import is a TRUST BOUNDARY: the envelope validator checks the
-        // top-level shape only, so nested per-item progress arrived
+        // top-level shape only, so wordsByDay/wpmSamples/progress arrived
         // unchecked and unbounded — a hand-edited or corrupt .votbak could
-        // seed thousands of entries with garbage members, breaking the
-        // LRU-50 invariant every writer assumes and feeding NaN into the
-        // word-weighted progress math. Normalize to the same shape
-        // recordProgress writes, then apply the same bound.
+        // seed a non-numeric word count (wordsForDays' consumers expect a
+        // number) or a poisoned wpmSamples entry (Infinity/NaN rates sort
+        // predictably enough to corrupt measuredWpm's median), same as the
+        // nested progress entries below breaking the LRU-50 invariant.
+        // Normalize each to the shape its own recorder writes, then apply
+        // the same bounds recording would.
+        wordsByDay: _normalizeWordsByDay(d.wordsByDay),
+        wpmSamples: _normalizeWpmSamples(d.wpmSamples),
         progress: _normalizeProgress(d.progress),
         // Must be listed HERE: replaceAll rebuilds _cache from an explicit
         // field list, so a field omitted is a field a .votbak restore wipes.

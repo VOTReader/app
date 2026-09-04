@@ -180,6 +180,30 @@ describe('JournalStatsStore — recordNewEntry (streak math)', () => {
     expect(stats.longestStreak).toBe(3);    // preserved
   });
 
+  // gap-reading-measurement-and-achievements-3: ReadingStreakStore's sibling
+  // bug, same shape — a backwards device-clock step or westward date-line
+  // crossing produces a NEGATIVE delta, which the old "else" branch treated
+  // like any other non-1 gap and reset the streak to 1. totalEntries must
+  // still count the entry that was really created; only the streak fields
+  // and the date cursor must stay put.
+  it('a backwards device-clock step is a no-op for the streak (totalEntries still counts the entry)', () => {
+    const data = JournalStatsStore._load();
+    data.totalEntries = 5;
+    data.currentStreak = 300;
+    data.longestStreak = 300;
+    data.lastEntryDate = _jrnDateStr(_tsRelative(0));   // "today"
+    JournalStatsStore._save();
+
+    // The new entry's "today" is chronologically BEFORE lastEntryDate.
+    JournalStatsStore.recordNewEntry(_tsRelative(-1));
+
+    const stats = JournalStatsStore.get();
+    expect(stats.totalEntries).toBe(6);
+    expect(stats.currentStreak).toBe(300);
+    expect(stats.longestStreak).toBe(300);
+    expect(stats.lastEntryDate).toBe(_jrnDateStr(_tsRelative(0)));
+  });
+
   it('longestStreak advances when a new streak exceeds it', () => {
     // Build a 2-day streak via direct manipulation, then add a new
     // entry that takes the streak to 3.
@@ -428,6 +452,48 @@ describe('JournalStatsStore — recordDeletion', () => {
     expect(after.totalEntries).toBe(0);
     expect(after.currentStreak).toBe(0);  // J5: no phantom live streak with 0 entries
     expect(after.longestStreak).toBe(1);  // history is kept
+  });
+});
+
+/* F12 (solo code-review scan): recordNewEntry, recordDeletion and
+   recomputeFromLoad called _save() without a following _bump(), so
+   subscribers (useSyncExternalStore consumers on the hub) never saw the
+   change — getVersion() sat frozen through real entry/streak writes. Only
+   replaceAll bumped. */
+describe('JournalStatsStore — version bumping (F12)', () => {
+  it('recordNewEntry bumps the version so subscribed screens re-render', () => {
+    const v0 = JournalStatsStore.getVersion();
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    expect(JournalStatsStore.getVersion()).toBeGreaterThan(v0);
+  });
+
+  it('recordDeletion bumps the version', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    const v1 = JournalStatsStore.getVersion();
+    JournalStatsStore.recordDeletion();
+    expect(JournalStatsStore.getVersion()).toBeGreaterThan(v1);
+  });
+
+  it('recomputeFromLoad bumps the version when it actually breaks the streak', () => {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const data = JournalStatsStore._load();
+    data.totalEntries = 5;
+    data.currentStreak = 5;
+    data.longestStreak = 5;
+    data.lastEntryDate = _jrnDateStr(threeDaysAgo.getTime());
+    JournalStatsStore._save();
+
+    const v0 = JournalStatsStore.getVersion();
+    JournalStatsStore.recomputeFromLoad();
+    expect(JournalStatsStore.getVersion()).toBeGreaterThan(v0);
+  });
+
+  it('recomputeFromLoad does NOT bump when it is a pure no-op (delta < 2)', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    const v0 = JournalStatsStore.getVersion();
+    JournalStatsStore.recomputeFromLoad();
+    expect(JournalStatsStore.getVersion()).toBe(v0);
   });
 });
 
