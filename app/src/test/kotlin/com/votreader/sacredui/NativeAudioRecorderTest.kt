@@ -3,6 +3,7 @@ package com.votreader.sacredui
 import android.Manifest
 import android.app.Application
 import android.os.Build
+import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Before
@@ -12,9 +13,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.RandomAccessFile
+import java.util.UUID
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -201,5 +207,127 @@ class NativeAudioRecorderTest {
 
         assertFalse(stale.exists(), "a stale served recording should be swept on start")
         assertTrue(fresh.exists(), "a just-served recording must survive (fetch may be in flight)")
+    }
+
+    // ─── journal-3 2a: readRecording / deleteRecording ────────────────
+    //
+    // Both verbs take a name that came from JS, so the tests that matter are the
+    // ones a NAIVE implementation would pass. Every negative case below plants a
+    // real, readable file at exactly the path `File(recordingsDir(), name)`
+    // resolves to, so "returns null" can only come from the validation and never
+    // from "there was nothing there anyway".
+
+    /** The dir the recorder serves finished memos from. */
+    private fun servedDir(): File =
+        File(application.cacheDir, NativeAudioRecorder.RECORDINGS_DIR).apply { mkdirs() }
+
+    /** A name matching the shape stop() actually writes. */
+    private fun servedName(): String = UUID.randomUUID().toString() + ".m4a"
+
+    /**
+     * Plant `bytes` at exactly the path an UNVALIDATED `File(recordingsDir(), name)`
+     * would open, and assert the poison is real: it exists, and (for a traversal
+     * name) it genuinely lands outside recordings/. Computing the path this way
+     * rather than hardcoding one keeps the test honest whatever cacheDir looks like
+     * under Robolectric — on device the same string resolves to
+     * /data/data/com.votreader.sacredui/databases/vot.db.
+     */
+    private fun plantAtNaivePath(name: String, bytes: ByteArray): File {
+        val naive = File(servedDir(), name)
+        naive.parentFile?.mkdirs()
+        naive.writeBytes(bytes)
+        assertTrue(naive.exists(), "the poison must exist or this test proves nothing")
+        return naive
+    }
+
+    @Test
+    fun `R8 - readRecording refuses a traversal name and touches nothing outside recordings`() {
+        val poison = byteArrayOf(1, 2, 3, 4, 5)
+        val db = plantAtNaivePath(TRAVERSAL, poison)
+        assertFalse(
+            db.canonicalFile.parentFile == servedDir().canonicalFile,
+            "the traversal must actually escape recordings/, or this is not a traversal test"
+        )
+
+        assertNull(recorder.readRecording(TRAVERSAL), "a traversal name must be refused")
+
+        assertTrue(db.exists(), "a refused read must not delete anything")
+        assertContentEquals(poison, db.readBytes(), "a refused read must not alter anything")
+    }
+
+    @Test
+    fun `deleteRecording refuses a traversal name and leaves the target in place`() {
+        val poison = byteArrayOf(9, 9, 9)
+        val db = plantAtNaivePath(TRAVERSAL, poison)
+
+        assertFalse(recorder.deleteRecording(TRAVERSAL), "a traversal name must be refused")
+
+        assertTrue(db.exists(), "the file outside recordings/ must survive")
+        assertContentEquals(poison, db.readBytes())
+    }
+
+    @Test
+    fun `readRecording refuses a name that is not the uuid shape the recorder writes`() {
+        // This one is INSIDE recordings/, so the canonical-containment check passes
+        // it. Only the name-shape check can refuse it — which is what makes this the
+        // test that bites that layer on its own.
+        val intruder = File(servedDir(), "evil.txt").apply { writeBytes(byteArrayOf(7)) }
+        assertEquals(
+            servedDir().canonicalFile, intruder.canonicalFile.parentFile,
+            "the fixture must sit inside recordings/, or it proves the wrong layer"
+        )
+
+        assertNull(recorder.readRecording("evil.txt"))
+
+        assertTrue(intruder.exists())
+    }
+
+    @Test
+    fun `readRecording returns the bytes of a served recording`() {
+        val bytes = ByteArray(64) { it.toByte() }
+        val name = servedName()
+        File(servedDir(), name).writeBytes(bytes)
+
+        val b64 = recorder.readRecording(name)
+
+        assertNotNull(b64, "a well-named served recording must be readable")
+        // Decode rather than re-encoding and comparing strings: an equality check
+        // against Base64.encodeToString would only restate the implementation.
+        assertContentEquals(bytes, Base64.decode(b64, Base64.NO_WRAP))
+    }
+
+    @Test
+    fun `readRecording returns null for a well-named file that is not there`() {
+        assertNull(recorder.readRecording(servedName()))
+    }
+
+    @Test
+    fun `deleteRecording removes a served recording and reports whether it did`() {
+        val name = servedName()
+        val f = File(servedDir(), name).apply { writeBytes(byteArrayOf(1)) }
+
+        assertTrue(recorder.deleteRecording(name), "deleting a real served file returns true")
+        assertFalse(f.exists())
+        assertFalse(recorder.deleteRecording(name), "deleting it twice reports false the second time")
+    }
+
+    @Test
+    fun `readRecording refuses a file bigger than this recorder could have produced`() {
+        // Sparse via setLength — a real 5.9 MB write would be the slowest test in the
+        // suite for no extra proof.
+        val name = servedName()
+        val big = File(servedDir(), name)
+        RandomAccessFile(big, "rw").use { it.setLength(NativeAudioRecorder.MAX_RECORDING_BYTES + 1) }
+        assertTrue(big.length() > NativeAudioRecorder.MAX_RECORDING_BYTES)
+
+        assertNull(recorder.readRecording(name), "an over-ceiling file must not be base64'd onto the bridge")
+
+        assertTrue(big.exists(), "refusing to read it is not a licence to delete it")
+    }
+
+    private companion object {
+        /** On device this resolves to /data/data/<pkg>/databases/vot.db — the real
+         *  database, one directory move above the served cache dir. */
+        const val TRAVERSAL = "../../databases/vot.db"
     }
 }

@@ -20,10 +20,16 @@ import timber.log.Timber
  * AndroidBridge.nativeRecord* whenever this bridge is present and reads
  * back the encoded AAC/MPEG-4 blob via window.__onNativeRecordingComplete.
  *
- * Threading: every public method synchronizes on [lock]. @JavascriptInterface
- * methods invoke them from binder threads, and the Activity-side cleanup
- * paths (ViewModel.onCleared, onDestroy fallback) need to safely race
- * against the recorder state from main / UI threads.
+ * Threading: every public method that touches recorder STATE synchronizes on
+ * [lock]. @JavascriptInterface methods invoke them from binder threads, and the
+ * Activity-side cleanup paths (ViewModel.onCleared, onDestroy fallback) need to
+ * safely race against the recorder state from main / UI threads.
+ *
+ * [readRecording] and [deleteRecording] are the two deliberate exceptions: they
+ * touch only files already finished and handed off, never [recorder] or
+ * [recordFile], so there is nothing for the lock to protect -- and taking it would
+ * park a multi-megabyte base64 read in front of a [cancel] arriving from an
+ * Activity teardown.
  *
  * State: a recording in progress holds a MediaRecorder + a temp file in
  * the app's cacheDir. cancel() / release() / stop() all clear both back
@@ -112,7 +118,7 @@ class NativeAudioRecorder(private val context: Context) {
             mr.setAudioSource(MediaRecorder.AudioSource.MIC)
             mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            mr.setAudioEncodingBitRate(96000)
+            mr.setAudioEncodingBitRate(AUDIO_BIT_RATE)
             mr.setAudioSamplingRate(44100)
             mr.setOutputFile(f.absolutePath)
             // OnErrorListener is MediaRecorder's ONLY notification channel for a
@@ -255,18 +261,118 @@ class NativeAudioRecorder(private val context: Context) {
             recordFile = null
             return Result.Success(RecordingResult(base64 = null, durationMs = safeDur, fileName = served.name))
         }
-        return try {
-            val bytes = f.readBytes()
-            val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            try { f.delete() } catch (_: Exception) {}
-            recordFile = null
-            Result.Success(RecordingResult(base64 = b64, durationMs = safeDur, fileName = null))
-        } catch (e: Exception) {
-            Timber.w(e, "nativeRecordStop read failed")
-            try { f.delete() } catch (_: Exception) {}
-            recordFile = null
-            Result.Failure("read_failed")
+        val b64 = encodeFileToBase64(f)
+        try { f.delete() } catch (_: Exception) {}
+        recordFile = null
+        return if (b64 == null) Result.Failure("read_failed")
+        else Result.Success(RecordingResult(base64 = b64, durationMs = safeDur, fileName = null))
+    }
+
+    /**
+     * Base64 of the served recording [name], or null.
+     *
+     * journal-3 2a: the SECOND route to a finished memo. The happy path hands JS a
+     * /recordings/ URL to fetch; when that fetch fails non-transiently the finished
+     * .m4a is still sitting in [recordingsDir] and nothing in JS can reach it again.
+     * This is how it gets it back.
+     *
+     * The trade, stated because it is real: this reintroduces exactly the base64 cost
+     * the fetch bridge exists to avoid (~7.9 MB of string at the ceiling, parsed by
+     * evaluateJavascript). It is worth paying only because the alternative on this
+     * path is losing the recording outright.
+     *
+     * ONE null covers missing, unreadable, over-ceiling and refused alike -- JS needs
+     * no way to tell them apart and it leaks least -- but the interesting cases log
+     * DIFFERENT Timber lines, so a rejected name is greppable in logcat.
+     */
+    fun readRecording(name: String): String? {
+        val f = resolveServedRecording(name) ?: return null
+        if (!f.isFile) {
+            Timber.i("readRecording: no served recording named %s", name)
+            return null
         }
+        return encodeFileToBase64(f)
+    }
+
+    /**
+     * Delete the served recording [name]; true only if a file was actually removed.
+     *
+     * journal-3 2a: the handshake half. JS calls this once the bytes are committed to
+     * its own store, so the native side stops holding a copy of something already
+     * saved. Nothing else prunes a claimed file -- [sweepStaleRecordings] exists for
+     * the ones JS never came back for.
+     */
+    fun deleteRecording(name: String): Boolean {
+        val f = resolveServedRecording(name) ?: return false
+        return try {
+            f.delete()
+        } catch (e: Exception) {
+            Timber.w(e, "deleteRecording failed for %s", name)
+            false
+        }
+    }
+
+    /**
+     * The trust boundary for both JS-facing file verbs: resolve [name] to a file in
+     * [recordingsDir], or refuse it. Two locks, and they are not redundant by accident.
+     *
+     * 1. [SERVED_NAME] -- the name must be the uuid shape [stop] itself writes. This is
+     *    the lock that bites today; nothing failing it reaches the filesystem at all.
+     * 2. Canonical PARENT equality with recordings/. Given (1) this is unreachable,
+     *    because a string matching [SERVED_NAME] cannot contain a separator or a
+     *    dot-dot -- so it is NOT independently proven by any test here, and this
+     *    comment says so rather than implying otherwise. It is here because it is the
+     *    check that still holds if (1) is ever loosened, and because it is the only one
+     *    of the two that can see through a symlink planted in recordings/ under a
+     *    legitimate-looking name.
+     *
+     * Parent EQUALITY, deliberately, not a path prefix: startsWith on the canonical
+     * path also says yes to a sibling directory named recordings-anything.
+     */
+    private fun resolveServedRecording(name: String): File? {
+        if (!SERVED_NAME.matches(name)) {
+            Timber.w("refused served-recording name (shape): %s", name)
+            return null
+        }
+        val dir = recordingsDir()
+        val f = File(dir, name)
+        val inside = try {
+            f.canonicalFile.parentFile == dir.canonicalFile
+        } catch (e: Exception) {
+            Timber.w(e, "refused served-recording name (unresolvable): %s", name)
+            false
+        }
+        if (!inside) {
+            Timber.w("refused served-recording name (outside recordings/): %s", name)
+            return null
+        }
+        return f
+    }
+
+    /**
+     * Whole-file base64, or null on any refusal or read error.
+     *
+     * Shared by [readRecording] and [stop]'s fallback branch so the size ceiling lives
+     * in ONE place. The stop() read has had no ceiling since it was written; routing
+     * both callers through here closes that sibling for free. The visible consequence
+     * is that an over-ceiling file now makes stop() return Failure("read_failed")
+     * instead of inflating it onto the bridge -- intended, since [MAX_RECORDING_BYTES]
+     * sits above anything this recorder can legitimately produce.
+     */
+    private fun encodeFileToBase64(f: File): String? = try {
+        val len = f.length()
+        if (len > MAX_RECORDING_BYTES) {
+            Timber.w(
+                "refusing to encode %s: %d bytes is over the %d ceiling",
+                f.name, len, MAX_RECORDING_BYTES
+            )
+            null
+        } else {
+            Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)
+        }
+    } catch (e: Exception) {
+        Timber.w(e, "base64 encode failed for %s", f.name)
+        null
     }
 
     /** Abort recording and delete the temp file. No JS callback. */
@@ -334,5 +440,26 @@ class NativeAudioRecorder(private val context: Context) {
          *  300 s JS cap so JS owns the normal stop and this only fires when that
          *  timer is throttled or stalled. */
         const val MAX_DURATION_MS = 330_000
+
+        /** The bit rate handed to MediaRecorder. Named rather than inline because
+         *  [MAX_RECORDING_BYTES] is derived from it -- raising one must carry the
+         *  other along. */
+        const val AUDIO_BIT_RATE = 96_000
+
+        /**
+         * Ceiling on a whole-file base64 read, DERIVED rather than picked: the longest
+         * recording this class can produce under its own [MAX_DURATION_MS] backstop at
+         * [AUDIO_BIT_RATE], plus 50 % for MPEG-4 container overhead. ~5.94 MB.
+         *
+         * So it is not a limit on normal use -- a file above it did not come from this
+         * recorder under this config. Encoding an arbitrary-sized file into a string
+         * for evaluateJavascript to parse is how a foreign or pathological file left in
+         * recordings/ would take the heap with it.
+         */
+        val MAX_RECORDING_BYTES: Long =
+            MAX_DURATION_MS / 1000L * (AUDIO_BIT_RATE / 8) * 3 / 2
+
+        /** Exactly the name shape [stop] writes: UUID.randomUUID().toString() + ".m4a". */
+        private val SERVED_NAME = Regex("^[0-9a-f-]{36}\\.m4a$")
     }
 }

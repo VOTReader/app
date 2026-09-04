@@ -51,6 +51,11 @@ class BridgeContractTest {
         "nativeRecordAmplitude" to 0,
         "nativeRecordStop" to 0,
         "nativeRecordCancel" to 0,
+        // journal-3 2a: the second route to a finished memo, and the handshake that
+        // releases it. Both land callerless for one cycle -- the JS call sites arrive
+        // with 2a-web -- so this map is what stops them rotting unnoticed meanwhile.
+        "nativeReadRecording" to 1,
+        "nativeDeleteRecording" to 1,
         "takeScreenshot" to 3,
         "openFilePicker" to 0,
         "saveToFile" to 2,

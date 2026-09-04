@@ -380,6 +380,19 @@ class AppInterface(
         vm.audioRecorder.cancel()
     }
 
+    /** journal-3 2a: the second route to a finished memo. Base64 of the served
+     *  recording, or null when it is gone, oversized, or the name is refused -- JS
+     *  gets no way to tell those apart. Only called after the /recordings/ fetch has
+     *  failed non-transiently, so the base64 cost the fetch bridge exists to avoid is
+     *  paid here deliberately, against losing the recording outright. */
+    @JavascriptInterface
+    fun nativeReadRecording(name: String): String? = vm.audioRecorder.readRecording(name)
+
+    /** journal-3 2a: the handshake. JS calls this once the bytes are committed to its
+     *  own store, so the native side stops holding a copy of something already saved. */
+    @JavascriptInterface
+    fun nativeDeleteRecording(name: String): Boolean = vm.audioRecorder.deleteRecording(name)
+
     @JavascriptInterface
     fun setZoomEnabled(enabled: Boolean) {
         host.postToUi {
