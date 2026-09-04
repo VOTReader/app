@@ -176,6 +176,10 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       init: () => Promise.resolve(),
       suggest: () => [],
       fuzzyBookSuggest: () => null,
+      // SRCH6: the synchronous direct-nav/command parse — a plain-text query
+      // (most of these tests) is not a reference, so null (no direct card) is
+      // the realistic default; tests that need a ref/command override this.
+      parse: () => null,
       search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
     };
     /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
@@ -378,5 +382,33 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(/** @type {any} */ (window).loadTranslation).toHaveBeenCalledWith('kjv');
     expect(initCalls[0]).toMatchObject({ translation: 'kjv' });
     delete /** @type {any} */ (window).loadTranslation;
+  });
+
+  /* search-6: reference/command parsing needs only window.VotSearchData
+     (bundle-a, always present) — no index — so it must work during the ~10s
+     cold build, which only the text-search branch actually needs. */
+  it('search-6: the direct-nav card renders during the cold index build (parse needs no index)', async () => {
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn(() => new Promise(() => {})); // never resolves — index stays cold
+    /** @type {any} */ (window).VotSearchMini.parse = vi.fn(() => ({ kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16 }));
+    const cardCalls = [];
+    /** @type {any} */ (globalThis).SrchCard = (props) => { cardCalls.push(props); return null; };
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    await act(async () => { await Promise.resolve(); });
+    rerender(<SearchScreen {...props} query="john 3:16" />);
+    expect(cardCalls.some((c) => c.isDirect && c.entry && c.entry.__label === 'John 3:16')).toBe(true);
+  });
+
+  it('search-6: a command dispatches during the cold index build', async () => {
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn(() => new Promise(() => {}));
+    /** @type {any} */ (window).VotSearchMini.parse = vi.fn(() => ({ kind: 'command', action: 'rebuildIndex', label: 'Rebuild index' }));
+    const onCommand = vi.fn();
+    const props = { ...baseProps(), onCommand };
+    const { rerender } = render(<SearchScreen {...props} />);
+    await act(async () => { await Promise.resolve(); });
+    rerender(<SearchScreen {...props} query="/rebuild index" />);
+    expect(onCommand).toHaveBeenCalledWith('rebuildIndex');
   });
 });
