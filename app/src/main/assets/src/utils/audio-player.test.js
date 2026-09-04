@@ -2484,3 +2484,60 @@ describe('audio-player — voice switch honors its own promise (noResume)', () =
     }
   });
 });
+
+describe('audio-player — a deferred seek cannot outlive the track it was armed for', () => {
+  /* _seekOnMetadata defers to 'loadedmetadata' when the element has no
+     metadata yet. There is one singleton element and (pre-fix) no generation
+     token, so a listener armed for a track whose metadata never arrived —
+     the reader moved on before it did — stayed registered and fired on
+     whatever loaded next instead, silently reseeking a track nobody asked
+     to resume. */
+  it('a second play with no saved position is not hijacked by a still-pending resume seek from the first', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === URL_OF('idA1') ? { t: 600, d: 3600 } : null),
+      setPosition() {}, clearPosition() {},
+    };
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+      expect(el().src).toBe(URL_OF('idA1'));   // A's resume seek is armed; A never sends loadedmetadata
+
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(el().src).toBe(URL_OF('idC'));
+      el().duration = 240;
+      el().dispatchEvent(new Event('loadedmetadata'));   // letter C's metadata — A's stale listener hears it too
+
+      expect(el().currentTime).toBe(0);   // NOT 595 — that seek belonged to letter A
+    } finally {
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+
+  it('a noResume edition switch mid-buffer is not reseeked by the chapter it replaced', () => {
+    const target = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-wop-v1/wop1_jonah_002.mp3';
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-wop-nkjv:jonah': [['wop1_jonah_001', '', 'Chapter 1'], ['wop1_jonah_002', '', 'Chapter 2']],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    globalThis.AudioPositionsStore = {
+      getPosition: (u) => (u === target ? null : { t: 90, d: 300 }),
+      setPosition() {}, clearPosition() {},
+    };
+    try {
+      // Chapter 1 has a remembered position; its metadata never arrives.
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 1 });
+
+      // The listener switches chapter mid-buffer; noResume means "start this
+      // again", which must hold even though chapter 1's seek is still armed.
+      AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 2, noResume: true });
+      expect(el().src).toBe(target);
+      el().duration = 240;
+      el().dispatchEvent(new Event('loadedmetadata'));
+
+      expect(el().currentTime).toBe(0);   // NOT chapter 1's remembered ~85s
+    } finally {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      delete globalThis.BIBLE_AUDIO_BOOKS;
+      delete globalThis.AudioPositionsStore;
+    }
+  });
+});

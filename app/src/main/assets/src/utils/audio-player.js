@@ -744,6 +744,7 @@ function _countCompletion() {
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */
 function _start() {
+  _seekGen++;   // invalidates any deferred seek still waiting on the last track
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
   if (!isVotAudioUrl(track.url)) {
@@ -832,6 +833,7 @@ function prewarm(volKey, letterId) {
   el.preload = 'metadata';
   const url = _assetUrlFor(volKey, parts[0][0]);
   if (!url) return;
+  _seekGen++;   // same reassign-src-outside-_start() hazard as toggle()'s retry
   el.src = url;
   _prewarmKey = key;
 }
@@ -1250,6 +1252,22 @@ function _resumeAt(track) {
   } catch (_e) { return 0; }
 }
 
+/** Bumped by every call that points the element at a new track (_start,
+ *  toggle()'s error retry, prewarm) — invalidates a still-pending deferred
+ *  seek armed for whatever was loading before. Without it, a seek armed for
+ *  a track whose metadata never arrived (slow network, or the reader moved on
+ *  before it did) survives that track and fires on the NEXT one's metadata
+ *  instead: a saved position from letter A landing on letter B, or a
+ *  noResume voice switch losing its "starts at 0" promise to the voice it
+ *  just replaced. */
+let _seekGen = 0;
+/** The 'loadedmetadata' handler _seekOnMetadata last armed, so a second
+ *  deferred seek before the first ever fires can drop it instead of leaving
+ *  two of our own listeners racing each other (playBibleBook deliberately
+ *  arms a chapter-tap seek AFTER playCollection's resume seek, to outrank
+ *  it — this keeps that down to one live listener instead of two). */
+let _pendingSeekHandler = /** @type {(() => void) | null} */ (null);
+
 /**
  * Seek once the element can honor it. HAVE_METADATA is the earliest safe
  * moment — a currentTime assignment before that is ignored or throws — but it
@@ -1263,6 +1281,11 @@ function _resumeAt(track) {
  * This IS the boot-restore timing contract; every deferred seek in this
  * module goes through here.
  *
+ * The deferred branch is generation-guarded (_seekGen): a still-pending
+ * listener from a track that never reached metadata must not fire on
+ * whatever the element loads next. Arming a new deferred seek also drops
+ * whichever one this function armed last, belt-and-braces on top of that.
+ *
  * @param {number} at
  * @returns {void}
  */
@@ -1274,9 +1297,15 @@ function _seekOnMetadata(at) {
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     return;
   }
-  _el.addEventListener('loadedmetadata', () => {
+  if (_pendingSeekHandler) { _el.removeEventListener('loadedmetadata', _pendingSeekHandler); }
+  const gen = _seekGen;
+  const handler = () => {
+    _pendingSeekHandler = null;
+    if (gen !== _seekGen) return;   // a newer track started — this seek is stale
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
-  }, { once: true });
+  };
+  _pendingSeekHandler = handler;
+  _el.addEventListener('loadedmetadata', handler, { once: true });
 }
 
 function _persist() {
@@ -1863,6 +1892,7 @@ function toggle() {
     // seek back to where playback died once metadata is available (currentTime
     // can't be set before then).
     const resumeAt = _errorTime;
+    _seekGen++;   // this reassigns src outside _start() — invalidate stale deferred seeks too
     _el.src = track.url;
     _el.addEventListener('loadedmetadata', () => {
       try { /** @type {HTMLAudioElement} */ (_el).currentTime = resumeAt; } catch (_e) { /* unseekable — restart from 0 */ }
