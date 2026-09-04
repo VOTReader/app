@@ -30,6 +30,7 @@
     "check:footnotes": "node tools/audit-footnotes.js --check",
     "check:app-size": "node tools/check-app-size.js",
     "check:audio-sync": "node tools/check-audio-sync.js",
+    "check:audio-manifest": "node tools/check-audio-manifest.js",
     "check:corpus": "node tools/check-corpus-version.js",
     "check:apk-assets": "node tools/check-apk-assets.js",
     "check:type-scale": "node tools/check-type-scale.js",

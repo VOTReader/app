@@ -125,6 +125,16 @@ jobs:
         # letters and validate:data never looks at it. Stdlib Python + node.
         run: python tools/validate-bible-sync.py --structural
 
+      - name: Check audio renditions reach the app (audio-manifest)
+        # node tools/check-audio-manifest.js: every reader who recorded a letter
+        # must be OFFERED that letter, as the primary or as an alternate. The
+        # manifest is generated, so a composition rule that drops a rendition
+        # fails silently — it just prints a smaller number, and the flock's
+        # reading is gone from the app. Checked against
+        # tools/audio-manifest-coverage.json, written by the generator's MAPPING
+        # stage, so a loss in the COMPOSITION stage is visible. Offline.
+        run: npm run check:audio-manifest
+
       - name: Audit footnote rendering (CORP6 — dup / white verse numbers)
         # node tools/audit-footnotes.js --check: fails if any Format A footnote (or
         # WTLB / Blessed / Matthew dict) value would render a DUPLICATED or WHITE

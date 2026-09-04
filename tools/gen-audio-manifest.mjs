@@ -30,11 +30,20 @@ import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+// THE rendition rules — shared with tools/check-audio-manifest.js and its
+// tests, so the manifest and the gate that checks it cannot drift apart.
+import {
+  READER_RANK, composeAlternates, countByReader, dedupeByAudioHash, formatReaderCounts,
+} from './audio-renditions-lib.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
 const ASSETS = resolve(REPO, 'app', 'src', 'main', 'assets');
 const LISTING = resolve(HERE, '_audio-drive-listing.json');
 const OUT = resolve(ASSETS, 'src', 'data', 'audio-manifest.js');
+// The gate's ground truth: every candidate this run MAPPED to a corpus item.
+// Committed (unlike the Drive listing) so check-audio-manifest.js runs in CI.
+const COVERAGE = resolve(HERE, 'audio-manifest-coverage.json');
 
 // ── corpus load (same vm technique as validate-schemas.js) ──────────────
 const DATA_FILES = [
@@ -122,7 +131,6 @@ const NUM_IDX = new Map(COLS.map((c) => {
 }));
 
 // ── filename parsing ─────────────────────────────────────────────────────
-const READER_RANK = { B: 3, T: 2, V: 1, M: 0 };
 function parseReader(tail) {
   // "(read by text-to-speech - Benjamin)" -> Benjamin wins (he produced it).
   const m = /\(read by ([^)]+)\)/i.exec(tail);
@@ -255,12 +263,25 @@ for (const f of listing) {
   if (SKIP_RE.test(path)) { skipped++; continue; }
   if (seenIds.has(f.id)) continue; // multi-parent dupe
   seenIds.add(f.id);
+  const name = path.split('/').pop();
   files.push({
-    name: path.split('/').pop(), id: f.id,
+    name, id: f.id,
     fill: ALL_LETTERS_RE.test(path),   // "0. ALL LETTERS" fills gaps only
     holy: HOLY_RE.test(path),
+    // Optional: an audio-frame hash (ID3 stripped) supplied by the listing —
+    // see vot_curate.py:audio_hash. Absent on a pre-hash listing, and then
+    // nothing is collapsed and this run behaves exactly as it always did.
+    hash: f.hash || f.audioHash || null,
+    reader: parseReader(name),         // dedup tiebreak only; the real parse is below
   });
 }
+// Compare AUDIO, not names (Machine Ops 2026-09-03): the archive holds files
+// that are byte-identical under different Drive ids, and two of them would
+// otherwise become two renditions of the same recording.
+const dedup = dedupeByAudioHash(files);
+const collapsedByHash = dedup.collapsed;
+files.length = 0;
+files.push(...dedup.records);
 // Per-collection folders first; "0. ALL LETTERS" fills what's still missing.
 files.sort((a, b) => (a.fill === b.fill ? 0 : a.fill ? 1 : -1));
 
@@ -324,13 +345,19 @@ for (const f of files) {
     }
   }
 
-  // "0. ALL LETTERS" fills gaps only — skip if the key already has anything.
-  if (f.fill && acc.has(key)) continue;
+  // "0. ALL LETTERS" fills gaps only — a file from there never competes for a
+  // PRIMARY slot once the per-collection folders have supplied one. It is still
+  // a candidate though: that folder holds readings by Benjamin and by Timothy
+  // for letters whose collection folder only has the TTS version, and skipping
+  // the record outright made those readers unreachable in the app (fixed
+  // 2026-09-04, FlockSync v2 §5.2).
+  const fillSkip = f.fill && acc.has(key);
 
   let e = acc.get(key);
   if (!e) { e = { full: null, sections: new Map(), parts: new Map(), addenda: [], comps: new Map(), cand: [] }; acc.set(key, e); }
   matched++;
   if (shape.kind !== 'compilation') e.cand.push({ kind: shape.kind, n: shape.n ?? 0, id: track.id, reader: track.reader });
+  if (fillSkip) continue;
   if (shape.kind === 'compilation') {
     const cur = e.comps.get(track.n);
     if (better(cur, track)) e.comps.set(track.n, track);
@@ -345,47 +372,6 @@ for (const f of files) {
   } else if (shape.kind === 'addendum') {
     if (e.addenda.length === 0 || better(e.addenda[0], track)) e.addenda = [track];
   }
-}
-
-/**
- * Compose reader R's own standalone rendition of a letter from its candidate
- * pool: same precedence as the primary flatten (full > sections > parts, one
- * addendum last), restricted to R's files, first-seen per slot (which is what
- * silently drops same-reader duplicate uploads). Returns
- * { kind: 'full'|'sections'|'parts', rows: [{id, label}] } — empty rows when
- * R recorded nothing usable.
- */
-function renditionFor(cands, reader) {
-  const seen = new Set();
-  const firsts = [];
-  for (const c of cands) {
-    if (c.reader !== reader) continue;
-    const slot = c.kind + ':' + c.n;
-    if (seen.has(slot)) continue;
-    seen.add(slot);
-    firsts.push(c);
-  }
-  const full = firsts.find((c) => c.kind === 'full');
-  let kind = 'full';
-  let list = [];
-  if (full) {
-    list = [{ id: full.id, label: null }];
-  } else {
-    const secs = firsts.filter((c) => c.kind === 'section').sort((a, b) => a.n - b.n);
-    if (secs.length) {
-      kind = 'sections';
-      list = secs.map((c) => ({ id: c.id, label: `Section ${c.n}` }));
-    } else {
-      kind = 'parts';
-      const parts = firsts.filter((c) => c.kind === 'part').sort((a, b) => a.n - b.n);
-      list = parts.map((c, i, arr) => ({ id: c.id, label: arr.length > 1 ? `Part ${i + 1}` : null }));
-    }
-  }
-  if (!list.length) return { kind, rows: [] };   // an addendum alone is not a rendition
-  const add = firsts.find((c) => c.kind === 'addendum');
-  if (add) list.push({ id: add.id, label: 'Addendum' });
-  if (list.length === 1) list[0].label = null;
-  return { kind, rows: list };
 }
 
 // ── flatten to manifest entries ──────────────────────────────────────────
@@ -415,25 +401,13 @@ for (const [key, e] of acc) {
   if (list.length === 1) list[0].label = null;
   manifest.set(key, list.map((t) => t.label ? [t.id, t.reader, t.label] : [t.id, t.reader]));
 
-  // Alternate renditions: any OTHER reader whose own composition of this
-  // letter brings at least one recording the primary list doesn't carry.
-  // A sections/parts rendition with fewer main tracks than the primary's is
-  // an incomplete fragment, not an alternative — skipped. (A single full-
-  // letter recording is always a complete alternative, whatever the primary
-  // is split into.)
-  const primaryIds = new Set(list.map((t) => t.id));
-  const primaryMain = list.filter((t) => t.label !== 'Addendum').length;
-  const readers = [...new Set(e.cand.map((c) => c.reader))]
-    .sort((a, b) => READER_RANK[b] - READER_RANK[a]);
-  const pairs = [];
-  for (const reader of readers) {
-    const r = renditionFor(e.cand, reader);
-    if (!r.rows.length) continue;
-    if (r.rows.every((row) => primaryIds.has(row.id))) continue;   // already the primary (or a subset of it)
-    const mainRows = r.rows.filter((row) => row.label !== 'Addendum').length;
-    if (r.kind !== 'full' && primaryMain > 1 && mainRows < primaryMain) continue;
-    pairs.push([reader, r.rows.map((row) => row.label ? [row.id, row.label] : [row.id])]);
-  }
+  // Alternate renditions: EVERY other reader who recorded any part of this
+  // letter, complete or not (FlockSync v2 §5.2-3, Corbin 2026-09-04). The only
+  // rendition dropped is one whose asset-ID set is exactly the primary's. A
+  // shorter rendition ships with a completeness note ("2 of 5 sections") — the
+  // old rule discarded it, which is how Timothy's and Benjamin's partial
+  // readings became invisible to the app.
+  const pairs = composeAlternates(e.cand, list);
   if (pairs.length) alternates.set(key, pairs);
 }
 
@@ -447,9 +421,13 @@ const altLines = altKeys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(alt
 const body = '/* AUDIO MANIFEST — auto-generated by tools/gen-audio-manifest.mjs. DO NOT EDIT.\n' +
   '   AUDIO_MANIFEST: "volKey:letterId" -> [[driveFileId, readerCode, partLabel?], ...]\n' +
   '   AUDIO_SECTIONS: volKey -> [[label, driveFileId, readerCode], ...] (range compilations)\n' +
-  '   AUDIO_ALTERNATES: "volKey:letterId" -> [[readerCode, [[driveFileId, partLabel?], ...]], ...]\n' +
-  '     — complete standalone renditions by OTHER readers, rank-ordered; lets\n' +
-  '     the listener choose who reads a letter. Assets live on audio-v1 too.\n' +
+  '   AUDIO_ALTERNATES: "volKey:letterId" -> [[readerCode, [[driveFileId, partLabel?], ...], note?], ...]\n' +
+  '     — every OTHER reader who recorded any part of this letter, rank-ordered;\n' +
+  '     lets the listener choose who reads it. A rendition SHORTER than what the\n' +
+  '     archive proves the letter has carries a third element, the completeness\n' +
+  '     note ("2 of 5 sections"); a complete one has no third element. Existing\n' +
+  '     consumers read [0] and [1] only, so the note is additive. Assets live on\n' +
+  '     audio-v1 too.\n' +
   '   Reader codes: B=Benjamin, T=Timothy, V=text-to-speech, M=AI with music.\n' +
   '   Streams from Google Drive (public, link-shared). Regenerate:\n' +
   '     python tools/fetch-drive-audio.py && node tools/gen-audio-manifest.mjs\n' +
@@ -459,24 +437,72 @@ const body = '/* AUDIO MANIFEST — auto-generated by tools/gen-audio-manifest.m
   'var AUDIO_ALTERNATES = {\n' + altLines.join(',\n') + '\n};\n';
 writeFileSync(OUT, body);
 
+// -- coverage sidecar ----------------------------------------------------
+// The gate reads this, and it is written from the MAPPING stage (acc), not
+// the composition stage (manifest/alternates) — so a candidate the composer
+// drops is still listed here and check-audio-manifest.js can see the loss.
+// Committed, unlike the Drive listing, so the gate runs in CI.
+// The unit that matters is (letter, reader): "did everyone who read this
+// letter get offered?" — NOT (letter, file). The archive mirrors most files
+// into "0. ALL LETTERS" under a second Drive id, and renditionFor's first-seen
+// slot rule drops those duplicates on purpose, so counting ids would drown the
+// real signal in ~830 duplicate uploads.
+const letters = {};
+for (const [key, e] of acc) {
+  if (key.startsWith('__sections:')) continue;
+  const byReader = {};
+  for (const c of e.cand) byReader[c.reader] = (byReader[c.reader] || 0) + 1;
+  // How many distinct main slots this letter HAS, across every reader — the
+  // gate needs it to tell a whole-letter reading from a fragment, and the
+  // manifest alone cannot say (a dropped row takes the evidence with it).
+  const slots = (kind) => new Set(e.cand.filter((c) => c.kind === kind).map((c) => c.n)).size;
+  letters[key] = { readers: byReader, slots: Math.max(slots('section'), slots('part'), 1) };
+}
+// One line per letter, so a regression shows as a readable diff rather than a
+// single 30 KB line or a 4,000-line reflow.
+const covLines = Object.keys(letters).sort()
+  .map((k) => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(letters[k]));
+writeFileSync(COVERAGE,
+  '{' + '\n' +
+  ' "note": ' + JSON.stringify('Auto-generated by tools/gen-audio-manifest.mjs. DO NOT EDIT. Ground truth for tools/check-audio-manifest.js: for every letter, how many candidate recordings each reader supplied. A reader listed here MUST be offered a rendition of that letter.') + ',\n' +
+  ' "listingRecords": ' + listing.length + ',\n' +
+  ' "collapsedByHash": ' + JSON.stringify(collapsedByHash) + ',\n' +
+  ' "letters": {\n' + covLines.join(',\n') + '\n }\n}\n');
+
 // ── report ───────────────────────────────────────────────────────────────
 const perCol = new Map(COLS.map((c) => [c.volKey, { have: 0, total: (c.preface ? 1 : 0) + c.letters.length }]));
 for (const key of keys) perCol.get(key.split(':')[0]).have++;
 console.log(`audio-manifest: ${keys.length} letters with audio (${matched} files used, ${skipped} non-letter files excluded)`);
 {
-  // Alternates summary + the id set a mirror run must cover.
+  // Reader counts, primary and alternate, kept separate (FlockSync v2 §5.5) —
+  // the one number that says whether Timothy's and Benjamin's readings actually
+  // reached the app, and the number that regressed silently before this run.
+  const primRows = [...manifest.values()].flat();
+  const primIds = new Set(primRows.map((r) => r[0]));
+  const primCounts = countByReader(primRows, (r) => r[1]);
+  console.log(`  primary:  ${primRows.length} tracks (${formatReaderCounts(primCounts)})`);
+
   const altIds = new Set();
-  const byReader = {};
+  const altCounts = {};
+  let partialRends = 0;
   for (const pairs of alternates.values()) {
-    for (const [reader, rows] of pairs) {
-      byReader[reader] = (byReader[reader] || 0) + rows.length;
+    for (const [reader, rows, note] of pairs) {
+      altCounts[reader] = (altCounts[reader] || 0) + rows.length;
+      if (note) partialRends++;
       for (const row of rows) altIds.add(row[0]);
     }
   }
-  const primIds = new Set([...manifest.values()].flat().map((r) => r[0]));
+  const altRends = [...alternates.values()].reduce((n, p) => n + p.length, 0);
+  console.log(`  alternates: ${altKeys.length} letters offer a reader choice — ${altRends} renditions, ${altIds.size} extra assets (${formatReaderCounts(altCounts)})`);
+  console.log(`  of those, ${partialRends} are PARTIAL and ship a completeness note`);
+  if (collapsedByHash.length) {
+    console.log(`  same-audio duplicates collapsed: ${collapsedByHash.length}`);
+  } else if (!listing.some((f) => f.hash || f.audioHash)) {
+    console.log('  same-audio dedup: SKIPPED — the listing carries no audio hashes');
+  }
   const overlap = [...altIds].filter((id) => primIds.has(id));
-  console.log(`  alternates: ${altKeys.length} letters offer a reader choice (${altIds.size} extra assets: ${Object.entries(byReader).map(([r, n]) => `${r}×${n}`).join(', ') || 'none'})`);
   if (overlap.length) console.log(`  WARNING: ${overlap.length} alternate ids also appear as primaries — mirror/emit logic needs review: ${overlap.slice(0, 5).join(', ')}`);
+  console.log(`  coverage sidecar: ${COVERAGE}`);
 }
 for (const [k, v] of perCol) {
   const missing = v.total - v.have;

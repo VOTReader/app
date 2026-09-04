@@ -204,6 +204,36 @@ if [ -n "$bible_sync_changed" ]; then
   echo ""
 fi
 
+# Every reader who recorded a letter must be OFFERED that letter. The manifest
+# is generated, so the failure mode is silent: a composition rule that drops a
+# rendition prints a smaller number and nothing else, and the flock's reading
+# is gone from the app forever (it happened — the pre-2026-09-04 rules discarded
+# any rendition shorter than the primary). node tools/check-audio-manifest.js
+# reads the manifest against tools/audio-manifest-coverage.json, which the
+# generator writes from its MAPPING stage, so a loss in the COMPOSITION stage
+# is visible. Offline and ~0.1 s; no Drive listing, no network.
+manifest_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/data/audio-manifest\.js|tools/(audio-manifest-coverage\.json|audio-renditions-lib|check-audio-manifest|gen-audio-manifest))' || true)
+if [ -n "$manifest_changed" ]; then
+  echo "[pre-commit] Checking audio renditions — node tools/check-audio-manifest.js..."
+  node tools/check-audio-manifest.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Audio rendition check FAILED — see output above."
+    echo "A reading the flock made can no longer be reached in the app, or"
+    echo "the manifest and its coverage file disagree. Regenerate both with"
+    echo "  node tools/gen-audio-manifest.mjs"
+    echo "(needs tools/_audio-drive-listing.json — refresh it with"
+    echo " python tools/fetch-drive-audio.py). NEVER hand-edit"
+    echo "src/data/audio-manifest.js or audio-manifest-coverage.json."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Audio renditions OK."
+  echo ""
+fi
+
 # ─── Step 1c: data-gate self-test (T6) ──────────────────────────────
 # When the data gate itself (check_balance.py) or its test changes, run the
 # gate's unit tests so a regression in the GATE — the front-line black-screen
