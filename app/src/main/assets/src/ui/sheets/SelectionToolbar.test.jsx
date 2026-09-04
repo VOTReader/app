@@ -32,6 +32,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll } from './SelectionToolbar.jsx';
+import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 
 let _origGetSelection;
 
@@ -170,6 +171,31 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
       'bible:test:1:1',
       expect.objectContaining({ kind: 'squiggle', color: 'green' }),
     );
+  });
+});
+
+describe('SelectionToolbar — zero-width annotation guard (annotation-selection-4)', () => {
+  it('does not persist a highlight for a punctuation-only selection (single container)', async () => {
+    const c = readingContainer('bible:test:1:1', 'He said — and the crowd, "Amen," — went away.');
+    // Real word-snap for this suite is stubbed as identity in beforeEach; swap in
+    // the REAL snapSelectionRange so this test exercises the actual collapse an
+    // all-punctuation run produces (annotation-engine.jsx:48: "An all-punctuation/
+    // whitespace selection collapses to start===end; every caller already bails
+    // on that" — applyHighlight's single-container path is the one that didn't).
+    /** @type {any} */ (globalThis).snapSelectionRange = realSnapSelectionRange;
+    mount();
+    stubSelection(rangeOver(c, 7, 10)); // " — " (space-emdash-space) -> snaps to {10,10}
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    // The trimmed selection text is the em dash itself (non-empty), so
+    // computeAndShow raises the toolbar same as any other selection.
+    const yellowBtn = document.querySelector('.sel-color-btn[data-color="yellow"]');
+    expect(yellowBtn).not.toBeNull();
+    act(() => { fire(yellowBtn, 'click'); });
+    expect(/** @type {any} */ (globalThis).AnnotationStore.add).not.toHaveBeenCalled();
   });
 });
 

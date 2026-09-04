@@ -662,6 +662,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const container = document.querySelector('[data-hl-key="' + selInfo.hlKey.replace(/"/g, '\\"') + '"]');
       const containerText = container ? container.textContent : selInfo.text;
       const snap = snapSelectionRange(container, containerText, selInfo.start, selInfo.end);
+      // Empty / whitespace-only / punctuation-only selection — bail before we
+      // create a zero-width annotation (would render as nothing but persist
+      // forever). Same guard handleNote's single-container branch already
+      // has; applyHighlight also sets suppressRef above, so the bail must
+      // still schedule its reset or every later selection stays suppressed.
+      if (snap.start >= snap.end) {
+        window.getSelection().removeAllRanges();
+        setVisible(false);
+        setTimeout(() => { suppressRef.current = false; }, 300);
+        return;
+      }
       const existing = AnnotationStore.get(selInfo.hlKey);
       const groupsToRemove = new Set();
       existing.forEach(h => {
