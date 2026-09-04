@@ -117,9 +117,19 @@ export function idbReadAll(liveKeys) {
     if (!db) return /** @type {Record<string, any>} */ ({});
     return new Promise((resolve) => {
       try {
-        // A live-key filter deletes dead rows inline, so it needs readwrite;
-        // the unfiltered full-dump stays readonly (today's behavior, unchanged).
-        const tx = db.transaction(THUMB_STORE, keep ? 'readwrite' : 'readonly');
+        // boot-performance-5 follow-up: the live-key filter USED to delete every
+        // non-matching row inline, which needed readwrite. It cannot: `liveKeys`
+        // comes from `tabs`, `tabs` comes from the persisted vot-state, and that
+        // store can mount on boot DEFAULTS — storage-backup-3 proves a 3 s
+        // hydration timeout drops it to 'degraded' and the app renders one
+        // synthetic tab. The pass would then commit a delete of every real
+        // thumbnail before the true state arrived. Nothing about `tabsEnabled`
+        // prevents that; it gates whether the pass runs, not whether `tabs` is
+        // real. So this is a READ filter now — readonly, always. Deleting dead
+        // rows stays with the debounced GC effect in use-thumbnails.js, which
+        // depends on [tabs, tabThumbnails] and so re-runs once the real tabs
+        // hydrate. (Verifier, 2026-09-04.)
+        const tx = db.transaction(THUMB_STORE, 'readonly');
         const store = tx.objectStore(THUMB_STORE);
         /** @type {Record<string, any>} */
         const out = {};
@@ -128,8 +138,7 @@ export function idbReadAll(liveKeys) {
           const c = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
           if (!c) { resolve(out); return; }
           const key = String(c.key);
-          if (keep && !keep.has(key)) c.delete();
-          else out[key] = c.value;
+          if (!keep || keep.has(key)) out[key] = c.value;
           c.continue();
         };
         req.onerror = () => resolve(out);
