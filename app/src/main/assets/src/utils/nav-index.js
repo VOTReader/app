@@ -501,7 +501,7 @@ export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceE
   const parts = sourceKey.split(':');
   const excerpt = sourceStart != null ? { start: sourceStart, end: sourceEnd, text: sourceText } : {};
   if (parts[0] === 'bible') {
-    return { type: 'bible', key: sourceKey, bookId: parts[1], chapter: parseInt(parts[2], 10), verse: parseInt(parts[3], 10), label: sourceLabel || sourceKey };
+    return { type: 'bible', key: sourceKey, bookId: parts[1], chapter: parseInt(parts[2], 10), verse: parseInt(parts[3], 10), label: sourceLabel || sourceKey, ...excerpt };
   }
   if (parts[0] === 'study') {
     // Matthew Study Bible verse. parts[1] is "matthew-N", parts[2] is verse
@@ -509,7 +509,7 @@ export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceE
     const bookId = m ? m[1] : 'matthew';
     const chapter = m ? parseInt(m[2], 10) : null;
     const verse = parts[2] && parts[2] !== '0' ? parseInt(parts[2], 10) : null;
-    return { type: 'study', key: sourceKey, bookId, chapter, verse, screen: 'matthew-ch', label: sourceLabel || sourceKey };
+    return { type: 'study', key: sourceKey, bookId, chapter, verse, screen: 'matthew-ch', label: sourceLabel || sourceKey, ...excerpt };
   }
   // letter / wtlb / blessed / holy-days — look up so the source endpoint
   // carries the right screen + studyId so it can be navigated back to.
