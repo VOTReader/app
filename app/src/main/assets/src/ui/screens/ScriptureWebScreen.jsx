@@ -404,16 +404,31 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!glc || !uic) return;
     let renderer = null;
     let disposed = false;
+    let lossTimer = 0;
     const build = () => createRenderer(glc, graph, {
       // After a GPU reset every GL object is dead. Rebuild the whole
       // renderer on the same (restored) context and repaint — this is what
       // turns the on-device "wash-out until app restart" into a blink.
       onContextRestored: () => {
+        if (lossTimer) { window.clearTimeout(lossTimer); lossTimer = 0; }
         if (disposed) return;
         try { renderer && renderer.dispose(); } catch (_e) { /* already dead */ }
         renderer = build();
         rendererRef.current = renderer;
         schedule();
+      },
+      // A loss Chrome never restores (it gives up after repeated resets)
+      // otherwise leaves the instrument permanently dead with no report —
+      // draw() just returns silently forever. Give a restore ~3s, then
+      // fall back to the same noWebGL panel the "unavailable" path uses,
+      // whose Try again already rebuilds via glRetry.
+      onContextLost: () => {
+        if (disposed) return;
+        if (lossTimer) window.clearTimeout(lossTimer);
+        lossTimer = window.setTimeout(() => {
+          lossTimer = 0;
+          if (!disposed) setNoWebGL(true);
+        }, 3000);
       },
     });
     try {
@@ -453,6 +468,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
     return () => {
       disposed = true;
+      if (lossTimer) window.clearTimeout(lossTimer);
       if (ro) ro.disconnect(); else window.removeEventListener('resize', resize);
       glc.removeEventListener('webglcontextrestored', onRestored);
       renderer.dispose();

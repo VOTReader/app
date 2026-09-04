@@ -8,9 +8,47 @@
    successful load in production); driving it directly here exercises the
    real decodeGraph()/ensureScriptureWebData() without fabricating a base64
    corpus payload.
+
+   scripture-web-6 — see that describe block.
+
+   scripture-web-7 — a WebGL context loss with no restore must surface the
+   noWebGL fallback. jsdom canvases have no WebGL2 (vitest.setup.js's global
+   getContext shim always returns null), so decodeGraph/createRenderer are
+   mocked to a trivial success stand-in — neither module owns this defect;
+   it is the SCREEN's missing loss listener. The mock exposes each build()
+   call's opts so a test can fire onContextLost/onContextRestored directly,
+   the same way the real canvas would via web-renderer.js's DOM listeners
+   (which are proven separately in web-renderer.test.js).
 */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
+
+vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    .../** @type {any} */ (real),
+    decodeGraph: vi.fn((data) => {
+      if (!data || !data.ok) throw new Error('scripture-web: data missing or empty');
+      return {
+        total: 0, count: 0, buckets: [], books: [], chapters: [],
+        chapterOfVerse: new Uint16Array(0), votEdges: [], prophecy: [], votLinks: [],
+      };
+    }),
+  };
+});
+vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    .../** @type {any} */ (real),
+    createRenderer: vi.fn(() => ({
+      gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
+      draw: () => ({ instances: 0, draws: 0 }),
+      dispose: vi.fn(),
+    })),
+  };
+});
+
+import { createRenderer } from '../scripture-web/web-renderer.js';
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
 
 const baseProps = () => ({
@@ -29,6 +67,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   setViewport(ORIG_W, ORIG_H);
   delete window.screen.orientation;
+  vi.useRealTimers();
 });
 
 describe('scripture-web-5 — Try again re-decodes the graph', () => {
@@ -65,5 +104,41 @@ describe('scripture-web-6 — the landscape hint gates on portrait-ness, not on 
     // showPortraitFallback ran: orientationHint is true, but it also cleared
     // rotated — the render gate `orientationHint && rotated` can never pass.
     expect(screen.getByText('Best in landscape')).toBeTruthy();
+  });
+});
+
+describe('scripture-web-7 — a WebGL context loss with no restore falls back', () => {
+  /** Loads a real graph (through the mocked decodeGraph) and returns the
+   *  opts object the screen's own build() last passed to createRenderer. */
+  async function renderWithGraph() {
+    window.SCRIPTURE_WEB_DATA = { ok: true };
+    render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const calls = /** @type {any} */ (createRenderer).mock.calls;
+    return calls[calls.length - 1][2];
+  }
+
+  it('reports the loss and falls back ~3s later when nothing restores it', async () => {
+    const opts = await renderWithGraph();
+    vi.useFakeTimers();
+    // The defect: createRenderer is never given an onContextLost, so the
+    // screen has no way to hear about a loss at all.
+    act(() => { opts.onContextLost(); });
+
+    act(() => { vi.advanceTimersByTime(2999); });
+    expect(screen.queryByText('The web can’t be drawn right now.')).toBeNull();
+
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(screen.getByText('The web can’t be drawn right now.')).toBeTruthy();
+  });
+
+  it('does NOT fall back when a restore arrives before the ~3s timer', async () => {
+    const opts = await renderWithGraph();
+    vi.useFakeTimers();
+    act(() => { opts.onContextLost(); });
+    act(() => { opts.onContextRestored(); });
+    act(() => { vi.advanceTimersByTime(3000); });
+
+    expect(screen.queryByText('The web can’t be drawn right now.')).toBeNull();
   });
 });
