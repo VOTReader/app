@@ -41,6 +41,37 @@ describe('harness', () => {
   });
 });
 
+describe('settings preference folio', () => {
+  it('summarizes the current visual reading choices', () => {
+    renderSettings(
+      { fontScale: '1.5', fontStyle: 'literata' },
+      { theme: 'light' },
+      { expandGroups: false }
+    );
+    const summary = document.querySelector('.settings-summary');
+    expect(summary.textContent).toContain('Light');
+    expect(summary.textContent).toContain('150%');
+    expect(summary.textContent).toContain('Literata');
+  });
+
+  it('switches to the single-column large-type flow at 180% and above', () => {
+    renderSettings({ fontScale: '1.75' }, {}, { expandGroups: false });
+    expect(document.querySelector('.settings-screen').classList.contains('settings-large-type')).toBe(false);
+    cleanup();
+    renderSettings({ fontScale: '1.8' }, {}, { expandGroups: false });
+    expect(document.querySelector('.settings-screen').classList.contains('settings-large-type')).toBe(true);
+  });
+
+  it('connects each expanded group header to its mounted body', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    const head = groupHead('Appearance');
+    fireEvent.click(head);
+    const controlledId = head.getAttribute('aria-controls');
+    expect(controlledId).toBe('settings-group-appearance');
+    expect(document.getElementById(controlledId)).toBeTruthy();
+  });
+});
+
 describe('auto-scroll settings disclosure', () => {
   const SUB_ROWS = ['Scroll Speed', 'Auto-Continue', 'Auto-Continue Pause'];
 
