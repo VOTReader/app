@@ -326,6 +326,48 @@ describe('JournalMediaStore — pruneOrphans() — the user-data deleter contrac
     expect(await JournalMediaStore.get('m3')).toBeNull();
   });
 
+  /* R3 — journal-3 (b). The load-bearing RED of this batch: it fails on a
+     VALUE, not on a missing symbol.
+
+     P3, the loss this closes: `persistRecording` awaits `put`, then calls
+     `onSave({mediaId})` for the editor to autosave into the entry. A crash
+     between those two leaves a media record no entry references. Four seconds
+     after the next boot the sweep prunes it — correctly by its own lights,
+     because it cannot tell "the owner was deleted" from "the link never
+     landed". The `unlinked` marker is exactly the bit that distinguishes
+     them, so prune must leave a marked record alone and let the Hub offer it
+     back. Per [[user-data-paramount]] this is the difference between a memo
+     the user can recover with one tap and one that is simply gone. */
+  it('R3: leaves an unreferenced record carrying the unlinked marker (a link that never landed)', async () => {
+    await JournalMediaStore.put({ id: 'm_unlinked', type: 'audio', blob: makeBlob(8, 'audio/webm'), unlinked: true });
+    const removed = await JournalMediaStore.pruneOrphans([]);
+
+    expect(removed).toBe(3);                                        // m1/m2/m3 only
+    expect(await JournalMediaStore.allIds()).toEqual(['m_unlinked']);
+    expect((await JournalMediaStore.get('m_unlinked')).unlinked).toBe(true);
+  });
+
+  /* R4 — journal-3 (b). Weaker RED than R3 (a missing method, not a wrong
+     value), but it pins the AND: the authoritative test for "unclaimed" is
+     marker AND unreferenced, never the marker alone. The marker is written in
+     one transaction and cleared in another, so it can go stale; AND-ing it
+     with the referenced set the sweep already computes makes a failed
+     markLinked cost nothing. */
+  it('R4: unclaimed() returns marked-and-unreferenced only', async () => {
+    await JournalMediaStore.put({ id: 'm_unlinked', type: 'audio', blob: makeBlob(8, 'audio/webm'), unlinked: true });
+    await JournalMediaStore.put({ id: 'm_claimed', type: 'audio', blob: makeBlob(8, 'audio/webm'), unlinked: true });
+
+    const out = await JournalMediaStore.unclaimed(['m_claimed']);
+
+    expect(out.map(function(r) { return r.id; })).toEqual(['m_unlinked']);
+    // m2 is an ordinary unmarked orphan — prune's business, never the banner's.
+    expect(out.some(function(r) { return r.id === 'm2'; })).toBe(false);
+    // Metadata projection, no blobs: the banner needs duration to render a row.
+    expect(out[0].duration === undefined || typeof out[0].duration === 'number').toBe(true);
+    expect(out[0].blob).toBeUndefined();
+    expect(out[0].unlinked).toBe(true);
+  });
+
   it('STORE-2: never prunes a record created AT/AFTER the sweep cutoff (TOCTOU guard)', async () => {
     // A photo captured AFTER the boot sweep's synchronous snapshot but read by
     // the async prune pass: durable in IDB, absent from `referencedIds`. Without

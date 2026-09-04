@@ -15,6 +15,8 @@
      JournalMediaStore.delete(id)     → Promise<void>
      JournalMediaStore.list()         → Promise<Array<record-without-blob>>
      JournalMediaStore.allIds()       → Promise<Array<id>>
+     JournalMediaStore.unclaimed(ids) → Promise<Array<record-without-blob>>
+     JournalMediaStore.markLinked(id) → Promise<void>
      JournalMediaStore.objectUrl(id)  → Promise<string | null>   (cached Blob URLs)
      JournalMediaStore.beginImportReplace() / stageImportRecord(record) /
        commitImportReplace() / commitImportMerge() / abortImportReplace()
@@ -22,7 +24,26 @@
 
    Record shape:
      { id, type:'image'|'audio', blob:Blob, mime, size,
-       width?, height?, duration?, created }
+       width?, height?, duration?, created, unlinked? }
+
+   THE `unlinked` MARKER (journal-3, clause (b)). A record is written with
+   `unlinked: true` the moment its bytes are durable and BEFORE any journal
+   entry references it; `markLinked(id)` drops the field once the entry that
+   owns it has been saved. It exists to answer one question the sweep cannot
+   otherwise answer: an unreferenced record is either an owner the user
+   deleted (prune it) or a link that never landed (a crash between `put` and
+   the entry autosave — surface it, never prune it). `pruneOrphans` skips
+   marked records for exactly that reason.
+
+   The authoritative test for "unclaimed" is `marker AND unreferenced`, never
+   the marker alone. The marker is written in one transaction and cleared in
+   another, so it can go stale; AND-ing it with the referenced set the sweep
+   already computes makes a failed `markLinked` cost nothing worse than one
+   spurious banner row.
+
+   Absent on every record written before journal-3, so `!rec.unlinked` is true
+   for all of them and the sweep behaves exactly as it always has. No
+   DB_VERSION bump, no migration.
 
    Object-URL cache: created Blob URLs are cached per-id so repeated
    reads inside the same session don't create duplicate URLs. Caller
@@ -45,7 +66,8 @@
  *   width?: number,
  *   height?: number,
  *   duration?: number,
- *   created?: number
+ *   created?: number,
+ *   unlinked?: boolean
  * }} MediaRecord
  */
 
@@ -468,6 +490,75 @@ export var JournalMediaStore = (function() {
     },
 
     /**
+     * Media that is durable, marked, and referenced by no journal entry —
+     * "unclaimed" in the journal-3 sense: bytes the user recorded and has
+     * never been shown, because the entry that would have owned them never
+     * saved. The Journal Hub offers each one back with Recover / Discard.
+     *
+     * Cursors the object store directly rather than filtering `list()`:
+     * `list()` builds an explicit field projection and would silently drop
+     * `unlinked`, so a filter over its output can only ever return nothing.
+     *
+     * Metadata only — no blobs. The banner needs `duration` and `created` to
+     * render a row the user can tell apart, and nothing heavier.
+     *
+     * @param {string[]} referencedIds every mediaId any entry currently
+     *   references. The marker alone is NOT authoritative (it can go stale if
+     *   markLinked failed); marker AND unreferenced is.
+     * @returns {Promise<MediaMetadata[]>}
+     */
+    unclaimed: function(referencedIds) {
+      /** @type {Record<string, boolean>} */
+      var set = {};
+      (referencedIds || []).forEach(function(id) { set[id] = true; });
+      return tx('readonly').then(function(store) {
+        return new Promise(function(resolve, reject) {
+          /** @type {MediaMetadata[]} */
+          var out = [];
+          var req = store.openCursor();
+          req.onsuccess = function(e) {
+            var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
+            if (!cursor) { resolve(out); return; }
+            var v = cursor.value || {};
+            if (v.unlinked === true && !set[v.id]) {
+              out.push({ id: v.id, type: v.type, mime: v.mime, size: v.size, width: v.width, height: v.height, duration: v.duration, created: v.created, unlinked: true });
+            }
+            cursor.continue();
+          };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          guardTx(store, reject);
+        });
+      });
+    },
+
+    /**
+     * Drop the `unlinked` marker — the entry that owns this media has saved.
+     *
+     * BEST-EFFORT BY DESIGN, and it is worth knowing why that is safe: a
+     * failed markLinked cannot lose data. The record keeps a stale marker, and
+     * the only consequence is one spurious "unclaimed" banner row if that
+     * entry is later deleted — because the authoritative test AND-s the marker
+     * with the referenced set. Erring the other way (clearing the marker
+     * before the entry is saved) would hand the record back to the sweep with
+     * nothing standing between it and deletion.
+     *
+     * A record that no longer exists resolves quietly: the caller's job is
+     * done either way.
+     *
+     * @param {string} id
+     * @returns {Promise<void>}
+     */
+    markLinked: function(id) {
+      if (!id) return Promise.resolve();
+      var self = this;
+      return self.get(id).then(function(rec) {
+        if (!rec || !rec.unlinked) return undefined;
+        delete rec.unlinked;
+        return self.put(rec).then(function() { return undefined; });
+      });
+    },
+
+    /**
      * Every id in the store. Uses openKeyCursor when available (cheaper
      * — no value materialization).
      * @returns {Promise<string[]>}
@@ -565,7 +656,11 @@ export var JournalMediaStore = (function() {
             if (!cursor) { resolve(toRemove); return; }
             var rec = cursor.value || {};
             var created = (typeof rec.created === 'number') ? rec.created : 0;
-            if (!set[rec.id] && created < cutoff) toRemove.push(rec.id);
+            // `rec.unlinked` is the link-never-landed marker (see the header).
+            // An unreferenced record carrying it is UNCLAIMED, not orphaned:
+            // the bytes are real and the user has never been shown them, so it
+            // is surfaced by the Hub banner rather than deleted here.
+            if (!set[rec.id] && !rec.unlinked && created < cutoff) toRemove.push(rec.id);
             cursor.continue();
           };
           req.onerror = function() { reject(req.error); };
