@@ -68,6 +68,7 @@ export function AppShellOverlays({
   // routes through the registry above). Refs land on each dialog's root.
   const disableTabsTrapRef = useFocusTrap(!!disableTabsPromptOpen);
   const gardenTrapRef = useFocusTrap(!!gardenWarningOpen);
+  const tabsTrapRef = useFocusTrap(!!(settings.tabsEnabled && tabsOverviewOpen));
   // (TabActionSheet traps itself — it mounts only while open.)
 
   return (
@@ -84,7 +85,7 @@ export function AppShellOverlays({
       <AudioPlayerBar />
 
       {settings.tabsEnabled && tabsOverviewOpen && (
-        <div className="tabs-overview-layer">
+        <div className="tabs-overview-layer" ref={tabsTrapRef} role="dialog" aria-modal="true" aria-labelledby="tabs-overview-title">
           {/* trackScroll={false}: this overlay renders OVER a live reading
               screen, so it must not become the global scroll-memory target —
               otherwise opening it hijacks __scrollEl and closing it nulls it,
