@@ -10,6 +10,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAndroidBack } from './use-android-back.js';
 import { modalRegistry } from './use-modal-registry.js';
+import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from './use-history-sync.js';
+import { PlatformBridge } from '../utils/platform-bridge.js';
 
 beforeEach(() => {
   modalRegistry._reset(); // module-level singleton — clear between runs (NAV1)
@@ -400,5 +402,71 @@ describe('useAndroidBack — NAV1 modal registry consumes hardware-back', () => 
     window.handleAndroidBack();
     expect(upper).toHaveBeenCalledTimes(1);
     expect(lower).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', () => {
+  // handleAndroidBack has several branches that consume the press (return
+  // "true") without touching any of the 8 fields useHistorySync watches:
+  // the modal-registry dismiss, window.__closeSheet, the tabs-overview
+  // close, window.__screenBack, and the journal-viewer-to-journal-viewer
+  // stack pop. Escape/popstate (W1.5(c)/(d)) arm suppressNextHistoryPush()
+  // BEFORE calling handleAndroidBack, expecting useHistorySync's effect to
+  // consume it — but that effect is gated on the nav-key dependency array,
+  // so it never runs when the key doesn't move, and the flag strands onto
+  // whatever real navigation happens next, silently eating its pushState.
+  const _origPushState = history.pushState;
+  let _pushCalls = [];
+
+  beforeEach(() => {
+    _pushCalls = [];
+    history.pushState = function (state, title, url) {
+      _pushCalls.push({ state, title, url });
+      return _origPushState.call(history, state, title, url);
+    };
+    PlatformBridge.isAndroid = false;
+    delete window.__historyReady;
+    clearSuppressNextHistoryPush();
+  });
+  afterEach(() => {
+    history.pushState = _origPushState;
+  });
+
+  function navKey(screen) {
+    return {
+      screen, bookId: null, chapterNum: null, letterId: null,
+      studyId: null, studyChapterId: null, genreId: null, gardenPage: null,
+    };
+  }
+
+  it('closing the Tabs overview does not strand the flag onto the next real navigation', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const props = baseProps({ screen: 'library', tabsOverviewOpen: true });
+    renderHook(() => useAndroidBack(props));
+
+    // Escape/popstate handshake: arm, then consume a press that closes the
+    // overview only — none of the 8 watched fields move.
+    suppressNextHistoryPush();
+    const result = window.handleAndroidBack();
+    expect(result).toBe('true');
+    expect(props.setTabsOverviewOpen).toHaveBeenCalledWith(false);
+
+    // A LATER, real navigation must still push — the flag must not have
+    // stranded onto it.
+    sync.rerender({ k: navKey('home') });
+    expect(_pushCalls.length).toBe(1);
+  });
+
+  it('a registered modal dismiss does not strand the flag either', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const props = baseProps({ screen: 'library' });
+    renderHook(() => useAndroidBack(props));
+    modalRegistry.register({ id: 'note-sheet', dismiss: vi.fn() });
+
+    suppressNextHistoryPush();
+    expect(window.handleAndroidBack()).toBe('true');
+
+    sync.rerender({ k: navKey('home') });
+    expect(_pushCalls.length).toBe(1);
   });
 });

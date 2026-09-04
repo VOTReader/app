@@ -36,7 +36,6 @@ describe('FootnoteListSection keyboard routing', () => {
       <FootnoteListSection
         footnotes={{ 1: { type: 'scripture', ref: 'John 3:16' } }}
         nkjv={{}}
-        highlightedFn={null}
         onInAppLink={() => {}}
         onGoToRef={onGo}
       />

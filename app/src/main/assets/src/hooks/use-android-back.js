@@ -214,13 +214,26 @@ export function useAndroidBack({
       // exact bug the registry exists to prevent on web). Dismiss the topmost and
       // consume the press. (The registry is populated on every platform; only the
       // Escape *listener* is web-gated.)
+      // navigation-tabs-2: each of the branches below consumes the press
+      // (returns "true") WITHOUT touching any of the 8 nav-key fields
+      // useHistorySync watches (screen/bookId/chapterNum/letterId/studyId/
+      // studyChapterId/genreId/gardenPage). Escape/popstate arm
+      // suppressNextHistoryPush() before calling handleAndroidBack,
+      // expecting useHistorySync's effect to consume it — but that effect
+      // is gated on the nav-key dependency array, so it never runs when
+      // the key doesn't move, and the flag would strand onto whatever
+      // real navigation happens next, silently eating its pushState. Each
+      // such branch clears the flag itself — the same self-clear already
+      // used below for the "false" (root-of-stack) case, just extended to
+      // "true, but nav-key-inert" too.
       if (modalRegistry.isAnyOpen()) {
         const top = modalRegistry.peek();
-        if (top && typeof top.dismiss === 'function') { top.dismiss(); return "true"; }
+        if (top && typeof top.dismiss === 'function') { top.dismiss(); clearSuppressNextHistoryPush(); return "true"; }
       }
-      if (window.__closeSheet) {window.__closeSheet();window.__closeSheet = null;return "true";}
+      if (window.__closeSheet) {window.__closeSheet();window.__closeSheet = null;clearSuppressNextHistoryPush();return "true";}
       if (tabsOverviewOpenRef.current) {
         setTabsOverviewOpen(false);
+        clearSuppressNextHistoryPush();
         return "true";
       }
       cancelDwell();
@@ -230,7 +243,7 @@ export function useAndroidBack({
       // is active. Unwind it FIRST so Back doesn't skip straight out to the
       // parent screen. Returns true when it consumed the press. Cross-bundle,
       // so it's a window slot — same pattern as window.__closeSheet above.
-      if (typeof window.__screenBack === 'function' && window.__screenBack()) return "true";
+      if (typeof window.__screenBack === 'function' && window.__screenBack()) { clearSuppressNextHistoryPush(); return "true"; }
       const stack = fromLetterRef.current;
       if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
         const fl = stack[stack.length - 1];
@@ -287,7 +300,9 @@ export function useAndroidBack({
       if (s === "journal-viewer") {
         const _jst = (typeof window !== 'undefined' && window.__journalBackStack) || null;
         if (_jst && _jst.length && _jst[_jst.length - 1].destId === journalEntryIdRef.current) {
-          goJournalViewer(_jst.pop().fromId);return "true";
+          // journalEntryId is not in the nav key (see navigation-tabs-2 note
+          // above) — this pop only ever changes it, so self-clear here too.
+          goJournalViewer(_jst.pop().fromId);clearSuppressNextHistoryPush();return "true";
         }
         if (backActiveRef.current) {tapThroughBackRef.current();return "true";}
         setScreen("journal-home");return "true";

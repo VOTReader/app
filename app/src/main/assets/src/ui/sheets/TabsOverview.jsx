@@ -269,7 +269,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     <div className="tabs-overview">
       <div className="tabs-overview-header">
         <div className="tabs-overview-eyebrow">Reading Places</div>
-        <h1 className="tabs-overview-title">Tabs</h1>
+        <h1 className="tabs-overview-title" id="tabs-overview-title">Tabs</h1>
         <div className="tabs-overview-ornament">
           <div className="tabs-overview-ornament-line" />
           <div className="tabs-overview-ornament-diamond">{"✦"}</div>
