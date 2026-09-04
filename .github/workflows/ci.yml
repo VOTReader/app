@@ -38,6 +38,23 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege for GITHUB_TOKEN (2026-09-03). Both jobs only check out the
+# repo and run gates, so the token needs nothing beyond reading it (the cache
+# and upload-artifact actions use the runtime token, not this one). Before this
+# block the scope lived only in Settings -> Actions on github.com, where
+# flipping it to "read and write" is two clicks with no diff, no review and no
+# CI signal -- and npm ci runs every dependency's lifecycle scripts under this
+# token. deploy-web.yml declares its own (pages / id-token) block.
+permissions:
+  contents: read
+
+# One CI run per ref at a time. A superseded push to a branch cancels the run it
+# replaces (nobody was going to read that result); main never cancels, so every
+# landed commit keeps a complete CI record beside its deploy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build:
     name: build + syntax-check
@@ -118,9 +135,14 @@ jobs:
         # esprima (the authoritative JS-syntax check) is pinned in
         # requirements-dev.txt; installing it makes the esprima cases real, not
         # skipped. Cheap + deterministic — runs before the heavier build.
+        # test_preview_server.py rides the same unittest call (2026-09-03):
+        # tools/preview-server.py must bind 127.0.0.1 only. It bound every
+        # interface for months and nothing said so; a dev server that can
+        # LAN-expose the tree is a defect, so the contract is proven on every
+        # push instead of assumed.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance -v
+          python -m unittest test_check_balance test_preview_server -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)

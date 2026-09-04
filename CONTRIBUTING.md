@@ -39,7 +39,9 @@ python tools/preview-server.py
 
 **Do not use plain `python -m http.server`** — it caches `dist/bundle-*.js`
 heuristically and serves stale bundles after a rebuild. `preview-server.py`
-sends `Cache-Control: no-store` so reloads always fetch fresh bundles.
+sends `Cache-Control: no-store` so reloads always fetch fresh bundles, and it
+listens on 127.0.0.1 only (`test_preview_server.py` proves it in pre-commit
+and CI) — a dev server that can LAN-expose the tree is a defect.
 
 To verify a boot, paste `tools/smoke.js` into the page console and call
 `votSmoke()` — expect the PASS line (globals ok, data ok, screens 0 crashed,
