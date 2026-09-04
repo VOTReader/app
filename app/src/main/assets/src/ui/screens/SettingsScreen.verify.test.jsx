@@ -7,12 +7,17 @@
    validateImportEnvelope + summarize/format pipeline. Pins:
      - a healthy container reports its contents + "Integrity check passed"
        in the Verify Result row (and the row dismisses);
-     - a corrupted container (flipped manifest byte -> CRC mismatch is
-       impossible to build via the real writer, so we truncate instead)
-       reports the corrupt-file message;
+     - storage-backup-1: a media frame truncated in transit STILL reports
+       the manifest's contents (readContainer salvages rather than
+       throwing) with a truncation WARNING, instead of the old "corrupt,
+       could not be read" — the manifest is byte-complete, so Verify can
+       say what is actually in the file;
+     - a genuinely unrecoverable file (bad magic — nothing to salvage,
+       not even a manifest) still reports the corrupt-file message;
      - a non-backup JSON file reports "does not look like a VOTReader
        backup";
-     - NOTHING is applied — no store method is ever called. */
+     - NOTHING is applied — no store method is ever called (Verify never
+       calls applyV3/the store layer on any path). */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { screen, cleanup, act } from '@testing-library/react';
@@ -85,9 +90,20 @@ describe('Verify a Backup (web)', () => {
     expect(screen.queryByText(/Integrity check passed/)).toBeNull();
   });
 
-  it('a truncated container reports corrupt, applies nothing', async () => {
+  it('storage-backup-1: a media frame truncated in transit still reports the (intact) manifest, with a truncation warning', async () => {
     const good = await buildVotbak();
-    setup(good.slice(0, good.size - 9)); // cut into the media frame
+    setup(good.slice(0, good.size - 9)); // cut into the media frame — the manifest ahead of it is untouched
+    renderSettings();
+    await clickVerify();
+    // The manifest survived — its real contents are reported, not a blanket "corrupt" refusal.
+    const result = await screen.findByText(/WARNING.*truncated or altered/);
+    expect(result.textContent).toContain('3 notes');
+    expect(result.textContent).toContain('2 bookmarks');
+    expect(screen.queryByText(/corrupt or incomplete/)).toBeNull();
+  });
+
+  it('a genuinely unrecoverable file (bad magic — no manifest to salvage) still reports corrupt', async () => {
+    setup(new Blob([new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])], { type: 'application/octet-stream' }));
     renderSettings();
     await clickVerify();
     expect(await screen.findByText(/corrupt or incomplete/)).toBeTruthy();
