@@ -97,27 +97,40 @@ export function idbDelete(key) {
 }
 
 /**
- * Read every entry from the thumbs store into a plain object. Returns
- * {} when IDB is unavailable or the read fails — partial reads (some
- * entries succeed, then an error) still return whatever was collected
- * up to that point.
+ * Read entries from the thumbs store into a plain object. With no
+ * `liveKeys` argument, reads every entry (today's full-dump contract —
+ * ThumbStore's own tests rely on this). Given `liveKeys` (boot-
+ * performance-5: an iterable of the currently-open tabs' content keys),
+ * reads ONLY those rows and DELETES every other row in the same cursor
+ * pass, so a caller that already knows its live key set never
+ * materializes (or leaves lying around) rows for tabs that no longer
+ * exist. Returns {} when IDB is unavailable or the read fails — partial
+ * reads (some entries succeed, then an error) still return whatever was
+ * collected up to that point.
  *
+ * @param {Iterable<string>} [liveKeys]
  * @returns {Promise<Record<string, any>>}
  */
-export function idbReadAll() {
+export function idbReadAll(liveKeys) {
+  const keep = liveKeys ? new Set(liveKeys) : null;
   return openThumbDB().then((db) => {
     if (!db) return /** @type {Record<string, any>} */ ({});
     return new Promise((resolve) => {
       try {
-        const tx = db.transaction(THUMB_STORE, 'readonly');
+        // A live-key filter deletes dead rows inline, so it needs readwrite;
+        // the unfiltered full-dump stays readonly (today's behavior, unchanged).
+        const tx = db.transaction(THUMB_STORE, keep ? 'readwrite' : 'readonly');
         const store = tx.objectStore(THUMB_STORE);
         /** @type {Record<string, any>} */
         const out = {};
         const req = store.openCursor();
         req.onsuccess = (e) => {
           const c = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
-          if (c) {out[String(c.key)] = c.value;c.continue();} else
-          resolve(out);
+          if (!c) { resolve(out); return; }
+          const key = String(c.key);
+          if (keep && !keep.has(key)) c.delete();
+          else out[key] = c.value;
+          c.continue();
         };
         req.onerror = () => resolve(out);
       } catch (_e) {resolve(/** @type {Record<string, any>} */ ({}));}
