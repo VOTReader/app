@@ -104,11 +104,14 @@ describe('validateTranslationVerseSet — both chapter edges, allowlisted with a
     expect(validateTranslationMap(m, { fileName: 't.js' }).warnings).toEqual([]);
   });
 
-  it('ERRORS on a present-but-empty verse (HNV Romans 16:25 shipped as "")', () => {
+  it('ERRORS on a present-but-blank verse (the HNV shipped five of them as "")', () => {
     const m = JSON.parse(JSON.stringify(complete));
     m.romans['16'][0].text = '';
     const r = validateTranslationVerseSet(m, ref, { fileName: 't.js', allow: none });
-    expect(r.errors).toEqual([expect.stringMatching(/romans 16:25 is present but EMPTY/)]);
+    expect(r.errors).toEqual([expect.stringMatching(/romans 16:25 is present but BLANK/)]);
+    // ...and the message says what to do about it, because "allowlist it" is
+    // the wrong answer for this class (data-corpus-6, 2026-09-04).
+    expect(r.errors[0]).toMatch(/must be LEFT OUT/);
   });
 
   it('ERRORS on an extra verse the reference does not have (it can never render)', () => {
@@ -128,6 +131,29 @@ describe('validateTranslationVerseSet — both chapter edges, allowlisted with a
   it('an allowlisted omission is counted, not errored', () => {
     const m = JSON.parse(JSON.stringify(complete));
     m.mark['9'].splice(1, 1); // 9:44 — a Textus Receptus verse
+    const r = validateTranslationVerseSet(m, ref, { fileName: 'bible-asv.js' });
+    expect(r.errors).toEqual([]);
+    expect(r.allowed).toBe(1);
+  });
+
+  it('a BLANK verse is an error even when the allowlist covers that reference', () => {
+    // data-corpus-6: the allowlist grants permission to be ABSENT, and blankness
+    // is not absence. An absent verse falls through to the alias, the base hop
+    // and the NKJV; a blank one used to be handed back and rendered as a
+    // numbered row with no scripture in it. Storing "we do not carry this
+    // verse" as an empty string also makes the file claim a verse it lacks.
+    for (const blank of ['', '   ', null, undefined, 42]) {
+      const m = JSON.parse(JSON.stringify(complete));
+      m.mark['9'][1] = { n: 44, text: blank };   // 9:44 IS allowlisted for every file
+      const r = validateTranslationVerseSet(m, ref, { fileName: 'bible-asv.js' });
+      expect(r.errors, `blank shape ${JSON.stringify(blank)}`)
+        .toEqual([expect.stringMatching(/mark 9:44 is present but BLANK/)]);
+    }
+  });
+
+  it('the SAME reference passes once the blank row is left out', () => {
+    const m = JSON.parse(JSON.stringify(complete));
+    m.mark['9'].splice(1, 1);
     const r = validateTranslationVerseSet(m, ref, { fileName: 'bible-asv.js' });
     expect(r.errors).toEqual([]);
     expect(r.allowed).toBe(1);

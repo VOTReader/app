@@ -140,22 +140,40 @@ function _verseIndex(data, translation, bookId, chNum) {
   return idx;
 }
 
+/**
+ * A verse value that would render a numbered row with nothing in it
+ * (data-corpus-6, 2026-09-04). Blankness, NOT emptiness: the three shapes that
+ * render the same blank row each took a different path through the old code —
+ * `''` fell through `t !== undefined`, `null` did too (React renders it as
+ * nothing), and `'   '` is TRUTHY so an early truthy test handed it straight
+ * back. One predicate, checked everywhere a verse value is accepted.
+ * @param {*} v
+ * @returns {boolean}
+ */
+function _blank(v) {
+  return typeof v !== 'string' || v.trim() === '';
+}
+
 export function translateVerse(bookId, chNum, verse, translation) {
   if (!translation || translation === 'nkjv') return verse.text;
   const data = window['BIBLE_' + translation.toUpperCase()];
   if (data) {
     const t = _verseIndex(data, translation, bookId, chNum)[verse.n];
-    // An EMPTY string counts as a miss: the HNV ships Romans 16:25 as "" and a
-    // blank verse is never what the reader wants — the alias below, or the NKJV
-    // fallback, both beat rendering nothing.
-    if (t) return t;
+    // A BLANK verse counts as a miss. The HNV ships five of them (luke 17:36,
+    // acts 8:37, acts 15:34, acts 24:7, romans 16:25) — verses it does not
+    // carry, stored as empty strings rather than left out — and returning one
+    // gives the reader a numbered row with no scripture in it and no marker.
+    // The alias below, the base hop, and the NKJV fallback all beat that.
+    if (!_blank(t)) return t;
     const alias = _VERSIFICATION_ALIAS[translation + '|' + bookId + '|' + chNum];
     const to = alias && alias[verse.n];
     if (to) {
       const at = _verseIndex(data, translation, bookId, to[0])[to[1]];
-      if (at) return at;
+      if (!_blank(at)) return at;
     }
-    if (t !== undefined) return t;
+    // Deliberately NO `if (t !== undefined) return t` here any more: a
+    // non-blank value has already returned, so anything reaching this line is
+    // blank and must fall through rather than be rendered.
   }
   // Sparse overlay miss (or overlay not yet loaded) → consult the registry
   // base translation (rkjv → kjv). nkjv-based overlays need no hop: falling
@@ -165,10 +183,10 @@ export function translateVerse(bookId, chNum, verse, translation) {
     const bd = window['BIBLE_' + base.toUpperCase()];
     if (bd) {
       const t = _verseIndex(bd, base, bookId, chNum)[verse.n];
-      if (t !== undefined) return t;
+      if (!_blank(t)) return t;
     }
   }
-  return verse.text; // not loaded / verse absent → NKJV fallback
+  return verse.text; // not loaded / verse absent or blank → NKJV fallback
 }
 
 // ── Translation display labels ──────────────────────────────────────────

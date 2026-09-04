@@ -109,6 +109,54 @@ describe('translateVerse — sparse overlay base chain', () => {
     } finally { globalThis.BIBLE_HNV = saved; }
   });
 
+  it('a BLANK shipped verse is a miss in every shape, not this translation’s text', () => {
+    // data-corpus-6, second face. `if (t !== undefined) return t` handed an
+    // empty string straight back, so the reader got a numbered verse row with
+    // no text at all under the translation's header and nothing saying why.
+    // Route A fixed hnv romans 16:25 only, because an empty value with no
+    // alias row fell through the same test. Three shapes render the same blank
+    // row and each took a different path: '' fell through `t !== undefined`;
+    // '   ' is TRUTHY so it was returned by the early `if (t) return t`; null
+    // fell through `t !== undefined` and React renders it as nothing.
+    const saved = globalThis.BIBLE_HNV;
+    globalThis.BIBLE_HNV = { luke: { '17': [
+      { n: 35, text: 'hnv 17:35' },
+      { n: 36, text: '' },
+      { n: 37, text: '   ' },
+      { n: 38, text: null },
+    ] } };
+    try {
+      expect(translateVerse('luke', 17, { n: 35, text: 'nkjv35' }, 'hnv')).toBe('hnv 17:35');
+      expect(translateVerse('luke', 17, { n: 36, text: 'nkjv36' }, 'hnv')).toBe('nkjv36');
+      expect(translateVerse('luke', 17, { n: 37, text: 'nkjv37' }, 'hnv')).toBe('nkjv37');
+      expect(translateVerse('luke', 17, { n: 38, text: 'nkjv38' }, 'hnv')).toBe('nkjv38');
+    } finally { globalThis.BIBLE_HNV = saved; }
+  });
+
+  it('a blank verse in a sparse overlay hops to its BASE instead of rendering nothing', () => {
+    // The base hop had the same `t !== undefined` test, so a blank overlay
+    // verse shadowed a perfectly good base verse.
+    const savedR = globalThis.BIBLE_RKJV;
+    const savedK = globalThis.BIBLE_KJV;
+    // titus, not john: _verseIndex caches by translation:book:chapter and the
+    // fixtures at the top of this file already warmed rkjv:john:3.
+    globalThis.BIBLE_RKJV = { titus: { '1': [{ n: 2, text: '' }] } };
+    globalThis.BIBLE_KJV = { titus: { '1': [{ n: 2, text: 'kjv titus 1:2' }] } };
+    try {
+      expect(translateVerse('titus', 1, { n: 2, text: 'nkjv-t2' }, 'rkjv')).toBe('kjv titus 1:2');
+    } finally { globalThis.BIBLE_RKJV = savedR; globalThis.BIBLE_KJV = savedK; }
+  });
+
+  it('a blank BASE verse falls all the way through to the NKJV', () => {
+    const savedR = globalThis.BIBLE_RKJV;
+    const savedK = globalThis.BIBLE_KJV;
+    globalThis.BIBLE_RKJV = { titus: { '2': [{ n: 11, text: '' }] } };
+    globalThis.BIBLE_KJV = { titus: { '2': [{ n: 11, text: '  ' }] } };
+    try {
+      expect(translateVerse('titus', 2, { n: 11, text: 'nkjv-t11' }, 'rkjv')).toBe('nkjv-t11');
+    } finally { globalThis.BIBLE_RKJV = savedR; globalThis.BIBLE_KJV = savedK; }
+  });
+
   it('chain lookups alternating overlay/base per verse stay consistent (LRU cache)', () => {
     for (let i = 0; i < 3; i++) {
       expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'rkjv')).toBe('restored kjv 16');
