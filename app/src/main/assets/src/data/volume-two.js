@@ -28,7 +28,7 @@ var LETTERS = [
     nkjv: {
       "Isaiah 13:11": "\u201cI will punish the world for its evil, and the wicked for their iniquity; I will halt the arrogance of the proud, and will lay low the haughtiness of the terrible.\u201d",
       "Psalm 2:12": "Kiss the Son, lest He be angry, and you perish in the way, when His wrath is kindled but a little. Blessed are all those who put their trust in Him.",
-      "Psalm 113:7 (ASV)": "He raiseth up the poor out of the dust, and lifteth up the needy from the dunghill,",
+      "Psalm 113:7 (ASV)": "He raiseth up the poor out of the dust, And lifteth up the needy from the dunghill;",
     },
     blocks: [
       { type: "para", segments: [

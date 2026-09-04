@@ -89,6 +89,26 @@ describe('translateVerse — sparse overlay base chain', () => {
     expect(translateVerse('john', 3, { n: 17, text: 'nkjv17' }, 'rnkjv')).toBe('nkjv17');
     expect(translateVerse('genesis', 1, { n: 1, text: 'nkjvG' }, 'rnkjv')).toBe('nkjvG');
   });
+  it('web: Romans 16:25-27 render the doxology this translation prints at 14:24-26', () => {
+    const saved = globalThis.BIBLE_WEB;
+    globalThis.BIBLE_WEB = { romans: { '14': [{ n: 24, text: 'web doxology a' }, { n: 25, text: 'web doxology b' }, { n: 26, text: 'web doxology c' }], '16': [{ n: 24, text: 'web 16:24' }] } };
+    try {
+      expect(translateVerse('romans', 16, { n: 24, text: 'nkjv24' }, 'web')).toBe('web 16:24');
+      expect(translateVerse('romans', 16, { n: 25, text: 'nkjv25' }, 'web')).toBe('web doxology a');
+      expect(translateVerse('romans', 16, { n: 27, text: 'nkjv27' }, 'web')).toBe('web doxology c');
+      // a verse outside the alias still falls back cleanly
+      expect(translateVerse('romans', 16, { n: 28, text: 'nkjv28' }, 'web')).toBe('nkjv28');
+    } finally { globalThis.BIBLE_WEB = saved; }
+  });
+
+  it('hnv: an EMPTY shipped verse is a miss, so 16:25 takes the alias, not the blank', () => {
+    const saved = globalThis.BIBLE_HNV;
+    globalThis.BIBLE_HNV = { romans: { '14': [{ n: 24, text: 'hnv doxology a' }], '16': [{ n: 25, text: '' }] } };
+    try {
+      expect(translateVerse('romans', 16, { n: 25, text: 'nkjv25' }, 'hnv')).toBe('hnv doxology a');
+    } finally { globalThis.BIBLE_HNV = saved; }
+  });
+
   it('chain lookups alternating overlay/base per verse stay consistent (LRU cache)', () => {
     for (let i = 0; i < 3; i++) {
       expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'rkjv')).toBe('restored kjv 16');

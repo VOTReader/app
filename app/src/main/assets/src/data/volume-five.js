@@ -2969,7 +2969,7 @@ var LETTERS_V5 = [
       "Ecclesiastes 9:5": "For the living know that they will die; But the dead know nothing, And they have no more reward, For the memory of them is forgotten.",
       "Psalm 146:4 (NAS)": "His spirit departs, he returns to the earth; On that very day his plans perish.",
       "Matthew 24:24": "For false christs and false prophets will rise and show great signs and wonders to deceive, if possible, even the elect.",
-      "Revelation 1:18 (HNV)": "and the Living one. I was dead, and behold, I am alive forever and ever. Amen. I have the keys of Death and of Hades."
+      "Revelation 1:18 (HNV)": "and the Living one. I was dead, and behold, I am alive forever and ever. Amen. I have the keys of Death and of Sheol."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/false-miracles-and-lies-deceived-and-ignorant-people",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=7f8mslxM5Sg&list=PLE8FlkxQPQkNIgyNvi80ZOJtvD5LuxQ3J&index=21",

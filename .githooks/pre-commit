@@ -163,6 +163,42 @@ if [ -n "$data_changed" ] || [ -n "$sync_tool_changed" ]; then
   echo ""
 fi
 
+# ─── Step 1b3: Bible verse timings match corpus, audio and belts ──────
+# src/data/bible-sync-<edition>.js is the Bible read-along (verse onsets in
+# centiseconds, one slot per verse). check-audio-sync covers the LETTERS only
+# and validate-schemas never reads this file, which is how c40 shipped with no
+# gate at all. tools/validate-bible-sync.py proves, per chapter: one slot per
+# verse of a fresh corpus extract, integer non-negative monotonic onsets, the
+# last onset inside the local mp3, the belt current (settings + verses +
+# audioSize) and above the ship gate, and the array byte-equal to what ship()
+# rebuilds -- plus no current belt silently dropped. Full mode here (this is
+# the machine that holds the belts and the audio); CI runs --structural.
+# Fires when a timings file, the gate, the pipeline it reads, or a Bible
+# translation file is staged: a verse-text edit re-keys every belt it touches.
+# A case-only edit is restamped with tools/restamp-bible-belts.py; anything
+# else needs a re-align.
+bible_sync_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/data/bible-(sync-[a-z-]+|kjv|web|asv|bsb|hnv|lsv|ylt)\.js|tools/(validate-bible-sync|batch-align-bible|hone-bible|_alignlib|extract-bible-verses)\.(py|mjs))$' || true)
+if [ -n "$bible_sync_changed" ]; then
+  echo "[pre-commit] Checking Bible verse timings — tools/validate-bible-sync.py..."
+  if command -v py >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
+  $PYBIN tools/validate-bible-sync.py
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Bible verse-timing check FAILED — see output above."
+    echo "A chapter in src/data/bible-sync-*.js no longer matches its corpus"
+    echo "text, its audio, or its belt. Case-only corpus edits: restamp with"
+    echo "  py -3.13 tools/restamp-bible-belts.py --edition brm-kjv --old-data <previous bible-kjv.js> --apply"
+    echo "Anything else: re-align the named chapters (tools/batch-align-bible.py)."
+    echo "NEVER hand-edit src/data/bible-sync-*.js — it is generated."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Bible verse timings OK."
+  echo ""
+fi
+
 # ─── Step 1c: data-gate self-test (T6) ──────────────────────────────
 # When the data gate itself (check_balance.py) or its test changes, run the
 # gate's unit tests so a regression in the GATE — the front-line black-screen

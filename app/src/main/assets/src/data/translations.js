@@ -100,6 +100,20 @@ export function loadBibleStudies() {
   return _bibleStudiesPromise;
 }
 
+/* Versification alias (data-corpus-4). The WEB and the HNV print the Romans
+   doxology at the END of chapter 14 — their Romans 16 simply stops at verse 24
+   (the HNV ships a 16:25 that is an empty string). BibleChapterView walks the
+   NKJV verse list, so Romans 16:25-27 asked those translations for verses they
+   do not have and got NKJV text under a WEB/HNV header, with no marker. This
+   table maps the reference's verse onto the row the translation actually ships,
+   so the doxology renders in the reader's chosen translation. Keyed
+   `translation|bookId|chapter` -> { referenceVerse: [chapter, verse] }; add a
+   row only for a real versification difference, never to paper over missing data. */
+const _VERSIFICATION_ALIAS = {
+  'web|romans|16': { 25: ['14', 24], 26: ['14', 25], 27: ['14', 26] },
+  'hnv|romans|16': { 25: ['14', 24], 26: ['14', 25], 27: ['14', 26] },
+};
+
 // PERF-3: a tiny verse-index cache so translateVerse is O(1) per verse, not O(N)
 // — a full chapter render was O(N²) (each of N verses linear-scanned the N-verse alt
 // array). The reader shows ONE chapter at a time, so a handful of { n -> text } maps
@@ -131,6 +145,16 @@ export function translateVerse(bookId, chNum, verse, translation) {
   const data = window['BIBLE_' + translation.toUpperCase()];
   if (data) {
     const t = _verseIndex(data, translation, bookId, chNum)[verse.n];
+    // An EMPTY string counts as a miss: the HNV ships Romans 16:25 as "" and a
+    // blank verse is never what the reader wants — the alias below, or the NKJV
+    // fallback, both beat rendering nothing.
+    if (t) return t;
+    const alias = _VERSIFICATION_ALIAS[translation + '|' + bookId + '|' + chNum];
+    const to = alias && alias[verse.n];
+    if (to) {
+      const at = _verseIndex(data, translation, bookId, to[0])[to[1]];
+      if (at) return at;
+    }
     if (t !== undefined) return t;
   }
   // Sparse overlay miss (or overlay not yet loaded) → consult the registry

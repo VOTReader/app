@@ -115,6 +115,16 @@ jobs:
         # validate:data (which has no AUDIO_SYNC coverage at all).
         run: npm run check:audio-sync
 
+      - name: Check Bible verse timings (bible-sync — structural)
+        # tools/validate-bible-sync.py --structural: every chapter in
+        # src/data/bible-sync-*.js has exactly one integer slot per verse of the
+        # CURRENT corpus and its onsets never step backwards. The belt / audio /
+        # rebuild proofs need the alignment belts and the local mp3s, which only
+        # the aligning machine has -- the pre-commit hook runs those (full mode).
+        # Until c43 nothing read this file at all: check-audio-sync covers the
+        # letters and validate:data never looks at it. Stdlib Python + node.
+        run: python tools/validate-bible-sync.py --structural
+
       - name: Audit footnote rendering (CORP6 — dup / white verse numbers)
         # node tools/audit-footnotes.js --check: fails if any Format A footnote (or
         # WTLB / Blessed / Matthew dict) value would render a DUPLICATED or WHITE

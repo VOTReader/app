@@ -34,7 +34,9 @@ const DIST = join(ASSETS, 'dist');
    headroom is actually left without re-running anything. */
 const BUDGETS = [
   // ── cold-boot blocking path (parsed before first paint, every launch) ──
-  { file: 'bundle-a.js', measured: 250595, max: 289000 },   // react + matthew-nkjv + search-data
+  // c43 (2026-09-03): matthew-nkjv.js LEFT this bundle for bundle-a-matthew
+  // (-53,976 B raw). Re-baselined DOWN so the collapse detector keeps its teeth.
+  { file: 'bundle-a.js', measured: 196619, max: 226000 },   // react + bible-audio-manifest + search-data
   { file: 'bundle-b.js', measured: 318650, max: 367000 },   // stores/hooks/journal/bridge
   { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
   { file: 'bundle-d.js', measured: 522971, max: 602000 },   // most screens/sheets/utils
@@ -47,7 +49,8 @@ const BUDGETS = [
   // Deliberate — this is the feature's lazy bundle, not the cold boot path.
   { file: 'bundle-f.js', measured: 57610, max: 66400 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
-  { file: 'bundle-a-matthew.js', measured: 492357, max: 567000 },
+  // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
+  { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
   // c41 (2026-09-01): audio-sync.js LEFT this bundle for a lazy src/data fetch
   // (−401,579 B minified). Re-baselined DOWN so the collapse detector keeps its
   // teeth; the old `measured` 2,432,537 was already stale against the

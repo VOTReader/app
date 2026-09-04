@@ -1103,7 +1103,7 @@ var LETTERS_V6 = [
       }
     },
     "nkjv": {
-      "1 Corinthians 3:11 (HNV)": "For no one can lay any other foundation than that which has been laid, which is Jesus Christ."
+      "1 Corinthians 3:11 (HNV)": "For no one can lay any other foundation than that which has been laid, which is Yeshua the Messiah."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/pentecost-3",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=QRVuknMEXRg&list=PLE8FlkxQPQkPq8VQsKdAQxdkiIuP0i4Fb&index=10",

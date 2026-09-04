@@ -55,9 +55,9 @@ MINIFY_JS = os.path.join(_HERE, 'minify-bundle.mjs')
 #   - matthew.js (618 KB Study Bible) → bundle-a-matthew.js (Q8.2)
 #   - all VOT collections (7 volumes + letters families + WTLB + holy
 #     days + hidden manna + blessed, ~3.0 MB) → bundle-a-vot.js (Q8.3)
-# matthew-nkjv.js stays critical (unguarded derefs on the VOT letter
-# path); books-restored.js + matthew-plain.js moved to A_BIBLE 2026-08-02
-# — every consumer is typeof-guarded or runs post-__finishBibleInit.
+# books-restored.js + matthew-plain.js moved to A_BIBLE 2026-08-02 — every
+# consumer is typeof-guarded or runs post-__finishBibleInit. matthew-nkjv.js
+# followed them into A_MATTHEW on 2026-09-03 (c43) — see the note there.
 # See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale.
 A = [
     # html2canvas.min.js is NO LONGER concatenated here (U13) — it was ~198 KB
@@ -69,10 +69,14 @@ A = [
     # consumer is typeof-guarded (BibleChapterView:12, ChapterIndex:17,
     # tabs.js:61) or runs inside __finishBibleInit (index.html:448), which only
     # fires after bundle-a-bible executes — so they ride the same lazy load.
-    # −353 KB off the cold-boot parse. matthew-nkjv.js STAYS: 3 unguarded
-    # derefs (InlineNotes/ScriptureSheet/StudyPanels) on the VOT letter path.
+    # −353 KB off the cold-boot parse. matthew-nkjv.js left too (2026-09-03,
+    # c43, −54 KB raw / −44 KB minified): its three derefs (InlineNotes,
+    # ScriptureSheet, StudyPanels) are unguarded but every one of them renders
+    # only inside ChapterView — the Matthew Study chapter screen, which
+    # screen-routes.jsx gates behind `typeof MATTHEW === 'undefined'` and the
+    # __loadMatthewCorpus() loader. bundle-a-matthew defines MATTHEW, so the
+    # dict is always on the page before any consumer can mount.
     'react.min.js', 'react-dom.min.js',
-    'src/data/matthew-nkjv.js',
     # Bible-edition audio manifest (~4 KB minified): whole-book audiobook rows
     # keyed "bible-<edition>:<bookId>". Rides the CRITICAL path deliberately —
     # the Listen pill + boot resume must work on matthew-idx (bundle-a-matthew)
@@ -97,7 +101,6 @@ A = [
 # NOT in the corpus-version gate (that hashes only the lazy a-bible/matthew/vot
 # bundles), so this needs no CORPUS_VERSION bump; the SW content-hash auto-busts.
 MINIFY_A = {
-    'src/data/matthew-nkjv.js',
     'src/data/bible-audio-manifest.js',
 }
 
@@ -125,6 +128,13 @@ A_BIBLE = [
 # useSurprise's matthew branch, MatthewChapterView all guard.
 A_MATTHEW = [
     'src/data/matthew.js',
+    # Moved from A (2026-09-03, c43): the ref->text dict behind the Matthew
+    # Study chapter's inline notes / scripture sheet / study panels. Those
+    # three consumers mount only inside ChapterView, which screen-routes.jsx
+    # renders only once MATTHEW is defined — i.e. after THIS bundle executed.
+    # Keep it in this bundle, not a sibling, for exactly that reason. The
+    # whole bundle is minified in place, so it needs no MINIFY_A entry.
+    'src/data/matthew-nkjv.js',
 ]
 
 # Cluster A-vot — all VOT collections (7 volumes + letters families +
