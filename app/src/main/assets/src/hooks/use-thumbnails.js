@@ -11,7 +11,9 @@
        theme class forced, so the Tabs overview always has the right-theme
        card and a theme switch never mixes dark+light walls)
      - setTabThumbnails   (returned so App's closeAllTabs can clear it)
-     - IDB load-on-mount  (idbReadAll — reads IndexedDB on first render)
+     - IDB load-on-mount  (idbReadAll — gated on tabsEnabled; reads + keeps
+                           only the live tabs' keys, deleting the rest —
+                           boot-performance-5)
      - GC effect          (debounced, removes stale keys no longer tied
                            to any open tab)
      - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled;
@@ -42,8 +44,8 @@
        capture callback.
 
    PARAMS:
-     tabs              — full tabs array (useTabs). For the GC live-key
-                         set + tabsRef.
+     tabs              — full tabs array (useTabs). For the mount-read's
+                         live-key filter, the GC live-key set, and tabsRef.
      activeTabIdx      — active tab index (useTabs). For activeTabIdxRef.
      activeTab         — active tab object (useTabs); screen/bookId/etc.
                          used as effect deps for the after-nav trigger.
@@ -55,9 +57,13 @@
    RETURNS: { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail }
 
    STORAGE:
-     IndexedDB — written via idbPut(key, dataUrl); read via idbReadAll()
-     on mount. Keys are content-signature strings produced by
-     tabContentKey(tab) — survive tab-index shifts (close/reorder).
+     IndexedDB — written via idbPut(key, dataUrl); read via
+     idbReadAll(liveKeys) on mount, gated on tabsEnabled and re-run if it
+     flips true later — a tabs-off session reads nothing, and only the
+     currently-open tabs' rows are read (dead rows are deleted inline by
+     idbReadAll itself — boot-performance-5). Keys are content-signature
+     strings produced by tabContentKey(tab) — survive tab-index shifts
+     (close/reorder).
 
    WINDOW: none — no window.__* handler bridges wired. Content-tab captures
      go through PlatformBridge.takeThemedScreenshot(curTheme) — an html2canvas
@@ -244,9 +250,16 @@ export function useThumbnails({
   // floor is dropped; an entry left empty is deleted → placeholder until the
   // next good capture.
   React.useEffect(() => {
+    // boot-performance-5: tabs off ⇒ nothing to show, so read nothing. Re-runs
+    // (and then actually reads) the moment tabsEnabled flips true.
+    if (!tabsEnabled) return undefined;
     let cancelled = false;
     const ok = (u) => typeof u === 'string' && u.length >= 1000;
-    idbReadAll().then((thumbs) => {
+    // Only the currently-open tabs' rows — idbReadAll deletes everything else
+    // in the same cursor pass, so the debounced GC effect below never has a
+    // mount-time backlog to clean up (boot-performance-5).
+    const liveKeys = tabs.map((t) => tabContentKey(t));
+    idbReadAll(liveKeys).then((thumbs) => {
       if (cancelled) return;
       const norm = {};
       /** @type {Array<[string, string]>} */
@@ -298,7 +311,8 @@ export function useThumbnails({
       });
     });
     return () => { cancelled = true; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsEnabled gates AND re-triggers this read (boot-performance-5: tabs-off reads nothing; flipping tabsEnabled true runs it). `tabs` is read once per run to build the live-key filter — it must NOT retrigger this normalize/probe pipeline on every tab open/close, that's the debounced GC effect below.
+  }, [tabsEnabled]);
 
   // ── Garbage-collect stale thumbnails ───────────────────────────────────
   // Debounced so we don't thrash during rapid tab edits.
