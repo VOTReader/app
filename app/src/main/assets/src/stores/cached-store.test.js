@@ -623,7 +623,7 @@ describe('CachedStore STORE-4 — bounded write-retry on a transient failure', (
     vi.restoreAllMocks();
     vi.useFakeTimers();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    window.StorageHealth = { onWriteFailure: vi.fn() };   // swallow the health hook
+    window.StorageHealth = { onWriteFailure: vi.fn(), onWriteSuccess: vi.fn() };   // swallow the health hook
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -645,6 +645,9 @@ describe('CachedStore STORE-4 — bounded write-retry on a transient failure', (
     expect(putSpy).toHaveBeenCalledTimes(2);
     expect(store._writeRetryTimer).toBeNull();           // cleared on success
     expect(store._writeRetryAttempt).toBe(0);
+    // The landed retry must also lift StorageHealth's READONLY override that
+    // the failure set — nothing else ever reports a write success to it.
+    expect(window.StorageHealth.onWriteSuccess).toHaveBeenCalledTimes(1);
   });
 
   it('gives up after the 4-slot backoff schedule when the failure persists', async () => {
@@ -1018,12 +1021,16 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('LS_SKIP_LIST exports the permanent LS exceptions (state + the two audio keys)', () => {
+  it('LS_SKIP_LIST exports the permanent LS exceptions (every live vot-* key that is not a migrated store)', () => {
     expect(LS_SKIP_LIST).toContain('vot-state');
     expect(LS_SKIP_LIST).toContain('vot-audio-pos');            // audio-player.js PERSIST_KEY
     expect(LS_SKIP_LIST).toContain('vot-audio-recent-open');    // AudioLibraryScreen RECENT_OPEN_KEY
+    expect(LS_SKIP_LIST).toContain('vot-recent-searches');      // search/recent-searches.js
+    expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
+    expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
+    expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(3);
+    expect(LS_SKIP_LIST.length).toBe(7);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

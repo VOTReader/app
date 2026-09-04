@@ -37,7 +37,6 @@
      StorageHealth.checkBeforeWrite(bytes)   → { ok, reason? }
      StorageHealth.onWriteFailure(err)       → void
      StorageHealth.onWriteSuccess()          → void
-     StorageHealth.reassessIfCautious()      → void
      StorageHealth.requestPersistence()      → Promise<boolean>
      StorageHealth.checkFirstDataCreation()  → { shouldBlock, reason? }
      StorageHealth.dismissScenario(id)       → void
@@ -615,16 +614,6 @@ function _onWriteSuccess() {
 }
 
 /**
- * Re-assess only if the current tier is CAUTION or worse. Called after
- * data-creating actions to track whether usage has tipped into a worse
- * tier. No-op when healthy (avoids unnecessary estimate() calls).
- */
-function _reassessIfCautious() {
-  if (!_report || _report.tier === TIER.HEALTHY) return;
-  _assess();
-}
-
-/**
  * Low-level persist() call. Feature-detects, swallows errors, returns the
  * boolean grant result. Does NOT re-assess — callers decide.
  *
@@ -829,7 +818,6 @@ export const StorageHealth = {
   checkBeforeWrite: _checkBeforeWrite,
   onWriteFailure: _onWriteFailure,
   onWriteSuccess: _onWriteSuccess,
-  reassessIfCautious: _reassessIfCautious,
   requestPersistence: _requestPersistence,
   ensurePersistence: _ensurePersistence,
   checkFirstDataCreation: _checkFirstDataCreation,

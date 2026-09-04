@@ -1374,7 +1374,7 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
 
   it('pickImportFile falls back to a DOM file input (no FS Access API)', async () => {
     const file = new Blob([new Uint8Array([5, 5])]);
-    /** @type {any} */ const fakeInput = {};
+    /** @type {any} */ const fakeInput = { addEventListener: () => {} };
     fakeInput.click = vi.fn(function () { if (fakeInput.onchange) fakeInput.onchange({ target: { files: [file] } }); });
     const orig = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((/** @type {any} */ tag) => (tag === 'input' ? fakeInput : orig(tag)));
@@ -1440,5 +1440,47 @@ describe('captureTargetEl', () => {
     document.body.appendChild(root);
     mkLayout(document.body, 0, 0);
     expect(mod.captureTargetEl()).toBe(root);
+  });
+});
+
+describe('PlatformBridge — Web pickImportFile (DOM input fallback)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let inputEl;
+  /** @type {Record<string, Function>} */ let listeners;
+  /** @type {any} */ let createElementSpy;
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window)).AndroidBridge;
+    delete (/** @type {any} */ (globalThis.window)).showOpenFilePicker;
+    listeners = {};
+    inputEl = /** @type {any} */ ({
+      type: '', accept: '', onchange: null, click: vi.fn(),
+      addEventListener: (/** @type {string} */ t, /** @type {Function} */ cb) => { listeners[t] = cb; },
+    });
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') return /** @type {any} */ (inputEl);
+      return realCreate(tag);
+    });
+    bridge = await importBridge();
+  });
+  afterEach(() => { createElementSpy.mockRestore(); });
+
+  it('resolves the picked file from change', async () => {
+    const p = bridge.pickImportFile();
+    expect(inputEl.click).toHaveBeenCalledTimes(1);
+    const file = { name: 'b.votbak' };
+    inputEl.onchange({ target: { files: [file] } });
+    await expect(p).resolves.toBe(file);
+  });
+
+  it('resolves null when the picker is dismissed (cancel event; change never fires)', async () => {
+    const p = bridge.pickImportFile();
+    // Without a cancel listener the await in SettingsScreen's backup mutex
+    // never settles and Import stays busy for the session.
+    expect(typeof listeners.cancel).toBe('function');
+    listeners.cancel();
+    await expect(p).resolves.toBeNull();
   });
 });
