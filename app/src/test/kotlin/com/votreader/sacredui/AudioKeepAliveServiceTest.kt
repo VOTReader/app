@@ -82,10 +82,36 @@ class AudioKeepAliveServiceTest {
     fun `updateNowPlaying without a running service is dropped, not a resurrection`() {
         // A trailing metadata update after the setAudioActive(false) stop must
         // NOT re-start the service into a silent notification with no
-        // keep-alive edge left to clear it (the `running` gate).
+        // keep-alive edge left to clear it (the `running` / `startPending` gate).
         val app = ApplicationProvider.getApplicationContext<Application>()
+        // Companion state is shared across tests and test order is not source
+        // order, so clear a start left pending by another case first.
+        AudioKeepAliveService.setActive(app, false)
         AudioKeepAliveService.updateNowPlaying(app, "T", "A", true, 0L, 0L, 1f)
         assertNull(shadowOf(app).nextStartedService, "update must not start a stopped service")
+    }
+
+    @Test
+    fun `the first now-playing update queued behind setActive(true) is delivered, not dropped`() {
+        // startForegroundService is ASYNCHRONOUS: onCreate — and therefore
+        // `running = true` — has not happened when the JS player sends its first
+        // metadata update on the very next line. Gating only on `running` drops
+        // that update, and the first media card of a session shows the
+        // placeholder "Audio letter / The Volumes of Truth" instead of the real
+        // title. Intents to a service are delivered in call order, so the update
+        // rides the queue safely behind the start.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        try {
+            AudioKeepAliveService.setActive(app, true)
+            AudioKeepAliveService.updateNowPlaying(app, "Letter", "The Volumes of Truth", true, 0L, 60_000L, 1f)
+
+            assertNotNull(shadowOf(app).nextStartedService, "the start intent")
+            val update = shadowOf(app).nextStartedService
+            assertNotNull(update, "the update must ride the queue behind the start, not be dropped")
+            assertEquals(AudioKeepAliveService.ACTION_UPDATE, update.action)
+        } finally {
+            AudioKeepAliveService.setActive(app, false) // companion state is shared across tests
+        }
     }
 
     // ─── API-level branch ─────────────────────────────────────────────
