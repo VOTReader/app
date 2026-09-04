@@ -50,7 +50,7 @@ import { bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey } from '../utils/hl-keys
 import { relativeDate, timeAgo } from '../utils/dates.js';
 import {
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
-  getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits,
+  getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
 } from '../utils/garden.js';
 import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab } from '../utils/tabs.js';
 import { createPressDrag } from '../utils/press-drag.js';
@@ -223,7 +223,7 @@ Object.assign(window, {
   bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey,
   relativeDate, timeAgo,
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
-  getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits,
+  getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
   createPressDrag,
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
