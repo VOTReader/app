@@ -98,10 +98,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [rotated, setRotated] = React.useState(
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth &&
     window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  // Physical aspect ratio only — NOT gated on touch or on whether the CSS
+  // rotation applied. showPortraitFallback clears `rotated` in the same
+  // callback that raises the hint, so the hint's render gate must key off
+  // this instead or it can never show (scripture-web-6).
+  const [isPortrait, setIsPortrait] = React.useState(
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
   React.useEffect(() => {
     const onResize = () => {
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
       setRotated(window.innerHeight > window.innerWidth && coarse);
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -905,7 +912,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         Select a line to see its references; Nearby opens a keyboard-friendly list.
       </div>
     </div>
-    {orientationHint && rotated && (
+    {orientationHint && isPortrait && (
       <div className="sw-orientation-note" role="status">
         <strong>Best in landscape</strong>
         <span>Turn your device sideways to read the full canon clearly.</span>
