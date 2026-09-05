@@ -484,21 +484,44 @@ describe('JournalMediaStore — compressImage() (journal-5: decode-time downscal
     expect(optsArg.imageOrientation).toBe('from-image');
   });
 
-  it('a decode that is STILL oversized (an aspect ratio the resize hint alone cannot tame) is rejected before the canvas ever sees it', async () => {
+  it('a decode that came back at full size anyway is downscaled, never refused', async () => {
     installFakeCanvas();
-    // The finding's own worst case: a 50 MP shot's raw dimensions, as if the
-    // resize hint had no effect (an old host silently ignoring it, or the
-    // portrait-orientation overshoot this hint's aspect-ratio math allows).
+    // A 50 MP shot's raw dimensions, as if the resize hint had no effect: an
+    // old host silently ignoring it, or a format headerPixelSize cannot read.
+    //
+    // journal-5 REJECTED this, with `terminal` set so nothing fell back — the
+    // attach was dropped and the reader saw "Could not save that image." A
+    // post-decode ceiling cannot prevent the allocation it names, because the
+    // bitmap already exists when it fires; all it can do is refuse an image
+    // the app is holding. Pre-journal-5 main accepted anything decodable and
+    // downscaled it, which is what this asserts. The guard that actually
+    // prevents the allocation runs before the decode and is journal-8.
     const bmp = { width: 8160, height: 6120, close: vi.fn() };
     /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bmp);
 
-    await expect(JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 }))
-      .rejects.toThrow(/too large to process/);
+    const out = await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
 
-    // The ceiling check runs BEFORE any canvas work — no 191 MB draw is attempted.
-    expect(fakeCanvas.getContext).not.toHaveBeenCalled();
-    // The oversized bitmap is still released, not leaked.
-    expect(bmp.close).toHaveBeenCalledTimes(1);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+    expect(bmp.close).toHaveBeenCalledTimes(1);   // still released, not leaked
+  });
+
+  it('a 12000x1000 panorama is accepted and downscaled, not rejected', async () => {
+    installFakeCanvas();
+    // The shape the conservative hint rule cannot optimise: the SHORT edge is
+    // under maxDim, so no hint is applied and the decode is the full 12 Mpx.
+    // 12 Mpx is over the ceiling journal-5 added, so this exact image was
+    // refused on that branch. A new refusal of an image the app previously
+    // took is user-content loss, and it is invisible to the person it happens
+    // to (Architect, 2026-09-04).
+    const cib = decoderMock(12000, 1000);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(jpegBlob(12000, 1000), { maxDim: 1600, quality: 0.8 });
+
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBeUndefined();  // un-hinted, as on main
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(133);
   });
 
   it('a properly downscaled bitmap (within the ceiling) still succeeds end to end', async () => {
