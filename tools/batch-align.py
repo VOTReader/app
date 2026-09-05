@@ -168,7 +168,8 @@ def main():
             # one core pinned, no belt for 45 minutes -- because run_belt built
             # a fresh whisper + MMS leg per letter. That is fixed, but a creep
             # that is invisible is a creep nobody catches twice.
-            print(f"  [{n}/{len(keys)}] {key} done   rss {_rss_gb():.2f} GB", flush=True)
+            print(f"  [{n}/{len(keys)}] {key} done   rss {_rss_gb():.2f} GB "
+                  f"commit {al.commit_gb():.2f} GB", flush=True)
 
     rep_path = os.path.join(REPORTS, f"batch-{'-'.join(sorted(vols))}.txt")
     with open(rep_path, "w", encoding="utf-8") as f:

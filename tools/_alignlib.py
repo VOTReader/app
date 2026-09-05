@@ -807,14 +807,14 @@ def silence_intervals(wav, noise_db=-32, min_d=0.25, stamp=None):
     return ivals
 
 
-def rss_gb():
-    """Resident set in GB, or 0.0 where the platform will not say.
+def _self_mem(field):
+    """One PROCESS_MEMORY_COUNTERS field for THIS process, in GB, or 0.0 where
+    the platform will not say.
 
     GetCurrentProcess returns a POINTER-sized pseudo-handle (-1); leaving
     ctypes to default its restype to 32-bit int truncates it and the call fails
     silently, returning 0 forever -- a metric that always reads zero is worse
-    than no metric, because it looks like good news. Shared by both batch
-    runners so the Bible progress line reads the same as the letters'."""
+    than no metric, because it looks like good news."""
     try:
         import ctypes
         import ctypes.wintypes as wt
@@ -836,9 +836,32 @@ def rss_gb():
         if not k.K32GetProcessMemoryInfo(ctypes.c_void_p(k.GetCurrentProcess()),
                                          ctypes.byref(c), c.cb):
             return 0.0
-        return c.WorkingSetSize / (1024 ** 3)
+        return getattr(c, field) / (1024 ** 3)
     except Exception:                                               # noqa: BLE001
         return 0.0
+
+
+def rss_gb():
+    """Resident set in GB. Shared by both batch runners so the Bible progress
+    line reads the same as the letters'."""
+    return _self_mem("WorkingSetSize")
+
+
+def commit_gb():
+    """Pagefile-backed COMMIT of this process, in GB. Same read as rss_gb, one
+    field over, so the progress line costs nothing extra to carry both.
+
+    Worth carrying because the two numbers disagree by an order of magnitude and
+    only one of them predicts harm to anyone else. Measured 2026-09-05 by
+    Machine Ops on the letters aligner: 18.7 GB of commit against a 2.38 GB
+    working set, while machine-wide commit headroom oscillated between 2.0 and
+    7.7 GB of a ~70 GB limit. A watcher reading resident set sees a small,
+    healthy process; the machine running out of commit sees the largest tenant
+    on the box. Nothing here pins host memory -- there is no DataLoader, no
+    pin_memory, no non_blocking copy -- so this is the CUDA/WDDM backing reserve
+    plus CTranslate2's arena, and the only thing that hands it back is releasing
+    the allocator, which both runners now do per unit."""
+    return _self_mem("PagefileUsage")
 
 
 def vram_free_gb():

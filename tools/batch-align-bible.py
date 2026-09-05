@@ -396,7 +396,8 @@ def main():
             per_book[book_id]["review"].append(tag)
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
               f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
-              f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB", flush=True)
+              f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB "
+              f"commit {al.commit_gb():.2f} GB", flush=True)
         checkpoint(tag)
     if last_book is not None:
         book_summary(last_book)
