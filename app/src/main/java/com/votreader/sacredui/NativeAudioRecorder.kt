@@ -276,10 +276,13 @@ class NativeAudioRecorder(private val context: Context) {
      * .m4a is still sitting in [recordingsDir] and nothing in JS can reach it again.
      * This is how it gets it back.
      *
-     * The trade, stated because it is real: this reintroduces exactly the base64 cost
-     * the fetch bridge exists to avoid (~7.9 MB of string at the ceiling, parsed by
-     * evaluateJavascript). It is worth paying only because the alternative on this
-     * path is losing the recording outright.
+     * The trade, stated because it is real, and sized honestly: at the ceiling this
+     * reintroduces the exact cost the fetch bridge exists to avoid. ~7.9 M base64
+     * characters is ~15.8 MB as an ART String (UTF-16), on top of the 5.94 MB byte
+     * array and Base64's own transient copy, before evaluateJavascript copies it
+     * again -- nearer 30 MB of peak native memory than the 8 MB the character count
+     * suggests. Worth paying only because the alternative on this path is losing the
+     * recording outright.
      *
      * ONE null covers missing, unreadable, over-ceiling and refused alike -- JS needs
      * no way to tell them apart and it leaks least -- but the interesting cases log
@@ -316,36 +319,57 @@ class NativeAudioRecorder(private val context: Context) {
      * The trust boundary for both JS-facing file verbs: resolve [name] to a file in
      * [recordingsDir], or refuse it. Two locks, and they are not redundant by accident.
      *
-     * 1. [SERVED_NAME] -- the name must be the uuid shape [stop] itself writes. This is
-     *    the lock that bites today; nothing failing it reaches the filesystem at all.
-     * 2. Canonical PARENT equality with recordings/. Given (1) this is unreachable,
-     *    because a string matching [SERVED_NAME] cannot contain a separator or a
-     *    dot-dot -- so it is NOT independently proven by any test here, and this
-     *    comment says so rather than implying otherwise. It is here because it is the
-     *    check that still holds if (1) is ever loosened, and because it is the only one
-     *    of the two that can see through a symlink planted in recordings/ under a
-     *    legitimate-looking name.
+     * 1. [SERVED_NAME] -- the name must be the uuid shape [stop] itself writes. It
+     *    refuses every path-shaped string: a traversal never reaches the filesystem.
+     * 2. Canonical PARENT equality with recordings/. This one catches what a name can
+     *    never show: a SYMLINK sitting in recordings/ under a perfectly legal uuid
+     *    name, whose canonical parent is somewhere else entirely. Lock 1 sees a valid
+     *    name and passes it; only this refuses it.
+     *
+     * Both locks are load-bearing and both are proven: delete lock 1 and the evil.txt
+     * case fails, delete lock 2 and the symlink case fails. The symlink test needs a
+     * privilege Windows only grants under Developer Mode, so it is guarded with
+     * assumeTrue and skips on a host without it rather than failing there.
      *
      * Parent EQUALITY, deliberately, not a path prefix: startsWith on the canonical
      * path also says yes to a sibling directory named recordings-anything.
      */
     private fun resolveServedRecording(name: String): File? {
+        // Every refusal logs a TRUNCATED name. Timber.w lands in BoundedLogTree on
+        // release, which bounds entry COUNT and not entry SIZE, and that buffer is
+        // carried into the user-shareable diagnostic export -- this is the first
+        // bridge path that can put an arbitrary-length JS string in there. A legal
+        // name is 40 characters, so 64 loses nothing real. (Security, 2026-09-04.)
         if (!SERVED_NAME.matches(name)) {
-            Timber.w("refused served-recording name (shape): %s", name)
+            Timber.w("refused served-recording name (shape): %s", name.take(LOGGED_NAME_CHARS))
             return null
         }
         val dir = recordingsDir()
         val f = File(dir, name)
-        val inside = try {
-            f.canonicalFile.parentFile == dir.canonicalFile
+        // toRealPath(), NOT File.canonicalFile. getCanonicalPath resolves symbolic
+        // links on Linux -- so on Android this lock worked -- but on Windows it does
+        // not, so the same code refused a symlink on device and followed one on the
+        // machine the gates run on. Found by the test below actually running, which
+        // is the only reason it is not still a comment claiming otherwise.
+        // Path.toRealPath() follows links on both, so this lock now means one thing
+        // everywhere and is provable where it is checked.
+        val real = try {
+            f.toPath().toRealPath()
+        } catch (e: java.nio.file.NoSuchFileException) {
+            // Ordinary: swept, or never written. Not an attack -- hand the File back
+            // and let the caller report it missing.
+            return f
         } catch (e: Exception) {
-            Timber.w(e, "refused served-recording name (unresolvable): %s", name)
-            false
-        }
-        if (!inside) {
-            Timber.w("refused served-recording name (outside recordings/): %s", name)
+            Timber.w(e, "refused served-recording name (unresolvable): %s", name.take(LOGGED_NAME_CHARS))
             return null
         }
+        if (real.parent != dir.toPath().toRealPath()) {
+            Timber.w("refused served-recording name (outside recordings/): %s", name.take(LOGGED_NAME_CHARS))
+            return null
+        }
+        // The read that follows re-opens by path, so a swap between here and there is
+        // theoretically possible -- but it needs code already running inside this
+        // app's sandbox, which owns the directory outright.
         return f
     }
 
@@ -461,5 +485,9 @@ class NativeAudioRecorder(private val context: Context) {
 
         /** Exactly the name shape [stop] writes: UUID.randomUUID().toString() + ".m4a". */
         private val SERVED_NAME = Regex("^[0-9a-f-]{36}\\.m4a$")
+
+        /** How much of a refused name is safe to log. A legal name is 40 characters;
+         *  a refused one came from JS and has no length at all. */
+        private const val LOGGED_NAME_CHARS = 64
     }
 }

@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -14,6 +15,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.RandomAccessFile
+import java.nio.file.Files
 import java.util.UUID
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -280,6 +282,32 @@ class NativeAudioRecorderTest {
         assertNull(recorder.readRecording("evil.txt"))
 
         assertTrue(intruder.exists())
+    }
+
+    @Test
+    fun `readRecording refuses a symlink in recordings that points outside it`() {
+        // The case that makes the canonical-parent check load-bearing rather than
+        // defence in depth (Security, 2026-09-04): the NAME is perfectly legal, so
+        // the name-shape lock passes it. Only resolving the link refuses it.
+        //
+        // assumeTrue, not a hard requirement: creating a symlink on Windows needs
+        // Developer Mode or elevation, so a dev box without it SKIPS this rather than
+        // reporting a failure that says nothing about the code.
+        val secret = File(application.cacheDir.parentFile, "outside.txt").apply {
+            writeBytes(byteArrayOf(4, 2))
+        }
+        val link = File(servedDir(), servedName())
+        try {
+            Files.createSymbolicLink(link.toPath(), secret.toPath())
+        } catch (e: Exception) {
+            assumeTrue("symlink creation unavailable on this host: " + e, false)
+        }
+        assumeTrue(link.exists())
+
+        assertNull(recorder.readRecording(link.name), "a symlink out of recordings/ must be refused")
+
+        assertTrue(secret.exists(), "the link target must be untouched")
+        assertContentEquals(byteArrayOf(4, 2), secret.readBytes())
     }
 
     @Test
