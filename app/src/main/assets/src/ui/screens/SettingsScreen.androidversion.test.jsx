@@ -158,4 +158,25 @@ describe('the App version row on Android', () => {
     expect(text).toContain('Not yet managed by the offline service worker');
     expect(text).not.toContain('60a64a8486');                // …and no version was invented
   });
+
+  /* ALSO ADDED BY THE WEB BUILDER, and it exists because a bite MISSED.
+     Disabling the whole `state === 'installed'` display branch left all three
+     cases above green: with the branch gone the row falls through to the general
+     path, which formats the same `running` value and appends "— could not reach
+     the server to compare." That contains the hash and the corpus and not
+     "Installed app build", so every assertion above is satisfied by text that is
+     WRONG on Android — the APK's own service-worker.js was read successfully;
+     there is no server it failed to reach. The branch was load-bearing for the
+     WORDING and nothing pinned the wording. */
+  it('says the build is the installed one, never that it could not reach a server it never needed', async () => {
+    setupSettingsGlobals(androidGlobals());   // Android, no controlling SW, APK values
+    renderSettings();
+    await act(async () => {});
+
+    const text = valueOf('App version');
+    expect(text).toContain('the version installed on this device');
+    expect(text).not.toContain('could not reach the server');
+    expect(text).not.toContain('up to date with the published version');
+    expect(text).not.toContain('an update is available');
+  });
 });
