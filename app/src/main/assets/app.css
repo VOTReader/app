@@ -2331,7 +2331,7 @@
 
     /* ── HOME SCREEN — AMBIENT MINIMAL ── */
     .home-screen-app {
-      padding-top: 2.6rem;
+      padding-top: 1.25rem;
       background-image: radial-gradient(ellipse at 50% 28%, rgba(200,164,86,0.044) 0%, transparent 66%);
       background-size: 80% 70%;
       background-repeat: no-repeat;
@@ -2344,7 +2344,7 @@
     .home-main-title {
       font-family: 'Cinzel Decorative', 'Cinzel', serif;
       font-weight: 400;
-      font-size: var(--fs-30);
+      font-size: var(--fs-24);
       color: var(--gold);
       text-align: center;
       letter-spacing: 0.06em;
@@ -2358,7 +2358,7 @@
       font-family: var(--font-body);
       font-style: italic;
       font-weight: 500;
-      font-size: var(--fs-30);
+      font-size: var(--fs-24);
       color: #f5d86a;
       text-align: center;
       line-height: 1;
@@ -2375,12 +2375,12 @@
       font-family: var(--font-body);
       font-weight: 500;
       font-style: italic;
-      font-size: var(--fs-24);
+      font-size: var(--fs-18);
       color: var(--cream);
       text-align: center;
       letter-spacing: 0.035em;
       line-height: 1.3;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.75rem;
       opacity: 0.95;
     }
     /* Drag-to-rearrange discoverability hint */
@@ -2391,12 +2391,9 @@
       margin: 0.9rem auto 0;
       padding: 0 0.5rem;
       text-align: center;
-      font-family: 'Cinzel', serif;
-      font-size: var(--fs-10);
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      opacity: 0.65;
+      font-family: var(--font-body);
+      font-size: var(--fs-12);
+      color: var(--cream-muted);
     }
     .home-rearrange-hint::before,
     .home-rearrange-hint::after {
@@ -2415,8 +2412,16 @@
     }
     /* homeHeroIn — removed (unused) */
     .home-screen-app .home-ornament {
-      margin-bottom: 1.3rem;
+      margin-bottom: 0.75rem;
     }
+    .home-shortcuts { display:flex; flex-wrap:wrap; gap:0.5rem; width:100%; max-width:30rem; margin-bottom:1rem; }
+    .home-shortcuts button { flex:1 1 auto; min-height:44px; padding:0.45rem 0.7rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font-family:var(--font-body); font-size:var(--fs-14); cursor:pointer; overflow-wrap:anywhere; }
+    .home-shortcuts .home-search-action { display:flex; align-items:center; gap:0.6rem; flex-basis:100%; text-align:left; background:var(--gold-faint); }
+    .home-search-action svg { width:18px; height:18px; flex-shrink:0; }
+    @media (hover:hover) { .home-shortcuts button:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
+    .home-status:empty { display:none; }
+    .surprise-fab:disabled { opacity:0.6; cursor:wait; }
     /* homeOrnIn — removed (unused) */
     /* Nav list — premium cards */
     .home-nav-list {
@@ -2435,7 +2440,7 @@
       background: linear-gradient(135deg, var(--bg2) 0%, rgba(200,164,86,0.035) 100%);
       border: 1px solid var(--gold-border);
       border-radius: 10px;
-      padding: 1.05rem 1.1rem;
+      padding: 0.7rem 1rem;
       cursor: pointer;
       text-align: left;
       color: inherit;
@@ -2535,8 +2540,7 @@
       display: block;
       font-family: var(--font-body);
       font-size: var(--fs-24);
-      color: var(--gold-dim);
-      opacity: 0.42;
+      color: var(--gold);
       flex-shrink: 0;
       line-height: 1;
     }
@@ -2648,13 +2652,11 @@
         filter:drop-shadow(0 0 2px rgba(162,122,34,0.3));
       }
     /* ── SETTINGS SCREEN ── */
-    .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(2rem,5vw,4.25rem) clamp(1rem,4vw,3rem) 5rem; }
-    .settings-header { width:100%; max-width:62rem; margin:0 auto clamp(2rem,5vw,3.6rem); text-align:left; }
-    .settings-header-mark { width:2.1rem; height:2.1rem; display:grid; place-items:center; margin-bottom:1.1rem; border:1px solid var(--gold-border); border-radius:50%; color:var(--gold); font-family:'Cinzel Decorative',serif; font-size:var(--fs-16); line-height:1; }
-    .settings-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.26em; text-transform:uppercase; color:var(--gold); opacity:0.84; margin-bottom:0.5rem; }
+    .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(1.25rem,3vw,2rem) clamp(1rem,4vw,3rem) 5rem; }
+    .settings-header { width:100%; max-width:62rem; margin:0 auto 1.25rem; text-align:left; }
     .settings-title { font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
     .settings-intro { max-width:38rem; margin:0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-16); line-height:1.55; }
-    .settings-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:clamp(1.8rem,4vw,2.8rem) 0 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .settings-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:1rem 0 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
     .settings-summary-item { min-width:0; padding:1rem clamp(0.8rem,2.5vw,1.6rem) 1.15rem; }
     .settings-summary-item + .settings-summary-item { border-left:1px solid var(--border); }
     .settings-summary dt { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-muted); letter-spacing:0.05em; margin:0 0 0.35rem; }
@@ -2662,6 +2664,13 @@
     .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
     .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
     .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
+    .settings-find { margin-bottom:1.25rem; font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); }
+    .settings-find label { display:block; margin-bottom:0.35rem; }
+    .settings-find-controls { display:flex; flex-wrap:wrap; gap:0.5rem; }
+    .settings-find input { flex:1 1 12rem; width:100%; min-width:0; min-height:44px; border:1px solid var(--gold-border); border-radius:6px; padding:0.6rem 0.8rem; background:var(--bg2); color:var(--cream); font:inherit; }
+    .settings-find input::placeholder { color:var(--cream-muted); opacity:1; }
+    .settings-find button { min-height:44px; padding:0.5rem 0.75rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font:inherit; cursor:pointer; }
+    .settings-find p { margin:0.5rem 0 0; color:var(--cream-muted); }
     .settings-section { width:100%; margin-bottom:0.75rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
@@ -2729,11 +2738,11 @@
     .settings-row-desc li { margin-top:0.35em; }
     .settings-row-desc li::marker { color:var(--gold-dim); }
     .settings-data-value { font-size:var(--fs-13); color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
-    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; flex-shrink:0; padding:0; line-height:1; border:1px solid var(--gold-border); border-radius:50%; background:transparent; color:var(--gold-dim); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-10); cursor:pointer; }
+    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
     @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); border-color:var(--gold-dim); } }
     .settings-info-btn[aria-expanded="true"]{ color:var(--gold); border-color:var(--gold); background:var(--gold-faint); }
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
-    .settings-select-trigger { display:flex; align-items:center; gap:0.35rem; background:transparent; border:none; cursor:pointer; padding:0; font-family:inherit; max-width:60%; }
+    .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; min-height:44px; background:var(--gold-faint); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; padding:0.35rem 0.55rem; font-family:inherit; max-width:60%; }
     .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     @media (hover:hover){ .settings-select-trigger:hover .settings-row-value{ color:var(--gold-bright); } }
     /* Top-Nav button chips */
@@ -2945,7 +2954,7 @@
     .scripture-layout-cycle-caption { position:absolute; top:100%; right:0; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-align:right; white-space:nowrap; pointer-events:none; }
     .scripture-layout-cycle-caption span { display:inline-block; padding:0.25rem 0.45rem; border:1px solid var(--gold-border); border-radius:4px; background:var(--bg2); animation:layoutCycleFade 1.5s ease forwards; }
     @keyframes layoutCycleFade { 0% { opacity:0; } 15% { opacity:0.85; } 65% { opacity:0.85; } 100% { opacity:0; } }
-    .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold-dim); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
+    .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
     @media (hover: hover) { .settings-gear-btn:hover { color:var(--gold); } }
     .settings-gear-btn svg { width:20px; height:20px; }
     /* ── Mark as Read ── */
@@ -3121,7 +3130,9 @@
     .srch-clear-btn:active { color:var(--gold); }
 
     .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); }
-    .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold-dim); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
+    .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
+    .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
+    @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
     @media (hover: hover) { .nav-search-btn:hover { color:var(--gold); } }
     .nav-search-btn svg { width:20px; height:20px; }
     

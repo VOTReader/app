@@ -129,6 +129,19 @@ function makeRoutes(overrides = {}) {
   return { routes: buildScreenRoutes(props), props };
 }
 
+describe('home quick access return paths', () => {
+  it('opens Scripture Web from Home and returns through the captured origin', () => {
+    const { routes, props } = makeRoutes();
+    routes.home().props.onScriptureWeb();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
+    expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
+    const next = makeRoutes({ navOrigin: { screen: 'home', returnOrigin: null } });
+    next.routes['scripture-web']().props.onBack();
+    expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
+    expect(next.props.setScreen).not.toHaveBeenCalled();
+  });
+});
+
 describe('screen-routes — P1-12 History onSelect routes through navigateToLink', () => {
   it('chapter entry → { type: "bible" } endpoint with the History back-pill title', () => {
     const { routes, props } = makeRoutes();

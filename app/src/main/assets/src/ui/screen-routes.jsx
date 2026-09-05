@@ -587,8 +587,15 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
+        onNotes={goNotesIndex}
+        onBookmarks={goBookmarksIndex}
+        onScriptureWeb={() => {
+          setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
+          setScreen('scripture-web');
+        }}
         historyEnabled={settings.historyEnabled !== false}
         onAbout={goAbout}
+        searchEnabled={settings.searchEnabled !== false}
         history={readHistory}
         translation={settings.translation}
         theme={theme} onThemeChange={setTheme}
@@ -1225,7 +1232,7 @@ export function buildScreenRoutes({
             if (!endpoint) return;
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
           }}
-          onBack={() => setScreen('library')}
+          onBack={() => navOrigin ? goNavOrigin() : setScreen('library')}
           settings={settings}
           updateSetting={updateSetting}
         />

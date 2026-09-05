@@ -261,7 +261,8 @@ function SettingsGroupIcon({ sectionId }) {
   );
 }
 
-function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, children = null }) {
+function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hidden = false, children = null }) {
+  if (hidden) return null;
   return (
     <section className={'settings-section' + (open ? ' open' : '')} data-settings-group={sectionId}>
       <button type="button" className="settings-group-head" aria-expanded={open} aria-controls={'settings-group-' + sectionId} onClick={onToggle}>
@@ -392,7 +393,7 @@ function DataActionRow({ label, desc = null, children = null, className = '' }) 
           <button
             type="button"
             className="settings-info-btn"
-            aria-label={showDesc ? "Hide description" : "Show description"}
+            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>
@@ -517,19 +518,21 @@ function _platformLabel(platform) {
    export/import loops) lives in utils/backup-android.js — a covered, unit-tested
    module (TEST-1). The functions arrive here as globals via _entry-d.js. */
 
+// Search groups by the reader's vocabulary, including controls hidden behind
+// dependencies. A match opens its group; dependent rows still obey their toggles.
+const SETTINGS_TOPICS = {
+  appearance: 'appearance theme light dark text size font typeface',
+  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker position dot streak dwell time random letter button surprise keep screen on double tap click fullscreen',
+  listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
+  autoscroll: 'auto scroll hands free reading speed continue pause',
+  topnav: 'top nav buttons icons settings gear history theme bookmark',
+  features: 'search synonyms synonym filter stop words tabs history',
+  garden: 'a return to the garden image quality pictures',
+  data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
+  progress: 'mark as read progress book reading clear',
+};
+
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
-  // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
-  // (for the NT section) AND LETTERS_V1/LETTERS/etc. globals (for the
-  // Volumes section). Pre-fire both loaders on mount and subscribe so the
-  // screen re-renders with full data once they arrive.
-  React.useEffect(() => {
-    if (typeof window.__loadBibleCorpus === 'function') {
-      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
-    }
-    if (typeof window.__loadVotCorpus === 'function') {
-      window.__loadVotCorpus().catch((e) => console.warn('VOT corpus pre-load failed', e));
-    }
-  }, []);
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -547,12 +550,30 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // All collapsed on entry — the screen reads as a scannable table of
   // contents; session-local on purpose (a fresh visit starts compact).
   const [openGroups, setOpenGroups] = React.useState(() => new Set());
-  const toggleGroup = (id) => setOpenGroups((prev) => {
+  const [settingsQuery, setSettingsQuery] = React.useState('');
+  const settingsFindRef = React.useRef(null);
+  const [closedMatches, setClosedMatches] = React.useState(() => new Set());
+  const queryWords = settingsQuery.toLowerCase().trim().split(/[\s-]+/).filter(Boolean);
+  const searching = queryWords.length > 0;
+  const matchesGroup = (id) => queryWords.every((word) => SETTINGS_TOPICS[id].includes(word));
+  const groupOpen = (id) => searching ? matchesGroup(id) && !closedMatches.has(id) : openGroups.has(id);
+  const toggleGroup = (id) => (searching ? setClosedMatches : setOpenGroups)((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const groupProps = (id) => ({ sectionId: id, open: openGroups.has(id), onToggle: () => toggleGroup(id) });
+  const groupProps = (id) => ({ sectionId: id, open: groupOpen(id), hidden: !matchesGroup(id), onToggle: () => toggleGroup(id) });
+  const changeSettingsQuery = (value) => { setSettingsQuery(value); setClosedMatches(new Set()); };
+  const matchingCount = Object.keys(SETTINGS_TOPICS).filter(matchesGroup).length;
+  const progressOpen = groupOpen('progress');
+  // Only the progress table needs the corpora. Changing a font or exporting
+  // a backup must not parse the whole library as a side effect.
+  React.useEffect(() => {
+    if (!progressOpen) return;
+    for (const load of [window.__loadBibleCorpus, window.__loadVotCorpus]) {
+      if (typeof load === 'function') load().catch((e) => console.warn('Progress corpus load failed', e));
+    }
+  }, [progressOpen]);
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text
@@ -1609,8 +1630,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     >
       <div className={'settings-screen' + (textScalePercent >= 180 ? ' settings-large-type' : '')}>
         <header className="settings-header">
-          <div className="settings-header-mark" aria-hidden="true">V</div>
-          <div className="settings-eyebrow">VOTReader preferences</div>
           <h1 className="settings-title">Settings</h1>
           <p className="settings-intro">Shape the way you read, listen, and move through the library.</p>
           <dl className="settings-summary" aria-label="Current reading preferences">
@@ -1631,6 +1650,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         </header>
 
         <div className="settings-groups">
+        <div className="settings-find">
+          <label htmlFor="settings-find-input">Find settings</label>
+          <div className="settings-find-controls">
+            <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Try font, audio, or backup" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
+            {settingsQuery && <button type="button" onClick={() => { changeSettingsQuery(''); settingsFindRef.current?.focus(); }}>Clear filter</button>}
+          </div>
+          {searching && <p role="status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
+        </div>
 
         <SettingsGroup label="Appearance" sub="Theme, text size & reading font" {...groupProps('appearance')}>
           <div className="settings-card">

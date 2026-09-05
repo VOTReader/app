@@ -26,21 +26,21 @@ describe('SettingsRow (compact + ⓘ reveal)', () => {
   it('hides the description until the ⓘ button is tapped', () => {
     render(<SettingsRow label="Modern Fonts" desc="Use Cinzel headings." checked={false} onToggle={() => {}} />);
     expect(screen.queryByText('Use Cinzel headings.')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description'));
+    fireEvent.click(screen.getByLabelText('Show description for Modern Fonts'));
     expect(screen.getByText('Use Cinzel headings.')).toBeTruthy();
   });
 
   it('collapses the description again on a second tap', () => {
     render(<SettingsRow label="X" desc="Hello desc." checked={false} onToggle={() => {}} />);
-    fireEvent.click(screen.getByLabelText('Show description'));
+    fireEvent.click(screen.getByLabelText('Show description for X'));
     expect(screen.getByText('Hello desc.')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description'));
+    fireEvent.click(screen.getByLabelText('Hide description for X'));
     expect(screen.queryByText('Hello desc.')).toBeNull();
   });
 
   it('renders no ⓘ button when there is no description', () => {
     render(<SettingsRow label="Bare" checked={false} onToggle={() => {}} />);
-    expect(screen.queryByLabelText('Show description')).toBeNull();
+    expect(screen.queryByLabelText('Show description for Bare')).toBeNull();
   });
 
   it('fires onToggle when the switch is changed', () => {
