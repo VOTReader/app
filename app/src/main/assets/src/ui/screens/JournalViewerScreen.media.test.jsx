@@ -240,3 +240,79 @@ describe('JournalHubScreen — unclaimed recordings are offered back', () => {
     expect(window.JournalMediaStore.delete).toHaveBeenCalledWith('m_lost');
   });
 });
+
+describe('a revoked object URL is re-resolved, not kept (memory-trim purge)', () => {
+  /* The store revokes cached object URLs in bulk — releaseObjectUrls() from
+     window.__onTrimMemory, and the import-replace clear. useMediaUrl resolves once per
+     mediaId and holds the string in React state, so after a purge both journal blocks
+     are pointing at a URL that no longer resolves, while their own state still says
+     missing:false. Nothing re-asks, so nothing recovers.
+
+     This has never been seen because MainActivity gated the trim signal on
+     TRIM_MEMORY_MODERATE(60), which API 34+ never sends. android-kotlin-3-4 moves it to
+     BACKGROUND(40), which arrives on every backgrounding. */
+
+  /** A store whose objectUrl mints a NEW url each call, and that can announce a purge. */
+  function setupPurgeableStore() {
+    let n = 0;
+    const subs = new Set();
+    let epoch = 0;
+    window.JournalMediaStore = {
+      objectUrl: vi.fn(() => Promise.resolve('blob:v' + (++n))),
+      get: vi.fn(() => Promise.resolve({ id: 'm1', blob: {} })),
+      subscribeUrls: (cb) => { subs.add(cb); return () => subs.delete(cb); },
+      getUrlEpoch: () => epoch,
+      __purge: () => { epoch++; subs.forEach((cb) => cb()); },
+    };
+    window.JournalHelpers = { formatDuration: () => '0:08' };
+    window.ConfirmStrip = () => null;
+    return window.JournalMediaStore;
+  }
+
+  it('RED: after a purge the image block resolves a fresh URL instead of holding the dead one', async () => {
+    const store = setupPurgeableStore();
+    const { container } = await renderSettled(<JournalImageBlock mediaId="m1" caption="Sunrise" />);
+    const first = container.querySelector('img');
+    expect(first && first.getAttribute('src')).toBe('blob:v1');
+
+    await act(async () => { store.__purge(); });
+
+    const after = container.querySelector('img');
+    expect(after && after.getAttribute('src')).toBe('blob:v2');   // re-resolved, not the revoked one
+    expect(store.objectUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it('RED: after a purge the voice-memo block resolves a fresh URL too', async () => {
+    // The audio case is the one that costs the reader something irreplaceable: a memo
+    // whose <audio src> was revoked fails on the next load or seek, and pressing play
+    // after returning from the background is exactly that.
+    const store = setupPurgeableStore();
+    const { container } = await renderSettled(
+      <JournalAudioBlock mediaId="m1" duration={8} caption="Morning walk" />
+    );
+    expect(container.querySelector('audio').getAttribute('src')).toBe('blob:v1');
+
+    await act(async () => { store.__purge(); });
+
+    expect(container.querySelector('audio').getAttribute('src')).toBe('blob:v2');
+  });
+
+  it('CONTROL: with no purge the URL is resolved exactly once — no re-resolve thrash', async () => {
+    // Same matcher as the REDs, the other outcome. A fix that simply re-resolved on
+    // every render would satisfy them and fail this.
+    const store = setupPurgeableStore();
+    const { container, rerender } = await renderSettled(<JournalImageBlock mediaId="m1" caption="Sunrise" />);
+    await act(async () => { rerender(<JournalImageBlock mediaId="m1" caption="Sunrise again" />); });
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:v1');
+    expect(store.objectUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('CONTROL: a store with no subscribeUrls still renders — the hook degrades, it does not throw', async () => {
+    // bundle-b may not be loaded (web/PWA harnesses), and every other case in this file
+    // stubs the store WITHOUT the new verbs. If the hook required them, this file would
+    // go red for a reason that has nothing to do with what it tests.
+    setupGlobals('blob:plain', { id: 'm1', blob: {} });
+    const { container } = await renderSettled(<JournalImageBlock mediaId="m1" caption="Sunrise" />);
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:plain');
+  });
+});

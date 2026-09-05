@@ -512,7 +512,70 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
       URL.revokeObjectURL = origRevoke;
     }
   });
-});
+
+  /* THE REVOCATION EPOCH — a revoked URL is still held by whoever resolved it.
+     releaseObjectUrls() and the import-replace clear drop URLs the two journal blocks
+     already have in React state (useMediaUrl resolves once per mediaId and keeps the
+     string). "objectUrl() re-creates on a later miss" is true and irrelevant: neither
+     caller ever asks again. So the store announces revocation.
+
+     Deferred while the page is HIDDEN, which is the point of the trim case: the purge
+     exists to free heap while the app is backgrounded, and notifying at once would have
+     every mounted block re-create the URLs the purge just released. */
+  function fakeVisibility(hidden) {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: function() { return hidden; } });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('RED: releaseObjectUrls announces itself, so a held URL can be re-resolved', async () => {
+    const seen = [];
+    const off = JournalMediaStore.subscribeUrls(function() { seen.push(JournalMediaStore.getUrlEpoch()); });
+    try {
+      await JournalMediaStore.put({ id: 'e1', type: 'image', blob: new Blob([new Uint8Array([1])]) });
+      await JournalMediaStore.objectUrl('e1');
+      const before = JournalMediaStore.getUrlEpoch();
+      JournalMediaStore.releaseObjectUrls();
+      expect(JournalMediaStore.getUrlEpoch()).toBe(before + 1);
+      expect(seen.length).toBe(1);
+    } finally { off(); await JournalMediaStore.delete('e1'); }
+  });
+
+  it('RED: while the page is hidden the epoch moves but nobody is told until it is visible again', async () => {
+    const seen = [];
+    const off = JournalMediaStore.subscribeUrls(function() { seen.push(1); });
+    try {
+      await JournalMediaStore.put({ id: 'e2', type: 'image', blob: new Blob([new Uint8Array([2])]) });
+      await JournalMediaStore.objectUrl('e2');
+      fakeVisibility(true);
+      const before = JournalMediaStore.getUrlEpoch();
+      JournalMediaStore.releaseObjectUrls();
+      expect(JournalMediaStore.getUrlEpoch()).toBe(before + 1);  // the drop really happened
+      expect(seen.length).toBe(0);                               // …and freed heap stays freed
+      fakeVisibility(false);
+      expect(seen.length).toBe(1);                               // told once, on return
+      fakeVisibility(false);
+      expect(seen.length).toBe(1);                               // and not again for the same drop
+    } finally { off(); fakeVisibility(false); await JournalMediaStore.delete('e2'); }
+  });
+
+  it('CONTROL: an LRU eviction does NOT announce itself', async () => {
+    // Deliberate, and the reason is a feedback loop: eviction happens INSIDE the
+    // objectUrl() call a block just made, so announcing it would re-run that block's
+    // effect, which resolves again, which evicts again. The narrower gap it leaves is
+    // named in the store: more than URL_CACHE_MAX media resolved at once.
+    const seen = [];
+    const off = JournalMediaStore.subscribeUrls(function() { seen.push(1); });
+    try {
+      const ids = [];
+      for (let i = 0; i < 26; i++) {
+        const id = 'lru' + i; ids.push(id);
+        await JournalMediaStore.put({ id: id, type: 'image', blob: new Blob([new Uint8Array([i])]) });
+        await JournalMediaStore.objectUrl(id);
+      }
+      expect(seen.length).toBe(0);
+      await Promise.all(ids.map(function(id) { return JournalMediaStore.delete(id); }));
+    } finally { off(); }
+  });});
 
 describe('JournalMediaStore — compressImage() (journal-5: decode-time downscale + byte ceiling)', () => {
   /** @type {any} */
