@@ -161,6 +161,40 @@ describe('app.css — Scripture Web panel scrolling (scripture-web-2/8)', () => 
   });
 });
 
+/* REM-SCALED CHROME MUST NOT SCALE PAST THE SCREEN (design-perf, launch-day live
+   read 2026-09-05, measured through the real slider with --font-scale asserted
+   at each site). At Text Size 1.8 on a 360x800 phone: the "New here?" strip was
+   350 px, 44 % of the screen, its buttons wrapping to three lines (218 px, 27 %
+   at 1); the letter hero was 615 px, 77 %, from 5.5rem/4rem padding that grew
+   to 158/115 px (294 px, 37 % at 1); and at 1 the Listen pill's hit band was
+   its 25 px paint. Three caps, one rule: the strip's type and height, the
+   hero's padding, and a 44 px hit band on the pill with the paint unchanged. */
+describe('app.css — large-type caps on rem-scaled chrome', () => {
+  it('the "New here?" strip is capped at a third of the screen and its type stops growing', () => {
+    // The strip's own rule, not the `.tour-card, .tour-prompt` block it shares with the tour card.
+    expect(CSS.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/[\n\r]\s*\.tour-prompt \{[^}]*max-height:\s*33vh/);
+    // Each selector's OWN rule (the title and text also appear in comma lists shared with the tour
+    // card, which keep growing: the card is the only way out of the tour and must stay readable).
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const sel of ['\\.tour-prompt-title', '\\.tour-prompt-text', '\\.tour-prompt \\.tour-btn']) {
+      expect(bare, sel).toMatch(new RegExp('[\\n\\r]\\s*' + sel + ' \\{[^}]*font-size:\\s*min\\(var\\(--fs-\\d+\\),\\s*\\d+px\\)'));
+    }
+  });
+  it('the hero pads in rem up to a px ceiling, never past it', () => {
+    const hero = ruleBlock(CSS, '.hero {');
+    expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+1\.8rem\s+min\(4rem,\s*\d+px\)/);
+  });
+  it('the hero pill owns a 44 px hit band around its paint', () => {
+    const pill = ruleBlock(CSS, '.hero-play-pill {');
+    expect(pill).toMatch(/position:\s*relative/);
+    const band = ruleBlock(CSS, '.hero-play-pill::after {');
+    expect(band).toMatch(/content:\s*['"]{2}/);
+    expect(band).toMatch(/position:\s*absolute/);
+    // Centred on the paint and never narrower than 44 px: inset calc(50% - 22px) top and bottom.
+    expect(band).toMatch(/calc\(50% - 22px\)/);
+  });
+});
+
 describe('app.css — .sr-only utility', () => {
   it('exists with the standard visually-hidden pattern', () => {
     const block = ruleBlock(CSS, '.sr-only');
