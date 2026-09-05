@@ -15,9 +15,8 @@
      node tools/e2e-read-detector.mjs
    Expects "E2E PASS" on stdout; exits 1 otherwise. It serves the assets
    itself on an OS-assigned port, so nothing has to be started first and
-   two runs cannot collide. The walk runs in its OWN browser context, so its
-   storage starts empty and is discarded with the context — this harness
-   never writes to, or deletes from, storage anything else can see.
+   two runs cannot collide. Wipes the votreader IDB + localStorage of that
+   ephemeral origin only.
 
    IT USED TO REQUIRE `python tools/preview-server.py 8097 ...` and hardcode
    http://127.0.0.1:8097. On 2026-09-04 four Envoys held servers on 8097 at
@@ -39,61 +38,6 @@
    "these are my bundles", and a mismatch aborts loudly rather than producing
    a green result about somebody else's work.
    ─────────────────────────────────────────────────────────────────── */
-/* WHY THERE IS NO STATE-CLEARING STEP HERE, AND WHAT USED TO BE.
-   ─────────────────────────────────────────────────────────────────
-   Until 2026-09-04 this file made its own fresh state, right after the app
-   first mounted:
-
-     await page.evaluate(async () => {
-       localStorage.clear();
-       await new Promise((res) => {
-         const rq = indexedDB.deleteDatabase('votreader');
-         rq.onsuccess = rq.onerror = rq.onblocked = res;
-       });
-       location.reload();
-     });
-
-   Its purpose was determinism: the walk asserts COUNTS — readItems === 1,
-   completions === 1, a frontier that exists and then does not — and every one
-   of those is wrong if a previous run's data is still in the origin. The step
-   was load-bearing, not hygiene.
-
-   It was also the `e2e:read` hang, measured and root-caused by the Verifier
-   (sessions\2026-09-03-orchestrator\e2e-hang-experiment.md). One run in twenty
-   died at the 240 s protocolTimeout with `ProtocolError: Runtime.callFunctionOn
-   timed out`. A console-channel probe — a different CDP stream, delivered even
-   when a call's reply is not — showed the function reaching `ls-cleared` and
-   then nothing, ever: `indexedDB.deleteDatabase('votreader')` fired **no
-   success, no error and no blocked**. Confirmed from a second CDP session
-   mid-hang, where a brand-new delete also settled nothing in six seconds while
-   the same page answered an evaluate in 2 ms. The database was simply
-   un-deletable at that moment, because this harness was deleting the app's live
-   database out from under a page that was still booting and reopening it for
-   every store write.
-
-   `rq.onsuccess = rq.onerror = rq.onblocked = res;` reads as exhaustive — three
-   handlers, every outcome covered. The real failure is NO OUTCOME AT ALL.
-
-   So the determinism now comes from isolation instead of deletion: each run
-   gets its own browser context, which is a separate storage partition, so
-   there is nothing to clear and nothing that can refuse to be cleared. The
-   walk still starts at onboarding, which is what a fresh profile looks like
-   and what the /Continue/ + /Begin Reading/ clicks below already expect.
-
-   TWO THINGS NOT TO DO HERE:
-   - Do not bound that promise with a timeout instead. It converts a 240 s
-     hang into a run that proceeds with DIRTY state, and the walk's assertions
-     are counts in that very database — a quiet wrong answer in place of a
-     loud one.
-   - Do not reintroduce a storage-clearing evaluate "just in case". A context
-     that needs clearing is not isolated, and the clearing is the thing that
-     hangs.
-
-   `location.reload()` went with the block. The Verifier's phase B established
-   it was NOT the cause of the hang (removed, still hung twice), so it is not
-   being sold as part of the fix; it existed only to re-boot the app after the
-   wipe, and with nothing wiped there is nothing to re-boot.
-   ─────────────────────────────────────────────────────────────────── */
 import puppeteer from 'puppeteer';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 
@@ -103,10 +47,6 @@ import { serveOwnTree } from './e2e-read-serve.mjs';
 // server while navigating somewhere else. That combination passed the harness
 // test 3/3 when it was possible; it is not possible now.
 const { server, url: URL } = await serveOwnTree();
-// Say what was served. serveOwnTree() has already proved these bytes are this
-// tree's, but a run whose log does not name its own origin is the shape that
-// let four worktrees share port 8097 and still print PASS.
-console.log('[e2e-read] serving', URL);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({
@@ -124,25 +64,14 @@ const browser = await puppeteer.launch({
   // 87% CPU all passed while an 18% CPU run failed. It is a hang. Load does not
   // predict it.
   //
-  // WHICH CDP call hung is now KNOWN, and this paragraph used to say it was not.
-  // It was the awaited state-clearing evaluate, and it hung because
-  // `indexedDB.deleteDatabase('votreader')` fired none of its three events --
-  // not success, not error, not blocked -- so `awaitPromise: true` correctly
-  // never returned. That block is gone; the walk gets a fresh browser context
-  // instead (see the note above the launch). Full record in
-  // sessions\2026-09-03-orchestrator\e2e-hang-experiment.md.
-  //
-  // Two things from that investigation are worth keeping even though the cause
-  // is settled, because both are general and both cost someone an afternoon:
-  // a `waitForFunction` option timeout bounds its POLLING LOOP, not the
-  // individual Runtime.callFunctionOn round-trip inside it, so `{ timeout:
-  // 30000 }` on a call does NOT exclude it as a 240 s culprit; and a guard that
-  // enumerates the ways an operation can finish is no guard at all against its
-  // not finishing.
-  //
-  // THIS CEILING STAYS, and not because the known hang might come back. It is
-  // the only thing that turns any future orphaned CDP call into a bounded
-  // failure with a stack instead of a wedged run.
+  // WHICH CDP call hangs is still unknown, and this comment deliberately does not
+  // guess. One candidate (a `location.reload()` ending the state-clearing
+  // evaluate, orphaning its own callback) was removed and tested for 17 runs; the
+  // failure came back at 241 s, so that was not it, or not all of it. Note also
+  // that a `waitForFunction` option timeout bounds its POLLING LOOP, not the
+  // individual Runtime.callFunctionOn round-trip inside it -- so a `{ timeout:
+  // 30000 }` on one of those does not exclude it as the 241 s culprit, and
+  // reasoning that it does is how the first diagnosis went wrong.
   //
   // What IS settled, and the reason to leave this number alone: raising a ceiling
   // cannot help a hang. The response is not late, it is never coming. Raise it and
@@ -152,18 +81,23 @@ const browser = await puppeteer.launch({
   // loop. If this fires, look for an orphaned CDP call -- not at the machine.
   protocolTimeout: 240000,
 });
-/* An isolated storage partition per run. `browser.newPage()` would share the
-   default context's origin storage with anything else this browser opens, and
-   with whatever a previous run left there. */
-const context = await browser.createBrowserContext();
 try {
-  const page = await context.newPage();
+  const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const r = document.getElementById('root');
     return !!r && r.children.length > 0;
   }, { timeout: 30000 });
+
+  // Fresh state for determinism.
+  await page.evaluate(async () => {
+    localStorage.clear();
+    await new Promise((res) => { const rq = indexedDB.deleteDatabase('votreader'); rq.onsuccess = rq.onerror = rq.onblocked = res; });
+    location.reload();
+  });
+  await sleep(1500);
+  await page.waitForFunction(() => document.getElementById('root')?.children.length > 0, { timeout: 30000 });
 
   const clickText = async (re) => page.evaluate((reSrc) => {
     const re2 = new RegExp(reSrc);
@@ -319,9 +253,6 @@ try {
   if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }
   else console.log('E2E PASS — completion, ledger, day bucket, frontier, frontier-clear all verified in a real compositing Chromium.');
 } finally {
-  // The context goes first: closing it discards this run's storage partition,
-  // which is what makes the next run's counts trustworthy.
-  await context.close();
   await browser.close();
   server.close();
 }
