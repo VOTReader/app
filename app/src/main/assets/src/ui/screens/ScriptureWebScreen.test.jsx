@@ -174,8 +174,27 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
   // targets M2's E row); jsdom has no layout, so what is pinned HERE is the
   // control's existence, its label, the persistence, Escape, and where focus
   // lands.
+  // The root's key handler bails at `if (!cam || !v.W) return;`, and v.W comes
+  // from the GL canvas's clientWidth \u2014 0 in jsdom, which made every assertion
+  // about .sw-root's Escape branch vacuous, the passing ones included. Sizing
+  // the canvas is what lets that branch run at all; the control case below is
+  // this harness's own precondition assertion, and it fails loudly if the
+  // handler ever becomes unreachable again.
+  const sizeCanvas = () => {
+    for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 600]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, {
+        configurable: true, get() { return px; },
+      });
+    }
+  };
+  afterEach(() => {
+    delete HTMLCanvasElement.prototype.clientWidth;
+    delete HTMLCanvasElement.prototype.clientHeight;
+  });
+
   const openMyWeb = async (props) => {
     window.SCRIPTURE_WEB_DATA = { count: 1, ok: true };
+    sizeCanvas();
     const r = render(<ScriptureWebScreen {...baseProps()} {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'My web' }));
     return r;
@@ -206,6 +225,42 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
     expect(screen.queryByText('Your web is still being woven.')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
+  });
+
+  it('Escape closes the notice WITHOUT leaving the Scripture Web', async () => {
+    // design-perf measured the real UI: the notice closed and the same
+    // keystroke bubbled to .sw-root's Escape branch, which found no overlay
+    // open and called onBack() \u2014 the reader landed in the Library with focus
+    // on body. The case above asserts what Escape DID and is blind to what
+    // else it did, which is why a green suite shipped it.
+    const onBack = vi.fn();
+    await openMyWeb({ onBack });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
+    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it('Escape still leaves the screen once the notice is gone', async () => {
+    // TWO JOBS. It is the control \u2014 a fix that simply swallowed Escape on this
+    // screen would pass the case above and break the way out for everyone. And
+    // it is this harness's PRECONDITION: the root handler returns early on an
+    // unsized canvas, so if this goes red every other Escape assertion here has
+    // stopped meaning anything, whatever colour it shows.
+    const onBack = vi.fn();
+    await openMyWeb({ onBack, settings: { swEmptyDismissed: true } });
+    fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'Escape' });
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('Escape reaches the notice from the canvas, not only from the close button', async () => {
+    // Focus lives on .sw-root for a reader who has not tabbed into the panel.
+    // One handler on the root means Escape behaves the same either way; a
+    // handler living on the panel only works when focus is already inside it.
+    const onBack = vi.fn();
+    await openMyWeb({ onBack });
+    fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'Escape' });
+    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it('returns focus to the My web segment button, not to the body', async () => {
