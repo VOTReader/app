@@ -18,8 +18,8 @@
  *     is content chrome and is allowed to grow;
  *   - no two visible controls overlap;
  *   - no page errors.
- * Labels that shorten to an ellipsis are REPORTED, not failed: the type ladder and the
- * card widths decide that, and the count is there so a regression is visible.
+ * Labels that shorten a little are REPORTED; a label that loses more than a third of its
+ * width or height is FAILED, whatever its selector — a general property, not a list.
  */
 import http from 'node:http';
 import { resolve, dirname, normalize, extname } from 'node:path';
@@ -81,7 +81,15 @@ try {
       const label = (e) => (e.getAttribute('aria-label') || e.textContent.trim().replace(/\s+/g, ' ')).slice(0, 26);
       const els = [...document.querySelectorAll('button,[role=button],a,input,select,textarea')].filter(vis);
       const offRight = els.filter((e) => e.getBoundingClientRect().right > vw + 1).map((e) => `${label(e)} right=${Math.round(e.getBoundingClientRect().right)}`);
-      const ellipsed = [...document.querySelectorAll('*')].filter((e) => vis(e) && e.children.length === 0 && getComputedStyle(e).textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim().slice(0, 30));
+      // Any leaf that shortens its text (ellipsis or a line clamp): reported when it loses a little,
+      // FAILED when it loses more than a third of its width or height — that is a label that stopped
+      // doing its job, whatever the selector ("Matthew" rendering as "M a…" at 1.8 was one).
+      const clipped = [...document.querySelectorAll('*')].filter((e) => { if (!vis(e) || e.children.length) return false; const cs = getComputedStyle(e); return (cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && e.scrollHeight > e.clientHeight + 1); });
+      const ellipsed = clipped.map((e) => e.textContent.trim().slice(0, 30));
+      // Width: a label that cannot show two thirds of itself has stopped doing its job. Height: a
+      // line clamp is a design choice for long titles, so it fails only when the column is under
+      // 4em — narrower than a word — which is the crush, not the clamp.
+      const crushed = clipped.filter((e) => e.scrollWidth > e.clientWidth * 1.5 || (e.scrollHeight > e.clientHeight * 1.5 && e.clientWidth < 4 * parseFloat(getComputedStyle(e).fontSize))).map((e) => `${e.textContent.trim().slice(0, 24)} ${e.clientWidth}x${e.clientHeight} of ${e.scrollWidth}x${e.scrollHeight}`);
       const boxes = els.map((e) => ({ e, r: e.getBoundingClientRect() }));
       const overlaps = [];
       for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
@@ -90,7 +98,7 @@ try {
         const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
         if (ix > 6 && iy > 6) overlaps.push(`${label(a.e)} × ${label(b.e)}`);
       }
-      return { screen: name, title: document.title, nav: nav ? Math.round(nav.getBoundingClientRect().height * 10) / 10 : null, overflowX: document.documentElement.scrollWidth - vw, offRight, ellipsed, overlaps };
+      return { screen: name, title: document.title, nav: nav ? Math.round(nav.getBoundingClientRect().height * 10) / 10 : null, overflowX: document.documentElement.scrollWidth - vw, offRight, ellipsed, crushed, overlaps };
     }, name);
     const stop = async (name) => {
       await setScale(); await sleep(200);
@@ -101,6 +109,7 @@ try {
       if (m.offRight.length) fail(`${scale} ${name}: past the right edge: ${m.offRight.join(', ')}`);
       if (m.overflowX > 0) fail(`${scale} ${name}: the page scrolls sideways by ${m.overflowX} px`);
       if (m.overlaps.length) fail(`${scale} ${name}: overlapping controls: ${m.overlaps.join(', ')}`);
+      if (m.crushed.length) fail(`${scale} ${name}: text crushed past a third: ${m.crushed.join(', ')}`);
       if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${String(scale).replace('.', '_')}-${name}.png`) });
     };
 
