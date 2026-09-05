@@ -11,16 +11,62 @@
    unit suite could not see (vot-reading-stats missing from IDBAdapter →
    permanent 'degraded' hydration) on 2026-08-03.
 
-   RUN (optional, ~40s — NOT a pre-commit/CI gate):
-     1. serve assets:  python tools/preview-server.py 8097 app/src/main/assets
-     2. node tools/e2e-read-detector.mjs
-   Expects "E2E PASS" on stdout; exits 1 otherwise. Wipes the votreader
-   IDB + localStorage of the target ORIGIN (localhost:8097) for a
-   deterministic run — never point it at a profile you care about.
+   RUN (optional, ~40s):
+     node tools/e2e-read-detector.mjs
+   Expects "E2E PASS" on stdout; exits 1 otherwise. It serves the assets
+   itself on an OS-assigned port, so nothing has to be started first and
+   two runs cannot collide. Wipes the votreader IDB + localStorage of that
+   ephemeral origin only.
+
+   IT USED TO REQUIRE `python tools/preview-server.py 8097 ...` and hardcode
+   http://127.0.0.1:8097. On 2026-09-04 four Envoys held servers on 8097 at
+   once; Python's http.server sets allow_reuse_address, so every bind
+   SUCCEEDED and which one answered a given connection was undefined. The
+   gate reported PASS while serving another worktree's tree — proved by the
+   served CACHE_VERSION not matching the tree under test, and by three of
+   four request logs being completely empty during runs that "passed". A
+   gate that can report green about a tree it never loaded is worse than a
+   gate that flakes. Its two siblings each bind their own ephemeral port
+   (e2e-readalong.mjs:122, smoke-ci.js); this one took the convention and
+   not the design. Never reintroduce a fixed port here.
    ─────────────────────────────────────────────────────────────────── */
+import http from 'node:http';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { resolve, dirname, normalize, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
 
-const URL = 'http://127.0.0.1:8097/index.html';
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
+const MIME = {
+  '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg',
+};
+
+/* Same shape as e2e-readalong.mjs:108 — port 0 lets the OS pick, so the
+   origin is unique to this process and no other server can answer for it. */
+function startServer() {
+  const server = http.createServer((req, res) => {
+    let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
+    const filePath = normalize(resolve(ASSETS, '.' + urlPath));
+    if (!filePath.startsWith(ASSETS) || !existsSync(filePath) || !statSync(filePath).isFile()) {
+      res.writeHead(404); res.end('not found'); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': MIME[extname(filePath).toLowerCase()] || 'application/octet-stream',
+      'Cache-Control': 'no-store',
+    });
+    res.end(readFileSync(filePath));
+  });
+  return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server)));
+}
+
+const server = await startServer();
+const URL = `http://127.0.0.1:${server.address().port}/index.html`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({
@@ -228,4 +274,5 @@ try {
   else console.log('E2E PASS — completion, ledger, day bucket, frontier, frontier-clear all verified in a real compositing Chromium.');
 } finally {
   await browser.close();
+  server.close();
 }

@@ -318,15 +318,19 @@ jobs:
         # user) + pre-loads the lazy corpora so every screen has its data.
         run: npm run smoke:ci
 
-      - name: End-to-end read detector (needs a preview server)
-        # e2e-read-detector.mjs drives headless Chrome against
-        # http://127.0.0.1:8097/index.html and starts NO server of its own —
-        # without one listening it dies on net::ERR_CONNECTION_REFUSED, which is
-        # why it had never run in CI. It proves the read detector end to end in a
-        # real compositing Chromium: completion, the ledger, the day bucket, and
-        # the frontier set and cleared. The server binds 127.0.0.1 only
-        # (test_preview_server.py) and sends Cache-Control: no-store, so the walk
-        # always sees the bundles this job just built.
+      - name: End-to-end read detector
+        # e2e-read-detector.mjs proves the read detector end to end in a real
+        # compositing Chromium: completion, the ledger, the day bucket, and the
+        # frontier set and cleared.
+        #
+        # It serves the assets itself on an OS-assigned port and sends
+        # Cache-Control: no-store, so the walk always sees the bundles this job
+        # just built. This step used to start `python tools/preview-server.py
+        # 8097 ...` first and poll for it, because the script hardcoded that
+        # port. That was removed on 2026-09-04: with a fixed port, four
+        # concurrent servers all bound successfully (Python's http.server sets
+        # allow_reuse_address) and the gate reported PASS while serving another
+        # worktree's tree. Nothing to start means nothing to collide with.
         #
         # Its sibling `npm run e2e:readalong` is deliberately NOT here. It needs
         # locally cached audio (tools/hone-sample.mjs downloads it) and on a clean
@@ -334,19 +338,7 @@ jobs:
         # check". In CI that is a step that can only ever skip, and a gate that
         # always skips is worse than an absent one — it reads green. It stays a
         # local gate until CI has audio to run it against.
-        run: |
-          python tools/preview-server.py 8097 app/src/main/assets &
-          echo $! > preview-server.pid
-          for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8097/index.html > /dev/null && break
-            sleep 1
-          done
-          curl -sf http://127.0.0.1:8097/index.html > /dev/null || {
-            echo '[e2e] preview server never came up on 127.0.0.1:8097'; exit 1; }
-          npm run e2e:read
-          status=$?
-          kill "$(cat preview-server.pid)" || true
-          exit $status
+        run: npm run e2e:read
 
   kotlin-tests:
     name: Kotlin unit tests (NK1)

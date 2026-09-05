@@ -48,14 +48,17 @@ To verify a boot, paste `tools/smoke.js` into the page console and call
 console.error 0, resource404 0). `npm run smoke:ci` runs the same walk
 headless (puppeteer).
 
-`npm run e2e:read` and `npm run e2e:readalong` do **not** start a server of
-their own — they drive Chromium against `http://127.0.0.1:8097/index.html` and
-die on `net::ERR_CONNECTION_REFUSED` if nothing is listening. Start one first
-and leave it running:
+`npm run e2e:read` and `npm run e2e:readalong` each **start their own server**
+on an OS-assigned port. Nothing has to be running first, and two of them can run
+at the same time without colliding.
 
-```bash
-python tools/preview-server.py 8097 app/src/main/assets
-```
+This section used to say the opposite — start `python tools/preview-server.py
+8097 app/src/main/assets` first and leave it running. That was already false for
+`e2e:readalong`, which has always bound its own ephemeral port, and it is what
+made `e2e:read` dangerous: with a hardcoded 8097, four concurrent servers all
+bound successfully (Python's `http.server` sets `allow_reuse_address`) and the
+gate reported PASS while serving a different worktree's tree. Fixed 2026-09-04.
+Never give an e2e harness a fixed port.
 
 ### Android APK
 
