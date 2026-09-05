@@ -21,6 +21,9 @@ import {
   groupHeads, groupHead, groupRowLabels, fakeAudioLibrary,
 } from './settings-harness.jsx';
 import { classifyV3ImportBegin as realClassifyV3 } from '../../utils/backup-android.js';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 beforeEach(() => {
   setupSettingsGlobals();
@@ -31,6 +34,90 @@ beforeEach(() => {
 afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); });
 
 const slider = (label) => document.querySelector(`input[type="range"][aria-label*="${label}"]`);
+
+/* Every rendered settings group must have a SETTINGS_TOPICS row, and nothing
+   else may have one.
+   ═══════════════════════════════════════════════════════════════════════
+   `matchesGroup` dereferences `SETTINGS_TOPICS[id].includes(word)` for the
+   FIRST typed character, so a group rendered without a row throws on that
+   keystroke and takes the whole screen with it. That is not hypothetical: the
+   tour added a tenth group and typing one character crashed Settings
+   (2026-09-04). The tenth is fixed; the eleventh will do it again, because the
+   group list and the topic table are two definitions that must agree with
+   nothing enforcing it.
+
+   The other direction is asserted too, and it is not symmetry for its own
+   sake: `matchingCount` counts the TABLE's keys, so a row for a group the
+   screen does not render makes the "N groups match" line say a number the
+   reader cannot see. One is a crash, one is a lie; both are the same drift.
+
+   Source-level, deliberately. A rendered-DOM count cannot do this job: several
+   groups are conditional, so a runtime scan measures the props it happened to
+   be given rather than the set the file can produce. The failure being guarded
+   is a `groupProps('x')` line ARRIVING without its row, and that is visible by
+   reading.
+
+   LIMIT: this reads the ids as text, so a group whose id is computed rather
+   than written as a literal is invisible here. Every one of the ten is a
+   literal today and there is no reason for one not to be; if that changes, the
+   assertion below that the count is at least ten is what fails first.
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('SETTINGS_TOPICS covers exactly the groups the screen renders', () => {
+  const SRC = resolve(dirname(fileURLToPath(import.meta.url)), 'SettingsScreen.jsx');
+  const raw = () => readFileSync(SRC, 'utf8');
+
+  /* Executable text only. This file's own header narrates the crash and names
+     group ids in prose; the third case proves the stripper is what makes the
+     negatives below mean anything rather than an empty string doing it. */
+  const code = () => raw()
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+
+  const renderedGroupIds = () => {
+    const out = new Set();
+    const re = /groupProps\(\s*'([a-z0-9-]+)'\s*\)/g;
+    let m;
+    while ((m = re.exec(code()))) out.add(m[1]);
+    return out;
+  };
+  const topicIds = () => {
+    const block = /const SETTINGS_TOPICS = \{([\s\S]*?)\n\};/.exec(code());
+    if (!block) return new Set();
+    const out = new Set();
+    const re = /^\s*([a-z0-9-]+)\s*:/gm;
+    let m;
+    while ((m = re.exec(block[1]))) out.add(m[1]);
+    return out;
+  };
+
+  it('no rendered group is missing its topics row', () => {
+    const missing = [...renderedGroupIds()].filter((id) => !topicIds().has(id)).sort();
+    expect(missing).toEqual([]);
+  });
+
+  it('no topics row exists for a group the screen never renders', () => {
+    const orphan = [...topicIds()].filter((id) => !renderedGroupIds().has(id)).sort();
+    expect(orphan).toEqual([]);
+  });
+
+  /* Non-vacuity, and it does NOT share its evidence with the two above: both
+     pass trivially if either scanner finds nothing. This pins what they must
+     be seeing, by name and by count, and proves the comment stripper is doing
+     the work rather than emptying the file. */
+  it('the scanners actually find both sets, and the stripper leaves the code', () => {
+    const rendered = renderedGroupIds();
+    const topics = topicIds();
+    expect(rendered.size).toBeGreaterThanOrEqual(10);
+    expect(topics.size).toBe(rendered.size);
+    for (const id of ['appearance', 'reading', 'data', 'help']) {
+      expect(rendered.has(id)).toBe(true);
+      expect(topics.has(id)).toBe(true);
+    }
+    // The stripped text is still the program, not an empty string.
+    expect(code()).toMatch(/export function SettingsScreen/);
+    expect(code().length).toBeGreaterThan(20000);
+  });
+});
 
 describe('settings filter and lazy progress', () => {
   it('finds and expands backup settings, then restores the previous accordion state', () => {
