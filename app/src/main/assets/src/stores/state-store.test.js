@@ -86,6 +86,30 @@ describe('StateStore — lsShim', () => {
     expect(shim.settings.showSurpriseButton).toBeUndefined();
   });
 
+  /* F7 — fontScaleSource, 2026-09-04. The shim's own header says do NOT
+     expand it without first verifying a new field is read pre-React-mount.
+     Both of these are: index.html:142 picks its input with fontScaleSource
+     and, on the system branch, reads the CACHED systemFontScale — it cannot
+     call the Android bridge, because an inline document-start script has no
+     proof the JavascriptInterface exists yet. Leave either out and the early
+     writer falls back on every launch while React corrects it: a resize flash
+     on every boot, which is the exact failure this shim exists to prevent.
+
+     A value-level RED, not a missing symbol: before the shim was expanded
+     these read `undefined` while the store held the values. */
+  it('F7: carries fontScaleSource and systemFontScale, which the boot writer reads', () => {
+    StateStore.set({
+      theme: 'dark',
+      tabs: [1],
+      settings: { fontStyle: 'classic', fontScale: '1', fontScaleSource: 'system', systemFontScale: '1.8' },
+    });
+    const shim = JSON.parse(localStorage.getItem('vot-state'));
+    expect(shim.settings.fontScaleSource).toBe('system');
+    expect(shim.settings.systemFontScale).toBe('1.8');
+    // ...and the shim is still REDUCED — this is not a licence to widen it.
+    expect(shim.tabs).toBeUndefined();
+  });
+
   it('drops undefined theme from shim (JSON.stringify strips undefined)', () => {
     StateStore.set({ tabs: [1, 2, 3] });
     const shim = JSON.parse(localStorage.getItem('vot-state'));

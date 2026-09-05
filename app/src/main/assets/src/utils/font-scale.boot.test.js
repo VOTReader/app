@@ -62,7 +62,7 @@ describe('F8: the inline boot writer is the module, copied', () => {
       let applied = null;
       const s = { settings };
       const document = { documentElement: { style: { setProperty: (k, v) => { if (k === '--font-scale') applied = v; } } } };
-      // eslint-disable-next-line no-new-func -- running the shipped copy IS the assertion
+      // Running the shipped copy IS the assertion.
       new Function('s', 'document', BOOT_FONT_SCALE_EXPR)(s, document);
 
       expect(applied, `boot writer produced nothing for ${JSON.stringify(settings)}`).not.toBeNull();
@@ -78,7 +78,6 @@ describe('F8: the inline boot writer is the module, copied', () => {
     let applied = null;
     const s = { settings: { fontScale: '1', fontScaleSource: 'system', systemFontScale: '1.8' } };
     const document = { documentElement: { style: { setProperty: (k, v) => { if (k === '--font-scale') applied = v; } } } };
-    // eslint-disable-next-line no-new-func -- see above
     new Function('s', 'document', BOOT_FONT_SCALE_EXPR)(s, document);
     expect(applied).toBe('1.8');
   });

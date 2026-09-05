@@ -49,6 +49,7 @@
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
+import { normalizeFontScaleSource, resolveFontScale } from '../utils/font-scale.js';
 
 /**
  * Settings object shape. Fields with stable defaults documented inline at
@@ -132,7 +133,23 @@ export function useSettings({ savedSettings, theme }) {
       showThemeBtn: true,
       showScrollNotch: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
-      fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
+      fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); the READER's choice
+      // fontScaleSource and systemFontScale are DELIBERATELY ABSENT from
+      // these defaults, and that is load-bearing.
+      //
+      // Defaults are merged OVER a legacy install's saved settings, so a
+      // literal `fontScaleSource: "system"` here would land on every reader
+      // who predates the key and look like an explicit choice —
+      // normalizeFontScaleSource would take it at face value and a reader
+      // sitting at 150% would drop to their phone's size with no migration
+      // ever running. Absence is the signal the normalizer needs; only the
+      // slider and the Settings switch ever write the key.
+      //
+      // systemFontScale is likewise not a default: it is whatever the Android
+      // bridge last reported, written by the effect below and cached for
+      // index.html's pre-bundle boot writer. Absent on web, where there is no
+      // bridge — which is also what makes it the availability signal for the
+      // Settings row.
       // Autoscroll. Speed is stored in LINES PER MINUTE, never px/s: the text-
       // size slider spans 80–160%, and a px/s speed would silently change
       // reading pace by up to 2× when the reader resizes text. The controller
@@ -203,19 +220,45 @@ export function useSettings({ savedSettings, theme }) {
     const customFontsEl = /** @type {HTMLStyleElement | null} */ (document.getElementById("custom-fonts"));
     if (customFontsEl) customFontsEl.disabled = !fontDef || fontDef.id === "classic";
     document.documentElement.style.setProperty("--font-body", readingFontCss(settings.fontStyle));
-    // WL1/Session-4 — text-size scale. Mirror settings.fontScale onto the
+    // WL1/Session-4 — text-size scale. Mirror the resolved scale onto the
     // --font-scale CSS var on <html>; app.css multiplies it into the root
     // font-size so all rem/em sizing scales (chrome is px-pinned — see the
     // "SESSION-4 TEXT-ONLY SCALING" block at the end of app.css). The
     // index.html boot script sets the initial value pre-mount (no FOUC);
-    // this handles live changes from the Settings slider.
-    // SEC-3: clamp numerically to the slider's range — settings (incl.
-    // fontScale) are import-restorable from a backup, and an out-of-range
-    // value would land in the --font-scale CSS var. The old 4-step selector
-    // values ("1"/"1.15"/"1.3"/"1.5") all fall inside the range.
-    const _fs = parseFloat(String(settings.fontScale));
-    const _fsSafe = Number.isFinite(_fs) ? Math.min(3, Math.max(0.8, _fs)) : 1;
-    document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
+    // this handles live changes from the Settings slider AND corrects the
+    // pre-mount guess once the live bridge value is known.
+    //
+    // WHICH INPUT WINS is settings.fontScaleSource, not settings.fontScale —
+    // see utils/font-scale.js. Clamping lives in resolveFontScale (SEC-3:
+    // settings are import-restorable from a backup, so an out-of-range value
+    // must not reach the CSS var).
+    //
+    // THE BRIDGE IS READ HERE AND NOWHERE ELSE. The value is cached back into
+    // settings.systemFontScale so index.html's inline writer — which runs
+    // before any bundle and has no proof the JavascriptInterface exists yet —
+    // never has to ask. `getSystemFontScale` does not exist on the bridge
+    // until the native text-zoom batch lands; until then this reads undefined,
+    // nothing is cached, and a 'system' source renders at 1, which is exactly
+    // today's behaviour. The web build has no bridge and is unaffected by
+    // design.
+    const _src = normalizeFontScaleSource(settings, 'system');
+    let _sysNow;
+    try {
+      const _b = /** @type {any} */ (PlatformBridge);
+      if (typeof _b.getSystemFontScale === 'function') _sysNow = _b.getSystemFontScale();
+    } catch (_e) { /* a bridge hop can throw; a wrong text size is not worth a crash */ }
+    const _sysStr = (_sysNow === undefined || _sysNow === null) ? undefined : String(_sysNow);
+    const _resolved = resolveFontScale(
+      _sysStr === undefined ? settings : { ...settings, systemFontScale: _sysStr },
+      _src,
+    );
+    document.documentElement.style.setProperty("--font-scale", String(_resolved));
+    // Cache it for the next boot, and only when it actually moved — this
+    // effect runs on every settings change and an unconditional write would
+    // loop.
+    if (_sysStr !== undefined && _sysStr !== settings.systemFontScale) {
+      setSettings((prev) => ({ ...prev, systemFontScale: _sysStr }));
+    }
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

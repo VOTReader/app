@@ -579,8 +579,86 @@ describe('applyImportPayload', () => {
       { storesMap: {}, flagMap: {}, mediaStore: emptyMedia,
         validateStorePayload: okValidate, validateMediaRecord: okValidate },
     );
-    expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
+    // NOT byte-identical any more, deliberately: the import path stamps
+    // `settings.fontScaleSource` into the LS mirror before reseeding it
+    // (fontScaleSource, 2026-09-04). A legacy backup carries no source, and
+    // at IMPORT an absent source means 'reader' — the reader is asking for
+    // their state back, not asking the app to re-decide. Left unstamped, this
+    // mirror hydrates as 'system' and the restore adopts the new phone's text
+    // size. The theme, and every key that is not vot-, are untouched.
+    expect(JSON.parse(localStorage.getItem('vot-state'))).toEqual({
+      theme: 'dark', settings: { fontScaleSource: 'reader' },
+    });
     expect(localStorage.getItem('evil')).toBeNull();
+  });
+
+  /* F6/F9 — the import property itself, at the boundary that decides it. */
+  it('stamps fontScaleSource=reader into BOTH containers on import', async () => {
+    const st = fakeStore('set');
+    await applyImportPayload(
+      {
+        exportVersion: 2,
+        data: { 'vot-state': '{"settings":{"fontScale":"1.4"}}' },
+        stores: { 'vot-state': { settings: { fontScale: '1.4' } } },
+      },
+      { storesMap: { 'vot-state': { store: st, method: 'set' } }, flagMap: {},
+        mediaStore: emptyMedia, validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    // The LS mirror the pre-mount boot writer reads on the next launch.
+    expect(JSON.parse(localStorage.getItem('vot-state')).settings.fontScaleSource).toBe('reader');
+    // ...and the store payload, which is what React hydrates from.
+    expect(st.calls[0].settings.fontScaleSource).toBe('reader');
+  });
+
+  /* F9, as rewritten: import-validators types `vot-state` as a bare 'object'
+     with "store does NOT coerce", so there is no per-field hook to reject a
+     bad source on the way in. The property that actually protects the reader
+     is what the import WRITES — an unknown value must never survive as itself
+     and must never become 'system', which would adopt the new phone's scale. */
+  it('F9: a garbage fontScaleSource in a backup is normalized, never adopted', async () => {
+    const st = fakeStore('set');
+    await applyImportPayload(
+      {
+        exportVersion: 2,
+        data: { 'vot-state': '{"settings":{"fontScale":"1","fontScaleSource":"garbage"}}' },
+        stores: { 'vot-state': { settings: { fontScale: '1', fontScaleSource: 'garbage' } } },
+      },
+      { storesMap: { 'vot-state': { store: st, method: 'set' } }, flagMap: {},
+        mediaStore: emptyMedia, validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    for (const got of [
+      JSON.parse(localStorage.getItem('vot-state')).settings.fontScaleSource,
+      st.calls[0].settings.fontScaleSource,
+    ]) {
+      expect(['system', 'reader']).toContain(got);
+      expect(got).toBe('reader');
+    }
+  });
+
+  /* F10 — the case that would otherwise ship broken. `_applyStoresAndFlags`
+     SKIPS a section that fails shape validation, deliberately, so corrupt data
+     cannot overwrite good data. If only the store payload were stamped, a
+     skipped `vot-state` would leave the raw un-normalized LS string in place
+     and the next boot would take the 'system' branch — a restore adopting the
+     new phone's scale, arriving through the corruption handler, which is the
+     moment a faithful restore matters most. */
+  it('F10: a SKIPPED vot-state section still leaves a stamped LS mirror', async () => {
+    const st = fakeStore('set');
+    const res = await applyImportPayload(
+      {
+        exportVersion: 2,
+        data: { 'vot-state': '{"settings":{"fontScale":"1"}}' },
+        stores: { 'vot-state': { settings: { fontScale: '1' } } },
+      },
+      { storesMap: { 'vot-state': { store: st, method: 'set' } }, flagMap: {},
+        mediaStore: emptyMedia,
+        validateStorePayload: () => ['bad shape'],   // the section is skipped
+        validateMediaRecord: okValidate },
+    );
+    expect(res.skippedStores).toContain('vot-state');
+    expect(st.calls.length).toBe(0);                 // nothing reached the store
+    // The mirror is still stamped, so the reader's 100% survives the skip.
+    expect(JSON.parse(localStorage.getItem('vot-state')).settings.fontScaleSource).toBe('reader');
   });
 
   it('V1 fallback: parses LS-shape strings in data and applies them', async () => {

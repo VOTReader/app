@@ -22,6 +22,7 @@
 */
 
 import { validateV3MediaMetadata } from './import-validators.js';
+import { normalizeFontScaleSource } from './font-scale.js';
 
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
@@ -452,6 +453,69 @@ function _whenSaved(s) {
 // the applyImportPayload + applyV3 integration tests.
 
 /**
+ * Stamp `settings.fontScaleSource` into an incoming `vot-state`, in BOTH
+ * containers, before either applier runs.
+ *
+ * WHY IT IS STAMPED AT THE BOUNDARY rather than decided at read time: import
+ * and hydration disagree about what an absent source means, and only the
+ * import path knows which event this is. Threading an "I am an import" flag
+ * through hydration would put a flag that can be wrong on the path that runs
+ * every launch, to serve the path that runs rarely. Stamp once where the
+ * intent exists; hydration stays a pure read.
+ *
+ * A backup carrying `fontScale: "1"` and no source is a reader who exported at
+ * 100%. Left unstamped it hydrates as 'system' and restores at the NEW phone's
+ * scale — a restore that did not restore.
+ *
+ * WHY BOTH CONTAINERS, and this is the part that is not obvious: on the happy
+ * path the store write lands last (`vot-state` is in `_exportableStores()` as
+ * `{ store: StateStore, method: 'set' }`, and its `lsShim` rewrites the LS
+ * mirror), so stamping the store payload alone would be enough.
+ * `_applyStoresAndFlags` SKIPS any section that fails shape validation —
+ * deliberately, so corrupt data cannot overwrite good data. A skipped
+ * `vot-state` leaves the raw un-normalized LS string in place and the next
+ * boot's inline writer takes the 'system' branch. A restore that adopts the
+ * new phone's scale, arriving through the corruption handler — the moment a
+ * faithful restore matters most.
+ *
+ * REJECTED: giving the inline boot writer a 'reader' legacy default instead.
+ * It satisfies the import property and makes every genuinely-local install
+ * that never touched the slider paint at 1 pre-mount and then get corrected to
+ * the phone scale — a resize flash on every launch, for exactly the readers
+ * the feature is for.
+ *
+ * Mutates in place and swallows its own errors: a malformed `vot-state` is the
+ * appliers' problem to skip, not this helper's to throw on.
+ *
+ * @param {any} parsedData  the `data` container (LS strings, keyed by store name)
+ * @param {any} parsedStores the `stores` container (parsed objects)
+ * @returns {void}
+ */
+function _stampFontScaleSource(parsedData, parsedStores) {
+  // The LS mirror: a JSON *string*, so parse-stamp-restringify.
+  try {
+    const raw = parsedData && parsedData['vot-state'];
+    if (typeof raw === 'string') {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        o.settings = o.settings || {};
+        o.settings.fontScaleSource = normalizeFontScaleSource(o.settings, 'reader');
+        parsedData['vot-state'] = JSON.stringify(o);
+      }
+    }
+  } catch (_e) { /* malformed LS mirror — the applier's problem, not ours */ }
+
+  // The store payload: already an object.
+  try {
+    const st = parsedStores && parsedStores['vot-state'];
+    if (st && typeof st === 'object') {
+      st.settings = st.settings || {};
+      st.settings.fontScaleSource = normalizeFontScaleSource(st.settings, 'reader');
+    }
+  } catch (_e) { /* same */ }
+}
+
+/**
  * Reseed the localStorage shim keys from a backup's `data` map: clear each known
  * key, then restore the string value for any `vot-`-prefixed key.
  * @param {Record<string, any> | null | undefined} dataObj
@@ -612,6 +676,10 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
   // non-coercing stores (state, home-order), persist garbage.
   /** @type {string[]} */
   const skippedStores = [];
+
+  // (0) Stamp fontScaleSource into both containers before either applier
+  //     runs — see _stampFontScaleSource for why both, and why here.
+  _stampFontScaleSource(parsed && parsed.data, parsed && parsed.stores);
 
   // (1) Reseed the LS shim keys from `data`.
   _reseedLsData(parsed && parsed.data, dataLsKeys);
@@ -886,6 +954,10 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
     catch (cleanupError) { console.warn('media import staging cleanup failed', cleanupError); }
     throw e;
   }
+
+  // Stamp fontScaleSource into both containers before either applier runs —
+  // see _stampFontScaleSource for why both, and why here.
+  _stampFontScaleSource(manifest && manifest.data, stores);
 
   // (2) Reseed the LS shim only after the media commit lands. This keeps even
   // the small boot-state mirror unchanged when the media phase throws outright.

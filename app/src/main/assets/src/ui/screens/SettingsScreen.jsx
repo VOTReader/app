@@ -2,6 +2,8 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeFontScaleSource, resolveFontScale } from '../../utils/font-scale.js';
+
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
    numeric string, so old values "1"/"1.15"/"1.3"/"1.5" remain valid). The
@@ -1592,7 +1594,25 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     }
   };
 
-  const textScalePercent = Math.round(clampFontScale(settings.fontScale || '1') * 100);
+  // fontScaleSource (2026-09-04): which input the app is actually rendering
+  // from. The slider shows the EFFECTIVE value, so a reader on 'system' sees
+  // the size they are reading at, not a stale stored "1".
+  //
+  // Through the shared helpers, NOT a local reimplementation: an install that
+  // predates the key has no fontScaleSource, and only normalizeFontScaleSource
+  // knows that a stored scale other than 1 is evidence the slider was used.
+  // A cruder `=== 'reader' ? … : 'system'` here reads every legacy reader as
+  // 'system' and shows them 100% while they are looking at 150% — which is
+  // what the first cut of this row did, and what the folio tests caught.
+  const fontScaleSource = normalizeFontScaleSource(settings, 'system');
+  const effectiveFontScale = resolveFontScale(settings, fontScaleSource);
+  // The row is Android-only: on web there is no system scale to defer to, so
+  // a switch there would do nothing. `systemFontScale` is written by
+  // use-settings from the live bridge, so its presence IS the availability
+  // signal — no second platform check to drift out of agreement with it.
+  const systemFontScaleAvailable = settings.systemFontScale !== undefined
+    && settings.systemFontScale !== null;
+  const textScalePercent = Math.round(effectiveFontScale * 100);
   const selectedFont = typeof readingFontById === 'function'
     ? readingFontById(settings.fontStyle || 'classic')
     : null;
@@ -1644,10 +1664,34 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 it default, looks better anyway") — pure-black surfaces are
                 now the dark theme's own tokens in app.css. A persisted
                 settings.trueBlack key is an ignored orphan. */}
+            {/* Text Size (fontScaleSource, 2026-09-04). The slider shows the
+                EFFECTIVE size, so a reader deferring to their phone sees the
+                size they are actually reading at rather than a stale 100%.
+                Touching it is the act that means "I am choosing" — it writes
+                fontScaleSource:'reader' along with the value, because the
+                stored scale alone cannot express intent ("1" is both "never
+                opened this" and "chose 100%"). */}
             <TextSizeSliderRow
-              value={settings.fontScale || "1"}
-              onChange={(v) => onSetting("fontScale", v)}
+              value={String(effectiveFontScale)}
+              onChange={(v) => { onSetting("fontScale", v); onSetting("fontScaleSource", "reader"); }}
             />
+            {/* Android only: the switch that hands the decision back to the
+                phone. It RENDERS ITS STATE deliberately — "Use my phone's text
+                size · on" is the whole explanation for why a reader's text
+                changed size after the upgrade, and shipping it write-only
+                would leave that change unexplained. No banner, no migration
+                notice; this row is the notice.
+
+                Hidden on web, where there is no system scale to defer to and
+                the row would be a switch that does nothing. */}
+            {systemFontScaleAvailable && (
+              <SettingsRow
+                label="Use my phone's text size"
+                desc="Follow the text size set in your phone's display settings. Moving the slider above turns this off."
+                checked={fontScaleSource === "system"}
+                onToggle={() => onSetting("fontScaleSource", fontScaleSource === "system" ? "reader" : "system")}
+              />
+            )}
             {/* Reading Font (2026-07-31) — replaces the two-state "Modern
                 Fonts" toggle. settings.fontStyle now holds any READING_FONTS
                 id; "classic"/"modern" keep their historical meanings so
