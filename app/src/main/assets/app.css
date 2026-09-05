@@ -2684,7 +2684,7 @@
     .settings-summary-item { min-width:0; padding:1rem clamp(0.8rem,2.5vw,1.6rem) 1.15rem; }
     .settings-summary-item + .settings-summary-item { border-left:1px solid var(--border); }
     .settings-summary dt { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-muted); letter-spacing:0.05em; margin:0 0 0.35rem; }
-    .settings-summary dd { margin:0; font-family:var(--font-body); font-size:clamp(var(--fs-18),2.4vw,var(--fs-24)); color:var(--gold); line-height:1.2; overflow-wrap:anywhere; }
+    .settings-summary dd { margin:0; font-family:var(--font-body); font-size:clamp(var(--fs-18),2.4vw,var(--fs-24)); color:var(--gold); line-height:1.2; overflow-wrap:break-word; }
     .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
     .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
     .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
@@ -2717,7 +2717,9 @@
     .settings-group-body { margin-top:0.65rem; }
     .settings-section.open { margin-bottom:1.3rem; }
     .settings-screen.settings-large-type .settings-summary { display:block; }
-    .settings-screen.settings-large-type .settings-summary-item { display:grid; grid-template-columns:minmax(6rem,0.5fr) 1fr; gap:0.75rem; align-items:baseline; border-left:none; border-bottom:1px solid var(--border); }
+    /* Large type stacks the pair: the two-column grid's 6rem label minimum scaled with Text Size and
+       left the value 68 px at 36 px type, so "System Serif" broke twice mid-word (2026-09-05). */
+    .settings-screen.settings-large-type .settings-summary-item { display:block; border-left:none; border-bottom:1px solid var(--border); }
     .settings-screen.settings-large-type .settings-summary-item:last-child { border-bottom:none; }
     .settings-screen.settings-large-type .settings-summary dd { font-size:var(--fs-20); }
     @media (max-width:520px) {
