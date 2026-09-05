@@ -21,13 +21,25 @@
      localStorage['vot-state'] = JSON.stringify({
        theme: full?.theme,
        settings: { fontStyle: full?.settings?.fontStyle,
-                   fontScale: full?.settings?.fontScale },
+                   fontScale: full?.settings?.fontScale,
+                   fontScaleSource: full?.settings?.fontScaleSource,
+                   systemFontScale: full?.settings?.systemFontScale },
      });
 
    The reduced shape is grepped from the literal boot-script code —
    do NOT expand it without first verifying a new field is actually
    read pre-React-mount. Over-inclusion wastes LS quota on data
    already in IDB; under-inclusion causes a wrong-theme flash.
+
+   GATE CHECKED, not waived (2026-09-04, fontScaleSource): both new
+   fields ARE read pre-mount. index.html:142 picks the input with
+   `fontScaleSource` and, when that says 'system', reads the cached
+   `systemFontScale` — it cannot call the Android bridge, because an
+   inline document-start script has no proof the JavascriptInterface
+   is injected yet. Leave either field out and the early writer falls
+   back on every launch while React corrects it: a resize flash on
+   every boot, which is the exact failure this shim exists to prevent.
+   Two short strings; the quota argument does not reach them.
 
    STATE SHAPE (the union usePersistedState writes):
      tabs[], activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
@@ -71,7 +83,8 @@ import { mergeStateStore } from './store-merge.js';
 
 /**
  * Reduce the full state to the paths the boot script reads pre-mount —
- * `s.theme`, `s.settings.fontStyle`, and `s.settings.fontScale` (WL1
+ * `s.theme`, `s.settings.fontStyle`, `s.settings.fontScale`,
+ * `s.settings.fontScaleSource` and `s.settings.systemFontScale` (WL1
  * text-size: applied to the --font-scale CSS var before React mounts so
  * larger text does not flash in at the standard size). Anything else is
  * kept in IDB only. Returning these as a stable shape (always `theme` +
@@ -79,7 +92,7 @@ import { mergeStateStore } from './store-merge.js';
  * undefined) keeps the LS payload predictable for the boot script.
  *
  * @param {VotState | null | undefined} full
- * @returns {{ theme: string | undefined, settings: { fontStyle: string | undefined, fontScale: string | undefined } }}
+ * @returns {{ theme: string | undefined, settings: { fontStyle: string | undefined, fontScale: string | undefined, fontScaleSource: string | undefined, systemFontScale: string | undefined } }}
  */
 function _bootScriptShim(full) {
   return {
@@ -87,6 +100,11 @@ function _bootScriptShim(full) {
     settings: {
       fontStyle: full && full.settings && full.settings.fontStyle,
       fontScale: full && full.settings && full.settings.fontScale,
+      // Both read pre-mount by index.html:142 — see the gate note in the
+      // header. systemFontScale is the last value React saw from the Android
+      // bridge, cached here precisely so the boot writer never has to ask.
+      fontScaleSource: full && full.settings && full.settings.fontScaleSource,
+      systemFontScale: full && full.settings && full.settings.systemFontScale,
     },
   };
 }
