@@ -83,24 +83,36 @@ object MainActivityLogic {
 
     /**
      * The onTrimMemory level at/above which MainActivity prunes the WebView's
-     * in-memory resource cache. Mirrors ComponentCallbacks2.TRIM_MEMORY_MODERATE
-     * (a frozen platform constant == 60), kept as a literal here so this module
+     * in-memory resource cache. Mirrors ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+     * (a frozen platform constant == 40), kept as a literal here so this module
      * stays framework-free (no android import) and JaCoCo-instrumentable.
+     *
+     * Was TRIM_MEMORY_MODERATE (60) until 2026-09-05. MEASURED, not assumed: in
+     * the API 36 android.jar this app compiles against, MODERATE(60),
+     * COMPLETE(80) and all three RUNNING_* constants carry java.lang.Deprecated,
+     * while BACKGROUND(40) and UI_HIDDEN(20) do not — the two survivors are
+     * exactly the two levels API 34+ still delivers. (Control: the instrument is
+     * not stuck reporting everything deprecated; 3 of 7 members come back clean.)
+     * A 60 gate on this phone is a gate that never opens, which made both halves
+     * of MainActivity.onTrimMemory dead code, the JS-side object-URL purge
+     * included.
      */
-    const val TRIM_MEMORY_MODERATE_LEVEL = 60
+    const val TRIM_MEMORY_BACKGROUND_LEVEL = 40
 
     /**
      * Decide whether an onTrimMemory([level]) signal is severe enough to drop
-     * the WebView's in-memory resource cache. True only at TRIM_MEMORY_MODERATE
-     * (60) and above — the background LRU-midpoint / COMPLETE(80) states — so the
-     * lighter background signals (UI_HIDDEN 20, BACKGROUND 40) and every
-     * foreground RUNNING_* level (5/10/15) are left alone: clearing the cache
-     * while the app is still interactive would only cost re-fetch jank for no
-     * pressure win. Assets are local (WebViewAssetLoader) so a background drop is
-     * cheap to repopulate on the next foregrounding.
+     * the WebView's in-memory resource cache. True from TRIM_MEMORY_BACKGROUND
+     * (40) up — BACKGROUND itself plus the MODERATE(60)/COMPLETE(80) levels that
+     * only API 33 and below still send — so UI_HIDDEN(20) and every foreground
+     * RUNNING_* level (5/10/15) are left alone: clearing the cache while the app
+     * is still interactive would only cost re-fetch jank for no pressure win.
+     * The original rationale is intact; 40 is still background-only, it is just
+     * the lowest background level rather than the middle one. Assets are local
+     * (WebViewAssetLoader) so a background drop is cheap to repopulate on the
+     * next foregrounding.
      */
     fun shouldTrimWebViewCache(level: Int): Boolean =
-        level >= TRIM_MEMORY_MODERATE_LEVEL
+        level >= TRIM_MEMORY_BACKGROUND_LEVEL
 
     /** Source crop + final thumbnail dimensions for a screenshot capture. */
     data class ScreenshotGeometry(

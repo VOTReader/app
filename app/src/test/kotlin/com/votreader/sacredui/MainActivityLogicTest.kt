@@ -159,28 +159,35 @@ class MainActivityLogicTest {
     }
 
     // ── shouldTrimWebViewCache ─────────────────────────────────────────
-    // Prune the WebView in-memory cache only at TRIM_MEMORY_MODERATE(60)+ —
-    // background LRU-midpoint states. Foreground RUNNING_* levels (5/10/15) and
-    // the lighter background UI_HIDDEN(20)/BACKGROUND(40) signals must NOT trim,
-    // or the user gets re-fetch jank mid-read. The 60 boundary is inclusive.
+    // Prune the WebView in-memory cache from TRIM_MEMORY_BACKGROUND(40) up —
+    // background states only. UI_HIDDEN(20) and every foreground RUNNING_* level
+    // (5/10/15) must NOT trim, or the user gets re-fetch jank mid-read. The 40
+    // boundary is inclusive.
+    //
+    // 40 rather than 60 because API 34+ stops delivering the levels above
+    // BACKGROUND: in the API 36 android.jar, MODERATE(60), COMPLETE(80) and all
+    // three RUNNING_* constants carry java.lang.Deprecated while BACKGROUND(40)
+    // and UI_HIDDEN(20) do not. A 60 gate is a gate that never opens on the
+    // phone this ships to. The MODERATE/COMPLETE cases below stay because API 33
+    // and below still deliver them and they must keep trimming.
     @Test
-    fun `trims at MODERATE exactly (inclusive boundary)`() {
-        assertTrue(MainActivityLogic.shouldTrimWebViewCache(60))
+    fun `trims at BACKGROUND exactly (inclusive boundary)`() {
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(40))
     }
 
     @Test
-    fun `trims at COMPLETE (above MODERATE)`() {
+    fun `trims at MODERATE and COMPLETE (above BACKGROUND, API 33 and below)`() {
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(60))
         assertTrue(MainActivityLogic.shouldTrimWebViewCache(80))
     }
 
     @Test
-    fun `does NOT trim just below MODERATE`() {
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(59))
+    fun `does NOT trim just below BACKGROUND`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(39))
     }
 
     @Test
-    fun `does NOT trim at BACKGROUND(40) or UI_HIDDEN(20)`() {
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(40))
+    fun `does NOT trim at UI_HIDDEN(20)`() {
         assertFalse(MainActivityLogic.shouldTrimWebViewCache(20))
     }
 
