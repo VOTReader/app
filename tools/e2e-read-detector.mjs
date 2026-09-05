@@ -173,12 +173,46 @@ try {
     return false;
   }, re.source);
 
+  /* WAIT FOR THE SCREEN, NEVER FOR A DURATION.
+     ─────────────────────────────────────────────────────────────────
+     These four steps used to be `click(); await sleep(N)`, tuned on this
+     machine — and they were carrying slack that did not belong to them. The
+     reset block that used to sit above (localStorage.clear + deleteDatabase +
+     location.reload + a 1500 ms sleep + a second #root wait) spent two to
+     three seconds here for its own reasons, and the corpus landed inside it.
+     Removing the reset removed that slack, and on GitHub's ubuntu-latest
+     runner 900 ms after "Volume One" was not enough for the index to render:
+     `opened: null`, then `segs: 0`, then `preface not marked read=1: {}`.
+     Twenty local runs never showed it. (Run 33942768839.)
+
+     A sleep long enough for the slowest runner is a sleep wasted on every
+     other one, and it silently becomes too short again the next time
+     something upstream changes. So each step now waits for the thing the NEXT
+     step needs, with a bounded timeout that fails loudly and names the step. */
+  const waitForScreen = async (label, fn, ...args) => {
+    try { await page.waitForFunction(fn, { timeout: 30000 }, ...args); }
+    catch (e) { throw new Error(`walk stalled waiting for ${label}: ${(e && e.message) || e}`); }
+  };
+  const HAS_TEXT = (src) => {
+    const rx = new RegExp(src);
+    return [...document.querySelectorAll('button,[role=button],[class*=tile],[class*=card],[class*=row]')]
+      .some((b) => rx.test(b.textContent) && b.textContent.length < 120);
+  };
+
   // Onboarding (fresh profile) → Home → Prophetic Letters → Volume One.
-  for (const re of [/Continue/, /Begin Reading/]) { await clickText(re); await sleep(700); }
-  await clickText(/Prophetic Letters/); await sleep(900);
+  await clickText(/Continue/);
+  await waitForScreen('the Begin Reading button', HAS_TEXT, 'Begin Reading');
+  await clickText(/Begin Reading/);
+  await waitForScreen('Home', HAS_TEXT, 'Prophetic Letters');
+  await clickText(/Prophetic Letters/);
+  await waitForScreen('the volumes screen', HAS_TEXT, 'Volume One(?!\d)');
   await page.evaluate(() => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); });
-  await sleep(1200);
-  await clickText(/Volume One(?!\d)/); await sleep(900);
+  await clickText(/Volume One(?!\d)/);
+  // The one that failed on the runner: the index rows are what `opened` below
+  // clicks, so wait for THEM rather than for a plausible number of milliseconds.
+  await waitForScreen('the Volume One index rows', () => [...document.querySelectorAll(
+    '.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]',
+  )].some((b) => b.querySelector('.idx-min-chip')));
 
   // Open the preface (first chip row).
   const opened = await page.evaluate(() => {
