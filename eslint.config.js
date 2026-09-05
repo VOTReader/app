@@ -110,6 +110,18 @@ export default [
       // no-unused-vars.
       'no-empty': 'warn',
 
+      /* webkit-compat-1. `requestIdleCallback` has never shipped in WebKit —
+         no Safari, and no iOS browser of any brand, since every iOS engine is
+         WebKit. A bare reference is a ReferenceError on those devices, not a
+         graceful degradation. Every call site here did carry the guard, and
+         the most recent one carried it by hand again, which is the shape that
+         eventually forgets. utils/on-idle.js is the guard, once; this rule is
+         what stops the bare global coming back past review. */
+      'no-restricted-globals': ['error',
+        { name: 'requestIdleCallback', message: 'WebKit has never shipped it. Use onIdle() from utils/on-idle.js — it carries the guard, the timeout and the matching cancel.' },
+        { name: 'cancelIdleCallback', message: 'Use the cancel function onIdle() returns; it knows which API it scheduled with.' },
+      ],
+
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of
       // them (rules-of-hooks, exhaustive-deps) are the canonical pair every

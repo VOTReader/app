@@ -34,6 +34,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useAutoScroll, clampLpm, clampEndDwell, lineHeightOf } from '../../hooks/use-autoscroll.js';
+import { onIdle } from '../../utils/on-idle.js';
 
 /**
  * Reading-transport configuration, provided by App (ReadingChromeProvider).
@@ -186,12 +187,9 @@ export function AutoScrollControl({ scrollRef, pager, placeKey }) {
     const el = scrollRef && scrollRef.current;
     if (!el) return undefined;
     const read = () => setWordsPerLine(measureWordsPerLine(el));
-    if (typeof requestIdleCallback === 'function') {
-      const tok = requestIdleCallback(read, { timeout: 1500 });
-      return () => cancelIdleCallback(tok);
-    }
-    const tok = setTimeout(read, 0);
-    return () => clearTimeout(tok);
+    // onIdle, not a bare requestIdleCallback: WebKit has never shipped that
+    // API, so every iOS reader takes the timer path. utils/on-idle.js.
+    return onIdle(read, { timeout: 1500, fallbackDelay: 0 });
   }, [scrollRef, placeKey]);
 
   // ── Dwell row ────────────────────────────────────────────────────────
