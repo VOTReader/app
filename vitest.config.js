@@ -18,6 +18,21 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.js'],
+
+    // Vitest's default per-test timeout is 5 s, and nothing here raised it. Four
+    // of these files do whole-tree synchronous filesystem scans — app-css,
+    // reading-fonts, toast-css and check-corpus-version — and on a machine
+    // running several agent sessions at once they have gone red at 5 s and green
+    // in 185 ms alone. Measured 2026-09-04: those four are 29 tests and 814 ms of
+    // test time on an idle machine, against 3.96 s of jsdom environment setup, so
+    // the budget is spent on contention rather than on the assertions.
+    //
+    // A test that fails because the machine was busy is worse than a slow suite:
+    // it sends the reader hunting for a defect that is not there, and it teaches
+    // people to re-run a red. 20 s is ~25x the measured solo cost, so it still
+    // fails a genuine hang rather than waiting on one — this raises the ceiling,
+    // it does not remove it.
+    testTimeout: 20000,
     include: [
       'app/src/main/assets/src/**/*.test.{js,jsx}',
       'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
