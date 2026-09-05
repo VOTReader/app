@@ -131,6 +131,55 @@ def rss_gb(pid):
         ctypes.windll.kernel32.CloseHandle(h)
 
 
+def commit_gb(pid):
+    """Pagefile-backed COMMIT of one pid, in GB -- the same PMC read, different
+    field, so it costs nothing extra.
+
+    This is REPORTED, never enforced, and the distinction is the point. Commit,
+    not resident set, is what starves the rest of the machine: Machine Ops
+    measured this aligner at 18.7 GB of commit against a 2.38 GB working set
+    while system-wide headroom oscillated between 2.0 and 7.7 GB. A ceiling that
+    watches RSS is blind to that by construction.
+
+    It is NOT a second kill switch, because the numbers do not separate: a
+    HEALTHY unit sits at ~18.7 GB of commit and the pathological one reached
+    29.8 GB, so any threshold between them is drawn through two samples and
+    would kill good work. Torch and the CUDA driver reserve commit they never
+    touch, so a high figure here is normal for this workload. The lever that
+    actually helps is machine-wide -- a pagefile floor raises the limit instead
+    of killing the tenant -- and that is not this tool's call to make. So: log
+    it on every kill, gather it across the Bible campaign, and pick a threshold
+    from data rather than from two points."""
+    if ctypes is None:
+        return 0.0
+    PROCESS_QUERY_LIMITED = 0x1000
+
+    class PMC(ctypes.Structure):
+        _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+
+    h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED, False, pid)
+    if not h:
+        return 0.0
+    try:
+        c = PMC()
+        c.cb = ctypes.sizeof(PMC)
+        if not ctypes.windll.psapi.GetProcessMemoryInfo(h, ctypes.byref(c), c.cb):
+            return 0.0
+        return c.PagefileUsage / (1024 ** 3)
+    finally:
+        ctypes.windll.kernel32.CloseHandle(h)
+
+
+def tree_commit_gb(pid):
+    """Commit of `pid` and every descendant, in GB. Same tree as tree_rss_gb."""
+    tree = _pid_tree()
+    return sum(commit_gb(p) for p in [pid] + _children_of(pid, tree))
+
+
 def kill_tree(p):
     """Kill the child AND its descendants. Killing only the direct child is how
     an orphan survives its parent and keeps running unwatched -- 2026-09-04, two
@@ -194,9 +243,11 @@ def main():
                 while not stop.wait(a.sample_s):
                     g = tree_rss_gb(p.pid)
                     if g > a.ceiling_gb:
-                        state["over"] = (state["unit"], g)
-                        log.write(f"  SUPERVISOR: rss {g:.2f} GB > {a.ceiling_gb} GB on "
-                                  f"{state['unit']} — killing this run and moving on\n")
+                        cm = tree_commit_gb(p.pid)
+                        state["over"] = (state["unit"], g, cm)
+                        log.write(f"  SUPERVISOR: rss {g:.2f} GB > {a.ceiling_gb} GB "
+                                  f"(commit {cm:.2f} GB) on {state['unit']} "
+                                  f"— killing this run and moving on\n")
                         log.flush()
                         kill_tree(p)
                         return
@@ -215,8 +266,9 @@ def main():
             over = state["over"]
 
         if over:
-            u, g = over
-            killed.append({"unit": u, "rssGb": round(g, 2), "when": time.strftime("%Y-%m-%d %H:%M:%S")})
+            u, g, cm = over
+            killed.append({"unit": u, "rssGb": round(g, 2), "commitGb": round(cm, 2),
+                           "when": time.strftime("%Y-%m-%d %H:%M:%S")})
             if u in banned:
                 print(f"supervisor: {u} exceeded the ceiling twice — giving up on it", flush=True)
             banned.add(u)
