@@ -268,3 +268,63 @@ describe('NavButtons — the icon cluster names itself', () => {
     }
   });
 });
+
+describe('the Home reorder hint', () => {
+  /* Corbin, 2026-09-05: the hint read "Hold to rearrange · Keyboard: Alt + ↑ / ↓"
+     and the keyboard half is going. It is the only line on Home that teaches a
+     gesture, and half of it taught a shortcut almost nobody on a phone can press.
+
+     The Alt+Arrow HANDLER stays — it still reorders, it is just no longer
+     advertised. That is a discoverability loss for a keyboard-only user, and it
+     is deliberate rather than overlooked; see the branch handoff. */
+
+  const hint = () => document.getElementById('home-reorder-hint');
+
+  it('RED: says nothing about a keyboard shortcut', () => {
+    setupGlobals();
+    renderHome();
+
+    const el = hint();
+    // PRESENCE CONTROL, and it is load-bearing: "the text does not mention a
+    // keyboard" is satisfied by a hint that was deleted, or never rendered at
+    // all. These two say the line is really there to be read, so the absence
+    // below is about its CONTENT.
+    expect(el).toBeTruthy();
+    expect(el.textContent).toMatch(/hold to rearrange/i);
+
+    expect(el.textContent).not.toMatch(/keyboard/i);
+    expect(el.textContent).not.toMatch(/alt/i);
+    expect(el.textContent).not.toContain('↑');
+    expect(el.textContent).not.toContain('↓');
+  });
+
+  it('is still what describes every tile, so the gesture reaches assistive tech', () => {
+    // The hint is not decoration: each tile carries aria-describedby pointing at
+    // it. Shortening the text must not orphan that reference — a describedby to
+    // a missing id is silently nothing.
+    setupGlobals();
+    const { container } = renderHome();
+
+    const tiles = [...container.querySelectorAll('.home-nav-item')];
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const t of tiles) expect(t.getAttribute('aria-describedby')).toBe('home-reorder-hint');
+    expect(hint()).toBeTruthy();
+  });
+
+  it('CONTROL: Alt+ArrowUp still reorders, so only the ADVERTISEMENT was removed', () => {
+    // The behaviour outlives its hint. Without this, deleting the handler along
+    // with the text would pass every assertion above.
+    setupGlobals();
+    const set = vi.fn();
+    globalThis.HomeOrderStore = {
+      get: () => ['volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history'],
+      set,
+    };
+    const { container } = renderHome();
+
+    const tiles = [...container.querySelectorAll('.home-nav-item')];
+    fireEvent.keyDown(tiles[1], { key: 'ArrowUp', altKey: true });
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set.mock.calls[0][0].slice(0, 2)).toEqual(['scriptures', 'volumes']);
+  });
+});
