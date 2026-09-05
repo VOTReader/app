@@ -131,6 +131,65 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(document.querySelector('.home-status[role="status"]').textContent).toBe('');
   });
 
+  /* codex-ux finding 3 — the idle warm-up, and the reason it retries.
+     ───────────────────────────────────────────────────────────────────
+     The hover warm-up is worth 6 ms on a touchscreen (measured), so on a phone
+     it does not replace the mount-time preload it arrived with; it moves the
+     3 MB download into the tap. The effect puts the warm-up back at the first
+     idle after paint instead of at mount.
+
+     THE FIRST VERSION OF THAT EFFECT DID NOTHING AT ALL, and nothing said so.
+     `window.__loadVotCorpus` is installed by a lazily-loaded bundle, so at the
+     first idle it is usually still undefined and `warmDestination` returns
+     without calling anything — no error, no signal, and a real-browser probe
+     showed the corpus request was never issued. A test that defined the loader
+     up front would have passed against that version, which is why the first
+     case here starts with the loader ABSENT. */
+  it('warms the VOT corpus at idle, retrying until the lazy loader exists', async () => {
+    vi.useFakeTimers();
+    try {
+      setupGlobals();
+      delete window.requestIdleCallback;        // exercise the setTimeout arm
+      delete window.__loadVotCorpus;            // the lazy bundle has not landed yet
+      renderHome({});
+
+      // Several idles with no loader: nothing to call, and no crash.
+      await act(async () => { vi.advanceTimersByTime(800); });
+
+      const load = vi.fn(() => Promise.resolve());
+      window.__loadVotCorpus = load;
+      await act(async () => { vi.advanceTimersByTime(800); });
+
+      expect(load).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('stops asking once it has warmed, and once its budget is spent', async () => {
+    vi.useFakeTimers();
+    try {
+      setupGlobals();
+      delete window.requestIdleCallback;
+      const load = vi.fn(() => Promise.resolve());
+      window.__loadVotCorpus = load;
+      renderHome({});
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      // Warmed on the first attempt and never again — this is a preload, not a
+      // poll, and re-firing it every 250 ms for the life of the screen would be
+      // worse than the problem it solves.
+      expect(load).toHaveBeenCalledTimes(1);
+
+      // And with no loader ever, the retries are bounded rather than endless.
+      load.mockClear();
+      cleanup();
+      delete window.__loadVotCorpus;
+      renderHome({});
+      await act(async () => { vi.advanceTimersByTime(30000); });
+      window.__loadVotCorpus = load;
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      expect(load).not.toHaveBeenCalled();      // budget spent long before
+    } finally { vi.useRealTimers(); }
+  });
+
   it('waits for every Surprise source and prevents repeated taps', async () => {
     setupGlobals();
     let finish;
