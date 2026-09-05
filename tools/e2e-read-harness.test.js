@@ -34,7 +34,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   ASSETS, startServer, servedCacheVersion, treeCacheVersion, assertServingOwnTree, httpGet,
+  serveOwnTree,
 } from './e2e-read-serve.mjs';
+import { readFileSync as readSrc } from 'node:fs';
 
 const DECOY_BODY = 'DECOY-NOT-THE-TREE-UNDER-TEST';
 let decoy = null;
@@ -105,5 +107,47 @@ describe('e2e:read serves its own tree', () => {
     // Whatever holds 8097 answers — but it is not serving this tree's
     // service worker, so the run must abort rather than report on it.
     await expect(assertServingOwnTree('http://127.0.0.1:8097')).rejects.toThrow(/CACHE_VERSION/);
+  });
+});
+
+/* The gap the Verifier found by bite-checking the three cases above, which is
+   the reason `serveOwnTree()` exists.
+
+   They reverted the port fix while LEAVING `startServer()` in place — the
+   realistic regression, not a synthetic one: the server still bound an
+   ephemeral port, and the detector navigated to a hardcoded 8097 anyway.
+   **The suite still passed 3/3.** Everything above asserts on a `base` this
+   file constructs itself, so it proves the MODULE behaves and never proves the
+   DETECTOR uses the module's origin. Two places the origin could be defined;
+   the guard covered one.
+
+   A test that pinned the fix rather than catching its removal — on the guard
+   built to stop that exact recurrence. These two cases close it. */
+describe('the detector uses the origin the module bound', () => {
+  it('serveOwnTree hands back a URL on its own ephemeral port', async () => {
+    decoy = await startDecoy();
+    const out = await serveOwnTree();
+    served = out.server;
+    try {
+      expect(out.url).toBe(`${out.base}/index.html`);
+      expect(out.url).not.toContain(':8097');
+      expect(await httpGet(out.url)).toBe(readFileSync(resolve(ASSETS, 'index.html'), 'utf8'));
+    } finally { /* afterEach shuts it */ }
+  });
+
+  /* Source-level, deliberately: the failure is a SECOND definition of the
+     origin appearing, and no runtime assertion can see a line that was never
+     executed. The detector must take its URL from the module and build none of
+     its own — that is the property, and it is checkable by reading. */
+  it('the detector builds no origin of its own', () => {
+    const src = readSrc(resolve(ASSETS, '..', '..', '..', '..', 'tools', 'e2e-read-detector.mjs'), 'utf8');
+    expect(src).toContain('serveOwnTree');
+    // Strip comments first: this file's header NARRATES the old
+    // http://127.0.0.1:8097 on purpose, and that prose is the opposite of the
+    // defect. Only executable lines carry the property.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/127\.0\.0\.1:\d+/);
+    // ...and no re-derivation from the server object either.
+    expect(code).not.toMatch(/address\(\)\s*\.\s*port/);
   });
 });
