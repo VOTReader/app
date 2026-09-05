@@ -862,6 +862,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // per [[consolidate-dont-duplicate]] via the showToast utility.
 
   const _TOAST_ID = 'vot-toast-info';
+  // Its own id, not _TOAST_ID: the escape offer and the status toast can be
+  // on screen at the same moment, and reusing one element would make the
+  // offer overwrite whatever the export was telling the reader.
+  const _ESCAPE_TOAST_ID = 'vot-toast-export-escape';
   // SEC1: route through textContent (opts.text), NOT innerHTML. Every caller here
   // passes a runtime-built status string (e.g. 'Import failed: ' + err.message,
   // 'could not read: ' + built.problems.join(', ')). None is trusted static markup,
@@ -977,7 +981,38 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
       hideToast(_TOAST_ID);
-      const sink = await PlatformBridge.openExportSink(filename);
+      // A save picker that NEVER settles leaves the reader with nothing on
+      // screen and no way forward — measured at 30 s and still going, on a
+      // fresh headless-Chromium profile, under a real trusted click. The
+      // bridge offers an escape once the picker has gone unanswered for
+      // PICKER_SLOW_MS; this puts that offer on screen.
+      //
+      // The wording is deliberately NOT error recovery. WebKit has never
+      // shipped the File System Access API, so a download IS how every iOS
+      // reader saves their backup, every time — "the usual way" is the plain
+      // truth for a large part of the flock, and framing it as a failure would
+      // make the ordinary path read as a broken one. It also does not claim the
+      // dialog failed to open: from here we cannot know whether it opened and
+      // the reader is still reading it, so it says only what is true either way.
+      const sink = await PlatformBridge.openExportSink(filename, {
+        onSlow: (saveTheUsualWay) => {
+          showToast({
+            id: _ESCAPE_TOAST_ID,
+            className: 'vot-toast vot-toast-action',
+            // SEC-2: TRUSTED STATIC markup, no interpolation — the same shape
+            // as the tab-close undo toast (hooks/use-tab-actions.js).
+            html: 'Still waiting for the save dialog. <button type="button" class="vot-escape-btn">Save the usual way</button>',
+            durationMs: 0,
+          });
+          const el = typeof document !== 'undefined' ? document.getElementById(_ESCAPE_TOAST_ID) : null;
+          const btn = el && el.querySelector('.vot-escape-btn');
+          if (btn) btn.addEventListener('click', saveTheUsualWay, { once: true });
+        },
+      });
+      // Whichever path claimed the export, the offer is stale the moment the
+      // sink resolves — including on cancel, where leaving it up would invite a
+      // tap that the bridge would (correctly) ignore.
+      hideToast(_ESCAPE_TOAST_ID);
       if (!sink) return; // user cancelled the picker — stay quiet
       _showToast('Saving backup…', 0);
       try {
@@ -999,6 +1034,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     } catch (e) {
       console.warn('export failed', e);
       hideToast(_TOAST_ID);
+      // The escape offer survives a throw out of the await above; nothing else
+      // takes it down on that path.
+      hideToast(_ESCAPE_TOAST_ID);
       // Wave-0: dropped the "See console for details." dev-speak — the detail
       // is in console.warn above; the user gets the actionable version.
       _showToast('Export failed. Please try again.');

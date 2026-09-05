@@ -94,6 +94,16 @@
       .vot-toast-undo .vot-undo-btn { margin-left:0.7em; background:none; border:none; padding:0; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
       body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-strong,#9a7b2e); }
 
+      /* export-escape — the "Save the usual way" offer shown when the save
+         picker never settles. Base .vot-toast is pointer-events:none, so an
+         action toast has to opt back in or its button cannot be tapped at all
+         (the same reason .vot-toast-undo exists). The button carries its own
+         44 px box rather than inheriting the text line-height: it is a real
+         target the reader hunts for on a stuck screen, not a nicety. */
+      .vot-toast-action { pointer-events:auto; }
+      .vot-toast-action .vot-escape-btn { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
+      body.light .vot-toast-action .vot-escape-btn { color:var(--gold-strong,#9a7b2e); }
+
       /* StorageHealthBanner — fixed strip above the nav (z-index 101 > nav 100).
          Three severity styles: gold (soft), amber (warning), danger (critical). */
       .sh-banner {
