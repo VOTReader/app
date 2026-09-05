@@ -2538,7 +2538,12 @@
     }
 
     /* ── TWO-COLUMN GENRE GRID ── */
-    .genre-columns { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; width:100%; max-width:32.5rem; }
+    /* Two columns while two tiles can still hold readable text, one column once the
+       reader's text size makes 6.5rem wider than half the row (about --font-scale 1.4 on a
+       360px phone): each column's floor is the larger of 6.5rem and half the row, so the
+       grid can never show three columns on a wide phone and never clips the second column
+       under overflow:hidden at a large size (a11y-ux-6, measured at 1.8 and 2.0). */
+    .genre-columns { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(6.5rem, calc(50% - 0.5rem))), 1fr)); gap:0.75rem; width:100%; max-width:32.5rem; }
     .genre-col-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
     .genre-tile { background:var(--bg2); border:1px solid var(--gold-border); border-radius:8px; padding:0.9rem 1rem; cursor:pointer; text-align:left; transition:all var(--transition); }
     @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
@@ -3013,14 +3018,18 @@
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
 
     /* Corpus segmented toggle */
-    .srch-corpus-row { display:flex; gap:0.35rem; padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
+    /* The All / Scriptures / Volumes row wraps at a large text size instead of pushing the third
+       button off the right edge (a11y-ux-6, measured at 1.8 and 2.0). */
+    .srch-corpus-row { flex-wrap:wrap; row-gap:0.35rem; display:flex; gap:0.35rem; padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
     .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.4rem 0.6rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
     .srch-corpus-btn.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
     .srch-corpus-btn:active { background:rgba(200,164,86,0.15); }
     /* [8] result-filter chips + verse sort toggle — same pill language as
        the corpus row, but content-sized (chips carry per-category counts)
        and horizontally scrollable when they overflow a phone width. */
-    .srch-filter-row { display:flex; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
+    /* The scope chips wrap at a large text size instead of running off the right edge behind a
+       hidden scrollbar, where a reader at 1.8x could not know a third chip existed (a11y-ux-6). */
+    .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
     .srch-filter-row::-webkit-scrollbar { display:none; }
     .srch-filter-chip { flex:0 0 auto; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.34rem 0.7rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; white-space:nowrap; }
     .srch-filter-chip.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
@@ -4980,7 +4989,8 @@
     }
     .library-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      /* Same fold as .genre-columns: two tiles until 6.5rem outgrows half the row (a11y-ux-6). */
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, max(6.5rem, calc(50% - 0.5rem))), 1fr));
       gap: 0.85rem;
       max-width: 32.5rem;
       margin: 0 auto;

@@ -44,7 +44,9 @@
   // small chips in the app (settings rows, notebook actions).
   R('.jrn-done-btn { background: var(--gold-faint); border: 1px solid var(--gold); color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-11); padding: 6px 14px; border-radius: 999px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }');
   R('.jrn-done-btn:hover { background: var(--gold); color: var(--bg); }');
-  R('.jrn-search { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; }');
+  // min-width:0 — an <input> keeps an intrinsic ~20ch width that flex:1 cannot shrink below, so
+  // at a large text size the box ran past the right edge of the toolbar (a11y-ux-6, measured at 2.0).
+  R('.jrn-search { flex: 1; min-width: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; }');
   R('body.light .jrn-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }');
   R('.jrn-search:focus { border-color: var(--gold); }');
   R('.jrn-sort-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-garamond); font-size: var(--fs-13); padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }');
