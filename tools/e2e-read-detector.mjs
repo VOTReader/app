@@ -29,44 +29,27 @@
    gate that flakes. Its two siblings each bind their own ephemeral port
    (e2e-readalong.mjs:122, smoke-ci.js); this one took the convention and
    not the design. Never reintroduce a fixed port here.
+
+   The port fix makes a collision impossible; it does not make the run PROVE
+   it loaded the right tree. So before the first navigation the harness now
+   asserts that the CACHE_VERSION in the service-worker.js it is serving
+   equals the one on disk here (tools/e2e-read-serve.mjs). Every build
+   regenerates that string, so it is the cheapest honest fingerprint of
+   "these are my bundles", and a mismatch aborts loudly rather than producing
+   a green result about somebody else's work.
    ─────────────────────────────────────────────────────────────────── */
-import http from 'node:http';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { resolve, dirname, normalize, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { startServer, assertServingOwnTree } from './e2e-read-serve.mjs';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
-const MIME = {
-  '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
-  '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-  '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg',
-};
-
-/* Same shape as e2e-readalong.mjs:108 — port 0 lets the OS pick, so the
-   origin is unique to this process and no other server can answer for it. */
-function startServer() {
-  const server = http.createServer((req, res) => {
-    let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-    if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
-    const filePath = normalize(resolve(ASSETS, '.' + urlPath));
-    if (!filePath.startsWith(ASSETS) || !existsSync(filePath) || !statSync(filePath).isFile()) {
-      res.writeHead(404); res.end('not found'); return;
-    }
-    res.writeHead(200, {
-      'Content-Type': MIME[extname(filePath).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
-    });
-    res.end(readFileSync(filePath));
-  });
-  return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server)));
-}
 
 const server = await startServer();
-const URL = `http://127.0.0.1:${server.address().port}/index.html`;
+const BASE = `http://127.0.0.1:${server.address().port}`;
+// Before a browser exists: prove the bytes about to reach the page are this
+// tree's. Port 0 makes a collision impossible going forward, but nothing else
+// checks that what is served is what was built here -- and a gate that can
+// report green about a tree it never loaded is the failure this replaced.
+await assertServingOwnTree(BASE);
+const URL = `${BASE}/index.html`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({
