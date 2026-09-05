@@ -75,7 +75,7 @@ describe('JournalAudioBlock — the bytes are gone', () => {
     // No play button — a control that does nothing is the defect. A disabled
     // one whose accessible name says why would also pass; a live one must not.
     const play = screen.queryByRole('button', { name: /play|pause/i });
-    expect(play === null || play.disabled).toBe(true);
+    expect(play === null || /** @type {HTMLButtonElement} */ (play).disabled).toBe(true);
 
     // No duration. `duration` is a claim about bytes that are gone: 72s here,
     // which today renders as "0:00 / 1:12".

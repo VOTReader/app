@@ -407,7 +407,6 @@ export function JournalImageBlock({ mediaId, caption }) {
 
 export function JournalAudioBlock(props) {
   var useState = React.useState;
-  var useEffect = React.useEffect;
   var useRef = React.useRef;
   var mediaId = props.mediaId;
   var duration = props.duration;
