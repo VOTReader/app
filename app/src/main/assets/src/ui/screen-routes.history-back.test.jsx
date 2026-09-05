@@ -140,6 +140,56 @@ describe('home quick access return paths', () => {
     expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
     expect(next.props.setScreen).not.toHaveBeenCalled();
   });
+
+  /* ScriptureWebScreen rides bundle-f, and the route renders a "Loading…"
+     frame until it arrives. The LIBRARY entry kicks the loader first, with a
+     comment saying exactly why. The Home entry, added later, copied the
+     navigation and not the preload — same destination, two different first
+     impressions. Asserted on both entries so the next one to be added is
+     compared against a pair rather than a single case. */
+  it('both Scripture Web entries kick bundle-f before the route renders', () => {
+    const loadF = vi.fn();
+    const prev = window.__loadScreensF;
+    window.__loadScreensF = loadF;
+    try {
+      const home = makeRoutes();
+      home.routes.home().props.onScriptureWeb();
+      expect(loadF).toHaveBeenCalledTimes(1);
+
+      const lib = makeRoutes();
+      lib.routes.library().props.onOpenScriptureWeb();
+      expect(loadF).toHaveBeenCalledTimes(2);
+    } finally {
+      window.__loadScreensF = prev;
+    }
+  });
+
+  /* THE RESTORED-TAB CASE, which nothing covered. `navOrigin` is not persisted;
+     `screen` is, and `_validateTabState` does not coerce `scripture-web`. So
+     after any reload while on the Scripture Web — service-worker takeover,
+     force-stop, tab restore — the origin is null and the two back gestures used
+     to disagree: the in-app button went to Library while
+     `use-android-back.js:284` called `goNavOrigin()`, which with no origin
+     falls through to Home.
+
+     The bite the Verifier ran proves the old fallback was unpinned: replacing
+     it with an unconditional `goNavOrigin()` passed the entire suite. This is
+     the case that makes it fail.
+
+     Both now go through `goNavOrigin()`, which is what all twelve sibling hub
+     screens do (`milestones` is the nearest, `onBack={goNavOrigin}`) and what
+     `use-android-back.js`'s own UX3 comment describes as the rule: restore the
+     captured origin, or Home when there is none. Home, not Library, is
+     therefore the destination on a restored tab — deliberately, because a
+     restored tab has no history and this is one behaviour now rather than
+     two. */
+  it('with no captured origin, in-app back does what Android back does', () => {
+    const { routes, props } = makeRoutes({ navOrigin: null });
+    routes['scripture-web']().props.onBack();
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+    // The bespoke fallback is gone: nothing routes to Library by hand.
+    expect(props.setScreen).not.toHaveBeenCalled();
+  });
 });
 
 describe('screen-routes — P1-12 History onSelect routes through navigateToLink', () => {

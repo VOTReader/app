@@ -590,6 +590,9 @@ export function buildScreenRoutes({
         onNotes={goNotesIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
+          // Same three lines as the Library entry below: kick bundle-f before
+          // the route renders so the "Loading…" frame is usually skipped.
+          if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
           setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
           setScreen('scripture-web');
         }}
@@ -1232,7 +1235,17 @@ export function buildScreenRoutes({
             if (!endpoint) return;
             navigateToLink(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
           }}
-          onBack={() => navOrigin ? goNavOrigin() : setScreen('library')}
+          // goNavOrigin, unconditionally, like every other hub screen. The
+          // bespoke `: setScreen('library')` fallback was a second definition
+          // of where back goes from here, and it disagreed with the hardware
+          // gesture in the one case nobody tested: `navOrigin` is not
+          // persisted while `screen` is, and `_validateTabState` does not
+          // coerce 'scripture-web', so after any reload on this screen the
+          // origin is null — in-app back went to Library, Android back
+          // (use-android-back.js:284) went through goNavOrigin to Home.
+          // goNavOrigin already means "the captured origin, or Home when there
+          // is none"; that is the rule for all twelve sibling hubs.
+          onBack={goNavOrigin}
           settings={settings}
           updateSetting={updateSetting}
         />
