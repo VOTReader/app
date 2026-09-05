@@ -454,15 +454,35 @@ function _whenSaved(s) {
 /**
  * Reseed the localStorage shim keys from a backup's `data` map: clear each known
  * key, then restore the string value for any `vot-`-prefixed key.
+ *
+ * storage-backup-7: A KEY WHOSE STORE WAS SKIPPED IS LEFT EXACTLY AS IT IS — neither
+ * cleared nor rewritten. `vot-state` (and every store name here, they share one
+ * namespace) rides in TWO containers: this localStorage shim, which the
+ * pre-hydration boot script reads for theme/fontScale, and the IDB store that
+ * hydration loads. The two writers fail differently — this one wrote whatever
+ * parsed as a string, `_applyStoresAndFlags` validates and skips — so a section
+ * that failed validation used to leave the IMPORTED theme in localStorage and the
+ * PRE-IMPORT state in IDB: the app painted one and hydrated the other.
+ *
+ * Untouched, not cleared. Clearing would swap one divergence for another: the boot
+ * script would paint DEFAULTS over the pre-import state IDB still holds. Leaving
+ * both containers at their pre-import values is the only outcome where they agree,
+ * and it is the honest one — this section could not be imported, so nothing about
+ * it changed. Callers must therefore run this AFTER `_applyStoresAndFlags`.
+ *
  * @param {Record<string, any> | null | undefined} dataObj
  * @param {string[]} dataLsKeys
+ * @param {string[]} [skippedStores] - store names whose payload failed validation
  */
-function _reseedLsData(dataObj, dataLsKeys) {
+function _reseedLsData(dataObj, dataLsKeys, skippedStores) {
+  const skipped = new Set(skippedStores || []);
   dataLsKeys.forEach((k) => {
+    if (skipped.has(k)) return;
     try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
   });
   Object.keys(dataObj || {}).forEach((k) => {
     if (k.indexOf('vot-') !== 0) return;
+    if (skipped.has(k)) return;
     const v = dataObj[k];
     if (typeof v === 'string') {
       try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
@@ -613,10 +633,9 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
   /** @type {string[]} */
   const skippedStores = [];
 
-  // (1) Reseed the LS shim keys from `data`.
-  _reseedLsData(parsed && parsed.data, dataLsKeys);
-
-  // (2) Apply stores → IDB-backed stores.
+  // (1) Apply stores → IDB-backed stores. THIS RUNS BEFORE THE LS RESEED
+  //     (storage-backup-7): the reseed needs `skippedStores` to know which keys
+  //     it must leave alone, and both branches below contribute to it.
   if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
     const applied = _applyStoresAndFlags(parsed.stores, storesMap, flagMap, validateStorePayload);
     importFailures += applied.importFailures;
@@ -645,6 +664,10 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
       }
     }
   }
+
+  // (2) Reseed the LS shim keys from `data`, skipping every key whose store was
+  //     skipped just above — see _reseedLsData (storage-backup-7).
+  _reseedLsData(parsed && parsed.data, dataLsKeys, skippedStores);
 
   // (3) Apply media → JournalMediaStore (v2 only). BAK-1 FAIL-SAFE REPLACE
   //     (mirror applyV3): decode + put each record (put = overwrite by id)
@@ -887,16 +910,18 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
     throw e;
   }
 
-  // (2) Reseed the LS shim only after the media commit lands. This keeps even
-  // the small boot-state mirror unchanged when the media phase throws outright.
-  _reseedLsData(manifest && manifest.data, dataLsKeys);
-
-  // (3) Apply stores + flags — only AFTER media fully landed, so a media truncation
+  // (2) Apply stores + flags — only AFTER media fully landed, so a media truncation
   // can't leave stores half-overwritten (BAK1). v3 is always v2-shape (no V1
   // fallback; SHARED with applyImportPayload's v2 branch via _applyStoresAndFlags).
   const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
   importFailures += applied.importFailures;
   const skippedStores = applied.skippedStores;
+
+  // (3) Reseed the LS shim LAST: after the media commit lands, which keeps even the
+  // small boot-state mirror unchanged when the media phase throws outright, AND after
+  // the stores, so a key whose section failed validation is left alone rather than
+  // mirroring an import that never reached IDB (storage-backup-7).
+  _reseedLsData(manifest && manifest.data, dataLsKeys, skippedStores);
 
   // (4) U1 DURABILITY BARRIER — media already durable (JournalMediaStore.put is
   // awaited above), stores' _save fired synchronously in (3). whenSaved never rejects.
