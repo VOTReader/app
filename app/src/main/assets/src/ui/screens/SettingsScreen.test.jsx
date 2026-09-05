@@ -43,9 +43,19 @@ describe('settings filter and lazy progress', () => {
     fireEvent.click(groupHead('Your Data'));
     expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(groupHeads()).toHaveLength(9);
+    expect(groupHeads()).toHaveLength(10);   // nine plus the tour's Help group
     expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
+  });
+
+  it('finds the Help group by "tour", so a lost reader can get the tour back through the find box', () => {
+    // RED on 47355cc1: matchesGroup('help') threw on SETTINGS_TOPICS['help'] for any query; the
+    // defensive `|| []` would have hidden Help from every search instead.
+    renderSettings({}, {}, { expandGroups: false });
+    fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'tour' } });
+    expect(groupHeads()).toHaveLength(1);
+    expect(groupHead('Help')).toBeTruthy();
+    expect(screen.getAllByText(/Show me around/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('handles hyphenated queries and explains no results', () => {

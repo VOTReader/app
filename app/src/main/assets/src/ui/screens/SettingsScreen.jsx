@@ -531,6 +531,10 @@ const SETTINGS_TOPICS = {
   garden: 'a return to the garden image quality pictures',
   data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
   progress: 'mark as read progress book reading clear',
+  // The tour's re-entry (Settings › Help › Show me around). Every group the screen renders needs a
+  // row here: matchesGroup dereferences SETTINGS_TOPICS[id] for the first typed character, and a
+  // group without one crashed the screen (2026-09-04, the Help group meeting this table).
+  help: 'help tour show me around guide about welcome',
 };
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
