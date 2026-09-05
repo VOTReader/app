@@ -115,6 +115,56 @@ describe('app.css — light --gold-dim contrast against every light surface (a11
   });
 });
 
+/* --gold-bright is the emphasis gold: footnote refs, rich footnote titles,
+   the active search-corpus chip, hover and active states -- 81 colour sites.
+   On the light walk (node tools/contrast-sweep.mjs --token --gold-bright
+   --theme light --min 4.5) three small-text sites measured under AA: the
+   active corpus chip "All" 10 px at 3.13:1 on gold-faint over --bg3, a rich
+   footnote title 13 px at 3.66:1, a footnote ref 14 px at 3.84:1 on --bg. The
+   old light value #9b7418 was LIGHTER than --gold, and on parchment nothing
+   lighter than --gold clears 4.5 on --bg3; so on a light ground "bright" is
+   emphasis by depth, darker and fuller than --gold, not paler. The chip
+   ground is modelled the way Chrome resolves it: --gold-faint blended over
+   --bg3 (alpha compositing in sRGB, the same as the sweep's first-opaque-
+   background rule). */
+function rgbaOver(hexBg, rgbaFg) {
+  const m = rgbaFg.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+  const a = parseFloat(m[4]);
+  const bg = [hexBg.slice(1, 3), hexBg.slice(3, 5), hexBg.slice(5, 7)].map((h) => parseInt(h, 16));
+  const out = [1, 2, 3].map((i, k) => Math.round(bg[k] * (1 - a) + parseInt(m[i], 10) * a));
+  return '#' + out.map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+describe('app.css — light --gold-bright contrast at its small-text grounds (a11y, design-perf 2026-09-05)', () => {
+  it.each([
+    ['--bg', 'bg'],
+    ['--bg2', 'bg2'],
+    ['--bg3', 'bg3'],
+  ])('light --gold-bright reaches WCAG AA against light %s', (_label, bgKey) => {
+    expect(contrastRatio(themed(LIGHT, 'gold-bright'), themed(LIGHT, bgKey))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+  it('light --gold-bright reaches WCAG AA on the active chip ground (--gold-faint over --bg3)', () => {
+    const chip = rgbaOver(themed(LIGHT, 'bg3'), themed(LIGHT, 'gold-faint'));
+    expect(contrastRatio(themed(LIGHT, 'gold-bright'), chip)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+  it('light --gold-bright is emphasis by depth: no lighter than --gold', () => {
+    expect(relLuminance(themed(LIGHT, 'gold-bright'))).toBeLessThanOrEqual(relLuminance(themed(LIGHT, 'gold')));
+  });
+  it('dark --gold-bright still reaches WCAG AA against dark --bg3 (untouched)', () => {
+    expect(contrastRatio(themed(ROOT, 'gold-bright'), themed(ROOT, 'bg3'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+  /* The one site where --gold-bright is a GROUND under text: the Listening
+     Library's primary action on hover. Its text was #17130a for the dark
+     theme's bright gold (4.33:1 there); on light it read 2.97:1 at rest on
+     --gold and would read 2.54:1 on the deeper hover gold. Light therefore
+     sets the text to the page ground. */
+  it('light primary-action text is the page ground, AA on both its golds', () => {
+    const rule = exactRuleBlock(CSS, 'body.light .audio-library-primary-action');
+    expect(rule).toMatch(/color:\s*var\(--bg\)/);
+    expect(contrastRatio(themed(LIGHT, 'bg'), themed(LIGHT, 'gold'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    expect(contrastRatio(themed(LIGHT, 'bg'), themed(LIGHT, 'gold-bright'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+});
+
 describe('app.css — surrounding contrast stays green', () => {
   it('dark --danger still reaches WCAG AA against dark --bg3 (untouched)', () => {
     const ratio = contrastRatio(themed(ROOT, 'danger'), themed(ROOT, 'bg3'));
