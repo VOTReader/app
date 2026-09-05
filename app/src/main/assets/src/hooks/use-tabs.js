@@ -141,17 +141,34 @@ export function useTabs({ saved }) {
     }];
   });
   const [activeTabIdx, setActiveTabIdx] = React.useState(() => {
+    // navigation-tabs-5: clamp to the RESTORED array, not to a magic 998.
+    // `tabs` is initialized above, so its length is the only honest ceiling —
+    // 998 was the tab-count cap, which is a different quantity and let a
+    // restored index sit past the end of a one-tab array.
     const idx = typeof saved.activeTabIdx === 'number' ? saved.activeTabIdx : 0;
-    return Math.max(0, Math.min(idx, 998));
+    return Math.max(0, Math.min(idx, Math.max(0, tabs.length - 1)));
   });
-  const activeTab = tabs[activeTabIdx] || tabs[0];
+  // ONE definition of which tab is active, used by the read AND the write.
+  //
+  // navigation-tabs-5: the read side fell back (`tabs[activeTabIdx] || tabs[0]`)
+  // and the write side did not (`i === activeTabIdx`), so under ANY desync the
+  // UI rendered tabs[0] while every tabField setter — setScreen, setBookId,
+  // setLetterId, scroll memory, the tap-through stack — matched no row and
+  // silently did nothing. The app looked alive and never moved, permanently,
+  // because the bad index is persisted.
+  //
+  // Two definitions of the same thing that disagreed in exactly one state.
+  // Deleting one is the fix; the clamp above stops that state being reached
+  // in the first place, and this stops it being fatal if it ever is.
+  const _activeIdx = (activeTabIdx >= 0 && activeTabIdx < tabs.length) ? activeTabIdx : 0;
+  const activeTab = tabs[_activeIdx];
   const updateActiveTab = React.useCallback((patchOrFn) => {
     setTabs((prev) => prev.map((t, i) => {
-      if (i !== activeTabIdx) return t;
+      if (i !== _activeIdx) return t;
       const patch = typeof patchOrFn === 'function' ? patchOrFn(t) : patchOrFn;
       return { ...t, ...patch };
     }));
-  }, [activeTabIdx]);
+  }, [_activeIdx]);
   const _uatRef = useRefMirror(updateActiveTab);
   const _tabSetters = React.useRef({});
   const tabField = (key) => {
