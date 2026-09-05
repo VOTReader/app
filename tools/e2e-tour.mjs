@@ -170,10 +170,11 @@ async function run(browser, { width, height, label, light }) {
       else {
         const pad = 8;
         if (!(f.ring.l <= f.target.l - pad + 1 && f.ring.t <= f.target.t - pad + 1 && f.ring.r >= f.target.r + pad - 1 && f.ring.b >= f.target.b + pad - 1)) fail(`${id}: the ring does not wrap the control`);
-        // The card may overlap the ring only when it could fit on neither side (device run 2026-09-04: a
-        // card placed off screen is a tour the reader cannot leave). Otherwise it stays clear.
-        const couldFit = (f.target.b + 8 + 18 + f.card.h <= f.vh - 12) || (f.target.t - 8 - 18 - f.card.h >= 12);
-        if (f.card && couldFit && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
+        // The card never covers the control: at a large text size it is capped to the room beside the
+        // ring and scrolls inside itself (device run 2026-09-04). The one exception is a ring so tall
+        // that not even the card's 160 px floor fits beside it; then the card wins.
+        const roomForFloor = f.target.b - f.target.t + 16 + 160 + 60 <= f.vh;
+        if (f.card && roomForFloor && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
         if (f.ring.t < 0 || f.ring.b > f.vh + 1) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
         if (!f.described) fail(`${id}: the control is not described by the card`);
         if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);

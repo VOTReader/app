@@ -43,6 +43,11 @@ const RESCROLL_EVERY_MS = 300;
 const CARD_EST_H = 220;
 const CARD_EDGE = 12;
 const CARD_GAP = 18;
+/* At a large text size the card is taller than the room beside the ring (603 px on a 699 px phone at
+   1.8), so it is capped to what is left once the ring has its place and scrolls inside itself, with
+   the button row stuck to its bottom edge (app.css .tour-row). The ringed control stays visible and
+   tappable; below this floor the card wins and covers the ring's far edge instead. */
+const CARD_MIN_H = 160;
 
 function _rect(el) {
   const r = el.getBoundingClientRect();
@@ -135,7 +140,10 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // with more room — and always clamped inside the viewport, over the ring's far edge if it must:
   // a card the reader cannot reach is a tour they cannot leave (Export at the bottom edge, and the
   // Letters tile at a large text size, both on a 699 px phone).
-  const h = cardH || CARD_EST_H;
+  // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
+  const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
+  const cap = ringOn ? Math.max(CARD_MIN_H, vh - ring.height - 2 * CARD_GAP - 2 * CARD_EDGE) : vh - 2 * CARD_EDGE;
+  const h = Math.min(cardH || CARD_EST_H, cap);
   let below = false, cardTop = 0;
   if (ring) {
     const fitsBelow = ring.top + ring.height + CARD_GAP + h <= vh - CARD_EDGE;
@@ -145,7 +153,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
   }
   const clear = ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
-  const cardStyle = ring ? { top: Math.round(cardTop) + 'px' } : { bottom: '16px' };
+  const cardStyle = ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
   const dims = ring ? [
     { left: 0, top: 0, width: vw, height: Math.max(0, ring.top) },
     { left: 0, top: ring.top + ring.height, width: vw, height: Math.max(0, vh - ring.top - ring.height) },

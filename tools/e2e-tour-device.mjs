@@ -96,6 +96,9 @@ async function facts() {
       scrollW: document.documentElement.scrollWidth, vw: window.innerWidth,
       fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim(),
       player: !!document.querySelector('.audio-bar'),
+      step: (() => { const tc = window.TourController; const st = tc && tc.getState(); return st && st.step ? st.step.id : null; })(),
+      pressed: !!(window.TourController && window.TourController.getState().pressed),
+      text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
       ringCovered: (() => { if (!ring) return null; const b = ring.getBoundingClientRect(); const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
         const tc = window.TourController; const target = tc ? tc.findTarget(tc.getState().step) : null;
         const at = document.elementFromPoint(cx, cy); if (!at) return 'nothing';
@@ -143,13 +146,21 @@ async function relaunch() {
 
 async function setScale() {
   if (SCALE === 1) return;
-  // Through the app's own state so it survives relaunch (the boot writer reads it).
-  await page.evaluate((s) => {
-    const st = window.StateStore && window.StateStore.get && window.StateStore.get();
-    if (st && window.StateStore.set) window.StateStore.set({ ...st, settings: { ...(st.settings || {}), fontScale: String(s) } });
-    document.documentElement.style.setProperty('--font-scale', String(s));
-  }, SCALE);
-  await sleep(600);
+  // Through the app's own state so it survives relaunch (the boot writer reads it). The store
+  // hydrates from IDB after mount and a write that lands before that is overwritten, so write
+  // until the store reads it back, and fail loudly rather than walk at 1 under a 1.8 label.
+  for (let i = 0; i < 10; i++) {
+    const got = await page.evaluate((sc) => {
+      const S = window.StateStore; if (!S || !S.get || !S.set) return 'no store';
+      const st = S.get();
+      S.set({ ...st, settings: { ...(st.settings || {}), fontScale: String(sc) } });
+      document.documentElement.style.setProperty('--font-scale', String(sc));
+      return String((S.get().settings || {}).fontScale);
+    }, SCALE);
+    if (got === String(SCALE)) { await sleep(800); return; }
+    await sleep(700);
+  }
+  throw new Error(`could not set --font-scale ${SCALE} through StateStore`);
 }
 
 (async () => {
@@ -174,6 +185,7 @@ async function setScale() {
   await sleep(800); f = await facts();
   if (!f.prompt) fail('the strip did not return after a relaunch following Maybe later'); else ok('Maybe later is one launch only');
   say(`  --font-scale after relaunch: ${f.fontScale}`);
+  if (String(parseFloat(f.fontScale)) !== String(SCALE)) throw new Error(`the walk would run at --font-scale ${f.fontScale}, not ${SCALE}: the size did not survive the relaunch`);
 
   // Don't show this again survives a kill.
   await tapLabel('Don'); f = await facts();
