@@ -56,6 +56,39 @@ class BridgeContractTest {
         // with 2a-web -- so this map is what stops them rotting unnoticed meanwhile.
         "nativeReadRecording" to 1,
         "nativeDeleteRecording" to 1,
+        // journal-3 2b: enumerate the served memos still on disk, so the JS sweep can
+        // recover a memo the app was killed before it could claim. PINNED BEFORE THE
+        // IMPLEMENTATION EXISTS, deliberately -- this row is RED until the Kotlin verb
+        // lands, and it is what makes the Web Builder's caller and my verb agree on a
+        // NAME before either is written. The name keeps the `native` prefix its two
+        // siblings use, because PlatformBridge mirrors it verbatim
+        // (platform-bridge.js:141-142): JS calls PlatformBridge.nativeListRecordings(),
+        // NOT listRecordings, whatever the contract note shortens it to.
+        //
+        // THE RETURN CONTRACT, one table, both sides. Always a String, never null.
+        //
+        //   case                                  nativeListRecordings   nativeReadRecording(name)
+        //   ------------------------------------  ---------------------  -------------------------
+        //   served file JS never claimed          row, see below         base64 of the bytes
+        //   no file (swept, or never written)     name absent            null
+        //   unreadable (refused name, I/O,        name absent            null
+        //     over the size ceiling)
+        //   zero bytes (exists, holds nothing)    row with "size": 0     null
+        //   looked, directory empty               "[]"                   n/a
+        //   could not look (listFiles() null)     "error:list_failed"    n/a
+        //
+        //   row shape: { "name": <SERVED_NAME>, "size": <Int>, "mtime": <epoch millis> }
+        //   mtime is File.lastModified(), WALL CLOCK, and describes the FILE. The claim
+        //   ceiling runs on SystemClock.elapsedRealtime() and is invisible here.
+        //
+        // Two rules the table encodes, both of them "a null must never impersonate a
+        // value": an empty directory answers "[]" and a FAILED listing must not be able
+        // to say that, so it answers "error:list_failed" -- a String (so the never-null
+        // rule holds), which fails JSON.parse-is-an-array on the JS side and lands in
+        // "could not enumerate", which is NOT "nothing to recover". And every name in
+        // the array has passed resolveServedRecording, so the lister can never offer a
+        // row the reader will refuse.
+        "nativeListRecordings" to 0,
         "takeScreenshot" to 3,
         "openFilePicker" to 0,
         "saveToFile" to 2,
