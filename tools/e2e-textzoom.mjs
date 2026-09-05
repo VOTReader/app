@@ -18,13 +18,16 @@
  *     is content chrome and is allowed to grow;
  *   - no two visible controls overlap;
  *   - no page errors.
- * Labels that shorten a little are REPORTED; a label that loses more than a third of its
- * width or height is FAILED, whatever its selector — a general property, not a list.
+ * Labels that shorten a little are REPORTED against a committed baseline
+ * (tools/e2e-textzoom.baseline.json): a report the baseline does not know FAILS, a known one
+ * passes, and a baseline entry that no longer appears is printed so the ledger can shrink.
+ * Re-baselining is deliberate: `--write-baseline`, reviewed in the same commit. A label that
+ * loses more than a third of its width or height is FAILED outright, whatever its selector.
  */
 import http from 'node:http';
 import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 
 const argv = process.argv.slice(2);
@@ -52,6 +55,10 @@ const BASE = `http://127.0.0.1:${server.address().port}/index.html`;
 if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 const SCALES = [1, 1.8, 2.0];
 const NAV_TOLERANCE = 8;
+const BASELINE = resolve(HERE, 'e2e-textzoom.baseline.json');
+const writeBaseline = argv.includes('--write-baseline');
+const known = existsSync(BASELINE) ? new Set(JSON.parse(readFileSync(BASELINE, 'utf8'))) : new Set();
+const reported = new Set();
 
 const failures = [];
 const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
@@ -110,6 +117,7 @@ try {
       if (m.overflowX > 0) fail(`${scale} ${name}: the page scrolls sideways by ${m.overflowX} px`);
       if (m.overlaps.length) fail(`${scale} ${name}: overlapping controls: ${m.overlaps.join(', ')}`);
       if (m.crushed.length) fail(`${scale} ${name}: text crushed past a third: ${m.crushed.join(', ')}`);
+      for (const t of m.ellipsed) reported.add(`${scale}|${name}|${t}`);
       if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${String(scale).replace('.', '_')}-${name}.png`) });
     };
 
@@ -138,5 +146,13 @@ try {
     await ctx.close();
   }
 } finally { await browser.close(); server.close(); }
+// The soft set is a ledger, not a scroll-away: new entries fail, cleared entries are named.
+const fresh = [...reported].filter((k) => !known.has(k)).sort();
+const cleared = [...known].filter((k) => !reported.has(k)).sort();
+if (writeBaseline) { writeFileSync(BASELINE, JSON.stringify([...reported].sort(), null, 2) + '\n'); console.log(`baseline written: ${reported.size} known reports -> ${BASELINE}`); }
+else {
+  if (cleared.length) console.log(`cleared since the baseline (remove them from ${BASELINE}):\n  ` + cleared.join('\n  '));
+  if (fresh.length) fail(`${fresh.length} shortened label(s) the baseline does not know (review, then --write-baseline in the same commit):\n  ` + fresh.join('\n  '));
+}
 if (failures.length) { console.log(`\n${failures.length} FAILED`); process.exit(1); }
 console.log('\ne2e-textzoom PASS');
