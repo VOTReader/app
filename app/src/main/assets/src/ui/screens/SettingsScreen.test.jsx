@@ -21,6 +21,7 @@ import {
   groupHeads, groupHead, groupRowLabels, fakeAudioLibrary,
 } from './settings-harness.jsx';
 import { classifyV3ImportBegin as realClassifyV3 } from '../../utils/backup-android.js';
+import { showToast as realShowToast, hideToast as realHideToast, _resetToasts } from '../../utils/toast.js';
 
 beforeEach(() => {
   setupSettingsGlobals();
@@ -1187,5 +1188,133 @@ describe('True Black (OLED) — retired', () => {
   it('TOMBSTONE: no True Black row in any theme', () => {
     renderSettings({}, { theme: 'dark' });
     expect(row('True Black (OLED)')).toBeUndefined();
+  });
+});
+
+
+/* THE SAVE PICKER THAT NEVER SETTLES (export-escape)
+   ═══════════════════════════════════════════════════════════════════════
+   Measured by the Verifier on a fresh headless-Chromium profile:
+   `showSaveFilePicker` exists, opens a dialog that can never be shown, and its
+   promise never settles — 30 s under a synthetic click and 30 s under a real
+   trusted page.mouse.click(). The reader was left on the export screen with no
+   error, no retry and nothing to press.
+
+   The bridge owns WHICH path writes the file and when the offer is made
+   (platform-bridge.test.js pins the four-second point, the single claim, and
+   the case where the picker settles after the escape). What THESE cases pin is
+   the half the bridge cannot: that the offer reaches the reader as something
+   they can actually tap, and that it comes down again afterwards.
+
+   They use the REAL toast primitive rather than a spy, deliberately. A spy
+   would let me assert the html string and prove nothing about whether the
+   markup yields a button, whether the click listener is attached to it, or
+   whether `.vot-toast-action` is even the element that gets the class. The
+   whole finding is a reader with nothing to press; a test that never presses
+   anything is not a test of it. */
+describe('export escape — the save picker that never settles', () => {
+  const okManifest = () => ({
+    ok: true,
+    manifest: { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] },
+    manifestBytes: 2048,
+    mediaEntries: [],
+    problems: [],
+  });
+
+  // Returns the captured escape callback plus the promise the screen is
+  // awaiting, so each case decides who claims the export and in what order.
+  const exportWithSlowPicker = () => {
+    const build = vi.fn(async () => okManifest());
+    const captured = { settle: null, opened: null, escapeTaken: false };
+    const openExportSink = vi.fn((name, opts) => new Promise((res) => {
+      captured.opened = name;
+      captured.settle = res;
+      // Stand-in for the bridge's PICKER_SLOW_MS timer. The timing itself is
+      // the bridge's, and pinned there; here the offer simply arrives. The
+      // escape handed over is never taken in this case — the point is what
+      // happens to the offer when the OTHER path settles.
+      opts.onSlow(() => { captured.escapeTaken = true; });
+    }));
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildV3Manifest: build,
+      showToast: realShowToast,
+      hideToast: realHideToast,
+      writeContainer: vi.fn(async () => {}),
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+      },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    return { build, captured };
+  };
+
+  afterEach(() => { _resetToasts(); });
+
+  it('offers "Save the usual way" as a real, tappable control', async () => {
+    let took = false;
+    const build = vi.fn(async () => okManifest());
+    const openExportSink = vi.fn((name, opts) => new Promise((res) => {
+      opts.onSlow(() => { took = true; res({ write: vi.fn(async () => {}), close: vi.fn(async () => {}) }); });
+    }));
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildV3Manifest: build,
+      showToast: realShowToast,
+      hideToast: realHideToast,
+      writeContainer: vi.fn(async () => {}),
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+      },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+
+    const el = await vi.waitFor(() => {
+      const found = document.getElementById('vot-toast-export-escape');
+      expect(found).toBeTruthy();
+      return found;
+    });
+    // Visible, and pointer-events:auto via the class — the base .vot-toast is
+    // pointer-events:none, so an action toast that forgot the class would be
+    // on screen and untappable, which is the bug wearing a disguise.
+    expect(el.classList.contains('show')).toBe(true);
+    expect(el.className).toContain('vot-toast-action');
+
+    const btn = el.querySelector('.vot-escape-btn');
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toBe('Save the usual way');
+    // It does not tell the reader the dialog failed to open: from here nobody
+    // knows whether it opened and the reader is still reading it.
+    expect(el.textContent).toContain('Still waiting for the save dialog');
+
+    expect(took).toBe(false);
+    fireEvent.click(btn);
+    expect(took).toBe(true);
+
+    // The offer is stale the moment the export is claimed.
+    await vi.waitFor(() => expect(el.classList.contains('show')).toBe(false));
+  });
+
+  /* Cancel is the case that would leave litter. The reader dismisses the real
+     dialog while the offer is already up; the sink resolves null and the export
+     ends quietly — but a stuck offer would invite a tap that the bridge then
+     (correctly) ignores, which reads as a dead button. */
+  it('takes the offer down when the reader cancels the picker instead', async () => {
+    const { captured } = exportWithSlowPicker();
+    const el = await vi.waitFor(() => {
+      const found = document.getElementById('vot-toast-export-escape');
+      expect(found).toBeTruthy();
+      return found;
+    });
+    expect(el.classList.contains('show')).toBe(true);
+    captured.settle(null);                       // AbortError → cancelled
+    await vi.waitFor(() => expect(el.classList.contains('show')).toBe(false));
+    expect(captured.escapeTaken).toBe(false);    // it came down, it was not pressed
   });
 });

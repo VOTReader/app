@@ -1373,6 +1373,175 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
     }
   });
 
+  /* THE PICKER THAT NEVER SETTLES (export-escape)
+     -------------------------------------------------------------------
+     Measured by the Verifier on a fresh headless-Chromium profile:
+     `showSaveFilePicker` EXISTS, opens a dialog that can never be shown, and
+     its promise never settles - 30 s under a synthetic click and 30 s under a
+     real trusted page.mouse.click(), both stuck on "Preparing export...". A
+     trusted gesture does not help, so it is not a harness artifact. Before
+     this, the reader's only backup had no way out of that state at all.
+
+     WHY THIS IS NOT A TIMEOUT. A timer that gives up and takes the blob path
+     on its own would, against a picker that is merely SLOW (a real dialog the
+     reader is reading), hand them two files. The picker cannot be cancelled -
+     nothing in the File System Access API can withdraw it - so the only safe
+     shape is an OFFER the reader takes, plus exactly one claim on the export:
+     whichever path arrives first wins and the loser turns into a no-op.
+     "Two ways to write one file" is how a backup becomes two divergent
+     backups, and this export is the only backup this product has. */
+  it('a picker that never settles offers an escape, and the escape writes the file', async () => {
+    vi.useFakeTimers();
+    let captured = /** @type {any} */ (null);
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((b) => { captured = b; return 'blob:fake'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      /** @type {any} */ (globalThis.window).showSaveFilePicker = vi.fn(() => new Promise(() => {}));
+      /** @type {any} */ let escape = null;
+      const onSlow = vi.fn((fn) => { escape = fn; });
+      const pending = bridge.openExportSink('b.votbak', { onSlow });
+
+      // Nothing offered while the picker might still be a real dialog opening.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(onSlow).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(onSlow).toHaveBeenCalledTimes(1);
+      expect(typeof escape).toBe('function');
+
+      escape();
+      const sink = await pending;
+      expect(sink).not.toBeNull();
+      await sink.write(new Uint8Array([1, 2]));
+      await sink.close();
+      expect(captured).toBeInstanceOf(Blob);
+      expect(Array.from(new Uint8Array(await captured.arrayBuffer()))).toEqual([1, 2]);
+    } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+      vi.useRealTimers();
+    }
+  });
+
+  /* The other half, and the half that makes the first one mean anything: a
+     picker that SETTLES must never offer the escape. If it did, every ordinary
+     export on a slow disk would show the reader a second way to save the same
+     file. */
+  it('a picker that settles never offers the escape', async () => {
+    vi.useFakeTimers();
+    try {
+      const writable = { write: vi.fn(async () => {}), close: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+      /** @type {any} */ (globalThis.window).showSaveFilePicker = vi.fn(async () => ({ createWritable: async () => writable }));
+      const onSlow = vi.fn();
+      const sink = await bridge.openExportSink('b.votbak', { onSlow });
+      expect(sink).not.toBeNull();
+      // Well past the offer point: the timer must have been cancelled, not
+      // merely not-yet-fired when the assertion ran.
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(onSlow).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  /* THE CASE THE WHOLE FLAG EXISTS FOR (the Verifier's, by name). The reader
+     took the escape; the picker settles afterwards. A late-settling picker
+     that also writes leaves TWO files with different contents where the reader
+     asked for one - strictly worse than the hang it replaced, because the hang
+     at least never lied about what was saved. */
+  it('a picker that settles AFTER the escape writes exactly one file', async () => {
+    vi.useFakeTimers();
+    const downloads = [];
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((b) => { downloads.push(b); return 'blob:fake'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      /** @type {any} */ let settlePicker = null;
+      const writable = { write: vi.fn(async () => {}), close: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+      const createWritable = vi.fn(async () => writable);
+      /** @type {any} */ (globalThis.window).showSaveFilePicker =
+        vi.fn(() => new Promise((res) => { settlePicker = () => res({ createWritable }); }));
+
+      /** @type {any} */ let escape = null;
+      const pending = bridge.openExportSink('b.votbak', { onSlow: (fn) => { escape = fn; } });
+      await vi.advanceTimersByTimeAsync(4000);
+      escape();
+      const sink = await pending;
+
+      // The picker comes back mid-write, the way a real dialog the reader
+      // abandoned would.
+      await sink.write(new Uint8Array([9]));
+      settlePicker();
+      await vi.advanceTimersByTimeAsync(0);
+      await sink.close();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(downloads.length).toBe(1);          // exactly one file
+      expect(writable.write).not.toHaveBeenCalled();
+      expect(writable.close).not.toHaveBeenCalled();
+    } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+      vi.useRealTimers();
+    }
+  });
+
+  /* The same claim from the other side. The UI hides the escape once the sink
+     resolves, so a reader should not be able to reach this - but "the UI does
+     not offer it" is an instruction, and the flag is the guarantee. */
+  it('an escape taken AFTER the picker won is a no-op, not a second file', async () => {
+    vi.useFakeTimers();
+    const downloads = [];
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((b) => { downloads.push(b); return 'blob:fake'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      /** @type {any} */ let settlePicker = null;
+      const writable = { write: vi.fn(async () => {}), close: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+      /** @type {any} */ (globalThis.window).showSaveFilePicker =
+        vi.fn(() => new Promise((res) => { settlePicker = () => res({ createWritable: async () => writable }); }));
+
+      /** @type {any} */ let escape = null;
+      const pending = bridge.openExportSink('b.votbak', { onSlow: (fn) => { escape = fn; } });
+      await vi.advanceTimersByTimeAsync(4000);
+      settlePicker();                              // the picker wins the claim
+      const sink = await pending;
+      escape();                                    // late tap on a stale offer
+      await vi.advanceTimersByTimeAsync(0);
+      await sink.write(new Uint8Array([4]));
+      await sink.close();
+      expect(downloads.length).toBe(0);            // no blob file at all
+      expect(writable.close).toHaveBeenCalledTimes(1);
+    } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+      vi.useRealTimers();
+    }
+  });
+
+  /* Cancel keeps its existing meaning. The offer may already be on screen when
+     the reader dismisses the dialog - that is still a cancel, and it must not
+     resolve a blob sink behind them. */
+  it('AbortError after the offer is still a cancel, not a silent blob save', async () => {
+    vi.useFakeTimers();
+    const downloads = [];
+    const origCreate = URL.createObjectURL;
+    URL.createObjectURL = vi.fn((b) => { downloads.push(b); return 'blob:fake'; });
+    try {
+      /** @type {any} */ let rejectPicker = null;
+      /** @type {any} */ (globalThis.window).showSaveFilePicker =
+        vi.fn(() => new Promise((_res, rej) => {
+          rejectPicker = () => { const e = new Error('cancel'); /** @type {any} */ (e).name = 'AbortError'; rej(e); };
+        }));
+      const onSlow = vi.fn();
+      const pending = bridge.openExportSink('b.votbak', { onSlow });
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(onSlow).toHaveBeenCalledTimes(1);
+      rejectPicker();
+      expect(await pending).toBeNull();
+      expect(downloads.length).toBe(0);
+    } finally {
+      URL.createObjectURL = origCreate;
+      vi.useRealTimers();
+    }
+  });
+
   // ── pickImportFile ──
   it('pickImportFile uses the FS Access API open picker when available', async () => {
     const file = new Blob([new Uint8Array([7])]);
