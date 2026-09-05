@@ -68,7 +68,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
- * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
+ * @property {(suggestedName: string, opts?: { onSlow?: (escape: () => void) => void }) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
  * @property {(suggestedName: string) => void} v3ExportOpen
  * @property {(manifestJson: string) => string} v3ExportBegin
@@ -428,39 +428,30 @@ function webSaveToFile(suggestedName, content) {
 // chunked bridge (P3) and implement the SAME { write, close } / File contract.
 
 /**
- * Open a streaming WRITE sink for an export. Returns { write, close, abort }, or
- * null if the user cancelled the destination picker. abort() discards a partial
- * write on failure (BAK5) so a mid-stream error can't leave a truncated backup.
- * @param {string} suggestedName
- * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>}
+ * How long the destination picker may go unanswered before the reader is
+ * OFFERED a way out. Measured (Verifier, fresh headless-Chromium profile):
+ * `showSaveFilePicker` exists, opens a dialog that can never be shown, and its
+ * promise NEVER settles — 30 s under a synthetic click and 30 s under a real
+ * trusted page.mouse.click(), both leaving the reader on the export screen with
+ * no error, no retry and no way forward. Four seconds is past where a picker
+ * that is going to resolve has resolved, and short enough that nobody is left
+ * staring at a dead screen.
  */
-async function webOpenExportSink(suggestedName) {
-  const picker = /** @type {any} */ (window).showSaveFilePicker;
-  if (typeof picker === 'function') {
-    let handle;
-    try {
-      handle = await picker({
-        suggestedName,
-        types: [{ description: 'VOTReader backup', accept: { 'application/octet-stream': ['.votbak'] } }],
-      });
-    } catch (e) {
-      if (e && /** @type {any} */ (e).name === 'AbortError') return null; // user cancelled
-      throw e;
-    }
-    const writable = await handle.createWritable();
-    return {
-      write: (chunk) => writable.write(chunk),
-      close: () => writable.close(),
-      // BAK5: createWritable() commits to the target file only on close()
-      // (temp-swap), so abort() drops the in-progress data and leaves the user's
-      // existing file intact — deterministic cleanup instead of relying on GC of
-      // an unclosed stream. The only backup must never leave a truncated .votbak.
-      abort: () => writable.abort(),
-    };
-  }
-  // Fallback: accumulate chunks, download as a Blob on close. No streaming-to-disk
-  // without the FS Access API, so this is memory-bounded (best-effort for moderate
-  // sizes; the GB-scale web path is the FS Access API above / the Android native bridge).
+const PICKER_SLOW_MS = 4000;
+
+/**
+ * The Blob-download export sink. This is NOT an error path: WebKit has never
+ * shipped the File System Access API, so every iOS reader takes it by default
+ * and a large part of the flock exports this way every time. It is also what
+ * the escape below hands back, so there is exactly ONE definition of "download
+ * the backup" rather than a fallback and a near-copy of it.
+ *
+ * No streaming-to-disk here, so it is memory-bounded (best-effort for moderate
+ * sizes; the GB-scale web path is the FS Access API / the Android native bridge).
+ * @param {string} suggestedName
+ * @returns {{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> }}
+ */
+function webBlobExportSink(suggestedName) {
   /** @type {Uint8Array[]} */
   const chunks = [];
   return {
@@ -483,6 +474,87 @@ async function webOpenExportSink(suggestedName) {
       return Promise.resolve();
     },
   };
+}
+
+/**
+ * Open a streaming WRITE sink for an export. Returns { write, close, abort }, or
+ * null if the user cancelled the destination picker. abort() discards a partial
+ * write on failure (BAK5) so a mid-stream error can't leave a truncated backup.
+ *
+ * `opts.onSlow` is called once, with an `escape` function, if the destination
+ * picker has neither resolved nor rejected after PICKER_SLOW_MS. Calling
+ * `escape()` resolves this promise with the Blob-download sink. The caller owns
+ * the affordance; this function owns which path actually writes.
+ *
+ * WHY AN OFFER AND NOT A TIMEOUT. `showSaveFilePicker` cannot be cancelled —
+ * nothing in the File System Access API withdraws it — so a timer that gave up
+ * and downloaded on its own would, against a picker that is merely SLOW (a real
+ * dialog the reader is still reading), write a SECOND file. Two ways to write
+ * one file is how a backup becomes two divergent backups, and this export is
+ * the only backup this product has. So exactly one of the two paths claims the
+ * export: whichever arrives first wins, and the loser becomes a no-op, checked
+ * in every continuation including the one after `createWritable()` resolves.
+ *
+ * @param {string} suggestedName
+ * @param {{ onSlow?: (escape: () => void) => void }} [opts]
+ * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>}
+ */
+function webOpenExportSink(suggestedName, opts) {
+  const picker = /** @type {any} */ (window).showSaveFilePicker;
+  if (typeof picker !== 'function') return Promise.resolve(webBlobExportSink(suggestedName));
+
+  // The single claim on the export. `claim()` returns true to exactly one
+  // caller, ever; every other continuation reads false and does nothing.
+  let claimed = false;
+  const claim = () => (claimed ? false : (claimed = true));
+
+  return new Promise((resolve, reject) => {
+    const onSlow = opts && opts.onSlow;
+    // No offer is scheduled at all when the caller cannot present one — a timer
+    // whose only effect is to call an absent callback is a timer that lies about
+    // what this function does.
+    /** @type {any} */
+    let offer = typeof onSlow === 'function'
+      ? setTimeout(() => {
+        offer = null;
+        onSlow(() => {
+          if (!claim()) return;                       // the picker already won
+          resolve(webBlobExportSink(suggestedName));
+        });
+      }, PICKER_SLOW_MS)
+      : null;
+    const cancelOffer = () => { if (offer != null) { clearTimeout(offer); offer = null; } };
+
+    picker({
+      suggestedName,
+      types: [{ description: 'VOTReader backup', accept: { 'application/octet-stream': ['.votbak'] } }],
+    }).then(
+      async (/** @type {any} */ handle) => {
+        if (claimed) return;                          // reader escaped; the handle is dropped unopened
+        /** @type {any} */
+        let writable;
+        try { writable = await handle.createWritable(); } catch (e) { if (claim()) { cancelOffer(); reject(e); } return; }
+        // The escape can fire DURING that await, which is why the claim is
+        // taken here and not before it. createWritable() has already opened a
+        // swap file, so losing the race means aborting it rather than leaking it.
+        if (!claim()) { try { await writable.abort(); } catch (_e) { /* best-effort cleanup */ } return; }
+        cancelOffer();
+        resolve({
+          write: (/** @type {Uint8Array} */ chunk) => writable.write(chunk),
+          close: () => writable.close(),
+          // BAK5: createWritable() commits to the target file only on close()
+          // (temp-swap), so abort() drops the in-progress data and leaves the user's
+          // existing file intact — deterministic cleanup instead of relying on GC of
+          // an unclosed stream. The only backup must never leave a truncated .votbak.
+          abort: () => writable.abort(),
+        });
+      },
+      (/** @type {any} */ e) => {
+        if (e && e.name === 'AbortError') { if (claim()) { cancelOffer(); resolve(null); } return; } // user cancelled
+        if (claim()) { cancelOffer(); reject(e); }
+      },
+    );
+  });
 }
 
 /**
