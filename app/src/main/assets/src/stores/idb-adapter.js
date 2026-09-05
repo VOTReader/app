@@ -78,7 +78,8 @@ export const IDBAdapter = (function () {
   // playback-rate preference). The onupgradeneeded guard keeps this additive.
   // 10 — added vot-audio-positions (durable per-recording resume points: a
   // bounded URL → {t,d,at} map, LRU-capped at 200). Same additive pattern.
-  const DB_VERSION = 10;
+  //  11 — added vot-tour-done (review-tutorial: the "Show me around" flag)
+  const DB_VERSION = 11;
 
   /**
    * The persistent `vot-*` stores, plus the `meta` store for migration
@@ -116,6 +117,7 @@ export const IDBAdapter = (function () {
     'vot-ann-hint-dismissed',
     'vot-audio-library',
     'vot-audio-positions',
+    'vot-tour-done',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

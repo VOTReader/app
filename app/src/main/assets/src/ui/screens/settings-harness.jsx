@@ -182,7 +182,9 @@ export function setupSettingsGlobals(overrides = {}) {
     // not fail loudly: _exportableStores() builds a map whose value is
     // `undefined`, and the export/import handler throws deep inside instead,
     // which is how these arrived as seven unrelated-looking failures.
-    'LibraryOrderStore', 'NoteDefaultStore', 'AnnHintDismissedFlagStore']) put(s, fakeStore());
+    'LibraryOrderStore', 'NoteDefaultStore', 'AnnHintDismissedFlagStore',
+    // review-tutorial: the fifth flag, carried in the backup like the fourth.
+    'TourDoneFlagStore']) put(s, fakeStore());
 
   // Backup/import plumbing — reachable only from buttons a render test never presses.
   for (const f of ['buildExportPayload', 'applyImportPayload', 'buildV3Manifest', 'applyV3',

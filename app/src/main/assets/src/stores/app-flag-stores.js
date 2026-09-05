@@ -13,6 +13,8 @@
      vot-garden-warning-acked   — Garden View "this is fan-made" modal
                                   acknowledged
      vot-ann-hint-dismissed     — AnnotationHint coach-mark ✕ dismissed
+     vot-tour-done              — "Show me around" finished, skipped, or
+                                  told never to ask again (review-tutorial)
 
    Each is IDB-backed via the W2.2 state machine so the W2.4 LS-
    clearing pass doesn't strip them out from under a hook still
@@ -96,3 +98,10 @@ export const GardenWarningFlagStore = buildFlagStore('vot-garden-warning-acked')
     dismissed it without ever annotating. IDB schema v7 added the store;
     no legacy LS data exists for this key. */
 export const AnnHintDismissedFlagStore = buildFlagStore('vot-ann-hint-dismissed');
+
+/** "Show me around" is done — finished, skipped, or "Don't show this again"
+    on the Home strip (review-tutorial, 2026-09-04). Read by TourController
+    (bundle-b) and TourPrompt (bundle-d); listed in Settings' _flagStores so a
+    restored backup does not pitch the strip at a reader who already said no.
+    IDB schema v11 added the store; no legacy LS data exists for this key. */
+export const TourDoneFlagStore = buildFlagStore('vot-tour-done');

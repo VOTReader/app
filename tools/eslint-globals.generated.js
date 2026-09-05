@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 529 distinct identifiers.
+// Total: 533 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -268,6 +268,10 @@ export const projectGlobals = {
   TabsNavBtn: "readonly",
   TabsOverview: "readonly",
   ThemeBtn: "readonly",
+  TourController: "readonly",
+  TourDoneFlagStore: "readonly",
+  TourOverlay: "readonly",
+  TourPrompt: "readonly",
   USER_DATA_STORES: "readonly",
   Utilities: "readonly",
   VOT_LETTER_REGISTRY: "readonly",
@@ -411,7 +415,6 @@ export const projectGlobals = {
   hlId: "readonly",
   html2canvas: "readonly",
   hydrateAllStores: "readonly",
-  idbAllKeys: "readonly",
   idbDelete: "readonly",
   idbPut: "readonly",
   idbReadAll: "readonly",
@@ -530,6 +533,7 @@ export const projectGlobals = {
   useTabs: "readonly",
   useTapThrough: "readonly",
   useThumbnails: "readonly",
+  useTour: "readonly",
   v3AndroidImportEntries: "readonly",
   validateImportEnvelope: "readonly",
   validateMediaRecord: "readonly",

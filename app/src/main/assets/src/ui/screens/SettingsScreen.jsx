@@ -251,6 +251,7 @@ function SettingsGroupIcon({ sectionId }) {
     garden: <><path d="M4 19c3.8-5.4 7-8.1 10.2-8.1 2.1 0 3.9 1 5.8 3.1" /><path d="M5 17.5C4.3 12 6.9 7.7 12.5 5c.6 3.2-.3 5.7-2.7 7.5" /><path d="M4 20h16" /></>,
     data: <><path d="M5 5.5h14v13H5z" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
     progress: <><circle cx="12" cy="12" r="8.5" /><path d="m8 12 2.6 2.7L16.5 9" /></>,
+    help: <><circle cx="12" cy="12" r="8.5" /><path d="M9.4 9.6a2.6 2.6 0 1 1 3.8 2.3c-.8.4-1.2 1-1.2 1.9" /><path d="M12 17h.01" /></>,
   };
   return (
     <span className="settings-group-icon" aria-hidden="true">
@@ -574,6 +575,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       if (typeof load === 'function') load().catch((e) => console.warn('Progress corpus load failed', e));
     }
   }, [progressOpen]);
+  // "Show me around" (review-tutorial): when the tour's stop needs a group open
+  // (the backup stop rings Export inside Your Data), open it — whether Settings
+  // mounted for the stop or was already on screen when the tour started here.
+  const _tour = typeof TourController !== 'undefined' ? TourController : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (_tour ? _tour.subscribe(cb) : () => {}), [_tour]),
+    () => (_tour ? _tour.getVersion() : 0)
+  );
+  const _tourGroup = _tour ? (() => { const t = _tour.getState(); return t.active && t.step && t.step.settingsGroup; })() : null;
+  React.useEffect(() => {
+    if (_tourGroup) setOpenGroups((prev) => (prev.has(_tourGroup) ? prev : new Set([...prev, _tourGroup])));
+  }, [_tourGroup]);
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text
@@ -914,6 +927,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     // the backup skipped, so a restore re-pitched the annotation coach-mark
     // at a reader who had dismissed it.
     'vot-ann-hint-dismissed':    AnnHintDismissedFlagStore,
+    // review-tutorial: "Show me around" done/skipped/never — carried so a restore does not re-pitch the strip.
+    'vot-tour-done':             TourDoneFlagStore,
   });
 
   // Web export uses the v3 STREAMING container (GB-scale — never holds the whole
@@ -2215,6 +2230,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} hasPartial={frontierKeys.length > 0} onClearAll={onClearAll} />
             </div>
           )}
+        </SettingsGroup>
+
+        {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
+        <SettingsGroup label="Help" sub="Show me around & About" {...groupProps('help')}>
+          <div className="settings-card">
+            <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
+            <p className="settings-help-note">A short tour of the app: six stops, about two minutes. It points at the real buttons; you can leave at any time.</p>
+          </div>
         </SettingsGroup>
         </div>
       </div>

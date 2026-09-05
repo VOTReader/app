@@ -24,6 +24,9 @@ import {
 // its sole trigger, so it never touches cold boot. Recent-searches helpers are
 // window-exposed here so cross-bundle callers (use-search's /clear history) can
 // reach them without bundling a second copy.
+// The tour's overlay (review-tutorial): loaded with the first tour start via the
+// same screens-e loader, so the cold-boot path pays nothing for it.
+import { TourOverlay } from './components/TourOverlay.jsx';
 import { VotSearchMini } from '../search/engine.js';
 import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
 
@@ -31,6 +34,7 @@ Object.assign(window, {
   SettingsScreen,
   SearchScreen,
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
+  TourOverlay,
   VotSearchMini,
   getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches,
 });

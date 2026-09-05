@@ -44,6 +44,7 @@ function renderOverlay() {
   return render(
     <AppShellOverlays
       settings={{ tabsEnabled: true }} updateSetting={noop}
+      screen="home"
       tabsOverviewOpen={true} setTabsOverviewOpen={noop}
       tabs={[]} activeTabIdx={0} tabThumbnails={{}} MAX_TABS={9}
       switchToTab={noop} closeTab={noop} openNewTab={noop}

@@ -7065,3 +7065,77 @@
       letter-spacing: 0.03em; font-style: italic; max-width: 46%;
     }
     .sw-fallback-row { display: flex; gap: 10px; }
+
+      /* ══════════════════════════════════════════════════════════════════
+         "Show me around" — the tour (review-tutorial, 2026-09-04)
+         Four dim panes around the ringed control, a gold ring 8 px outside
+         it, a card of plain words beside it, and the Home strip that offers
+         the tour once. Tokens only; type on the rem ladder so Text Size
+         scales it; 48 px buttons; nothing animates, so reduced-motion has
+         nothing to turn off. z-index 320: above the Garden warning (300),
+         below toasts (400+). Contrast (design page): dark card #070707 with
+         --cream-dim 18.6:1, --cream-muted 12.1:1, --gold 12.6:1; light card
+         #e6dece with #150a04 15.5:1, #3a2510 10.2:1, --gold 5.4:1.
+         ══════════════════════════════════════════════════════════════════ */
+      .tour-dim { position: fixed; z-index: 320; background: rgba(0,0,0,0.62); }
+      body.light .tour-dim { background: rgba(20,14,4,0.5); }
+      .tour-ring {
+        position: fixed; z-index: 321; pointer-events: none;
+        border: 3px solid var(--gold); border-radius: 12px;
+        box-shadow: 0 0 0 4px rgba(0,0,0,0.35), 0 0 18px var(--gold-glow);
+      }
+      .tour-arrow { position: fixed; z-index: 322; width: 0; height: 0; border: 10px solid transparent; pointer-events: none; }
+      .tour-arrow.up { border-bottom-color: var(--gold-border); }
+      .tour-arrow.down { border-top-color: var(--gold-border); }
+      .tour-card, .tour-prompt {
+        position: fixed; left: 12px; right: 12px; z-index: 322;
+        max-width: 520px; margin: 0 auto;
+        background: var(--bg3); color: var(--cream-dim);
+        border: 1px solid var(--gold-border); border-radius: 16px;
+        padding: 16px 18px 14px;
+        box-shadow: 0 10px 34px rgba(0,0,0,0.55);
+        font-family: var(--font-body);
+        max-height: 70vh; overflow-y: auto;
+      }
+      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
+      .tour-eyebrow {
+        font-family: var(--font-cinzel); font-size: var(--fs-11);
+        letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
+      }
+      .tour-title, .tour-prompt-title {
+        font-family: var(--font-cinzel); font-weight: 600; font-size: var(--fs-20);
+        line-height: 1.2; color: var(--cream); margin: 0 0 8px;
+      }
+      .tour-prompt-title { font-size: var(--fs-18); margin-bottom: 4px; }
+      .tour-text, .tour-prompt-text { font-size: var(--fs-18); line-height: 1.4; margin: 0 0 14px; }
+      .tour-prompt-text { font-size: var(--fs-16); margin-bottom: 12px; }
+      .tour-tip { font-size: var(--fs-16); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
+      .tour-row { display: flex; gap: 8px; align-items: center; }
+      .tour-sp { flex: 1; }
+      .tour-btn {
+        font-family: var(--font-cinzel); font-size: var(--fs-14); letter-spacing: 0.08em; text-transform: uppercase;
+        min-height: 48px; padding: 0 16px; border-radius: 12px;
+        border: 1px solid var(--gold-border); background: transparent; color: var(--gold); cursor: pointer;
+      }
+      .tour-btn.primary { background: var(--gold); color: #000; border-color: var(--gold); flex: 1; }
+      body.light .tour-btn.primary { color: #fff; }
+      .tour-btn.quiet { border-color: transparent; color: var(--cream-muted); padding: 0 10px; }
+      .tour-btn[disabled] { opacity: 0.45; cursor: default; }
+      .tour-btn:focus-visible, .tour-never:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+      .tour-never {
+        display: block; margin: 8px auto 0; min-height: 44px;
+        background: none; border: 0; color: var(--cream-muted); cursor: pointer;
+        font-family: var(--font-body); font-size: var(--fs-16); text-decoration: underline;
+      }
+      .tour-wait {
+        position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 322; text-align: center;
+        font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);
+        background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 16px; padding: 12px;
+      }
+      .settings-help-btn {
+        font-family: var(--font-cinzel); font-size: var(--fs-14); letter-spacing: 0.08em; text-transform: uppercase;
+        min-height: 48px; padding: 0 16px; border-radius: 12px; width: 100%;
+        border: 1px solid var(--gold-border); background: var(--gold); color: #000; cursor: pointer;
+      }
+      body.light .settings-help-btn { color: #fff; }
+      .settings-help-note { font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); margin: 8px 0 0; line-height: 1.4; }
