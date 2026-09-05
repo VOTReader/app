@@ -1693,6 +1693,9 @@
         background: var(--bg2); border: 1px solid var(--gold-border); border-radius: var(--radius);
         padding: 1rem 1.1rem; text-align: left;
         transition: all var(--transition); color: inherit; cursor: pointer;
+        /* A track that may shrink below its content needs the words inside to wrap, or the clip
+           moves one box inward: "Warning" ran 16 px past its 122 px card at Text Size 1.8. */
+        min-width: 0; overflow-wrap: break-word;
       }
       @media (hover: hover) { .bottom-nav-card:hover { border-color: var(--gold); background: var(--gold-faint); } }
       .bottom-nav-card.next { text-align: right; }

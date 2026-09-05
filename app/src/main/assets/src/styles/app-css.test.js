@@ -229,7 +229,12 @@ describe('app.css — bottom-nav cards fit the row at large type', () => {
     const nav = ruleBlock(CSS, '.bottom-nav {');
     expect(nav).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/);
   });
-  it('the caps label wraps rather than widening the card', () => {
+  it('the words inside a card wrap rather than running past it (label and title alike)', () => {
+    // The card's own rule: `.pager-peek-boundary .bottom-nav-card {` sits earlier in the file.
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const card = (bare.match(/[\n\r]\s*\.bottom-nav-card \{([^}]*)\}/) || [])[1] || '';
+    expect(card).toMatch(/overflow-wrap:\s*(anywhere|break-word)/);
+    expect(card).toMatch(/min-width:\s*0/);
     const label = ruleBlock(CSS, '.bottom-nav-label {');
     expect(label).toMatch(/overflow-wrap:\s*(anywhere|break-word)/);
   });
