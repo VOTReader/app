@@ -156,16 +156,52 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const toolbarRef = React.useRef(null);
   const suppressRef = React.useRef(false);
 
-  // Compute character offset of a node+offset within a data-hl-key container's text
-  const computeOffset = React.useCallback((container, node, offset) => {
+  /**
+   * Characters before `node` in the container's text, walking the same
+   * SHOW_TEXT order that applyDOMHighlights indexes by.
+   *
+   * An ELEMENT is located by its first text node, so `contains` is the test —
+   * a text walker can never equal an element.
+   */
+  const textPosBefore = React.useCallback((container, node) => {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
     let charPos = 0;
     while (walker.nextNode()) {
-      if (walker.currentNode === node) return charPos + offset;
-      charPos += walker.currentNode.textContent.length;
+      const cur = walker.currentNode;
+      if (cur === node || (node.nodeType === 1 && node.contains(cur))) return charPos;
+      charPos += cur.textContent.length;
     }
-    return charPos + offset;
+    return charPos;   // no text under `node`: it sits at the end
   }, []);
+
+  /**
+   * Character offset of a Range boundary within a data-hl-key container.
+   *
+   * annotation-selection-8: a Range boundary is NOT always a text node, and
+   * when it is an element its `offset` is a CHILD INDEX, not a character
+   * offset — that is the DOM spec, and it is what `Range.selectNodeContents()`
+   * and Chrome's triple-click both produce. The old walker only ever compared
+   * against text nodes, so an element boundary matched nothing and fell
+   * through to `charPos + offset` — the container's WHOLE length plus a child
+   * index. A 12-character paragraph selected whole reported [12, 13): an empty
+   * range past the end, so triple-clicking a paragraph and highlighting it
+   * annotated nothing while looking like it worked.
+   *
+   * Both boundary kinds resolve through the same `textPosBefore`, so there is
+   * one definition of "where is this in the text" rather than two.
+   */
+  const computeOffset = React.useCallback((container, node, offset) => {
+    if (node && node.nodeType === 1) {
+      const kids = node.childNodes;
+      // Before child i, or — when the index is past the last child, which is
+      // what selectNodeContents produces for the END boundary — after all of
+      // this element's text.
+      return (offset < kids.length)
+        ? textPosBefore(container, kids[offset])
+        : textPosBefore(container, node) + node.textContent.length;
+    }
+    return textPosBefore(container, node) + offset;
+  }, [textPosBefore]);
 
   // Find the data-hl-key container for a DOM node
   const findHlContainer = React.useCallback((node) => {
@@ -426,7 +462,27 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         }
       })();
       const container = findHlContainer(range.startContainer);
-      const endContainer = findHlContainer(range.endContainer);
+      // annotation-selection-8: Chrome's triple-click ends the range at child 0
+      // of the NEXT block, so the end boundary names a container the selection
+      // does not actually include a character of. Taken literally that is two
+      // containers, and one paragraph took the multi-verse branch — no Link
+      // action, no highlight, for the commonest way there is to select a
+      // paragraph.
+      //
+      // The test is the offset, not the element: an end boundary that resolves
+      // to character 0 of a container contributes nothing from it, so the
+      // selection really ends where the start container's text ends. Anything
+      // that genuinely spans two blocks resolves to a non-zero offset in the
+      // second and still takes the multi-verse branch.
+      let endNode = range.endContainer;
+      let endOff = range.endOffset;
+      const rawEndContainer = findHlContainer(endNode);
+      if (container && rawEndContainer && rawEndContainer !== container
+          && computeOffset(rawEndContainer, endNode, endOff) === 0) {
+        endNode = container;
+        endOff = container.childNodes.length;   // element boundary: past the last child
+      }
+      const endContainer = findHlContainer(endNode);
       const isMultiVerse = !container || !endContainer || endContainer !== container;
       if (isMultiVerse) {
         // Cross-container selection: find all [data-hl-key] containers that overlap
@@ -437,7 +493,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
-        const end = computeOffset(container, range.endContainer, range.endOffset);
+        const end = computeOffset(container, endNode, endOff);
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
         setSelInfo({ hlKey, start, end, text, copyText: selCopyText, existingHl: existing || null, multiVerse: false });
