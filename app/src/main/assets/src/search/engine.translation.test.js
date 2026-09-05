@@ -54,30 +54,33 @@ const BIBLE_KJV = {
   ] },
 };
 
+/** The untyped classic-script globals this suite installs and removes. */
+const G = /** @type {any} */ (globalThis);
+
 let prevData;
 /** @type {any} */ let loadSpy;
 
 beforeEach(() => {
   prevData = window.VotSearchData;
   window.VotSearchData = VOT_DATA;
-  globalThis.BOOKS = BOOKS;
-  delete globalThis.BIBLE_KJV;
+  G.BOOKS = BOOKS;
+  delete G.BIBLE_KJV;
 });
 
 afterEach(() => {
   window.VotSearchData = prevData;
-  delete globalThis.BOOKS;
-  delete globalThis.BIBLE_KJV;
-  delete globalThis.loadTranslation;
+  delete G.BOOKS;
+  delete G.BIBLE_KJV;
+  delete G.loadTranslation;
 });
 
 /** A loader that behaves like the real one: resolves either way, and defines
     the global only when the script would really have shipped. */
 function installLoader({ shipped }) {
   loadSpy = vi.fn(async (code) => {
-    if (shipped && code === 'kjv') globalThis.BIBLE_KJV = BIBLE_KJV;
+    if (shipped && code === 'kjv') G.BIBLE_KJV = BIBLE_KJV;
   });
-  globalThis.loadTranslation = loadSpy;
+  G.loadTranslation = loadSpy;
 }
 
 async function textsFor(query) {
@@ -112,7 +115,7 @@ describe('search-3 — the index is built from the translation it is stamped wit
     installLoader({ shipped: false });
     await VotSearchMini.rebuild({ translation: 'kjv' });
 
-    expect(globalThis.BIBLE_KJV).toBeUndefined();
+    expect(G.BIBLE_KJV).toBeUndefined();
     expect(await textsFor('pastures')).toEqual(['Psalms 23:2']);   // it IS the NKJV text
     expect(VotSearchMini.getStats().translation).toBe('nkjv');     // …so that is what it must say
   });
