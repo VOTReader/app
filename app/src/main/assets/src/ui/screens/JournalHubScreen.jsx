@@ -146,7 +146,7 @@ export function JournalHubScreen(props) {
       .then(function(rows) { if (!cancelled) setUnclaimed(rows || []); })
       .catch(function() { /* a failed read must not take the hub down */ });
     return function() { cancelled = true; };
-  }, [storeVersion]);
+  }, [storeVersion, setUnclaimed]);
 
   function recoverUnclaimed(rec) {
     // No samples: the waveform degrades to a flat bar. Inventing samples would
