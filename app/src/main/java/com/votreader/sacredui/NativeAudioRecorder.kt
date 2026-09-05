@@ -10,6 +10,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import timber.log.Timber
 
 /**
@@ -39,6 +40,20 @@ import timber.log.Timber
 class NativeAudioRecorder(private val context: Context) {
 
     private val lock = Any()
+
+    /**
+     * Names [stop] handed to JS and [deleteRecording] has not taken back. The sweep
+     * must not touch these: a served file becomes sweep-eligible 60 s after stop(),
+     * a fetch that keeps failing is retried for longer than that, and the user's
+     * natural response to a stuck memo is to record again -- a start(), which swept
+     * the one file journal-3 2a exists to rescue.
+     *
+     * In memory ON PURPOSE. A crash empties it, so the next session's orphans are
+     * swept normally -- and orphans from a dead session are the only case the sweep
+     * was ever for. Concurrent because [deleteRecording] runs on a binder thread
+     * outside [lock] while the sweep runs under it.
+     */
+    private val servedNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var recorder: MediaRecorder? = null
     private var recordFile: File? = null
     private var startMs = 0L
@@ -81,15 +96,18 @@ class NativeAudioRecorder(private val context: Context) {
      * dangling temp file, no half-initialised recorder.
      */
     fun start(): Result<Unit> = synchronized(lock) {
-        // #1: clean any orphaned served memos from an interrupted prior session
-        // (the happy path fetches the file + drops the reference within a second).
-        sweepStaleRecordings()
         if (ContextCompat.checkSelfPermission(
                 context, Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             return Result.Failure("permission")
         }
+
+        // #1: clean any orphaned served memos from an interrupted prior session
+        // (the happy path fetches the file + drops the reference within a second).
+        // BELOW the permission check, not above it: the sweep deletes files, and a
+        // tap that is refused the mic is no reason to prune anybody's data.
+        sweepStaleRecordings()
 
         // Drop any prior instance defensively -- the JS side could double-
         // fire start without a stop / cancel in between (race with
@@ -258,6 +276,9 @@ class NativeAudioRecorder(private val context: Context) {
         val served = File(recordingsDir(), UUID.randomUUID().toString() + ".m4a")
         val moved = try { f.renameTo(served) } catch (_: Exception) { false }
         if (moved) {
+            // JS now owns this name until it calls deleteRecording; the sweep skips it
+            // until then, however old it gets waiting for a fetch that keeps failing.
+            servedNames.add(served.name)
             recordFile = null
             return Result.Success(RecordingResult(base64 = null, durationMs = safeDur, fileName = served.name))
         }
@@ -300,13 +321,20 @@ class NativeAudioRecorder(private val context: Context) {
     /**
      * Delete the served recording [name]; true only if a file was actually removed.
      *
-     * journal-3 2a: the handshake half. JS calls this once the bytes are committed to
-     * its own store, so the native side stops holding a copy of something already
-     * saved. Nothing else prunes a claimed file -- [sweepStaleRecordings] exists for
-     * the ones JS never came back for.
+     * journal-3 2a: the handshake half, and the ONLY thing that ends a claim. JS calls
+     * this once the bytes are committed to its own store, so the native side stops
+     * holding a copy of something already saved. Until it does, [servedNames] keeps
+     * the file out of [sweepStaleRecordings] -- which exists for the memos of a
+     * session that died, the only ones nobody is coming back for.
+     *
+     * The claim is dropped even when the unlink fails: JS is finished with the file
+     * either way, and a claim nothing can release would pin the file for the life of
+     * the process. A file left behind by a failed delete is then an ordinary orphan
+     * and the sweep can have it.
      */
     fun deleteRecording(name: String): Boolean {
         val f = resolveServedRecording(name) ?: return false
+        servedNames.remove(f.name)
         return try {
             f.delete()
         } catch (e: Exception) {
@@ -444,13 +472,17 @@ class NativeAudioRecorder(private val context: Context) {
 
     /** Delete served recordings older than [RECORDING_TTL_MS] — orphans left when
      *  the app died before JS fetched them (the happy path fetches within a second
-     *  of stop()). A just-served file is far newer than the cutoff, so an in-flight
-     *  fetch is never touched. Best-effort; never throws. */
+     *  of stop()).
+     *
+     *  AGE ALONE IS NOT ENOUGH, and the KDoc here used to say it was: a memo whose
+     *  fetch fails is retried past the cutoff while JS still needs it. [servedNames]
+     *  is the second condition -- anything this process handed out and JS has not
+     *  released is spared at any age. Best-effort; never throws. */
     private fun sweepStaleRecordings() {
         try {
             val cutoff = System.currentTimeMillis() - RECORDING_TTL_MS
             recordingsDir().listFiles()?.forEach { file ->
-                if (file.isFile && file.lastModified() < cutoff) {
+                if (file.isFile && file.name !in servedNames && file.lastModified() < cutoff) {
                     try { file.delete() } catch (_: Exception) {}
                 }
             }
