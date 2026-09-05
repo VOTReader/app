@@ -120,11 +120,12 @@ def main():
               + ", ".join(sorted(skip_units)))
 
     report, failures = [], []
-    # Highest commit charge seen since the last progress line. The line only
+    # Highest commit charge and resident set seen since the last progress line,
+    # both sampled at the same moment below. The line only
     # prints every fifth letter, so one letter's figure is not the window's:
     # a composite that reports one member and is read as all five is the same
     # trap as sampling a trough and reading it as a peak.
-    window_peak = 0.0
+    window_peak = window_rss = 0.0
     for n, key in enumerate(keys, 1):
         if key in skip_units:
             failures.append((key, "SKIPPED — exceeded the supervisor's RSS ceiling"))
@@ -172,7 +173,12 @@ def main():
         # letter this line exists to catch. Measured on the Bible runner
         # 2026-09-05: a logged 10.00 GB against a true 19.06 GB for the same pid,
         # the whole gap being sampling PHASE and not a bad field.
+        # BOTH readers, sampled at one moment. The first cut of this fix moved
+        # commit up and left rss inside the print, so one column reported a peak
+        # and the column beside it a trough -- and the mismatch read as the
+        # process being trimmed by the OS.
         window_peak = max(window_peak, al.commit_gb())
+        window_rss = max(window_rss, al.rss_gb())
         al.release_caches()
         if n % 5 == 0 or n == len(keys):
             # Resident memory rides the progress line. The 2026-08-26 run grew
@@ -180,9 +186,9 @@ def main():
             # one core pinned, no belt for 45 minutes -- because run_belt built
             # a fresh whisper + MMS leg per letter. That is fixed, but a creep
             # that is invisible is a creep nobody catches twice.
-            print(f"  [{n}/{len(keys)}] {key} done   rss {_rss_gb():.2f} GB "
+            print(f"  [{n}/{len(keys)}] {key} done   rss {window_rss:.2f}/{_rss_gb():.2f} GB "
                   f"commit {window_peak:.2f}/{al.commit_gb():.2f} GB", flush=True)
-            window_peak = 0.0
+            window_peak = window_rss = 0.0
 
     rep_path = os.path.join(REPORTS, f"batch-{'-'.join(sorted(vols))}.txt")
     with open(rep_path, "w", encoding="utf-8") as f:

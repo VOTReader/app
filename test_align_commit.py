@@ -129,94 +129,125 @@ class CommitChargeAgreesWithAnExternalInstrument(unittest.TestCase):
                 f"disagrees with Win32_Process {theirs:.3f} GB")
 
 
-class CommitIsSampledBeforeTheAllocatorIsReleased(unittest.TestCase):
-    """WHERE the reader is called is part of the number it returns.
+class MemoryIsSampledBeforeTheAllocatorIsReleased(unittest.TestCase):
+    """WHERE a reader is called is part of the number it returns.
 
     Both runners hand torch's allocator cache back with al.release_caches()
     right before printing their per-unit progress line, and both used to sample
-    commit AFTER that call. Every figure either of them has ever logged is
-    therefore a post-release TROUGH: a unit that climbed to 30 GB and gave it
-    back logs the same idle number as one that never grew, which is precisely
-    the unit the column exists to find. Measured 2026-09-05 on the Bible runner:
-    a logged 10.00 GB against 19.06 GB for the same pid at the same moment, the
-    whole gap being sampling PHASE, not a bad field or a stale build.
+    memory AFTER that call. Every figure either has ever logged is therefore a
+    post-release TROUGH: a unit that climbed to 30 GB and gave it back logs the
+    same idle number as one that never grew, which is precisely the unit the
+    column exists to find. Measured 2026-09-05 on the Bible runner: a logged
+    10.00 GB against 19.06 GB for the same pid at the same moment, the whole gap
+    being sampling PHASE, not a bad field or a stale build.
 
-    An external per-minute sampler does not rescue this — chapters run 36-120 s,
-    so a short one peaks and releases entirely between two samples.
+    BOTH readers on the line, not just commit. The first cut of this fix moved
+    commit_gb() up and left rss_gb() inside the print, so one column reported a
+    peak while the column beside it reported a trough -- and the resulting
+    2.54 -> 1.62 GB "drop" was read as the OS trimming the process under memory
+    pressure. It was not: nothing else on the machine had grown by more than
+    0.5 GB and 28 GB of physical memory was free. Two readers on one line are
+    sampled at one moment or the line lies about which phase it describes.
 
     Source-order assertion rather than a live run: the defect is a line's
     position, the runners need a GPU and hours, and a position is exactly what
     a reviewer moves back by accident.
+
+    THE HOLE THIS DOES NOT CLOSE, stated rather than implied. The ordering leg
+    accepts ANY qualifying call above the release, so an unrelated earlier read
+    satisfies it: on pristine main, batch-align-bible.py's rss ordering PASSED
+    because main() reads al.rss_gb() at line 334 to stamp a checkpoint, two
+    hundred lines above the progress line that was actually broken. Seven of the
+    eight cells went red there, not eight. **The print leg is what carries the
+    weight for that cell** — it names the variable the line must reference, which
+    no unrelated call can provide. Verified as a pair, RED both ways: 7 failures
+    against pristine main, and 3 against this branch's own first cut (ea9351cf),
+    all three of them rss and none of them commit — which is exactly the shape
+    that proves this revision catches what the first one missed.
     """
 
+    # runner -> {reader attribute on the progress line: the variable holding
+    #            its pre-release sample}
     RUNNERS = {
-        "tools/batch-align-bible.py": "peak_commit",
-        "tools/batch-align.py": "window_peak",
+        "tools/batch-align-bible.py": {"commit_gb": "peak_commit", "rss_gb": "peak_rss"},
+        "tools/batch-align.py": {"commit_gb": "window_peak", "rss_gb": "window_rss"},
     }
 
     def _tree(self, rel):
         with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
             return ast.parse(f.read(), filename=rel)
 
-    def test_a_commit_read_precedes_release_caches(self):
-        for rel, peak_var in self.RUNNERS.items():
-            with self.subTest(runner=rel):
-                tree = self._tree(rel)
-                releases, samples = [], []
-                for node in ast.walk(tree):
-                    if not isinstance(node, ast.Call):
-                        continue
-                    fn = node.func
-                    if not isinstance(fn, ast.Attribute):
-                        continue
-                    if fn.attr == "release_caches":
-                        releases.append(node.lineno)
-                    elif fn.attr == "commit_gb":
-                        samples.append(node.lineno)
-                # Positive control: an assertion about ordering is vacuous if
-                # neither call is there any more. A runner that stopped
-                # releasing, or stopped reading commit, is its own finding.
-                self.assertEqual(
-                    len(releases), 1,
-                    f"{rel}: expected exactly one al.release_caches() call, "
-                    f"found {len(releases)} on lines {releases}")
-                self.assertTrue(
-                    samples, f"{rel}: no al.commit_gb() call at all")
-                self.assertTrue(
-                    any(s < releases[0] for s in samples),
-                    f"{rel}: every al.commit_gb() call (lines {samples}) is "
-                    f"BELOW al.release_caches() on line {releases[0]}, so the "
-                    f"commit column is a post-release trough and cannot show a "
-                    f"unit that peaked and released.")
+    def _releasing_function(self, tree, rel):
+        """The function that releases the cache, and the line it does it on.
 
-    def test_the_progress_line_prints_the_peak(self):
+        Scoped to that ONE function on purpose. A file-wide search would accept
+        tools/batch-align.py's module-level `_rss_gb()` helper, whose body reads
+        al.rss_gb() two hundred lines ABOVE the release — an ordering assertion
+        satisfied by a call that has nothing to do with the loop is a pass for
+        the wrong reason, which is the failure mode this whole file exists for.
+        """
+        found = []
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef):
+                continue
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "release_caches"):
+                    found.append((fn, node.lineno))
+        self.assertEqual(
+            len(found), 1,
+            f"{rel}: expected exactly one al.release_caches() call inside exactly "
+            f"one function, found {len(found)}")
+        return found[0]
+
+    def test_every_reader_is_sampled_before_release_caches(self):
+        for rel, readers in self.RUNNERS.items():
+            tree = self._tree(rel)
+            fn, release_line = self._releasing_function(tree, rel)
+            for attr in readers:
+                with self.subTest(runner=rel, reader=attr):
+                    calls = [n.lineno for n in ast.walk(fn)
+                             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                             and n.func.attr == attr]
+                    # Positive control: an ordering assertion is vacuous once
+                    # the call is not there at all.
+                    self.assertTrue(
+                        calls, f"{rel}: no al.{attr}() call in the function that "
+                        f"releases the allocator")
+                    self.assertTrue(
+                        any(c < release_line for c in calls),
+                        f"{rel}: every al.{attr}() call (lines {calls}) is BELOW "
+                        f"al.release_caches() on line {release_line}, so that "
+                        f"column is a post-release trough and cannot show a unit "
+                        f"that peaked and released.")
+
+    def test_the_progress_line_prints_every_peak(self):
         """Sampling early is worthless if the print still shows only the trough."""
-        for rel, peak_var in self.RUNNERS.items():
-            with self.subTest(runner=rel):
-                tree = self._tree(rel)
-                printed = [
-                    node for node in ast.walk(tree)
-                    if isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Name) and node.func.id == "print"
-                ]
-                commit_lines = [
-                    node for node in printed
-                    if "commit " in "".join(
-                        v.value for a in node.args
-                        for v in ast.walk(a) if isinstance(v, ast.Constant)
-                        and isinstance(v.value, str))
-                ]
-                self.assertTrue(
-                    commit_lines,
-                    f"{rel}: no print() emits a 'commit ' column any more")
-                names = {
-                    v.id for node in commit_lines
-                    for v in ast.walk(node) if isinstance(v, ast.Name)
-                }
-                self.assertIn(
-                    peak_var, names,
-                    f"{rel}: the commit progress line does not reference "
-                    f"{peak_var!r}, so it prints the post-release trough only")
+        for rel, readers in self.RUNNERS.items():
+            tree = self._tree(rel)
+            printed = [
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name) and node.func.id == "print"
+            ]
+            lines = [
+                node for node in printed
+                if "commit " in "".join(
+                    v.value for a in node.args
+                    for v in ast.walk(a) if isinstance(v, ast.Constant)
+                    and isinstance(v.value, str))
+            ]
+            self.assertTrue(
+                lines, f"{rel}: no print() emits a 'commit ' column any more")
+            names = {v.id for node in lines
+                     for v in ast.walk(node) if isinstance(v, ast.Name)}
+            for attr, peak_var in readers.items():
+                with self.subTest(runner=rel, reader=attr):
+                    self.assertIn(
+                        peak_var, names,
+                        f"{rel}: the progress line does not reference "
+                        f"{peak_var!r}, so it prints {attr}'s post-release "
+                        f"trough only")
 
 
 if __name__ == "__main__":

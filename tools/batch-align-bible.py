@@ -397,7 +397,13 @@ def main():
         # the same pid, the whole gap being sampling PHASE and not a bad field.
         # An external sampler cannot replace this -- at 60 s granularity a short
         # chapter peaks and releases entirely between two of its samples.
-        peak_commit = al.commit_gb()
+        # BOTH readers, not just commit. The first cut of this fix moved
+        # commit_gb() up and left rss_gb() inside the print below, so the rss
+        # column stayed a trough while the commit column beside it reported a
+        # peak -- and a 2.54 -> 1.62 GB "drop" in that column cost an hour and a
+        # teammate's turn before it was identified as the same artefact one
+        # field over. Two readers on one line must be sampled at one moment.
+        peak_rss, peak_commit = al.rss_gb(), al.commit_gb()
         al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
@@ -405,7 +411,7 @@ def main():
             per_book[book_id]["review"].append(tag)
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
               f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
-              f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB "
+              f"   {time.time() - t0:5.1f}s  rss {peak_rss:.2f}/{al.rss_gb():.2f} GB "
               f"commit {peak_commit:.2f}/{al.commit_gb():.2f} GB", flush=True)
         checkpoint(tag)
     if last_book is not None:
