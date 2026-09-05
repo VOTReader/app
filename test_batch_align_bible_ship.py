@@ -105,5 +105,123 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         self.assertEqual(arr, [100, 200, 300, 400, 500])
 
 
+class WebNumbersSparselyAndTheAppSlotsAreNkjvs(unittest.TestCase):
+    """The corpus half of the same contract, and the reason the shipper is safe.
+
+    The shipper is only correct because WEB PRESERVES verse numbering across its
+    omissions -- acts 8 runs 1..36, 38, 39, 40 rather than closing up to 1..39.
+    That is a property of `bible-web.js`, so it is checked here against the
+    corpus rather than assumed from a design read, and it does not need the
+    campaign to have run. `BibleChapterView.renderVerse` takes its slots from
+    the books.js (NKJV) skeleton and `translateVerse` only swaps TEXT, keyed by
+    `verse.n`, so the on-screen slot set is the same whichever translation the
+    reader has chosen -- which is why the app side of the comparison is books.js
+    and not the edition the recording is in.
+
+    Measured 2026-09-05 over all 1,189 chapters: WEB diverges from that skeleton
+    in exactly six, and KJV in none. The `six` is the positive control -- a
+    different number means this is measuring something other than versification.
+    """
+
+    # WEB vs the on-screen NKJV skeleton. `absent` are verse numbers the app
+    # renders that WEB has no verse for; `extra` are the reverse.
+    DIVERGENCES = {
+        ("acts", 8):     {"absent": [37], "extra": []},
+        ("acts", 15):    {"absent": [34], "extra": []},
+        ("acts", 24):    {"absent": [7], "extra": []},
+        ("luke", 17):    {"absent": [36], "extra": []},
+        ("romans", 14):  {"absent": [], "extra": [24, 25, 26]},
+        ("romans", 16):  {"absent": [25, 26, 27], "extra": []},
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        import subprocess
+        # One node call, not 1,189: dump both shapes as JSON and compare in
+        # Python. books.js is Format C (chapters[].sections[].verses[]) and
+        # Matthew lives in matthew-plain.js -- the same two shapes and the same
+        # alias tools/extract-bible-verses.mjs owns.
+        js = r"""
+        const {readFileSync}=require('fs'), {runInNewContext}=require('vm'), {resolve}=require('path');
+        const A=resolve('app','src','main','assets','src','data');
+        const L=(f,n)=>{const c={};runInNewContext(readFileSync(resolve(A,f),'utf8'),c,{filename:f});return c[n];};
+        const app={}; const add=(b,id)=>{for(const ch of b.chapters||[]){const ns=[];
+          for(const s of ch.sections||[])for(const v of s.verses||[])ns.push(v.n);
+          app[id+'|'+ch.num]=ns.sort((x,y)=>x-y);}};
+        const B=L('books.js','BOOKS');
+        for(const k of Object.keys(B)){const b=B[k]; if(b&&b.chapters) add(b,b.id||k);}
+        add(L('matthew-plain.js','MATTHEW_PLAIN'),'matthew-plain');
+        const ed={}; for(const [c,g] of [['web','BIBLE_WEB'],['kjv','BIBLE_KJV']]){
+          const d=L('bible-'+c+'.js',g); const o={};
+          for(const b of Object.keys(d))for(const ch of Object.keys(d[b]))o[b+'|'+ch]=d[b][ch].map(v=>v.n);
+          ed[c]=o;}
+        process.stdout.write(JSON.stringify({app,ed}));
+        """
+        r = subprocess.run(["node", "-e", js], capture_output=True, cwd=ROOT,
+                           encoding="utf-8", errors="replace")
+        if r.returncode != 0:
+            raise unittest.SkipTest("node unavailable or corpus unreadable: "
+                                    + (r.stderr or "")[:200])
+        cls.corpus = json.loads(r.stdout)
+
+    def _diff(self, code):
+        """(book, chapter) -> what this edition lacks / adds vs the app's slots."""
+        app, ed = self.corpus["app"], self.corpus["ed"][code]
+        out = {}
+        for key, ns in ed.items():
+            slots = app.get(key)
+            if slots is None:
+                continue                       # book the reader has no screen for
+            have, want = set(ns), set(slots)
+            absent, extra = sorted(want - have), sorted(have - want)
+            if absent or extra:
+                book, ch = key.split("|")
+                out[(book, int(ch))] = {"absent": absent, "extra": extra}
+        return out
+
+    def test_web_diverges_in_exactly_the_six_known_chapters(self):
+        self.assertEqual(self._diff("web"), self.DIVERGENCES)
+
+    def test_an_interior_omission_leaves_a_hole_rather_than_renumbering(self):
+        # The property the shipper depends on. An omitted verse in the MIDDLE
+        # leaves a hole and the verses after it keep their own numbers, so
+        # max(n) is unchanged and ship()'s array already has the app's length
+        # with a zero in the hole -- which is why four of the six divergences
+        # need no handling at all. If WEB ever closed such a gap, this says so.
+        app, web = self.corpus["app"], self.corpus["ed"]["web"]
+        checked = []
+        for (book, ch), d in self.DIVERGENCES.items():
+            key = "%s|%d" % (book, ch)
+            interior = [n for n in d["absent"] if n < max(web[key])]
+            if not interior:
+                continue
+            checked.append((book, ch))
+            self.assertEqual(max(web[key]), max(app[key]),
+                             "%s %d: WEB closed the gap at %s instead of leaving it"
+                             % (book, ch, interior))
+            self.assertEqual(len(web[key]), len(app[key]) - len(d["absent"]))
+        self.assertEqual(sorted(checked), [("acts", 8), ("acts", 15), ("acts", 24), ("luke", 17)])
+
+    def test_a_trailing_omission_shortens_the_range_instead(self):
+        # The case the test above deliberately does not cover, named rather than
+        # skipped in silence. romans 16 loses its last three verses (the WEB
+        # prints that doxology at 14:24-26), so there IS no verse after the
+        # omission to keep a number and max(n) legitimately falls short of the
+        # app's. The shipper needs nothing for this either: those slots simply
+        # get no row and paint nothing, and their audio is in another chapter's
+        # file, so there is nothing to point at even in principle.
+        app, web = self.corpus["app"], self.corpus["ed"]["web"]
+        self.assertEqual(max(web["romans|16"]), 24)
+        self.assertEqual(max(app["romans|16"]), 27)
+        # ...and its counterpart runs LONGER for the same reason.
+        self.assertEqual(max(web["romans|14"]), 26)
+        self.assertEqual(max(app["romans|14"]), 23)
+
+    def test_kjv_diverges_nowhere(self):
+        # The control. Without it, "six" could be six for any reason the reader
+        # of the corpus invented, and this whole comparison would be unfalsified.
+        self.assertEqual(self._diff("kjv"), {})
+
+
 if __name__ == "__main__":
     unittest.main()

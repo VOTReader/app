@@ -3,8 +3,11 @@
   py -3.13 tools/validate-bible-sync.py [--edition brm-kjv] [--data <path>] [--structural]
 
 Read-only. For every chapter in src/data/bible-sync-<edition>.js:
-  - the array has exactly one slot per verse of the CURRENT reference corpus
-    (a fresh extract through tools/extract-bible-verses.mjs, never the cache)
+  - the array has one slot per verse NUMBER, 1..max(n), of the CURRENT reference
+    corpus (a fresh extract through tools/extract-bible-verses.mjs, never the
+    cache) -- NOT one per verse: an edition may number sparsely, and a slot it
+    has no verse for is excluded by versification, reported by name
+  - no slot carries a timing for a verse number the edition does not have
   - slots are non-negative integers; the non-zero onsets never step backwards
   - the last onset lies inside the chapter's local audio (ffprobe)
   - the belt on disk is current: today's settings hash, the fresh verses hash,
@@ -132,6 +135,7 @@ def check(ed, a):
     tmp = tempfile.mkdtemp(prefix="bible-sync-validate-")
     chapters = slots = zeros = 0
     shipped = set()
+    absent = []                 # slots this edition has no verse for
     for book in table:
         for ch_s, arr in table[book].items():
             ch = int(ch_s)
@@ -144,8 +148,45 @@ def check(ed, a):
                 continue
             slots += len(arr)
             zeros += sum(1 for v in arr if not v)
-            if len(arr) != len(verses):
-                problems.append((tag, f"{len(arr)} slots for {len(verses)} verses"))
+            # ONE SLOT PER VERSE NUMBER, not one per verse. The array is
+            # addressed by the edition's own verse numbers (ship() writes
+            # arr[n - 1] and sizes to max(n)), and some editions number
+            # SPARSELY: the WEB omits acts 8:37, acts 15:34, acts 24:7 and
+            # luke 17:36 while keeping the verses after each gap at their own
+            # numbers. Comparing against len(verses) failed all four of those
+            # chapters on a correctly shipped file -- measured 2026-09-05
+            # against a fixture built by ship()'s own formula, and it would
+            # have blocked the WEB ship. rebuild() below already used max(n);
+            # the two legs of this gate disagreed and only one of them fired.
+            nums = {v["n"] for v in verses}
+            if not nums:
+                # The old len() comparison degraded into a plain problem line
+                # here; max() would raise and take the whole gate down with it,
+                # and a gate that crashes is a gate someone bypasses.
+                problems.append((tag, "reference corpus has no verses for this chapter"))
+                continue
+            want_len = max(nums)
+            if len(arr) != want_len:
+                problems.append((tag, f"{len(arr)} slots for verse numbers 1..{want_len}"))
+            # The other half, and the one that catches a DENSE shipper: a
+            # timing may only sit at a slot this edition actually numbers.
+            # Packing rows densely puts acts 8's verse 38 at index 36, i.e. at
+            # verse 37, which the WEB does not have -- the array stays a
+            # plausible length and every other check here passes.
+            stray = [i + 1 for i, v in enumerate(arr) if v and (i + 1) not in nums]
+            if stray:
+                problems.append((tag, f"timed at verse {', '.join(map(str, stray[:5]))}"
+                                      f"{' …' if len(stray) > 5 else ''}, which this edition does not have"))
+            # A ZERO slot the edition has no verse for is EXCLUDED BY
+            # VERSIFICATION, not untimed. Reported apart from the unproven zeros
+            # so no later session chases it as an alignment gap (Orchestrator,
+            # 2026-09-05). It must stay a subset of the zeros: a NON-zero slot at
+            # a verse number the edition lacks is the `stray` defect above, and
+            # counting it here made the summary print "-2 unproven" on a dense
+            # file -- a nonsense number that still reads like a count.
+            for n in range(1, len(arr) + 1):
+                if n not in nums and not arr[n - 1]:
+                    absent.append(f"{book} {ch}:{n}")
             if any((not isinstance(v, int)) or isinstance(v, bool) or v < 0 for v in arr):
                 problems.append((tag, "non-integer or negative slot"))
             last = 0
@@ -197,8 +238,14 @@ def check(ed, a):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
 
     mode = "STRUCTURAL (corpus shape only; belts + audio not checked)" if structural else "FULL"
-    print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, {zeros} zero  "
+    print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, "
+          f"{zeros - len(absent)} unproven, {len(absent)} excluded by versification  "
           f"(settings {want}, audio index {len(idx)} chapters, mode {mode})")
+    if absent:
+        # Named, because an unnamed count is what a later session mistakes for
+        # an alignment gap and spends card time chasing.
+        print(f"  excluded by versification ({len(absent)}): {', '.join(absent[:20])}"
+              f"{' …' if len(absent) > 20 else ''}")
     if problems:
         print(f"FAIL: {len(problems)} problem(s)")
         for tag, why in problems[:200]:
