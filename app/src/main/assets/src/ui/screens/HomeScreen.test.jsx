@@ -90,6 +90,47 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(document.activeElement).toBe(card);
   });
 
+  /* The reorder's whole purpose is the keyboard path, and a sighted user sees
+     the tile move while a screen-reader user gets the store write and nothing
+     else. The screen already has the live region — <p className="home-status"
+     role="status"> — so the announcement is one setHomeStatus in the handler.
+     It IS there (11d4fed3); nothing pinned it, which is how a one-line
+     announcement disappears in a refactor without a single test going red. */
+  it('announces the move in the live region, by name and direction', () => {
+    setupGlobals();
+    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
+    HomeOrderStore.set = vi.fn();
+    renderHome({ historyEnabled: false });
+    const card = screen.getByRole('button', { name: /The Scriptures of Truth/ });
+    card.focus();
+
+    const live = document.querySelector('.home-status[role="status"]');
+    expect(live).toBeTruthy();
+    expect(live.textContent).toBe('');            // nothing announced before the move
+
+    fireEvent.keyDown(card, { key: 'ArrowUp', altKey: true });
+    expect(live.textContent).toMatch(/moved up/);
+    expect(live.textContent).toMatch(/Scriptures of Truth/);
+
+    fireEvent.keyDown(card, { key: 'ArrowDown', altKey: true });
+    expect(live.textContent).toMatch(/moved down/);
+  });
+
+  /* The other half: a keypress that changes NOTHING must not announce
+     anything, or the live region cries wolf on every Alt+Up at the top of the
+     list. The first tile has no neighbour above it. */
+  it('says nothing when the move is not possible', () => {
+    setupGlobals();
+    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
+    HomeOrderStore.set = vi.fn();
+    renderHome({ historyEnabled: false });
+    const first = screen.getByRole('button', { name: /The Volumes of Truth/ });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowUp', altKey: true });
+    expect(HomeOrderStore.set).not.toHaveBeenCalled();
+    expect(document.querySelector('.home-status[role="status"]').textContent).toBe('');
+  });
+
   it('waits for every Surprise source and prevents repeated taps', async () => {
     setupGlobals();
     let finish;
