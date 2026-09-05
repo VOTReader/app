@@ -195,6 +195,15 @@ jobs:
         # ModuleNotFoundError at step 1 and audio ingestion stops indefinitely
         # while the repo stays green. It reads imports with `ast`, installs
         # nothing, and keeps the heavy OCR dependencies out of that path.
+        # test_batch_align_ship.py rides the same unittest call (2026-09-04):
+        # batch-align.py rebuilds audio-sync.js volume by volume from its run
+        # report, so a letter that RAISED or that align-supervisor.py skipped
+        # for memory had its already-shipped read-along timings DELETED. No gate
+        # sees that -- check-audio-sync.js validates the rows present and never
+        # compares the file with its previous self, so a shorter audio-sync.js
+        # is green. The shipper now carries such a key forward; the test also
+        # proves the two deliberate drops (below the ship gate, gone from the
+        # manifest) still drop, so carry-forward cannot rot into never deleting.
         # test_preview_server.py rides the same unittest call (2026-09-03):
         # tools/preview-server.py must bind 127.0.0.1 only. It bound every
         # interface for months and nothing said so; a dev server that can
@@ -202,7 +211,7 @@ jobs:
         # push instead of assumed.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)

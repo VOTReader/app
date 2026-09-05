@@ -110,8 +110,21 @@ def main():
     keys = sorted(k for k in manifest if k.split(":", 1)[0] in vols)
     print(f"batch-align: {len(keys)} letters in volumes {sorted(vols)}  settings {want_hash}")
 
+    # Units tools/align-supervisor.py killed for memory. A relaunch must not
+    # walk straight back into the letter that just took 13.4 GB, or the
+    # supervisor and this loop spin against each other until max-restarts.
+    # Set by the supervisor, empty in a normal run.
+    skip_units = {u for u in os.environ.get("ALIGN_SKIP_UNITS", "").split(",") if u}
+    if skip_units:
+        print(f"batch-align: skipping {len(skip_units)} unit(s) the supervisor killed for memory: "
+              + ", ".join(sorted(skip_units)))
+
     report, failures = [], []
     for n, key in enumerate(keys, 1):
+        if key in skip_units:
+            failures.append((key, "SKIPPED — exceeded the supervisor's RSS ceiling"))
+            print(f"  [{n}/{len(keys)}] {key}  SKIPPED (memory ceiling)")
+            continue
         jobs = [(None, belt_path(key))]
         for reader, assets in alternates.get(key, []):
             jobs.append((assets[0][0], belt_path(key, assets[0][0])))
@@ -163,11 +176,11 @@ def main():
 
     if a.no_ship:
         return 0
-    ship(vols, report, want_hash)
+    ship(vols, report, want_hash, keys)
     return 0 if not failures else 1
 
 
-def ship(vols, report, want_hash):
+def ship(vols, report, want_hash, keys=()):
     """Rebuild audio-sync.js: replace this volume's keys, keep everything else."""
     sync, alt = {}, {}
     if os.path.exists(SYNC_JS):
@@ -178,7 +191,21 @@ def ship(vols, report, want_hash):
         m = re.search(r"var AUDIO_SYNC_ALT = (\{.*?\n\});", prev, re.S)
         if m:
             alt = json.loads(m.group(1))
+    # A key this run produced NO report row for -- it raised, or the
+    # supervisor's RSS ceiling skipped it -- keeps the timings it already
+    # ships. Rebuilding from `report` alone DELETED them, so one CTC failure
+    # or one memory spike silently became a coverage regression in a file no
+    # gate compares against its previous self. A deliberate drop still works
+    # and is tested: an EXCLUDED unit HAS a report row, and a key no longer in
+    # the manifest is not in `keys`.
+    reported = {label.partition("@")[0] for label, *_rest in report}
+    keys = set(keys)
+    carried = {k: v for k, v in sync.items()
+               if k.split(":", 1)[0] in vols and k in keys and k not in reported}
     sync = {k: v for k, v in sync.items() if k.split(":", 1)[0] not in vols}
+    sync.update(carried)
+    for k in sorted(carried):
+        print(f"  CARRIED FORWARD  {k}  (no result this run -- its shipped timings are kept)")
 
     shipped_n = alt_n = 0
     for label, cov, shp, tot, c, p, rv, tag, uns in report:
@@ -216,8 +243,8 @@ def ship(vols, report, want_hash):
         "var AUDIO_SYNC = {\n" + ",\n".join(lines) + "\n};\n"
         "var AUDIO_SYNC_ALT = {\n" + ",\n".join(alt_lines) + "\n};\n")
     open(SYNC_JS, "w", encoding="utf-8", newline="\n").write(body)
-    print(f"audio-sync.js: {len(sync)} letters ({shipped_n} from this batch), "
-          f"{len(alt)} alternate timelines ({alt_n} new)")
+    print(f"audio-sync.js: {len(sync)} letters ({shipped_n} from this batch, "
+          f"{len(carried)} carried forward), {len(alt)} alternate timelines ({alt_n} new)")
 
 
 if __name__ == "__main__":

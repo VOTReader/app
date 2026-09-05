@@ -14,6 +14,10 @@
 #      The preview server must listen on 127.0.0.1 only; it bound every
 #      interface until 2026-09-03 and nothing said so. A dev server that
 #      can LAN-expose the tree is a defect. CI runs this on every push.
+#   1d. test_batch_align_ship.py when tools/batch-align.py or its test changes
+#      batch-align.py's ship() rebuilds audio-sync.js from its run report, so
+#      a letter that raised — or that align-supervisor.py skipped for memory —
+#      used to be deleted from the shipped file. Coverage only goes up.
 #
 #   2. lint-staged (Q3.5)    when any .js/.jsx source file changes
 #      Runs `eslint --max-warnings 0` ONLY on staged source files.
@@ -349,6 +353,34 @@ if [ -n "$preview_changed" ]; then
     exit 1
   fi
   echo "[pre-commit] Preview server binds loopback only."
+  echo ""
+fi
+
+# ─── Step 1d: the read-along shipper never deletes what it did not run ───
+# tools/batch-align.py rebuilds src/data/audio-sync.js volume by volume from its
+# run report, so a letter that RAISED or that tools/align-supervisor.py skipped
+# for exceeding the RSS ceiling used to be DELETED from the shipped file — one
+# crash or one memory spike became a silent coverage regression, and every gate
+# stayed green because they all validate the rows that ARE present.
+# test_batch_align_ship.py proves the carry-forward AND the two deliberate drops
+# (below the ship gate, gone from the manifest), so it cannot rot into a shipper
+# that never deletes anything. ci.yml runs it on every push beside
+# test_check_balance.
+ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py)$' || true)
+if [ -n "$ship_changed" ]; then
+  echo "[pre-commit] Read-along shipper changed — running test_batch_align_ship.py..."
+  python -m unittest test_batch_align_ship
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Shipper carry-forward test FAILED — batch-align.py's ship() must"
+    echo "keep the timings of a unit its run produced no result for, and"
+    echo "must still drop an EXCLUDED one and one gone from the manifest."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Shipper carries forward unrun units."
   echo ""
 fi
 

@@ -46,6 +46,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { runInNewContext } from 'vm';
+import { execFileSync } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CORPUS_FILES, buildCollections, blockDomainText, formatBSpoken } from './audio-fragments-lib.mjs';
@@ -328,6 +329,48 @@ for (const [assetId, rows] of Object.entries(AUDIO_SYNC_ALT)) {
   checkTimeline('alt:' + assetId, owner, rows);
 }
 
+// -------------------------------------------------- the coverage floor --
+/**
+ * Read-along coverage only goes UP.
+ *
+ * batch-align.py rebuilds this file volume by volume from its run report: it
+ * drops every key of the volumes in the run and re-adds the ones the report
+ * carries. A letter that RAISED (the twelve-section rendition's CTC failure) or
+ * that tools/align-supervisor.py skipped for exceeding the RSS ceiling never
+ * reaches that report, so it was DELETED -- one crash or one memory spike
+ * silently became a coverage regression. Nothing here saw it: every check above
+ * validates the rows that ARE present, so a shorter audio-sync.js is green.
+ *
+ * The shipper carries such a key forward now (test_batch_align_ship.py), but
+ * that protects one writer. This protects every future one -- a hand edit, a
+ * bad merge, a second generator -- because it reads the shipped file rather
+ * than trusting whoever wrote it.
+ *
+ * A timeline may only leave together with the reason it existed: its
+ * audio-manifest entry. A letter pulled from the corpus drops freely; a letter
+ * still on offer that lost its timings is the regression, and fails here.
+ */
+function lostTimings() {
+  let head;
+  try {
+    head = execFileSync('git', ['show', 'HEAD:app/src/main/assets/src/data/audio-sync.js'],
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 << 20 });
+  } catch {
+    return null;            // no git, or the file is new in this commit
+  }
+  const ctx = {};
+  runInNewContext(head, ctx, { filename: 'audio-sync.js@HEAD' });
+  const lost = [];
+  for (const k of Object.keys(ctx.AUDIO_SYNC || {})) {
+    if (!(k in AUDIO_SYNC) && k in AUDIO_MANIFEST) lost.push(k);
+  }
+  for (const a of Object.keys(ctx.AUDIO_SYNC_ALT || {})) {
+    if (!(a in AUDIO_SYNC_ALT) && ALT_OWNER.has(a)) lost.push('alt:' + a);
+  }
+  return lost.sort();
+}
+const lost = lostTimings();
+
 // ---------------------------------------------------------------- report --
 const byKind = new Map();
 for (const f of failures) byKind.set(f.kind, (byKind.get(f.kind) || 0) + 1);
@@ -350,14 +393,30 @@ if (asJson) {
     staleKeys,
     otherKeys,
     coverage: touchedChars ? +(timedChars / touchedChars).toFixed(4) : null,
+    lost,
     detail: failures.slice(0, 200),
   }, null, 2));
-  process.exit(failures.length ? 1 : 0);
+  process.exit(failures.length || (lost && lost.length) ? 1 : 0);
 }
 
 const nTimelines = Object.keys(AUDIO_SYNC).length + Object.keys(AUDIO_SYNC_ALT).length;
 console.log(`[audio-sync] ${rowsChecked} rows across ${nTimelines} timelines; ` +
   `${touchedChars ? Math.round((timedChars / touchedChars) * 1000) / 10 : 0}% of touched characters timed`);
+
+if (lost === null) {
+  console.error('[audio-sync] NOTE — the coverage floor did not run: no git HEAD for audio-sync.js.');
+} else if (lost.length) {
+  console.error('');
+  console.error(`[audio-sync] FAIL — ${lost.length} timeline(s) shipped at HEAD are gone while their`);
+  console.error('  audio-manifest entry remains. Read-along coverage only goes up:');
+  for (const k of lost.slice(0, 20)) console.error('    ' + k);
+  if (lost.length > 20) console.error(`    ... and ${lost.length - 20} more`);
+  console.error('');
+  console.error('  A letter that really left the corpus loses its manifest entry too, and then');
+  console.error('  this check passes on its own. A letter still on offer must keep its timings —');
+  console.error('  batch-align.py carries forward any unit its run produced no result for.');
+  process.exit(1);
+}
 
 const notAllowed = (k) => !ALLOWED.has(k);
 // The register waives STALENESS only: a key queued for re-alignment can still
