@@ -96,7 +96,14 @@ describe('classifyV3ImportBegin', () => {
   it('classifies every native sniff result', () => {
     expect(classifyV3ImportBegin('error:too_large')).toEqual({ kind: 'error', reason: 'too_large' });
     expect(classifyV3ImportBegin('error:corrupt')).toEqual({ kind: 'error', reason: 'corrupt' });
-    expect(classifyV3ImportBegin('legacy:{"a":1}')).toEqual({ kind: 'legacy', json: '{"a":1}' });
+    // F4: there is no 'legacy' kind. Native fails a v1/v2 file by NAME, so the UI can
+    // say why; a literal 'legacy:' payload can no longer arrive and must not be
+    // silently re-admitted as a recognised shape.
+    expect(classifyV3ImportBegin('error:legacy_unsupported'))
+      .toEqual({ kind: 'error', reason: 'legacy_unsupported' });
+    expect(classifyV3ImportBegin('error:not_a_backup'))
+      .toEqual({ kind: 'error', reason: 'not_a_backup' });
+    expect(classifyV3ImportBegin('legacy:{"a":1}')).toEqual({ kind: 'unknown' });
     expect(classifyV3ImportBegin('v3:{"media":[]}')).toEqual({ kind: 'v3', manifestJson: '{"media":[]}' });
     expect(classifyV3ImportBegin('not-a-backup')).toEqual({ kind: 'unknown' });
     expect(classifyV3ImportBegin('')).toEqual({ kind: 'unknown' });

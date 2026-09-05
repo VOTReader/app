@@ -612,9 +612,19 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
         pickImportFile,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
-      isContainerMagic: () => false,       // route the legacy-JSON path
+      // F4: these tests are about the confirm sheet, the restore-inflight marker
+      // and the action lock — not about which container format got them there.
+      // They used to ride the legacy-JSON path because it was the shortest one to
+      // drive; that path is gone, so they ride the v3 one, which is the import a
+      // reader actually has. Every behaviour asserted below is unchanged.
+      isContainerMagic: () => true,
+      readContainer: async () => ({
+        manifest: { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] },
+        entries: (async function* () { yield* []; })(),
+        integrity: 'ok',
+      }),
       validateImportEnvelope: () => [],
-      applyImportPayload: applySpy,
+      applyV3: applySpy,
       ...overrides,
     });
     renderSettings();
@@ -702,7 +712,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
       flagDuringApply = localStorage.getItem('vot-restore-inflight');
       return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
     });
-    setupImport({ applyImportPayload: applySpy });
+    setupImport({ applyV3: applySpy });
     fireEvent.click(screen.getByText('Import'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
@@ -716,21 +726,21 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   it('leaves the restore-inflight marker set when the apply throws (part-applied state)', async () => {
     localStorage.removeItem('vot-restore-inflight');
     const applySpy = vi.fn(async () => { throw new Error('corrupt payload'); });
-    setupImport({ applyImportPayload: applySpy });
+    setupImport({ applyV3: applySpy });
     fireEvent.click(screen.getByText('Import'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     // The marker survives a handled failure — the boot guard must warn, because
-    // a legacy apply may have part-landed before the throw.
+    // the apply may have part-landed before the throw.
     await vi.waitFor(() => expect(localStorage.getItem('vot-restore-inflight')).not.toBeNull());
     localStorage.removeItem('vot-restore-inflight');
   });
 
   it('does not erase another tab\'s restore marker when the import lock is busy', async () => {
     localStorage.setItem('vot-restore-inflight', 'active-tab-marker');
-    setupImport({ applyImportPayload: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
+    setupImport({ applyV3: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
     fireEvent.click(screen.getByText('Import'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
@@ -809,6 +819,39 @@ describe('Android v3 import — native stream not closed until the confirm settl
     fireEvent.click(screen.getByText('Import & Overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled()); // closed only after apply consumed the stream
+  });
+
+  it('F4: a pre-v3 v1/v2 backup is REFUSED, by age and not as corruption', async () => {
+    // The test the F4 deletion is required to leave behind. "Rejects it" is only
+    // half — a reader holding an old backup must be told WHAT is wrong, so the
+    // assertion is on the wording, not merely on nothing being applied. Native
+    // still sniffs the format and fails it by name; if that branch ever falls
+    // through to the generic corrupt-file message, this fails.
+    const toastSpy = vi.fn();
+    const applySpy = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      PlatformBridge: {
+        isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
+        v3ImportBegin: () => 'error:legacy_unsupported',
+        v3ImportClose: () => {},
+      },
+      classifyV3ImportBegin: realClassifyV3,
+      showToast: toastSpy,
+      applyV3: applySpy,
+    });
+    renderSettings();
+    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled());
+    const said = toastSpy.mock.calls.map((c) => String(c[0] && c[0].text ? c[0].text : c[0])).join(' | ');
+    expect(said).toMatch(/before the current backup format/);
+    expect(said).not.toMatch(/corrupt/);
+    // Nothing was applied, and no confirm sheet was ever raised.
+    expect(applySpy).not.toHaveBeenCalled();
+    expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
   });
 
   it('cancelling still closes the native stream and applies nothing', async () => {

@@ -636,13 +636,45 @@ class StorageManagerTest {
     }
 
     @Test
-    fun `beginV3Import sniffs a legacy JSON backup and returns it tagged`() {
+    fun `beginV3Import REFUSES a legacy v1 or v2 JSON backup, and says which it was`() {
+        // F4. The v1/v2 JSON import was removed, but the sniff was kept: the whole
+        // point is that a reader holding a pre-v3 backup is told its AGE, not told
+        // their file is corrupt. So the assertion is on the reason, not just on the
+        // failure — "it failed" would also pass if the branch fell through to the
+        // generic error, which is the outcome this test exists to forbid.
         val uri = Uri.parse("content://test/legacy")
         val json = "{\"app\":\"VOTReader\",\"exportVersion\":2,\"stores\":{}}"
         every { cr.openInputStream(uri) } returns ByteArrayInputStream(json.toByteArray(Charsets.UTF_8))
         val r = storage.beginV3Import(uri)
-        assertIs<StorageManager.Result.Success<String>>(r)
-        assertEquals("legacy:$json", r.value)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("legacy_unsupported", r.reason)
+    }
+
+    @Test
+    fun `beginV3Import tells a non-backup apart from a retired backup`() {
+        // The other half of the same decision: everything that is not a v3 container
+        // used to be assumed to be legacy JSON. Being wrong in THIS direction is the
+        // worse one — telling someone who picked the wrong file that they hold an old
+        // backup sends them hunting for a file that does not exist.
+        val uri = Uri.parse("content://test/notabackup")
+        every { cr.openInputStream(uri) } returns
+            ByteArrayInputStream("not a backup at all".toByteArray(Charsets.UTF_8))
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("not_a_backup", r.reason)
+    }
+
+    @Test
+    fun `beginV3Import does not call another app's JSON an old VOTReader backup`() {
+        // JSON alone is not the signal — the envelope marker is. A leading brace was
+        // the first thing I reached for, and it would have mislabelled every JSON
+        // file on the device.
+        val uri = Uri.parse("content://test/otherjson")
+        every { cr.openInputStream(uri) } returns
+            ByteArrayInputStream("{\"hello\":\"world\"}".toByteArray(Charsets.UTF_8))
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("not_a_backup", r.reason)
     }
 
     @Test

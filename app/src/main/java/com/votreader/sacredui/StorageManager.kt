@@ -331,11 +331,18 @@ class StorageManager(private val context: Context) {
      *   • "VOTBACK1" magic → a v3 container. Reads the manifest frame and
      *     returns "v3:" + the manifest JSON; the stream stays open, positioned
      *     at the first media frame, for v3ImportNextBlob / v3ImportReadChunk.
-     *   • anything else → a legacy v1/v2 JSON backup (starts with '{'). Reads
-     *     the whole file (bounded by MAX_IMPORT_SIZE — legacy backups are
-     *     small) and returns "legacy:" + the JSON text; no streaming session.
-     * The "v3:" / "legacy:" prefix is unambiguous: a JSON payload starts with
-     * '{', never with those ASCII tags.
+     *   • a file carrying the VOTReader envelope marker in its first
+     *     [SNIFF_BYTES] → the pre-v3 v1/v2 JSON backup format, which this app no
+     *     longer imports. Fails "legacy_unsupported" so the UI can say WHY rather
+     *     than calling it corrupt.
+     *   • anything else → fails "not_a_backup". Someone who picked the wrong file
+     *     must not be told they are holding an old backup, so the marker is checked
+     *     rather than merely the JSON opening brace.
+     *
+     * The sniff survives the format it used to read on purpose: telling a reader
+     * "this is an old VOTReader backup we no longer import" needs the same first
+     * byte that reading it did, and dropping the branch entirely would report a
+     * real v1/v2 backup as a corrupt file.
      */
     fun beginV3Import(uri: Uri): Result<String> = synchronized(v3Lock) {
         closeImportQuietly()
@@ -386,12 +393,27 @@ class StorageManager(private val context: Context) {
                 importBytesRead = CONTAINER_MAGIC.size.toLong() + 8L + manifestLen  // magic + len field + manifest
                 Result.Success("v3:$manifestJson")
             } else {
-                // legacy JSON — rewind and read the whole (bounded) file.
-                bis.reset()
-                val bytes = readBounded(bis, MAX_IMPORT_SIZE)
+                // Not a v3 container. A v1/v2 backup is JSON carrying the VOTReader
+                // envelope; anything else is someone's wrong file, and the two need
+                // different messages because they need different actions.
+                //
+                // The peek past the first 8 bytes is ONE non-looping read, taken only
+                // when the file opens with '{'. That restraint is deliberate: this
+                // branch used to read the ENTIRE file (readBounded to MAX_IMPORT_SIZE),
+                // and a SAF stream that BLOCKS at EOF instead of returning -1 is the
+                // documented import-hang regression `v3ImportVerify returns absent
+                // WITHOUT a speculative read` exists to forbid. A loop that insisted on
+                // filling the buffer reintroduced it, and that test caught it.
+                val isOldBackup = if (n > 0 && head[0] == '{'.code.toByte()) {
+                    val more = ByteArray(SNIFF_BYTES - CONTAINER_MAGIC.size)
+                    val extra = try { bis.read(more, 0, more.size) } catch (_: Exception) { -1 }
+                    val prefix = String(head, 0, n, Charsets.UTF_8) +
+                        (if (extra > 0) String(more, 0, extra, Charsets.UTF_8) else "")
+                    prefix.contains(ENVELOPE_MARKER)
+                } else false
                 try { bis.close() } catch (_: Exception) {}
-                if (bytes == null) return Result.Failure("too_large")
-                Result.Success("legacy:" + String(bytes, Charsets.UTF_8))
+                if (isOldBackup) Result.Failure("legacy_unsupported")
+                else Result.Failure("not_a_backup")
             }
         } catch (e: Exception) {
             Timber.w(e, "beginV3Import failed")
@@ -625,6 +647,16 @@ class StorageManager(private val context: Context) {
         // (v3 STREAMING import is NOT bounded by this — see beginV3Import; the
         // cap only guards the legacy whole-file JSON read.)
         const val MAX_IMPORT_SIZE = 50L * 1024 * 1024
+
+        /** How much of a file to peek when deciding what it is. Enough to carry the
+         *  v1/v2 envelope fields, far under BufferedInputStream's buffer so the
+         *  rewind for the v3 path always succeeds. */
+        private const val SNIFF_BYTES = 256
+
+        /** The app name in every VOTReader backup envelope, v1 through v3. Its
+         *  presence in the sniffed prefix is what separates "an old backup of yours"
+         *  from "some other JSON file". */
+        private const val ENVELOPE_MARKER = "VOTReader"
 
         // v3 container magic: ASCII "VOTBACK1". Byte-identical to the web codec's
         // CONTAINER_MAGIC (backup-container.js) so a backup written on either

@@ -32,6 +32,24 @@ const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 const MANIFEST_WARN_BYTES = 12 * 1024 * 1024;
 const MANIFEST_MAX_BYTES = 16 * 1024 * 1024;
 
+// F4: the pre-v3 v1/v2 JSON backup format is no longer imported (Corbin,
+// 2026-09-04: "no reader has a legacy import"). Both platforms and both buttons
+// still SNIFF for it, and all four say this one sentence, so a reader holding an
+// old backup learns its age instead of being told their file is corrupt.
+const LEGACY_BACKUP_MSG =
+  'This backup was made by a version of VOTReader from before the current backup format, and can no longer be imported.';
+
+// Is this prefix a pre-v3 VOTReader backup, or just someone's other JSON file?
+// Only the envelope marker separates them, and being wrong in the second direction
+// is worse: telling a reader who picked package.json that they hold an old backup
+// sends them looking for a file that does not exist.
+function _looksLikeOldBackup(head) {
+  if (!head || head[0] !== 0x7b /* '{' */) return false;
+  let s = '';
+  for (let i = 0; i < head.length; i++) s += String.fromCharCode(head[i]);
+  return s.indexOf('VOTReader') !== -1;
+}
+
 /**
  * The toast after a backup is written. `problems` (ok:true, from
  * buildV3Manifest) names the stores whose newest change never reached disk —
@@ -1249,37 +1267,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       }));
     };
 
-    const _doImport = async (jsonText) => {
-      try {
-        const parsed = JSON.parse(jsonText);
-        const envelopeErrors = validateImportEnvelope(parsed);
-        if (envelopeErrors.length) {
-          console.warn('import envelope invalid:', envelopeErrors);
-          _showToast('This file does not look like a VOTReader backup.');
-          return;
-        }
-        await _confirmDegradeApplyReload(parsed, (storesMap, flagMap) => applyImportPayload(parsed, {
-          storesMap: storesMap,
-          flagMap: flagMap,
-          mediaStore: JournalMediaStore,
-          validateStorePayload: validateStorePayload,
-          validateMediaRecord: validateMediaRecord,
-        }));
-      } catch (err) {
-        // SEC2: never surface the raw JSON.parse/exception text — V8 folds a
-        // fragment of the malformed input into err.message. Log it for diagnostics;
-        // show the same generic message the other corrupt-file paths use.
-        console.warn('import failed', err);
-        hideToast(_TOAST_ID);
-        _showToast('This backup file is corrupt or incomplete and could not be read.');
-      }
-    };
-    // Android v3 streaming import via the native chunked bridge. Native sniffs
-    // the magic and returns "v3:<manifest>" (stream the blobs) or "legacy:<json>"
-    // (a whole v1/v2 backup → reuse _doImport). For v3, the blobs feed applyV3
-    // through an async-generator of {id, meta, blob} entries — the SAME applier
-    // the web path uses — so only the SOURCE of the entries differs per platform.
-    // BACKUP-STREAMING-PLAN P3.
+    // Android v3 streaming import via the native chunked bridge. Native sniffs the
+    // magic and returns "v3:<manifest>" (stream the blobs) or an error naming why it
+    // will not: 'legacy_unsupported' for the retired v1/v2 JSON format,
+    // 'not_a_backup' for anything else. The blobs feed applyV3 through an
+    // async-generator of {id, meta, blob} entries — the SAME applier the web path
+    // uses — so only the SOURCE of the entries differs per platform.
+    // BACKUP-STREAMING-PLAN P3; F4 retired the legacy branch.
     const _importV3Android = async () => {
       // 1. SAF source picker (async). Install the ready callback BEFORE launch.
       const ready = await new Promise((resolve) => {
@@ -1304,15 +1298,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         if (sniff.reason === 'too_large') {
           _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+        } else if (sniff.reason === 'legacy_unsupported') {
+          // F4: the pre-v3 v1/v2 JSON import was removed. Native still SNIFFS the
+          // format so this says what is actually wrong — a reader holding an old
+          // backup is told its age, not told it is corrupt.
+          _showToast(LEGACY_BACKUP_MSG);
+        } else if (sniff.reason === 'not_a_backup') {
+          _showToast('This file does not look like a VOTReader backup.');
         } else {
           _showToast('This backup file is corrupt or incomplete and could not be read.');
         }
-        return;
-      }
-      if (sniff.kind === 'legacy') {
-        // Legacy v1/v2 JSON — already fully read by native; route to the v2 applier.
-        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
-        await _doImport(sniff.json);
         return;
       }
       if (sniff.kind !== 'v3') {
@@ -1380,21 +1375,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       try {
         const file = await PlatformBridge.pickImportFile();
         if (!file) return; // user cancelled
-        const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+        // 256 bytes, not 8: the magic needs the first 8, but telling an old backup
+        // apart from someone's wrong file needs the envelope marker. Mirrors
+        // StorageManager.beginV3Import's SNIFF_BYTES on Android.
+        const head = new Uint8Array(await file.slice(0, 256).arrayBuffer());
         if (isContainerMagic(head)) {
           await _importV3Container(file);
         } else {
-          // Legacy JSON whole-file text read. BAK4: cap at 50 MB to match Android
-          // (StorageManager.MAX_IMPORT_SIZE) + the other web path
-          // (WEB_MAX_IMPORT_BYTES) — v3 is the GB-scale streaming path, a legacy
-          // v1/v2 backup is always well under this, so a larger pick is a
-          // pathological non-backup that a 300 MB .text() read would OOM on a
-          // budget device.
-          if (file.size > 50 * 1024 * 1024) {
-            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
-            return;
-          }
-          await _doImport(await file.text());
+          // F4: the pre-v3 v1/v2 JSON import was removed. Nothing is read — the
+          // first byte alone separates "an old backup" from "not a backup", which
+          // is the whole difference between a useful message and a wrong one. The
+          // web sniff mirrors StorageManager.beginV3Import's on Android.
+          _showToast(_looksLikeOldBackup(head)
+            ? LEGACY_BACKUP_MSG
+            : 'This file does not look like a VOTReader backup.');
         }
       } catch (e) {
         // SEC2: log for diagnostics; show a generic message, never the raw
@@ -1448,17 +1442,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         const sniff = classifyV3ImportBegin(begin);
         try {
           if (sniff.kind === 'error') {
-            _verifyFail(sniff.reason === 'too_large'
-              ? 'That file is too large to be a VOTReader backup (over 50 MB).'
-              : 'This backup file is corrupt or incomplete and could not be read.');
-            return;
-          }
-          if (sniff.kind === 'legacy') {
-            let parsed;
-            try { parsed = JSON.parse(sniff.json); }
-            catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
-            if (!_checkEnvelope(parsed)) return;
-            _report(parsed, 'absent', 'legacy');
+            if (sniff.reason === 'too_large') {
+              _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).');
+            } else if (sniff.reason === 'legacy_unsupported') {
+              _verifyFail(LEGACY_BACKUP_MSG);
+            } else if (sniff.reason === 'not_a_backup') {
+              _verifyFail('This file does not look like a VOTReader backup.');
+            } else {
+              _verifyFail('This backup file is corrupt or incomplete and could not be read.');
+            }
             return;
           }
           if (sniff.kind !== 'v3') { _verifyFail('This file does not look like a VOTReader backup.'); return; }
@@ -1504,12 +1496,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           if (!_checkEnvelope(read.manifest)) return;
           _report(read.manifest, read.integrity, 'v3');
         } else {
-          if (file.size > 50 * 1024 * 1024) { _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).'); return; }
-          let parsed;
-          try { parsed = JSON.parse(await file.text()); }
-          catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
-          if (!_checkEnvelope(parsed)) return;
-          _report(parsed, 'absent', 'legacy');
+          // F4: nothing to verify in a format that can no longer be imported. Same
+          // first-byte sniff as the import path, so both buttons say the same thing.
+          _verifyFail(_looksLikeOldBackup(head)
+            ? LEGACY_BACKUP_MSG
+            : 'This file does not look like a VOTReader backup.');
         }
       } catch (e) {
         console.warn('verify failed', e);

@@ -139,14 +139,16 @@ export async function runV3AndroidExport(args) {
  *
  * @param {string} begin
  * @returns {{ kind: 'error', reason: string }
- *   | { kind: 'legacy', json: string }
  *   | { kind: 'v3', manifestJson: string }
  *   | { kind: 'unknown' }}
+ *
+ * There is no 'legacy' kind any more: native fails a v1/v2 file with
+ * reason 'legacy_unsupported', which arrives here as an ordinary error and lets
+ * the UI name the reason instead of guessing at it.
  */
 export function classifyV3ImportBegin(begin) {
   const s = (begin == null) ? '' : String(begin);
   if (s.indexOf('error:') === 0) return { kind: 'error', reason: s.slice(6) };
-  if (s.indexOf('legacy:') === 0) return { kind: 'legacy', json: s.slice(7) };
   if (s.indexOf('v3:') === 0) return { kind: 'v3', manifestJson: s.slice(3) };
   return { kind: 'unknown' };
 }
