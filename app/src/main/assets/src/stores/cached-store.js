@@ -1106,11 +1106,17 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-journal-draft',            // JournalEditorScreen
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
-  'vot-scrollheal-1',             // use-saved-state: ONE-SHOT. Swept, the heal
-                                  // re-runs and wipes every tab's scroll
-                                  // positions -- its own comment says the flag
-                                  // prevents that.
-  'vot-tabs-hint-seen',           // TabsNavBtn: swept, the hint reappears.
+  // storage-ls-1. Both are LIVE one-shot flags, and both are safe today only by
+  // an ordering nobody wrote down: HydrationGate awaits clearLegacyLs() BEFORE
+  // setHydrated(true), and setHydrated is what mounts the code that writes
+  // them -- so the sweep has always taken its key list before either exists.
+  // Measured across two boots; neither has ever been deleted. They are listed
+  // anyway because that ordering is not a guarantee anyone is holding, and if
+  // it ever slips, vot-scrollheal-1 going missing re-runs a heal that resets
+  // every tab's scroll position -- while its own comment says the flag
+  // prevents exactly that.
+  'vot-scrollheal-1',             // use-saved-state
+  'vot-tabs-hint-seen',           // TabsNavBtn
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
