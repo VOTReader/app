@@ -176,7 +176,21 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
     const ringH = 59 + 16;                                            // the pill plus the ring's 8 px pad
-    expect(parseFloat(card.style.maxHeight)).toBe(vh() - ringH - 2 * 18 - 2 * 12);
+    expect(parseFloat(card.style.maxHeight)).toBe(vh() - ringH - 18 - 12);   // room below a ring at the top
+  });
+
+  it('a card that fits on neither side where the ring sits scrolls the ring to the top of its screen', async () => {
+    // The tall Listen card at 1.8: the pill sits mid-screen, the card fits neither above nor below it,
+    // but would below once the pill is at the top. Centre-scrolling cannot get there.
+    document.body.innerHTML = '<div id="app"><button class="home-nav-item">The Volumes of Truth</button></div>';
+    const tile = document.querySelector('.home-nav-item');
+    tile.getBoundingClientRect = rect(12, 250, 330, 300);
+    const scrolls = vi.fn();
+    tile.scrollIntoView = scrolls;
+    startAt('letters');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await act(async () => { await new Promise((r) => setTimeout(r, 500)); });
+    expect(scrolls.mock.calls.some((c) => c[0] && c[0].block === 'start')).toBe(true);
   });
 
   it('keeps the target on screen against a second writer of the scroll position (scroll memory)', async () => {

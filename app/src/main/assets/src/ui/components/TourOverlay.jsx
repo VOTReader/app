@@ -53,6 +53,18 @@ function _rect(el) {
   const r = el.getBoundingClientRect();
   return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
+/** The top edge of the nearest scrolling ancestor: the highest a scrolled-to-start target can sit. */
+function _scrollerTop(el) {
+  let e = el && el.parentElement;
+  while (e && e !== document.body) {
+    try {
+      const st = getComputedStyle(e);
+      if (/(auto|scroll)/.test(st.overflowY) && e.scrollHeight > e.clientHeight) return Math.max(0, e.getBoundingClientRect().top);
+    } catch (_e) { break; }
+    e = e.parentElement;
+  }
+  return 0;
+}
 function _sameRect(a, b) {
   return !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
@@ -69,6 +81,8 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const trapRef = useFocusTrap(active && st.ready);
   useModalRegistry({ id: 'tour', dismiss: () => { if (ctl) ctl.skip(); }, active });
 
+  // The card element (its measured height feeds the placement below and the scroll choice above).
+  const cardRef = React.useRef(/** @type {HTMLElement|null} */ (null));
   // The ringed control, measured each frame while a stop is showing.
   const [rect, setRect] = React.useState(null);
   const [missing, setMissing] = React.useState(false);
@@ -98,9 +112,20 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
         const off = r.top < 0 || r.top + r.height > vh;
         const now = Date.now();
-        if (!scrolled || (off && now - started < RESCROLL_WINDOW_MS && now - lastScroll >= RESCROLL_EVERY_MS)) {
+        // Where the card would go: if it fits on neither side of the ring where the ring sits now,
+        // but would below the ring once the ring is scrolled to the top of its screen (the tall
+        // Listen card at a large text size), scroll it there instead of to the centre.
+        const cardEl = cardRef.current;
+        const ch = cardEl ? cardEl.getBoundingClientRect().height || CARD_EST_H : CARD_EST_H;
+        const ringH = r.height + 2 * TOUR_RING_PAD;
+        const fitsBelow = r.top - TOUR_RING_PAD + ringH + CARD_GAP + ch <= vh - CARD_EDGE;
+        const fitsAbove = r.top - TOUR_RING_PAD - CARD_GAP - ch >= CARD_EDGE;
+        const top0 = _scrollerTop(el);
+        const fitsAtStart = top0 + ringH + CARD_GAP + ch + CARD_EDGE <= vh;
+        const block = off ? 'center' : (!fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > top0 + 1 ? 'start' : null);
+        if (!scrolled || (block && now - started < RESCROLL_WINDOW_MS && now - lastScroll >= RESCROLL_EVERY_MS)) {
           scrolled = true; lastScroll = now;
-          try { el.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
+          try { el.scrollIntoView({ block: block || 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
         }
         if (!_sameRect(r, last)) { last = r; setRect(r); }
         if (missing) setMissing(false);
@@ -116,7 +141,6 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   }, [active, st.ready, st.index, waitMs]);
 
   // The card's real height, so the clamp below can keep all of it (Skip and Next) on screen.
-  const cardRef = React.useRef(/** @type {HTMLElement|null} */ (null));
   const [cardH, setCardH] = React.useState(0);
   React.useLayoutEffect(() => {
     const el = cardRef.current;
@@ -142,7 +166,8 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // Letters tile at a large text size, both on a 699 px phone).
   // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
   const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
-  const cap = ringOn ? Math.max(CARD_MIN_H, vh - ring.height - 2 * CARD_GAP - 2 * CARD_EDGE) : vh - 2 * CARD_EDGE;
+  const top0 = ringOn && targetRef.current ? _scrollerTop(targetRef.current) : 0;
+  const cap = ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE;
   const h = Math.min(cardH || CARD_EST_H, cap);
   let below = false, cardTop = 0;
   if (ring) {
