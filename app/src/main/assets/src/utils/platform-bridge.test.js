@@ -1474,9 +1474,52 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
       await sink.close();
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(downloads.length).toBe(1);          // exactly one file
-      expect(writable.write).not.toHaveBeenCalled();
+      expect(downloads.length).toBe(1);            // exactly one file
+      // And the losing path never even OPENS one. createWritable() creates the
+      // swap entry, so short-circuiting before it is what keeps a second file
+      // off the disk — a `resolve()` that is merely a no-op would not.
+      expect(createWritable).not.toHaveBeenCalled();
+    } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+      vi.useRealTimers();
+    }
+  });
+
+  /* THE RACE INSIDE THE AWAIT. `createWritable()` is itself asynchronous and
+     it opens the swap file, so an escape taken while it is in flight leaves a
+     real open writable that this promise is about to throw away. Aborting it is
+     what keeps the reader's existing file intact (BAK5) instead of leaking an
+     unclosed stream to the garbage collector. This is why the claim is taken
+     AFTER that await and not before it. */
+  it('an escape during createWritable() aborts the writable it just opened', async () => {
+    vi.useFakeTimers();
+    const downloads = [];
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((b) => { downloads.push(b); return 'blob:fake'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      const writable = { write: vi.fn(async () => {}), close: vi.fn(async () => {}), abort: vi.fn(async () => {}) };
+      /** @type {any} */ let finishCreateWritable = null;
+      const handle = { createWritable: vi.fn(() => new Promise((res) => { finishCreateWritable = () => res(writable); })) };
+      /** @type {any} */ (globalThis.window).showSaveFilePicker = vi.fn(async () => handle);
+
+      /** @type {any} */ let escape = null;
+      const pending = bridge.openExportSink('b.votbak', { onSlow: (fn) => { escape = fn; } });
+      // The picker resolves, createWritable() hangs; the offer still arrives.
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(handle.createWritable).toHaveBeenCalledTimes(1);
+      expect(typeof escape).toBe('function');
+
+      escape();
+      finishCreateWritable();
+      const sink = await pending;
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(writable.abort).toHaveBeenCalledTimes(1);   // the swap file is dropped
       expect(writable.close).not.toHaveBeenCalled();
+      await sink.write(new Uint8Array([7]));
+      await sink.close();
+      expect(downloads.length).toBe(1);                  // still exactly one file
     } finally {
       URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
       vi.useRealTimers();
