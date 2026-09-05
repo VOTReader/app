@@ -875,9 +875,9 @@ describe('Android v3 import — native stream not closed until the confirm settl
    ─────────────────────────────────────────────────────────────────────── */
 describe('settings groups — collapsible accordion', () => {
   const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top-Nav Buttons',
-    'Search, Tabs & History', 'A Return to The Garden', 'Your Data', 'Mark as Read'];
+    'Search, Tabs & History', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
 
-  it('renders all 9 group headers, every one collapsed on entry', () => {
+  it('renders all 10 group headers, every one collapsed on entry', () => {
     renderSettings({}, {}, { expandGroups: false });
     expect(groupHeads().length).toBe(GROUPS.length);
     for (const label of GROUPS) {

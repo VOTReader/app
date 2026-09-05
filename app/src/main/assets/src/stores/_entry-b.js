@@ -46,7 +46,8 @@ import { getBuildVersion, fetchServerBuildVersion, formatBuildVersion } from '..
 import { navHandoff } from '../utils/nav-handoff.js';
 import { READING_FONTS, readingFontById, readingFontCss } from '../utils/reading-fonts.js';
 import { IDBAdapter } from './idb-adapter.js';
-import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore } from './app-flag-stores.js';
+import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore } from './app-flag-stores.js';
+import { TourController } from '../utils/tour-controller.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
 import { StateStore } from './state-store.js';
 import { HistoryStore } from './history-store.js';
@@ -109,6 +110,7 @@ import { useFocusTrap } from '../hooks/use-focus-trap.js';
 import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { useNavHistoryTracking } from '../hooks/use-nav-history-tracking.js';
 import { useNav } from '../hooks/use-nav.js';
+import { useTour } from '../hooks/use-tour.js';
 import { useSearch } from '../hooks/use-search.js';
 import { useBibleStudies } from '../hooks/use-bible-studies.js';
 import { useJournalMutations } from '../hooks/use-journal-mutations.js';
@@ -178,7 +180,8 @@ Object.assign(window, {
   navHandoff,
   READING_FONTS, readingFontById, readingFontCss,
   IDBAdapter,
-  WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore,
+  WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore,
+  TourController,
   ProphecyCardsStore,
   StateStore,
   HistoryStore,
@@ -224,6 +227,7 @@ Object.assign(window, {
   useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush,
   useNavHistoryTracking,
   useNav,
+  useTour,
   useSearch,
   useBibleStudies,
   useJournalMutations,

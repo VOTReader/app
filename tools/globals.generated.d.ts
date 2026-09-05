@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 529 distinct identifiers.
+// Total: 533 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -269,6 +269,10 @@ declare const TabsContext: any;
 declare const TabsNavBtn: any;
 declare const TabsOverview: any;
 declare const ThemeBtn: any;
+declare const TourController: any;
+declare const TourDoneFlagStore: any;
+declare const TourOverlay: any;
+declare const TourPrompt: any;
 declare const USER_DATA_STORES: any;
 declare const Utilities: any;
 declare const VOT_LETTER_REGISTRY: any;
@@ -412,7 +416,6 @@ declare const highlightExcerptInDom: any;
 declare const hlId: any;
 declare const html2canvas: any;
 declare const hydrateAllStores: any;
-declare const idbAllKeys: any;
 declare const idbDelete: any;
 declare const idbPut: any;
 declare const idbReadAll: any;
@@ -531,6 +534,7 @@ declare const useTabTitleMemo: any;
 declare const useTabs: any;
 declare const useTapThrough: any;
 declare const useThumbnails: any;
+declare const useTour: any;
 declare const v3AndroidImportEntries: any;
 declare const validateImportEnvelope: any;
 declare const validateMediaRecord: any;

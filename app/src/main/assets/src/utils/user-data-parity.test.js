@@ -249,13 +249,13 @@ describe('user-data parity — STORE_SHAPES (the import trust boundary)', () => 
     );
   });
 
-  it('deliberately exempts the four boolean flag stores', () => {
+  it('deliberately exempts the five boolean flag stores', () => {
     // Flags are `true`/`false`, not payloads — they are applied via set()/clear(),
     // never through validateStorePayload. Pinned so the exemption stays exactly
-    // four known names and never becomes a general hole in the boundary.
+    // five known names and never becomes a general hole in the boundary.
     expect(FLAGS.slice().sort()).toEqual([
       'vot-about-seen', 'vot-ann-hint-dismissed',
-      'vot-garden-warning-acked', 'vot-welcomed',
+      'vot-garden-warning-acked', 'vot-tour-done', 'vot-welcomed',
     ]);
     for (const flag of FLAGS) expect(SHAPED).not.toContain(flag);
   });

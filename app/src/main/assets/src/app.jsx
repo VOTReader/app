@@ -449,6 +449,8 @@ function App() {
     setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack,
     setJournalEntryId, setGardenPage,
   });
+  // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
+  useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
 
   /* W1.5(b) — History API sync. Watches the per-active-tab nav-key tuple
      and pushes an empty-state history entry on every change. Required
@@ -731,6 +733,7 @@ function App() {
         disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
         gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}
         setSettings={setSettings} setScreen={setScreen}
+        screen={screen}
       />
 
       {/* Per-screen render slot \u2014 dispatch table built right above the

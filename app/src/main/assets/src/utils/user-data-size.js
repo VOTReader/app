@@ -84,6 +84,8 @@ export const USER_DATA_STORES = [
   'vot-about-seen',
   'vot-garden-warning-acked',
   'vot-ann-hint-dismissed',
+  // review-tutorial: the fifth flag — "Show me around" done / skipped / never again.
+  'vot-tour-done',
 ];
 
 /**

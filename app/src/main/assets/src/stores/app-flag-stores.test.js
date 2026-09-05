@@ -13,9 +13,10 @@ import {
   AboutSeenFlagStore,
   GardenWarningFlagStore,
   AnnHintDismissedFlagStore,
+  TourDoneFlagStore,
 } from './app-flag-stores.js';
 
-const ALL_FLAGS = [WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore];
+const ALL_FLAGS = [WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore];
 
 beforeEach(() => {
   localStorage.clear();
@@ -142,5 +143,34 @@ describe('AppFlagStores — independence', () => {
     WelcomedFlagStore.set();
     expect(WelcomedFlagStore.getVersion()).toBe(vW + 1);
     expect(AboutSeenFlagStore.getVersion()).toBe(vA);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   TourDoneFlagStore — "Show me around" finished, skipped, or told never
+   to ask again (review-tutorial, 2026-09-04). One durable byte; the
+   prompt strip on Home reads it, the tour sets it, the backup carries it.
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('TourDoneFlagStore', () => {
+  it('is false on a fresh install and true after set()', () => {
+    expect(TourDoneFlagStore.is()).toBe(false);
+    TourDoneFlagStore.set();
+    expect(TourDoneFlagStore.is()).toBe(true);
+  });
+
+  it('clear() lets the prompt return, and does not touch the other flags', () => {
+    TourDoneFlagStore.set(); AboutSeenFlagStore.set();
+    TourDoneFlagStore.clear();
+    expect(TourDoneFlagStore.is()).toBe(false);
+    expect(AboutSeenFlagStore.is()).toBe(true);
+  });
+
+  it('is independent of the annotation hint flag it sits beside', () => {
+    AnnHintDismissedFlagStore.set();
+    expect(TourDoneFlagStore.is()).toBe(false);
+    TourDoneFlagStore.set();
+    AnnHintDismissedFlagStore.clear();
+    expect(TourDoneFlagStore.is()).toBe(true);
   });
 });

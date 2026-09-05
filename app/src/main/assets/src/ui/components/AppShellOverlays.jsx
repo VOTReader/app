@@ -36,6 +36,8 @@ export function AppShellOverlays({
   // Garden warning
   gardenWarningOpen, setGardenWarningOpen,
   setSettings, setScreen,
+  // "Show me around" (review-tutorial): the Home strip needs the screen; the overlay needs nothing.
+  screen,
 }) {
   // W1.5(a.2) — Escape-key dispatch registrations. Each modal registers
   // a stable string ID + a dismiss callback. The app-level Escape
@@ -197,6 +199,10 @@ export function AppShellOverlays({
           </div>
         );
       })()}
+      {/* "Show me around": the strip on Home (bundle-d) and the tour itself (bundle-e, lazy;
+          undefined until TourController.start() has loaded it). */}
+      {typeof TourPrompt !== 'undefined' ? <TourPrompt screen={screen} /> : null}
+      {typeof TourOverlay !== 'undefined' ? <TourOverlay /> : null}
     </>
     </ErrorBoundary>
   );
