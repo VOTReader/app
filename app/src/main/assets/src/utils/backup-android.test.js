@@ -241,32 +241,133 @@ describe('export aborts the open sink on any bridge failure (no truncated backup
   });
 });
 
+describe('backup-android-1: a container cut mid-frame salvages, it does not fail the read', () => {
+  // The web reader already does this (storage-backup-1): a media-frame problem
+  // stops enumeration and returns the manifest plus every frame read cleanly,
+  // tagged integrity 'truncated'. The Android walk threw instead, so the SAME
+  // damaged file reported "3 of 42 media files still readable" on the web and
+  // "corrupt, could not be read" on Android — and the Android verdict is the one
+  // that makes a reader delete a 99%-restorable backup and trust the source.
+  const media42 = Array.from({ length: 42 }, (_, i) => ({ id: 'm' + i, mime: 'image/png', size: 10 }));
+
+  /**
+   * A bridge whose container is cut partway through frame `cutAt`.
+   * `how` picks where the cut lands: 'data' = mid-frame bytes (readChunk stops
+   * short), 'chunkEof' = the native reader hits EOF mid-frame (error:truncated),
+   * 'header' = the cut lands inside the 8-byte frame length (nextBlob EOFs).
+   */
+  const cutBridge = (cutAt, how) => {
+    let frame = -1;
+    let servedThisFrame = false;
+    return {
+      v3ImportNextBlob: () => {
+        frame += 1;
+        servedThisFrame = false;
+        if (frame === cutAt && how === 'header') return 'error:truncated';
+        return '10';
+      },
+      v3ImportReadChunk: () => {
+        if (frame === cutAt && how === 'chunkEof') return 'error:truncated';
+        if (servedThisFrame) return '';
+        servedThisFrame = true;
+        // The cut frame yields fewer bytes than it declared, then ends.
+        return u8ToBase64(bytes(frame === cutAt ? 4 : 10, frame));
+      },
+      v3ImportVerify: () => 'ok',
+    };
+  };
+
+  const drain = async (bridge, media) => {
+    const out = [];
+    let done = null;
+    let salvaged = null;
+    for await (const e of v3AndroidImportEntries({
+      bridge: /** @type {any} */ (bridge),
+      media,
+      chunkSize: 1024,
+      onDone: (v, s) => { done = v; salvaged = s || null; },
+    })) out.push(e);
+    return { out, done, salvaged };
+  };
+
+  it.each(['data', 'chunkEof', 'header'])('a cut in the %s of frame 3 yields the 3 clean frames and reports truncated', async (how) => {
+    const { out, done, salvaged } = await drain(cutBridge(3, how), media42);
+    expect(out.map((e) => e.id)).toEqual(['m0', 'm1', 'm2']);
+    expect(done).toBe('truncated');
+    expect(salvaged).toEqual({ count: 3, bytes: 30 });
+  });
+
+  it('does not run the trailing CRC verify on a cut file — the stream never reached it', async () => {
+    let verifyCalls = 0;
+    const bridge = cutBridge(3, 'data');
+    bridge.v3ImportVerify = () => { verifyCalls += 1; return 'ok'; };
+    const { done } = await drain(bridge, media42);
+    expect(verifyCalls).toBe(0);
+    expect(done).toBe('truncated');
+  });
+
+  it('an undamaged 42-frame container still reports the real CRC result and no salvage count', async () => {
+    // The control. Without it, "reports truncated" would pass just as happily
+    // against a walk that had started calling every file truncated.
+    const { out, done, salvaged } = await drain(cutBridge(-1, 'data'), media42);
+    expect(out).toHaveLength(42);
+    expect(done).toBe('ok');
+    expect(salvaged).toBe(null);
+  });
+
+  it('a broken bridge session still throws — it is not evidence about the file', async () => {
+    // 'no_session' means the app lost its own import stream. Reporting "0 of 42
+    // readable" for that would be a claim about the backup that nothing checked.
+    const bridge = { v3ImportNextBlob: () => 'error:no_session', v3ImportReadChunk: () => '' };
+    const gen = v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: media42, chunkSize: 1024 });
+    await expect(gen.next()).rejects.toThrow(/nextBlob: no_session/);
+  });
+});
+
 describe('import guards against a corrupt / truncated stream', () => {
   const baseManifestMedia = [{ id: 'a', mime: 'image/png', size: 10 }];
 
-  it('throws on a manifest-vs-frame size mismatch', async () => {
+  // backup-android-1 changed the VERDICT on the three cases below, not the
+  // detection: each is still caught at exactly the same point, but a damaged
+  // media frame now ends the walk instead of failing the whole read, matching
+  // what the web reader has done since storage-backup-1. With one frame in the
+  // manifest and the damage in that frame, nothing is salvageable — so these
+  // pin the floor of the salvage path: zero frames, still a report and not an
+  // exception. The corresponding "some survived" cases are the 42-frame ones
+  // above.
+  const firstFrameDamaged = async (bridge, media) => {
+    const out = [];
+    let done = null;
+    let salvaged = null;
+    for await (const e of v3AndroidImportEntries({
+      bridge: /** @type {any} */ (bridge), media, chunkSize: 1024,
+      onDone: (v, sv) => { done = v; salvaged = sv || null; },
+    })) out.push(e);
+    expect(out).toEqual([]);
+    expect(done).toBe('truncated');
+    expect(salvaged).toEqual({ count: 0, bytes: 0 });
+  };
+
+  it('salvages on a manifest-vs-frame size mismatch', async () => {
     const bridge = {
       v3ImportNextBlob: () => '7',                 // frame says 7, manifest says 10
       v3ImportReadChunk: () => '',
     };
-    const gen = v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: baseManifestMedia, chunkSize: 1024 });
-    await expect(gen.next()).rejects.toThrow(/size mismatch/);
+    await firstFrameDamaged(bridge, baseManifestMedia);
   });
 
-  it('BAK2: throws when a manifest media entry has no numeric size (parity with the web reader)', async () => {
+  it('BAK2: salvages when a manifest media entry has no numeric size (parity with the web reader)', async () => {
     const bridge = { v3ImportNextBlob: () => '10', v3ImportReadChunk: () => '' };
-    const gen = v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: [{ id: 'a', mime: 'image/png' }], chunkSize: 1024 });
-    await expect(gen.next()).rejects.toThrow(/no numeric manifest size/);
+    await firstFrameDamaged(bridge, [{ id: 'a', mime: 'image/png' }]);
   });
 
-  it('throws on a truncated frame (fewer bytes than declared)', async () => {
+  it('salvages on a truncated frame (fewer bytes than declared)', async () => {
     let served = false;
     const bridge = {
       v3ImportNextBlob: () => '10',
       v3ImportReadChunk: () => { if (served) return ''; served = true; return u8ToBase64(bytes(4, 1)); }, // only 4 of 10
     };
-    const gen = v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: baseManifestMedia, chunkSize: 1024 });
-    await expect(gen.next()).rejects.toThrow(/truncated frame/);
+    await firstFrameDamaged(bridge, baseManifestMedia);
   });
 
   it('propagates a native nextBlob error', async () => {

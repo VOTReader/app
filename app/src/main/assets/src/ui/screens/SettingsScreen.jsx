@@ -1225,13 +1225,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         problems.push(`some records didn't restore (${countMismatches.join(', ')})`);
       }
       // BAK-INTEGRITY: every verify outcome other than ok/absent ('mismatch',
-      // 'malformed', 'trailing') is a corruption warning — never a block (the
-      // data already imported); warn + record durably.
+      // 'malformed', 'trailing', 'truncated') is a corruption warning — never a
+      // block (the data already imported); warn + record durably.
       const integ = getIntegrity ? getIntegrity() : null;
       if (integ && integ !== 'ok' && integ !== 'absent') {
         console.warn('[import] v3 backup integrity check failed (' + integ + ')');
         try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup integrity ' + integ + ' (android)'); } catch (_e) { /* best-effort */ }
-        problems.push('the file failed its integrity check — some data may be corrupted');
+        // 'truncated' says the file is CUT, not that a checksum disagreed, and
+        // backup-android-1 is what makes it reachable here. Same distinction
+        // formatVerifyReport already draws: telling someone their backup failed
+        // an integrity check when it was simply cut short sends them looking for
+        // the wrong problem.
+        problems.push(integ === 'truncated'
+          ? 'the file was cut short — the media past that point could not be read'
+          : 'the file failed its integrity check — some data may be corrupted');
       }
       if (problems.length) {
         // Wave-0: dropped "(check console)." dev-speak — details are in console.warn.
@@ -1257,7 +1264,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     const _warnBackupIntegrity = (platform, integrity) => {
       console.warn('[import] v3 backup integrity check failed (' + integrity + ')');
       try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup integrity ' + integrity + ' (' + platform + ')'); } catch (_e) { /* best-effort */ }
-      _showToast('Warning: this backup failed its integrity check — some data may be corrupted. It can still be imported.', 5000);
+      // 'truncated' is not a failed checksum — readContainer has produced it
+      // since storage-backup-1, and this line has been calling a cut file a
+      // corrupt one ever since. Say which one it is.
+      _showToast(integrity === 'truncated'
+        ? 'Warning: this backup was cut short — the media past that point could not be read. Everything else can still be imported.'
+        : 'Warning: this backup failed its integrity check — some data may be corrupted. It can still be imported.', 5000);
     };
 
     // v3 streaming container import (web): read the file, validate, apply via applyV3.
@@ -1458,10 +1470,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     setVerifyReport({ message: msg, level: 'warn' });
   };
   const verifyBackupFile = () => {
-    // `salvaged` is only meaningful for integrity 'truncated', which only
-    // readContainer produces (storage-backup-1) — and only that caller can
-    // know how many media frames actually came back, so the count travels
-    // from there rather than being re-derived from the manifest's claim.
+    // `salvaged` is only meaningful for integrity 'truncated'. Both readers
+    // produce it now — readContainer on the web (storage-backup-1) and the
+    // Android frame walk (backup-android-1) — and only the reader can know how
+    // many media frames actually came back, so the count travels from there
+    // rather than being re-derived from the manifest's claim.
     const _report = (manifest, integrity, kind, salvaged) => {
       hideToast(_TOAST_ID);
       setVerifyReport(formatVerifyReport(summarizeBackupManifest(manifest), integrity, kind, salvaged));
@@ -1512,22 +1525,27 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           if (!_checkEnvelope(manifest)) return;
           // Drain every media frame (discarding the bytes) so the stream reaches
           // the trailing CRC — the generator runs the native verify via onDone.
-          // Any frame-size mismatch or truncation throws = corruption caught.
+          // A damaged frame no longer throws (backup-android-1): the walk stops
+          // there and onDone reports 'truncated' with the frames that survived,
+          // so this branch reports "N of M still readable" like the web one
+          // instead of calling a 99%-restorable backup corrupt. What still
+          // throws is a broken bridge session, which says nothing about the file.
           _showToast('Checking backup…', 0);
           let integrity = 'absent';
+          let salvaged = null;
           try {
             const entries = v3AndroidImportEntries({
               bridge: PlatformBridge,
               media: Array.isArray(manifest.media) ? manifest.media : [],
-              onDone: (v) => { integrity = v; },
+              onDone: (v, sv) => { integrity = v; salvaged = sv || null; },
             });
             for await (const _entry of entries) { /* verify-only: bytes discarded */ }
           } catch (e) {
             console.warn('verify frame walk failed', e);
-            _verifyFail('This backup file is corrupt or incomplete — a media frame failed its size check.');
+            _verifyFail('This backup could not be checked — the app could not read the file all the way through. Please try again.');
             return;
           }
-          _report(manifest, integrity, 'v3');
+          _report(manifest, integrity, 'v3', salvaged);
         } finally {
           try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         }

@@ -155,58 +155,120 @@ export function classifyV3ImportBegin(begin) {
  * Async-generator of `{ id, meta, blob }` for applyV3, reassembling each media
  * frame from the native import bridge: nextBlob → declared size, then read
  * <=chunkSize base64 chunks until '' (frame end), accumulating raw bytes one
- * frame at a time (peak memory = one frame). Throws on a bridge error, a
- * manifest-vs-frame size mismatch, or a truncated frame (bytes read != declared)
- * — applyV3's decode-all-then-swap ordering keeps existing media on a throw.
+ * frame at a time (peak memory = one frame).
+ *
+ * A DAMAGED MEDIA FRAME NO LONGER THROWS (backup-android-1). Enumeration stops
+ * where the damage is and the caller is told through [onDone] — the same shape
+ * the web readContainer already returns as integrity 'truncated' with the frames
+ * it read cleanly (storage-backup-1). Before this, the same cut file reported
+ * "3 of 42 media files still readable" on the web and "corrupt, could not be
+ * read" on Android, and the Android verdict is the one that makes a reader
+ * delete a 99%-restorable backup and trust the source.
+ *
+ * What still throws: a bridge failure that is not evidence about the FILE — a
+ * lost import session, a frame asked for out of order, a decode error. Saying
+ * "3 of 42 readable" because the app dropped its own stream would be a claim
+ * about the backup that nothing checked. Only the reasons in
+ * [CONTAINER_DAMAGE], plus a short/oversized/absent manifest size and a frame
+ * that delivered fewer bytes than it declared, are read as a cut container.
  *
  * @param {object} args
  * @param {V3ImportBridge} args.bridge
  * @param {Array<any>} args.media                       manifest.media (per-blob metas)
  * @param {number} [args.chunkSize]                     default ANDROID_V3_CHUNK
  * @param {(b64: string) => Uint8Array} [args.b64ToU8]  default base64ToU8
- * @param {(result: string) => void} [args.onDone]      BAK-INTEGRITY: called with
- *   the trailing manifest-CRC verify result ("ok"/"absent"/"mismatch"/"malformed")
- *   ONLY after every frame is consumed — so a cancelled/aborted import (the
- *   generator never exhausts) never fires a spurious integrity warning.
+ * @param {(result: string, salvaged?: {count: number, bytes: number}) => void} [args.onDone]
+ *   Called ONCE, only when the generator runs to its own end — so a cancelled or
+ *   abandoned import never fires a spurious warning. Either:
+ *   - the trailing manifest-CRC verify result ("ok"/"absent"/"mismatch"/"malformed"),
+ *     with no second argument, after every frame was consumed cleanly; or
+ *   - "truncated" plus `{count, bytes}` for the frames salvaged before the cut.
+ *     The CRC is NOT read in that case: the stream never reached it.
  * @returns {AsyncGenerator<{ id: any, meta: any, blob: Blob }>}
  */
+/**
+ * Native failure reasons that mean the CONTAINER is cut, not that the bridge
+ * broke. StorageManager returns 'truncated' when a read hits EOF inside a frame
+ * or inside a frame-length header, and 'bad_frame_len' for a negative declared
+ * length — both are damage the web reader salvages past. Every other reason
+ * ('no_session', 'frame_incomplete', an IO message) says something failed on
+ * this side and stays a throw.
+ */
+const CONTAINER_DAMAGE = new Set(['truncated', 'bad_frame_len']);
+
 export async function* v3AndroidImportEntries(args) {
   const bridge = args.bridge;
   const CH = args.chunkSize || ANDROID_V3_CHUNK;
   const dec = args.b64ToU8 || base64ToU8;
   const list = Array.isArray(args.media) ? args.media : [];
+  // backup-android-1: what stopped the walk, and what came back before it. The
+  // count is of frames actually YIELDED, never re-derived from the manifest's
+  // claim — the manifest is what the export MEANT to write, not what survives.
+  let cut = '';
+  let salvagedCount = 0;
+  let salvagedBytes = 0;
   for (let i = 0; i < list.length; i++) {
     const meta = list[i];
     const sizeStr = bridge.v3ImportNextBlob();
-    if (sizeStr.indexOf('error:') === 0) throw new Error('nextBlob: ' + sizeStr.slice(6));
+    if (sizeStr.indexOf('error:') === 0) {
+      const reason = sizeStr.slice(6);
+      if (!CONTAINER_DAMAGE.has(reason)) throw new Error('nextBlob: ' + reason);
+      cut = 'frame header for media[' + i + '] (' + reason + ')';
+      break;
+    }
     const declared = Number(sizeStr);
     // BAK2: the web readContainer requires every manifest media entry to carry a
     // numeric size — its primary corruption check. Match it here so a dropped /
-    // hand-edited size is rejected on BOTH platforms, instead of being silently
+    // hand-edited size is caught on BOTH platforms instead of being silently
     // accepted (trusting whatever length the native frame happens to report).
+    // Salvage rather than throw, also matching it: a manifest that disagrees
+    // with the bytes is damage, and damage past frame N does not un-read the
+    // frames before it.
     if (!meta || typeof meta.size !== 'number') {
-      throw new Error('media[' + i + '] has no numeric manifest size (corrupt)');
+      cut = 'media[' + i + '] has no numeric manifest size (corrupt)';
+      break;
     }
     if (meta.size !== declared) {
-      throw new Error('size mismatch for ' + meta.id + ' (manifest ' + meta.size + ', frame ' + declared + ')');
+      cut = 'size mismatch for ' + meta.id + ' (manifest ' + meta.size + ', frame ' + declared + ')';
+      break;
     }
     /** @type {any[]} */
     const parts = [];   // BlobPart[]; `any` sidesteps the Uint8Array<ArrayBufferLike> vs ArrayBuffer mismatch
     let readTotal = 0;
+    let chunkCut = '';
     for (;;) {
       const chunk = bridge.v3ImportReadChunk(CH);
       if (chunk === '') break;                       // current frame fully read
-      if (chunk.indexOf('error:') === 0) throw new Error('readChunk: ' + chunk.slice(6));
+      if (chunk.indexOf('error:') === 0) {
+        const reason = chunk.slice(6);
+        if (!CONTAINER_DAMAGE.has(reason)) throw new Error('readChunk: ' + reason);
+        chunkCut = 'media frame for ' + (meta && meta.id) + ' (' + reason + ')';
+        break;
+      }
       const u8 = dec(chunk);
       parts.push(u8);
       readTotal += u8.length;
     }
-    if (readTotal !== declared) throw new Error('truncated frame for ' + (meta && meta.id));
+    if (chunkCut) { cut = chunkCut; break; }
+    if (readTotal !== declared) { cut = 'truncated frame for ' + (meta && meta.id); break; }
     yield {
       id: meta ? meta.id : null,
       meta: meta || null,
       blob: new Blob(parts, { type: (meta && meta.mime) || 'application/octet-stream' }),
     };
+    salvagedCount += 1;
+    salvagedBytes += meta.size;
+  }
+  if (cut) {
+    console.warn('[backup-android] ' + cut + ' — salvaging ' + salvagedCount
+      + ' of ' + list.length + ' good media frame(s).');
+    // No CRC read here: the trailing checksum sits after the LAST frame and the
+    // stream never got there. Reading speculatively is also the exact shape that
+    // froze imports on a SAF stream that blocks at EOF (v3ImportVerify's note).
+    if (typeof args.onDone === 'function') {
+      args.onDone('truncated', { count: salvagedCount, bytes: salvagedBytes });
+    }
+    return;
   }
   // BAK-INTEGRITY: every frame consumed → the stream is now at the trailing
   // manifest CRC. Verify it (warn-and-allow; result handed to the caller). Runs

@@ -9,6 +9,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
 import java.io.InputStream
 import java.util.zip.CRC32
 import timber.log.Timber
@@ -406,6 +407,15 @@ class StorageManager(private val context: Context) {
      * JS side can cross-check it against manifest.media[i].size (corruption
      * detection, mirroring the web readContainer's size check). The previous
      * frame MUST be fully consumed first.
+     *
+     * A file that ends inside this 8-byte header fails as "truncated", the same
+     * reason [v3ImportReadChunk] gives for an EOF inside frame data, because the
+     * JS walk salvages on that reason and on no other (backup-android-1). It used
+     * to arrive as "read_failed" — EOFException carries no message — which is
+     * indistinguishable from a disk or SAF fault, so a container cut here failed
+     * the whole read and told the reader a 99%-restorable backup was corrupt.
+     * Every other exception keeps its own message on purpose: a fault in THIS
+     * read says nothing about the file, and must not license a salvage report.
      */
     fun v3ImportNextBlob(): Result<Long> = synchronized(v3Lock) {
         val dis = importIn ?: return Result.Failure("no_session")
@@ -416,6 +426,9 @@ class StorageManager(private val context: Context) {
             importFrameRemaining = len
             importBytesRead += 8L                          // the frame-length field
             Result.Success(len)
+        } catch (e: EOFException) {
+            Timber.w(e, "v3ImportNextBlob hit EOF inside a frame header (cut container)")
+            Result.Failure("truncated")
         } catch (e: Exception) {
             Timber.w(e, "v3ImportNextBlob failed")
             Result.Failure(e.message ?: "read_failed")
