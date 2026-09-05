@@ -8,8 +8,8 @@
    Captions vanish once the tile has real content.
 */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { act, render, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { LibraryScreen } from './LibraryScreen.jsx';
 import { ACHIEVEMENT_TOTAL } from '../../utils/achievements.js';
 
@@ -78,6 +78,40 @@ const renderLibrary = (props = {}) => render(
 
 const tileEl = (title) => [...document.querySelectorAll('.library-tile')]
   .find((t) => { const h = t.querySelector('.library-tile-title'); return h && h.textContent.trim() === title; });
+
+/* Scripture Web is reachable only by drilling now (Corbin, 2026-09-05): the
+   Home shortcut is gone and this is the way in. It carries an "under
+   construction" caption in the app's own `library-tile-guide` style — the same
+   one-line span the empty Notes / Links / Bookmarks tiles use — rather than a
+   banner or a rectangle of its own. */
+describe('Scripture Web is reachable from the Library, and says it is unfinished', () => {
+  it('renders the tile with an under-construction caption in the tile-guide style', () => {
+    // The shared stub's order list predates the tile and omits it; the REAL
+    // LibraryOrderStore default DOES carry 'scripture-web'
+    // (library-order-store.js:35), which is what makes the drill-down route
+    // Corbin asked for actually reachable. Pass an order that says so rather
+    // than widening the shared stub, which several other cases pin.
+    setupGlobals({
+      LibraryOrderStore: {
+        get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones', 'scripture-web'],
+        set: () => {}, subscribe: () => () => {}, getVersion: () => 0,
+      },
+    });
+    const onOpenScriptureWeb = vi.fn();
+    renderLibrary({ onOpenScriptureWeb });
+
+    const tile = screen.getByText('Scripture Web').closest('button');
+    expect(tile).toBeTruthy();
+
+    const guide = tile.querySelector('.library-tile-guide');
+    expect(guide).toBeTruthy();
+    expect(guide.textContent).toMatch(/under construction/i);
+
+    // Still the way in.
+    fireEvent.click(tile);
+    expect(onOpenScriptureWeb).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('LibraryScreen — empty-tile guidance captions', () => {
   it('every empty tile explains how its content happens', () => {

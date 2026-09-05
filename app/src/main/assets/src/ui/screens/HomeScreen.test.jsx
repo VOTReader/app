@@ -78,6 +78,33 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(screen.queryByRole('button', { name: 'Recent reading' })).toBeNull();
   });
 
+  /* Corbin, 2026-09-05: "get rid of scripture web on the landing page, make
+     users drill for it, still under construction." Home is the landing page,
+     so the shortcut goes; the Library entry stays and carries the caption. The
+     routes and deep links are untouched — this is about what Home OFFERS, not
+     about what the app can reach.
+
+     Asserted by absence, and absence is the weak kind of assertion, so the
+     second half of this case is the control: the OTHER shortcuts must still be
+     there. A Home that rendered no shortcut row at all would satisfy the first
+     expectation and fail the reader. */
+  it('Home offers no Scripture Web shortcut, and still offers the others', () => {
+    setupGlobals();
+    renderHome({ onNotes: () => {}, onBookmarks: () => {} });
+
+    expect(screen.queryByRole('button', { name: /Scripture Web/i })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Scripture Web/i);
+
+    // The control: the row itself is alive.
+    const shortcuts = document.querySelector('.home-shortcuts');
+    expect(shortcuts).toBeTruthy();
+    const labels = [...shortcuts.querySelectorAll('button')].map((x) => x.textContent.trim());
+    expect(labels).toContain('Notes');
+    expect(labels).toContain('Bookmarks');
+    expect(labels).toContain('Recent reading');
+    expect(labels).not.toContain('Scripture Web');
+  });
+
   it('reorders by keyboard while preserving hidden History and focus', () => {
     setupGlobals();
     HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];

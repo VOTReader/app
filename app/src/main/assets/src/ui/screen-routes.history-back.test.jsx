@@ -129,16 +129,36 @@ function makeRoutes(overrides = {}) {
   return { routes: buildScreenRoutes(props), props };
 }
 
-describe('home quick access return paths', () => {
-  it('opens Scripture Web from Home and returns through the captured origin', () => {
+describe('Scripture Web is reached by drilling, not from the landing page', () => {
+  /* Corbin, 2026-09-05: "get rid of scripture web on the landing page, make
+     users drill for it, still under construction."
+
+     This case used to assert the opposite — that Home opened it — so it is
+     replaced rather than added to. What has NOT changed is everything past the
+     entry point: the route resolves, the Library entry opens it, and back
+     still returns through the captured origin. A deep link into
+     `scripture-web` is unaffected; the screen was never removed. */
+  it('the Home route offers no Scripture Web entry at all', () => {
+    const { routes } = makeRoutes();
+    expect(routes.home().props.onScriptureWeb).toBeUndefined();
+  });
+
+  it('the Library entry still opens it, and back returns through the origin', () => {
     const { routes, props } = makeRoutes();
-    routes.home().props.onScriptureWeb();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
+    routes.library().props.onOpenScriptureWeb();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'library', returnOrigin: null });
     expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
-    const next = makeRoutes({ navOrigin: { screen: 'home', returnOrigin: null } });
+
+    const next = makeRoutes({ navOrigin: { screen: 'library', returnOrigin: null } });
     next.routes['scripture-web']().props.onBack();
     expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
     expect(next.props.setScreen).not.toHaveBeenCalled();
+  });
+
+  it('the route itself still resolves, so deep links keep working', () => {
+    const { routes } = makeRoutes();
+    expect(typeof routes['scripture-web']).toBe('function');
+    expect(routes['scripture-web']()).toBeTruthy();
   });
 });
 

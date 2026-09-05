@@ -13,7 +13,7 @@ function _homeDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onNotes, onBookmarks, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -285,7 +285,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           {historyEnabled !== false && <button type="button" onClick={onHistory}>Recent reading</button>}
           {onNotes && <button type="button" onClick={onNotes}>Notes</button>}
           {onBookmarks && <button type="button" onClick={onBookmarks}>Bookmarks</button>}
-          {onScriptureWeb && <button type="button" onClick={onScriptureWeb}>Scripture Web</button>}
+          {/* Scripture Web is deliberately NOT offered from the landing page
+              (Corbin, 2026-09-05): it is still under construction, so a reader
+              drills to it through the Library, where the tile says so. The
+              routes and deep links are untouched — this is about what Home
+              offers, not about what the app can reach. */}
         </nav>
         <div className="home-nav-list">
           {orderedItems.map((item, i) => (
