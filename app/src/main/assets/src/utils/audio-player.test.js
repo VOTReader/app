@@ -2503,3 +2503,35 @@ describe('audio-player — voice switch honors its own promise (noResume)', () =
     }
   });
 });
+
+describe('audio-player — the tour defers the notification ask', () => {
+  /* Device run 2026-09-04: on a fresh API 33+ install the first Listen is the tour's own press,
+     and setAudioActive(true) is the edge Kotlin asks for POST_NOTIFICATIONS on — so the system
+     prompt landed on top of the tour card. While the tour is active the edge is held back (the app
+     is in the foreground, the keep-alive buys nothing); the next Listen after the tour raises it. */
+  afterEach(() => { delete (/** @type {any} */ (globalThis)).TourController; });
+  it('holds the true edge while the tour is active, and raises it on the next playback after', () => {
+    let active = true;
+    /** @type {any} */ (globalThis).TourController = { getState: () => ({ active }) };
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    expect(bridge.setAudioActive).not.toHaveBeenCalledWith(true);
+    AudioPlayer.stop();
+    active = false;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    expect(bridge.setAudioActive).toHaveBeenLastCalledWith(true);
+  });
+
+  it('syncKeepAlive raises the held edge for a track still playing once the tour is over', () => {
+    let active = true;
+    /** @type {any} */ (globalThis).TourController = { getState: () => ({ active }) };
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.syncKeepAlive();                                   // still showing: still held
+    expect(bridge.setAudioActive).not.toHaveBeenCalledWith(true);
+    active = false;
+    AudioPlayer.syncKeepAlive();                                   // the tour ended: raised for the running track
+    expect(bridge.setAudioActive).toHaveBeenLastCalledWith(true);
+  });
+});

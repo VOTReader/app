@@ -32,6 +32,17 @@
 
 const TOUR_RING_PAD = 8;
 const TARGET_WAIT_MS = 3000;
+/* The target is scrolled into view whenever it is off screen during this window after the stop
+   opens, not once: the one-shot scroll lost to the new screen's scroll-memory reset (scrollTop = 0
+   a few frames after mount) and left Export below the fold on a 699 px phone (emulator-5554,
+   2026-09-04). After the window the reader's own scrolling is left alone. */
+const RESCROLL_WINDOW_MS = 2500;
+const RESCROLL_EVERY_MS = 300;
+/* The card's height before it has been measured (jsdom never measures): the clamp below keeps
+   the whole card on screen at this estimate, and at the real height once ResizeObserver reports. */
+const CARD_EST_H = 220;
+const CARD_EDGE = 12;
+const CARD_GAP = 18;
 
 function _rect(el) {
   const r = el.getBoundingClientRect();
@@ -61,7 +72,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   React.useEffect(() => {
     if (!active || !st.ready) return undefined;
     setRect(null); setMissing(false);
-    let raf = 0, stopped = false, scrolled = false;
+    let raf = 0, stopped = false, scrolled = false, lastScroll = 0;
     const started = Date.now();
     let last = null;
     const detach = () => {
@@ -78,8 +89,14 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         if (el) { targetRef.current = el; el.addEventListener('click', onTargetClick); el.setAttribute('aria-describedby', descId); }
       }
       if (el) {
-        if (!scrolled) { scrolled = true; try { el.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ } }
         const r = _rect(el);
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const off = r.top < 0 || r.top + r.height > vh;
+        const now = Date.now();
+        if (!scrolled || (off && now - started < RESCROLL_WINDOW_MS && now - lastScroll >= RESCROLL_EVERY_MS)) {
+          scrolled = true; lastScroll = now;
+          try { el.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
+        }
         if (!_sameRect(r, last)) { last = r; setRect(r); }
         if (missing) setMissing(false);
       } else if (step && step.target && Date.now() - started > waitMs) {
@@ -93,6 +110,20 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, st.ready, st.index, waitMs]);
 
+  // The card's real height, so the clamp below can keep all of it (Skip and Next) on screen.
+  const cardRef = React.useRef(/** @type {HTMLElement|null} */ (null));
+  const [cardH, setCardH] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => { const h = el.getBoundingClientRect().height; if (h) setCardH((prev) => (prev === h ? prev : h)); };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [active, st.ready, st.index, st.pressed]);
+  const setCardEl = React.useCallback((el) => { cardRef.current = el; if (trapRef) trapRef.current = el; }, [trapRef]);
+
   if (!active) return null;
   if (!st.ready) return <div className="tour-wait" role="status">One moment…</div>;
 
@@ -100,10 +131,21 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const p = TOUR_RING_PAD;
   const ring = rect ? { left: rect.left - p, top: rect.top - p, width: rect.width + 2 * p, height: rect.height + 2 * p } : null;
-  const below = ring ? (ring.top + ring.height + 18 + 220 < vh || ring.top < vh / 2) : false;
-  const cardStyle = ring
-    ? (below ? { top: Math.round(ring.top + ring.height + 18) + 'px' } : { bottom: Math.round(vh - ring.top + 18) + 'px' })
-    : { bottom: '16px' };
+  // WHERE THE CARD GOES. Below the ring when it fits, else above when that fits, else on the side
+  // with more room — and always clamped inside the viewport, over the ring's far edge if it must:
+  // a card the reader cannot reach is a tour they cannot leave (Export at the bottom edge, and the
+  // Letters tile at a large text size, both on a 699 px phone).
+  const h = cardH || CARD_EST_H;
+  let below = false, cardTop = 0;
+  if (ring) {
+    const fitsBelow = ring.top + ring.height + CARD_GAP + h <= vh - CARD_EDGE;
+    const fitsAbove = ring.top - CARD_GAP - h >= CARD_EDGE;
+    below = fitsBelow || (!fitsAbove && ring.top < vh / 2);
+    cardTop = below ? ring.top + ring.height + CARD_GAP : ring.top - CARD_GAP - h;
+    cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
+  }
+  const clear = ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
+  const cardStyle = ring ? { top: Math.round(cardTop) + 'px' } : { bottom: '16px' };
   const dims = ring ? [
     { left: 0, top: 0, width: vw, height: Math.max(0, ring.top) },
     { left: 0, top: ring.top + ring.height, width: vw, height: Math.max(0, vh - ring.top - ring.height) },
@@ -113,19 +155,21 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const px = (n) => Math.round(n) + 'px';
   const first = st.index === 0;
   const primary = step.primary || 'Next';
-  const hint = missing ? 'I could not find it on this screen. Press Next to go on.' : (step.tip || null);
+  // After the tour (or the reader) pressed the ringed control, the card says what to look for.
+  const text = st.pressed && step.after ? step.after : step.text;
+  const hint = missing ? 'I could not find it on this screen. Press Next to go on.' : (st.pressed ? null : (step.tip || null));
   return (
     <>
       {dims.map((d, i) => (
         <div key={i} className="tour-dim" style={{ left: px(d.left), top: px(d.top), width: px(d.width), height: px(d.height) }} onClick={(e) => e.stopPropagation()} />
       ))}
       {ring && <div className="tour-ring" aria-hidden="true" style={{ left: px(ring.left), top: px(ring.top), width: px(ring.width), height: px(ring.height) }} />}
-      {ring && <div className={'tour-arrow ' + (below ? 'up' : 'down')} aria-hidden="true" style={{ left: px(ring.left + ring.width / 2 - 10), top: below ? px(ring.top + ring.height + 18 - 20) : px(ring.top - 18) }} />}
-      <div className="tour-card" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle}>
+      {ring && clear && <div className={'tour-arrow ' + (below ? 'up' : 'down')} aria-hidden="true" style={{ left: px(ring.left + ring.width / 2 - 10), top: below ? px(cardTop - 20) : px(cardTop + h) }} />}
+      <div className="tour-card" ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle}>
         <div className="tour-eyebrow">{step.eyebrow}</div>
         <h2 className="tour-title" id="tour-title">{step.title}</h2>
         <div aria-live="polite">
-          <p className="tour-text" id={descId}>{step.text}</p>
+          <p className="tour-text" id={descId}>{text}</p>
           {hint && <p className="tour-tip">{hint}</p>}
         </div>
         <div className="tour-row">

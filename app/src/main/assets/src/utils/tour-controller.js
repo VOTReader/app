@@ -40,7 +40,7 @@ let pressing = false;
 let state = fresh();
 
 function fresh() {
-  return { active: false, index: 0, from: null, ready: true, promptDismissed: false };
+  return { active: false, index: 0, from: null, ready: true, promptDismissed: false, pressed: false };
 }
 function bump() {
   version++;
@@ -50,13 +50,27 @@ function runEnter(step) {
   const fn = step && step.enter && nav[step.enter];
   if (typeof fn === 'function') { try { fn(); } catch (_e) { /* the picture may lag the words; the overlay says so */ } }
 }
+/* The tour ends what the tour started. A Listen stop's press begins real playback; leaving that
+   stop (Next, Back, Skip, Done) stops it, or the player bar follows the reader into the Journal and
+   Settings and covers the very controls the next stops ring (seen on emulator-5554, 2026-09-04).
+   AudioPlayer is a bundle-d global; absent on a bare host. */
+function stopTourAudio() {
+  if (!state.pressed) return;
+  const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
+  try { if (ap && typeof ap.stop === 'function') ap.stop(); } catch (_e) { /* the player's problem */ }
+}
 function goTo(index, skipEnter) {
-  state = { ...state, index };
+  stopTourAudio();
+  state = { ...state, index, pressed: false };
   if (!skipEnter) runEnter(TOUR_STEPS[index]);
   bump();
 }
 function end() {
-  state = { ...state, active: false };
+  stopTourAudio();
+  state = { ...state, active: false, pressed: false };
+  // Playback the reader began during the tour by some other control ran under the held
+  // keep-alive edge (audio-player.js holds it while the tour shows); raise it now.
+  try { const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null; if (ap && typeof ap.syncKeepAlive === 'function') ap.syncKeepAlive(); } catch (_e) { /* the player's problem */ }
   try { TourDoneFlagStore.set(); } catch (_e) { /* no store on a bare host */ }
   bump();
 }
@@ -64,7 +78,7 @@ function end() {
 export const TourController = {
   subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); },
   getVersion() { return version; },
-  /** @returns {{active:boolean,index:number,step:any,from:string|null,ready:boolean,promptDismissed:boolean}} */
+  /** @returns {{active:boolean,index:number,step:any,from:string|null,ready:boolean,promptDismissed:boolean,pressed:boolean}} */
   getState() { return { ...state, step: TOUR_STEPS[state.index] }; },
 
   /** True only while next() is pressing the ringed control itself. */
@@ -94,12 +108,16 @@ export const TourController = {
     if (!state.active) return;
     const step = TOUR_STEPS[state.index];
     if (state.index >= TOUR_STEPS.length - 1) { end(); return; }
-    if (step.act === 'press') {
+    if (step.act === 'press' && !state.pressed) {
       // The overlay listens on the ringed control to notice the reader's own tap; this click is
       // ours, so it is fenced off or the tour would advance twice (seen in the browser walk).
       const el = /** @type {HTMLElement|null} */ (findTarget(step));
       pressing = true;
       try { if (el && typeof el.click === 'function') el.click(); } finally { pressing = false; }
+      // Stay: the reader should see what the press does. The next Next moves on.
+      state = { ...state, pressed: true };
+      bump();
+      return;
     } else if (step.act && typeof nav[step.act] === 'function') {
       // A navigating act already took the reader where the next stop lives; running that
       // stop's `enter` too would navigate twice (and re-render the letter mid-arrival).
@@ -116,6 +134,8 @@ export const TourController = {
   targetPressed() {
     if (!state.active) return;
     if (state.index >= TOUR_STEPS.length - 1) { end(); return; }
+    const step = TOUR_STEPS[state.index];
+    if (step.act === 'press' && !state.pressed) { state = { ...state, pressed: true }; bump(); return; }
     goTo(nextIndex(state.index));
   },
 

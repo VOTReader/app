@@ -8,8 +8,10 @@
    key on the nav the app attaches — see hooks/use-tour.js), WHAT it rings
    (`target`: a selector, and a text match where the control's position is
    not stable, like Home's reorderable tiles), and what NEXT does (`act`):
-   'press' taps the ringed control for the reader; a nav key navigates; null
-   just moves on. The reader may also tap the ringed control themselves — the
+   'press' taps the ringed control for the reader AND STAYS on the stop with
+   `after` as the card's words, so the reader sees what the press does (the
+   words lighting up); the next Next moves on, and the tour stops the playback
+   it started. A nav key navigates; null just moves on. The reader may also tap the ringed control themselves — the
    overlay notices and moves on without acting twice.
 
    THE WORDS are the trailer's (Creative, 2026-09-04): "Press Listen", "The
@@ -41,6 +43,7 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
  * @property {string} title
  * @property {string} text
  * @property {string} [tip]
+ * @property {string} [after]      what the card says once the ringed control has been pressed (Listen stops)
  * @property {string} primary        the primary button's label
  * @property {string} [settingsGroup] a Settings group the stop needs open
  */
@@ -69,6 +72,7 @@ export const TOUR_STEPS = Object.freeze([
     title: 'Hear it read aloud',
     text: 'Press Listen. The words light up as they are read, and the page follows along.',
     tip: 'Tap it now, or press Next and I will do it for you.',
+    after: 'Hear it? The words light up as they are read, and the page follows along. Press Next when you are ready.',
     primary: 'Next',
   },
   {
@@ -77,6 +81,7 @@ export const TOUR_STEPS = Object.freeze([
     eyebrow: '3 of 6 · The Scriptures',
     title: 'The Bible too, verse by verse',
     text: 'I opened John 3 for you: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen and the verses light up one by one as they are read.',
+    after: 'Hear it? Each verse lights up as it is read. Press Next when you are ready.',
     primary: 'Next',
   },
   {

@@ -37,8 +37,10 @@ const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
 const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+let served = 0;   // requests this server answered: a green is evidence only if it is > 0 (the Verifier's second half)
 function startServer() {
   const server = http.createServer((req, res) => {
+    served++;
     let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
     if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
     const filePath = normalize(resolve(ASSETS, '.' + urlPath));
@@ -50,6 +52,7 @@ function startServer() {
 }
 const server = await startServer();
 const BASE = `http://127.0.0.1:${server.address().port}/index.html`;
+const SCALE = parseFloat((process.argv[process.argv.indexOf('--scale') + 1]) || '1') || 1;   // --scale 1.8: Text Size, through the app's own state
 if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 
 const failures = [];
@@ -104,12 +107,20 @@ async function run(browser, { width, height, label, light }) {
       focusInside: !!(card && card.contains(document.activeElement)),
       overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
       tourDone: !!(window.TourDoneFlagStore && window.TourDoneFlagStore.is()),
+      pressed: !!(st && st.pressed),
+      text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
+      vh: window.innerHeight,
     };
   });
   const shot = async (name) => { if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-${light ? 'light' : 'dark'}-${name}.png`) }); };
 
   // About → Home; the strip appears on Home only.
   await clickLabel('Continue'); await clickLabel('Begin Reading');
+  if (SCALE !== 1) {
+    // Text Size as the reader would have it: through the app's state (the boot writer restores it on reload).
+    await page.evaluate((sc) => { const st = window.StateStore.get(); window.StateStore.set({ ...st, settings: { ...(st.settings || {}), fontScale: String(sc) } }); document.documentElement.style.setProperty('--font-scale', String(sc)); }, SCALE);
+    await sleep(400);
+  }
   await sleep(500);
   let f = await facts();
   if (!f.prompt) fail('the strip did not appear on Home after About');
@@ -159,13 +170,30 @@ async function run(browser, { width, height, label, light }) {
       else {
         const pad = 8;
         if (!(f.ring.l <= f.target.l - pad + 1 && f.ring.t <= f.target.t - pad + 1 && f.ring.r >= f.target.r + pad - 1 && f.ring.b >= f.target.b + pad - 1)) fail(`${id}: the ring does not wrap the control`);
-        if (f.card && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
+        // The card may overlap the ring only when it could fit on neither side (device run 2026-09-04: a
+        // card placed off screen is a tour the reader cannot leave). Otherwise it stays clear.
+        const couldFit = (f.target.b + 8 + 18 + f.card.h <= f.vh - 12) || (f.target.t - 8 - 18 - f.card.h >= 12);
+        if (f.card && couldFit && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
+        if (f.ring.t < 0 || f.ring.b > f.vh + 1) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
         if (!f.described) fail(`${id}: the control is not described by the card`);
         if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);
         ok(`${id}: ringed on ${f.title}`);
       }
     } else ok(`${id}: card on ${f.title}`);
+    // The whole card (Skip, Next) is on screen at every stop, whatever the ring's size or place.
+    if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen (${Math.round(f.card.t)}..${Math.round(f.card.b)} of ${f.vh})`);
     await shot(`${STOPS.indexOf(id)}-${id}`);
+    if (id === 'listen' || id === 'bible') {
+      // A Listen stop stays after the press, with the words to look for; the second Next moves on.
+      await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
+      await sleep(600);
+      f = await facts();
+      if (f.step !== id || !f.pressed) fail(`${id}: the tour did not stay after pressing Listen (at ${f.step}, pressed ${f.pressed})`);
+      else if (!/Hear it\?/.test(f.text || '')) fail(`${id}: after the press the card does not say what to look for ("${f.text}")`);
+      else ok(`${id}: pressed Listen and stayed, the card says what to look for`);
+      if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen after the press`);
+      await shot(`${STOPS.indexOf(id)}-${id}-pressed`);
+    }
     if (id === 'listen') {
       // Tab stays inside the card; the reader can press Next with the keyboard.
       await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
@@ -204,5 +232,7 @@ try {
   const real = errs.filter((e) => !/ERR_FAILED|Failed to load resource|404|net::/.test(e));
   if (real.length) fail('browser errors:\n  ' + real.slice(0, 8).join('\n  '));
 } finally { await browser.close(); server.close(); }
+if (served === 0) failures.push('the harness served nothing: the browser loaded some other origin');
+console.log(`served ${served} requests from ${BASE}`);
 if (failures.length) { console.log(`\n${failures.length} FAILED`); process.exit(1); }
 console.log('\ne2e-tour PASS');
