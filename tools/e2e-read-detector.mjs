@@ -26,13 +26,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({
   headless: true,
   args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  // 31 s on a quiet machine, but the read walk is a long chain of CDP calls and
-  // a loaded shared runner stalls one of them: measured 191 s and a
-  // 'ProtocolError: Runtime.callFunctionOn timed out' against puppeteer's 180 s
-  // default, with no real failure behind it. A gate that flakes teaches people to
-  // re-run instead of read, so the ceiling is explicit and generous against the
-  // measured time (~8x) but still bounded, the same reasoning as smoke-ci.js and
-  // e2e-readalong.mjs, which both already set it.
+  // The walk is 31-39 s, quiet machine or busy. This ceiling exists so a hang
+  // surfaces in minutes instead of hanging the run -- NOT as headroom for a slow
+  // CDP call on a loaded machine.
+  //
+  // The comment that used to sit here said the opposite: that the 191 s
+  // 'ProtocolError: Runtime.callFunctionOn timed out' was a loaded shared runner
+  // 'with no real failure behind it'. Measured 2026-09-04, over 17 runs on a
+  // known base: passes cluster at 30-39 s and failures land at 241 s and 244 s --
+  // ON the ceiling, which contention cannot produce -- and runs at 100%, 100% and
+  // 87% CPU all passed while an 18% CPU run failed. It is a hang. Load does not
+  // predict it.
+  //
+  // WHICH CDP call hangs is still unknown, and this comment deliberately does not
+  // guess. One candidate (a `location.reload()` ending the state-clearing
+  // evaluate, orphaning its own callback) was removed and tested for 17 runs; the
+  // failure came back at 241 s, so that was not it, or not all of it. Note also
+  // that a `waitForFunction` option timeout bounds its POLLING LOOP, not the
+  // individual Runtime.callFunctionOn round-trip inside it -- so a `{ timeout:
+  // 30000 }` on one of those does not exclude it as the 241 s culprit, and
+  // reasoning that it does is how the first diagnosis went wrong.
+  //
+  // What IS settled, and the reason to leave this number alone: raising a ceiling
+  // cannot help a hang. The response is not late, it is never coming. Raise it and
+  // you buy a longer wait for the same failure while hiding the shape that
+  // identifies it. smoke-ci.js:157 already says this ('a hang consumes whatever
+  // timeout it's given (600s was hit too)') and pairs its ceiling with a retry
+  // loop. If this fires, look for an orphaned CDP call -- not at the machine.
   protocolTimeout: 240000,
 });
 try {
