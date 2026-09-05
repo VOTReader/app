@@ -208,6 +208,27 @@ try {
       .some((b) => rx.test(b.textContent) && b.textContent.length < 120);
   };
 
+  /* ONE PATTERN PER STEP, for the wait AND the click.
+     ─────────────────────────────────────────────────────────────────
+     Waiting for the button you are about to click is only worth something if
+     both halves look for the SAME thing. When they were written separately
+     they drifted, silently. The wait took a JS STRING, and in a string `\d` is
+     just `d` — so `waitForScreen('the volumes screen', HAS_TEXT, 'Volume One(?!\d)')`
+     built /Volume One(?!d)/ while the click beneath it used /Volume One(?!\d)/. A wait that can be satisfied by something the
+     click then rejects is a wait that resolved for the wrong reason — the same
+     class as the silent `clickText` boolean above, where the step could not
+     say where it went wrong.
+
+     `re.source` is what HAS_TEXT needs and it comes from the one regex, so
+     there is no second spelling to keep in step. `between` exists for the one
+     step that has to warm the corpus after the screen renders and before the
+     click; it is not a hook looking for a use. */
+  const waitThenClick = async (label, re, between) => {
+    await waitForScreen(label, HAS_TEXT, re.source);
+    if (between) await between();
+    await clickText(re);
+  };
+
   // Onboarding (fresh profile) → Home → Prophetic Letters → Volume One.
   //
   // The #root wait above proves only that SOMETHING rendered. On ubuntu-latest
@@ -216,15 +237,12 @@ try {
   // for "Begin Reading" while page 1 sat there showing "Continue" — run
   // 33945493524, green on this machine and on the pre-rebase base. Every step
   // below waits for the button it is about to click; this one now does too.
-  await waitForScreen('the onboarding Continue button', HAS_TEXT, 'Continue');
-  await clickText(/Continue/);
-  await waitForScreen('the Begin Reading button', HAS_TEXT, 'Begin Reading');
-  await clickText(/Begin Reading/);
-  await waitForScreen('Home', HAS_TEXT, 'Prophetic Letters');
-  await clickText(/Prophetic Letters/);
-  await waitForScreen('the volumes screen', HAS_TEXT, 'Volume One(?!\d)');
-  await page.evaluate(() => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); });
-  await clickText(/Volume One(?!\d)/);
+  await waitThenClick('the onboarding Continue button', /Continue/);
+  await waitThenClick('the Begin Reading button', /Begin Reading/);
+  await waitThenClick('Home', /Prophetic Letters/);
+  await waitThenClick('the volumes screen', /Volume One(?!\d)/, () => page.evaluate(
+    () => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); },
+  ));
   // The one that failed on the runner: the index rows are what `opened` below
   // clicks, so wait for THEM rather than for a plausible number of milliseconds.
   await waitForScreen('the Volume One index rows', () => [...document.querySelectorAll(
