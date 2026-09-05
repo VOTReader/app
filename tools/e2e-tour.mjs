@@ -2,7 +2,7 @@
  * e2e-tour — "Show me around" walked end to end in a real browser, at a phone
  * and a tablet size, in both themes.
  *
- *   node tools/e2e-tour.mjs                 # needs tools/preview-server.py on 8097
+ *   node tools/e2e-tour.mjs                 # serves its own tree on an ephemeral port
  *   node tools/e2e-tour.mjs --shots DIR     # also write a screenshot per stop
  *
  * What it proves, at every stop, on a FRESH profile (About → Begin Reading → Home):
@@ -22,15 +22,34 @@
  * tour does) and the player is left to fail its fetch quietly; the assertion is
  * that the tour moved on, not that audio played.
  */
-import { resolve, dirname } from 'node:path';
+import http from 'node:http';
+import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
-const BASE = process.env.VOT_PREVIEW || 'http://127.0.0.1:8097/index.html';
+
+/* The harness serves its own tree on an ephemeral port. A shared fixed port (8097) let
+   several preview servers bind at once with allow_reuse_address, and a green here could be
+   about another worktree's build — proven on e2e:read, 2026-09-04. Nothing needs starting. */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
+const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+function startServer() {
+  const server = http.createServer((req, res) => {
+    let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
+    const filePath = normalize(resolve(ASSETS, '.' + urlPath));
+    if (!filePath.startsWith(ASSETS) || !existsSync(filePath) || !statSync(filePath).isFile()) { res.writeHead(404); res.end('not found'); return; }
+    res.writeHead(200, { 'Content-Type': MIME[extname(filePath).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    res.end(readFileSync(filePath));
+  });
+  return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server)));
+}
+const server = await startServer();
+const BASE = `http://127.0.0.1:${server.address().port}/index.html`;
 if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 
 const failures = [];
@@ -184,6 +203,6 @@ try {
   errs.push(...await run(browser, { width: 800, height: 1280, label: 'tablet', light: true }));
   const real = errs.filter((e) => !/ERR_FAILED|Failed to load resource|404|net::/.test(e));
   if (real.length) fail('browser errors:\n  ' + real.slice(0, 8).join('\n  '));
-} finally { await browser.close(); }
+} finally { await browser.close(); server.close(); }
 if (failures.length) { console.log(`\n${failures.length} FAILED`); process.exit(1); }
 console.log('\ne2e-tour PASS');
