@@ -12,6 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { LibraryScreen } from './LibraryScreen.jsx';
 import { ACHIEVEMENT_TOTAL } from '../../utils/achievements.js';
+import { DEFAULT_LIBRARY_ORDER } from '../../stores/library-order-store.js';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'NoteStore', 'LinkStore', 'BookmarkStore',
   'JournalStore', 'AnnotationStore', 'ReadingStatsStore', 'ReadingStreakStore',
@@ -36,8 +37,16 @@ function setupGlobals(over = {}) {
   globalThis.ReadingStreakStore = over.ReadingStreakStore || fakeStore({ get: () => ({}) });
   globalThis.JournalStatsStore = over.JournalStatsStore || fakeStore({ get: () => ({}) });
   globalThis.AudioLibraryStore = over.AudioLibraryStore || fakeStore({ saved: () => [], getPlays: () => 0 });
+  /* DERIVED FROM THE REAL DEFAULT, never re-typed.
+     This list used to be a hand-written copy that had fallen a tile behind:
+     it omitted 'scripture-web', which DEFAULT_LIBRARY_ORDER has carried since
+     the tile shipped. So no case in this file had ever rendered that tile, and
+     the screen's own suite could not have caught its removal, its caption, or
+     its route — it would have reported green either way. A stub that has to
+     agree with a constant is two definitions of one thing; this is the one
+     that gets deleted. */
   globalThis.LibraryOrderStore = over.LibraryOrderStore || {
-    get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones'],
+    get: () => [...DEFAULT_LIBRARY_ORDER],
     set: () => {},
     subscribe: () => () => {},
     getVersion: () => 0,
@@ -86,17 +95,13 @@ const tileEl = (title) => [...document.querySelectorAll('.library-tile')]
    banner or a rectangle of its own. */
 describe('Scripture Web is reachable from the Library, and says it is unfinished', () => {
   it('renders the tile with an under-construction caption in the tile-guide style', () => {
-    // The shared stub's order list predates the tile and omits it; the REAL
-    // LibraryOrderStore default DOES carry 'scripture-web'
-    // (library-order-store.js:35), which is what makes the drill-down route
-    // Corbin asked for actually reachable. Pass an order that says so rather
-    // than widening the shared stub, which several other cases pin.
-    setupGlobals({
-      LibraryOrderStore: {
-        get: () => ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones', 'scripture-web'],
-        set: () => {}, subscribe: () => () => {}, getVersion: () => 0,
-      },
-    });
+    // No bespoke order any more: the shared stub now derives from
+    // DEFAULT_LIBRARY_ORDER, so this case renders the tile the app renders.
+    // It also asserts that, rather than trusting it — a stub that silently
+    // stopped carrying the id would otherwise make this case vacuous instead
+    // of red, which is the failure it was written to prevent.
+    expect(DEFAULT_LIBRARY_ORDER).toContain('scripture-web');
+    setupGlobals();
     const onOpenScriptureWeb = vi.fn();
     renderLibrary({ onOpenScriptureWeb });
 
@@ -118,7 +123,12 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     setupGlobals();
     renderLibrary();
     const guides = [...document.querySelectorAll('.library-tile-guide')];
-    expect(guides).toHaveLength(7);
+    /* DERIVED, not re-typed. This was a hard 7 while the shared stub carried a
+       hand-copied seven-id order, and the two agreed only by accident — the app
+       had eight tiles. Counting against DEFAULT_LIBRARY_ORDER means adding a
+       tile fails this case for the right reason (its caption is missing) rather
+       than for the wrong one (a number nobody updated). */
+    expect(guides).toHaveLength(DEFAULT_LIBRARY_ORDER.length);
     guides.forEach((g) => expect(g.textContent.length).toBeGreaterThan(10));
     // Spot-pin the voice/accuracy of each caption against the destination
     // screens' own empty-state copy.
@@ -129,6 +139,10 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
     expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
     expect(tileEl('Milestones').querySelector('.library-tile-guide').textContent).toMatch(/listening/i);
+    // The eighth. Its caption says the tile is unfinished rather than how to
+    // fill it, which is the honest caption for a screen under construction —
+    // and the case above claims EVERY tile, so it has to be named here too.
+    expect(tileEl('Scripture Web').querySelector('.library-tile-guide').textContent).toMatch(/under construction/i);
   });
 
   it('a tile with real content drops its caption', () => {
@@ -136,16 +150,16 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     renderLibrary();
     expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeNull();
     expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
-    // A first note also earns the matching milestone, so those two tiles now
-    // have real content; the remaining five still keep their captions.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(5);
+    // A first note also earns the matching milestone, so those TWO tiles now
+    // have real content; every other tile keeps its caption.
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 2);
   });
 
   it('the Progress tile drops its caption once anything is read', () => {
     setupGlobals();
     renderLibrary({ totalReadCount: 7 });
     expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(6);
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 1);
   });
 
   it('updates the Milestones tile while Library stays open', () => {
