@@ -99,8 +99,13 @@ const playChapter = (chapterNum) => act(() => {
 
 beforeEach(() => {
   globalThis.Audio = FakeAudio;
+  // Real asset ids. The names carry the edition stamp bibleAudioAssetUrl
+  // routes on and resolveBibleAudio reads, so which timings file this
+  // component asks for is decided by the RECORDING. 'john-1' named no
+  // edition, which under that rule is 'do not paint' — a fixture that no
+  // release could produce, and it went quiet the moment the name mattered.
   globalThis.BIBLE_AUDIO_MANIFEST = {
-    'bible-brm-kjv:john': [['john-1', '', 'Chapter 1'], ['john-2', '', 'Chapter 2']],
+    'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1'], ['brm2_john_002', '', 'Chapter 2']],
   };
   globalThis.BIBLE_AUDIO_BOOKS = [['john', 'John']];
   globalThis.requestAnimationFrame = () => 1;
