@@ -142,23 +142,31 @@ describe('home quick access return paths', () => {
   });
 
   /* ScriptureWebScreen rides bundle-f, and the route renders a "Loading…"
-     frame until it arrives. The LIBRARY entry kicks the loader first, with a
-     comment saying exactly why. The Home entry, added later, copied the
-     navigation and not the preload — same destination, two different first
-     impressions. Asserted on both entries so the next one to be added is
-     compared against a pair rather than a single case. */
-  it('both Scripture Web entries kick bundle-f before the route renders', () => {
+     frame until it arrives, so the entry that opens it kicks the loader first.
+
+     This case was written against a PAIR — Home and Library — because the Home
+     entry had copied the navigation and not the preload, giving one destination
+     two different first impressions. Corbin has since taken Scripture Web off
+     the landing page (`w-scriptureweb-drill`), so the Library entry is the only
+     way in and the pair no longer exists. The preload the pair-fix added to the
+     Home entry went with it rather than shipping code scheduled for deletion.
+
+     Kept as a single case rather than dropped: nothing else pins the Library
+     entry's preload, and losing it silently is exactly how the two entries
+     drifted apart in the first place. Delete the `window.__loadScreensF()` line
+     at the Library entry in screen-routes.jsx and this goes red. */
+  it('the Library entry kicks bundle-f before the route renders', () => {
     const loadF = vi.fn();
     const prev = window.__loadScreensF;
     window.__loadScreensF = loadF;
     try {
-      const home = makeRoutes();
-      home.routes.home().props.onScriptureWeb();
-      expect(loadF).toHaveBeenCalledTimes(1);
-
       const lib = makeRoutes();
       lib.routes.library().props.onOpenScriptureWeb();
-      expect(loadF).toHaveBeenCalledTimes(2);
+      expect(loadF).toHaveBeenCalledTimes(1);
+      // The preload is a HEAD START, not a replacement for the route: the
+      // navigation still has to happen, or a kicked bundle arrives at a screen
+      // nobody navigated to.
+      expect(lib.props.setScreen).toHaveBeenCalledWith('scripture-web');
     } finally {
       window.__loadScreensF = prev;
     }

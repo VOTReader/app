@@ -590,9 +590,6 @@ export function buildScreenRoutes({
         onNotes={goNotesIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
-          // Same three lines as the Library entry below: kick bundle-f before
-          // the route renders so the "Loading…" frame is usually skipped.
-          if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
           setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
           setScreen('scripture-web');
         }}
