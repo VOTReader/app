@@ -165,13 +165,22 @@ try {
     return !!r && r.children.length > 0;
   }, { timeout: 30000 });
 
-  const clickText = async (re) => page.evaluate((reSrc) => {
-    const re2 = new RegExp(reSrc);
-    const el = [...document.querySelectorAll('button,[role=button],[class*=tile],[class*=card],[class*=row]')]
-      .find((b) => re2.test(b.textContent) && b.textContent.length < 120);
-    if (el) { el.click(); return true; }
-    return false;
-  }, re.source);
+  /* A CLICK THAT FINDS NOTHING IS AN ERROR, NOT A `false`.
+     This returned true/false and every one of its five call sites discarded
+     it, so a click that matched no button was completely silent and surfaced
+     many steps later as `opened: null` with no cause to read. One guard here
+     covers all five sites: it throws, and it names the pattern it looked for. */
+  const clickText = async (re) => {
+    const hit = await page.evaluate((reSrc) => {
+      const re2 = new RegExp(reSrc);
+      const el = [...document.querySelectorAll('button,[role=button],[class*=tile],[class*=card],[class*=row]')]
+        .find((b) => re2.test(b.textContent) && b.textContent.length < 120);
+      if (el) { el.click(); return true; }
+      return false;
+    }, re.source);
+    if (!hit) throw new Error(`walk found nothing to click matching /${re.source}/`);
+    return true;
+  };
 
   /* WAIT FOR THE SCREEN, NEVER FOR A DURATION.
      ─────────────────────────────────────────────────────────────────
@@ -200,6 +209,14 @@ try {
   };
 
   // Onboarding (fresh profile) → Home → Prophetic Letters → Volume One.
+  //
+  // The #root wait above proves only that SOMETHING rendered. On ubuntu-latest
+  // that is not yet the About screen, so this click fired into a page with no
+  // button, returned false into a void, and the walk then spent 30 s waiting
+  // for "Begin Reading" while page 1 sat there showing "Continue" — run
+  // 33945493524, green on this machine and on the pre-rebase base. Every step
+  // below waits for the button it is about to click; this one now does too.
+  await waitForScreen('the onboarding Continue button', HAS_TEXT, 'Continue');
   await clickText(/Continue/);
   await waitForScreen('the Begin Reading button', HAS_TEXT, 'Begin Reading');
   await clickText(/Begin Reading/);
