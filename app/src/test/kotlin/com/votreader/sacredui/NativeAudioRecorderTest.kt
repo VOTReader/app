@@ -215,6 +215,50 @@ class NativeAudioRecorderTest {
         assertTrue(fresh.exists(), "a just-served recording must survive (fetch may be in flight)")
     }
 
+    // ─── PARKED, NOT FOR TODAY ─────────────────────────────────────────
+    // journal-3 2b, the zero-byte case. RED on this tree ON PURPOSE: it is the
+    // test for a fix that lands with listRecordings and the Web Builder's
+    // caller, in one batch, on Monday. Do not "fix the failing test" by
+    // deleting it.
+    //
+    // A served file that exists and holds nothing reads back as "" today:
+    // resolveServedRecording passes, isFile is true, 0 is under the ceiling, and
+    // Base64.encodeToString(ByteArray(0), NO_WRAP) is the empty string. JS then
+    // does atob("") -> a zero-size Blob -> the caller's !recovered guard, whose
+    // message is "Could not read the recording from the device." That sentence
+    // is honest about a file it could not use and wrong about WHY: the file was
+    // read perfectly and there was nothing in it.
+    //
+    // Same family as atob(null) giving three bytes [158,233,101] that commit as
+    // a memo playing silence -- measured, and guarded in JournalRecordingSheet.
+    // A value that decodes into something plausible is worse than a refusal.
+    @Test
+    fun `a served recording with no bytes reads as null, not an empty string`() {
+        val empty = File(servedDir(), servedName()).apply { writeBytes(ByteArray(0)) }
+        assertTrue(empty.exists() && empty.length() == 0L, "the fixture must be a real zero-byte file")
+
+        assertNull(
+            recorder.readRecording(empty.name),
+            "an existing but empty served file must read as null -- \"\" decodes to a " +
+                "zero-size blob the caller cannot tell from a read it could not do"
+        )
+    }
+
+    @Test
+    fun `the zero-byte case is not vacuous - the same name with bytes reads back`() {
+        // The control. Without it, `returns null` above would pass just as
+        // happily against a name resolveServedRecording refused outright, which
+        // is a different verdict about a different file.
+        val name = servedName()
+        File(servedDir(), name).writeBytes(byteArrayOf(1, 2, 3))
+
+        assertNotNull(
+            recorder.readRecording(name),
+            "a served file WITH bytes must still read back, or the null above proves nothing"
+        )
+    }
+    // ─── end PARKED ────────────────────────────────────────────────────────
+
     @Test
     fun `a served memo JS has not released survives the sweep`() {
         // The loss journal-3 2a exists to prevent, from the other side. A served file

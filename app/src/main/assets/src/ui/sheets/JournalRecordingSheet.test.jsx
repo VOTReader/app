@@ -545,6 +545,43 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
   });
 
+  /* PARKED, NOT FOR TODAY — journal-3 2b, the zero-byte case.
+     RED on this tree ON PURPOSE. It passes when the native side returns null
+     for an existing-but-empty served file AND this sheet says so in its own
+     words. Both halves land in one batch on Monday; do not delete this to make
+     the suite green.
+
+     Today `nativeReadRecording` returns "" for a zero-byte file. "" is falsy,
+     so it takes the same `if (!recovered) fail(e)` path as a refusal, and the
+     reader is told "Could not read the recording from the device." — honest
+     about the outcome, wrong about the cause. The file was read perfectly and
+     held nothing, which is a different thing to tell someone about their memo.
+
+     The wording below is asserted by MEANING, not by string: /empty/i must
+     appear and the could-not-read sentence must not. The exact sentence is the
+     Web Builder's to choose. */
+  it('an empty served file is reported as empty, not as a read that failed', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    MockBridge.nativeReadRecording.mockReturnValue('');       // exists, holds nothing
+
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
+    // Nothing empty is ever committed as a memo.
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    // And the reason given is the true one.
+    expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
+    expect(screen.getByText(/empty/i)).toBeTruthy();
+  });
+
   it('does NOT reach for the expensive read before the reader has taken Try again', async () => {
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
     MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
