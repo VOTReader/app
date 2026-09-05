@@ -564,7 +564,9 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  *   Format B only: projects a corpus offset onto the rendered one.
  */
 export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Named, not discarded: the two lazy-timing effects below depend on it so a
+  // failed fetch is re-asked on transport activity — see read-along-5.
+  const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
   const track = st.queue[st.qi];
@@ -601,10 +603,46 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // The verse timings are their own lazy file, fetched the first time a Bible
   // recording is actually playing with read-along on. A reader who never
   // presses Listen, or who has the wash switched off, never downloads it.
+  //
+  // Both files land as globals that _syncFor reads at render, so their ARRIVAL
+  // has to be a render input (the c36 lesson): one number folded from both
+  // stores, carried into the frags memo deps below. Subscribed HERE, above the
+  // two loader effects, because those effects depend on it — see read-along-5.
+  const bibleVersion = React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
+  const letterVersion = React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
+  const corpusVersion = bibleVersion + letterVersion;
+
   const needBibleSync = !!chapter && loaded && readAlongOn;
   React.useEffect(() => {
     if (needBibleSync) loadBibleSync(volKey);
-  }, [needBibleSync, volKey]);
+    // read-along-5: `chapter` and `playerVersion` are in the deps so a FAILED
+    // load is asked again. The deps used to be [needBibleSync, volKey], and
+    // NONE of the inputs a reader produces while staying on the book changes
+    // either — so one flaky first byte, one corpus bump that evicted the cache
+    // entry, or one Pages hiccup left the wash silently dead for the whole
+    // book, with no affordance anywhere to retry it.
+    //
+    // DELIBERATELY NOT THE LOADER'S OWN VERSION. That was my first fix and it
+    // LOOPS: load() clears a prior error and bumps before it re-fetches, so an
+    // error-version dep re-enters itself — measured at 53 calls where 1 was
+    // expected, in a harness that would have shipped it as "the retry works".
+    // The retry inputs have to come from the READER, not from the retry.
+    //
+    // `playerVersion` is the transport: pause, resume, seek, track change. That
+    // is the natural cadence for a second attempt — the reader is still here
+    // and still listening — and it cannot feed itself, because loading timings
+    // does not touch AudioPlayer.
+    //
+    // AND ASKING AGAIN REALLY RE-FETCHES — checked by reading the loader, not
+    // assumed, because a retry that re-awaits a memoized rejection passes its
+    // own test and does nothing in the app (scripture-web-5). `script.onerror`
+    // RESETS `corpus._promise`, and `load()` clears a prior error before
+    // building a new promise, so the early return at `if (corpus._promise)`
+    // cannot hand back the settled failure.
+    //
+    // Re-asking after a SUCCESS is free: `_promise` is still set, so load()
+    // returns it without touching the network.
+  }, [needBibleSync, volKey, chapter, playerVersion]);
   // The letter timings are their own lazy file too (c41): asked for the moment
   // THIS letter's track is loaded with the wash on, and not otherwise — a
   // reader who never presses Listen, or keeps the wash off, never downloads
@@ -613,13 +651,13 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const needLetterSync = !chapter && loaded && readAlongOn;
   React.useEffect(() => {
     if (needLetterSync) loadAudioSync();
-  }, [needLetterSync]);
-  // Both files land as globals that _syncFor reads at render, so their ARRIVAL
-  // has to be a render input (the c36 lesson): one number folded from both
-  // stores, carried into the frags memo deps below.
-  const bibleVersion = React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
-  const letterVersion = React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
-  const corpusVersion = bibleVersion + letterVersion;
+    // Same fix as the Bible effect above, and for the same reason — the
+    // finding named the Bible path, but this one had the identical dead-end:
+    // deps of [needLetterSync] alone, so a failed fetch was never asked for
+    // again while the reader stayed in the letter. `key` covers moving between
+    // letters; `playerVersion` covers transport activity within one. Not the
+    // loader's version, for the loop reason above.
+  }, [needLetterSync, key, playerVersion]);
 
   const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
