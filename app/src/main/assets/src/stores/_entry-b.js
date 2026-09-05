@@ -289,11 +289,21 @@ registerServiceWorker();
 // esbuild entry from this bundle-b file, so it's reached via the window global
 // _entry-d.js already publishes rather than a direct import (a direct import
 // would bundle a SECOND copy of utils/garden.js with its own private cache
-// state — not the one GardenView actually populated). Both purges are safe by
-// construction (objectUrl re-creates from IDB on the next miss; a Garden page
-// re-decodes from the HTTP/native disk cache — a cache drop, not data loss, in
-// either case). Guarded so a purge error can never crash the app; a no-op on
-// web/PWA (nothing calls it there) and a no-op if bundle-d was never loaded.
+// state — not the one GardenView actually populated).
+//
+// BOTH PURGES ARE CACHE DROPS, NEVER DATA LOSS — but "safe by construction" is not
+// what makes the first one safe, and this comment used to say it was. Dropping a
+// journal object URL leaves whoever already resolved it holding a string that no
+// longer resolves: JournalImageBlock and JournalAudioBlock resolve ONCE per mediaId
+// and keep it in React state, so "objectUrl() re-creates on a later miss" was true
+// and irrelevant — there is no later miss. What actually makes it safe is that
+// JournalMediaStore now ANNOUNCES a bulk revocation (subscribeUrls / getUrlEpoch,
+// deferred until the page is visible so this purge still frees what it frees) and
+// the blocks re-resolve. A Garden page genuinely does just re-decode from the
+// HTTP/native disk cache, with no live reference to invalidate.
+//
+// Guarded so a purge error can never crash the app; a no-op on web/PWA (nothing
+// calls it there) and a no-op if bundle-d was never loaded.
 window.__onTrimMemory = function() {
   try { JournalMediaStore.releaseObjectUrls(); } catch (_e) { /* best-effort */ }
   try { if (typeof gardenClearCache !== 'undefined') gardenClearCache(); } catch (_e) { /* best-effort */ }
