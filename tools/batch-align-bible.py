@@ -297,6 +297,16 @@ def main():
                   f"something else holds the card. Not starting.", flush=True)
             return 3
 
+    # Chapters tools/align-supervisor.py killed for memory. Without this the
+    # supervisor's relaunch walks straight back into the chapter that just blew
+    # the ceiling and the two spin against each other until max-restarts.
+    # batch-align.py carries the same hook; both aligners resume by belt, so the
+    # only work a kill costs is the offending unit.
+    skip_units = {u for u in os.environ.get("ALIGN_SKIP_UNITS", "").split(",") if u}
+    if skip_units:
+        print(f"batch-align-bible: skipping {len(skip_units)} chapter(s) the supervisor "
+              f"killed for memory: {', '.join(sorted(skip_units))}", flush=True)
+
     done = skipped = failed = 0
     review = []
     per_book = {}
@@ -334,6 +344,15 @@ def main():
         entry = idx.get((book_id, chapter))
         audio = entry[0] if entry else None
         tag = f"{book_id}_{chapter:03d}"
+        # Printed BEFORE the work, not with the result: tools/align-supervisor.py
+        # names the unit in flight off the log, and a tag that only appears on
+        # completion tells it nothing about the chapter that is eating the box.
+        print(f"  [{n}/{len(work)}] {tag}  start", flush=True)
+        if tag in skip_units:
+            print(f"  [{n}/{len(work)}] {tag}  SKIPPED (memory ceiling)", flush=True)
+            failed += 1
+            note(book_id, "failed")
+            continue
         if not audio:
             print(f"  [{n}/{len(work)}] {tag}  NO AUDIO", flush=True)
             failed += 1

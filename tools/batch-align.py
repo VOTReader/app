@@ -147,11 +147,21 @@ def main():
             report.append((label, cov, shipped, total,
                            d.get("confirmed", 0), d.get("probed", 0), d.get("review", 0),
                            tag, unspoken))
-        # Every 25 items, drop the per-recording arrays and let torch return
+        # After EVERY letter, drop the per-recording arrays and let torch return
         # its blocks. The MODELS stay -- reloading those per item is the fault
         # the singletons exist to avoid -- but everything around them grows.
-        if n % 25 == 0:
-            al.release_caches()
+        #
+        # This was every 25 until 2026-09-04, and Machine Ops measured what that
+        # costs on a shared card: 37 minutes with 119-209 MiB free of 16,303,
+        # one child, its host RSS a comfortable 4.14 GB. Resident memory and VRAM
+        # are not correlated here -- the tensors are on the card -- so the RSS
+        # ceiling could not see it, and torch never hands the allocator cache
+        # back on its own. batch-align-bible.py has released per chapter since
+        # the night one chapter filled the cache and every chapter after it ran
+        # 7x slower (WDDM spills past the ceiling into system memory over PCIe).
+        # The letters pay the same tax for the same reason; the release costs
+        # milliseconds against a ~25 s letter.
+        al.release_caches()
         if n % 5 == 0 or n == len(keys):
             # Resident memory rides the progress line. The 2026-08-26 run grew
             # from 7.8 GB to 15.3 GB and then stopped completing anything --
