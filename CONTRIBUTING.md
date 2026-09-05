@@ -263,6 +263,42 @@ The habit outlives the fix, because it is not really about Gradle:
   A quietly wrong count is worse than a missing one, because the next person
   builds on it.
 
+### One checkout is `main`, and it is the primary one
+
+`D:\VOTReader-studio` itself is the canonical `main` checkout. Everything else —
+every `.claude/worktrees/*` — is scratch. Two reasons, and the second is the one
+that bites:
+
+**The scheduled jobs run there.** `vot-audio-app-sync` (Sunday 19:30) and
+`vot-weekly-sync` (Sunday 18:00) drive `tools/flock-audio-sync.py` against the
+primary checkout, and it refuses to run on a dirty tree — deliberately, so it
+never tramples a session mid-work. A primary checkout left on a feature branch,
+or left dirty, silently costs a week of audio ingestion; three Sundays were lost
+that way in August 2026 before anyone looked at the log.
+
+**Git lets exactly one worktree hold a branch.** A scratch worktree parked *on*
+`main` makes `git checkout main` in the primary fail with
+
+```
+fatal: 'main' is already used by worktree at D:/VOTReader-studio/.claude/worktrees/<name>
+```
+
+which is a confusing error to meet when you are trying to put the repository back
+the way you found it.
+
+So: **a scratch worktree used for landing keeps a detached HEAD, never the `main`
+ref.** `git worktree add --detach <path> main` to make one, or
+`git -C <path> checkout --detach` to release a branch it already holds. Landing
+from a worktree at all is the exception — it exists for when the primary checkout
+is occupied by another session's work — and when that work is done, the primary
+goes back to `main` and the worktree goes back to detached.
+
+Two things claiming to be `main` is the same failure as two worktrees claiming
+one build directory, one step up: whichever you read is a coin flip, and the tool
+that tells you is not the tool you happen to be running. `npm run check:live`
+prints `(HEAD on <branch>)` — that line is the only place it says which checkout
+answered, and it exits 0 either way.
+
 ---
 
 ## Common bug patterns to avoid
