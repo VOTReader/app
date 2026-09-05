@@ -101,6 +101,24 @@ function pngHeader(w, h) {
   return u;
 }
 const jpegBlob = (w, h) => new Blob([jpegHeader(w, h)], { type: 'image/jpeg' });
+/* A JPEG assembled from arbitrary segments, for the marker-walk cases below.
+   SOI, the given segments in order, a frame header, EOI. */
+function jpegOf(segments, w, h, sof) {
+  const frame = [0xFF, sof || 0xC0, 0x00, 0x11, 0x08,
+    (h >> 8) & 0xFF, h & 0xFF, (w >> 8) & 0xFF, w & 0xFF, 0x03,
+    0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01];
+  let flat = [0xFF, 0xD8];
+  for (const seg of segments) flat = flat.concat(seg);
+  return new Uint8Array(flat.concat(frame, [0xFF, 0xD9]));
+}
+/** An APP1 segment carrying [payload], length field included. */
+function app1(payload) {
+  const len = payload.length + 2;
+  return [0xFF, 0xE1, (len >> 8) & 0xFF, len & 0xFF].concat(payload);
+}
+const jpegSegBlob = (segments, w, h, sof) => new Blob([jpegOf(segments, w, h, sof)], { type: 'image/jpeg' });
+
+
 const pngBlob = (w, h) => new Blob([pngHeader(w, h)], { type: 'image/png' });
 
 /* A createImageBitmap that behaves like a DECODER: it honours the resize
@@ -668,6 +686,88 @@ describe('JournalMediaStore — compressImage() never upscales a source below th
     expect(hintOf(cib)).toBeUndefined();
     expect(out.width).toBe(900);
     expect(out.height).toBe(700);
+  });
+
+  /* ── The marker walk, four cases the Verifier attacked it with ──────────
+     These are regression pins rather than REDs: the shipped parser passes all
+     four. They are here because the failure mode of getting any of them wrong
+     is silent and catastrophic, and because the mocked decode that hid the
+     original upscale would hide these too. Every source below is real bytes
+     the parser walks; only the decoder is a stub.
+     ────────────────────────────────────────────────────────────────────── */
+
+  it('an EXIF thumbnail with its own SOF does not become the photo\'s size', async () => {
+    installFakeCanvas();
+    // Almost every phone photo carries a complete little JPEG inside APP1. A
+    // walk that scans for the first FFC0-FFCF without skipping APP segments by
+    // their length finds the THUMBNAIL's frame header first, reads 160x120,
+    // and hints the decoder down to 160 px wide — so the reader's 2400x1800
+    // photo would be stored as a thumbnail, silently, with no error anywhere.
+    const thumbnail = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00].concat(  // "Exif\0\0"
+      Array.from(jpegOf([], 160, 120)),                             // a whole JPEG
+    );
+    const cib = decoderMock(2400, 1800);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(
+      jpegSegBlob([app1(thumbnail)], 2400, 1800), { maxDim: 1600, quality: 0.8 },
+    );
+
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBe(1600);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+  });
+
+  it('a progressive JPEG (SOF2) is read, not skipped', async () => {
+    installFakeCanvas();
+    // SOF2 is 0xC2. A walk that special-cases SOF0 finds nothing here, and
+    // "nothing" is only safe if it means NO HINT. If it ever meant a default,
+    // every progressive photo would take the upscale.
+    const cib = decoderMock(3000, 2000);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(
+      jpegSegBlob([], 3000, 2000, 0xC2), { maxDim: 1600, quality: 0.8 },
+    );
+
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBe(1600);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1067);
+  });
+
+  it('a DHT segment is not mistaken for a frame header', async () => {
+    installFakeCanvas();
+    // 0xC4 sits inside the FFC0-FFCF range and is not a frame header; it is
+    // also the most common segment in a JPEG. A range match that forgets to
+    // exclude it reads Huffman table bytes as a width.
+    const dht = [0xFF, 0xC4, 0x00, 0x05, 0x00, 0x01, 0x02];
+    const cib = decoderMock(2400, 1800);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(
+      jpegSegBlob([dht], 2400, 1800), { maxDim: 1600, quality: 0.8 },
+    );
+
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBe(1600);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+  });
+
+  it('a zero-length segment bails out instead of looping', async () => {
+    installFakeCanvas();
+    // len < 2 cannot advance the walk. Without the bail this is an infinite
+    // loop on a corrupt file, inside the image-attach path.
+    const cib = decoderMock(800, 600);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(
+      jpegSegBlob([[0xFF, 0xE1, 0x00, 0x00]], 800, 600), { maxDim: 1600, quality: 0.8 },
+    );
+
+    // Unknown size, so no hint — and the decode is the source, not a guess.
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBeUndefined();
+    expect(out.width).toBe(800);
+    expect(out.height).toBe(600);
   });
 
   it('the imageOrientation retry carries the same hint decision, not a fresh guess', async () => {
