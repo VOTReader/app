@@ -224,6 +224,28 @@ export var JournalMediaStore = (function() {
   /** @type {Set<() => void>} */
   var _urlSubs = new Set();
   var _urlNotifyPending = false;
+  // THE DEFER IS AN OPTIMISATION, NOT A CORRECTNESS GUARD, and the difference matters
+  // because `document.hidden` is not reliably true at the moment the Android trim
+  // handler runs. MainActivity.onPause deliberately SKIPS webView.onPause() while audio
+  // is playing (`if (!vm.streamAudioActive) webView.onPause()`), so a backgrounding with
+  // a letter or a memo playing may reach __onTrimMemory with the page still reporting
+  // visible. Chromium is believed to derive page visibility from window visibility as
+  // well as view visibility, which would make it hidden anyway — that is AOSP internals
+  // nobody here has measured, and the Native Builder's emulator run settles it.
+  //
+  // If it reads false we notify at once and the MOUNTED blocks re-resolve immediately.
+  // That costs MEMORY, never correctness: releaseObjectUrls() has already revoked the
+  // whole cache (up to URL_CACHE_MAX), and only the blocks actually on screen re-create
+  // — one to three in an open journal entry. The reader still sees live media; the purge
+  // still frees most of what it meant to free. An unmeasured platform detail bounds how
+  // much heap comes back and cannot make the app wrong.
+  //
+  // A pending notify also cannot get stuck: it is only pending when the page really was
+  // hidden, and a hidden page that comes back always fires visibilitychange. (The same
+  // event is what use-persisted-state.js:198 relies on for data durability, so it does
+  // fire on this WebView — that path works.) Unlike that hook, this one needs no
+  // pagehide/beforeunload fallback: a page that never comes back has no blocks left to
+  // tell.
   function _flushUrlEpoch() {
     if (!_urlNotifyPending) return;
     if (typeof document !== 'undefined' && document.hidden) return;
