@@ -205,7 +205,14 @@ def main():
     lines.append('};')
     lines.append('')
 
-    OUT_FILE.write_text('\n'.join(lines), encoding='utf-8')
+    # newline='\n' because .gitattributes stores AND checks out these files with
+    # LF (`* text=auto eol=lf`). write_text defaults to newline=None, which
+    # translates every '\n' to os.linesep — CRLF on Windows — so this generator
+    # rewrote both files on every `npm run lint` and left `git status` reporting
+    # them modified while `git diff` showed nothing. Cosmetic on its own, but a
+    # tree that reads dirty after a lint is how a session decides it is not clean,
+    # and the weekly flock-audio sync refuses to run on exactly that signal.
+    OUT_FILE.write_text('\n'.join(lines), encoding='utf-8', newline='\n')
     print(f'WROTE {OUT_FILE.relative_to(ROOT)} ({len(sorted_globals)} globals)')
 
     # ── Parallel emit: .d.ts ambient declarations ───────────────────────
@@ -239,7 +246,7 @@ def main():
     dts_lines.append('}')
     dts_lines.append('')
 
-    OUT_DTS.write_text('\n'.join(dts_lines), encoding='utf-8')
+    OUT_DTS.write_text('\n'.join(dts_lines), encoding='utf-8', newline='\n')  # LF: see OUT_FILE above
     print(f'WROTE {OUT_DTS.relative_to(ROOT)} ({len(sorted_globals)} globals)')
 
 
