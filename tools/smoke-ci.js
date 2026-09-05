@@ -214,10 +214,176 @@ async function runAttempt(url) {
     } else {
       report.summary += ' | compact nav ok at 360x800';
     }
+    /* Runs second on purpose: the nav audit leaves the page on the letter
+       screen, which is where the hero Listen pill is. */
+    let touch;
+    try {
+      touch = await auditTouchTargets(page);
+    } catch (error) {
+      touch = { ok: false, problems: [(error && error.message) || String(error)], inventory: [] };
+    }
+    report.touchTargets = touch;
+    if (touch.measurements) for (const m of touch.measurements) console.log(`[smoke-ci] tap ${m}`);
+    if (touch.inventory.length) {
+      console.log(`[smoke-ci] controls under ${TOUCH_FLOOR} px, reported not failed (Design & Performance triages):`);
+      for (const line of touch.inventory) console.log(`  ${line}`);
+    }
+    if (!touch.ok) {
+      report.ok = false;
+      report.summary += ` | TOUCH TARGETS ${touch.problems.join('; ')}`;
+    } else {
+      report.summary += ' | touch targets ok at 360x800';
+    }
     return { report, pageErrors };
   } finally {
     if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }
   }
+}
+
+/* WL4 touch-target floor, measured the way a finger meets it.
+   ─────────────────────────────────────────────────────────────────────────
+   getBoundingClientRect cannot see this. The repo's WL4 pattern keeps a
+   control's VISUAL size and grows only its hit area, with a transparent
+   ::after that no DOM box reports — journal-styles.js has used it since the
+   26px block-delete x. So the only honest measurement is hit testing:
+   elementFromPoint straight up and down the control's centre column until it
+   stops answering with that control. That is the property the policy is
+   about, and it is the one a reader experiences.
+
+   Two assertions, because expanding a hit area is not free:
+
+   1. Each named control owns at least FLOOR px vertically. Reported as the
+      measured number, not a boolean, so a regression says how far it fell.
+
+   2. NO visible control has lost its own centre. An expanded band reaches
+      into the gutter, and a gutter between two rows is shared — grow both
+      sides too far and the later one in paint order covers the earlier one's
+      edge. Settings rows sit 21 px apart, so a 44 px band over a 26 px button
+      takes 9 px of an 21 px gutter and 3 px stay clear; this assertion is
+      what keeps that true when someone changes the spacing.
+
+   Deliberately NOT a sweep of every control against the floor: the 18x18
+   Settings info buttons and several chips are under it too, and are Design &
+   Performance's to triage, not something to fail a CI gate on today. They are
+   PRINTED below so the list stays visible instead of being quietly narrowed
+   to what happens to pass. */
+const TOUCH_FLOOR = 44;
+
+async function auditTouchTargets(page) {
+  await page.setViewport({ width: 360, height: 800 });
+  const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clickText = async (source) => {
+    const clicked = await page.evaluate((src) => {
+      const re = new RegExp(src, 'i');
+      const b = Array.from(document.querySelectorAll('button,[role=button]'))
+        .find((el) => re.test(((el.getAttribute('aria-label') || el.textContent || '')).trim()) && el.getBoundingClientRect().width > 0);
+      if (!b) return false;
+      b.click();
+      return true;
+    }, source);
+    await settle(550);
+    return clicked;
+  };
+
+  /* Only RENDERED matches. The app keeps unmounted copies of some screens in
+     the tree, so a raw querySelectorAll count includes pills with a zero box
+     that no scroll can bring into view — indexing over those would report a
+     failure about an element no reader can touch. */
+  const countOf = (sel) => page.evaluate(
+    (s2) => Array.from(document.querySelectorAll(s2)).filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).length,
+    sel,
+  );
+
+  /* One target at a time, each scrolled to the middle first. Measuring a whole
+     screen in one pass sounds cheaper and is wrong: elementFromPoint answers
+     only inside the viewport, so anything near an edge measures short and
+     anything past the fold measures zero -- which would read as "a neighbour
+     stole its centre" and make the collision check meaningless. Centring the
+     target also puts its real neighbours on screen, which is the population
+     the collision check needs. */
+  const measureOne = (screenName, sel, index) => page.evaluate(async (name, s2, i, floor) => {
+    const target = Array.from(document.querySelectorAll(s2))
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })[i];
+    if (!target) return null;
+    target.scrollIntoView({ block: 'center', behavior: 'instant' });
+    await new Promise((r) => setTimeout(r, 120));
+
+    const inView = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0
+        && r.top >= floor && r.bottom <= window.innerHeight - floor
+        && r.left >= 0 && r.right <= window.innerWidth;
+    };
+    const label = (el) => (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    const tapHeight = (el) => {
+      const r = el.getBoundingClientRect();
+      const cx = Math.round(r.left + r.width / 2);
+      const cy = Math.round(r.top + r.height / 2);
+      const owns = (y) => { const t = document.elementFromPoint(cx, y); return !!t && (t === el || el.contains(t)); };
+      if (!owns(cy)) return 0;
+      let up = 0; while (up < 80 && owns(cy - up - 1)) up += 1;
+      let down = 0; while (down < 80 && owns(cy + down + 1)) down += 1;
+      return up + down + 1;
+    };
+    const measured = (el) => { const r = el.getBoundingClientRect(); return { label: label(el), cls: String(el.className).slice(0, 30), w: Math.round(r.width), tap: tapHeight(el) }; };
+
+    const neighbours = Array.from(document.querySelectorAll('button,[role=button],a,input,select,textarea')).filter(inView);
+    return {
+      screen: name,
+      target: inView(target) ? measured(target) : null,
+      offscreen: !inView(target),
+      stolen: neighbours.map(measured).filter((m) => m.tap === 0).map((m) => m.label),
+      under: neighbours.map(measured).filter((m) => m.tap < floor || m.w < floor),
+    };
+  }, screenName, sel, index, TOUCH_FLOOR);
+
+  const measureAll = async (screenName, sel) => {
+    const n = await countOf(sel);
+    const rows = [];
+    for (let i = 0; i < n; i += 1) {
+      const r = await measureOne(screenName, sel, i);
+      if (r) rows.push(r);
+    }
+    return { screen: screenName, selector: sel, count: n, rows };
+  };
+
+  /* The compact-nav audit leaves the page on a WTLB Part One entry, which is
+     where the hero Listen pill lives -- measured before navigating away. */
+  const results = [await measureAll('letter', '.hero-play-pill')];
+
+  if (!(await clickText('^Home$'))) throw new Error('touch-targets: Home button not found');
+  if (!(await clickText('App Configuration'))) throw new Error('touch-targets: App Configuration not found');
+  await page.evaluate(() => {
+    for (const h of document.querySelectorAll('.settings-group-head')) if (/Your Data/.test(h.textContent || '')) h.click();
+  });
+  await settle(600);
+  results.push(await measureAll('settings', '.settings-clear-btn'));
+
+  const problems = [];
+  const measurements = [];
+  const inventory = [];
+  for (const res of results) {
+    if (!res.count) problems.push(`${res.screen}: nothing matched ${res.selector} -- the walk did not reach that screen`);
+    /* A screen can hold several rendered copies of a control — the letter view
+       preloads its neighbours, so three Listen pills exist and two sit ~900 and
+       ~1600 px below the fold inside a container scrollIntoView does not drive.
+       Those are skipped, not failed: they are not controls a reader can touch
+       from here. What is NOT allowed is measuring none of them, which would
+       make this whole audit pass by reaching nothing. */
+    if (res.count && !res.rows.some((r) => !r.offscreen)) {
+      problems.push(`${res.screen}: none of the ${res.count} ${res.selector} could be brought into the viewport — nothing was measured`);
+    }
+    for (const row of res.rows) {
+      if (row.offscreen) continue;
+      measurements.push(`${res.screen} ${row.target.label} ${row.target.w}x${row.target.tap}`);
+      if (row.target.tap < TOUCH_FLOOR || row.target.w < TOUCH_FLOOR) {
+        problems.push(`${res.screen}: "${row.target.label}" tap area ${row.target.w}x${row.target.tap} is under ${TOUCH_FLOOR}`);
+      }
+      for (const l of row.stolen) problems.push(`${res.screen}: "${l}" no longer owns its own centre -- a neighbour's hit area covers it`);
+      for (const m of row.under) inventory.push(`${res.screen} ${m.w}x${m.tap} ${m.label} .${m.cls}`);
+    }
+  }
+  return { ok: problems.length === 0, problems, measurements, inventory: [...new Set(inventory)] };
 }
 
 async function main() {

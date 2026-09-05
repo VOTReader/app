@@ -1368,6 +1368,17 @@
         letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.2;
         transition: border-color 0.18s, transform 0.18s;
       }
+      /* WL4 touch-target floor. The visual stays exactly as designed; a
+         transparent ::after gives the finger a 44 px band. Same pattern as
+         journal-styles.js's 26 px block-delete x, and the reason it is a
+         pseudo-element rather than a min-height is that growing these boxes
+         would relayout two screens Design & Performance has already tuned.
+         `max(100%, 44px)` never SHRINKS a control that is already taller.
+         Measured at 360x800 by tools/smoke-ci.js's touch-target audit, which
+         hit-tests up and down the centre column rather than reading a box:
+         a ::after hit area is invisible to getBoundingClientRect. */
+      .hero-play-pill { position: relative; }
+      .hero-play-pill::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: max(100%, 44px); }
       .hero-play-pill svg { width: 1.15em; height: 1.15em; flex-shrink: 0; }
       @media (hover: hover) { .hero-play-pill:hover { border-color: var(--gold); transform: translateY(-1px); } }
       .hero-play-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
@@ -2962,6 +2973,13 @@
        Text Size extreme, "Clear All" as one unbreakable line ran off a 375px
        screen; letting the label wrap inside the button keeps it on-screen. */
     .settings-clear-btn { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); max-width:100%; }
+    /* WL4 touch-target floor -- see .hero-play-pill. These sit 21 px apart in
+       the Settings rows, so a 44 px band over a 26 px button takes 9 px of
+       each gutter and 3 px stay clear between neighbours. smoke-ci's audit
+       asserts no control loses its own centre, which is what keeps that true
+       if the row spacing ever tightens. */
+    .settings-clear-btn { position: relative; }
+    .settings-clear-btn::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: max(100%, 44px); }
     @media (hover: hover) { .settings-clear-btn:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
     .settings-clear-btn.warning { color:var(--settings-warning); border-color:var(--settings-warning); font-size:var(--fs-10); }
