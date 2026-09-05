@@ -447,6 +447,72 @@ describe('applyImportPayload', () => {
     expect(ann.calls).toEqual([]); // never written — corrupt section can't clobber good data
   });
 
+  /* storage-backup-7 — `vot-state` travels in TWO containers: the `data` map (the
+     localStorage boot shim the pre-hydration script reads for theme/fontScale) and the
+     `stores` map (IDB, what hydration loads). Two writers with different failure
+     behaviour: _reseedLsData writes unvalidated, _applyStoresAndFlags validates and
+     skips. A section that fails validation must leave BOTH at the pre-import value —
+     untouched, not cleared: clearing would swap one divergence (imported paint over old
+     state) for another (default paint over old state). */
+
+  it('storage-backup-7 RED: a vot-state section that fails validation leaves the LS boot mirror at the PRE-IMPORT value', async () => {
+    localStorage.setItem('vot-state', '{"theme":"dark"}');
+    const state = fakeStore('set');
+    const res = await applyImportPayload(
+      { exportVersion: 2, data: { 'vot-state': '{"theme":"light"}' }, stores: { 'vot-state': { theme: 'light' } } },
+      {
+        storesMap: { 'vot-state': { store: state, method: 'set' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: () => ['shape violation'], validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.skippedStores).toEqual(['vot-state']);
+    expect(state.calls).toEqual([]);                                    // IDB keeps the pre-import state
+    expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}'); // … and so must the boot mirror
+  });
+
+  it('storage-backup-7 CONTROL: a vot-state section that VALIDATES still reseeds the LS boot mirror', async () => {
+    // Same key, same matcher, the OTHER value: this is what stops the fix from being
+    // "delete the reseed". It passes before and after.
+    localStorage.setItem('vot-state', '{"theme":"dark"}');
+    const state = fakeStore('set');
+    const res = await applyImportPayload(
+      { exportVersion: 2, data: { 'vot-state': '{"theme":"light"}' }, stores: { 'vot-state': { theme: 'light' } } },
+      {
+        storesMap: { 'vot-state': { store: state, method: 'set' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.skippedStores).toEqual([]);
+    expect(state.calls).toEqual([{ theme: 'light' }]);
+    expect(localStorage.getItem('vot-state')).toBe('{"theme":"light"}');
+  });
+
+  it('storage-backup-7: the skip is PER KEY — a valid section reseeds while the invalid one is left alone', async () => {
+    localStorage.setItem('vot-state', 'old-state');
+    localStorage.setItem('vot-home-order', 'old-order');
+    const state = fakeStore('set');
+    const order = fakeStore('set');
+    const res = await applyImportPayload(
+      {
+        exportVersion: 2,
+        data: { 'vot-state': 'new-state', 'vot-home-order': 'new-order' },
+        stores: { 'vot-state': { a: 1 }, 'vot-home-order': { b: 2 } },
+      },
+      {
+        storesMap: { 'vot-state': { store: state, method: 'set' }, 'vot-home-order': { store: order, method: 'set' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        dataLsKeys: ['vot-state', 'vot-home-order'],
+        validateStorePayload: (name) => (name === 'vot-state' ? ['shape violation'] : []),
+        validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.skippedStores).toEqual(['vot-state']);
+    expect(localStorage.getItem('vot-state')).toBe('old-state');       // skipped → untouched
+    expect(localStorage.getItem('vot-home-order')).toBe('new-order');  // applied → reseeded
+  });
+
   it('counts importFailures when a store write throws', async () => {
     const ann = fakeStore('replaceAll', { throws: true });
     const res = await applyImportPayload(
@@ -769,6 +835,21 @@ describe('applyV3', () => {
     expect(res.skippedStores).toEqual(['vot-annotations']);
     expect(ann.calls).toEqual([]);          // invalid payload never written
     expect(Object.keys(media._store)).toEqual(['old']); // nothing pruned
+  });
+
+  it('storage-backup-7 RED: a skipped vot-state leaves the LS boot mirror at the pre-import value (v3)', async () => {
+    localStorage.setItem('vot-state', 'old-state');
+    const state = destStore('set');
+    const res = await applyV3(
+      { ...manifest({ 'vot-state': { bad: true } }), data: { 'vot-state': 'new-state' } }, [],
+      {
+        storesMap: { 'vot-state': { store: state, method: 'set' } },
+        flagMap: {}, mediaStore: destMedia(), validateStorePayload: () => ['shape violation'],
+      },
+    );
+    expect(res.skippedStores).toEqual(['vot-state']);
+    expect(state.calls).toEqual([]);
+    expect(localStorage.getItem('vot-state')).toBe('old-state');
   });
 
   it('an omitted journal store demotes media to merge so old attachments stay valid', async () => {
