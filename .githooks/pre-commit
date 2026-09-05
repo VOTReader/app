@@ -64,6 +64,40 @@
 
 exec 1>&2  # all output to stderr so it appears during commit
 
+# --- Step 0: no fossil hook is shadowing this one (UNCONDITIONAL) -----
+# On 2026-09-04 this repo had a 3,694-byte May-20 `.git/hooks/pre-commit`
+# sitting beside a 40,325-byte `.githooks/pre-commit`. It never ran, because
+# core.hooksPath pointed here -- but it gated two things out of twenty and
+# would have printed [pre-commit] lines and exited 0 for anyone who unset
+# core.hooksPath or cloned without the install step. A fossil that never runs
+# is not harmless; it is a silent downgrade waiting for one config change.
+#
+# This loops over every name .githooks defines rather than checking
+# "pre-commit", because core.hooksPath redirects EVERY hook: add a
+# .githooks/pre-push later and a fossil .git/hooks/pre-push is armed with
+# nothing to say so. Same code, does not go stale.
+#
+# It CANNOT catch core.hooksPath being unset -- this file does not run at all
+# in that case, and nothing local can. That case is covered by CI, which runs
+# the whole gate set on every push independently of any hook. So the exposure
+# there is a late failure, not an ungated main.
+#
+# RED proof, both directions plus a control: sh tools/hook-shadow-guard.test.sh
+_gitdir=$(git rev-parse --git-common-dir)
+_toplevel=$(git rev-parse --show-toplevel)
+for _h in "$_toplevel"/.githooks/*; do
+  [ -f "$_h" ] || continue
+  _name=${_h##*/}
+  if [ -f "$_gitdir/hooks/$_name" ]; then
+    echo "[pre-commit] FATAL: $_gitdir/hooks/$_name shadows .githooks/$_name."
+    echo "  git runs only the hook core.hooksPath points at, so this file is"
+    echo "  inert today -- and takes over silently the moment that is unset."
+    echo "  Disable it (do not delete; it may not exist anywhere in history):"
+    echo "    mv '$_gitdir/hooks/$_name' '$_gitdir/hooks/$_name.disabled'"
+    exit 1
+  fi
+done
+
 # Detect HEAD (first commit has no HEAD)
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
   against=HEAD
