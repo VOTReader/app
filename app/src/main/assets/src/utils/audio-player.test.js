@@ -1249,6 +1249,34 @@ describe('audio-player — load errors', () => {
     el().dispatchEvent(new Event('loadedmetadata'));
     expect(el().currentTime).toBe(12.4);           // …and metadata restores it
   });
+
+  /* The retry above arms its OWN deferred seek, and it is the same singleton
+     and the same one listener slot as every other one. If the reader gives up
+     on the failing recording and opens a different one before its metadata
+     arrives, the retry's seek lands on THAT track instead — a letter they have
+     never played, opened twelve seconds in.
+
+     Second instance of audio-player-1, hand-written beside the shared helper
+     rather than through it. The fix is to route it through the helper, which
+     is where the generation guard lives. */
+  it('a retry seek does not survive onto a recording the reader opened instead', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().currentTime = 12.4;
+    el().dispatchEvent(new Event('timeupdate'));
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+
+    AudioPlayer.toggle();                    // arms the retry seek for letter C
+    expect(el().currentTime).toBe(0);
+
+    // The reader gives up and opens something else before metadata arrives.
+    el().error = null;
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    expect(el().src).toBe(URL_OF('idSolo'));
+    el().dispatchEvent(new Event('loadedmetadata'));
+
+    expect(el().currentTime).toBe(0);        // letter C's clock stayed with letter C
+  });
 });
 
 describe('audio-player — subscribe / version', () => {
@@ -2041,6 +2069,74 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
 
     expect(el().currentTime).toBe(600 - AUDIO_RESUME_REWIND_SEC);
     expect(el().srcHistory.length).toBe(assignsBefore);   // prewarm reuse intact
+  });
+
+  /* THE OTHER HALF OF THE SAME SINGLETON: a seek armed for one recording
+     firing on the NEXT one (audio-player-1).
+     ─────────────────────────────────────────────────────────────────
+     There is one media element and one shared listener slot. When a start's
+     metadata has not arrived before the reader taps something else, the first
+     start's `loadedmetadata` listener is still attached — and the SECOND
+     track's metadata event fires it. The reader opens a letter they have
+     never played and lands ten minutes in.
+
+     Neither the bar nor the position store looks wrong afterwards: the app
+     believes it is where it seeked to. Same family as the prewarm case above
+     — a deferred seek is a promise about ONE track, and nothing was checking
+     which track collected it. */
+  it('does not let a pending seek from one recording land on the next', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (value) => {
+        const url = typeof value === 'string' ? value : (value && value.url) || '';
+        return url === URL_OF('idA1') ? { t: 600, d: 3600 } : null;
+      },
+      setPosition() {},
+      clearPosition() {},
+    };
+
+    // Letter A: a saved position, and metadata that never arrives — so the
+    // seek is deferred and the listener stays armed.
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    expect(el().currentTime).toBe(0);          // nothing seeked yet
+
+    // Letter C: no saved position at all. Its src assignment resets the
+    // element, and its metadata now arrives.
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    expect(el().src).toBe(URL_OF('idC'));
+    el().duration = 1800;
+    el().dispatchEvent(new Event('loadedmetadata'));
+
+    // Letter C starts at its beginning, because letter A's resume was
+    // letter A's business.
+    expect(el().currentTime).toBe(0);
+  });
+
+  /* `noResume` is the desk's voice-switch promise: "start this again". It
+     arms no seek of its own — which is exactly why it cannot defend itself.
+     A pending seek from the PREVIOUS voice survives the switch and lands on
+     the new one, dropping the listener mid-sentence in a recording with
+     different pacing: the precise outcome noResume exists to prevent. */
+  it('keeps the noResume promise when a seek is still pending from the last start', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (value) => {
+        const url = typeof value === 'string' ? value : (value && value.url) || '';
+        return url === URL_OF('idA1') ? { t: 600, d: 3600 } : null;
+      },
+      setPosition() {},
+      clearPosition() {},
+    };
+
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    expect(el().currentTime).toBe(0);
+
+    AudioPlayer.playLetter({
+      volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' },
+      collectionLabel: 'Volume One', reader: 'V', noResume: true,
+    });
+    el().duration = 3600;
+    el().dispatchEvent(new Event('loadedmetadata'));
+
+    expect(el().currentTime).toBe(0);
   });
 });
 
