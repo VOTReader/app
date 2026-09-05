@@ -52,6 +52,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(enabled: boolean) => void} setZoomEnabled
  * @property {() => void} resetZoom
  * @property {() => number} getZoomScale
+ * @property {() => number} getSystemFontScale
  * @property {(style: number) => void} haptic
  * @property {() => void} startAudioSession
  * @property {() => void} endAudioSession
@@ -126,6 +127,7 @@ const androidImpl = {
   setZoomEnabled: (enabled) => /** @type {any} */ (window).AndroidBridge.setZoomEnabled(enabled),
   resetZoom: () => /** @type {any} */ (window).AndroidBridge.resetZoom(),
   getZoomScale: () => /** @type {any} */ (window).AndroidBridge.getZoomScale(),
+  getSystemFontScale: () => /** @type {any} */ (window).AndroidBridge.getSystemFontScale(),
   haptic: (style) => /** @type {any} */ (window).AndroidBridge.haptic(style),
   startAudioSession: () => /** @type {any} */ (window).AndroidBridge.startAudioSession(),
   endAudioSession: () => /** @type {any} */ (window).AndroidBridge.endAudioSession(),
@@ -1042,6 +1044,11 @@ const webImpl = {
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
   resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
+  // a11y-ux-6: 1 on web BY DESIGN, not as a stub. A browser already applies the
+  // OS/browser text size to rem sizing itself, so reporting it here and feeding it
+  // into --font-scale would double-apply it — the exact stacking bug this pair of
+  // changes exists to remove on Android.
+  getSystemFontScale: () => 1,
   // Tier C (W1.4): MediaRecorder + AnalyserNode recording flow
   requestMicPermission: webRequestMicPermission,
   nativeRecordStart: webNativeRecordStart,

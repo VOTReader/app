@@ -35,6 +35,7 @@ const METHODS = [
   'setZoomEnabled',
   'resetZoom',
   'getZoomScale',
+  'getSystemFontScale',
   'takeScreenshot',
   'takeThemedScreenshot',
   'openFilePicker',
@@ -82,6 +83,7 @@ function mockAndroidBridge() {
     setZoomEnabled: vi.fn(),
     resetZoom: vi.fn(),
     getZoomScale: vi.fn(() => 1.5),
+    getSystemFontScale: vi.fn(() => 2.0),
     takeScreenshot: vi.fn(() => 'data:image/jpeg;base64,abc'),
     openFilePicker: vi.fn(),
     saveToFile: vi.fn(),
@@ -187,6 +189,9 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeRecordResume', [], 'ok'],
     ['nativeRecordAmplitude', [], 8192],
     ['getZoomScale', [], 1.5],
+    // a11y-ux-6: the reader Display > Font size setting, reported so the app can
+    // apply it once through --font-scale instead of letting the WebView stack it.
+    ['getSystemFontScale', [], 2.0],
     // takeScreenshot is the one async method on the bridge — Android wraps
     // its sync native call in Promise.resolve to give consumers a uniform
     // Promise<string> shape (web returns html2canvas's genuine Promise).
@@ -263,6 +268,12 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
   it('nativeRecordAmplitude returns 0 on web', () => {
     expect(bridge.nativeRecordAmplitude()).toBe(0);
+  });
+  it('getSystemFontScale is 1 on web, because the browser already applied it', () => {
+    // Not a stub value: a browser scales rem sizing by the user's text-size setting
+    // itself. Reporting anything else here would feed it into --font-scale a second
+    // time — the stacking bug a11y-ux-6 exists to remove.
+    expect(bridge.getSystemFontScale()).toBe(1);
   });
   it('takeScreenshot returns empty string when html2canvas cannot load', async () => {
     // U13: html2canvas is lazy-loaded via <script> on first web screenshot. In

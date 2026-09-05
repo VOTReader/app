@@ -1,9 +1,13 @@
 package com.votreader.sacredui
 
+import android.app.Application
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Build
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.test.core.app.ApplicationProvider
+import io.mockk.mockk
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -75,6 +79,43 @@ class MainActivityWebSettingsTest {
     @Test
     fun `mixed content is never allowed`() {
         assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, applied().mixedContentMode)
+    }
+
+    // ─── a11y-ux-6, second half: the system size is HONOURED, not ignored ──
+    //
+    // Pinning textZoom stops the OS font size stacking on --font-scale, but on its
+    // own it also throws the OS setting away: a reader who set Android's Display >
+    // Font size to its largest step got no larger text at all. The bridge reports
+    // that scale so the app can apply it ONCE, through its own --font-scale, which
+    // app.css routes to text while chrome stays px-pinned. That is the whole reason
+    // it goes through --font-scale rather than back through textZoom.
+
+    /** An AppInterface whose host context carries [fontScale], the way a device
+     *  with that Display > Font size setting hands one to the Activity. */
+    private fun bridgeAtSystemFontScale(fontScale: Float): AppInterface {
+        val base = ApplicationProvider.getApplicationContext<Application>()
+        val cfg = Configuration(base.resources.configuration).apply { this.fontScale = fontScale }
+        val scaled: Context = base.createConfigurationContext(cfg)
+        return AppInterface(FakeBridgeHost(activityContext = scaled), mockk(relaxed = true), mockk(relaxed = true))
+    }
+
+    @Test
+    fun `the bridge reports the system font scale at the largest setting`() {
+        // 2.0 is the top of Android's Display > Font size slider. Poisoned by
+        // construction: 1.0 is the value a hardcoded stub would return, and it is
+        // exactly the value that means "the reader's setting was thrown away".
+        assertEquals(
+            2.0f, bridgeAtSystemFontScale(2.0f).getSystemFontScale(), 0.0f,
+            "the largest system text size must reach the app, not be flattened to 1"
+        )
+    }
+
+    @Test
+    fun `the bridge reports intermediate system font scales, not just a boolean large`() {
+        // Guards the lazy wrong fix — a threshold that returns 1 or 2 would pass the
+        // test above and still lose every step in between.
+        assertEquals(1.3f, bridgeAtSystemFontScale(1.3f).getSystemFontScale(), 0.0f)
+        assertEquals(0.85f, bridgeAtSystemFontScale(0.85f).getSystemFontScale(), 0.0f)
     }
 
     @Test

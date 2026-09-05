@@ -380,6 +380,24 @@ class AppInterface(
         vm.audioRecorder.cancel()
     }
 
+    /**
+     * The reader's Android Display > Font size, as a multiplier (1.0 = default,
+     * 2.0 = the largest step on the slider).
+     *
+     * a11y-ux-6, second half. MainActivity pins the WebView textZoom at 100 so the
+     * OS setting cannot multiply the page's computed px on top of the app's own
+     * --font-scale -- but a pin alone also THROWS THE SETTING AWAY, which is the
+     * accessibility regression it traded for. This reports the scale so JS can apply
+     * it once, through --font-scale, which app.css routes to text while the chrome
+     * stays px-pinned. Through textZoom the same number would drag the px chrome with
+     * it (measured: .top-nav 91.1 -> 101.1px across system 1.0x -> 1.5x).
+     *
+     * Raw, unclamped: use-settings.js already clamps --font-scale to [0.8, 3] for
+     * every source, and a second clamp here would be a second place to keep in step.
+     */
+    @JavascriptInterface
+    fun getSystemFontScale(): Float = host.activityContext.resources.configuration.fontScale
+
     @JavascriptInterface
     fun setZoomEnabled(enabled: Boolean) {
         host.postToUi {

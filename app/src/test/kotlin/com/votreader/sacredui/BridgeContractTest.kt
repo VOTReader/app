@@ -42,6 +42,9 @@ class BridgeContractTest {
         "setZoomEnabled" to 1,
         "resetZoom" to 0,
         "getZoomScale" to 0,
+        // a11y-ux-6: the reader's Display > Font size, applied once through
+        // --font-scale rather than stacked on it by the WebView.
+        "getSystemFontScale" to 0,
         "requestMicPermission" to 0,
         "startAudioSession" to 0,
         "endAudioSession" to 0,

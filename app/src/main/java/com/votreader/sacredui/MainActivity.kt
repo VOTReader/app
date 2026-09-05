@@ -635,6 +635,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // 91.1 -> 101.1px across system 1.0x -> 1.5x. Text Size is this app's text
         // scaling control and this makes it the only one, rather than one of two
         // that multiply. (Reproduced on emulator-5554 / WebView 113 before the fix.)
+        //
+        // The pin is HALF the fix, and on its own it is an accessibility regression:
+        // it also throws the reader's system setting away. The other half is
+        // AppInterface.getSystemFontScale(), which reports that setting so the app
+        // applies it ONCE through --font-scale, the variable app.css routes to text
+        // while chrome stays px-pinned. So the OS setting IS honoured; it enters
+        // through the knob that scales text only, instead of the one that scales
+        // everything including the chrome that is supposed to be fixed.
         s.textZoom = 100
         // Both OFF. file:// reads could expose any file on disk the app
         // process has rights to. allowContentAccess gates loading a
