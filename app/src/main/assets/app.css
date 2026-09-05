@@ -7095,7 +7095,9 @@
         padding: 16px 18px 14px;
         box-shadow: 0 10px 34px rgba(0,0,0,0.55);
         font-family: var(--font-body);
-        max-height: 70vh; overflow-y: auto;
+        /* Never taller than the screen: at a large text size the card is the only way out
+           (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
+        max-height: calc(100vh - 24px); overflow-y: auto;
       }
       .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
       .tour-eyebrow {

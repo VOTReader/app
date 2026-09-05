@@ -199,10 +199,34 @@ function _setStatus(next) {
   // the next 'playing' edge simply re-starts it. 'loading' is a mid-stream
   // stall ('waiting'); releasing there would let the OS kill the very
   // playback we're waiting on.
-  if (next === 'playing') _setAudioActive(true);
+  // While the tour is showing, the true edge is held back: setAudioActive(true) is also the
+  // moment Kotlin asks for POST_NOTIFICATIONS (API 33+), and on a fresh install the tour's own
+  // Listen press is the first playback — the system prompt landed on top of the tour card
+  // (emulator-5554, 2026-09-04). The app is in the foreground for the whole tour and the tour
+  // stops what it started, so the keep-alive buys nothing there; the reader's next Listen after
+  // the tour raises the ask as before. TourController is a bundle-b global; absent on a bare host.
+  if (next === 'playing') { if (!_tourShowing()) _setAudioActive(true); }
   else if (next === 'idle') _setAudioActive(false);
   _syncMediaSessionState(next);
   _notify();
+}
+
+/**
+ * Raise the held keep-alive edge if playback is running once the tour is over: the tour stops
+ * what it started, but a track the reader began during the tour by some other control would
+ * otherwise run on without the media card until the next 'playing' edge. TourController calls
+ * this from end(); idempotent (Kotlin's ask is one-shot per process, keep-alive is a no-op when on).
+ */
+function syncKeepAlive() {
+  if (_state.status === 'playing' && !_tourShowing()) _setAudioActive(true);
+}
+
+/** @returns {boolean} true while "Show me around" is on screen. */
+function _tourShowing() {
+  try {
+    const tc = typeof TourController !== 'undefined' ? /** @type {any} */ (TourController) : null;
+    return !!(tc && tc.getState && tc.getState().active);
+  } catch (_e) { return false; }
 }
 
 /** @returns {boolean} */
@@ -2241,4 +2265,5 @@ export const AudioPlayer = {
   clearUpcoming,
   stop,
   pauseIfPlaying,
+  syncKeepAlive,
 };

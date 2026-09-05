@@ -113,7 +113,11 @@ describe('TourController — moving', () => {
     TourController.attachNav(n);
     TourController.start('prompt');
     TourController.next(); TourController.next();     // → listen
-    TourController.targetPressed();                   // the reader pressed Listen
+    TourController.targetPressed();                   // the reader pressed Listen: the stop stays, marked pressed
+    expect(onClick).not.toHaveBeenCalled();
+    expect(TourController.getState().step.id).toBe('listen');
+    expect(TourController.getState().pressed).toBe(true);
+    TourController.next();                            // → bible, without a second click
     expect(onClick).not.toHaveBeenCalled();
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);
@@ -129,7 +133,10 @@ describe('TourController — moving', () => {
     TourController.attachNav(n);
     TourController.start('prompt');
     TourController.next(); TourController.next();     // → listen
-    TourController.next();                            // press Listen, → bible
+    TourController.next();                            // press Listen, stay
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(TourController.getState().step.id).toBe('listen');
+    TourController.next();                            // → bible
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);     // the bible stop's enter
@@ -139,7 +146,7 @@ describe('TourController — moving', () => {
     const n = nav();
     TourController.attachNav(n);
     TourController.start('prompt');
-    TourController.next(); TourController.next(); TourController.next();   // bible
+    TourController.next(); TourController.next(); TourController.next(); TourController.next();   // bible (listen takes two)
     TourController.back();
     expect(TourController.getState().step.id).toBe('listen');
     expect(n.openLetter).toHaveBeenCalledTimes(2);   // once on the way there, once coming back
@@ -155,7 +162,7 @@ describe('TourController — moving', () => {
   it('next() on the closing card finishes and records the flag', () => {
     TourController.attachNav(nav());
     TourController.start('prompt');
-    for (let i = 0; i < 6; i++) TourController.next();
+    for (let i = 0; i < 8; i++) TourController.next();   // the two Listen stops take two each
     expect(TourController.getState().step.id).toBe('done');
     TourController.next();
     expect(TourController.getState().active).toBe(false);
@@ -200,5 +207,85 @@ describe('TourController — shouldPrompt', () => {
     TourController.attachNav(nav());
     TourController.start('prompt');
     expect(TourController.shouldPrompt({ screen: 'home' })).toBe(false);
+  });
+});
+
+/* Device run (emulator-5554, 2026-09-04): the tour pressed Listen and moved on at once, so the
+   reader never saw the words light up, and the playback it started ran on into the Journal and
+   Settings, where the player bar hid the New Entry button under the ring. The rule now: a Listen
+   stop stays until the reader has heard it, and the tour ends what the tour started. */
+describe('TourController — a Listen stop stays, and the tour ends what it started', () => {
+  const pill = () => {
+    document.body.innerHTML = '<button class="hero-play-pill">Listen</button>';
+    const el = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
+    el.getBoundingClientRect = () => /** @type {any} */ ({ x: 133, y: 271, width: 94, height: 25, left: 133, right: 227, top: 271, bottom: 296 });
+    return el;
+  };
+  const toListen = () => { TourController.attachNav(nav()); TourController.start('prompt'); TourController.next(); TourController.next(); };
+  let audio;
+  beforeEach(() => { audio = { stop: vi.fn(), syncKeepAlive: vi.fn() }; /** @type {any} */ (globalThis).AudioPlayer = audio; });
+
+  it('ending the tour asks the player to raise the keep-alive edge it held back', () => {
+    TourController.attachNav(nav()); TourController.start('settings');
+    TourController.skip();
+    expect(audio.syncKeepAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('next() on a Listen stop presses the control and STAYS, marked pressed; the second next() moves on', () => {
+    const el = pill(); const clicks = vi.fn(); el.addEventListener('click', clicks);
+    toListen();
+    expect(TourController.getState().step.id).toBe('listen');
+    TourController.next();
+    expect(clicks).toHaveBeenCalledTimes(1);
+    expect(TourController.getState().step.id).toBe('listen');
+    expect(TourController.getState().pressed).toBe(true);
+    TourController.next();
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(TourController.getState().pressed).toBe(false);
+    expect(clicks).toHaveBeenCalledTimes(1);
+  });
+
+  it("the reader's own tap on the ringed Listen also stays, marked pressed", () => {
+    pill(); toListen();
+    TourController.targetPressed();
+    expect(TourController.getState().step.id).toBe('listen');
+    expect(TourController.getState().pressed).toBe(true);
+  });
+
+  it('leaving a pressed Listen stop stops the playback the tour started: next, back, skip', () => {
+    pill(); toListen();
+    TourController.next(); expect(audio.stop).not.toHaveBeenCalled();   // pressed: still playing, on purpose
+    TourController.next(); expect(audio.stop).toHaveBeenCalledTimes(1);  // → bible: stopped
+    TourController.back(); expect(audio.stop).toHaveBeenCalledTimes(1);  // nothing was started at bible
+    TourController.next(); TourController.back(); expect(audio.stop).toHaveBeenCalledTimes(2);
+    TourController.next(); TourController.next();                          // → listen, press again
+    TourController.skip(); expect(audio.stop).toHaveBeenCalledTimes(3);
+  });
+
+  it('playback the READER started before the tour is never stopped by it', () => {
+    // Settings › Help › Show me around while a letter plays: the tour pressed nothing, so it
+    // owns nothing. (If a press at a Listen stop then REPLACES the reader's track, that
+    // replacement is the press itself, and leaving the stop stops the tour's track; the reader's
+    // was already gone, so there is nothing left to protect.) Only a press at a Listen stop (the tour's or the reader's tap on the ringed
+    // control) makes the playback the tour's to end.
+    pill();
+    TourController.attachNav(nav()); TourController.start('settings');
+    TourController.next();                 // letters
+    TourController.back(); TourController.next();
+    TourController.skip();
+    expect(audio.stop).not.toHaveBeenCalled();
+    TourController.start('settings'); TourController.next(); TourController.next();   // listen, not pressed
+    TourController.next();                 // pressed: the tour now owns it
+    TourController.skip();
+    expect(audio.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stop the tour did not press is left alone', () => {
+    pill(); toListen();
+    TourController.next(); TourController.next();   // → bible, stopped once
+    TourController.next(); TourController.next();   // press John 3, → journal: stopped twice
+    expect(audio.stop).toHaveBeenCalledTimes(2);
+    TourController.next(); TourController.next(); TourController.next();  // backup, done, end
+    expect(audio.stop).toHaveBeenCalledTimes(2);
   });
 });
