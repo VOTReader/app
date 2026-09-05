@@ -1254,7 +1254,7 @@ describe('export escape — the save picker that never settles', () => {
 
   afterEach(() => { _resetToasts(); });
 
-  it('offers "Save the usual way" as a real, tappable control', async () => {
+  it('offers "Save the file the usual way" as a real, tappable control', async () => {
     let took = false;
     const build = vi.fn(async () => okManifest());
     const openExportSink = vi.fn((name, opts) => new Promise((res) => {
@@ -1288,7 +1288,7 @@ describe('export escape — the save picker that never settles', () => {
 
     const btn = el.querySelector('.vot-escape-btn');
     expect(btn).toBeTruthy();
-    expect(btn.textContent).toBe('Save the usual way');
+    expect(btn.textContent).toBe('Save the file the usual way');
     // It does not tell the reader the dialog failed to open: from here nobody
     // knows whether it opened and the reader is still reading it.
     expect(el.textContent).toContain('Still waiting for the save dialog');

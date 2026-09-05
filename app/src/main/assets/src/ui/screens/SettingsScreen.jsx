@@ -987,13 +987,26 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // bridge offers an escape once the picker has gone unanswered for
       // PICKER_SLOW_MS; this puts that offer on screen.
       //
+      // "NOTHING ON SCREEN" IS LITERAL, AND IT IS WHY THIS TOAST IS NOT
+      // DECORATION. Measured on a real Chromium during a stuck export: the
+      // "Preparing export…" toast is at `opacity: 0` — hideToast() fires on
+      // the line above and leaves the faded node in the DOM — so the reader
+      // has no status, no spinner, no error and no progress. THIS TOAST IS
+      // THE ENTIRE UI OF THAT STATE. Do not later "simplify" the offer into a
+      // spinner or a status line: there is no other pixel to fall back on,
+      // and a spinner would replace the only thing the reader can act on with
+      // something they can only watch.
+      //
       // The wording is deliberately NOT error recovery. WebKit has never
       // shipped the File System Access API, so a download IS how every iOS
       // reader saves their backup, every time — "the usual way" is the plain
       // truth for a large part of the flock, and framing it as a failure would
-      // make the ordinary path read as a broken one. It also does not claim the
-      // dialog failed to open: from here we cannot know whether it opened and
-      // the reader is still reading it, so it says only what is true either way.
+      // make the ordinary path read as a broken one. It says "the file"
+      // because the reader is being offered a thing they recognise, not a
+      // mechanism (owner's wording; never "fallback"). It also does not claim
+      // the dialog failed to open: from here nobody can know whether it opened
+      // and the reader is still reading it, so it says only what is true in
+      // both cases.
       const sink = await PlatformBridge.openExportSink(filename, {
         onSlow: (saveTheUsualWay) => {
           showToast({
@@ -1001,7 +1014,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             className: 'vot-toast vot-toast-action',
             // SEC-2: TRUSTED STATIC markup, no interpolation — the same shape
             // as the tab-close undo toast (hooks/use-tab-actions.js).
-            html: 'Still waiting for the save dialog. <button type="button" class="vot-escape-btn">Save the usual way</button>',
+            html: 'Still waiting for the save dialog. <button type="button" class="vot-escape-btn">Save the file the usual way</button>',
             durationMs: 0,
           });
           const el = typeof document !== 'undefined' ? document.getElementById(_ESCAPE_TOAST_ID) : null;
