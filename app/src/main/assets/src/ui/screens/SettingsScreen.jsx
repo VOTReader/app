@@ -615,8 +615,30 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     const running = (typeof getBuildVersion === 'function') ? await getBuildVersion() : null;
     if (!running) {
       // No service worker to ask: the Android WebView (assets ship inside the APK)
-      // or a first visit before the SW has taken control.
-      setBuildInfo({ state: 'no-sw', running: null, server: null });
+      // or a first visit before the SW has taken control. Those two are different
+      // questions and only one of them has an answer.
+      //
+      // ANDROID: the APK ships its own assets/service-worker.js (measured in the
+      // installed launch build: assets/service-worker.js, CACHE_VERSION
+      // v1.0.2-60a64a8486, CORPUS_VERSION c45), and MainActivity maps /assets/ to
+      // AssetsPathHandler with the page loaded from
+      // https://appassets.androidplatform.net/assets/index.html — so the relative
+      // './service-worker.js' that fetchServerBuildVersion already fetches resolves
+      // HERE to the installed build's own copy. Same function, same regex, no native
+      // code and no new bridge verb. Only the MEANING of the answer changes with the
+      // platform: on the web that file is what the SERVER has; on Android it is what
+      // the reader INSTALLED, which is why it lands in `running` and not in `server`.
+      //
+      // WEB: deliberately NOT given the same fallback. Off Android an uncontrolled
+      // page is a first visit, and the deployed service-worker.js would describe what
+      // the server publishes, not what this page is running — a version the reader
+      // could not act on and has no reason to trust.
+      const installed = (PlatformBridge.isAndroid && typeof fetchServerBuildVersion === 'function')
+        ? await fetchServerBuildVersion()
+        : null;
+      setBuildInfo(installed
+        ? { state: 'installed', running: installed, server: null }
+        : { state: 'no-sw', running: null, server: null });
       return;
     }
     const server = (typeof fetchServerBuildVersion === 'function') ? await fetchServerBuildVersion() : null;
@@ -625,13 +647,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   React.useEffect(() => { refreshBuildInfo(); }, [refreshBuildInfo]);
 
   const versionDisplayText = (() => {
+    const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));
     if (buildInfo.state === 'loading') return 'Checking…';
+    if (buildInfo.state === 'installed') {
+      // Android, and we read the version out of the APK's own service-worker.js.
+      // There is nothing to compare it against — an APK cannot update itself over
+      // the web — so this states the build and stops, rather than inventing a
+      // verdict about currency it has no evidence for.
+      return fmt(buildInfo.running.cacheVersion)
+        + ' · corpus ' + (buildInfo.running.corpusVersion || '?')
+        + ' — the version installed on this device. New versions arrive by installing an update, not over the web.';
+    }
     if (buildInfo.state === 'no-sw') {
+      // Android reaches here only when the APK's own service-worker.js could not be
+      // read, so the honest answer is still that there is no version to show.
       return PlatformBridge.isAndroid
         ? 'Installed app build — updates arrive by installing a new APK, not over the web.'
         : 'Not yet managed by the offline service worker on this device.';
     }
-    const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));
     const runningText = fmt(buildInfo.running.cacheVersion)
       + ' · corpus ' + (buildInfo.running.corpusVersion || '?');
     if (!buildInfo.server) return runningText + ' — could not reach the server to compare.';

@@ -34,11 +34,14 @@
        media-src blob: is required for journal voice-memo playback — recordings
        are captured locally and played from a Blob object URL; without it every
        <audio> src is rejected (no network media is unlocked — blob: only).
-       connect-src is 'self' (SE2): the only document-context fetch is the
-       Android voice-memo bridge (#1) — SAME-ORIGIN to
-       appassets.androidplatform.net/recordings/, allowed by 'self' — so no
-       REMOTE host needs to be reachable from the page; the SW's own corpus
-       fetch is same-origin + not page-CSP-governed.
+       connect-src is 'self' (SE2): every document-context fetch is SAME-ORIGIN,
+       so no REMOTE host needs to be reachable from the page. Two of them today —
+       the Android voice-memo bridge (#1), to
+       appassets.androidplatform.net/recordings/, and build-version.js's read-only
+       probe of './service-worker.js', which on the web reads what the SERVER
+       publishes and on Android resolves through WebViewAssetLoader to the
+       INSTALLED APK's own copy (the App version row). Both are covered by 'self';
+       the SW's own corpus fetch is same-origin + not page-CSP-governed.
        img-src KEEPS the GitHub hosts: the web Garden renders release-asset
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
