@@ -161,3 +161,61 @@ describe('F27 — the immersive-mode unmount effect unlocks screen orientation',
     expect(() => unmount()).not.toThrow();
   });
 });
+
+describe('My Web — the empty-web notice is dismissible (M2)', () => {
+  // Corbin: the notice has no way to close it, so a reader who has read it
+  // and is not ready to make a link is told the same thing on every visit,
+  // forever. The dismissal rides `settings` (vot-state, already exported,
+  // counted and shape-checked by the backup) rather than a sixth flag store:
+  // no DB_VERSION bump, no seven-legged registration, and it comes back on a
+  // fresh profile because a fresh profile has no key.
+  //
+  // 44 CSS px and the glyph's contrast are design-perf's instruments (spec
+  // targets M2's E row); jsdom has no layout, so what is pinned HERE is the
+  // control's existence, its label, the persistence, Escape, and where focus
+  // lands.
+  const openMyWeb = async (props) => {
+    window.SCRIPTURE_WEB_DATA = { count: 1, ok: true };
+    const r = render(<ScriptureWebScreen {...baseProps()} {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'My web' }));
+    return r;
+  };
+
+  it('offers a Dismiss control on the notice', async () => {
+    await openMyWeb();
+    expect(screen.getByText('Your web is still being woven.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy();
+  });
+
+  it('hides the notice and records the dismissal so it survives a cold boot', async () => {
+    const updateSetting = vi.fn();
+    await openMyWeb({ updateSetting });
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
+  });
+
+  it('does not pitch the notice again once the dismissal is stored', async () => {
+    await openMyWeb({ settings: { swEmptyDismissed: true } });
+    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+  });
+
+  it('closes on Escape while focus is inside the notice', async () => {
+    const updateSetting = vi.fn();
+    await openMyWeb({ updateSetting });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
+    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
+  });
+
+  it('returns focus to the My web segment button, not to the body', async () => {
+    // The notice is the only thing that was focused; without this the next
+    // Tab starts from the top of the document and a keyboard reader is
+    // dropped out of the control they were using.
+    await openMyWeb();
+    const close = screen.getByRole('button', { name: 'Dismiss' });
+    close.focus();
+    fireEvent.click(close);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My web' }));
+  });
+});
