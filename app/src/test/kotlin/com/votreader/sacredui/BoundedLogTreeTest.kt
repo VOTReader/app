@@ -2,6 +2,7 @@ package com.votreader.sacredui
 
 import android.util.Log
 import org.junit.jupiter.api.Test
+import timber.log.Timber
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -364,4 +365,126 @@ class BoundedLogTreeTest {
             assertEquals(Log.WARN, e.level)
         }
     }
+
+    // ─── per-entry byte cap ─────────────────────────────────────────────
+    //
+    // The buffer bounds entry COUNT and never touched the message — but Timber's
+    // prepareLog appends getStackTraceString(t) to the message BEFORE log() ever
+    // sees it. Measured in this JVM: 90 bytes for a plain WARN, 5,489 with one
+    // throwable, 5,853 with three chained causes, ~1.05 MB for 200 of them —
+    // inside the diagnostic export the reader shares from Settings. A logger that
+    // destroys the log is worse than no logger: one 5 KB entry evicts 5 KB of
+    // other evidence from a ring that counts entries.
+    //
+    // These go through Timber rather than calling log() with a hand-composed
+    // message, because the composition IS the defect: a test against a message
+    // shape I invented would pass against a tree that never sees the real one.
+
+    private fun captureWarn(t: Throwable?, message: String): BoundedLogTree {
+        Timber.uprootAll()
+        val tree = BoundedLogTree()
+        Timber.plant(tree)
+        if (t == null) Timber.w(message) else Timber.w(t, message)
+        Timber.uprootAll()
+        return tree
+    }
+
+    private fun chained(depth: Int): Throwable {
+        var t: Throwable = IllegalStateException("root cause text")
+        for (i in 0 until depth) t = RuntimeException("wrapper $i text", t)
+        return t
+    }
+
+    private fun storedBytes(tree: BoundedLogTree) =
+        tree.getEntries().single().message.toByteArray(Charsets.UTF_8).size
+
+    @Test
+    fun `a WARN carrying a throwable is stored under the 512-byte entry cap`() {
+        val tree = captureWarn(
+            java.io.IOException("ENOSPC: no space left on device"),
+            "audio keep-alive startForeground failed",
+        )
+        val size = storedBytes(tree)
+        assertTrue(size <= 512, "entry was $size bytes")
+    }
+
+    // 512 is written as a literal here, NOT read from the constant it checks.
+    // Asserting against BoundedLogTree's own constant would pass whatever that
+    // constant became, which is not a cap, it is a mirror.
+
+    @Test
+    fun `a plain message over the cap is capped too`() {
+        val tree = captureWarn(null, "x".repeat(4000))
+        val size = storedBytes(tree)
+        assertTrue(size <= 512, "entry was $size bytes")
+    }
+
+    @Test
+    fun `200 throwable entries keep the whole export under 128 KB`() {
+        Timber.uprootAll()
+        val tree = BoundedLogTree()
+        Timber.plant(tree)
+        repeat(200) { Timber.w(java.io.IOException("ENOSPC: no space left on device"), "v3 export write failed") }
+        Timber.uprootAll()
+        val bytes = tree.toJson().toByteArray(Charsets.UTF_8).size
+        assertTrue(bytes < 131_072, "export was $bytes bytes")
+    }
+
+    @Test
+    fun `only the first three frames are kept and the rest are counted`() {
+        val tree = captureWarn(java.io.IOException("boom"), "v3 export write failed")
+        val stored = tree.getEntries().single().message
+        assertEquals(3, stored.split("\n\tat ").size - 1, "frame lines in: $stored")
+        assertTrue(Regex("""\+\d+ frames""").containsMatchIn(stored), "no dropped-frame marker in: $stored")
+    }
+
+    // ── the three controls ─────────────────────────────────────────
+    // All three pass BEFORE the cap exists and after it. Without them,
+    // "everything is under 512 bytes" is satisfied by a tree that stores nothing
+    // useful. They do NOT all catch the same wrong fix, and saying which catches
+    // what is the difference between a control and a decoration:
+    //
+    //   stored whole      catches a budget so tight it truncates ordinary lines,
+    //                     or a cap applied where it should not be. It PASSES
+    //                     against message.take(512) -- that is not its job.
+    //   cause chain       catches message.take(512), the obvious wrong fix: the
+    //                     first 512 characters of a Timber message are the head,
+    //                     the toString and some frames, so every "Caused by:"
+    //                     falls off the end and the root cause is lost.
+    //   surrogate pair    catches ANY char-based truncation, take(512) included.
+    //                     The leading "A" below is load-bearing: without it the
+    //                     cut lands on an even index, every pair survives by
+    //                     luck, and the control passes against the very fix it
+    //                     exists to fail.
+
+    @Test
+    fun `control - a plain message under the cap is stored whole, not truncated`() {
+        val msg = "audio keep-alive startForeground failed — WebView keep-alive still active"
+        val tree = captureWarn(null, msg)
+        assertEquals(msg, tree.getEntries().single().message)
+    }
+
+    @Test
+    fun `control - the whole cause chain's messages survive the cap`() {
+        val tree = captureWarn(chained(3), "v3 export write failed")
+        val stored = tree.getEntries().single().message
+        assertTrue(stored.contains("root cause text"), "root cause lost from: $stored")
+        for (i in 0 until 3) {
+            assertTrue(stored.contains("wrapper $i text"), "wrapper $i lost from: $stored")
+        }
+    }
+
+    @Test
+    fun `control - the cap never splits a surrogate pair`() {
+        // A blind message.take(512) cuts on a UTF-16 unit and can leave a lone
+        // high surrogate. toJson() emits code points above the control range
+        // verbatim, so that lone surrogate reaches the reader's export as
+        // invalid UTF-8 and can break JSON.parse on the JS side.
+        // "A" first, so a char-based cut lands mid-pair instead of between pairs.
+        val tree = captureWarn(null, "A" + "\uD83D\uDD25".repeat(400))
+        val stored = tree.getEntries().single().message
+        assertTrue(stored.isNotEmpty(), "nothing stored at all")
+        assertTrue(!stored.last().isHighSurrogate(), "stored value ends on a lone high surrogate")
+    }
+
 }

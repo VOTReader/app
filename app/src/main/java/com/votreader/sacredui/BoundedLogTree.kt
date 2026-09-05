@@ -23,6 +23,19 @@ import timber.log.Timber
  *     logged outside the app process. Matches the project's "no
  *     credentials, no security risks, local data only" policy
  *     (CLAUDE.md User policies).
+ *   - Size filter: [MAX_ENTRY_BYTES] per entry, so the buffer is
+ *     bounded in BYTES as well as in entries. It was not, and the
+ *     reason is not obvious from this file: Timber's Tree.prepareLog
+ *     appends getStackTraceString(t) to the message BEFORE log() is
+ *     called, so every Timber.w(e, "...") arrived here carrying a
+ *     whole stack trace. Measured 2026-09-05 in the unit-test JVM:
+ *     90 bytes for a plain WARN, 5,489 with one throwable, 5,853 with
+ *     three chained causes, ~1.05 MB for 200 of them -- inside the
+ *     diagnostic export the reader shares from Settings. Two harms,
+ *     not one: a megabyte of stack frames in a shareable file, and a
+ *     ring that bounds COUNT silently evicting 5 KB of other evidence
+ *     per noisy entry. Same reason NativeAudioRecorder truncates a
+ *     refused name to LOGGED_NAME_CHARS.
  *
  * Sanitization: before storage, both regexes below redact content://
  * URIs and absolute paths from common Android roots. This keeps the
@@ -70,7 +83,16 @@ class BoundedLogTree(
         // Timber.tag(someUri) would otherwise leak straight past the message
         // redaction. Sanitizing the tag too keeps the guarantee total, not
         // message-only, at the cost of one no-op String pass per WARN+ line.
-        val entry = LogEntry(clock(), priority, tag?.let { sanitize(it) }, sanitize(message))
+        // compact() FIRST (rebuild the throwable half from t instead of storing
+        // the multi-kilobyte trace Timber already glued onto the message),
+        // sanitize() on the small result, capBytes() LAST so the stored value is
+        // guaranteed to be under the cap whatever sanitize did to its length.
+        val entry = LogEntry(
+            clock(),
+            priority,
+            tag?.let { sanitize(it) },
+            capBytes(sanitize(compact(message, t))),
+        )
         synchronized(lock) {
             if (buffer.size >= capacity) buffer.removeFirst()
             buffer.addLast(entry)
@@ -117,6 +139,109 @@ class BoundedLogTree(
 
     companion object {
         const val DEFAULT_CAPACITY = 200
+
+        /** Hard ceiling on the bytes ONE entry may occupy after sanitizing. */
+        const val MAX_ENTRY_BYTES = 512
+
+        /** Stack frames kept from the outermost throwable; the rest are counted. */
+        const val TRACE_FRAMES = 3
+
+        /** Cause-chain walk limit -- a self-referential cause chain is legal Java. */
+        private const val MAX_CAUSES = 5
+
+        /** U+2026, three bytes in UTF-8; reserved out of the budget when we truncate. */
+        private const val ELLIPSIS = "\u2026"
+
+        /**
+         * Rebuild the throwable half of a Timber message compactly.
+         *
+         * Timber composes `message + "\n" + getStackTraceString(t)` before
+         * calling log(), so by the time we see it the trace is already glued on.
+         * We still have [t], so the whole appended trace is dropped and replaced
+         * with: the caller's own message, the throwable's toString, EVERY cause's
+         * toString, then [TRACE_FRAMES] frames and a "+N frames" marker.
+         *
+         * CAUSES BEFORE FRAMES, deliberately and against stack-trace convention.
+         * [capBytes] truncates the tail, so whatever sits last is what gets lost
+         * first -- and a root cause's message is worth more in a diagnostic than
+         * a third frame. Frames are the context; causes are the finding.
+         *
+         * The boundary between the caller's message and Timber's appended trace
+         * is the LAST occurrence of "\n" + t.toString(), which is exactly what
+         * printStackTrace writes as its first line. `lastIndexOf` rather than
+         * `indexOf` so a caller message that happens to quote the same text
+         * cannot cut early; a "Caused by: " line cannot match because of its
+         * prefix. If the marker is absent (a Timber version that composes
+         * differently) the message is used whole and [capBytes] still bounds it.
+         */
+        internal fun compact(message: String, t: Throwable?): String {
+            if (t == null) return message
+            val marker = "\n" + t.toString()
+            val cut = message.lastIndexOf(marker)
+            val head = if (cut >= 0) message.substring(0, cut) else message
+
+            val sb = StringBuilder(MAX_ENTRY_BYTES)
+            if (head.isNotEmpty()) sb.append(head).append('\n')
+            sb.append(t.toString())
+
+            var cause = t.cause
+            var seen = 0
+            while (cause != null && cause !== t && seen < MAX_CAUSES) {
+                sb.append("\nCaused by: ").append(cause.toString())
+                val next = cause.cause
+                cause = if (next === cause) null else next
+                seen++
+            }
+
+            val frames = t.stackTrace
+            for (i in 0 until minOf(TRACE_FRAMES, frames.size)) {
+                sb.append("\n\tat ").append(frames[i].toString())
+            }
+            val dropped = frames.size - TRACE_FRAMES
+            if (dropped > 0) sb.append("\n\t+").append(dropped).append(" frames")
+            return sb.toString()
+        }
+
+        /**
+         * Truncate [s] to [MAX_ENTRY_BYTES] of UTF-8, appending [ELLIPSIS] when
+         * anything was dropped.
+         *
+         * Walks code POINTS, not chars: `String.take` cuts on a UTF-16 unit and
+         * can leave a lone high surrogate, which [jsonString] then emits verbatim
+         * (it only escapes the sub-0x20 control set) -- so an invalid-UTF-8 byte
+         * would reach the reader's export and can break JSON.parse on the JS
+         * side. A half-truncated log line is a nuisance; an unparseable export is
+         * a lost diagnostic.
+         */
+        internal fun capBytes(s: String): String {
+            var total = 0
+            var i = 0
+            while (i < s.length) {
+                total += utf8Width(s.codePointAt(i))
+                i += Character.charCount(s.codePointAt(i))
+            }
+            if (total <= MAX_ENTRY_BYTES) return s
+
+            val budget = MAX_ENTRY_BYTES - 3 // ELLIPSIS is 3 bytes in UTF-8
+            var used = 0
+            var end = 0
+            while (end < s.length) {
+                val cp = s.codePointAt(end)
+                val w = utf8Width(cp)
+                if (used + w > budget) break
+                used += w
+                end += Character.charCount(cp)
+            }
+            return s.substring(0, end) + ELLIPSIS
+        }
+
+        /** UTF-8 byte width of one code point. */
+        private fun utf8Width(cp: Int): Int = when {
+            cp < 0x80 -> 1
+            cp < 0x800 -> 2
+            cp < 0x10000 -> 3
+            else -> 4
+        }
 
         // Match content:// and file:// URIs all the way to next whitespace.
         // Both expose either a content-provider identity or a real path,
