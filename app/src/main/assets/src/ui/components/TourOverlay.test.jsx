@@ -167,6 +167,18 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     expect(top + 220).toBeLessThanOrEqual(vh());
   });
 
+  it('a card taller than the room beside the ring is capped to that room, so the ring stays visible', () => {
+    // 1.8 on a 699 px phone: the Listen card was 603 px tall and lay over the ringed control.
+    document.body.innerHTML = '<div id="app"><button class="hero-play-pill">Listen</button></div>';
+    const pill = document.querySelector('.hero-play-pill');
+    pill.getBoundingClientRect = rect(60, Math.round(vh() * 0.4), 185, 59);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    const ringH = 59 + 16;                                            // the pill plus the ring's 8 px pad
+    expect(parseFloat(card.style.maxHeight)).toBe(vh() - ringH - 2 * 18 - 2 * 12);
+  });
+
   it('keeps the target on screen against a second writer of the scroll position (scroll memory)', async () => {
     // Two writers, one scroll position: the overlay scrolls the target into view, then the new
     // screen's scroll memory sets scrollTop = 0 a few frames later and the target is below the

@@ -7112,7 +7112,11 @@
       .tour-text, .tour-prompt-text { font-size: var(--fs-18); line-height: 1.4; margin: 0 0 14px; }
       .tour-prompt-text { font-size: var(--fs-16); margin-bottom: 12px; }
       .tour-tip { font-size: var(--fs-16); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
-      .tour-row { display: flex; gap: 8px; align-items: center; }
+      .tour-row { display: flex; gap: 8px; align-items: center;
+        /* Stuck to the card's bottom edge while its text scrolls (a tall card at a large text
+           size is capped to the room beside the ring): Skip, Back and Next never scroll away. */
+        position: sticky; bottom: -14px; margin-bottom: -14px; padding: 10px 0 14px;
+        background: var(--bg3); }
       .tour-sp { flex: 1; }
       .tour-btn {
         font-family: var(--font-cinzel); font-size: var(--fs-14); letter-spacing: 0.08em; text-transform: uppercase;
