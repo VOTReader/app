@@ -23,6 +23,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
+import { onIdle } from '../../utils/on-idle.js';
 
 /**
  * Compact count for the hero cells: exact with separators below 10k
@@ -183,13 +184,18 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
       for (const g of groups) { out[g.id] = groupWordStats(readItems, g); }
       if (!cancelled) setWordStats(out);
     };
-    const tok = (typeof requestIdleCallback === 'function')
-      ? requestIdleCallback(compute, { timeout: 3000 })
-      : setTimeout(compute, 50);
+    // onIdle, not a bare requestIdleCallback: WebKit has never shipped that
+    // API, so every iOS reader takes the timer path.
+    //
+    // It also removes a coincidence this cleanup was resting on. Both
+    // requestIdleCallback and setTimeout return a NUMBER in a browser, so the
+    // `typeof tok === 'number'` test that used to sit here could not tell the
+    // two apart; it was correct only because the two idle APIs have always
+    // shipped together. onIdle closes over which branch it took.
+    const stop = onIdle(compute, { timeout: 3000, fallbackDelay: 50 });
     return () => {
       cancelled = true;
-      if (typeof cancelIdleCallback === 'function' && typeof tok === 'number') cancelIdleCallback(tok);
-      else clearTimeout(/** @type {any} */ (tok));
+      stop();
     };
     // readItems identity changes on every mark; groupShape changes when a
     // lazy corpus adds sources or items. `groups` itself is rebuilt every
