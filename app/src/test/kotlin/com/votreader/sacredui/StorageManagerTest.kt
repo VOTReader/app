@@ -668,6 +668,69 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `a container cut inside a frame length header reports truncated, not a generic read failure`() {
+        // backup-android-1: the JS frame walk salvages a cut container, but only for
+        // the reasons it can tell apart from a broken bridge session — reporting
+        // "3 of 42 media files still readable" because the app lost its own stream
+        // would be a claim about the backup that nothing checked. An EOF inside the
+        // 8-byte frame header arrived as Failure("read_failed"), because
+        // EOFException carries no message, which is exactly what an IO fault looks
+        // like. So a file cut here failed the whole read and the reader was told a
+        // 99%-restorable backup was corrupt.
+        val cut = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            val manifest = "{\"media\":[{\"id\":\"m1\",\"size\":4},{\"id\":\"m2\",\"size\":4}]}"
+                .toByteArray(Charsets.UTF_8)
+            write(beLong(manifest.size.toLong())); write(manifest)
+            write(beLong(4L)); write(byteArrayOf(1, 2, 3, 4))   // frame 1, whole
+            write(byteArrayOf(0, 0, 0))                         // frame 2 length, cut short
+        }.toByteArray()
+        val uri = Uri.parse("content://test/v3-cut-header")
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(cut)
+
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val n1 = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Success<Long>>(n1)
+        assertEquals(4L, n1.value)
+        assertTrue(
+            readWholeFrame().contentEquals(byteArrayOf(1, 2, 3, 4)),
+            "the frame before the cut must still read back exactly, or there is nothing to salvage"
+        )
+
+        val n2 = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Failure>(n2)
+        assertEquals("truncated", n2.reason)
+    }
+
+    @Test
+    fun `an IO failure in a frame header is NOT reported as truncation`() {
+        // The control for the test above, and the reason the catch names
+        // EOFException instead of Exception: 'truncated' is a statement about the
+        // FILE and licenses the JS side to salvage. A disk or SAF fault is a
+        // statement about this read. Mapping both to one reason would turn every
+        // transient failure into "some of your media is gone".
+        val prefix = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            val manifest = "{\"media\":[{\"id\":\"m1\",\"size\":4}]}".toByteArray(Charsets.UTF_8)
+            write(beLong(manifest.size.toLong())); write(manifest)
+        }.toByteArray()
+        val backing = ByteArrayInputStream(prefix)
+        val exploding = object : InputStream() {
+            override fun read(): Int =
+                if (backing.available() > 0) backing.read() else throw IOException("disk on fire")
+            override fun read(b: ByteArray, off: Int, len: Int): Int =
+                if (backing.available() > 0) backing.read(b, off, len) else throw IOException("disk on fire")
+        }
+        val uri = Uri.parse("content://test/v3-io-fault")
+        every { cr.openInputStream(uri) } returns exploding
+
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val n = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Failure>(n)
+        assertEquals("disk on fire", n.reason)
+    }
+
+    @Test
     fun `beginV3Import rejects an over-cap manifest length before allocating`() {
         // A corrupt/garbage header declaring a manifest larger than the cap must
         // be refused at the length check — NOT allocated and then OOM-crashed.
