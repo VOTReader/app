@@ -223,9 +223,20 @@ jobs:
         # _self_mem returns 0.0 off Windows, so the EMPIRICAL half skips here;
         # what CI holds is the shape of the struct and of the reader, which is
         # exactly what the revert would break.
+        # test_batch_align_bible_ship.py rides the same unittest call
+        # (2026-09-05): batch-align-bible.py writes each belt row at
+        # arr[n - 1] where n is the EDITION's verse number, which is SPARSE in
+        # some editions, and ReadAlongHighlight reads position i back as verse
+        # NUMBER i + 1. Two readers concluded the array was dense and wanted it
+        # re-indexed by position; that would move every verse after a gap by one
+        # for the rest of the chapter (WEB acts 8 has no :37, so verse 38 would
+        # land at index 36) with every other gate green. The shipped brm-kjv
+        # file cannot catch it -- KJV is dense in all 1,161 chapters, so both
+        # shippers emit identical bytes -- so the test carries a real gapped
+        # chapter of its own.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_align_commit -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)
