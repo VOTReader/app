@@ -61,6 +61,21 @@ android {
 
     buildTypes {
         release {
+            // LOCAL DEVICE PROOF ONLY, NOT DISTRIBUTION. The release build is signed
+            // with the DEBUG key so the R8-minified APK can be installed over an
+            // existing debug install with `adb install -r`, keeping the reader's
+            // journal, notes, highlights and voice memos. Android refuses to update
+            // an app whose signer changed, and the only way through that refusal is
+            // an uninstall, which deletes all of it. Signing with the debug key is
+            // what makes the launch walk exercise R8 and the proguard keep rules on
+            // the owner's own phone without a data-loss ceremony first.
+            //
+            // A build for anyone ELSE needs a real keystore, held outside this repo,
+            // and the first install of it is necessarily an uninstall — see
+            // native-release-signing-note.md. Until that exists this APK must not
+            // leave the machine that built it: every debug keystore is per-machine
+            // and its password is public.
+            signingConfig = signingConfigs.getByName("debug")
             // N2.1b: R8 code shrink + obfuscate + optimize. ACTIVATES the dormant
             // keep rules in proguard-rules.pro (AppInterface @JavascriptInterface
             // bridge, JsEvent sealed hierarchy, BoundedLogTree.LogEntry — N6).
