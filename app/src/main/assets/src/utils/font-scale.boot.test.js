@@ -45,6 +45,7 @@ describe('F8: the inline boot writer is the module, copied', () => {
     // non-1 → reader, clamps at both ends, and the non-numeric fallbacks.
     const cases = [
       { fontScale: '1.3', fontScaleSource: 'reader', systemFontScale: '2' },
+      { fontScale: '1', fontScaleSource: 'reader', systemFontScale: '2' },   // R7: an explicit 100% BEATS a larger phone
       { fontScale: '1.3', fontScaleSource: 'system', systemFontScale: '2' },
       { fontScale: '1', systemFontScale: '2' },              // legacy, ambiguous → system
       { fontScale: '1.5', systemFontScale: '2' },            // legacy, unambiguous → reader

@@ -2,7 +2,7 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { normalizeFontScaleSource, resolveFontScale } from '../../utils/font-scale.js';
+import { normalizeFontScaleSource, resolveFontScale, clampFontScale } from '../../utils/font-scale.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -12,12 +12,10 @@ import { normalizeFontScaleSource, resolveFontScale } from '../../utils/font-sca
    visible right in Settings. Icons + navigation chrome are px-pinned in
    app.css and never scale. */
 /* Cap raised 1.6 → 3.0 (2026-08-02, owner: 160% was far too little on PC —
-   he resorted to browser ctrl-zoom). Keep in sync with the SEC-3 clamp in
-   use-settings.js and the boot-script clamp in index.html. */
-function clampFontScale(v) {
-  const f = parseFloat(String(v));
-  return Number.isFinite(f) ? Math.min(3, Math.max(0.8, f)) : 1;
-}
+   he resorted to browser ctrl-zoom). The clamp itself is imported from
+   utils/font-scale.js — this file used to carry its own copy under a "keep in
+   sync" comment, which is the shape that has bitten this codebase repeatedly:
+   two definitions that must agree, with nothing enforcing it. */
 
 // Set immediately before an import applies; removed only when the apply
 // completes (or provably never started). A crash mid-restore leaves it behind,
@@ -1689,7 +1687,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 label="Use my phone's text size"
                 desc="Follow the text size set in your phone's display settings. Moving the slider above turns this off."
                 checked={fontScaleSource === "system"}
-                onToggle={() => onSetting("fontScaleSource", fontScaleSource === "system" ? "reader" : "system")}
+                onToggle={() => {
+                  // R4: turning the switch OFF hands control to the slider, so
+                  // pin the slider to the size on screen first — otherwise the
+                  // page snaps from the phone's 2.0 to a stored "1" in one
+                  // frame, which reads as the app breaking rather than as the
+                  // reader taking over.
+                  if (fontScaleSource === "system") onSetting("fontScale", String(effectiveFontScale));
+                  onSetting("fontScaleSource", fontScaleSource === "system" ? "reader" : "system");
+                }}
               />
             )}
             {/* Reading Font (2026-07-31) — replaces the two-state "Modern

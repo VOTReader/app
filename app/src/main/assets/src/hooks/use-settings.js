@@ -49,7 +49,7 @@
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
-import { normalizeFontScaleSource, resolveFontScale } from '../utils/font-scale.js';
+import { normalizeFontScaleSource, resolveFontScale, HYDRATION_FONT_SCALE_SOURCE } from '../utils/font-scale.js';
 
 /**
  * Settings object shape. Fields with stable defaults documented inline at
@@ -241,11 +241,17 @@ export function useSettings({ savedSettings, theme }) {
     // nothing is cached, and a 'system' source renders at 1, which is exactly
     // today's behaviour. The web build has no bridge and is unaffected by
     // design.
-    const _src = normalizeFontScaleSource(settings, 'system');
+    const _src = normalizeFontScaleSource(settings, HYDRATION_FONT_SCALE_SOURCE);
+    // R2: ANDROID ONLY. The web PlatformBridge answers 1 by design, and
+    // caching that would (a) write systemFontScale:"1" into every web reader's
+    // state and (b) light up the "Use my phone's text size" row on a platform
+    // with no phone text size to follow — a switch that does nothing. Absence
+    // of the cached value IS the availability signal the Settings row reads,
+    // so it has to stay absent where the feature does not apply.
     let _sysNow;
     try {
       const _b = /** @type {any} */ (PlatformBridge);
-      if (typeof _b.getSystemFontScale === 'function') _sysNow = _b.getSystemFontScale();
+      if (_b.isAndroid && typeof _b.getSystemFontScale === 'function') _sysNow = _b.getSystemFontScale();
     } catch (_e) { /* a bridge hop can throw; a wrong text size is not worth a crash */ }
     const _sysStr = (_sysNow === undefined || _sysNow === null) ? undefined : String(_sysNow);
     const _resolved = resolveFontScale(

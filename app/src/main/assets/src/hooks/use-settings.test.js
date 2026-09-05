@@ -17,6 +17,11 @@ vi.mock('../utils/platform-bridge.js', () => ({
   PlatformBridge: {
     setLightStatusBar: vi.fn(),
     setKeepScreenOn: vi.fn(),
+    // fontScaleSource: the real bridge gains getSystemFontScale with the
+    // native text-zoom batch (Android passthrough, web returns 1). Both
+    // platform shapes are driven per-test below.
+    isAndroid: false,
+    getSystemFontScale: vi.fn(() => 1),
   },
 }));
 import { PlatformBridge } from '../utils/platform-bridge.js';
@@ -188,6 +193,66 @@ describe('useSettings — reading-font routing', () => {
     mount({ savedSettings: { fontStyle: 'font-from-the-future' } });
     expect(fontsEl().disabled).toBe(true);
     expect(bodyVar()).toContain('EB Garamond'); // readingFontCss fallback
+  });
+});
+
+/* fontScaleSource — the derive, and the cache that keeps the bridge off the
+   boot path.
+   ────────────────────────────────────────────────────────────────────
+   The reader's scale comes from `fontScaleSource`, not from `fontScale`
+   directly. React is the ONLY place that talks to the bridge; what it reads is
+   written back as `settings.systemFontScale` so index.html's pre-bundle writer
+   never has to call an interface it cannot prove exists yet.
+
+   ANDROID ONLY (R2). The web bridge answers 1 by design, so caching it there
+   would write systemFontScale:"1" into every web reader's state and light up
+   an Android-only Settings row on a platform with no phone text size to
+   follow. Absence of the cached value IS the availability signal that row
+   reads, so it has to stay absent where the feature does not apply. */
+describe('useSettings — fontScaleSource', () => {
+  const scaleVar = () => document.documentElement.style.getPropertyValue('--font-scale');
+  const bridge = /** @type {any} */ (PlatformBridge);
+
+  afterEach(() => { bridge.isAndroid = false; bridge.getSystemFontScale = vi.fn(() => 1); });
+
+  it('on Android, an untouched slider follows the phone', () => {
+    bridge.isAndroid = true;
+    bridge.getSystemFontScale = vi.fn(() => 1.8);
+    mount({ savedSettings: { fontScale: '1' } });
+    expect(scaleVar()).toBe('1.8');
+  });
+
+  it('a reader choice beats a larger phone scale', () => {
+    bridge.isAndroid = true;
+    bridge.getSystemFontScale = vi.fn(() => 2);
+    mount({ savedSettings: { fontScale: '1.5', fontScaleSource: 'reader' } });
+    expect(scaleVar()).toBe('1.5');
+  });
+
+  /* The migration, from the other end: a legacy install with a NON-1 scale and
+     no source is unambiguous evidence the slider was used, so the phone must
+     not override it. */
+  it('a legacy 1.4 with no source is a reader choice, not a system one', () => {
+    bridge.isAndroid = true;
+    bridge.getSystemFontScale = vi.fn(() => 2);
+    mount({ savedSettings: { fontScale: '1.4' } });
+    expect(scaleVar()).toBe('1.4');
+  });
+
+  it('caches what the bridge said, so the boot writer never has to ask', () => {
+    bridge.isAndroid = true;
+    bridge.getSystemFontScale = vi.fn(() => 1.8);
+    const { result } = mount({ savedSettings: { fontScale: '1' } });
+    expect(result.current.settings.systemFontScale).toBe('1.8');
+  });
+
+  it('R2: on web it does not read the bridge, cache a value, or leave the row a signal', () => {
+    bridge.isAndroid = false;
+    bridge.getSystemFontScale = vi.fn(() => 1);
+    const { result } = mount({ savedSettings: { fontScale: '1' } });
+    expect(bridge.getSystemFontScale).not.toHaveBeenCalled();
+    expect(result.current.settings.systemFontScale).toBeUndefined();
+    expect(scaleVar()).toBe('1');
   });
 });
 

@@ -53,6 +53,20 @@ export const FONT_SCALE_MAX = 3;
 /** @typedef {'system' | 'reader'} FontScaleSource */
 
 /**
+ * What an ABSENT source means at hydration — and therefore at export.
+ *
+ * Export's job is to record what the reader is currently SEEING, so its
+ * default is not a second decision: it is this one, by definition. Naming it
+ * once means that if hydration's default ever changes, export follows without
+ * anyone remembering to look. (Import is the deliberate exception and passes
+ * `'reader'` explicitly — it restores what was asked for, not what this
+ * device would decide.)
+ *
+ * @type {FontScaleSource}
+ */
+export const HYDRATION_FONT_SCALE_SOURCE = 'system';
+
+/**
  * Which input decides the scale, resolving the legacy shape.
  *
  * @param {{ fontScale?: unknown, fontScaleSource?: unknown }} settings

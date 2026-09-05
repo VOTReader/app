@@ -22,7 +22,7 @@
 */
 
 import { validateV3MediaMetadata } from './import-validators.js';
-import { normalizeFontScaleSource } from './font-scale.js';
+import { normalizeFontScaleSource, HYDRATION_FONT_SCALE_SOURCE } from './font-scale.js';
 
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
@@ -238,6 +238,10 @@ export async function buildExportPayload(ctx) {
       if (v !== undefined) stores[name] = v;
     } catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
   }
+
+  // R3: record what the reader is actually seeing, so the backup is not
+  // legacy-shaped forever. See _stampFontScaleSource.
+  _stampFontScaleSource(data, stores, HYDRATION_FONT_SCALE_SOURCE, true);
   for (const name of Object.keys(flagMap)) {
     try {
       const v = await idbAdapter.get(name, 'v');
@@ -370,6 +374,9 @@ export async function buildV3Manifest(ctx) {
   for (const name of Object.keys(storesMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = v; }
     catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
+
+  // R3: same stamp on the v3 path — see the v2 exporter above.
+  _stampFontScaleSource(data, stores, HYDRATION_FONT_SCALE_SOURCE, true);
   }
   for (const name of Object.keys(flagMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = !!v; }
@@ -484,14 +491,45 @@ function _whenSaved(s) {
  * the phone scale — a resize flash on every launch, for exactly the readers
  * the feature is for.
  *
+ * AND AT EXPORT, with `'system'` (R3, Design & Performance). Hydration
+ * deliberately never writes the key — a default must not be able to
+ * impersonate a choice — so the ruling's "the special case ages out on its
+ * own" was FALSE: nothing ever put the key into a reader's state, so every
+ * export stayed legacy-shaped forever. A reader who never touched the slider
+ * on a phone at 2.0 would export with no source, import would stamp
+ * `'reader'` pinned to `fontScale: "1"`, and the SAME PHONE would restore
+ * them at 1.0. A restore that did not restore, in the opposite direction from
+ * the case the import default exists for.
+ *
+ * Export records what the reader is actually doing right now, which for an
+ * untouched slider is: follow the phone.
+ *
  * Mutates in place and swallows its own errors: a malformed `vot-state` is the
  * appliers' problem to skip, not this helper's to throw on.
  *
  * @param {any} parsedData  the `data` container (LS strings, keyed by store name)
  * @param {any} parsedStores the `stores` container (parsed objects)
+ * SEALING AN EXPORT ALSO STRIPS `systemFontScale`. That field is a cache of
+ * THIS phone's setting, kept so index.html's pre-bundle writer never has to
+ * call the bridge — a device fact, not user data. Carried in a backup it
+ * paints the OLD device's scale for a frame on the new one before React
+ * corrects it, and moving to a new phone is the main reason anyone exports.
+ * Stripped, the first post-restore launch falls to 1 for one frame and
+ * corrects. One flash either way; never another device's number in a portable
+ * file.
+ *
+ * Mutates in place and swallows its own errors: a malformed `vot-state` is the
+ * appliers' problem to skip, not this helper's to throw on.
+ *
+ * @param {any} parsedData  the `data` container (LS strings, keyed by store name)
+ * @param {any} parsedStores the `stores` container (parsed objects)
+ * @param {'system'|'reader'} legacyDefault what an absent source means here:
+ *   HYDRATION_FONT_SCALE_SOURCE at export (what they see now), `'reader'` at
+ *   import (what they asked to get back).
+ * @param {boolean} [dropDeviceCache] true when sealing an export
  * @returns {void}
  */
-function _stampFontScaleSource(parsedData, parsedStores) {
+function _stampFontScaleSource(parsedData, parsedStores, legacyDefault, dropDeviceCache) {
   // The LS mirror: a JSON *string*, so parse-stamp-restringify.
   try {
     const raw = parsedData && parsedData['vot-state'];
@@ -499,7 +537,8 @@ function _stampFontScaleSource(parsedData, parsedStores) {
       const o = JSON.parse(raw);
       if (o && typeof o === 'object') {
         o.settings = o.settings || {};
-        o.settings.fontScaleSource = normalizeFontScaleSource(o.settings, 'reader');
+        o.settings.fontScaleSource = normalizeFontScaleSource(o.settings, legacyDefault);
+        if (dropDeviceCache) delete o.settings.systemFontScale;
         parsedData['vot-state'] = JSON.stringify(o);
       }
     }
@@ -510,7 +549,8 @@ function _stampFontScaleSource(parsedData, parsedStores) {
     const st = parsedStores && parsedStores['vot-state'];
     if (st && typeof st === 'object') {
       st.settings = st.settings || {};
-      st.settings.fontScaleSource = normalizeFontScaleSource(st.settings, 'reader');
+      st.settings.fontScaleSource = normalizeFontScaleSource(st.settings, legacyDefault);
+      if (dropDeviceCache) delete st.settings.systemFontScale;
     }
   } catch (_e) { /* same */ }
 }
@@ -679,7 +719,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
 
   // (0) Stamp fontScaleSource into both containers before either applier
   //     runs — see _stampFontScaleSource for why both, and why here.
-  _stampFontScaleSource(parsed && parsed.data, parsed && parsed.stores);
+  _stampFontScaleSource(parsed && parsed.data, parsed && parsed.stores, 'reader');
 
   // (1) Reseed the LS shim keys from `data`.
   _reseedLsData(parsed && parsed.data, dataLsKeys);
@@ -957,7 +997,7 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
 
   // Stamp fontScaleSource into both containers before either applier runs —
   // see _stampFontScaleSource for why both, and why here.
-  _stampFontScaleSource(manifest && manifest.data, stores);
+  _stampFontScaleSource(manifest && manifest.data, stores, 'reader');
 
   // (2) Reseed the LS shim only after the media commit lands. This keeps even
   // the small boot-state mirror unchanged when the media phase throws outright.

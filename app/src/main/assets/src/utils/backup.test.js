@@ -26,6 +26,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 /** @type {any} */ (globalThis).Blob = NodeBlob;
 
 import 'fake-indexeddb/auto';
+import { resolveFontScale } from './font-scale.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
@@ -139,7 +140,12 @@ describe('buildExportPayload', () => {
     // counts manifest: object-of-arrays counts keys, array counts length, primitive=1
     expect(res.payload.counts['vot-annotations']).toBe(2);
     expect(res.payload.counts['vot-bookmarks']).toBe(3);
-    expect(res.payload.counts['vot-state']).toBe(1);
+    // 2, not 1: the export stamp adds `settings.fontScaleSource` to a state
+    // that had only `theme` (R3). Unconditional on purpose — a fresh install
+    // with no settings at all still has to restore as "follow the phone",
+    // which is what the stamp records; leaving it legacy-shaped would make
+    // import guess 'reader' and pin it to an absent scale, i.e. 1.
+    expect(res.payload.counts['vot-state']).toBe(2);
     expect(res.payload.counts['vot-welcomed']).toBe(1);
     expect(res.payload.counts._media).toBe(0);
   });
@@ -153,7 +159,13 @@ describe('buildExportPayload', () => {
       storageEstimate: async () => ({ quota: 1000, usage: 200 }),
     });
     expect(res.ok).toBe(true);
-    expect(res.payload.data['vot-state']).toBe('{"theme":"light"}');
+    // NOT byte-identical any more, deliberately (R3): the export stamps
+    // `settings.fontScaleSource` into the LS mirror so the backup records what
+    // the reader is currently seeing rather than staying legacy-shaped
+    // forever. The theme is untouched.
+    expect(JSON.parse(res.payload.data['vot-state'])).toEqual({
+      theme: 'light', settings: { fontScaleSource: 'system' },
+    });
     expect(res.payload.diagnosticLog).toEqual([{ t: 1, lvl: 'W', tag: 'x', msg: 'y' }]);
     expect(res.payload.storageQuota).toBe(1000);
     expect(res.payload.storageUsed).toBe(200);
@@ -633,6 +645,59 @@ describe('applyImportPayload', () => {
       expect(['system', 'reader']).toContain(got);
       expect(got).toBe('reader');
     }
+  });
+
+  /* R3 + R3b — the export boundary, which the original ruling missed.
+
+     Hydration deliberately never writes `fontScaleSource` (a default must not
+     impersonate a choice), so the ruling's "the import special case ages out
+     on its own" was FALSE: nothing ever put the key into a reader's state, and
+     every export stayed legacy-shaped forever. A reader who never touched the
+     slider on a phone at 2.0 exported with no source; import stamped 'reader'
+     pinned to fontScale "1"; the SAME PHONE restored them at 1.0.
+
+     Export now records what they are actually seeing. And it STRIPS
+     `systemFontScale`: that is a cache of this phone's setting, a device fact,
+     and carrying it into a backup paints the old phone's scale for a frame on
+     the new one.
+
+     So this asserts against the RESTORING device's value, never one smuggled
+     in the file — which is the trap in the obvious version of this test. */
+  it('R3: an untouched slider exports as system, and restores at the new device scale', async () => {
+    const st = fakeStore('set');
+    localStorage.setItem('vot-state', JSON.stringify({ settings: { fontScale: '1', systemFontScale: '2' } }));
+    const res = await buildExportPayload({
+      storesMap: { 'vot-state': { store: st, method: 'set' } },
+      flagMap: {},
+      idbAdapter: { get: async () => ({ settings: { fontScale: '1', systemFontScale: '2' } }) },
+      mediaStore: emptyMedia,
+    });
+    expect(res.ok).toBe(true);
+
+    for (const settings of [
+      JSON.parse(res.payload.data['vot-state']).settings,
+      res.payload.stores['vot-state'].settings,
+    ]) {
+      expect(settings.fontScaleSource).toBe('system');
+      // R3b: the device cache does NOT travel.
+      expect(settings.systemFontScale).toBeUndefined();
+      // Restored on a phone reporting 1.6, the reader follows THAT phone.
+      expect(resolveFontScale({ ...settings, systemFontScale: '1.6' })).toBe(1.6);
+    }
+  });
+
+  it('R3: a reader who chose 1.5 exports as reader and restores at 1.5 anywhere', async () => {
+    const st = fakeStore('set');
+    localStorage.setItem('vot-state', JSON.stringify({ settings: { fontScale: '1.5', fontScaleSource: 'reader', systemFontScale: '2' } }));
+    const res = await buildExportPayload({
+      storesMap: { 'vot-state': { store: st, method: 'set' } },
+      flagMap: {},
+      idbAdapter: { get: async () => ({ settings: { fontScale: '1.5', fontScaleSource: 'reader', systemFontScale: '2' } }) },
+      mediaStore: emptyMedia,
+    });
+    const settings = res.payload.stores['vot-state'].settings;
+    expect(settings.fontScaleSource).toBe('reader');
+    expect(resolveFontScale({ ...settings, systemFontScale: '1.6' })).toBe(1.5);
   });
 
   /* F10 — the case that would otherwise ship broken. `_applyStoresAndFlags`
