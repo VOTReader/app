@@ -403,7 +403,13 @@ fi
 # ceiling off that series. Unlike CI's ubuntu runner this hook is on Windows, so
 # BOTH halves run here: the shape of the struct and the live comparison against
 # Win32_Process PrivatePageCount for this very process. ~0.5s.
-mem_changed=$(echo "$staged" | grep -E '^(tools/_alignlib\.py|tools/align-supervisor\.py|test_align_commit\.py)$' || true)
+# The two RUNNERS are in the trigger too (2026-09-05): the reader was right and
+# the SAMPLE SITE was wrong. Both called al.commit_gb() immediately after
+# al.release_caches(), so every figure ever logged was a post-release trough —
+# a chapter that peaked at 19 GB logged the same 10.00 GB as an idle one, which
+# is the exact unit the column exists to find. That is a line's POSITION, so it
+# is what a later edit moves back by accident; the test asserts the order.
+mem_changed=$(echo "$staged" | grep -E '^(tools/_alignlib\.py|tools/align-supervisor\.py|tools/batch-align\.py|tools/batch-align-bible\.py|test_align_commit\.py)$' || true)
 if [ -n "$mem_changed" ]; then
   echo "[pre-commit] Memory instrumentation changed — running test_align_commit.py..."
   python -m unittest test_align_commit

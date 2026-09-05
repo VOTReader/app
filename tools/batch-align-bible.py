@@ -389,6 +389,15 @@ def main():
         # Windows WDDM spills allocations past the ceiling into system memory
         # over PCIe and torch never gives the cache back on its own. Returning
         # it costs milliseconds; the models stay resident either way.
+        # Sample commit BEFORE handing the allocator back. Everything below this
+        # line is a post-release TROUGH: a chapter that peaked at 30 GB and
+        # released cleanly logs the same ~10 GB as one that never grew at all,
+        # so a trough-only series can never show the pathological unit it exists
+        # to find. Measured 2026-09-05: peak 19.06 GB against a logged 10.00 for
+        # the same pid, the whole gap being sampling PHASE and not a bad field.
+        # An external sampler cannot replace this -- at 60 s granularity a short
+        # chapter peaks and releases entirely between two of its samples.
+        peak_commit = al.commit_gb()
         al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
@@ -397,7 +406,7 @@ def main():
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
               f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
               f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB "
-              f"commit {al.commit_gb():.2f} GB", flush=True)
+              f"commit {peak_commit:.2f}/{al.commit_gb():.2f} GB", flush=True)
         checkpoint(tag)
     if last_book is not None:
         book_summary(last_book)

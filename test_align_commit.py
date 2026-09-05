@@ -25,6 +25,7 @@ on the aligner because of the CUDA/WDDM backing reserve. The shape assertions
 are what carry the regression weight; the external comparison proves the reader
 returns a real number rather than a plausible constant.
 """
+import ast
 import importlib.util
 import inspect
 import os
@@ -126,6 +127,96 @@ class CommitChargeAgreesWithAnExternalInstrument(unittest.TestCase):
             theirs_sup, theirs, delta=max(0.05, theirs * 0.10),
             msg=f"align-supervisor.py commit_gb(pid) {theirs_sup:.3f} GB "
                 f"disagrees with Win32_Process {theirs:.3f} GB")
+
+
+class CommitIsSampledBeforeTheAllocatorIsReleased(unittest.TestCase):
+    """WHERE the reader is called is part of the number it returns.
+
+    Both runners hand torch's allocator cache back with al.release_caches()
+    right before printing their per-unit progress line, and both used to sample
+    commit AFTER that call. Every figure either of them has ever logged is
+    therefore a post-release TROUGH: a unit that climbed to 30 GB and gave it
+    back logs the same idle number as one that never grew, which is precisely
+    the unit the column exists to find. Measured 2026-09-05 on the Bible runner:
+    a logged 10.00 GB against 19.06 GB for the same pid at the same moment, the
+    whole gap being sampling PHASE, not a bad field or a stale build.
+
+    An external per-minute sampler does not rescue this — chapters run 36-120 s,
+    so a short one peaks and releases entirely between two samples.
+
+    Source-order assertion rather than a live run: the defect is a line's
+    position, the runners need a GPU and hours, and a position is exactly what
+    a reviewer moves back by accident.
+    """
+
+    RUNNERS = {
+        "tools/batch-align-bible.py": "peak_commit",
+        "tools/batch-align.py": "window_peak",
+    }
+
+    def _tree(self, rel):
+        with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
+            return ast.parse(f.read(), filename=rel)
+
+    def test_a_commit_read_precedes_release_caches(self):
+        for rel, peak_var in self.RUNNERS.items():
+            with self.subTest(runner=rel):
+                tree = self._tree(rel)
+                releases, samples = [], []
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    fn = node.func
+                    if not isinstance(fn, ast.Attribute):
+                        continue
+                    if fn.attr == "release_caches":
+                        releases.append(node.lineno)
+                    elif fn.attr == "commit_gb":
+                        samples.append(node.lineno)
+                # Positive control: an assertion about ordering is vacuous if
+                # neither call is there any more. A runner that stopped
+                # releasing, or stopped reading commit, is its own finding.
+                self.assertEqual(
+                    len(releases), 1,
+                    f"{rel}: expected exactly one al.release_caches() call, "
+                    f"found {len(releases)} on lines {releases}")
+                self.assertTrue(
+                    samples, f"{rel}: no al.commit_gb() call at all")
+                self.assertTrue(
+                    any(s < releases[0] for s in samples),
+                    f"{rel}: every al.commit_gb() call (lines {samples}) is "
+                    f"BELOW al.release_caches() on line {releases[0]}, so the "
+                    f"commit column is a post-release trough and cannot show a "
+                    f"unit that peaked and released.")
+
+    def test_the_progress_line_prints_the_peak(self):
+        """Sampling early is worthless if the print still shows only the trough."""
+        for rel, peak_var in self.RUNNERS.items():
+            with self.subTest(runner=rel):
+                tree = self._tree(rel)
+                printed = [
+                    node for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name) and node.func.id == "print"
+                ]
+                commit_lines = [
+                    node for node in printed
+                    if "commit " in "".join(
+                        v.value for a in node.args
+                        for v in ast.walk(a) if isinstance(v, ast.Constant)
+                        and isinstance(v.value, str))
+                ]
+                self.assertTrue(
+                    commit_lines,
+                    f"{rel}: no print() emits a 'commit ' column any more")
+                names = {
+                    v.id for node in commit_lines
+                    for v in ast.walk(node) if isinstance(v, ast.Name)
+                }
+                self.assertIn(
+                    peak_var, names,
+                    f"{rel}: the commit progress line does not reference "
+                    f"{peak_var!r}, so it prints the post-release trough only")
 
 
 if __name__ == "__main__":

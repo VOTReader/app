@@ -120,6 +120,11 @@ def main():
               + ", ".join(sorted(skip_units)))
 
     report, failures = [], []
+    # Highest commit charge seen since the last progress line. The line only
+    # prints every fifth letter, so one letter's figure is not the window's:
+    # a composite that reports one member and is read as all five is the same
+    # trap as sampling a trough and reading it as a peak.
+    window_peak = 0.0
     for n, key in enumerate(keys, 1):
         if key in skip_units:
             failures.append((key, "SKIPPED — exceeded the supervisor's RSS ceiling"))
@@ -161,6 +166,13 @@ def main():
         # 7x slower (WDDM spills past the ceiling into system memory over PCIe).
         # The letters pay the same tax for the same reason; the release costs
         # milliseconds against a ~25 s letter.
+        # Sample commit BEFORE handing the allocator back, or every figure below
+        # is a post-release TROUGH: a letter that peaked and released cleanly
+        # logs the same idle number as one that never grew, which is exactly the
+        # letter this line exists to catch. Measured on the Bible runner
+        # 2026-09-05: a logged 10.00 GB against a true 19.06 GB for the same pid,
+        # the whole gap being sampling PHASE and not a bad field.
+        window_peak = max(window_peak, al.commit_gb())
         al.release_caches()
         if n % 5 == 0 or n == len(keys):
             # Resident memory rides the progress line. The 2026-08-26 run grew
@@ -169,7 +181,8 @@ def main():
             # a fresh whisper + MMS leg per letter. That is fixed, but a creep
             # that is invisible is a creep nobody catches twice.
             print(f"  [{n}/{len(keys)}] {key} done   rss {_rss_gb():.2f} GB "
-                  f"commit {al.commit_gb():.2f} GB", flush=True)
+                  f"commit {window_peak:.2f}/{al.commit_gb():.2f} GB", flush=True)
+            window_peak = 0.0
 
     rep_path = os.path.join(REPORTS, f"batch-{'-'.join(sorted(vols))}.txt")
     with open(rep_path, "w", encoding="utf-8") as f:
