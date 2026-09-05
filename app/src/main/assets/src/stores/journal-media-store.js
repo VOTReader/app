@@ -200,6 +200,46 @@ export var JournalMediaStore = (function() {
     _urlCache.set(id, url);
   }
 
+  // REVOCATION EPOCH.
+  // A revoked URL is still held by whoever resolved it. The comment above says eviction
+  // is invisible to callers because objectUrl() re-creates on a later miss: true, and
+  // beside the point, because the two callers that exist (JournalImageBlock and
+  // JournalAudioBlock, through useMediaUrl) resolve ONCE per mediaId and keep the string
+  // in React state. There is no later miss. So the bulk drops announce themselves and
+  // the blocks re-resolve.
+  //
+  // DEFERRED WHILE THE PAGE IS HIDDEN, and that is the whole point of the trim case:
+  // releaseObjectUrls() exists to free heap while the app is backgrounded. Notifying at
+  // once would have every mounted block re-create the URLs the purge just released and
+  // free nothing. The epoch moves immediately (the drop really happened); subscribers
+  // hear about it when the page is next visible, once per drop.
+  //
+  // NOT bumped by the LRU eviction in _cacheUrl, deliberately: that eviction happens
+  // INSIDE the objectUrl() call a block just made, so announcing it would re-run that
+  // block's effect, which resolves again, which evicts again. The gap it leaves is
+  // narrow and named: more than URL_CACHE_MAX media resolved at once, the oldest of them
+  // still on screen. Closing that needs the store to say WHICH ids it dropped, a bigger
+  // change than this defect asked for.
+  var _urlEpoch = 0;
+  /** @type {Set<() => void>} */
+  var _urlSubs = new Set();
+  var _urlNotifyPending = false;
+  function _flushUrlEpoch() {
+    if (!_urlNotifyPending) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    _urlNotifyPending = false;
+    _urlSubs.forEach(function(cb) { try { cb(); } catch (_e) { /* one bad subscriber must not stop the rest */ } });
+  }
+  function _bumpUrlEpoch() {
+    _urlEpoch++;
+    _urlNotifyPending = true;
+    _flushUrlEpoch();
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', _flushUrlEpoch);
+  }
+
+
   /**
    * Open (or reuse) the IDB connection. Rejects when IndexedDB is
    * unavailable; resolves with the database otherwise.
@@ -307,6 +347,7 @@ export var JournalMediaStore = (function() {
             try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
           });
           _urlCache.clear();
+          _bumpUrlEpoch();
           resolve();
         });
         guardTx(live, reject);
@@ -451,6 +492,7 @@ export var JournalMediaStore = (function() {
       if (_urlCache.has(id)) {
         try { URL.revokeObjectURL(_urlCache.get(id)); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         _urlCache.delete(id);
+        _bumpUrlEpoch();   // the block holding this URL must re-ask and learn the record is gone
       }
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
@@ -613,12 +655,24 @@ export var JournalMediaStore = (function() {
      * released (diagnostics). Never throws.
      * @returns {number}
      */
+    /**
+     * Subscribe to bulk object-URL revocation. The callback fires once per drop, on the
+     * first moment the page is visible after it. Returns an unsubscribe.
+     * @param {() => void} cb
+     * @returns {() => void}
+     */
+    subscribeUrls: function(cb) { _urlSubs.add(cb); return function() { _urlSubs.delete(cb); }; },
+
+    /** How many bulk revocations have happened. A change means every held URL is stale. */
+    getUrlEpoch: function() { return _urlEpoch; },
+
     releaseObjectUrls: function() {
       var n = _urlCache.size;
       _urlCache.forEach(function(url) {
         try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
       });
       _urlCache.clear();
+      _bumpUrlEpoch();
       return n;
     },
 
