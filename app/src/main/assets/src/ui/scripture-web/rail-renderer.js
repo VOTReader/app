@@ -42,24 +42,73 @@ export function railFrame(v, base) {
 }
 
 /**
- * The on-screen point of one endpoint.
+ * A position on the VOT rail → device px, THROUGH the camera.
+ *
+ * The VOT rail is still its own even axis — the corpus has no verse-count
+ * geometry to honour, so its letters are spread evenly and sparse early data
+ * stays legible instead of bunched. What changed is "evenly across WHAT".
+ * Spreading across the VIEWPORT pins the rail to the screen, so the reader
+ * zooms the Bible half while the Volumes half sits still (Corbin, 2026-09-05).
+ * Spreading across the same VERSE SPAN the bottom rail uses, and mapping that
+ * through the same camera, keeps the axis even and makes both halves move
+ * together. At fit zoom the two forms are algebraically equal, so the overview
+ * does not move at all — pinned by rail-camera.test.js.
+ *
+ * This is the ONLY place a rail position becomes an x. Three call sites used
+ * to do it by hand (the endpoint and both ends of every collection band), and
+ * a fix that moved one and not the others would be worse than no fix: before,
+ * every reading was wrong and they at least AGREED.
+ *
+ * @param {number} pos — rail position, 0..votRail.total
+ * @param {{verseX:(v:number)=>number, votRail:{total:number}, verseTotal:number}} opts
+ * @returns {number}
+ */
+export function votRailX(pos, opts) {
+  const total = opts.verseTotal;
+  // A missing verseTotal makes every top-rail x NaN: an invisible rail and a
+  // dead hit test, which reads as a rendering bug rather than the wiring bug
+  // it is. A null must never be able to impersonate a value.
+  if (!(total > 0)) {
+    throw new TypeError('rail-renderer: opts.verseTotal (the camera verse count) is required');
+  }
+  return opts.verseX((pos / Math.max(opts.votRail.total, 1)) * total);
+}
+
+/**
+ * Where one collection's band sits on screen, and the room its name has.
+ *
+ * `null` when the band has left the frame entirely: at depth most of the rail
+ * is off screen, and a band nobody can see is not measured or painted. A band
+ * the frame CUTS keeps its label over the visible part — a name printed at the
+ * true midpoint of a forty-screen-wide band is a name nobody ever sees. Both
+ * clips are no-ops at fit zoom, where every band lies inside [0, width].
+ *
+ * @param {{start:number, count:number}} seg
+ * @param {{verseX:(v:number)=>number, votRail:{total:number}, verseTotal:number,
+ *   width:number}} opts
+ * @returns {{x0:number, x1:number, labelX:number, room:number}|null}
+ */
+export function segmentSpan(seg, opts) {
+  const x0 = votRailX(seg.start, opts);
+  const x1 = votRailX(seg.start + seg.count, opts);
+  if (x1 < 0 || x0 > opts.width) return null;
+  const l = Math.max(x0, 0), r = Math.min(x1, opts.width);
+  return { x0, x1, labelX: (l + r) / 2, room: r - l };
+}
+
+/**
+ * The on-screen point of one endpoint. Both rails go through the same camera;
+ * only the axis differs (see votRailX).
+ *
  * @param {{rail:number, pos:number}} side
- * @param {(verse:number) => number} verseX — canonical camera mapping
- * @param {{total:number, segments?:any[]}} votRail
- * @param {number} width
+ * @param {{verseX:(v:number)=>number, votRail:{total:number}, verseTotal:number,
+ *   width:number}} opts
  * @param {{bottomY:number, topY:number}} rails
  * @returns {[number, number]}
  */
-export function endpointPoint(side, verseX, votRail, width, rails) {
-  if (side.rail === 1) {
-    // The VOT rail is its own even axis across the full width — the corpus has
-    // no verse-count geometry to honour, and spreading it edge to edge keeps
-    // sparse early data legible instead of bunched.
-    const n = Math.max(votRail.total, 1);
-    const x = ((side.pos + 0.5) / n) * width;
-    return [x, rails.topY];
-  }
-  return [verseX(side.pos), rails.bottomY];
+export function endpointPoint(side, opts, rails) {
+  if (side.rail === 1) return [votRailX(side.pos + 0.5, opts), rails.topY];
+  return [opts.verseX(side.pos), rails.bottomY];
 }
 
 /**
@@ -135,7 +184,7 @@ export function distanceToPath(pts, px, py) {
  * @param {{count:number, aRail:Uint8Array, bRail:Uint8Array, aPos:Float32Array,
  *   bPos:Float32Array, kind:Uint8Array}|null} personal
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array}|null} underlay
- * @param {{verseX:(v:number)=>number, votRail:any, width:number, height:number,
+ * @param {{verseX:(v:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number, chrome:any, showUnderlay?:boolean,
  *   hoverIndex?:number, focusIndex?:number}} opts
  */
@@ -160,25 +209,25 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     let row = 0;
     for (const seg of votRail.segments) {
       if (!seg.count) continue;
-      const x0 = (seg.start / votRail.total) * width;
-      const x1 = ((seg.start + seg.count) / votRail.total) * width;
+      const span = segmentSpan(seg, opts);
+      if (!span) continue;
       ctx.strokeStyle = 'rgba(' + gold + ',0.22)';
       ctx.beginPath();
-      ctx.moveTo(x0, rails.topY - 7 * DPR); ctx.lineTo(x0, rails.topY);
+      ctx.moveTo(span.x0, rails.topY - 7 * DPR); ctx.lineTo(span.x0, rails.topY);
       ctx.stroke();
       // Measure before drawing: collection names are long ("Words To Live By:
       // Part One"), and printing one that doesn't fit just overlaps its
       // neighbour into mush. Alternate rows buy width for the tighter ones.
       const label = (seg.short || seg.label).toUpperCase();
       const w = ctx.measureText(label).width;
-      const room = x1 - x0;
+      const room = span.room;
       if (w <= room - 6 * DPR) {
         ctx.fillStyle = 'rgba(' + ink + ',0.8)';
-        ctx.fillText(label, (x0 + x1) / 2, rails.topY - 11 * DPR);
+        ctx.fillText(label, span.labelX, rails.topY - 11 * DPR);
       } else if (w <= room * 2) {
         row = 1 - row;
         ctx.fillStyle = 'rgba(' + ink + ',0.62)';
-        ctx.fillText(label, (x0 + x1) / 2, rails.topY - (row ? 27 : 11) * DPR);
+        ctx.fillText(label, span.labelX, rails.topY - (row ? 27 : 11) * DPR);
       }
     }
   }
@@ -192,7 +241,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     ctx.beginPath();
     for (let i = 0; i < underlay.count; i++) {
       const a = [verseX(underlay.versePos[i]), rails.bottomY];
-      const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, verseX, votRail, width, rails);
+      const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       if ((a[0] < -50 && b[0] < -50) || (a[0] > width + 50 && b[0] > width + 50)) continue;
       const pts = linkPath(a[0], a[1], b[0], b[1], true, 12);
       ctx.moveTo(pts[0][0], pts[0][1]);
@@ -205,8 +254,8 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
 
   // ── the reader's links ──
   for (let i = 0; i < personal.count; i++) {
-    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, verseX, votRail, width, rails);
-    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, verseX, votRail, width, rails);
+    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
+    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const cross = personal.aRail[i] !== personal.bRail[i];
     const gap = Math.abs(rails.bottomY - rails.topY);
     const pts = linkPath(a[0], a[1], b[0], b[1], cross,
@@ -245,7 +294,7 @@ function insertNearest(out, candidate, limit) {
  * Nearest personal links to a point.
  * @param {{count:number, aRail:Uint8Array, bRail:Uint8Array, aPos:Float32Array,
  *   bPos:Float32Array}|null} personal
- * @param {{verseX:(v:number)=>number, votRail:any, width:number, height:number,
+ * @param {{verseX:(v:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number}} opts
  * @param {number} px
  * @param {number} py
@@ -255,13 +304,13 @@ function insertNearest(out, candidate, limit) {
  */
 export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
   if (!personal || !personal.count) return [];
-  const { width, base, DPR, votRail, verseX } = opts;
+  const { base, DPR } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   for (let i = 0; i < personal.count; i++) {
-    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, verseX, votRail, width, rails);
-    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, verseX, votRail, width, rails);
+    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
+    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
     if (px < minX || px > maxX) continue;
     const cross = personal.aRail[i] !== personal.bRail[i];
@@ -285,7 +334,7 @@ export function pickPersonal(personal, opts, px, py, tol) {
  * be selected.
  *
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array, records?:Array}|null} underlay
- * @param {{verseX:(v:number)=>number, votRail:any, width:number, height:number,
+ * @param {{verseX:(v:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number}} opts
  * @param {number} px
  * @param {number} py
@@ -295,13 +344,13 @@ export function pickPersonal(personal, opts, px, py, tol) {
  */
 export function pickUnderlayLinks(underlay, opts, px, py, tol, limit) {
   if (!underlay || !underlay.count) return [];
-  const { width, base, DPR, votRail, verseX } = opts;
+  const { base, DPR, verseX } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   for (let i = 0; i < underlay.count; i++) {
     const a = [verseX(underlay.versePos[i]), rails.bottomY];
-    const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, verseX, votRail, width, rails);
+    const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
     const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
     if (px < minX || px > maxX) continue;
     const d = distanceToPath(linkPath(a[0], a[1], b[0], b[1], true, 12), px, py);

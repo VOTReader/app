@@ -11,6 +11,10 @@ const rail = buildVotRail([
 ]);
 const opts = {
   width: 1000, height: 600, H: 600, DPR: 1, base: 500, votRail: rail,
+  // verseX is a 100-verse canon at fit zoom in a 1000 px viewport (ppv 10),
+  // so the top rail lands exactly where it did before it rode the camera and
+  // these two picking cases keep their original coordinates.
+  verseTotal: 100,
   verseX: (verse) => verse * 10,
 };
 
@@ -24,7 +28,7 @@ describe('rail picking', () => {
     };
     const rails = railFrame(opts, opts.base);
     const a = [opts.verseX(5), rails.bottomY];
-    const b = endpointPoint({ rail: 1, pos: 0 }, opts.verseX, rail, opts.width, rails);
+    const b = endpointPoint({ rail: 1, pos: 0 }, opts, rails);
     const point = linkPath(a[0], a[1], b[0], b[1], true, 12)[6];
     expect(pickUnderlayLinks(underlay, opts, point[0], point[1], 4, 4))
       .toMatchObject([{ index: 0, record: underlay.records[0] }]);
@@ -38,7 +42,7 @@ describe('rail picking', () => {
     };
     const rails = railFrame(opts, opts.base);
     const a = [opts.verseX(5), rails.bottomY];
-    const b = endpointPoint({ rail: 1, pos: 0 }, opts.verseX, rail, opts.width, rails);
+    const b = endpointPoint({ rail: 1, pos: 0 }, opts, rails);
     const point = linkPath(a[0], a[1], b[0], b[1], true, { n: 28 })[14];
     expect(pickPersonalLinks(personal, opts, point[0], point[1], 4, 4)
       .map((hit) => hit.index)).toEqual([0, 1]);
