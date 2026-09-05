@@ -16,7 +16,8 @@
  *
  * Reports per screen: elements, the minimum ratio, how many small-text elements (< 18.66 px,
  * or < 24 px when not bold) sit under 4.5:1 and under 3:1. With --min it exits 1 when any
- * small-text element measures under that ratio; without it, it measures and reports.
+ * small-text element measures under that ratio, and when the token coloured no rendered text at
+ * all (a sweep of nothing is not a pass); without it, it measures and reports.
  */
 import { resolve } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -54,8 +55,11 @@ try {
 
   const measure = (name) => page.evaluate((name, token) => {
     const parse = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(',').map((x) => parseFloat(x)); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
-    const probe = document.createElement('span'); probe.style.color = `var(${token})`; document.body.appendChild(probe);
-    const target = parse(getComputedStyle(probe).color); probe.remove();
+    // The token's own declared value, not a probe's inherited colour: `color: var(--nope)` is invalid
+    // and inherits, which would measure the body text and call it the token.
+    const declared = getComputedStyle(document.body).getPropertyValue(token).trim();
+    const probe = document.createElement('span'); probe.style.color = declared; document.body.appendChild(probe);
+    const target = declared ? parse(getComputedStyle(probe).color) : null; probe.remove();
     if (!target) return { screen: name, theme: document.body.classList.contains('light') ? 'light' : 'dark', token, tokenRgb: null, rows: [] };
     const same = (c) => c && Math.abs(c.r - target.r) < 1 && Math.abs(c.g - target.g) < 1 && Math.abs(c.b - target.b) < 1 && c.a > 0.99;
     const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
@@ -138,5 +142,8 @@ console.log(`\n${THEME} ${TOKEN} = ${all.find((m) => m.tokenRgb)?.tokenRgb || 'u
 console.log('worst distinct sites (selector, px, ratio, background, screen):');
 for (const r of worst.slice(0, 12)) console.log(`  ${r.sel.padEnd(40)} ${String(r.size).padStart(5)}px ${r.ratio.toFixed(2)}:1 on ${r.bg} ${r.screen} "${r.text}"`);
 if (OUT) { writeFileSync(resolve(OUT), JSON.stringify({ token: TOKEN, theme: THEME, screens: all }, null, 2) + '\n'); console.log(`wrote ${OUT}`); }
+// A gate that finds nothing has measured nothing: with --min, a token that did not resolve or a walk
+// that met zero elements in its colour is a vacuous pass and fails as such.
+if (MIN != null && rows.length === 0) { failed = true; console.log(`FAIL vacuous: ${TOKEN} coloured no rendered text on ${all.length} screens (token ${all.some((m) => m.tokenRgb) ? 'resolved' : 'did not resolve'})`); }
 if (failed) { console.log('\ncontrast-sweep FAILED'); process.exit(1); }
 console.log('\ncontrast-sweep done');
