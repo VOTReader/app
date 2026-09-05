@@ -447,7 +447,56 @@ export function buildScreenRoutes({
     if (typeof loadFn === 'function') loadFn();
     return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>{loadingLabel}</div>;
   };
-  const _wrapVot = (jsx) => _votReady ? jsx : _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…');
+  /**
+   * What a letter/entry route renders when the corpus IS loaded and the active
+   * letter does not resolve — a persisted tab whose letterId is no longer in
+   * the corpus (navigation-tabs-4).
+   *
+   * Every one of these routes was `_wrapVot(actL(k) && <View/>)`, so a dead
+   * letterId made the `&&` yield null and _wrapVot passed it straight through:
+   * no header, no nav, no back affordance. And because the tab is PERSISTED,
+   * reloading landed on the same blank screen. `_validateTabState` cannot
+   * catch it — it only checks that letterId is truthy, because the corpus is
+   * lazy and does not exist at boot — so the guard has to live here.
+   *
+   * Chrome plus a way out, not an error: the reader did nothing wrong, and the
+   * collection they were in is still there. `COL_BY_KEY` carries the
+   * `indexScreen` for each volKey, so the button goes where they were headed.
+   *
+   * @param {string} volKey
+   * @returns {any} never null
+   */
+  const _deadLetter = (volKey) => {
+    const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get) ? COL_BY_KEY.get(volKey) : null;
+    const idxScreen = (col && col.indexScreen) || 'volumes-home';
+    const body = (
+      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
+        <div>This letter is no longer available.</div>
+        <button type="button" onClick={() => setScreen(idxScreen)} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Back to the list</button>
+      </div>
+    );
+    // Chrome when it is there, body alone when it is not. A FALLBACK MUST NOT
+    // BE ABLE TO FAIL: this path only runs because something already went
+    // wrong, and throwing a ReferenceError here would replace a blank route
+    // with a dead app — strictly worse than the bug it fixes. `ScreenLayout`
+    // is a bare Cluster-D global, so its presence is an assumption, not a
+    // guarantee this function can make.
+    return (typeof ScreenLayout === 'function')
+      ? <ScreenLayout navChildren={_idxNav()}>{body}</ScreenLayout>
+      : body;
+  };
+
+  /**
+   * @param {any} jsx     the route's element, or falsy when the letter did not resolve
+   * @param {string} [volKey] the collection, for the dead-letter fallback. Pass it
+   *   on every letter/entry route; index routes have no letter to lose.
+   */
+  const _wrapVot = (jsx, volKey) => {
+    if (!_votReady) return _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…');
+    // Corpus loaded and nothing to render: a dead letterId, never a blank screen.
+    if (!jsx && volKey) return _deadLetter(volKey);
+    return jsx;
+  };
   // Personal-library screens (notes/bookmarks/links/highlights/journal) resolve
   // VOT letter titles + nav endpoints via findEntryContext, which only works
   // once the VOT corpus registry is built. On a cold-boot restore straight into
@@ -527,24 +576,24 @@ export function buildScreenRoutes({
     )),
 
     // ── Letter screens (10) — data-guarded ──
-    'vot-one-letter':    () => _wrapVot(actL('one')     && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', actL('one'))}     letter={actL('one')}     volumeLabel="Volume One" />),
+    'vot-one-letter':    () => _wrapVot(actL('one')     && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', actL('one'))}     letter={actL('one')}     volumeLabel="Volume One" />, 'one'),
     // C2-C [C2]: this was the ONE letter route that named no volume — it rode
     // LetterView's `volumeLabel || "Volume Two"` fallback, which is why the
     // fallback looked harmless. Say it here so the fallback can become honest.
-    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')}     volumeLabel="Volume Two" />),
-    'vot-three-letter':    () => _wrapVot(actL('three')   && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', actL('three'))}   letter={actL('three')}     volumeLabel="Volume Three" />),
-    'vot-four-letter':    () => _wrapVot(actL('four')    && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', actL('four'))}    letter={actL('four')}     volumeLabel="Volume Four" />),
-    'vot-five-letter':    () => _wrapVot(actL('five')    && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', actL('five'))}    letter={actL('five')}     volumeLabel="Volume Five" />),
-    'vot-six-letter':    () => _wrapVot(actL('six')     && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', actL('six'))}     letter={actL('six')}     volumeLabel="Volume Six" />),
-    'vot-seven-letter':    () => _wrapVot(actL('seven')   && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', actL('seven'))}   letter={actL('seven')}     volumeLabel="Volume Seven" />),
-    'vot-timothy-letter':    () => _wrapVot(actL('timothy') && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', actL('timothy'))} letter={actL('timothy')} volumeLabel="Letters from Timothy" />),
-    'vot-flock-letter':    () => _wrapVot(actL('flock')   && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', actL('flock'))}   letter={actL('flock')}   volumeLabel="Letters to The Lord's Little Flock" />),
-    'vot-rebuke-letter':    () => _wrapVot(actL('rebuke')  && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', actL('rebuke'))} letter={actL('rebuke')}  volumeLabel="The Lord's Rebuke" />),
+    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')}     volumeLabel="Volume Two" />, 'two'),
+    'vot-three-letter':    () => _wrapVot(actL('three')   && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', actL('three'))}   letter={actL('three')}     volumeLabel="Volume Three" />, 'three'),
+    'vot-four-letter':    () => _wrapVot(actL('four')    && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', actL('four'))}    letter={actL('four')}     volumeLabel="Volume Four" />, 'four'),
+    'vot-five-letter':    () => _wrapVot(actL('five')    && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', actL('five'))}    letter={actL('five')}     volumeLabel="Volume Five" />, 'five'),
+    'vot-six-letter':    () => _wrapVot(actL('six')     && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', actL('six'))}     letter={actL('six')}     volumeLabel="Volume Six" />, 'six'),
+    'vot-seven-letter':    () => _wrapVot(actL('seven')   && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', actL('seven'))}   letter={actL('seven')}     volumeLabel="Volume Seven" />, 'seven'),
+    'vot-timothy-letter':    () => _wrapVot(actL('timothy') && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', actL('timothy'))} letter={actL('timothy')} volumeLabel="Letters from Timothy" />, 'timothy'),
+    'vot-flock-letter':    () => _wrapVot(actL('flock')   && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', actL('flock'))}   letter={actL('flock')}   volumeLabel="Letters to The Lord's Little Flock" />, 'flock'),
+    'vot-rebuke-letter':    () => _wrapVot(actL('rebuke')  && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', actL('rebuke'))} letter={actL('rebuke')}  volumeLabel="The Lord's Rebuke" />, 'rebuke'),
 
     // ── WTLB / Blessed entry screens (3) — data-guarded ──
-    'wtlb-one-entry':    () => _wrapVot(actL('wtlb1')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', actL('wtlb1'))}   entry={actL('wtlb1')}   partLabel="Part One" onNavToChapter={_navToChapter} />),
-    'wtlb-two-entry':    () => _wrapVot(actL('wtlb2')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', actL('wtlb2'))}   entry={actL('wtlb2')}   partLabel="Part Two" onNavToChapter={_navToChapter} />),
-    'blessed-entry':    () => _wrapVot(actL('blessed') && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', actL('blessed'))} entry={actL('blessed')} partLabel="The Blessed" onNavToChapter={_navToChapter} />),
+    'wtlb-one-entry':    () => _wrapVot(actL('wtlb1')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', actL('wtlb1'))}   entry={actL('wtlb1')}   partLabel="Part One" onNavToChapter={_navToChapter} />, 'wtlb1'),
+    'wtlb-two-entry':    () => _wrapVot(actL('wtlb2')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', actL('wtlb2'))}   entry={actL('wtlb2')}   partLabel="Part Two" onNavToChapter={_navToChapter} />, 'wtlb2'),
+    'blessed-entry':    () => _wrapVot(actL('blessed') && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', actL('blessed'))} entry={actL('blessed')} partLabel="The Blessed" onNavToChapter={_navToChapter} />, 'blessed'),
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──
@@ -1179,7 +1228,7 @@ export function buildScreenRoutes({
       // blank screen that never pulled the corpus. Take the same loading view.
       if (!_votReady) return _wrapVot(null);
       const hdEntry = actL('holydays');
-      if (!hdEntry) return null;
+      if (!hdEntry) return _deadLetter('holydays');   // navigation-tabs-4
       const bc = boundaryConfig('holydays', hdEntry);
       if (hdEntry.type === 'wtlb') {
         return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} entry={hdEntry} partLabel="Regarding The Holy Days" onNavToChapter={_navToChapter} footnotesMode={true} />;
@@ -1191,7 +1240,7 @@ export function buildScreenRoutes({
     'hm-letter': () => {
       if (!_votReady) return _wrapVot(null); // see 'holy-days-entry'
       const hmEntry = actL('hm');
-      if (!hmEntry) return null;
+      if (!hmEntry) return _deadLetter('hm');   // navigation-tabs-4
       const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
       // Returning home from HM goes back to the Matthew chapter that led here.
       const goHomeFromHM = () => {
