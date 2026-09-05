@@ -29,7 +29,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     setScriptureText(null);
     onNavigateToLink(endpoint, { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null });
   } : null;
-  const [highlightedFn, setHighlightedFn] = React.useState(null);
   const wtlbMainRef = React.useRef(null);
   React.useEffect(() => {
     const pending = window.navHandoff.peek('pendingHighlight');
@@ -147,17 +146,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
   const scripTrapRef = useFocusTrap(!!scriptureRef && !railMode);  // dialog semantics — see LetterView
 
-  React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
-
-  React.useEffect(() => {
-    const root = wtlbMainRef.current;
-    if (!root) return;
-    root.querySelectorAll('.fn-ref.active').forEach((e) => e.classList.remove('active'));
-    if (highlightedFn != null) {
-      const el = root.querySelector('.fn-ref[data-fn-num="' + String(highlightedFn).replace(/"/g, '\\"') + '"]');
-      if (el) el.classList.add('active');
-    }
-  }, [highlightedFn, entry.id]);
+  React.useEffect(() => { setScriptureRef(null); setScriptureText(null); }, [entry.id]);
 
   const prevEntry = entry.prevEntry;
   const nextEntry = entry.nextEntry;
@@ -308,7 +297,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           return (
             <span
               key={si}
-              className={`fn-ref${highlightedFn === n ? " active" : ""}`}
+              className="fn-ref"
               data-fn-num={n}
               role="button"
               tabIndex={0}
@@ -446,7 +435,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                   const num = refAnalysis.refNumMap[ref];
                   const verseText = lookupVerse(ref);
                   return (
-                    <div key={ref} id={`wtlb-fn-${entry.id}-${num}`} className={`footnote-list-item${highlightedFn === num ? " pulse" : ""}`}>
+                    <div key={ref} id={`wtlb-fn-${entry.id}-${num}`} className="footnote-list-item">
                       <div className="footnote-list-num">{num}.</div>
                       <div>
                         <span className="footnote-list-ref">{ref}</span>
