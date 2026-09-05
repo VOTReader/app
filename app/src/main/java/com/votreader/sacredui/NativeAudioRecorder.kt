@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.SystemClock
 import android.util.Base64
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
@@ -42,18 +43,34 @@ class NativeAudioRecorder(private val context: Context) {
     private val lock = Any()
 
     /**
-     * Names [stop] handed to JS and [deleteRecording] has not taken back. The sweep
-     * must not touch these: a served file becomes sweep-eligible 60 s after stop(),
-     * a fetch that keeps failing is retried for longer than that, and the user's
-     * natural response to a stuck memo is to record again -- a start(), which swept
-     * the one file journal-3 2a exists to rescue.
+     * Names [stop] handed to JS, mapped to the [SystemClock.elapsedRealtime] at which
+     * it handed them over. The sweep must not touch a live claim: a served file
+     * becomes sweep-eligible 60 s after stop(), a fetch that keeps failing is retried
+     * for longer than that, and the user's natural response to a stuck memo is to
+     * record again -- a start(), which swept the one file journal-3 2a exists to
+     * rescue.
+     *
+     * BOUNDED AT [CLAIM_TTL_MS]. Only [deleteRecording] ends a claim deliberately, and
+     * NOTHING CALLS IT YET (see there), so without a ceiling a long-lived process
+     * would pin every memo it ever served -- twenty five-minute memos is ~72 MB of
+     * cacheDir held against a fetch that stopped being plausible many hours earlier.
+     * A day is far outside anything a fetch or a recovery read could still want (the
+     * happy path fetches within a second of stop()) and far inside "forever". The
+     * sweep evicts expired entries as it passes, so the map is bounded too, not just
+     * the disk.
+     *
+     * WHY elapsedRealtime AND NOT WALL TIME. This measures an interval inside one
+     * process. Wall time can step backwards -- NTP, the user changing the clock --
+     * and a claim would then look younger than it is, for hours. The sweep's OTHER
+     * comparison, file age, has to stay on wall time because it reads a filesystem
+     * mtime. Two clocks in one function, each against what it can actually compare to.
      *
      * In memory ON PURPOSE. A crash empties it, so the next session's orphans are
      * swept normally -- and orphans from a dead session are the only case the sweep
      * was ever for. Concurrent because [deleteRecording] runs on a binder thread
      * outside [lock] while the sweep runs under it.
      */
-    private val servedNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val servedNames = ConcurrentHashMap<String, Long>()
     private var recorder: MediaRecorder? = null
     private var recordFile: File? = null
     private var startMs = 0L
@@ -277,8 +294,10 @@ class NativeAudioRecorder(private val context: Context) {
         val moved = try { f.renameTo(served) } catch (_: Exception) { false }
         if (moved) {
             // JS now owns this name until it calls deleteRecording; the sweep skips it
-            // until then, however old it gets waiting for a fetch that keeps failing.
-            servedNames.add(served.name)
+            // until then, however old the FILE gets waiting for a fetch that keeps
+            // failing -- but not past CLAIM_TTL_MS, since nothing calls deleteRecording
+            // yet and an unreleasable claim would pin the file for the whole process.
+            servedNames[served.name] = SystemClock.elapsedRealtime()
             recordFile = null
             return Result.Success(RecordingResult(base64 = null, durationMs = safeDur, fileName = served.name))
         }
@@ -321,11 +340,18 @@ class NativeAudioRecorder(private val context: Context) {
     /**
      * Delete the served recording [name]; true only if a file was actually removed.
      *
-     * journal-3 2a: the handshake half, and the ONLY thing that ends a claim. JS calls
-     * this once the bytes are committed to its own store, so the native side stops
-     * holding a copy of something already saved. Until it does, [servedNames] keeps
-     * the file out of [sweepStaleRecordings] -- which exists for the memos of a
-     * session that died, the only ones nobody is coming back for.
+     * journal-3 2a: the handshake half, and the only thing that ends a claim
+     * deliberately. JS calls this once the bytes are committed to its own store, so
+     * the native side stops holding a copy of something already saved. Until it does,
+     * [servedNames] keeps the file out of [sweepStaleRecordings] -- which exists for
+     * the memos of a session that died, the only ones nobody is coming back for.
+     *
+     * NOTHING CALLS THIS YET, and both halves of that are true at once: the bridge
+     * entry EXISTS on the JS side (`PlatformBridge.nativeDeleteRecording`, pinned in
+     * platform-bridge.test.js METHODS, a no-op returning false on web), but no call
+     * SITE does. The caller arrives with journal-3 Phase 2b, the Web Builder's, after
+     * Phase 1 lands. Until then every claim ends by ageing out at [CLAIM_TTL_MS]
+     * rather than by handshake, which is exactly why that ceiling is not optional.
      *
      * The claim is dropped even when the unlink fails: JS is finished with the file
      * either way, and a claim nothing can release would pin the file for the life of
@@ -477,12 +503,19 @@ class NativeAudioRecorder(private val context: Context) {
      *  AGE ALONE IS NOT ENOUGH, and the KDoc here used to say it was: a memo whose
      *  fetch fails is retried past the cutoff while JS still needs it. [servedNames]
      *  is the second condition -- anything this process handed out and JS has not
-     *  released is spared at any age. Best-effort; never throws. */
+     *  released is spared, until the claim itself ages out at [CLAIM_TTL_MS].
+     *  Expired claims are dropped here rather than anywhere else, so the map is
+     *  bounded by the same pass that bounds the directory. Best-effort; never throws. */
     private fun sweepStaleRecordings() {
         try {
+            // Two clocks, deliberately: file age is a filesystem mtime and must be
+            // compared to wall time; a claim's age is an interval inside this process
+            // and must not be able to shrink when the wall clock steps backwards.
             val cutoff = System.currentTimeMillis() - RECORDING_TTL_MS
+            val claimCutoff = SystemClock.elapsedRealtime() - CLAIM_TTL_MS
+            servedNames.entries.removeIf { it.value < claimCutoff }
             recordingsDir().listFiles()?.forEach { file ->
-                if (file.isFile && file.name !in servedNames && file.lastModified() < cutoff) {
+                if (file.isFile && !servedNames.containsKey(file.name) && file.lastModified() < cutoff) {
                     try { file.delete() } catch (_: Exception) {}
                 }
             }
@@ -504,6 +537,13 @@ class NativeAudioRecorder(private val context: Context) {
         // A served memo is fetched by JS within a second of stop(); anything older
         // than this in recordings/ is an orphan from an interrupted session.
         const val RECORDING_TTL_MS = 60_000L
+
+        /** How long a name handed to JS keeps its file out of the sweep. A ceiling,
+         *  not a deadline: everything a fetch or a recovery read could plausibly want
+         *  happens in the first seconds, and this only decides when an abandoned claim
+         *  stops costing cacheDir. It matters today because nothing calls
+         *  deleteRecording yet, so without it no claim would ever end. */
+        const val CLAIM_TTL_MS = 24L * 60L * 60L * 1000L
 
         /** Native recording-length backstop, 30 s above JournalRecordingSheet's
          *  300 s JS cap so JS owns the normal stop and this only fires when that

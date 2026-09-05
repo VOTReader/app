@@ -3,6 +3,7 @@ package com.votreader.sacredui
 import android.Manifest
 import android.app.Application
 import android.os.Build
+import android.os.SystemClock
 import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
@@ -13,8 +14,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.File
 import java.io.RandomAccessFile
+import java.time.Duration
 import java.nio.file.Files
 import java.util.UUID
 import kotlin.test.assertContentEquals
@@ -278,6 +281,90 @@ class NativeAudioRecorderTest {
         assertIs<NativeAudioRecorder.Result.Failure>(recorder.start())
 
         assertTrue(orphan.exists(), "a start refused for permission must not delete anything")
+    }
+
+    /**
+     * Serve a memo through the real stop() path and hand back its name. The claim
+     * these tests are about only exists because stop() made it.
+     */
+    private fun serveOneMemo(): String {
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+        val stopped = assertIs<NativeAudioRecorder.Result.Success<NativeAudioRecorder.RecordingResult>>(
+            recorder.stop()
+        )
+        return requireNotNull(stopped.value.fileName) {
+            "stop() must have taken the fetch-bridge path, or this test proves nothing"
+        }
+    }
+
+    /**
+     * Move the monotonic clock the claim ages against, and PROVE it moved. Measured
+     * rather than assumed, because the first version of these tests advanced the
+     * shadow clock and asserted on System.currentTimeMillis(), which Robolectric
+     * does NOT drive here -- it moved 0 ms of a requested 25 h. Without this
+     * assertion the 23 h test would have passed against a claim zero milliseconds
+     * old, which is the wrong reason for the right answer.
+     */
+    private fun advanceHours(h: Long) {
+        val before = SystemClock.elapsedRealtime()
+        ShadowSystemClock.advanceBy(Duration.ofHours(h))
+        val moved = SystemClock.elapsedRealtime() - before
+        assertTrue(
+            moved >= Duration.ofHours(h).toMillis(),
+            "the shadow clock must move SystemClock.elapsedRealtime() (moved ${moved}ms of ${h}h), " +
+                "or every claim-expiry assertion below is vacuous"
+        )
+    }
+
+    /** Make the file itself sweep-eligible. Separate knob from the claim's age on
+     *  purpose: the sweep reads a filesystem mtime against the WALL clock, and the
+     *  claim ages against the MONOTONIC one, so these tests move one at a time. */
+    private fun ageFilePastTtl(f: File) {
+        f.setLastModified(System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L)
+    }
+
+    @Test
+    fun `a claim JS never released stops protecting its memo after a day`() {
+        // The claim is unbounded in one direction by design -- nothing but
+        // deleteRecording ends it -- so a session that runs for days could pin every
+        // memo it ever served. Twenty five-minute memos is ~72 MB of cacheDir held
+        // against a fetch that stopped being plausible many hours ago.
+        val served = serveOneMemo()
+        val memo = File(servedDir(), served)
+        assertTrue(memo.exists(), "the served memo must be on disk before the sweep runs")
+        ageFilePastTtl(memo)
+
+        advanceHours(25)
+        recorder.start()
+
+        assertFalse(
+            memo.exists(),
+            "a claim older than CLAIM_TTL_MS must stop protecting its file"
+        )
+    }
+
+    @Test
+    fun `a claim under a day still protects its memo`() {
+        // The control, and the half that must not regress: the bound exists to stop
+        // an abandoned claim pinning cacheDir forever, NOT to put a deadline on a
+        // recovery. Anything a fetch or a retry could still plausibly want is well
+        // inside this window -- the happy path fetches within a second.
+        val served = serveOneMemo()
+        val memo = File(servedDir(), served)
+        ageFilePastTtl(memo)
+
+        advanceHours(23)
+        recorder.start()
+
+        assertTrue(
+            memo.exists(),
+            "a claim inside CLAIM_TTL_MS must still spare its file, however stale the file looks"
+        )
+        assertNotNull(
+            recorder.readRecording(served),
+            "and it must still be readable -- surviving on disk is only half of it"
+        )
     }
 
     // ─── journal-3 2a: readRecording / deleteRecording ────────────────
