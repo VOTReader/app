@@ -211,8 +211,17 @@ def main():
 
     unit_re = re.compile(a.unit_re)
     killed = []            # [{unit, rssGb, when}]
-    banned = set()         # units killed twice — the loop must not spin
+    # A skip list the CALLER set, e.g. the c46 ship pass naming fifteen letters
+    # that are already correct and must not burn card time. The supervisor's own
+    # bans are added to it, never substituted for it: the first version assigned
+    # ALIGN_SKIP_UNITS outright, so one kill would have silently dropped the
+    # caller's fifteen and re-aligned every one of them on the relaunch.
+    inherited = {u for u in os.environ.get("ALIGN_SKIP_UNITS", "").split(",") if u}
+    banned = set(inherited)   # units killed for memory — the loop must not spin
     restarts = 0
+    if inherited:
+        print(f"supervisor: honouring {len(inherited)} skip unit(s) from the environment",
+              flush=True)
 
     while True:
         env = dict(os.environ)
