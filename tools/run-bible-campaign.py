@@ -57,6 +57,15 @@ def main():
     ap.add_argument("--edition", default="brm-kjv")
     ap.add_argument("--chunks", help="comma list of chunk numbers (1-based); default all")
     ap.add_argument("--dry", action="store_true", help="print the commands and exit")
+    # The ceiling wraps each CHUNK's aligner, never this runner. Wrapping the
+    # runner would sample the wrong process: the supervisor reads the resident
+    # set of its direct child, and this runner's direct child is a chunk that
+    # spawns the aligner -- it would have watched a few megabytes of bookkeeping
+    # all night and never seen the process actually growing. Per chunk the
+    # aligner IS the direct child, and a kill relaunches only that chunk, which
+    # resumes by belt.
+    ap.add_argument("--supervise-gb", type=float, default=0.0,
+                    help="run each chunk under tools/align-supervisor.py with this RSS ceiling")
     a = ap.parse_args()
     belts = os.path.join(WORK, "bible", a.edition)
     reports = os.path.join(WORK, "reports")
@@ -74,6 +83,13 @@ def main():
             books = CHUNKS[i - 1]
             cmd = [PY, os.path.join(BASE, "batch-align-bible.py"), "--edition", a.edition,
                    "--books", ",".join(books), "--no-ship"]
+            if a.supervise_gb > 0:
+                cmd = [PY, "-u", os.path.join(BASE, "align-supervisor.py"),
+                       "--ceiling-gb", str(a.supervise_gb),
+                       "--unit-re", r"\[[0-9]+/[0-9]+\] ([a-z0-9]+_[0-9]{3})  start",
+                       "--log", log_path,
+                       "--record", os.path.join(belts, "rss-killed-chapters.json"),
+                       "--"] + cmd
             if a.dry:
                 print("  " + " ".join(cmd))
                 continue
