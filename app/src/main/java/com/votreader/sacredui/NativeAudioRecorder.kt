@@ -353,24 +353,37 @@ class NativeAudioRecorder(private val context: Context) {
         // is the only reason it is not still a comment claiming otherwise.
         // Path.toRealPath() follows links on both, so this lock now means one thing
         // everywhere and is provable where it is checked.
+        // BOTH resolves inside the same try. recordingsDir() mkdirs first, but if that
+        // ever fails -- cacheDir evicted between the mkdirs and the resolve, disk full
+        // -- resolving the DIR throws too, and an exception crossing the
+        // @JavascriptInterface boundary is a different failure shape from the clean
+        // null every other path on this method returns. (Security, 2026-09-04.)
         val real = try {
-            f.toPath().toRealPath()
+            val realDir = dir.toPath().toRealPath()
+            val realFile = f.toPath().toRealPath()
+            if (realFile.parent != realDir) {
+                Timber.w("refused served-recording name (outside recordings/): %s", name.take(LOGGED_NAME_CHARS))
+                return null
+            }
+            realFile
         } catch (e: java.nio.file.NoSuchFileException) {
             // Ordinary: swept, or never written. Not an attack -- hand the File back
             // and let the caller report it missing.
+            //
+            // NOTE the shape difference: here containment was never CHECKED, where
+            // below it was checked and passed. A symlink appearing between this throw
+            // and the caller's read would be followed. Same threat model as the window
+            // below -- it needs code already inside this app's sandbox, which owns the
+            // directory outright -- but it is a wider window and worth naming.
             return f
         } catch (e: Exception) {
             Timber.w(e, "refused served-recording name (unresolvable): %s", name.take(LOGGED_NAME_CHARS))
             return null
         }
-        if (real.parent != dir.toPath().toRealPath()) {
-            Timber.w("refused served-recording name (outside recordings/): %s", name.take(LOGGED_NAME_CHARS))
-            return null
-        }
-        // The read that follows re-opens by path, so a swap between here and there is
-        // theoretically possible -- but it needs code already running inside this
-        // app's sandbox, which owns the directory outright.
-        return f
+        // Hand back the RESOLVED path, not the name-built one: the read then re-opens
+        // exactly what was checked. A swap between here and there is still
+        // theoretically possible, and needs the same in-sandbox foothold.
+        return real.toFile()
     }
 
     /**
