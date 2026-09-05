@@ -93,6 +93,28 @@ describe('app.css — --danger contrast against every light surface (a11y-ux-1)'
   });
 });
 
+/* a11y-ux-2. --gold-dim colours the eyebrows, chapter labels, chevrons and
+   settings values -- 99 small-text sites at 10-16 px on one walk of thirteen
+   screens (node tools/contrast-sweep.mjs --theme light). The old light value
+   #a8832a measured 3.17 / 2.86 / 2.64 on --bg / --bg2 / --bg3: under 4.5 at
+   every site, under the 3:1 UI floor on two surfaces. On a light ground a
+   colour LIGHTER than --gold cannot reach 4.5 on --bg3 (--gold is 4.67 there),
+   so "dim" now recedes by saturation, not lightness. This pins the constant;
+   the sweep measures what Chrome resolves. */
+describe('app.css — light --gold-dim contrast against every light surface (a11y-ux-2)', () => {
+  it.each([
+    ['--bg', 'bg'],
+    ['--bg2', 'bg2'],
+    ['--bg3', 'bg3'],
+  ])('light --gold-dim reaches WCAG AA against light %s', (_label, bgKey) => {
+    const ratio = contrastRatio(themed(LIGHT, 'gold-dim'), themed(LIGHT, bgKey));
+    expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+  it('dark --gold-dim still reaches WCAG AA against dark --bg3 (untouched)', () => {
+    expect(contrastRatio(themed(ROOT, 'gold-dim'), themed(ROOT, 'bg3'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+});
+
 describe('app.css — surrounding contrast stays green', () => {
   it('dark --danger still reaches WCAG AA against dark --bg3 (untouched)', () => {
     const ratio = contrastRatio(themed(ROOT, 'danger'), themed(ROOT, 'bg3'));

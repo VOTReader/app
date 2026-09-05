@@ -427,7 +427,7 @@
         --bg3:         #e6dece;
         --gold:        #7a5c10;
         --gold-bright: #9b7418;
-        --gold-dim:    #a8832a;
+        --gold-dim:    #705c26;   /* a11y-ux-2: was #a8832a, 3.17:1 on --bg, 2.86 on --bg2, 2.64 on --bg3 (under even the 3:1 UI floor on two of three), and it colours 99 small-text sites per walk (eyebrows, chapter labels, chevrons, settings values at 10-16 px). On a light ground a colour lighter than --gold cannot clear 4.5:1 on --bg3 (--gold itself is 4.67 there), so "dim" recedes by SATURATION here, not lightness: same hue as --gold (43deg), 49% vs 77% saturation, 5.79 / 5.24 / 4.84 on bg / bg2 / bg3 and 4.73 on the settings select ground. Measured, not estimated: node tools/contrast-sweep.mjs --theme light --min 4.5 */
         --gold-faint:  rgba(122,92,16,0.08);
         --gold-border: rgba(122,92,16,0.28);
         --gold-glow:   rgba(122,92,16,0.35);
