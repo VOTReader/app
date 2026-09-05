@@ -26,7 +26,19 @@ run {
         localProps.inputStream().use { props.load(it) }
         val customBuildRoot = props.getProperty("vot.buildDir")?.trim()
         if (!customBuildRoot.isNullOrEmpty()) {
-            layout.buildDirectory.set(file("$customBuildRoot/app"))
+            // Per CHECKOUT, not just per machine. Every git worktree gets a copy of
+            // the same gitignored local.properties (it has to -- Gradle fails with
+            // "SDK location not found" without one), so a bare vot.buildDir pointed
+            // every worktree on this machine at ONE build directory. Two agents
+            // running :app:testDebugUnitTest in different worktrees then overwrote
+            // each other's test XML and lint reports, and a count read back from
+            // there was whoever finished last. That is not hypothetical: it put
+            // wrong test totals in three of my commit messages on 2026-09-04.
+            //
+            // Derived from the checkout path rather than configured, so a COPIED
+            // local.properties cannot collide however carelessly it is copied.
+            val checkout = rootProject.projectDir.name
+            layout.buildDirectory.set(file("$customBuildRoot/$checkout/app"))
         }
     }
 }

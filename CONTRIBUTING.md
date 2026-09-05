@@ -235,6 +235,34 @@ they are production code now, so normal editing discipline applies (there is
 no "do not touch" embargo). The historical Phase 0–5 plan in PLAN.txt is
 closed; treat phase references as history.
 
+### A test count read from a shared directory is a guess
+
+`local.properties` is gitignored, so every git worktree needs its own copy —
+Gradle fails with "SDK location not found" without one, and the usual way to get
+it is to copy the file from the main checkout. That copy carries `vot.buildDir`
+with it, so before 2026-09-04 every worktree on a machine pointed at the SAME
+build directory. Two sessions running `:app:testDebugUnitTest` in different
+worktrees then overwrote each other's `test-results/` XML and lint reports, and a
+count read back was whoever finished last. It put wrong test totals into three
+commit messages on 2026-09-04 before anyone noticed — nothing was broken, but the
+evidence was somebody else's.
+
+`app/build.gradle.kts` now derives the build directory from the checkout
+(`<vot.buildDir>/<checkout-name>/app`), so a copied `local.properties` cannot
+collide however carelessly it is copied. Two concurrent runs were used to prove
+it: separate report directories, independent counts, both green.
+
+The habit outlives the fix, because it is not really about Gradle:
+
+- **Never quote a number from a mutable location you did not just write.** Clear
+  the report directory, or run the suite yourself, before putting a count in a
+  commit message or a report.
+- The same class of mistake is reading a gate's green from a server you did not
+  start, or a log file you did not watch get written.
+- If you have already published a wrong number, re-run and correct it in place.
+  A quietly wrong count is worse than a missing one, because the next person
+  builds on it.
+
 ---
 
 ## Common bug patterns to avoid
