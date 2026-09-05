@@ -929,6 +929,97 @@ describe('ReadAlongHighlight — Bible chapters', () => {
     expect(painted()).toBeNull();
     delete globalThis.BIBLE_SYNC_WEB;
   });
+
+  /* The timings painted belong to the AUDIO PLAYING, never to the Settings
+     edition (Architect, readalong-corpus-model §5.1 — with a correction to the
+     symptom, measured here rather than derived).
+
+     The volKey prop comes from settings.bibleAudio via screen-routes'
+     bibleAudioProp; the recording comes from the queue, which the Listening
+     Library and "Resume last" rebuild from immutable URLs that know nothing
+     about the setting. So the reader can be listening to a BRM recording with
+     Settings naming WEB.
+
+     THE SYMPTOM IS SILENCE, NOT A WRONG PAINT. `key` is `volKey + ':' +
+     letterId`, and `loaded` is `track.key === key` — so a track from another
+     edition does not match, `loaded` is false, and the component paints
+     NOTHING at all on a chapter whose timings are sitting in memory. Measured:
+     with the SETTING's table loaded and the editions differing, today's tree
+     paints null rather than the setting's verse. The edition is baked into an
+     identity that is supposed to answer "is this the book being played".
+
+     Three lines carry the same defect and all three move together, or the fix
+     disagrees with itself: `loaded` (line 587), `loadBibleSync(volKey)` (the
+     file it fetches), and `_syncFor` (the table it reads).
+
+     Reader-visible the moment a reader plays a library recording from any
+     edition but the selected one — and about to get much easier to reach, since
+     WEB is chunk 1 of the alignment campaign and rides c47.
+
+     Both tables give a DIFFERENT specific verse at the same instant, so the
+     bite asserts a real row value rather than "not the other one". */
+  const BOTH_EDITIONS = () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1']],
+      'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    };
+    globalThis.BIBLE_SYNC_BRM_KJV = { john: { 1: [500, 1200] } };   // v2 from 12s
+    globalThis.BIBLE_SYNC_WEB_EBIBLE = { john: { 1: [500, 2500] } };  // v2 from 25s
+  };
+
+  it('paints the playing edition\u2019s timings, not the Settings edition\u2019s', () => {
+    BOTH_EDITIONS();
+    mountBible({ volKey: 'bible-web' });      // Settings says WEB
+    playChapter(1, 'bible-brm-kjv');          // a BRM recording is playing
+    clockTo(13);
+    // BRM's belt has moved to verse 2 by 13s; WEB's has not (25s). Painting
+    // VERSE1 here is the defect, and it is the wrong verse on the reader's
+    // screen, not merely the wrong table.
+    expect(painted()).toBe(VERSE2);
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
+
+  it('paints nothing when the playing edition has no timings, rather than borrowing the setting\u2019s', () => {
+    // PASSES ON MAIN, FOR THE WRONG REASON, and that is the whole point of
+    // saying so here: today nothing paints because `loaded` is false, not
+    // because the track's table is missing. After the fix `loaded` is true and
+    // this is a real assertion about the absent table — the same green with a
+    // different mechanism behind it. Its bite is arm B below.
+    BOTH_EDITIONS();
+    delete globalThis.BIBLE_SYNC_BRM_KJV;     // the TRACK's table is absent
+    mountBible({ volKey: 'bible-web' });      // the SETTING's table is loaded
+    playChapter(1, 'bible-brm-kjv');
+    clockTo(13);
+    expect(painted()).toBeNull();
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
+
+  it('paints a library recording of this book from an edition the setting does not name', () => {
+    // The reader-facing sentence: press Listen from the Listening Library on a
+    // BRM recording while Settings says WEB, and the wash works. Today it is
+    // simply dead. Same setup as the bite, asserted at the other verse so a
+    // fix that pins one instant cannot satisfy both by accident.
+    BOTH_EDITIONS();
+    mountBible({ volKey: 'bible-web' });
+    playChapter(1, 'bible-brm-kjv');
+    clockTo(6);
+    expect(painted()).toBe(VERSE1);
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
+
+  it('control \u2014 setting and recording agree, so it paints and the row is real', () => {
+    // Not optional. An instrument that paints nothing because it is broken
+    // passes the absence arm for the wrong reason, and would pass the bite
+    // arm too if the bite only asserted "not WEB's".
+    BOTH_EDITIONS();
+    mountBible({ volKey: 'bible-brm-kjv' });
+    playChapter(1, 'bible-brm-kjv');
+    clockTo(13);
+    expect(painted()).toBe(VERSE2);
+    clockTo(6);
+    expect(painted()).toBe(VERSE1);
+    delete globalThis.BIBLE_SYNC_WEB_EBIBLE;
+  });
 });
 
 /* Format B (WTLB / The Blessed). Its timings are stored in the CORPUS offset

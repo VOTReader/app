@@ -8,7 +8,7 @@
    tests pin that boundary — an imported favorite or a widened prefix must
    never turn the app into a generic remote loader. */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   AUDIO_RELEASE_PREFIX,
   AUDIO_BIBLE_RELEASE_PREFIX,
@@ -27,6 +27,7 @@ import {
   displayPartLabel,
   isVotAudioUrl,
   normalizeAudioTrack,
+  resolveBibleAudio,
 } from './audio-track.js';
 
 describe('audio-track — release URL policy', () => {
@@ -222,5 +223,95 @@ describe('audio-track — displayPartLabel (the title-unique rule)', () => {
     expect(displayPartLabel('The Seventh Day', '')).toBe(null);
     expect(displayPartLabel('The Seventh Day', undefined)).toBe(null);
     expect(displayPartLabel(null, 'Chapter 2')).toBe('Chapter 2');
+  });
+});
+
+/* resolveBibleAudio — one function, two outputs, computed from DIFFERENT
+   inputs, and neither is ever used for the other (Architect, §6).
+
+     offer = the edition this BOOK is offered in. Falls back, because that is
+             its whole job: a partial edition must not blank 65 books. Has to
+             resolve with NOTHING playing — the Listen pill renders before any
+             audio exists.
+     paint = the edition of the recording CURRENTLY PLAYING, read from the
+             asset-name stamp. NEVER falls back. A fallback here is §5.1 in a
+             new costume and it fires on exactly the case the fallback exists
+             for: a reader on a book the selected edition lacks, playing a
+             library track from a third edition.
+*/
+describe('resolveBibleAudio — what is offered and what is painted', () => {
+  const MANIFEST = {
+    'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1']],
+    'bible-brm-kjv:genesis': [['brm1_genesis_001', '', 'Chapter 1']],
+    'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    // deliberately NO 'bible-web:genesis' — a partial edition
+  };
+  const trackFor = (asset) => ({ url: 'https://example.test/' + asset + '.mp3' });
+
+  beforeEach(() => { globalThis.BIBLE_AUDIO_MANIFEST = MANIFEST; });
+  afterEach(() => { delete globalThis.BIBLE_AUDIO_MANIFEST; });
+
+  it('offers the selected edition for a book it carries', () => {
+    const r = resolveBibleAudio({ settings: { bibleAudio: 'web-ebible' }, bookId: 'john' });
+    expect(r.offer && r.offer.volKey).toBe('bible-web');
+  });
+
+  it('offers the default edition for a book the selected one does not carry', () => {
+    const r = resolveBibleAudio({ settings: { bibleAudio: 'web-ebible' }, bookId: 'genesis' });
+    expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
+  });
+
+  it('offers nothing when Bible audio is off', () => {
+    expect(resolveBibleAudio({ settings: { bibleAudio: 'off' }, bookId: 'john' }).offer).toBeNull();
+  });
+
+  it('resolves an offer with nothing playing \u2014 the pill renders before any audio exists', () => {
+    const r = resolveBibleAudio({ settings: { bibleAudio: 'brm-kjv' }, bookId: 'john' });
+    expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
+    expect(r.paint).toBeNull();
+  });
+
+  it('the offered edition is the one that gets queued \u2014 one value, read twice', () => {
+    // The trap in the Architect\u2019s own \u00a71 ruling: resolve the pill from the
+    // fallback and queue from the setting and the pill renders on a book whose
+    // queued asset 404s. There is only ever ONE volKey to read.
+    const r = resolveBibleAudio({ settings: { bibleAudio: 'web-ebible' }, bookId: 'genesis' });
+    expect(MANIFEST[r.offer.volKey + ':genesis']).toBeTruthy();
+  });
+
+  it('paints from the asset stamp of the track that is playing', () => {
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'web-ebible' }, bookId: 'john', track: trackFor('brm2_john_001'),
+    });
+    expect(r.paint && r.paint.volKey).toBe('bible-brm-kjv');
+    expect(r.offer && r.offer.volKey).toBe('bible-web');
+  });
+
+  it('paint never falls back to offer', () => {
+    // An asset naming no known edition (a legacy whole-book id) is not a
+    // licence to guess: paint is null and nothing is painted.
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'brm-kjv' }, bookId: 'genesis', track: trackFor('brm-kjv_genesis'),
+    });
+    expect(r.paint).toBeNull();
+    expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
+  });
+
+  it('reads the edition off every stamp the URL builder routes on', () => {
+    // The stamps and the release hosts are ONE table; this pins that every
+    // stamp bibleAudioAssetUrl routes on also names an edition, so the two
+    // readings of an asset name can never disagree.
+    for (const [asset, volKey] of [
+      ['brm1_genesis_001', 'bible-brm-kjv'], ['brm2_john_001', 'bible-brm-kjv'],
+      ['wop1_genesis_001', 'bible-wop-nkjv'], ['wop2_john_001', 'bible-wop-nkjv'],
+      ['web1_genesis_001', 'bible-web'], ['web2_john_001', 'bible-web'],
+    ]) {
+      const r = resolveBibleAudio({
+        settings: { bibleAudio: 'off' }, bookId: 'john', track: trackFor(asset),
+      });
+      expect(r.paint && r.paint.volKey, asset).toBe(volKey);
+      // and the same stamp still routes to a release host, not the fallthrough
+      expect(bibleAudioAssetUrl(asset), asset).toContain(asset);
+    }
   });
 });
