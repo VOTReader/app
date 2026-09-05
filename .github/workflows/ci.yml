@@ -393,6 +393,41 @@ jobs:
         # NK2-NK5 fill it with real test cases.
         run: ./gradlew :app:testDebugUnitTest
 
+      - name: Report the Kotlin test totals (and refuse a silent skip)
+        # The test task prints no total, so the suite's SIZE was invisible here:
+        # a run that quietly stopped executing tests read exactly like a run that
+        # passed them. CI is also the only place this count is trustworthy — a
+        # local run writes into vot.buildDir, which every worktree on the
+        # aligning machine copies from the same local.properties, so a number
+        # read there can belong to another branch entirely.
+        #
+        # `skipped` is asserted at 0 on purpose. A JUnit assumption failure
+        # (assumeTrue) marks a test skipped, and a skip is invisible to every
+        # cache and up-to-date check in this pipeline — the build still says
+        # SUCCESSFUL. app/src/test carries no skip markers today; this is what
+        # keeps that true. Zero result files fails as well: a check that can
+        # only pass vacuously is worse than no check.
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')
+          if not files:
+              sys.exit('no JUnit result files — the test task produced nothing to count')
+          tests = failures = errors = skipped = 0
+          for path in files:
+              a = ET.parse(path).getroot().attrib
+              tests += int(a.get('tests', 0))
+              failures += int(a.get('failures', 0))
+              errors += int(a.get('errors', 0))
+              skipped += int(a.get('skipped', 0))
+          print(f'Kotlin unit tests: {len(files)} suites, {tests} tests, '
+                f'{failures} failures, {errors} errors, {skipped} skipped')
+          if skipped:
+              sys.exit(f'{skipped} test(s) skipped — an assumption failure is '
+                       'invisible to every other gate in this pipeline')
+          PY
+
       - name: Android Lint (NewApi / manifest checks — any error fails CI)
         # lintDebug aborts the build on any lint ERROR (warnings don't fail).
         # Added 2026-08-09 after an external audit found 6 NewApi errors —
