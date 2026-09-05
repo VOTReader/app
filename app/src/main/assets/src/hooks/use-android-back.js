@@ -267,6 +267,27 @@ export function useAndroidBack({
       // tap-through stack and restore the source — exactly what tapping the pill
       // does (tapThroughBack). Must precede the fromSurprise/fromSearch chapter
       // routing below so a visible pill wins.
+      // DELIBERATELY NO clearSuppressNextHistoryPush() HERE (nor at the
+      // journal-viewer tapThroughBack below), and this is load-bearing:
+      // on these paths the nav key DOES move, so the flag is doing the job it
+      // exists for — suppressing a pushState that should not happen. Clearing
+      // it early buys a spurious history entry.
+      //
+      // The residual is an invariant nothing enforces: every push's
+      // `sourceScreen` must DIFFER from its destination. tapThroughBack calls
+      // setScreen only `if (popped.sourceScreen)`, and a restore onto the
+      // screen you are already on is a React no-op — so a pushFromLetter entry
+      // whose sourceScreen equals its destination would strand the flag.
+      // Verified 2026-09-04: there are exactly four pushers and none produces
+      // one — use-navigate-to-link.js:204, use-tap-through.js:117 and :172,
+      // screen-routes.jsx:393. The journal-viewer-to-journal-viewer case that
+      // looks reachable does not use this mechanism at all; it pushes
+      // window.__journalBackStack (JournalViewerScreen.jsx:633) and is caught
+      // by the branch above, which self-clears.
+      //
+      // Add a fifth pusher and check that invariant, or make tapThroughBack
+      // report whether it actually moved `screen` and clear only when it did
+      // not. Do NOT clear unconditionally here.
       if ((s === "bible-ch" || s === "matthew-ch") && backActiveRef.current) {
         tapThroughBackRef.current();
         return "true";

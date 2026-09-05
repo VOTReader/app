@@ -469,4 +469,67 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
     sync.rerender({ k: navKey('home') });
     expect(_pushCalls.length).toBe(1);
   });
+
+  /* The three clears the Verifier found uncovered.
+     ───────────────────────────────────────────────────────────────
+     They deleted each `clearSuppressNextHistoryPush()` individually and
+     re-ran all 43 cases: lines 231 and 236 each failed one, and lines 233
+     (__closeSheet), 246 (__screenBack) and 305 (journal-viewer pop) left
+     43 passing. The code is right; nothing was watching it.
+
+     That matters more here than it would elsewhere, because navigation-tabs-2
+     is a bug about a SILENTLY swallowed pushState. A later tidy-up that drops
+     one of these clears reintroduces exactly the invisible failure this fix
+     was written to end — and the suite would stay green while it did.
+     Bite-checked: deleting the matching clear fails the matching case. */
+
+  it('closing a sheet via window.__closeSheet does not strand the flag', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const props = baseProps({ screen: 'library' });
+    renderHook(() => useAndroidBack(props));
+    const closed = vi.fn();
+    window.__closeSheet = closed;
+
+    suppressNextHistoryPush();
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(window.__closeSheet).toBeNull();
+
+    sync.rerender({ k: navKey('home') });
+    expect(_pushCalls.length).toBe(1);
+  });
+
+  it('an internal screen level unwound by window.__screenBack does not strand the flag', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const props = baseProps({ screen: 'library' });
+    renderHook(() => useAndroidBack(props));
+    const screenBack = vi.fn(() => true);   // consumed the press
+    window.__screenBack = screenBack;
+
+    suppressNextHistoryPush();
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(screenBack).toHaveBeenCalledTimes(1);
+
+    sync.rerender({ k: navKey('home') });
+    expect(_pushCalls.length).toBe(1);
+    delete window.__screenBack;
+  });
+
+  it('a journal-viewer to journal-viewer pop does not strand the flag', () => {
+    // journalEntryId is deliberately NOT one of the 8 fields useHistorySync
+    // watches, so this pop changes the screen the reader sees without moving
+    // the nav key at all — the exact shape that strands the flag.
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('journal-viewer') } });
+    const props = baseProps({ screen: 'journal-viewer', journalEntryId: 'e2' });
+    renderHook(() => useAndroidBack(props));
+    window.__journalBackStack = [{ destId: 'e2', fromId: 'e1' }];
+
+    suppressNextHistoryPush();
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goJournalViewer).toHaveBeenCalledWith('e1');
+
+    sync.rerender({ k: navKey('home') });
+    expect(_pushCalls.length).toBe(1);
+    delete window.__journalBackStack;
+  });
 });
