@@ -33,6 +33,12 @@ name: CI
 #          CI. AGP 9.2.1 requires JDK 17+; we run JDK 21 to match the local
 #          toolchain pinned in gradle/gradle-daemon-jvm.properties.
 
+# A branch that lives in THIS repo fires both of these. `push` is the signal
+# builders actually use (most branches here never open a PR at all), so it stays
+# unfiltered; `pull_request` exists for the one case `push` does not cover — a PR
+# from a fork, where no push event reaches this repo. Both jobs therefore carry an
+# `if:` that skips the pull_request copy for same-repo branches. See the block on
+# the build job for the measurement.
 on:
   push:
   pull_request:
@@ -59,6 +65,26 @@ jobs:
   build:
     name: build + syntax-check
     runs-on: ubuntu-latest
+    # Every PR opened here ran this whole chain TWICE. Measured, not inferred:
+    # `gh pr checks 13` listed each check under two distinct run ids
+    # (33872042913 and 33872045621). The `push` and `pull_request` events both
+    # fire for a branch that lives in this repo, and the concurrency group above
+    # keys on github.ref — refs/heads/<branch> for the push, refs/pull/<n>/merge
+    # for the PR — so the two runs are in different groups and nothing dedupes
+    # them. Dependabot is the only PR author here and its branches are in-repo,
+    # so every bump paid double.
+    #
+    # A fork PR is the one case where `push` does NOT fire in this repo, so that
+    # is exactly when the pull_request copy has to run. Skipping the job (rather
+    # than dropping the trigger, or filtering `push` to main) keeps branch CI for
+    # builders and keeps fork PRs gated.
+    #
+    # `build + syntax-check` is a REQUIRED status check on main, and the check
+    # run this job publishes is keyed to the head SHA — the push run publishes it
+    # for the same SHA, so the requirement is still satisfied on an in-repo PR.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -343,6 +369,11 @@ jobs:
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest
+    # Same duplicate-run condition as the build job above; see the block there.
+    # GitHub Actions does not expand YAML anchors, so it is written out twice.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
