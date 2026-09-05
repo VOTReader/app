@@ -195,6 +195,23 @@ describe('a salvaged (truncated) container reports what it can give back', () =>
     expect(r.level).toBe('warn');
   });
 
+  it('a caller that omits the salvaged count states ignorance, never zero', async () => {
+    // The Android verify path calls formatVerifyReport with three arguments.
+    // It cannot reach this branch today — v3ImportVerify never returns
+    // 'truncated' — but the day the native reader salvages the way the web
+    // one now does, a defaulted 0 would tell the owner that none of their
+    // media survived a backup that may be almost whole. Ignorance has to read
+    // as ignorance.
+    const read = await truncatedRead();
+    const r = formatVerifyReport(summarizeBackupManifest(read.manifest), read.integrity, 'v3');
+
+    expect(r.message).not.toContain('0 of 2');
+    expect(r.message).not.toContain('plus 2 media files');
+    expect(r.message).toContain('some of its 2 media files could not be read back');
+    expect(r.message).toContain('could not be read all the way through');
+    expect(r.level).toBe('warn');
+  });
+
   it('an intact container is unaffected — the honest count IS the manifest count', () => {
     const r = formatVerifyReport(summarizeBackupManifest(v3Manifest), 'ok', 'v3');
     expect(r.message).toContain('2 media files');
