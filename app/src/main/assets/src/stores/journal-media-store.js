@@ -621,16 +621,20 @@ export var JournalMediaStore = (function() {
      *
      * The cost of being conservative is that an extreme aspect ratio whose
      * SHORT edge is under `maxDim` (a panorama, a long screenshot) decodes
-     * un-hinted at its full size. That is what this function did before
-     * journal-5 and is still bounded by `maxDecodedPixels`; the ceiling
-     * rejecting a >10.24 Mpx un-hinted decode of that shape is a real
-     * residual, recorded rather than papered over.
+     * un-hinted at its full size, then downscales on the canvas exactly as
+     * it did before journal-5. Slower, never lossy, and never refused.
      *
-     * `maxDecodedPixels` is now the backstop for decodes this hint does not
-     * govern: an unreadable/unknown header (HEIC, AVIF, a damaged file), a
-     * host that silently ignores the hint, and the <img> fallback, which has
-     * no resize-hint mechanism at all. Note it runs AFTER the bitmap exists,
-     * so it protects the canvas step, not the allocation.
+     * THERE IS DELIBERATELY NO SIZE CEILING HERE (Architect, 2026-09-04).
+     * journal-5 added one after the decode, and a post-decode ceiling cannot
+     * prevent the allocation it exists to prevent — by the time
+     * createImageBitmap resolves the RGBA is already spent, so rejecting
+     * costs the reader their image and buys nothing. Pre-journal-5 this
+     * function had no ceiling and accepted anything decodable, because the
+     * draw below already scales by min(1, maxDim / max(w, h)): a bitmap that
+     * decoded is a bitmap this can handle. A guard that actually prevents an
+     * OOM has to run BEFORE the decode, off the header — which also makes
+     * the EXIF orientation tag nearly free and removes the conservatism
+     * above. That is journal-8, its own change, not folded in here.
      *
      * @param {File | Blob} fileOrBlob
      * @param {{ maxDim?: number, quality?: number }} [opts]
@@ -641,13 +645,6 @@ export var JournalMediaStore = (function() {
       opts = opts || {};
       var maxDim = opts.maxDim || 1600;
       var quality = opts.quality || 0.8;
-      // journal-5: 4x the area of a perfect maxDim-by-maxDim square covers
-      // every ordinary camera aspect ratio (up to ~2:1) with room to spare —
-      // at the default maxDim=1600 that's 10.24M px (~41 MB of RGBA), still
-      // far below the 191 MB un-hinted worst case. Every HINTED decode lands
-      // far under this; what it actually catches is the un-hinted ones (see
-      // the doc comment above).
-      var maxDecodedPixels = maxDim * maxDim * 4;
 
       /**
        * @param {CanvasImageSource & {width: number, height: number}} source
@@ -661,14 +658,14 @@ export var JournalMediaStore = (function() {
           // journal-5: every failure below is about the DECODED bitmap or the
           // canvas/encode step, never about which createImageBitmap options
           // were used — retrying the decode with different options cannot
-          // fix a zero-dimension bitmap, an oversized one, or a missing 2D
-          // context any more than the first attempt could. `terminal` tells
+          // fix a zero-dimension bitmap or a missing 2D context any more than
+          // the first attempt could. `terminal` tells
           // the two .catch() handlers downstream (the imageOrientation retry
           // and the <img>-fallback) to propagate these instead of treating
-          // them like a decode failure worth retrying — a genuinely oversized
-          // image must never fall through to imgPath()'s <img> decode, which
-          // has no resize-hint mechanism at all and would recreate the exact
-          // full-resolution decode this fix exists to prevent.
+          // them like a decode failure worth retrying: a bitmap that decoded
+          // and then failed the canvas step will fail imgPath()'s <img> decode
+          // the same way, having paid for a second full-resolution decode
+          // first.
           function fail(message) {
             cleanup && cleanup();
             var err = /** @type {any} */ (new Error(message));
@@ -676,7 +673,12 @@ export var JournalMediaStore = (function() {
             reject(err);
           }
           if (!w || !h) { fail('Image has zero dimensions'); return; }
-          if (w * h > maxDecodedPixels) { fail('Image is too large to process (' + w + 'x' + h + ')'); return; }
+          // journal-5 rejected here when w*h exceeded 4x a maxDim square. What
+          // that line did was refuse an image AFTER its bitmap was already
+          // allocated, so it never prevented the memory it named — and with
+          // `terminal` set there was no fallback, so the attach was simply
+          // dropped. The scale below handles any decodable bitmap. See the
+          // doc comment: the real guard is pre-decode, filed as journal-8.
           var scale = Math.min(1, maxDim / Math.max(w, h));
           var nw = Math.max(1, Math.round(w * scale));
           var nh = Math.max(1, Math.round(h * scale));
