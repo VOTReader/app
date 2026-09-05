@@ -31,7 +31,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CachedStore, extendStore,
   hydrateAllStores, hasAnyPendingStores, _resetStoreRegistry,
-  clearLegacyLs, _resetLegacyLsFlag, LS_SKIP_LIST,
+  clearLegacyLs, _resetLegacyLsFlag,
 } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
@@ -1021,24 +1021,62 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('LS_SKIP_LIST exports the permanent LS exceptions (every live vot-* key that is not a migrated store)', () => {
-    expect(LS_SKIP_LIST).toContain('vot-state');
-    expect(LS_SKIP_LIST).toContain('vot-audio-pos');            // audio-player.js PERSIST_KEY
-    expect(LS_SKIP_LIST).toContain('vot-audio-recent-open');    // AudioLibraryScreen RECENT_OPEN_KEY
-    expect(LS_SKIP_LIST).toContain('vot-recent-searches');      // search/recent-searches.js
-    expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
-    expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
-    expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
-    // storage-ls-1: this case's own title claims EVERY live vot-* key, and for
-    // two of them it was false — both were swept once per install. The title
-    // was the property; the assertions were a hand-written subset of it, and a
-    // subset cannot notice a key nobody thought to add. src/stores/
-    // ls-skip-list.test.js now derives the set from the write sites instead.
-    expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');          // use-saved-state, ONE-SHOT flag
-    expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');        // TabsNavBtn
-    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');      // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(9);
-    expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
+  /* storage-ls-1, inverted (Architect, 2026-09-04). There is no skip list any
+     more, and these cases are the reason. The sweep used to remove every `vot-`
+     key that was not on a hand-maintained allowlist, which made that list the
+     definition of "still in use" — so a new flag was deleted unless somebody
+     remembered to add it. It now removes exactly the keys whose DATA moved into
+     IDB, taken from the store registry: a key a store declares as its
+     legacyLsKey is legacy by definition, and a flag is not a store.
+
+     The old case here was titled "every live vot-* key that is not a migrated
+     store" over a hand-written subset of seven. The title was the property and
+     it was false for two keys. A test's name is an assertion and nothing checks
+     it — so the property is derived now, and there is nothing left to list. */
+  it('a vot- key that is not any store\'s legacy key is left alone', async () => {
+    _resetStoreRegistry();
+    createTestStore('vot-test-migrated', { idb: true })._resetForTests({ forceLoaded: true });
+    localStorage.setItem('vot-test-migrated', '[]');       // a store's legacy copy
+    localStorage.setItem('vot-some-future-flag', '1');     // a flag nobody listed
+    localStorage.setItem('vot-scrollheal-1', '1');         // the real one-shot flag
+    localStorage.setItem('vot-tabs-hint-seen', '1');
+
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (_s, k, v) => { idbMeta[String(k)] = v; });
+
+    await clearLegacyLs();
+
+    // The store's legacy copy goes — that is what the sweep is FOR.
+    expect(localStorage.getItem('vot-test-migrated')).toBeNull();
+    // Nothing else does, and no list was consulted to decide that.
+    expect(localStorage.getItem('vot-some-future-flag')).toBe('1');
+    expect(localStorage.getItem('vot-scrollheal-1')).toBe('1');
+    expect(localStorage.getItem('vot-tabs-hint-seen')).toBe('1');
+    expect(idbMeta['migrated-v1']).toBe(true);
+  });
+
+  it('a store that keeps a live LS shim keeps its key — vot-state', async () => {
+    _resetStoreRegistry();
+    createTestStore('vot-test-shimmed', { idb: true, lsShim: (v) => v })._resetForTests({ forceLoaded: true });
+    createTestStore('vot-test-plain', { idb: true })._resetForTests({ forceLoaded: true });
+    localStorage.setItem('vot-test-shimmed', '{"theme":"dark"}');
+    localStorage.setItem('vot-test-plain', '[]');
+
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (_s, k, v) => { idbMeta[String(k)] = v; });
+
+    await clearLegacyLs();
+
+    // A shim store WRITES that key every save — index.html reads it before
+    // React hydrates. Its LS copy is live, not legacy. This is the vot-state
+    // exception, and it is structural rather than listed: the store declares a
+    // shim, so the sweep can see for itself.
+    expect(localStorage.getItem('vot-test-shimmed')).toBe('{"theme":"dark"}');
+    expect(localStorage.getItem('vot-test-plain')).toBeNull();
   });
 
   it('LIVE audio LS keys survive the cleanup (resume position + recently-played state)', async () => {
@@ -1046,12 +1084,15 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     // storage, written every few seconds while a recording plays. clearLegacyLs
     // is one-shot via the meta flag, but the flag is only set AFTER a successful
     // meta write; a quota failure leaves it unset and the NEXT boot retries,
-    // by which time playback has already written 'vot-audio-pos'. Skipping them
-    // is what keeps that retry from eating the reader's place in a 90-minute track.
+    // by which time playback has already written 'vot-audio-pos'. Under the
+    // inverted predicate they are safe by construction — neither is a store's
+    // legacy key — where they used to depend on being remembered on a list.
     const resume = JSON.stringify({ trackId: 'brm-kjv:jeremiah', t: 4211.5, mode: 'collection' });
+    _resetStoreRegistry();
+    createTestStore('vot-test-audio-store', { idb: true })._resetForTests({ forceLoaded: true });
     localStorage.setItem('vot-audio-pos', resume);
     localStorage.setItem('vot-audio-recent-open', '1');
-    localStorage.setItem('vot-audio-stale-example', 'legacy');  // control: a vot-* key NOT skipped
+    localStorage.setItem('vot-test-audio-store', 'legacy');  // control: a real store's legacy copy
 
     /** @type {Record<string, any>} */
     const idbMeta = {};
@@ -1062,19 +1103,23 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
 
     expect(localStorage.getItem('vot-audio-pos')).toBe(resume);
     expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
-    expect(localStorage.getItem('vot-audio-stale-example')).toBeNull();  // control cleared
+    expect(localStorage.getItem('vot-test-audio-store')).toBeNull();  // control cleared
   });
 
-  it('first run: clears vot-* LS keys except skip-list AND sets the flag', async () => {
-    // Seed legacy LS state
+  it('first run: clears the registry\'s legacy store keys AND sets the flag', async () => {
+    _resetStoreRegistry();
+    createTestStore('vot-bookmarks', { idb: true })._resetForTests({ forceLoaded: true });
+    createTestStore('vot-history', { idb: true })._resetForTests({ forceLoaded: true });
+    createTestStore('vot-home-order', { idb: true })._resetForTests({ forceLoaded: true });
+    createTestStore('vot-state', { idb: true, lsShim: (v) => v })._resetForTests({ forceLoaded: true });
+
     localStorage.setItem('vot-bookmarks', '[]');
     localStorage.setItem('vot-history', '[]');
     localStorage.setItem('vot-home-order', '[]');
-    localStorage.setItem('vot-state', '{"theme":"dark"}');           // skip
-    localStorage.setItem('vot-ann-migrated', '1');                    // W7.1: no longer skipped → cleared
+    localStorage.setItem('vot-state', '{"theme":"dark"}');           // live shim
+    localStorage.setItem('vot-ann-migrated', '1');                    // retired flag, NOT a store
     localStorage.setItem('other-non-vot-key', 'untouched');           // not vot-* prefix
 
-    // Mock IDB so the flag round-trip works
     /** @type {Record<string, any>} */
     const idbMeta = {};
     vi.spyOn(IDBAdapter, 'get').mockImplementation(async function (_store, key) {
@@ -1086,14 +1131,20 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
 
     await clearLegacyLs();
 
-    // Cleared (incl. vot-ann-migrated — W7.1 removed it from the skip list):
+    // Cleared: the legacy LS copies of data that now lives in IDB.
     expect(localStorage.getItem('vot-bookmarks')).toBeNull();
     expect(localStorage.getItem('vot-history')).toBeNull();
     expect(localStorage.getItem('vot-home-order')).toBeNull();
-    expect(localStorage.getItem('vot-ann-migrated')).toBeNull();
     // Preserved:
     expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
     expect(localStorage.getItem('other-non-vot-key')).toBe('untouched');
+    // BEHAVIOUR CHANGE, deliberate and named: `vot-ann-migrated` is a RETIRED
+    // migration flag, not a store, so the registry-derived set does not reach
+    // it and it now survives. That is one stale boolean per pre-W7.1 install,
+    // and the alternative is reintroducing a hand-maintained list of retired
+    // keys — the exact thing this change deletes. Raised with the Architect
+    // rather than decided here.
+    expect(localStorage.getItem('vot-ann-migrated')).toBe('1');
     // Flag set:
     expect(idbMeta['migrated-v1']).toBe(true);
   });
@@ -1149,6 +1200,10 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('quota'));
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
+    // The sweep is registry-derived now, so the key only counts as legacy if a
+    // store claims it.
+    _resetStoreRegistry();
+    createTestStore('vot-bookmarks', { idb: true })._resetForTests({ forceLoaded: true });
     localStorage.setItem('vot-bookmarks', '[]');
     await clearLegacyLs();
     expect(localStorage.getItem('vot-bookmarks')).toBeNull();  // cleared
@@ -1167,7 +1222,10 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     await _resetLegacyLsFlag();
     expect(idbMeta['migrated-v1']).toBeUndefined();
 
-    // Now clearLegacyLs runs the cleanup again
+    // Now clearLegacyLs runs the cleanup again. Registry-derived: a key is
+    // only swept when a store declares it as its legacy LS location.
+    _resetStoreRegistry();
+    createTestStore('vot-cleanup-me', { idb: true })._resetForTests({ forceLoaded: true });
     localStorage.setItem('vot-cleanup-me', 'x');
     await clearLegacyLs();
     expect(localStorage.getItem('vot-cleanup-me')).toBeNull();

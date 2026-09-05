@@ -119,6 +119,7 @@ function _cloneSnapshot(v) {
  *   _idb: boolean,
  *   _idbStoreName: string,
  *   _idbLsShim: ((full: T | null) => any) | null,
+ *   _legacyLsKey: string | null,
  *   _idbHydrationTimeoutMs: number,
  *   _backgroundRetryDelays: number[],
  *   _schemaVersion: number,
@@ -293,6 +294,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _idb: useIdb,
     _idbStoreName: idbStoreName,
     _idbLsShim: lsShim,
+    /* The LS key this store's data used to live at, or null if it never did.
+       clearLegacyLs() computes what to sweep from these, so the registry
+       describes itself and there is no second list to keep in step. */
+    _legacyLsKey: legacyLsKey,
     _idbHydrationTimeoutMs: hydrationTimeoutMs,
     _backgroundRetryDelays: backgroundRetryDelays,
     _schemaVersion: schemaVersion,
@@ -1096,46 +1101,50 @@ export function _resetStoreRegistry() {
    clears the orphaned flag like any other legacy vot-* key.)
    ═══════════════════════════════════════════════════════════════════ */
 
-/** localStorage keys NOT cleared by W2.4. Frozen + exported so tests
- *  + the Settings export path can reference the canonical list. */
-export const LS_SKIP_LIST = Object.freeze([
-  'vot-state',
-  'vot-audio-pos',
-  'vot-audio-recent-open',
-  'vot-recent-searches',          // search/recent-searches.js
-  'vot-journal-draft',            // JournalEditorScreen
-  'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
-  'vot-restore-inflight',         // use-restore-guard
-  // storage-ls-1. Both are LIVE one-shot flags, and both are safe today only by
-  // an ordering nobody wrote down: HydrationGate awaits clearLegacyLs() BEFORE
-  // setHydrated(true), and setHydrated is what mounts the code that writes
-  // them -- so the sweep has always taken its key list before either exists.
-  // Measured across two boots; neither has ever been deleted. They are listed
-  // anyway because that ordering is not a guarantee anyone is holding, and if
-  // it ever slips, vot-scrollheal-1 going missing re-runs a heal that resets
-  // every tab's scroll position -- while its own comment says the flag
-  // prevents exactly that.
-  'vot-scrollheal-1',             // use-saved-state
-  'vot-tabs-hint-seen',           // TabsNavBtn
-]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
 const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
 
 /**
- * One-time legacy LS cleanup. Idempotent — checks the meta-store
- * flag; if already set, returns immediately. Otherwise iterates
- * `localStorage`, removes every `vot-*` key not in `LS_SKIP_LIST`,
- * then writes the flag.
+ * One-time legacy LS cleanup. Idempotent — checks the meta-store flag; if
+ * already set, returns immediately. Otherwise removes the localStorage copies
+ * of data that now lives in IDB, then writes the flag.
  *
- * `LS_SKIP_LIST` is therefore not a nicety: it is the entire definition of
- * "still in use", maintained by hand, and every key missing from it is
- * DELETED once per install. Two keys were (storage-ls-1, 2026-09-04), and
- * `vot-home-order` was only saved by someone reading an inventory during
- * W2.3b. `src/stores/ls-skip-list.test.js` now scans the write sites and
- * fails when a live key is missing, so the list and the code cannot drift
- * apart silently. Whether the list should exist at all, rather than live
- * keys being namespaced out of the swept prefix, is with the Architect.
+ * WHAT IT SWEEPS, AND WHY THERE IS NO LIST (storage-ls-1, inverted by the
+ * Architect 2026-09-04). Until now this removed every `vot-` key that was NOT
+ * on a hand-maintained `LS_SKIP_LIST`. That made the list the definition of
+ * "still in use", so every new `vot-` flag was deleted unless somebody
+ * remembered to add it — and two were not (`vot-scrollheal-1`, a ONE-SHOT flag
+ * whose own comment says it prevents a re-run, and `vot-tabs-hint-seen`), while
+ * `vot-home-order` was saved only because a human read an inventory during
+ * W2.3b.
+ *
+ * It now sweeps exactly the `legacyLsKey` of each registered IDB store. A key
+ * whose data moved into IDB is legacy BY DEFINITION; a flag is not a store, so
+ * no flag can be caught. The set comes from the registry, so it cannot drift
+ * from the code the way a list can.
+ *
+ * ONE EXCLUSION, and it is structural rather than listed: a store that defines
+ * an `lsShim` WRITES its LS key on every save — `index.html`'s boot script reads
+ * `vot-state` before React exists — so that copy is live, not legacy. The sweep
+ * can see the shim on the instance and does not need to be told the key.
+ *
+ * KNOWN AND DELIBERATE: a retired flag that was never a store's key survives
+ * now, e.g. `vot-ann-migrated` (W7.1). That is one stale boolean per pre-W7.1
+ * install, and the alternative is a hand-maintained list of retired keys — the
+ * exact thing this deletes.
+ *
+ * WHAT A PRE-MAY INSTALL SEES. `migrated-v1` is unset, so the sweep runs on its
+ * first boot exactly as before and clears the legacy LS copy of every migrated
+ * store — that behaviour is unchanged, and it is the whole reason the sweep
+ * survives at all. What changed is only that nothing ELSE it has ever written
+ * can be caught.
+ *
+ * ORDERING still matters and is still guarded: the registry must be populated
+ * and hydration must have settled. `_entry-b.js` imports every store module
+ * eagerly, so registration is complete before any of this runs, and the
+ * `hasAnyPendingStores()` check below fails safe (defers to next boot) rather
+ * than sweeping a store whose IDB data has not loaded.
  *
  * MUST run after `hydrateAllStores()` resolves so the per-store
  * legacy-LS-fallback path has read the LS keys it needs.
@@ -1168,18 +1177,14 @@ export async function clearLegacyLs() {
     return;
   }
 
+  /* Derived from the registry, not from a list, and not from what happens to
+     be in localStorage: the question is "whose data moved into IDB", and only
+     the stores know that. */
   /** @type {string[]} */
   const toClear = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.indexOf('vot-') === 0 && !LS_SKIP_LIST.includes(k)) {
-        toClear.push(k);
-      }
-    }
-  } catch (e) {
-    console.warn('clearLegacyLs: LS iteration failed', e);
-    return;
+  for (const st of _idbStoreRegistry) {
+    if (st._idbLsShim) continue;            // writes that key live; not legacy
+    if (st._legacyLsKey) toClear.push(st._legacyLsKey);
   }
   for (const k of toClear) {
     try { localStorage.removeItem(k); }

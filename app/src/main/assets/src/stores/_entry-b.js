@@ -37,7 +37,7 @@
 import '../styles/journal-styles.js';
 
 // ── Stores ──────────────────────────────────────────────────────────────
-import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST } from './cached-store.js';
+import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs } from './cached-store.js';
 import { showToast, hideToast } from '../utils/toast.js';
 // Build identity (2026-08-11) — Settings' "App version" row asks the service
 // worker which build is actually serving the page, and the server what the
@@ -172,7 +172,7 @@ Object.assign(window, {
   // Platform bridge (W1.1)
   PlatformBridge,
   // Stores
-  CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
+  CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs,
   showToast, hideToast,
   getBuildVersion, fetchServerBuildVersion, formatBuildVersion,
   navHandoff,
