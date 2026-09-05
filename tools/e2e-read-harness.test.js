@@ -222,4 +222,79 @@ describe('the detector isolates its storage instead of deleting it', () => {
     expect(code).toMatch(/E2E PASS/);
     expect(code.length).toBeGreaterThan(2000);
   });
+
+  /* A STEP'S WAIT AND ITS CLICK MUST BE THE SAME PATTERN.
+     ─────────────────────────────────────────────────────────────────
+     Each navigation step waits for the button it is about to click. That is
+     only worth something if the two agree — a wait satisfied by something the
+     click then rejects is a wait that resolved for the wrong reason, and it
+     fails many steps later pointing at the wrong screen. Same class as the
+     silent `clickText` boolean: a step that cannot say where it went wrong.
+
+     It had already happened here. `waitForScreen(..., HAS_TEXT, 'Volume One(?!\d)')`
+     passes a JS STRING, and in a string `\d` is just `d` — so the wait was
+     built from /Volume One(?!d)/ while the click used /Volume One(?!\d)/.
+     Measured rather than read off the spec:
+     `new RegExp('Volume One(?!\d)').source` is `Volume One(?!d)`, and it
+     matches "Volume One2" where the click's regex does not. Harmless today
+     only because nothing renders "Volume One" followed by a digit — which is
+     exactly why nothing caught it.
+
+     So this asserts the property, not the spelling: for every navigation step,
+     what the wait matched on and what the click matched on are the same regex
+     source. It also asserts a STEP COUNT, because a source-lint that stops
+     recognising its subject finds nothing and reports green. That is not a
+     hypothetical: the first version of this case paired the two halves by
+     ADJACENCY, and the Volume One step has a `page.evaluate` between its wait
+     and its click — so it skipped the one step that was wrong and failed on a
+     count of 3 instead of on the mismatch. The pairing below is by source
+     order for that reason. */
+  it('every navigation step waits on the same pattern it then clicks', () => {
+    const src = readSrc(resolve(ASSETS, '..', '..', '..', '..', 'tools', 'e2e-read-detector.mjs'), 'utf8');
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+    /** @type {{ label: string, wait: string, click: string }[]} */
+    const steps = [];
+
+    // Shape A — one call carrying ONE pattern for both halves. Nothing to drift.
+    for (const m of code.matchAll(/waitThenClick\(\s*'([^']*)'\s*,\s*\/((?:[^/\\\n]|\\.)+)\//g)) {
+      steps.push({ label: m[1], wait: m[2], click: m[2] });
+    }
+    // Shape B — a wait built from a STRING, then a SEPARATE click regex: the
+    // shape that can drift. Paired in source order, never by adjacency.
+    let pending = null;
+    for (const m of code.matchAll(
+      /waitForScreen\(\s*'([^']*)'\s*,\s*HAS_TEXT\s*,\s*'((?:[^'\\]|\\.)*)'\s*\)|clickText\(\s*\/((?:[^/\\\n]|\\.)+)\/\s*\)/g,
+    )) {
+      if (m[3] === undefined) {
+        // eslint-disable-next-line no-new-func -- the text is read from our own
+        // source file, and evaluating it as a JS string literal is the only way
+        // to reproduce what the running harness builds its RegExp from.
+        pending = { label: m[1], wait: new RegExp(new Function(`return '${m[2]}';`)()).source };
+      } else if (pending) {
+        steps.push({ label: pending.label, wait: pending.wait, click: new RegExp(m[3]).source });
+        pending = null;
+      }
+    }
+
+    // The walk has four text-driven navigation steps: Continue, Begin Reading,
+    // Prophetic Letters, Volume One. If this number drops, the scanner stopped
+    // seeing steps — it does not mean the steps became correct.
+    expect(steps.length).toBe(4);
+    for (const step of steps) {
+      expect(`${step.label} waits on: ${step.wait}`).toBe(`${step.label} waits on: ${step.click}`);
+    }
+
+    /* The drift SHAPE is gone from the program, not merely corrected once —
+       and the comment-stripper is proved on the file that carries the hazard
+       rather than assumed. The detector's own header quotes the old
+       `HAS_TEXT, 'Volume One(?!\d)'` form on purpose, because narrating the
+       defect is the opposite of committing it. So: the raw source contains
+       that text, the stripped code does not, and the stripped code is still
+       the program. Without the middle assertion this pair would pass for a
+       stripper that deleted everything. */
+    expect(src).toMatch(/HAS_TEXT, 'Volume One/);
+    expect(code).not.toMatch(/HAS_TEXT\s*,\s*'/);
+    expect(code).toMatch(/await\s+puppeteer\.launch/);
+  });
 });
