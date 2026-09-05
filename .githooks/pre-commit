@@ -224,7 +224,11 @@ bible_sync_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/data/bi
 if [ -n "$bible_sync_changed" ]; then
   echo "[pre-commit] Checking Bible verse timings — tools/validate-bible-sync.py..."
   if command -v py >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
-  $PYBIN tools/validate-bible-sync.py
+  # --all-editions, because this block's trigger already matches ANY
+  # bible-sync-<edition>.js while the command named none: it ran the brm-kjv
+  # default. Staging a new edition's timings fired the gate and the gate read a
+  # different file and passed.
+  $PYBIN tools/validate-bible-sync.py --all-editions
   status=$?
   if [ $status -ne 0 ]; then
     echo ""

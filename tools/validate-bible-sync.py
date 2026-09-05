@@ -108,15 +108,13 @@ def rebuild(belt):
     return arr
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--edition", default="brm-kjv")
-    ap.add_argument("--data", help="data file to check (default src/data/bible-sync-<edition>.js)")
-    ap.add_argument("--structural", action="store_true",
-                    help="corpus-shape checks only: no belts, no local audio, no ffprobe (CI)")
-    a = ap.parse_args()
-    ed = a.edition
+def check(ed, a):
+    """Validate ONE edition's data file. Returns 0 when it is clean."""
     bab = load(os.path.join(BASE, "batch-align-bible.py"), "batch_align_bible")
+    if ed not in bab.EDITIONS:
+        print(f"FAIL: src/data/bible-sync-{ed}.js exists but {ed!r} is not a known edition "
+              f"in batch-align-bible.py (known: {', '.join(sorted(bab.EDITIONS))})")
+        return 1
     want = al.settings_hash(al.settings_for(bab.EDITIONS[ed]["family"]))
     structural = a.structural
     idx = {} if structural else bab.audio_index(ed)
@@ -211,6 +209,36 @@ def main():
         return 0
     print("OK: every chapter matches its corpus, its audio and its belt; every current belt is shipped")
     return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--edition", default="brm-kjv")
+    ap.add_argument("--data", help="data file to check (default src/data/bible-sync-<edition>.js)")
+    ap.add_argument("--structural", action="store_true",
+                    help="corpus-shape checks only: no belts, no local audio, no ffprobe (CI)")
+    # Both callers -- ci.yml and .githooks/pre-commit -- used to invoke this with
+    # no --edition at all, so they checked brm-kjv and nothing else while their
+    # own comments claimed "every chapter in src/data/bible-sync-*.js". The
+    # hook's trigger already matches any bible-sync-<edition>.js, so the WEB
+    # edition now being aligned would have STAGED a new timings file, FIRED the
+    # gate, and had the gate validate a different file and pass. A gate that runs
+    # on the wrong input is worse than none: it reads as coverage.
+    ap.add_argument("--all-editions", action="store_true",
+                    help="check every src/data/bible-sync-<edition>.js on disk")
+    a = ap.parse_args()
+    if not a.all_editions:
+        return check(a.edition, a)
+    if a.data:
+        ap.error("--data names one file and cannot be combined with --all-editions")
+    pat = re.compile(r"^bible-sync-(.+)\.js$")
+    eds = sorted(m.group(1) for m in map(pat.match, os.listdir(DATA)) if m)
+    if not eds:
+        print("FAIL: --all-editions found no src/data/bible-sync-*.js to check")
+        return 1
+    # Every edition is checked even after one fails: a short report hides the
+    # rest, and the point of the flag is that nothing goes unlooked-at.
+    return max(check(ed, a) for ed in eds)
 
 
 if __name__ == "__main__":

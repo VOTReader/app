@@ -149,7 +149,11 @@ jobs:
         # the aligning machine has -- the pre-commit hook runs those (full mode).
         # Until c43 nothing read this file at all: check-audio-sync covers the
         # letters and validate:data never looks at it. Stdlib Python + node.
-        run: python tools/validate-bible-sync.py --structural
+        # --all-editions discovers the files rather than naming one. Without it
+        # this ran the brm-kjv default while the comment above claimed every
+        # bible-sync-*.js, so the WEB edition now being aligned would have landed
+        # a new timings file past a green gate that never opened it.
+        run: python tools/validate-bible-sync.py --structural --all-editions
 
       - name: Check audio renditions reach the app (audio-manifest)
         # node tools/check-audio-manifest.js: every reader who recorded a letter
