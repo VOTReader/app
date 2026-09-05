@@ -156,14 +156,71 @@ const browser = await puppeteer.launch({
    default context's origin storage with anything else this browser opens, and
    with whatever a previous run left there. */
 const context = await browser.createBrowserContext();
+/* DIAGNOSTICS (temporary). The detector reports what it expected to find and
+   nothing about what actually happened, so a boot that produces an empty page
+   reads as `segs:0` with no cause. These listeners cost nothing on a pass and
+   are printed only when something fails. */
+const diag = { pageerror: [], console: [], badRequests: [] };
+const CAP = 40;
+let dumpDiagnostics = async () => { console.error('(no page yet)'); };
 try {
   const page = await context.newPage();
+  page.on('console', (m) => { if (diag.console.length < CAP) diag.console.push(`[${m.type()}] ${m.text()}`); });
+  page.on('pageerror', (e) => { if (diag.pageerror.length < CAP) diag.pageerror.push(String((e && e.stack) || e)); });
+  page.on('requestfailed', (r) => { if (diag.badRequests.length < CAP) diag.badRequests.push(`FAILED ${r.url()} - ${r.failure() && r.failure().errorText}`); });
+  page.on('response', (r) => { if (r.status() >= 400 && diag.badRequests.length < CAP) diag.badRequests.push(`${r.status()} ${r.url()}`); });
+  dumpDiagnostics = async (why) => {
+    console.error(`===== E2E DIAGNOSTICS (${why}) =====`);
+    const state = await page.evaluate(() => ({
+      readyState: document.readyState,
+      url: location.href,
+      rootChildren: document.getElementById('root') ? document.getElementById('root').children.length : -1,
+      rootHtml: ((document.getElementById('root') || {}).innerHTML || '(no #root)').slice(0, 500),
+      scripts: [...document.querySelectorAll('script[src]')].map((x) => x.getAttribute('src')),
+      sw: (typeof navigator.serviceWorker === 'undefined') ? 'NO navigator.serviceWorker'
+          : (navigator.serviceWorker.controller ? 'controlled' : 'uncontrolled'),
+      idb: (typeof indexedDB === 'undefined' || indexedDB === null) ? 'NO indexedDB' : 'present',
+      ls: (() => { try { localStorage.setItem('__p', '1'); localStorage.removeItem('__p'); return 'writable'; }
+                   catch (e) { return 'THROWS ' + e.name; } })(),
+    })).catch((e) => ({ evaluateFailed: String(e) }));
+    const state2 = await Promise.race([
+      Promise.resolve(state),
+      new Promise((r) => setTimeout(() => r({ pageUnresponsive: 'evaluate did not return in 5s' }), 5000)),
+    ]);
+    console.error('page state: ' + JSON.stringify(state2, null, 2));
+    for (const k of ['pageerror', 'console', 'badRequests']) {
+      console.error(`--- ${k} (${diag[k].length}) ---`);
+      for (const line of diag[k]) console.error('  ' + line);
+    }
+    console.error('===== END DIAGNOSTICS =====');
+  };
+  /* BREADCRUMBS. A hang means a CDP call never answers, and the stack Puppeteer
+     prints on protocolTimeout names its own internals, not the call site. Every
+     page call announces itself on stderr before it goes and again when it comes
+     back, so the last line without a matching arrow IS the call that hung. */
+  let stepN = 0;
+  for (const m of ['goto', 'evaluate', 'waitForFunction', 'reload', 'setViewport']) {
+    const orig = page[m].bind(page);
+    page[m] = async (...a) => {
+      const n = ++stepN;
+      const where = ((new Error().stack || '').split('\n')[2] || '').trim();
+      process.stderr.write(`[step ${n}] --> page.${m}  ${where}\n`);
+      try {
+        const r = await orig(...a);
+        process.stderr.write(`[step ${n}] <-- page.${m} ok\n`);
+        return r;
+      } catch (e) {
+        process.stderr.write(`[step ${n}] <-- page.${m} THREW ${(e && e.message) || e}\n`);
+        throw e;
+      }
+    };
+  }
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const r = document.getElementById('root');
     return !!r && r.children.length > 0;
-  }, { timeout: 30000 });
+  }, { timeout: 30000 }).catch(async (e) => { await dumpDiagnostics('#root never got children'); throw e; });
 
   const clickText = async (re) => page.evaluate((reSrc) => {
     const re2 = new RegExp(reSrc);
@@ -316,8 +373,12 @@ try {
   else if (!(Math.abs(resume.scrollTop - resume.maxTop) <= resume.viewport)) fails.push('reopen did not resume at the SAVED scroll position (frontier jump back?): ' + JSON.stringify(resume));
   if (result2.progress['v1:volume-one:a-word-of-warning']) fails.push('completed item still has a frontier (should be cleared)');
 
-  if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); process.exitCode = 1; }
+  if (fails.length) { console.error('E2E FAIL:\n  ' + fails.join('\n  ')); await dumpDiagnostics('assertions failed'); process.exitCode = 1; }
   else console.log('E2E PASS — completion, ledger, day bucket, frontier, frontier-clear all verified in a real compositing Chromium.');
+} catch (err) {
+  console.error('\n!!! e2e:read threw: ' + ((err && err.stack) || err));
+  try { await dumpDiagnostics('threw before finishing'); } catch (e2) { console.error('(dump failed: ' + e2 + ')'); }
+  process.exitCode = 1;
 } finally {
   // The context goes first: closing it discards this run's storage partition,
   // which is what makes the next run's counts trustworthy.

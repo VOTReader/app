@@ -338,7 +338,31 @@ jobs:
         # check". In CI that is a step that can only ever skip, and a gate that
         # always skips is worse than an absent one — it reads green. It stays a
         # local gate until CI has audio to run it against.
-        run: npm run e2e:read
+        # ─── DIAGNOSTIC BRANCH ONLY — `diag-e2e-read`. NEVER LAND THIS. ───
+        # The 240 s `ProtocolError: Runtime.callFunctionOn timed out` hang fired
+        # on a runner for the first time on 2026-09-05 (run 33943433450 attempt 1,
+        # 04:05:31 -> 04:09:33), which killed the "it is that Windows machine"
+        # theory. Six prior main runs were green on this step, so the runner rate
+        # is roughly 1 in 7 — one attempt is a coin flip you lose.
+        #
+        # Three invocations per job is three chances per runner attempt, and the
+        # banners make the log unambiguous about which one hung: grep the whole
+        # log and you read whichever ran last, which is the mistake this repo has
+        # already made once. The detector on this branch is instrumented — every
+        # page call announces itself with its own call site, so the last `-->`
+        # with no matching `<--` names the line that never returned.
+        run: |
+          rc=0
+          for i in 1 2 3; do
+            echo "=================== E2E ATTEMPT $i ==================="
+            if npm run e2e:read; then
+              echo "=================== ATTEMPT $i PASSED ==================="
+            else
+              rc=1
+              echo "=================== ATTEMPT $i FAILED ==================="
+            fi
+          done
+          exit $rc
 
   kotlin-tests:
     name: Kotlin unit tests (NK1)
