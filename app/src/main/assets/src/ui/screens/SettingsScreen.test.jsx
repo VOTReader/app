@@ -794,6 +794,119 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 });
 
 /* ───────────────────────────────────────────────────────────────────────
+   A backup that was CUT is not a backup that failed a checksum.
+   ─────────────────────────────────────────────────────────────────────
+   Two import toasts named the wrong defect for integrity 'truncated'. The
+   web one has said "this backup failed its integrity check — some data may
+   be corrupted" since storage-backup-1 made readContainer produce that value;
+   backup-android-1 made the same sentence reachable on Android. A cut file
+   did not fail a checksum, and telling the owner it did sends them looking
+   for corruption in data that is intact — the same distinction
+   formatVerifyReport draws three times over.
+
+   THESE TOASTS HAD NO TEST AT ALL. The Native Builder said so rather than let
+   4,536 green tests imply coverage they did not have, which is why this exists
+   instead of a note. Both assertions check BOTH directions: the cut wording
+   appears, and the checksum wording does not — because a fix that merely adds
+   a branch, or one that deletes the true warning along with the false one,
+   would each pass half of this.
+   ─────────────────────────────────────────────────────────────────────── */
+describe('a truncated backup is reported as cut, not as failing its checksum', () => {
+  beforeEach(() => modalRegistry._reset());
+
+  const MANIFEST = { app: 'VOTReader', exportVersion: 3, exportDate: '2026-01-01T00:00:00.000Z', stores: {}, media: [] };
+  // fakeFile() lives in another describe's scope; the container path only needs
+  // a size and eight bytes to sniff, and isContainerMagic is stubbed true.
+  const containerFile = () => ({
+    size: 4096,
+    slice: () => ({ arrayBuffer: async () => new Uint8Array(8).buffer }),
+    text: async () => '',
+  });
+  const CUT = /cut short/;
+  const CHECKSUM = /failed its integrity check/;
+  const textsOf = (spy) => spy.mock.calls.map((c) => (c[0] && c[0].text) || '').join(' | ');
+
+  it('web: readContainer returning truncated warns that the file was cut', async () => {
+    const toastSpy = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        pickImportFile: async () => containerFile(),
+      },
+      isContainerMagic: () => true,
+      readContainer: async () => ({ manifest: MANIFEST, entries: [], integrity: 'truncated' }),
+      validateImportEnvelope: () => [],
+      applyV3: vi.fn(async () => ({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] })),
+      showToast: toastSpy,
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
+    expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
+  });
+
+  it('web: a real checksum MISMATCH still says the integrity check failed', async () => {
+    // The other half. A fix that stopped saying "failed its integrity check"
+    // at all would pass the case above and lose a true warning.
+    const toastSpy = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        pickImportFile: async () => containerFile(),
+      },
+      isContainerMagic: () => true,
+      readContainer: async () => ({ manifest: MANIFEST, entries: [], integrity: 'mismatch' }),
+      validateImportEnvelope: () => [],
+      applyV3: vi.fn(async () => ({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] })),
+      showToast: toastSpy,
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CHECKSUM));
+    expect(textsOf(toastSpy)).not.toMatch(CUT);
+  });
+
+  it('android: onDone("truncated") reports a cut file in the completion toast', async () => {
+    const toastSpy = vi.fn();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      PlatformBridge: {
+        isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
+        v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
+        v3ImportClose: () => {},
+      },
+      classifyV3ImportBegin: realClassifyV3,
+      validateImportEnvelope: () => [],
+      v3AndroidImportEntries: (args) => (async function* () { yield* []; if (args.onDone) args.onDone('truncated'); })(),
+      applyV3: vi.fn(async (_m, entries) => {
+        for await (const _e of entries) { void _e; }
+        return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
+      }),
+      showToast: toastSpy,
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByText('Import'));
+    await screen.findByText(/will OVERWRITE/);
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+
+    await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
+    expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────
    Android v3 import — the native stream must stay OPEN across the confirm.
    Regression: the fire-and-forget confirm sheet (after the blocking
    window.confirm was retired in Wave 0) let _importV3Android's
