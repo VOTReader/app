@@ -2,6 +2,18 @@
  * sw-visual-diff — does collapsing a fly-over faded to nothing change a single pixel? (scripture-web-3:
  * the design pass at depth, measured instead of eyeballed.)
  *
+ * CONTRACT. This is the repo's first GPU-pixel gate. It PROVES, on this machine's GPU through the
+ * Chrome puppeteer bundles (ANGLE D3D11 on the Radeon 890M; `--backend sw` for SwiftShader Vulkan),
+ * that a renderer change draws the same pixels as main at every listed view, within the noise floor
+ * main-drawn-twice sets, and that the instrument can see a change (the threshold-1.0 control must
+ * erase every ribbon; an epsilon guard must move pixels inside the partial-fade band). It CANNOT
+ * prove a mobile GPU: no Mali or Adreno compiler runs here, so a GLSL construct that is legal on
+ * desktop and rejected on a phone passes this gate. Exit 0 = PASS; exit 1 prints which view failed
+ * and why; exit 2 = bad arguments. To run it on scripture-web-3 from this branch's worktree:
+ *   git show <branch tip>:app/src/main/assets/src/ui/scripture-web/web-renderer.js > after.js
+ *   node tools/sw-visual-diff.mjs --after after.js --backend hw --eps 0.02,0.05,0.1 --out shots
+ * about four minutes on hw with PNGs, two without `--out`; `--backend sw` about two minutes.
+ *
  *   node tools/sw-visual-diff.mjs --after <web-renderer.js from the branch> [--backend hw|sw] [--out dir]
  *                                 [--eps 0.02,0.1] [--zooms 1,16,23,400]
  *
