@@ -364,8 +364,28 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
  * @param {string | undefined} mediaId
  * @returns {{ url: string | null, missing: boolean }}
  */
+/** Stable identities for useSyncExternalStore - a new function each render would
+ *  resubscribe on every render. @param {() => void} cb @returns {() => void} */
+function _subscribeMediaUrls(cb) {
+  var S = /** @type {any} */ (window).JournalMediaStore;
+  return (S && typeof S.subscribeUrls === 'function') ? S.subscribeUrls(cb) : function() {};
+}
+
+/** @returns {number} */
+function _mediaUrlEpoch() {
+  var S = /** @type {any} */ (window).JournalMediaStore;
+  return (S && typeof S.getUrlEpoch === 'function') ? S.getUrlEpoch() : 0;
+}
+
 function useMediaUrl(mediaId) {
   const [state, setState] = React.useState({ url: null, missing: false });
+  // The store revokes cached object URLs in bulk (the memory-trim purge, the
+  // import-replace clear, a delete). This resolves ONCE per mediaId, so without the
+  // epoch in the deps the block keeps a URL that no longer resolves while its own state
+  // still says missing:false. Guarded: a store without these verbs (the web/PWA
+  // harnesses, and every other case in the media suite) degrades to the old behaviour
+  // rather than throwing.
+  const epoch = React.useSyncExternalStore(_subscribeMediaUrls, _mediaUrlEpoch);
   React.useEffect(function() {
     var cancelled = false;
     if (!mediaId) { setState({ url: null, missing: true }); return undefined; }
@@ -385,7 +405,7 @@ function useMediaUrl(mediaId) {
       if (!cancelled) { console.warn('journal media lookup failed', mediaId, e); setState({ url: null, missing: false }); }
     });
     return function() { cancelled = true; };
-  }, [mediaId]);
+  }, [mediaId, epoch]);
   return state;
 }
 
