@@ -44,3 +44,51 @@ describe('matthew-nkjv.js rides the lazy Matthew bundle, not the cold-boot bundl
     expect(/\bMATTHEW\s*=/.test(am), 'bundle-a-matthew.js lacks MATTHEW').toBe(true);
   });
 });
+
+
+/* THE VENDORED MIT NOTICES HAVE TO REACH THE SHIPPED BYTES.
+   ─────────────────────────────────────────────────────────────────────
+   MiniSearch is MIT (© Luca Ongaro), and MIT requires the copyright notice
+   to travel with "all copies or substantial portions of the Software". The
+   vendored source carried it in a plain `/* … *\/` banner, which is exactly
+   the form esbuild's default `legal-comments=eof` does NOT keep — it keeps
+   `/*!`, `//!`, `@license` and `@preserve` — so the notice was silently
+   dropped from `dist/bundle-e.js`, and from the live site, for as long as
+   search has shipped. Verified against the live bundle: zero hits for
+   `Ongaro`, `@license` or `Copyright`.
+
+   This is NOT a missing build flag. Nothing about the pipeline needed
+   changing; the banner simply never qualified as a legal comment.
+
+   The two assertions are deliberately split so a failure says WHICH half
+   broke: the vendored file losing the notice (a bad regeneration) and the
+   bundle losing it (a build change) are different repairs. A regeneration
+   is exactly how it got here, so the recipe in the file header and in
+   VENDORED-LIBS.md now spells the `/*!` form out. */
+describe('vendored MIT notices survive into the shipped bundles', () => {
+  it('the vendored MiniSearch source carries its MIT notice', () => {
+    const src = readFileSync(resolve(HERE, '..', 'app', 'src', 'main', 'assets', 'src', 'search', 'vendor', 'minisearch.js'), 'utf-8');
+    // Booleans, not toMatch: a failure must not dump a 64 KB file into the report.
+    expect(/Luca Ongaro/.test(src), 'vendored minisearch.js lost its MIT notice').toBe(true);
+    expect(/^\/\*!/.test(src), 'the banner is not in a form esbuild keeps (needs /*! or @license)').toBe(true);
+  });
+
+  it('...and it is still there in dist/bundle-e.js, which is what ships', () => {
+    const built = readFileSync(resolve(DIST, 'bundle-e.js'), 'utf-8');
+    expect(/Luca Ongaro/.test(built), 'dist/bundle-e.js ships without MiniSearch\'s MIT notice').toBe(true);
+    // The control: bundle-e really is the minified artifact, so the assertion
+    // above is not passing because someone pointed it at an unminified file.
+    expect(built.length > 50000, 'bundle-e.js is smaller than expected — wrong file?').toBe(true);
+    expect(/\n\s{2,}\S/.test(built.slice(0, 4000)), 'bundle-e.js head looks unminified').toBe(false);
+
+    /* ...and ONLY the notice ships. The vendored file's maintenance notes sit in
+       a plain comment that esbuild strips -- but only while they avoid NAMING the
+       two conventional preservation markers, because esbuild keeps any comment
+       that contains one. Measured on a fixture, not assumed: a plain comment
+       merely talking about those markers survives minification, while a control
+       mentioning neither is stripped. The first draft of those notes named both
+       and shipped ~800 bytes of build instructions to every reader. This is the
+       assertion that caught it. */
+    expect(/Regenerate:/.test(built), 'bundle-e.js is shipping the vendor file build instructions').toBe(false);
+  });
+});

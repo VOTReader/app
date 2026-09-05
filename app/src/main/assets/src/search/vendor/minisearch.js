@@ -1,5 +1,23 @@
-/* MiniSearch v7.2.0 — vendored from npm (MIT © Luca Ongaro). Generated, do not hand-edit. Regenerate: npx esbuild node_modules/minisearch/dist/es/index.js --bundle --format=esm */
+/*! MiniSearch v7.2.0 | MIT License | Copyright (c) Luca Ongaro */
+/* MAINTENANCE NOTES. Only the one-line banner above ships: `/*!` marks it a
+   legal comment, so esbuild moves it to the end of dist/bundle-e.js and every
+   reader downloads it. This comment is stripped.
 
+   Vendored from npm. Generated, do not hand-edit.
+   Regenerate:  npx esbuild node_modules/minisearch/dist/es/index.js --bundle --format=esm
+   ...then PUT THE BANNER BACK, and keep its `/*!`. esbuild's default
+   legal-comments=eof keeps a comment only if it opens with the bang form, or if
+   it CONTAINS either of the two conventional preservation markers -- which this
+   comment deliberately does not spell out, because naming them is enough to make
+   esbuild keep this comment too. That is measured, not assumed: the first draft
+   of these notes named both markers in prose and shipped ~800 bytes of build
+   instructions to every reader.
+
+   The plain banner this file used to carry was dropped from the shipped bundle
+   for the same reason in reverse, and MIT's "include this notice in all copies"
+   stopped being true of the bytes readers actually get. A regeneration is how
+   that happened; the form is the fix, and tools/bundle-membership.test.js fails
+   if the notice goes missing or if these notes start shipping. */
 // node_modules/minisearch/dist/es/index.js
 var ENTRIES = "ENTRIES";
 var KEYS = "KEYS";
