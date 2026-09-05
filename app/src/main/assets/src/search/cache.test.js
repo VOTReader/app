@@ -33,6 +33,21 @@ describe('cache signature', () => {
     expect(dataSignature('nkjv')).not.toBe(dataSignature('kjv'));
   });
 
+  it('search-3: retires every NON-NKJV slot the old builder wrote, and leaves nkjv alone', () => {
+    // Before search-3 a non-NKJV index was built from NKJV text (the BIBLE_<CODE> global was
+    // never loaded) and cached under that code. Those slots must never be read back. NKJV
+    // slots were always correct — this is what makes the retirement targeted rather than an
+    // MS_INDEX_VERSION bump, which would rebuild every reader's index to fix some readers'.
+    expect(dataSignature('kjv')).toContain('tr:kjv.t2');
+    expect(dataSignature('web')).toContain('tr:web.t2');
+    // CONTROL, and it is the whole point of doing it this way: nkjv is untouched, so an NKJV
+    // reader's cached index still matches and they rebuild nothing.
+    expect(dataSignature('nkjv')).toContain('tr:nkjv');
+    expect(dataSignature('nkjv')).not.toContain('.t2');
+    // …and the empty/absent code still resolves to the nkjv slot, not to a '.t2' one.
+    expect(dataSignature('')).toBe(dataSignature('nkjv'));
+  });
+
   it('counts book chapters when BOOKS is present', () => {
     const G = /** @type {any} */ (globalThis);
     G.BOOKS = { genesis: { chapters: [{}, {}, {}] } };

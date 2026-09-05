@@ -38,7 +38,9 @@ const FUZZY = 0.2;
 /** @type {Promise<boolean>|null} */ let building = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string}} */ let stats = {};
+/** `translation` is the text the index ACTUALLY holds; `requested` is the code that was asked
+ *  for. They differ when a translation could not be loaded (search-3). */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, requested?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -55,9 +57,38 @@ function reshapeDoc(r) {
 }
 
 /** Build the in-memory index for one translation (chunked for onProgress). */
+/**
+ * Is this translation's TEXT actually present? Only the `BIBLE_<CODE>` global says so —
+ * `loadTranslation` resolves for an unshipped code and for a 404 alike, so "we asked for kjv"
+ * is never evidence that KJV text arrived (search-3).
+ * @param {string} code
+ * @returns {boolean}
+ */
+function translationTextAvailable(code) {
+  if (!code || code === 'nkjv') return true;
+  return !!(/** @type {any} */ (globalThis))['BIBLE_' + code.toUpperCase()];
+}
+
 async function build(options) {
   options = options || {};
-  const code = options.translation || 'nkjv';
+  const requested = options.translation || 'nkjv';
+
+  // search-3: buildDocs reads the alternate translation off the BIBLE_<CODE> global, and only
+  // loadTranslation() ever defines it. Nothing on the search path was calling it — SearchScreen
+  // fires init() with mount deps [] and comes straight here — so every non-NKJV index was built
+  // from the NKJV base text. translations.js lives in bundle-d and owns the load cache in module
+  // state, so this is the guarded bare global scripture-resolution.js already uses; importing it
+  // would give bundle-e a second copy of that cache and the two would disagree about what is
+  // loaded.
+  const g = /** @type {any} */ (globalThis);
+  if (requested !== 'nkjv' && typeof g.loadTranslation === 'function') {
+    try { await g.loadTranslation(requested); } catch { /* 404 / unshipped — the stamp below tells the truth */ }
+  }
+
+  // Stamp the index with the text it HOLDS, never with the text that was asked for. Recording the
+  // request would persist NKJV text under 'tr:kjv', where sameTranslation() would keep it for
+  // good — a not-known written down as a value, and made durable by the cache.
+  const code = translationTextAvailable(requested) ? requested : 'nkjv';
   const sig = dataSignature(code);
 
   // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s).
@@ -68,7 +99,7 @@ async function build(options) {
       msIndex = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
       ready = true;
       buildError = null;
-      stats = { docCount: msIndex.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code };
+      stats = { docCount: msIndex.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, requested };
       if (options.onProgress) options.onProgress(stats.docCount, stats.docCount);
       return;
     }
@@ -98,13 +129,18 @@ async function build(options) {
     insertMs: Math.round(t2 - t1), // MiniSearch addAll (index-bound)
     cached: false,
     translation: code,
+    requested,
   };
   // Persist for next session (fire-and-forget; ~0.5s serialize + IDB write).
   saveCached(sig, JSON.stringify(ms)).catch(() => {});
 }
 
+/** Does the built index answer for the translation this call wants? Compared against the REQUEST,
+ *  not against the stamp: an index that fell back to NKJV because kjv could not load still answers
+ *  a kjv request as well as it ever will, and comparing stamps would rebuild it on every search
+ *  (search-3). */
 function sameTranslation(opts) {
-  return !opts || !opts.translation || stats.translation === opts.translation;
+  return !opts || !opts.translation || stats.requested === opts.translation;
 }
 
 /**
@@ -344,7 +380,7 @@ function suggest(query, opts) {
 /** Drop the in-memory index and rebuild for the active (or given) translation. */
 function rebuild(options) {
   options = options || {};
-  const code = options.translation || stats.translation || 'nkjv';
+  const code = options.translation || stats.requested || stats.translation || 'nkjv';
   ready = false;
   msIndex = null;
   clearCached().catch(() => {});

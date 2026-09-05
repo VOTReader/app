@@ -69,7 +69,12 @@ export function dataSignature(translation) {
   return [
     'v:' + MS_INDEX_VERSION,
     'cv:' + CORPUS_CONTENT_VERSION,
-    'tr:' + (translation || 'nkjv'),
+    // search-3: '.t2' marks the generation of non-NKJV indexes built AFTER the engine began
+    // loading the translation before indexing. Every earlier non-NKJV slot holds NKJV text under
+    // a foreign code and must never be read back. NKJV slots were always correct and keep their
+    // signature, so those readers rebuild nothing — which is why this is not an MS_INDEX_VERSION
+    // bump, that would bust every reader's index to fix an index only some readers have.
+    'tr:' + (translation && translation !== 'nkjv' ? translation + '.t2' : 'nkjv'),
     'bk:' + kc(g('BOOKS')) + '.' + bookChapterCount(),
     'mt:' + (MATTHEW && MATTHEW.chapters ? MATTHEW.chapters.length : 0),
     'v1:' + ln(g('LETTERS_V1')), 'v2:' + ln(g('LETTERS')), 'v3:' + ln(g('LETTERS_V3')),
