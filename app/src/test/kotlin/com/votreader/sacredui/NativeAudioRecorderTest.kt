@@ -197,9 +197,10 @@ class NativeAudioRecorderTest {
     fun `start sweeps stale served recordings but keeps fresh ones`() {
         // start() prunes recordings/ files older than the TTL (memos orphaned when
         // the app died before JS fetched them) but never a just-served file (an
-        // in-flight fetch is only seconds old). The sweep runs at the TOP of
-        // start(), before the permission check, so it fires even though start()
-        // then denies below (RECORD_AUDIO revoked in @Before).
+        // in-flight fetch is only seconds old). The sweep runs BELOW the permission
+        // check -- deleting files is not something a refused start should do -- so
+        // this test has to grant RECORD_AUDIO to reach it at all.
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         val dir = File(application.cacheDir, NativeAudioRecorder.RECORDINGS_DIR).apply { mkdirs() }
         val stale = File(dir, "stale.m4a").apply { writeBytes(ByteArray(4)) }
         val fresh = File(dir, "fresh.m4a").apply { writeBytes(ByteArray(4)) }
@@ -209,6 +210,74 @@ class NativeAudioRecorderTest {
 
         assertFalse(stale.exists(), "a stale served recording should be swept on start")
         assertTrue(fresh.exists(), "a just-served recording must survive (fetch may be in flight)")
+    }
+
+    @Test
+    fun `a served memo JS has not released survives the sweep`() {
+        // The loss journal-3 2a exists to prevent, from the other side. A served file
+        // becomes sweep-eligible RECORDING_TTL_MS after stop(); a fetch that keeps
+        // failing is retried for longer than that, and the user's natural response to
+        // a stuck memo is to record again -- which is a start(), which swept it.
+        //
+        // The orphan planted alongside is the control: if the sweep stopped working
+        // altogether the first assertion would pass for the wrong reason.
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+        val stopped = assertIs<NativeAudioRecorder.Result.Success<NativeAudioRecorder.RecordingResult>>(
+            recorder.stop()
+        )
+        val served = requireNotNull(stopped.value.fileName) {
+            "stop() must have taken the fetch-bridge path, or this test proves nothing"
+        }
+        val memo = File(servedDir(), served)
+        assertTrue(memo.exists(), "the served memo must be on disk before the sweep runs")
+
+        val orphan = File(servedDir(), servedName()).apply { writeBytes(ByteArray(4)) }
+        val old = System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L
+        memo.setLastModified(old)
+        orphan.setLastModified(old)
+
+        recorder.start()
+
+        assertTrue(
+            memo.exists(),
+            "a memo JS was handed and has not released must survive start(), however old"
+        )
+        assertNotNull(
+            recorder.readRecording(served),
+            "and it must still be recoverable -- surviving on disk is only half of it"
+        )
+        assertFalse(
+            orphan.exists(),
+            "an orphan no one claimed must still be swept, or the sweep has simply stopped"
+        )
+
+        // The handshake is the only thing that ends the claim.
+        assertTrue(recorder.deleteRecording(served), "deleteRecording must remove the claimed memo")
+        assertFalse(memo.exists(), "and the file must actually be gone afterwards")
+
+        // The claim is keyed by name, so releasing it has to be observable: a file that
+        // later takes the released name is an ordinary orphan again. Without the remove
+        // in deleteRecording the claim outlives the file it was made for and pins that
+        // name for the life of the process, and nothing else in this suite would notice.
+        val reused = File(servedDir(), served).apply { writeBytes(ByteArray(4)) }
+        reused.setLastModified(old)
+
+        recorder.start()
+
+        assertFalse(reused.exists(), "a released name must go back to being sweepable")
+    }
+
+    @Test
+    fun `a start refused for permission sweeps nothing`() {
+        // RECORD_AUDIO revoked in @Before. The sweep destroys data, so it belongs
+        // below the gate: a tap with the mic revoked is not a reason to prune.
+        val orphan = File(servedDir(), servedName()).apply { writeBytes(ByteArray(4)) }
+        orphan.setLastModified(System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L)
+
+        assertIs<NativeAudioRecorder.Result.Failure>(recorder.start())
+
+        assertTrue(orphan.exists(), "a start refused for permission must not delete anything")
     }
 
     // ─── journal-3 2a: readRecording / deleteRecording ────────────────
