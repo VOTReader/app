@@ -423,8 +423,9 @@ class AppInterfaceTest {
 
     @Test
     fun `getCrashLog returns empty array when releaseTree is null`() {
-        // Default state -- VOTReaderApp.releaseTree is null on debug builds
-        // (and in this test environment, where VOTReaderApp.onCreate never ran).
+        // The pre-onCreate state. VOTReaderApp.onCreate never runs in this
+        // test environment, so releaseTree is null here on every variant
+        // (since android-kotlin-4 a real app plants the buffer on debug too).
         VOTReaderApp.releaseTree = null
         val (app, _, _) = newSubject()
         assertEquals("[]", app.getCrashLog())

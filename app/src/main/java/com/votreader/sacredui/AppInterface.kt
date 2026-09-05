@@ -569,11 +569,12 @@ class AppInterface(
     /**
      * Return the BoundedLogTree's JSON-array snapshot, used by the
      * JS-side Export to include a diagnostic tail in the user's
-     * "Your Data" export. Returns "[]" on debug builds (the
-     * DebugTree is planted instead of BoundedLogTree, so there's no
-     * captured buffer to read). The contract from JS's perspective
-     * is "always a valid JSON array string", which both branches
-     * honour.
+     * "Your Data" export. The buffer is planted on every variant
+     * (android-kotlin-4), so the "[]" fallback now covers only the
+     * window before VOTReaderApp.onCreate has run — in practice, unit
+     * tests. An empty buffer also serializes to "[]". The contract
+     * from JS's perspective is "always a valid JSON array string",
+     * which every branch honours.
      */
     @JavascriptInterface
     fun getCrashLog(): String {

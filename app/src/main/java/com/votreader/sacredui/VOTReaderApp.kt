@@ -7,34 +7,43 @@ import java.io.File
 import timber.log.Timber
 
 /**
- * Application subclass — plants a Timber tree on cold start.
+ * Application subclass — plants the Timber trees on cold start.
  *
- * Debug builds get DebugTree, which auto-tags logs with the calling
- * class name and forwards every level to Logcat for chrome://inspect
- * debugging.
- *
- * Release builds get [BoundedLogTree] (NK5b) — an in-memory ring buffer
+ * EVERY variant gets [BoundedLogTree] (NK5b) — an in-memory ring buffer
  * of the last 200 WARN+ entries, sanitized to redact content:// URIs
  * and absolute paths. The Export JSON pulls this via the
  * AndroidBridge.getCrashLog() @JavascriptInterface so a user-shared
  * diagnostic includes the recent failure trail without ever writing
  * anything to disk or sending bytes off-device.
  *
- * The release tree is held in [releaseTree] (singleton, nullable) so
+ * Debug builds get DebugTree ON TOP of it, which auto-tags logs with the
+ * calling class name and forwards every level to Logcat for
+ * chrome://inspect debugging.
+ *
+ * The buffer is held in [releaseTree] (singleton, nullable) so
  * MainActivity can read it back without re-discovering the planted
- * instance.
+ * instance. The property name is historical — since android-kotlin-4
+ * (2026-09-05) it is planted on debug too; it is null only before
+ * onCreate has run, which in practice means unit tests.
  */
 class VOTReaderApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        } else {
-            val tree = BoundedLogTree()
-            releaseTree = tree
-            Timber.plant(tree)
-        }
+        // android-kotlin-4: the ring buffer is planted on EVERY variant, not only
+        // release. It used to be an either/or, which meant a debug build -- the
+        // build a tester installs and the build every device APK before
+        // 2026-09-05 was -- left releaseTree null, so getCrashLog returned "[]"
+        // forever and the "Your Data" export's native diagnostic half was
+        // structurally empty. Timber supports multiple trees; the buffer costs
+        // 200 entries of RAM and its own WARN floor keeps debug noise out.
+        val tree = BoundedLogTree()
+        releaseTree = tree
+        Timber.plant(tree)
+        // Debug additionally keeps the Logcat tree, which is what
+        // chrome://inspect debugging reads. Planted second so the buffer is
+        // populated even if DebugTree ever throws.
+        if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
 
         // #2: WebView forbids two processes sharing one data directory. This app is
         // single-process today, but if any future component/library ever spawns a
@@ -81,9 +90,11 @@ class VOTReaderApp : Application() {
 
     companion object {
         /**
-         * The currently-planted release tree, or null on debug builds.
-         * MainActivity's getCrashLog @JavascriptInterface reads from
-         * here.
+         * The currently-planted [BoundedLogTree], or null before
+         * [onCreate] has run. MainActivity's getCrashLog
+         * @JavascriptInterface reads from here. Named for the release
+         * build it was introduced for; planted on every variant since
+         * android-kotlin-4.
          */
         @Volatile var releaseTree: BoundedLogTree? = null
             internal set
