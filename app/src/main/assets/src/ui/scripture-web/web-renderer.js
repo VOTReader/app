@@ -87,6 +87,19 @@ void main(){
   // The law lives in geometry.js, inlined above, because pick.js applies the
   // same test — an arc faded to nothing here must not win a tap there.
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
+  // ...and once it has reached zero, STOP DRAWING IT. Alpha 0 still costs a
+  // full rasterise and blend of every pixel of the ribbon. Measured with
+  // EXT_disjoint_timer_query_webgl2 on the real asset (Design & Performance,
+  // scripture-web-3-fill-measure.md): phone 375@3 at zoom 400x, 3.05 -> 1.09 ms
+  // on a Radeon 890M (-64 %) and 319.7 -> 134.5 ms on SwiftShader (-58 %). The
+  // chunk cull already dropped 63,418 instances to 18,944 there; only a few
+  // dozen of those are visible, and the rest were being blended for nothing.
+  //
+  // The threshold is EXACTLY the zero pick.js refuses taps on (pick.js:87), not
+  // an epsilon near it. Culling any wider would blank arcs inside the partial
+  // fade band that are still tappable, and the reader would be tapping a line
+  // that is not on the screen.
+  if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
   vec3 col;
   if (uColorMode < .5) {
