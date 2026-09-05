@@ -14,7 +14,7 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
           <button
             type="button"
             className="settings-info-btn"
-            aria-label={showDesc ? "Hide description" : "Show description"}
+            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>

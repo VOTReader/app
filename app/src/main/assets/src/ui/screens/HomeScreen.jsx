@@ -13,7 +13,7 @@ function _homeDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, historyEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -61,34 +61,37 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const orderRef = React.useRef(order);
   React.useEffect(() => {orderRef.current = order;}, [order]);
 
-  // Q8.3: pre-fire the VOT corpus load on home screen mount. Users
-  // typically tap a home tile within a few seconds; by the time they pick
-  // Volumes / Library / Studies, the 3 MB corpus is already downloading
-  // in parallel with their tile scan.
-  React.useEffect(() => {
-    if (typeof window.__loadVotCorpus === 'function') {
-      window.__loadVotCorpus().catch((e) => console.warn('VOT corpus pre-load failed', e));
+  // Warm only the destination the reader is approaching. Offline precaching
+  // remains the service worker's job; opening Home no longer executes corpora.
+  const warmDestination = (id) => {
+    const load = id === 'scriptures' ? window.__loadBibleCorpus
+      : id === 'settings' ? window.__loadScreensE
+      : ['volumes', 'studies', 'library', 'listening'].includes(id) ? window.__loadVotCorpus : null;
+    if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));
+  };
+  const [surpriseBusy, setSurpriseBusy] = React.useState(false);
+  const [homeStatus, setHomeStatus] = React.useState('');
+  const surprisePending = React.useRef(false);
+  const mounted = React.useRef(true);
+  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const openSurprise = async () => {
+    if (surprisePending.current) return;
+    surprisePending.current = true;
+    setSurpriseBusy(true);
+    setHomeStatus('Preparing a reading…');
+    try {
+      await Promise.all([
+        window.__loadVotCorpus, window.__loadBibleCorpus, window.__loadMatthewCorpus,
+        typeof loadBibleStudies === 'function' ? loadBibleStudies : null,
+      ].filter((load) => typeof load === 'function').map((load) => load()));
+      if (mounted.current) { setHomeStatus(''); onSurprise(); }
+    } catch (_e) {
+      if (mounted.current) setHomeStatus('Could not prepare a reading. Check your connection and try Surprise Me again.');
+    } finally {
+      surprisePending.current = false;
+      if (mounted.current) setSurpriseBusy(false);
     }
-  }, []);
-
-  // Surprise button needs MATTHEW + BIBLE_BOOK_LIST + BIBLE_STUDIES (all
-  // lazy globals) to build its random pool. Pre-fire each loader when the
-  // button is shown so the tap resolves cleanly instead of waiting on the
-  // user's next visit to Scriptures / Studies.
-  React.useEffect(() => {
-    if (!showSurprise) return;
-    if (typeof window.__loadBibleCorpus === 'function') {
-      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load (surprise) failed', e));
-    }
-    if (typeof window.__loadMatthewCorpus === 'function') {
-      window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load (surprise) failed', e));
-    }
-    // bible-studies.js is a separate ~4.3 MB lazy script (translations.js
-    // loadBibleStudies). Without it, study chapters never reach the dice pool.
-    if (typeof loadBibleStudies === 'function') {
-      loadBibleStudies().catch((e) => console.warn('Bible studies pre-load (surprise) failed', e));
-    }
-  }, [showSurprise]);
+  };
 
   const setCardRef = (i) => (el) => {cardRefs.current[i] = el;};
 
@@ -274,11 +277,36 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           <div className="home-ornament-diamond" />
           <div className="home-ornament-line r" />
         </div>
+        <nav className="home-shortcuts" aria-label="Quick access">
+          {searchEnabled !== false && <button type="button" className="home-search-action" onClick={onSearch}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
+            Search library
+          </button>}
+          {historyEnabled !== false && <button type="button" onClick={onHistory}>Recent reading</button>}
+          {onNotes && <button type="button" onClick={onNotes}>Notes</button>}
+          {onBookmarks && <button type="button" onClick={onBookmarks}>Bookmarks</button>}
+          {onScriptureWeb && <button type="button" onClick={onScriptureWeb}>Scripture Web</button>}
+        </nav>
         <div className="home-nav-list">
           {orderedItems.map((item, i) => (
             <button
               key={item.id}
               ref={setCardRef(i)}
+              aria-describedby="home-reorder-hint"
+              onPointerEnter={() => warmDestination(item.id)}
+              onFocus={() => warmDestination(item.id)}
+              onKeyDown={(e) => {
+                if (!e.altKey || !['ArrowUp', 'ArrowDown'].includes(e.key) || dragIdx >= 0) return;
+                e.preventDefault();
+                const target = orderedItems[i + (e.key === 'ArrowUp' ? -1 : 1)];
+                if (!target) return;
+                const next = [...order];
+                const from = next.indexOf(item.id), to = next.indexOf(target.id);
+                [next[from], next[to]] = [next[to], next[from]];
+                HomeOrderStore.set(next);
+                setOrder(next);
+                setHomeStatus(item.title + ' moved ' + (e.key === 'ArrowUp' ? 'up.' : 'down.'));
+              }}
               className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
               onPointerDown={(e) => {
                 if (e.isPrimary === false) return; // a second finger never owns a gesture
@@ -300,7 +328,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
             </button>
           ))}
         </div>
-        {isFirstVisit && <span className="home-rearrange-hint">Hold to rearrange</span>}
+        <span id="home-reorder-hint" className="home-rearrange-hint">Hold to rearrange · Keyboard: Alt + ↑ / ↓</span>
+        <p className="home-status" role="status">{homeStatus}</p>
         {showSurprise && (
           /* Wave 0: the breathing dice was visually anonymous — a sighted
              user had no way to know what it does. The visible caption
@@ -314,7 +343,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
              is the descriptive one; it still OPENS with the visible caption,
              so label-in-name (2.5.3) holds, which a bare swap to the
              descriptive title would have broken. */
-          <button className="surprise-fab" onClick={onSurprise} title="Surprise Me — open a random chapter or letter" aria-label="Surprise Me — open a random chapter or letter">
+          <button className="surprise-fab" onClick={openSurprise} disabled={surpriseBusy} aria-busy={surpriseBusy} title="Surprise Me — open a random chapter or letter" aria-label="Surprise Me — open a random chapter or letter">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3.5" />
               <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />

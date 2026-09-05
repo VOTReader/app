@@ -24,9 +24,9 @@ describe('SelectField — ⓘ description', () => {
   it('reveals and hides a plain string desc on ⓘ taps', () => {
     render(<SelectField eyebrow="Test" title="Row" label="Row" desc="plain string desc" value="a" options={OPTIONS} onChange={() => {}} />);
     expect(screen.queryByText('plain string desc')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description'));
+    fireEvent.click(screen.getByLabelText('Show description for Row'));
     expect(screen.getByText('plain string desc')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description'));
+    fireEvent.click(screen.getByLabelText('Hide description for Row'));
     expect(screen.queryByText('plain string desc')).toBeNull();
   });
 
@@ -40,10 +40,10 @@ describe('SelectField — ⓘ description', () => {
     );
     render(<SelectField eyebrow="Test" title="Row" label="Row" desc={node} value="a" options={OPTIONS} onChange={() => {}} />);
     expect(screen.queryByText(/AI assistance/)).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description'));
+    fireEvent.click(screen.getByLabelText('Show description for Row'));
     expect(screen.getByText(/AI assistance/)).toBeTruthy();
     expect(screen.getByText('rule one')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description'));
+    fireEvent.click(screen.getByLabelText('Hide description for Row'));
     expect(screen.queryByText(/AI assistance/)).toBeNull();
   });
 });

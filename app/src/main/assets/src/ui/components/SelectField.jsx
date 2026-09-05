@@ -33,13 +33,13 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
           <button
             type="button"
             className="settings-info-btn"
-            aria-label={showDesc ? "Hide description" : "Show description"}
+            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>
         )}
         <span className="settings-row-grow" />
-        <button type="button" className="settings-select-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={sheetId} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        <button type="button" className="settings-select-trigger" aria-label={label + ': ' + selected.label} aria-haspopup="dialog" aria-expanded={open} aria-controls={sheetId} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{selected.label}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>

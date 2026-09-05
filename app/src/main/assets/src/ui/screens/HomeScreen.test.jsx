@@ -8,7 +8,7 @@
 */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
@@ -37,6 +37,7 @@ function setupGlobals() {
 afterEach(() => {
   cleanup();
   GLOBALS.forEach((k) => { delete globalThis[k]; });
+  ['__loadVotCorpus', '__loadBibleCorpus', '__loadMatthewCorpus', 'loadBibleStudies'].forEach((k) => { delete window[k]; });
 });
 
 const renderHome = (props = {}) => render(
@@ -56,6 +57,83 @@ const renderHome = (props = {}) => render(
     {...props}
   />
 );
+
+describe('HomeScreen — shortcuts and demand loading', () => {
+  it('keeps corpora idle until a destination is approached, even with Surprise enabled', () => {
+    setupGlobals();
+    window.__loadVotCorpus = vi.fn(() => Promise.resolve());
+    window.__loadBibleCorpus = vi.fn(() => Promise.resolve());
+    renderHome();
+    expect(window.__loadVotCorpus).not.toHaveBeenCalled();
+    expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+    fireEvent.focus(screen.getByRole('button', { name: /The Scriptures of Truth/ }));
+    expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
+    expect(window.__loadVotCorpus).not.toHaveBeenCalled();
+  });
+
+  it('honors disabled Search and History in quick access', () => {
+    setupGlobals();
+    renderHome({ searchEnabled: false, historyEnabled: false });
+    expect(screen.queryByRole('button', { name: 'Search library' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recent reading' })).toBeNull();
+  });
+
+  it('reorders by keyboard while preserving hidden History and focus', () => {
+    setupGlobals();
+    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
+    HomeOrderStore.set = vi.fn();
+    renderHome({ historyEnabled: false });
+    const card = screen.getByRole('button', { name: /The Scriptures of Truth/ });
+    card.focus();
+    fireEvent.keyDown(card, { key: 'ArrowUp', altKey: true });
+    expect(HomeOrderStore.set).toHaveBeenCalledWith(['scriptures', 'history', 'volumes', 'studies', 'listening', 'library', 'settings']);
+    expect(document.activeElement).toBe(card);
+  });
+
+  it('waits for every Surprise source and prevents repeated taps', async () => {
+    setupGlobals();
+    let finish;
+    window.__loadVotCorpus = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    window.__loadBibleCorpus = vi.fn(() => Promise.resolve());
+    window.__loadMatthewCorpus = vi.fn(() => Promise.resolve());
+    window.loadBibleStudies = vi.fn(() => Promise.resolve());
+    const onSurprise = vi.fn();
+    renderHome({ onSurprise });
+    const button = screen.getByRole('button', { name: /Surprise Me/ });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(button.disabled).toBe(true);
+    expect(onSurprise).not.toHaveBeenCalled();
+    expect(window.loadBibleStudies).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(); });
+    expect(onSurprise).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers retry after a failed Surprise load', async () => {
+    setupGlobals();
+    window.__loadVotCorpus = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
+    const onSurprise = vi.fn();
+    renderHome({ onSurprise });
+    const button = screen.getByRole('button', { name: /Surprise Me/ });
+    await act(async () => { fireEvent.click(button); });
+    expect(screen.getByRole('status').textContent).toContain('try Surprise Me again');
+    expect(button.disabled).toBe(false);
+    await act(async () => { fireEvent.click(button); });
+    expect(onSurprise).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not navigate after leaving Home during a Surprise load', async () => {
+    setupGlobals();
+    let finish;
+    window.__loadVotCorpus = () => new Promise((resolve) => { finish = resolve; });
+    const onSurprise = vi.fn();
+    const view = renderHome({ onSurprise });
+    fireEvent.click(screen.getByRole('button', { name: /Surprise Me/ }));
+    view.unmount();
+    await act(async () => { finish(); });
+    expect(onSurprise).not.toHaveBeenCalled();
+  });
+});
 
 describe('HomeScreen — Listening Library card', () => {
   it('renders the card pixel-consistent with its neighbors and routes through onOpenAudio', () => {

@@ -32,6 +32,51 @@ afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); })
 
 const slider = (label) => document.querySelector(`input[type="range"][aria-label*="${label}"]`);
 
+describe('settings filter and lazy progress', () => {
+  it('finds and expands backup settings, then restores the previous accordion state', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    fireEvent.click(groupHead('Appearance'));
+    fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'backup' } });
+    expect(groupHeads()).toHaveLength(1);
+    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Verify a Backup')).toBeTruthy();
+    fireEvent.click(groupHead('Your Data'));
+    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+    expect(groupHeads()).toHaveLength(9);
+    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
+  });
+
+  it('handles hyphenated queries and explains no results', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    const input = screen.getByLabelText('Find settings');
+    fireEvent.change(input, { target: { value: 'read-along' } });
+    expect(groupHead('Listening')).toBeTruthy();
+    expect(groupHeads()).toHaveLength(1);
+    fireEvent.change(input, { target: { value: 'nothing-matches-this' } });
+    expect(groupHeads()).toHaveLength(0);
+    expect(screen.getByRole('status').textContent).toContain('No matching settings');
+  });
+
+  it('does not load corpora for Appearance; opens them for Mark as Read', () => {
+    window.__loadVotCorpus = vi.fn(() => Promise.resolve());
+    window.__loadBibleCorpus = vi.fn(() => Promise.resolve());
+    try {
+      renderSettings({}, {}, { expandGroups: false });
+      fireEvent.click(groupHead('Appearance'));
+      expect(window.__loadVotCorpus).not.toHaveBeenCalled();
+      expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+      fireEvent.click(groupHead('Mark as Read'));
+      expect(window.__loadVotCorpus).toHaveBeenCalledTimes(1);
+      expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
+    } finally {
+      delete window.__loadVotCorpus;
+      delete window.__loadBibleCorpus;
+    }
+  });
+});
+
 describe('harness', () => {
   it('renders the whole screen with the real row components', () => {
     renderSettings();
@@ -399,7 +444,7 @@ describe('P1-9 — every settings toggle has an accessible name', () => {
 describe('export/import copy names the real .votbak artifact', () => {
   const descOf = (label) => {
     const r = row(label);
-    fireEvent.click(within(r).getByLabelText('Show description'));
+    fireEvent.click(within(r).getByLabelText('Show description for ' + label));
     return r.querySelector('.settings-row-desc').textContent;
   };
 
