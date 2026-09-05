@@ -332,7 +332,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
             </button>
           ))}
         </div>
-        <span id="home-reorder-hint" className="home-rearrange-hint">Hold to rearrange · Keyboard: Alt + ↑ / ↓</span>
+        <span id="home-reorder-hint" className="home-rearrange-hint">Hold to rearrange</span>
         <p className="home-status" role="status">{homeStatus}</p>
         {showSurprise && (
           /* Wave 0: the breathing dice was visually anonymous — a sighted
