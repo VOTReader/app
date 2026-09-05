@@ -851,7 +851,11 @@
          a ~constant CHARACTER measure by the same mechanism. The shell
          (--col-max) and fixed sheets stay px — they anchor overlay geometry. */
       .vol-index {
-        max-width: 42.5rem; margin: 0 auto; padding: 2.5rem 1.5rem 5rem;
+        /* Side padding capped in viewport terms: at a large text size every horizontal rem on the
+           card chain (this, .chapter-cards, the card's padding and gap, the number column) grew
+           together and left the Gospels cards 35 px for their text at --font-scale 1.8 on 360 px.
+           7.5vw equals 1.5rem on a 320 px phone at scale 1, so nothing changes at 1.0 (a11y-ux-6). */
+        max-width: 42.5rem; margin: 0 auto; padding: 2.5rem min(1.5rem, 7.5vw) 5rem;
       }
       .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
       .vol-index-eyebrow {
@@ -3122,7 +3126,7 @@
     .nav-search-btn svg { width:20px; height:20px; }
     
     /* ── CHAPTER INDEX CARDS ── */
-    .chapter-cards { padding:1rem 1rem 2.5rem; display:flex; flex-direction:column; gap:0.55rem; }
+    .chapter-cards { padding:1rem min(1rem, 5vw) 2.5rem; display:flex; flex-direction:column; gap:0.55rem; }   /* side padding capped, see .vol-index */
     .chapter-cards.two-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.55rem; align-items:stretch; }
     @media (max-width: 339px) { .chapter-cards.two-col { grid-template-columns:1fr; } }
     .chapter-cards.two-col .chapter-card-btn {
@@ -3152,12 +3156,19 @@
       margin-left:0; white-space:normal; font-size:var(--fs-11); line-height:1.2;
     }
     .chapter-cards.two-col .two-col-meta .read-check { margin-left:0; }
-    .chapter-card-btn { display:flex; align-items:center; gap:0.9rem; width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 1.1rem; transition:border-color 0.18s, background 0.18s; position:relative; }
+    .chapter-card-btn { display:flex; align-items:center; gap:min(0.9rem, 4.5vw); width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem min(1.1rem, 5.5vw); transition:border-color 0.18s, background 0.18s; position:relative; }
     .chapter-card-btn:active { background:var(--bg3); border-color:var(--gold-dim); }
     .chapter-card-btn.is-current { border-color:rgba(200,164,86,0.5); background:var(--gold-faint); }
     body.light .chapter-card-btn { background:var(--bg2); }
     body.light .chapter-card-btn:active { background:var(--bg3); }
-    .chapter-card-num { font-family:'Cinzel',serif; font-size:var(--fs-20); font-weight:600; color:var(--gold); min-width:2.2rem; text-align:center; flex-shrink:0; line-height:1; }
+    /* The card is a size container so the minute chip can step aside when the text column would
+       otherwise be crushed: at --font-scale 1.8 a 360 px phone gives the card 270 px, and number +
+       divider + gaps + chip left the title 79 px ("A Word of Warning" clamped to "A Word…"). Below
+       14rem (224 px at scale 1, which no phone reaches; 403 px at 1.8, which every phone does) the
+       chip is hidden on the one-column index; the two-column Bible grid keeps its own chip rule. */
+    .chapter-card-btn { container-type:inline-size; }
+    @container (max-width: 14rem) { .chapter-cards:not(.two-col) .chapter-card-btn .idx-min-chip { display:none; } }
+    .chapter-card-num { font-family:'Cinzel',serif; font-size:var(--fs-20); font-weight:600; color:var(--gold); min-width:min(2.2rem, 11vw); text-align:center; flex-shrink:0; line-height:1; }
     .chapter-card-btn.is-current .chapter-card-num { color:var(--gold-bright); }
     .chapter-card-divider { width:1px; align-self:stretch; background:var(--gold-border); flex-shrink:0; min-height:1.8rem; }
     .chapter-card-info { flex:1; min-width:0; }
