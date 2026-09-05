@@ -1106,6 +1106,11 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-journal-draft',            // JournalEditorScreen
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
+  'vot-scrollheal-1',             // use-saved-state: ONE-SHOT. Swept, the heal
+                                  // re-runs and wipes every tab's scroll
+                                  // positions -- its own comment says the flag
+                                  // prevents that.
+  'vot-tabs-hint-seen',           // TabsNavBtn: swept, the hint reappears.
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
@@ -1116,6 +1121,15 @@ const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
  * flag; if already set, returns immediately. Otherwise iterates
  * `localStorage`, removes every `vot-*` key not in `LS_SKIP_LIST`,
  * then writes the flag.
+ *
+ * `LS_SKIP_LIST` is therefore not a nicety: it is the entire definition of
+ * "still in use", maintained by hand, and every key missing from it is
+ * DELETED once per install. Two keys were (storage-ls-1, 2026-09-04), and
+ * `vot-home-order` was only saved by someone reading an inventory during
+ * W2.3b. `src/stores/ls-skip-list.test.js` now scans the write sites and
+ * fails when a live key is missing, so the list and the code cannot drift
+ * apart silently. Whether the list should exist at all, rather than live
+ * keys being namespaced out of the swept prefix, is with the Architect.
  *
  * MUST run after `hydrateAllStores()` resolves so the per-store
  * legacy-LS-fallback path has read the LS keys it needs.

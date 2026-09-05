@@ -1029,8 +1029,15 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
     expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
     expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
-    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(7);
+    // storage-ls-1: this case's own title claims EVERY live vot-* key, and for
+    // two of them it was false — both were swept once per install. The title
+    // was the property; the assertions were a hand-written subset of it, and a
+    // subset cannot notice a key nobody thought to add. src/stores/
+    // ls-skip-list.test.js now derives the set from the write sites instead.
+    expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');          // use-saved-state, ONE-SHOT flag
+    expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');        // TabsNavBtn
+    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');      // W7.1 retired this exception
+    expect(LS_SKIP_LIST.length).toBe(9);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
