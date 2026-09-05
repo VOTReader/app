@@ -159,7 +159,8 @@ def commit_gb(pid):
                     ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
                     ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
                     ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
-                    ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+                    ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t),
+                    ("PrivateUsage", ctypes.c_size_t)]
 
     h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED, False, pid)
     if not h:
@@ -169,7 +170,7 @@ def commit_gb(pid):
         c.cb = ctypes.sizeof(PMC)
         if not ctypes.windll.psapi.GetProcessMemoryInfo(h, ctypes.byref(c), c.cb):
             return 0.0
-        return c.PagefileUsage / (1024 ** 3)
+        return c.PrivateUsage / (1024 ** 3)
     finally:
         ctypes.windll.kernel32.CloseHandle(h)
 

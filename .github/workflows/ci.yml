@@ -213,9 +213,19 @@ jobs:
         # interface for months and nothing said so; a dev server that can
         # LAN-expose the tree is a defect, so the contract is proven on every
         # push instead of assumed.
+        # test_align_commit.py rides the same unittest call (2026-09-05): the
+        # alignment runners print a per-unit COMMIT charge, and the reader took
+        # PagefileUsage from the base PROCESS_MEMORY_COUNTERS instead of
+        # PrivateUsage from the _EX struct. It printed 10.02 GB where the truth
+        # was 17.29 GB -- self-consistent, plausible, and 40% low, on the number
+        # another agent was using to size a memory ceiling. Only a second
+        # instrument on the same PID caught it. Note this runner is ubuntu and
+        # _self_mem returns 0.0 off Windows, so the EMPIRICAL half skips here;
+        # what CI holds is the shape of the struct and of the reader, which is
+        # exactly what the revert would break.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_align_commit -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)
