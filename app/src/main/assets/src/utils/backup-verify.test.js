@@ -5,6 +5,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
+import { writeContainer, readContainer } from './backup-container.js';
+import { formatBytes } from './format-bytes.js';
 
 const v3Manifest = {
   app: 'VOTReader',
@@ -103,5 +105,99 @@ describe('formatVerifyReport', () => {
     expect(r.message).toContain('1 record across 1 data store');
     expect(r.message).toContain('1 media file (');
     expect(r.message).toContain('date unknown');
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   The seam storage-backup-1 opened. readContainer stopped throwing on a
+   damaged media frame and started salvaging, which is right for IMPORT — the
+   owner is warned before the confirm sheet and 99% of a backup beats none of
+   it. "Verify a Backup" inherited the same change without its own report, and
+   verify's entire job is telling the owner what the file can give back. So a
+   media count taken from the manifest's claim rather than from what was
+   actually read is the one number in this app that must never be optimistic:
+   someone reads it, believes the backup is whole, and deletes the source.
+
+   These run the real writeContainer -> readContainer -> formatVerifyReport
+   chain rather than a hand-made integrity string, because the defect was in
+   the seam between two modules that were each correct on their own.
+   ───────────────────────────────────────────────────────────────────────── */
+describe('a salvaged (truncated) container reports what it can give back', () => {
+  async function pack(manifest, mediaEntries) {
+    const chunks = [];
+    await writeContainer(manifest, mediaEntries, (u8) => { chunks.push(u8.slice()); });
+    return new Blob(chunks);
+  }
+  const fill = (n, v) => { const u = new Uint8Array(n); u.fill(v); return u; };
+
+  /** Build a 2-media container and cut into the LAST frame. */
+  async function truncatedRead() {
+    const good = fill(500, 7);
+    const bad = fill(300, 9);
+    const manifest = {
+      app: 'VOTReader', exportVersion: 3, exportDate: '2026-09-01T12:00:00.000Z',
+      counts: { 'vot-notes': 4 },
+      media: [{ id: 'good', size: good.length }, { id: 'bad', size: bad.length }],
+    };
+    const blob = await pack(manifest, [{ blob: new Blob([good]) }, { blob: new Blob([bad]) }]);
+    return readContainer(blob.slice(0, blob.size - 50));
+  }
+
+  /** What SettingsScreen hands the report: the frames actually read back. */
+  const salvagedOf = (read) => ({
+    count: read.entries.length,
+    bytes: read.entries.reduce((n, e) => n + ((e.meta && e.meta.size) || 0), 0),
+  });
+
+  it('REPRO: the report counts the media frames READ, not the number the manifest claims', async () => {
+    const read = await truncatedRead();
+    expect(read.integrity).toBe('truncated');
+    expect(read.entries).toHaveLength(1);   // 1 of 2 is recoverable
+
+    const r = formatVerifyReport(
+      summarizeBackupManifest(read.manifest), read.integrity, 'v3', salvagedOf(read),
+    );
+
+    expect(r.level).toBe('warn');
+    expect(r.message).not.toContain('plus 2 media files');
+    expect(r.message).toContain('1 of 2 media files');
+    // The byte figure follows the readable frames too, not the declared total.
+    expect(r.message).toContain(formatBytes(500));
+    expect(r.message).not.toContain(formatBytes(800));
+  });
+
+  it('REPRO: a short file is not reported as a file with extra bytes appended', async () => {
+    const read = await truncatedRead();
+    const r = formatVerifyReport(
+      summarizeBackupManifest(read.manifest), read.integrity, 'v3', salvagedOf(read),
+    );
+    // 'truncated' used to fall through to the malformed/trailing catch-all,
+    // which diagnoses the opposite failure: bytes ADDED after the last frame.
+    expect(r.message).not.toContain('unexpected bytes at the end of the file');
+    expect(r.message).toContain('could not be read all the way through');
+  });
+
+  it('a container whose media is entirely unreadable says so instead of going quiet', async () => {
+    const only = fill(500, 3);
+    const manifest = {
+      app: 'VOTReader', exportVersion: 3,
+      counts: { 'vot-notes': 4 },
+      media: [{ id: 'a', size: only.length }],
+    };
+    const blob = await pack(manifest, [{ blob: new Blob([only]) }]);
+    const read = await readContainer(blob.slice(0, blob.size - 10));
+    expect(read.entries).toEqual([]);
+
+    const r = formatVerifyReport(
+      summarizeBackupManifest(read.manifest), read.integrity, 'v3', salvagedOf(read),
+    );
+    expect(r.message).toContain('0 of 1 media file');
+    expect(r.level).toBe('warn');
+  });
+
+  it('an intact container is unaffected — the honest count IS the manifest count', () => {
+    const r = formatVerifyReport(summarizeBackupManifest(v3Manifest), 'ok', 'v3');
+    expect(r.message).toContain('2 media files');
+    expect(r.message).not.toContain(' of 2 media files');
   });
 });

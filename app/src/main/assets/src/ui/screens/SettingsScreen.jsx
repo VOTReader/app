@@ -1418,9 +1418,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     setVerifyReport({ message: msg, level: 'warn' });
   };
   const verifyBackupFile = () => {
-    const _report = (manifest, integrity, kind) => {
+    // `salvaged` is only meaningful for integrity 'truncated', which only
+    // readContainer produces (storage-backup-1) — and only that caller can
+    // know how many media frames actually came back, so the count travels
+    // from there rather than being re-derived from the manifest's claim.
+    const _report = (manifest, integrity, kind, salvaged) => {
       hideToast(_TOAST_ID);
-      setVerifyReport(formatVerifyReport(summarizeBackupManifest(manifest), integrity, kind));
+      setVerifyReport(formatVerifyReport(summarizeBackupManifest(manifest), integrity, kind, salvaged));
     };
     // Both platforms: envelope-validate the parsed manifest/payload first so a
     // random JSON file reports "not a backup", not a zero-count summary.
@@ -1499,10 +1503,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         if (isContainerMagic(head)) {
           _showToast('Checking backup…', 0);
           let read;
-          try { read = await readContainer(file); }  // frame sizes verified inside
+          // Magic, manifest length/JSON, then the full media-frame walk. A
+          // frame problem no longer throws (storage-backup-1) — it comes back
+          // as integrity 'truncated' with the frames that DID read, which is
+          // the honest input to the report below.
+          try { read = await readContainer(file); }
           catch (e) { console.warn('verify container read failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
           if (!_checkEnvelope(read.manifest)) return;
-          _report(read.manifest, read.integrity, 'v3');
+          _report(read.manifest, read.integrity, 'v3', {
+            count: read.entries.length,
+            bytes: read.entries.reduce((n, e) => n + ((e.meta && e.meta.size) || 0), 0),
+          });
         } else {
           if (file.size > 50 * 1024 * 1024) { _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).'); return; }
           let parsed;
