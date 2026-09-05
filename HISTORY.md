@@ -8,6 +8,16 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
 
+### 2026-09-04 — a11y-ux-2: the light theme's --gold-dim measured, then fixed (Design & Performance)
+
+**The defect.** `body.light --gold-dim: #a8832a` was **3.17:1 on --bg, 2.86 on --bg2, 2.64 on --bg3** — under WCAG AA 4.5:1 for small text everywhere and under even the 3:1 UI floor the 2026-06-03 audit accepted on two of the three surfaces. It is not a decorative token: `color: var(--gold-dim)` appears in 201 rules, 163 of them text, 82 at `--fs-10` — the eyebrows ("THE VOLUMES OF TRUTH", "MY NOTES"), chapter-card labels and dates, footnote headers, chevrons, the settings values and the search progress line. Measured on a walk of the thirteen reader-first screens at 360x800 in the light theme: **99 small-text elements, 99 under 4.5:1, 61 under 3:1** (worst `.settings-select-chev` 16 px at 2.58:1 on the select ground `rgb(228,220,200)`). The dark theme's `#d0a838` is fine (minimum 7.63:1) and is untouched.
+
+**The ramp decision.** On the light ground a "dim" that is *lighter* than `--gold` cannot clear 4.5:1 on `--bg3` (`--gold #7a5c10` itself is 4.67 there), so lightness cannot carry the hierarchy. It now recedes by **saturation**: `#705c26`, the same 43° hue as `--gold`, 49% saturation against gold's 77%, lightness 29% against 27%. Ratios **5.79 / 5.24 / 4.84** on --bg / --bg2 / --bg3 and 4.73 on the select ground. The after-walk: **99 small-text elements, 0 under 4.5:1**, minimum 4.73. `--tap-ref` (light) rides the same token and darkens with it.
+
+**The instruments.** `tools/contrast-sweep.mjs` (new): serves its own tree (`serveOwnTree`), walks the e2e-textzoom screens, finds every rendered element whose *computed* colour is the token, blends translucent layers to the first opaque background behind it and reports the ratio, minimum, and small-text counts under 4.5 and 3 per screen; `--min 4.5` makes it a gate, `--out` keeps every element, `--shots` a screenshot per screen. `app-css.contrast.test.js` gains the a11y-ux-2 block pinning light `--gold-dim` ≥ 4.5 on all three light surfaces (RED on `#a8832a`: 3 failures; GREEN on `#705c26`) plus the dark value's floor. Commands: `node tools/contrast-sweep.mjs --theme light --min 4.5`, `node tools/contrast-sweep.mjs --theme dark`.
+
+**Left alone, named.** Light `--gold-bright #9b7418` sits at 3.84 / 3.47 / 3.20; it is a hover and emphasis colour, not a text token by rule, and a separate row if the sweep ever finds it on body text. The sweep skips image and gradient backgrounds (none carry gold-dim text on these screens).
+
 ### 2026-09-01 → 09-02 s15 — the whole Bible learned to paint, and the letters stopped charging every reader for it
 
 Three corpus ships in thirty-six hours (c40, c41, c42), one GPU campaign, and two gates that did not exist when the first of them landed.
