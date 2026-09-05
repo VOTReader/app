@@ -14,10 +14,14 @@
 #      The preview server must listen on 127.0.0.1 only; it bound every
 #      interface until 2026-09-03 and nothing said so. A dev server that
 #      can LAN-expose the tree is a defect. CI runs this on every push.
-#   1d. test_batch_align_ship.py when tools/batch-align.py or its test changes
+#   1d. test_batch_align_ship.py + test_batch_align_bible_ship.py when either
+#      shipper or either test changes.
 #      batch-align.py's ship() rebuilds audio-sync.js from its run report, so
 #      a letter that raised — or that align-supervisor.py skipped for memory —
 #      used to be deleted from the shipped file. Coverage only goes up.
+#      batch-align-bible.py's ship() addresses its array by VERSE NUMBER, not
+#      by row position: re-indexing it by position moves every verse after a
+#      gap by one for the rest of the chapter, in silence.
 #   1e. test_align_commit.py    when tools/_alignlib.py, tools/align-supervisor.py
 #      or its test changes. commit_gb() must read PrivateUsage from the _EX
 #      struct: reading the base struct's PagefileUsage printed 10.02 GB where
@@ -375,21 +379,29 @@ fi
 # (below the ship gate, gone from the manifest), so it cannot rot into a shipper
 # that never deletes anything. ci.yml runs it on every push beside
 # test_check_balance.
-ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py)$' || true)
+# The BIBLE shipper rides this same block (2026-09-05). Its invariant is a
+# different one: batch-align-bible.py writes each belt row at arr[n - 1] where
+# n is the EDITION's own verse number — sparse in some editions — and
+# ReadAlongHighlight._bibleRowsFor reads position i back as verse NUMBER i + 1,
+# so the two ends meet by verse identity. Re-indexing that array by position
+# shifts every verse after a gap by one for the rest of the chapter, silently.
+ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py)$' || true)
 if [ -n "$ship_changed" ]; then
-  echo "[pre-commit] Read-along shipper changed — running test_batch_align_ship.py..."
-  python -m unittest test_batch_align_ship
+  echo "[pre-commit] Read-along shipper changed — running the shipper tests..."
+  python -m unittest test_batch_align_ship test_batch_align_bible_ship
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
     echo "---------------------------------------------------------------"
-    echo "Shipper carry-forward test FAILED — batch-align.py's ship() must"
-    echo "keep the timings of a unit its run produced no result for, and"
-    echo "must still drop an EXCLUDED one and one gone from the manifest."
+    echo "A shipper test FAILED. batch-align.py's ship() must keep the"
+    echo "timings of a unit its run produced no result for, and must still"
+    echo "drop an EXCLUDED one and one gone from the manifest."
+    echo "batch-align-bible.py's ship() must address its array by VERSE"
+    echo "NUMBER (arr[n - 1]), never by the row's position."
     echo "---------------------------------------------------------------"
     exit 1
   fi
-  echo "[pre-commit] Shipper carries forward unrun units."
+  echo "[pre-commit] Shippers carry forward unrun units and index by verse number."
   echo ""
 fi
 
