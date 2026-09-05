@@ -1431,6 +1431,94 @@ function compressRanges(nums) {
  * @param {(b64: string) => Uint8Array} [opts.decode] — base64 → bytes
  * @returns {{ errors: string[], warnings: string[], count: number }}
  */
+/**
+ * The Scripture Web node-position buffer (scripture-web-positions.js).
+ *
+ * The load-bearing check is NOT "is this file well formed" — it is "does this
+ * file agree with the thing that indexes it". scripture-web-data.js stores its
+ * edges as verse indices into a 31,102 space, so a position buffer of the wrong
+ * length, or one whose order drifted, draws a scrambled graph with nothing
+ * failing. Both directions are checked, with the CORPUS as the origin of truth
+ * for the count rather than the edge asset's opinion of it:
+ *
+ *   1. buffer length  === corpus verse count
+ *   2. every node index any EDGE references is inside the buffer
+ *   3. coincident nodes stay under a stated fraction — a node quantised on top
+ *      of another is unpickable, so this is the cheap check that a layout which
+ *      failed to converge cannot ship. It needs no human to look at the result.
+ *
+ * @param {any} data     SCRIPTURE_WEB_POSITIONS
+ * @param {any} edges    SCRIPTURE_WEB_DATA, for the cross-check (optional)
+ */
+export function validateScriptureWebPositions(data, edges, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const file = opts.fileName || 'scripture-web-positions.js';
+  const CORPUS_VERSES = 31102;
+  const MAX_COINCIDENT_FRACTION = 0.001;   // 0.1% — see (3) above
+
+  if (!data || typeof data !== 'object') {
+    errors.push(`${file}: SCRIPTURE_WEB_POSITIONS is missing or not an object`);
+    return { errors, warnings, count: 0 };
+  }
+  for (const f of ['version', 'layout', 'total', 'range', 'xy64']) {
+    if (data[f] === undefined) errors.push(`${file}: missing field "${f}"`);
+  }
+  if (errors.length) return { errors, warnings, count: 0 };
+
+  const bin = Buffer.from(String(data.xy64), 'base64');
+  const xy = new Int16Array(bin.buffer, bin.byteOffset, Math.floor(bin.byteLength / 2));
+  const nodes = Math.floor(xy.length / 2);
+
+  if (data.total !== CORPUS_VERSES) {
+    errors.push(`${file}: total ${data.total} but the corpus has ${CORPUS_VERSES} verses`);
+  }
+  if (nodes !== data.total) {
+    errors.push(`${file}: xy64 decodes to ${nodes} nodes but total says ${data.total}`);
+  }
+  if (xy.length % 2 !== 0) errors.push(`${file}: xy64 is not an even number of Int16s (must be interleaved x,y)`);
+
+  const range = Number(data.range) || 32767;
+  let outOfRange = 0;
+  for (let i = 0; i < xy.length; i++) {
+    if (!Number.isFinite(xy[i]) || xy[i] < -range || xy[i] > range) outOfRange++;
+  }
+  if (outOfRange) errors.push(`${file}: ${outOfRange} coordinate(s) outside [-${range}, ${range}]`);
+
+  // (2) the cross-check that actually catches a scrambled graph.
+  if (edges && typeof edges === 'object') {
+    if (typeof edges.total === 'number' && edges.total !== nodes) {
+      errors.push(`${file}: ${nodes} nodes, but scripture-web-data.js indexes a ${edges.total}-verse space — ` +
+        'the edges would point at the wrong nodes');
+    }
+    for (const e of (edges.votEdges || [])) {
+      for (const idx of [e && e.from, e && e.to]) {
+        if (typeof idx === 'number' && (idx < 0 || idx >= nodes)) {
+          errors.push(`${file}: a VOT edge references node ${idx}, outside the ${nodes}-node buffer`);
+          break;
+        }
+      }
+      if (errors.length > 40) break;
+    }
+  } else {
+    warnings.push(`${file}: scripture-web-data.js not available — the edge cross-check did not run`);
+  }
+
+  // (3) coincident nodes.
+  const seen = new Set();
+  let dup = 0;
+  for (let i = 0; i < xy.length; i += 2) {
+    const key = (xy[i] + 32768) * 65536 + (xy[i + 1] + 32768);
+    if (seen.has(key)) dup++; else seen.add(key);
+  }
+  if (dup / Math.max(nodes, 1) > MAX_COINCIDENT_FRACTION) {
+    errors.push(`${file}: ${dup} coincident node pair(s) (${((100 * dup) / nodes).toFixed(2)}%) exceeds ` +
+      `${(100 * MAX_COINCIDENT_FRACTION).toFixed(1)}% — coincident nodes are unpickable, so the layout did not converge`);
+  }
+
+  return { errors, warnings, count: nodes, coincident: dup };
+}
+
 export function validateScriptureWeb(data, opts = {}) {
   const errors = [];
   const warnings = [];
@@ -2563,6 +2651,32 @@ function runCli() {
         console.log(`  ${r.count.toLocaleString()} cross-references + ` +
           `${(data.votEdges || []).length} VOT edges checked — ` +
           `${r.errors.length === 0 ? 'OK' : 'FAIL'}`);
+      }
+    }
+  }
+
+  // ── Scripture Web node-position buffer ──
+  {
+    const posPath = resolve(dataDir, 'scripture-web-positions.js');
+    if (existsSync(posPath)) {
+      console.log('\nScripture Web node positions:');
+      let pos = null, edges = null;
+      try { pos = loadVar(posPath, 'SCRIPTURE_WEB_POSITIONS'); }
+      catch (e) { console.error(`  ERROR: failed to load — ${e.message}`); totals.errors++; }
+      // The cross-check's other side. Loaded here, not passed in, so the gate
+      // balances the buffer against the EDGE ASSET rather than against anything
+      // the position generator wrote.
+      const swPath2 = resolve(dataDir, 'scripture-web-data.js');
+      if (existsSync(swPath2)) { try { edges = loadVar(swPath2, 'SCRIPTURE_WEB_DATA'); } catch { /* reported above */ } }
+      if (pos) {
+        const r = validateScriptureWebPositions(pos, edges, { fileName: 'scripture-web-positions.js' });
+        for (const e of r.errors) console.error(`  ERROR: ${e}`);
+        for (const w of r.warnings) console.warn(`  WARN:  ${w}`);
+        totals.errors += r.errors.length;
+        totals.warnings += r.warnings.length;
+        totals.items += r.count;
+        console.log(`  ${r.count.toLocaleString()} node positions (layout "${pos.layout}", ` +
+          `${r.coincident} coincident) — ${r.errors.length === 0 ? 'OK' : 'FAIL'}`);
       }
     }
   }
