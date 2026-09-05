@@ -40,14 +40,14 @@ class FakeAudio extends EventTarget {
   removeAttribute() {}
 }
 
-function Host({ chapter = 1, readAlongOn = true }) {
+function Host({ chapter = 1, readAlongOn = true, volKey = 'bible-brm-kjv' }) {
   const mainRef = React.useRef(null);
   return (
     <div className="screen-scroll">
       <main className="chapter-body" ref={mainRef}>
         <span data-hl-key={'bible:john:' + chapter + ':1'}>A verse.</span>
         <ReadAlongHighlight
-          volKey="bible-brm-kjv"
+          volKey={volKey}
           letterId="john"
           chapter={chapter}
           mainRef={mainRef}
@@ -125,6 +125,28 @@ afterEach(() => {
 });
 
 const FILE = 'src/data/bible-sync-brm-kjv.js';
+const WEB_FILE = 'src/data/bible-sync-web-ebible.js';
+
+describe('the timings file asked for is the PLAYING edition\u2019s', () => {
+  it('fetches the recording\u2019s file, not the Settings edition\u2019s', async () => {
+    // The third of the three lines that carry the sync-selector defect, and
+    // the only one no other case can see: everywhere else the table is
+    // installed directly on globalThis, so the loader is never the path that
+    // supplies it. Asking for the setting's file downloads a table nothing
+    // paints from and leaves the wash dead until the reader changes Settings
+    // to match \u2014 a silence with a network request behind it.
+    const { loads } = failingOnceFactory();
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1']],
+      'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    };
+    render(<Host volKey="bible-web" />);      // Settings says WEB
+    playChapter(1);                            // a BRM recording plays
+    await flush();
+    expect(loads(FILE), 'the playing edition\u2019s file').toBe(1);
+    expect(loads(WEB_FILE), 'the Settings edition\u2019s file').toBe(0);
+  });
+});
 
 describe('read-along-5 — a failed first Bible-timings fetch', () => {
   it('CONTROL: switching the wash off and on asks for the file again (the harness sees retries)', async () => {
