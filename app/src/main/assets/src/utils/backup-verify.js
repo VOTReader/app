@@ -84,8 +84,10 @@ export function summarizeBackupManifest(manifest) {
  *   back; reporting the claim instead of the salvage is how someone keeps a
  *   gutted backup and deletes the source. readContainer is the only producer
  *   of 'truncated' and its caller has `entries` in hand, so this is always
- *   available on the path a reader can reach; omitting it costs the media
- *   line entirely rather than printing an optimistic one.
+ *   available on the path a reader can reach. Omitting it does NOT default the
+ *   salvage to zero: the line drops its numbers and says some media could not
+ *   be read back, because a caller that forgot an argument must not be able to
+ *   tell the owner their media is gone.
  * @returns {{ message: string, level: 'ok' | 'warn' }}
  */
 export function formatVerifyReport(s, integrity, kind, salvaged) {
@@ -102,15 +104,24 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
   const detail = parts.length ? parts.join(', ') + ' — ' : '';
   const plural = s.mediaCount === 1 ? '' : 's';
   let mediaBit = '';
-  if (integrity === 'truncated') {
-    // 'N of M', never M: M is what the export wrote, N is what survives.
-    const got = salvaged ? salvaged.count : 0;
-    const gotBytes = salvaged ? salvaged.bytes : 0;
-    if (s.mediaCount) {
-      mediaBit = ', plus ' + got + ' of ' + s.mediaCount + ' media file' + plural
-        + ' still readable' + (gotBytes ? ' (' + formatBytes(gotBytes) + ')' : '');
+  if (integrity === 'truncated' && s.mediaCount) {
+    if (salvaged) {
+      // 'N of M', never M: M is what the export wrote, N is what survives.
+      mediaBit = ', plus ' + salvaged.count + ' of ' + s.mediaCount + ' media file' + plural
+        + ' still readable' + (salvaged.bytes ? ' (' + formatBytes(salvaged.bytes) + ')' : '');
+    } else {
+      // No count means NO NUMBER. Defaulting the salvage to 0 here would print
+      // "0 of 42 media files still readable" about a backup that may be almost
+      // whole — a caller that forgot an argument would be telling the owner
+      // their media is gone. Unreachable on the web path (readContainer is the
+      // only producer of 'truncated' and its caller passes the count), and
+      // written this way because it will not stay unreachable: the Android
+      // verify path calls with three arguments today only because
+      // v3ImportVerify cannot return 'truncated' yet.
+      mediaBit = ', and some of its ' + s.mediaCount + ' media file' + plural
+        + ' could not be read back';
     }
-  } else if (s.mediaCount) {
+  } else if (integrity !== 'truncated' && s.mediaCount) {
     mediaBit = ', plus ' + s.mediaCount + ' media file' + plural
       + (s.mediaBytes ? ' (' + formatBytes(s.mediaBytes) + ')' : '');
   }
