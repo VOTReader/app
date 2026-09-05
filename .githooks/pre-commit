@@ -299,8 +299,17 @@ fi
 # gen-audio-manifest -> mirror-audio-release unattended, so an undeclared
 # import is a ModuleNotFoundError at step 1 and audio ingestion stops
 # indefinitely against a green repo (process-hygiene-6, 2026-09-04). Fires when
-# a requirements file, a scheduled-path script or the test itself is staged.
-reqs_changed=$(echo "$staged" | grep -E '^(requirements-(dev|ocr)\.txt|test_requirements\.py|tools/(flock-audio-sync|fetch-drive-audio|mirror-audio-release|verify-audio-release)\.py)$' || true)
+# a requirements file or ANY Python file is staged.
+#
+# It used to enumerate the scheduled-path scripts here, which made this line a
+# second copy of the file lists inside test_requirements.py — and the two had
+# already drifted: the enumeration missed check_balance.py, which is IN
+# SCHEDULED_PATH, and all four OCR consumers the test reads. Same shape as
+# tests-gates-6: a trigger that cannot match its own file. Naming the file TYPE
+# instead of the files removes the list that had to be kept in sync. The test is
+# stdlib-only and parses nine files with `ast`; it runs in under 0.2 s, so
+# there is nothing here worth gating against.
+reqs_changed=$(echo "$staged" | grep -E '\.py$|^requirements-(dev|ocr)\.txt$' || true)
 if [ -n "$reqs_changed" ]; then
   echo "[pre-commit] Checking the scheduled pipeline's Python pins (test_requirements.py)..."
   python -m unittest test_requirements
