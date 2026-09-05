@@ -433,7 +433,7 @@ describe('v3 export manifest limit', () => {
       showToast: toast,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        openExportSink, pickImportFile: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -462,7 +462,7 @@ describe('v3 export manifest limit', () => {
       showToast: toast,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: vi.fn(async () => ({ write: vi.fn(), close: vi.fn() })),
+        openExportSink: vi.fn(async () => ({ write: vi.fn(), close: vi.fn() })),
         pickImportFile: () => null, clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -608,7 +608,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         pickImportFile,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
@@ -794,7 +794,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
         v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
@@ -833,7 +833,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
         v3ImportBegin: () => 'error:legacy_unsupported',

@@ -27,61 +27,6 @@ import timber.log.Timber
 class StorageManager(private val context: Context) {
 
     /**
-     * Read [uri] into memory and return its content as a base64 string.
-     * Rejects files larger than [maxBytes] (defaults to MAX_IMPORT_SIZE)
-     * and any URI whose provider does not expose a size -- the Export
-     * format is one we own end-to-end, so an unknown size is suspicious
-     * enough to refuse rather than read blindly.
-     *
-     * The declared size (OpenableColumns.SIZE) is only a HINT from the
-     * content provider: a buggy or malicious provider can declare a small
-     * size and then stream gigabytes. That's why the actual read goes
-     * through [readBounded] with the same [maxBytes] cap — enforcing the
-     * cap on the bytes really pulled from the stream, not just on the
-     * declared number, is what makes the OOM protection real. An
-     * over-delivering stream fails as "too_large", the same reason the
-     * declared-size check uses, so the JS side sees one failure mode.
-     */
-    fun readUriAsBase64(
-        uri: Uri,
-        maxBytes: Long = MAX_IMPORT_SIZE
-    ): Result<String> {
-        val size = queryFileSize(uri)
-        if (size < 0L) {
-            Timber.w("Import rejected: unknown file size for %s", uri)
-            return Result.Failure("unknown_size")
-        }
-        if (size > maxBytes) {
-            Timber.w("Import rejected: size=%d (limit=%d)", size, maxBytes)
-            return Result.Failure("too_large")
-        }
-        return try {
-            val stream = context.contentResolver.openInputStream(uri)
-            val bytes = if (stream == null) {
-                ByteArray(0)
-            } else {
-                // Sized read: the file size is known (checked 0..maxBytes above),
-                // so read into ONE pre-allocated ByteArray — no ByteArrayOutputStream
-                // doubling + no toByteArray() copy, halving peak heap (~1x the payload
-                // vs ~2x+) on a large legacy import. Still fail-loud on a lying
-                // provider that declares small then streams large (see readSized).
-                stream.use { readSized(it, size, maxBytes) }
-                    ?: run {
-                        Timber.w(
-                            "Import rejected: stream over-delivered past declared size=%d (limit=%d)",
-                            size, maxBytes
-                        )
-                        return Result.Failure("too_large")
-                    }
-            }
-            Result.Success(Base64.encodeToString(bytes, Base64.NO_WRAP))
-        } catch (e: Exception) {
-            Timber.w(e, "Import file read failed")
-            Result.Failure(e.message ?: "read_failed")
-        }
-    }
-
-    /**
      * Write [content] (UTF-8) to an already-chosen SAF document [uri]
      * (the result of ACTION_CREATE_DOCUMENT, where the user picked the
      * destination folder + filename). Unlike the old Downloads-collection

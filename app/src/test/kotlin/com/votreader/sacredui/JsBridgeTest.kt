@@ -241,12 +241,12 @@ class JsBridgeTest {
 
     @Test
     fun `callOptional accepts all production callee names`() {
-        // Regression guard: the three names MainActivity actually invokes.
-        // If FN_NAME's pattern were ever tightened in a way that broke an
-        // existing callee, this test catches it -- the negative-space
-        // counterpart of the rejection tests above.
+        // Regression guard: names MainActivity actually invokes. If FN_NAME's
+        // pattern were ever tightened in a way that broke an existing callee, this
+        // test catches it -- the negative-space counterpart of the rejection tests
+        // above. (__onImportFile left with the legacy import picker it served, F4.)
         for (name in listOf(
-            "__onImportFile",
+            "__onExportComplete",
             "__onMicPermissionResult",
             "__onNativeRecordingComplete"
         )) {
@@ -295,7 +295,6 @@ class JsBridgeTest {
     fun `JsEvent fn names match their JS-side window callbacks`() {
         // If a callback is renamed on one side but not the other, the
         // bridge breaks silently. These pins catch the mismatch.
-        assertEquals("__onImportFile", JsEvent.ImportFile.fn)
         assertEquals("__onExportComplete", JsEvent.ExportComplete.fn)
         assertEquals("__onMicPermissionResult", JsEvent.MicPermissionResult.fn)
         assertEquals("__onNativeRecordingComplete", JsEvent.NativeRecordingComplete.fn)
@@ -307,7 +306,6 @@ class JsBridgeTest {
         // passes FN_NAME and reaches webView.post (our throwing stub).
         // IllegalStateException = require passed + reached WebView.
         for (event in listOf(
-            JsEvent.ImportFile,
             JsEvent.ExportComplete,
             JsEvent.MicPermissionResult,
             JsEvent.NativeRecordingComplete

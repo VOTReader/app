@@ -152,7 +152,7 @@ export function setupSettingsGlobals(overrides = {}) {
   // Platform + diagnostics.
   put('PlatformBridge', {
     isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-    openFilePicker: () => {}, openExportSink: () => null, pickImportFile: () => null,
+    openExportSink: () => null, pickImportFile: () => null,
     clearGardenCache: () => {}, getCrashLog: () => '[]',
   });
   put('DiagnosticLog', { error: () => {}, all: () => [], clear: () => {} });

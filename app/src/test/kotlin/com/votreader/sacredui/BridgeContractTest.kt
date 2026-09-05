@@ -52,7 +52,6 @@ class BridgeContractTest {
         "nativeRecordStop" to 0,
         "nativeRecordCancel" to 0,
         "takeScreenshot" to 3,
-        "openFilePicker" to 0,
         "saveToFile" to 2,
         // v3 streaming backup — native chunked bridge (BACKUP-STREAMING-PLAN P3).
         "v3ExportOpen" to 1,

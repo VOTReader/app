@@ -36,7 +36,6 @@ class FakeBridgeHost(
     var executePostedImmediately: Boolean = true
     val postedActions: MutableList<() -> Unit> = mutableListOf()
 
-    var filePickerLaunchCount: Int = 0
     var micPermissionLaunchCount: Int = 0
 
     /** Records (suggestedName, content) for every launchExportPicker call. */
@@ -47,9 +46,6 @@ class FakeBridgeHost(
 
     /** Counts launchV3ImportPicker calls. */
     var v3ImportPickerLaunchCount: Int = 0
-
-    /** Optional exception that launchFilePicker throws when invoked. */
-    var filePickerThrowsOnLaunch: Exception? = null
 
     /** Optional exception that launchMicPermissionRequest throws when invoked. */
     var micPermissionThrowsOnLaunch: Exception? = null
@@ -76,11 +72,6 @@ class FakeBridgeHost(
 
     override fun applyImmersiveMode(immersive: Boolean) {
         immersiveModeCalls.add(immersive)
-    }
-
-    override fun launchFilePicker() {
-        filePickerLaunchCount++
-        filePickerThrowsOnLaunch?.let { throw it }
     }
 
     override fun launchExportPicker(suggestedName: String, content: String) {

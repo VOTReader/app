@@ -408,18 +408,7 @@ class AppInterfaceTest {
         assertEquals(Triple(48, 1024, 85), host.captureScreenshotCalls[0])
     }
 
-    // ─── File picker + crash log ──────────────────────────────────────
-
-    @Test
-    fun `openFilePicker posts to UI thread and launches picker`() {
-        val host = FakeBridgeHost()
-        val (app, _, _) = newSubject(host = host)
-
-        app.openFilePicker()
-
-        assertEquals(1, host.postedActions.size, "should hop through postToUi")
-        assertEquals(1, host.filePickerLaunchCount)
-    }
+    // ─── Crash log ────────────────────────────────────────────────────
 
     @Test
     fun `getCrashLog returns empty array when releaseTree is null`() {

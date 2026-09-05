@@ -21,7 +21,7 @@
    W1.2 (NEXT): migrate the call sites in use-settings, use-thumbnails,
      GardenView, JournalRecordingSheet, SettingsScreen. After this commit,
      grep for `window.AndroidBridge` outside this file returns ZERO matches.
-   W1.3: web file I/O — openFilePicker + saveToFile via <input
+   W1.3: web file I/O — saveToFile via <input
      type="file"> / Blob URL. MUST be called from a user-gesture callstack
      (browsers block programmatic .click() outside user-initiated handlers).
    W1.4: web audio recording — CONSOLIDATES the existing MediaRecorder
@@ -64,7 +64,6 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => void} nativeRecordCancel
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
- * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
  * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
@@ -145,7 +144,6 @@ const androidImpl = {
   // capture must render from a DOM clone, and html2canvas runs fine inside
   // the WebView (it's the same JS bundle; lazy-loaded on first use).
   takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme),
-  openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
   // / sliceable Blob). They are NOT the Android path: a SAF import can't expose a
@@ -329,56 +327,6 @@ function webSetImmersiveMode(immersive) {
 // are no-ops, NOT CSS hacks.
 const webSetZoomEnabled = () => {};
 const webResetZoom = () => {};
-
-// Web file picker — openFilePicker impl (W1.2 Tier B.2). Per
-// [[file-input-user-gesture]], the input.click() MUST be invoked synchronously
-// from the caller's user-gesture handler (no await/setTimeout between).
-// Per [[preserve-callback-contracts]], we fire `window.__onImportFile(base64)`
-// with the same shape Android's AppInterface fires — the caller (SettingsScreen)
-// installs that global handler BEFORE calling openFilePicker; web fires it
-// from FileReader.onload exactly like Android fires it from the picker activity.
-//
-// FileReader.readAsDataURL gives us a "data:<mime>;base64,XXX" string; we
-// strip the prefix so the callback receives pure base64 matching the
-// Android contract (atob-decodable directly).
-// Matches Android's StorageManager.MAX_IMPORT_SIZE (50 MB) so the oversize
-// import guard is symmetric across both platforms.
-const WEB_MAX_IMPORT_BYTES = 50 * 1024 * 1024;
-
-function webOpenFilePicker() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json,.json';
-  input.onchange = (/** @type {any} */ ev) => {
-    const cb = /** @type {any} */ (window).__onImportFile;
-    const file = ev.target.files && ev.target.files[0];
-    if (!file) {
-      if (typeof cb === 'function') cb(null);
-      return;
-    }
-    // Mirror the Android 50 MB import cap: a huge accidental pick would
-    // otherwise OOM / hang FileReader on a low-end device. Report it as the
-    // 'too_large' code so SettingsScreen shows the specific oversize message;
-    // every other null stays a silent cancel/error exactly as before.
-    if (file.size > WEB_MAX_IMPORT_BYTES) {
-      if (typeof cb === 'function') cb(null, 'too_large');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (/** @type {any} */ re) => {
-      // "data:application/json;base64,XXX" → strip prefix to "XXX"
-      const result = String(re.target.result || '');
-      const idx = result.indexOf(',');
-      const base64 = idx >= 0 ? result.substring(idx + 1) : result;
-      if (typeof cb === 'function') cb(base64);
-    };
-    reader.onerror = () => {
-      if (typeof cb === 'function') cb(null);
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-}
 
 // Web save-to-downloads — Blob + URL.createObjectURL + anchor click (W1.2
 // Tier B.2). The browser's download manager IS the destination picker
@@ -1023,7 +971,6 @@ const webImpl = {
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
   takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme), // dual-theme thumbnails
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
-  openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
   openExportSink: webOpenExportSink,         // P2 (FS Access API writable / Blob-download fallback)
   pickImportFile: webPickImportFile,         // P2 (FS Access API open / DOM input → File)

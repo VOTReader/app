@@ -52,7 +52,7 @@ function setup(file) {
     summarizeBackupManifest, formatVerifyReport,
     PlatformBridge: {
       isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-      openFilePicker: () => {}, openExportSink: () => null,
+      openExportSink: () => null,
       clearGardenCache: () => {}, getCrashLog: () => '[]',
       pickImportFile: () => Promise.resolve(file),
     },
