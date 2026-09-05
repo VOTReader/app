@@ -259,5 +259,18 @@ function selfcheck() {
   console.log('selfcheck OK — deterministic, in range, parameterised, consecutive-adjacent, no coincidence');
 }
 
-if (process.argv.includes('--selfcheck')) selfcheck();
-else main();
+// Run only when this file IS the entry point, never on import. buildPositions,
+// spacingStats and coincidentCount are exported so a harness can score a
+// candidate layout without generating anything -- but importing the module used
+// to run main() and REWRITE the asset as a side effect. It came out
+// byte-identical, which is the dangerous shape: the determinism that made it
+// harmless today is not a property of the next parameter someone passes, and a
+// harness in one worktree would be silently rewriting a generated file in
+// another. Found 2026-09-05 by an import that did exactly that.
+const RUN_DIRECTLY = process.argv[1]
+  && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+
+if (RUN_DIRECTLY) {
+  if (process.argv.includes('--selfcheck')) selfcheck();
+  else main();
+}
