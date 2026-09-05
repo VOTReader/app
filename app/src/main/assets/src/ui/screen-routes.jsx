@@ -589,10 +589,6 @@ export function buildScreenRoutes({
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onNotes={goNotesIndex}
         onBookmarks={goBookmarksIndex}
-        onScriptureWeb={() => {
-          setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
-          setScreen('scripture-web');
-        }}
         historyEnabled={settings.historyEnabled !== false}
         onAbout={goAbout}
         searchEnabled={settings.searchEnabled !== false}
