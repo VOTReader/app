@@ -175,12 +175,31 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       ampRef.current = 0;
       tickRef.current = 0;
 
-      function decodeB64() {
-        var bin = atob(b64);
+      // Takes its input rather than closing over `b64`, so the native re-read
+      // below decodes through THIS function instead of a second copy of it.
+      function decodeB64(str) {
+        var bin = atob(str);
         var arr = new Uint8Array(bin.length);
         for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
         return new Blob([arr], { type: mime || 'audio/webm' });
       }
+
+      /* THE SERVED NAME — journal-3 clause (d), JS half.
+         Native moved the finished memo to recordings/<uuid>.m4a and built the
+         url from that name (AppInterface.postNativeComplete), so the name is
+         the url's last segment. Requiring the /recordings/ path is a check
+         that we are parsing the RIGHT url, not a second copy of native's name
+         rule: NativeAudioRecorder.resolveServedRecording re-validates every
+         name it is handed (uuid shape AND canonical parent equality), and it
+         is the authority. Anything else -- a web blob: url, a shape we do not
+         recognise -- leaves this null, and null means no native call and no
+         `sourceName` on the record. Absence is the signal; a placeholder name
+         would be a value we do not know, stored as if we did. */
+      var servedName = null;
+      try {
+        var nameMatch = /\/recordings\/([^/?#]+)$/.exec(url || '');
+        servedName = nameMatch ? nameMatch[1] : null;
+      } catch (_e) { servedName = null; }
 
       // Common tail: given the resolved audio Blob, preview it (or auto-save).
       // journal-3 clause (a): COMMIT, THEN PREVIEW. The durability line is
@@ -216,15 +235,39 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           return;
         }
         var d = Math.max(1, Math.round((durMs || 0) / 1000));
-        JournalMediaStore.put({
+        var record = {
           type: 'audio',
           blob: audioBlob,
           mime: audioBlob.type || 'audio/webm',
           duration: d,
           unlinked: true
-        }).then(function(id) {
+        };
+        // Only when there IS one. journal-3 2b diffs the files on disk against
+        // the sourceNames already in the store to find memos nothing claimed;
+        // a key holding a non-name would make an unclaimed file look claimed.
+        if (servedName) record.sourceName = servedName;
+        JournalMediaStore.put(record).then(function(id) {
           if (cancelled) return;
           committedIdRef.current = id;
+          /* THE HANDSHAKE (clause (d)): native stops holding the bytes because
+             JS SAID IT HAS THEM, not because a timer guessed. This is the only
+             caller of nativeDeleteRecording; before it, the sole thing that
+             ever removed a served file was NativeAudioRecorder's own TTL sweep.
+
+             AFTER the put resolves, never before. put() resolving IS the
+             durability line -- STORE-3 makes it resolve on the transaction
+             commit, not the request's onsuccess -- so releasing the file any
+             earlier opens a window where native has let go and JS has not yet
+             got it, and a crash inside that window loses the recording with
+             the bytes deleted from under it.
+
+             Best-effort, and deliberately not awaited or surfaced: a delete
+             that fails leaves a file the native sweep collects later, which
+             costs disk. A delete that BLOCKED the preview would cost the
+             reader their recording over a housekeeping call. */
+          if (servedName) {
+            try { PlatformBridge.nativeDeleteRecording(servedName); } catch (_e) { /* housekeeping only */ }
+          }
           previewBlobRef.current = audioBlob;
           // Keep the local object URL for playback: the bytes are durable
           // either way, so re-reading them out of the store buys nothing.
@@ -289,17 +332,49 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           // anywhere -- so re-entering at attempt 0 is a genuine retry rather
           // than a re-await of the same rejection. That is what makes the Try
           // again button on the error stage real instead of decorative.
+          /* THE SECOND ROUTE (clause (d)), and why it waits.
+             ─────────────────────────────────────────────────────────────
+             When the fetch keeps failing the bytes are still on disk, and
+             nativeReadRecording reads them by name. Before this it existed on
+             the bridge with no caller at all, so a non-transient fetch failure
+             lost a finished recording that native was still holding.
+
+             It runs only after the reader has taken the offered Try again and
+             THAT failed too. The read returns base64 -- ~7.9 MB of string for
+             a 5-minute memo, the exact cost the fetch bridge was built to
+             avoid, and enough to freeze the renderer while it parses. So the
+             cheap path gets its second chance first, and the expensive one
+             runs only when the alternative is losing the recording outright.
+
+             A null read is "gone or refused" -- native returns one null for
+             both, deliberately, and logs which. Either way there is nothing
+             left to recover, so it falls through to the same loud failure the
+             reader saw before, rather than a quieter one. */
+          var fetchRounds = 0;
           var runFetch = function() {
+            fetchRounds++;
             fetchAttempt(0)
               .then(function(fb) { finalize(fb && !fb.type ? new Blob([fb], { type: mime || 'audio/mp4' }) : fb); })
-              .catch(function(e) { fail(e); });
+              .catch(function(e) {
+                if (fetchRounds < 2 || !servedName) { fail(e); return; }
+                var recovered = null;
+                try { recovered = PlatformBridge.nativeReadRecording(servedName); } catch (_e) { recovered = null; }
+                // MEASURED, not defensive-by-habit: without this guard a null
+                // read reaches decodeB64(null), atob() coerces it to the string
+                // "null", and that is VALID base64 -- three bytes, [158,233,101].
+                // finalize() sees size 3 > 0 and commits them as the reader's
+                // recording. A missing file would become a three-byte memo that
+                // plays as silence, which is worse than the loss it hides.
+                if (!recovered) { fail(e); return; }
+                try { finalize(decodeB64(recovered)); } catch (e2) { fail(e2); }
+              });
           };
           retryFetchRef.current = runFetch;
           runFetch();
           return;
         }
         // 3) Android legacy/base64 path.
-        if (b64) { finalize(decodeB64()); return; }
+        if (b64) { finalize(decodeB64(b64)); return; }
         // Nothing was delivered.
         finalize(null);
       } catch (e) {

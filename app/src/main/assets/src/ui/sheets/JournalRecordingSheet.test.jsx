@@ -20,6 +20,11 @@ vi.mock('../../utils/platform-bridge.js', () => ({
     nativeRecordCancel: vi.fn(),
     nativeRecordPause: vi.fn(() => 'ok'),
     nativeRecordResume: vi.fn(() => 'ok'),
+    // journal-3 clause (d), 2a-web. Spies, not no-ops: the whole point of both
+    // verbs is the NAME they are handed, and a stub that ignored its arguments
+    // would pass whatever this code sent it.
+    nativeReadRecording: vi.fn(() => null),
+    nativeDeleteRecording: vi.fn(() => true),
     startAudioSession: vi.fn(),
     endAudioSession: vi.fn(),
   },
@@ -431,5 +436,168 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
     });
 
     expect(attempts).toBeGreaterThan(afterFirst);
+  });
+});
+
+
+/* journal-3 clause (d), the JS half — THE HANDSHAKE AND THE SECOND ROUTE.
+   ═══════════════════════════════════════════════════════════════════════
+   Native moves a finished memo into recordings/<uuid>.m4a, hands JS a URL, and
+   holds the file until JS says it has the bytes. Two things were missing on the
+   JS side and both are in this batch:
+
+   1. NOTHING EVER SAID IT HAD THEM. `nativeDeleteRecording` existed on the
+      bridge with no caller, so the only thing that ever removed a served file
+      was native's own TTL sweep — a timer guessing, which is exactly what
+      clause (d) says must not decide. The delete goes AFTER the store commit
+      resolves, never before: JournalMediaStore.put() resolving IS the
+      durability line (STORE-3 makes it resolve on the transaction commit), so
+      deleting before it would put a window between "native let go" and "JS has
+      it" in which a crash loses the recording outright.
+
+   2. A FETCH THAT KEPT FAILING LOST THE TAKE while the bytes sat on disk.
+      `nativeReadRecording` also existed with no caller. It is the SECOND
+      route: after the reader has taken the offered Try again and that failed
+      too, read the same file by name off the device and commit that.
+
+   WHY THE SECOND ROUTE WAITS FOR TRY AGAIN, since it looks like it should just
+   run: the read comes back as base64, which for a 5-minute memo is ~7.9 MB of
+   string for the renderer to parse — the exact cost the fetch bridge exists to
+   avoid, and it can freeze the UI. So the cheap path gets its second chance
+   first, and the expensive one only runs when the alternative is losing the
+   recording. The third case below is the control for that ordering. */
+describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-web)', () => {
+  const realFetch = globalThis.fetch;
+  const SERVED = 'https://appassets.androidplatform.net/recordings/3f2a9c11-0000-4aaa-8bbb-1c2d3e4f5061.m4a';
+  const SERVED_NAME = '3f2a9c11-0000-4aaa-8bbb-1c2d3e4f5061.m4a';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    MockBridge.isAndroid = true;
+    MockBridge.nativeReadRecording.mockReset().mockReturnValue(null);
+    MockBridge.nativeDeleteRecording.mockReset().mockReturnValue(true);
+    window.JournalMediaStore = {
+      put: vi.fn(() => Promise.resolve('media-1')),
+      delete: vi.fn(() => Promise.resolve()),
+      markLinked: vi.fn(() => Promise.resolve()),
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    globalThis.fetch = realFetch;
+    delete window.JournalMediaStore;
+  });
+
+  it('records the served name and releases the file ONLY after the commit resolves', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({
+      ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })),
+    })));
+    // A put we settle by hand, so "after the commit" is a measurement and not a
+    // reading of the source. With an already-resolved put both orders pass.
+    let settlePut;
+    window.JournalMediaStore.put = vi.fn(() => new Promise((res) => { settlePut = () => res('media-1'); }));
+
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    // The name travels with the record: 2b diffs the files on disk against the
+    // sourceNames already in the store, and cannot do that if nothing stored it.
+    expect(window.JournalMediaStore.put).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceName: SERVED_NAME, unlinked: true }),
+    );
+    // Native still holds the file: the commit has not landed.
+    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+
+    await act(async () => { settlePut(); await vi.advanceTimersByTimeAsync(100); });
+    expect(MockBridge.nativeDeleteRecording).toHaveBeenCalledWith(SERVED_NAME);
+  });
+
+  it('after Try again fails too, it reads the file by name and commits those bytes', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    // Two audible bytes, so the commit can be checked for THESE bytes rather
+    // than for any blob at all.
+    MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
+
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();   // nothing saved yet
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    const rec = window.JournalMediaStore.put.mock.calls[0][0];
+    expect(rec.blob.size).toBe(2);                                  // the recovered bytes
+    expect(rec.sourceName).toBe(SERVED_NAME);
+    // Recovered, therefore not lost: the error stage is gone.
+    expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
+  });
+
+  it('does NOT reach for the expensive read before the reader has taken Try again', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
+
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    // The first exhaustion offers the cheap second chance and nothing else. A
+    // ~7.9 MB base64 parse is not inflicted on a reader who has not asked for it.
+    expect(MockBridge.nativeReadRecording).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('when the read comes back empty the recording is reported lost, not silently dropped', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    MockBridge.nativeReadRecording.mockReturnValue(null);   // swept, or refused by native
+
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+
+    expect(MockBridge.nativeReadRecording).toHaveBeenCalledTimes(1);
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+    // And native still holds the file: nothing committed, so nothing released.
+    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+  });
+
+  /* A url that is not a served-recording url yields no name, and no name means
+     no native call at all. The name is the last segment of native's own
+     /recordings/ URL; native re-validates it (uuid shape AND canonical parent),
+     so this is not a second copy of that rule — it is a check that we are
+     parsing the right URL in the first place. */
+  it('a non-served url produces no sourceName and no native calls', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({
+      ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })),
+    })));
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    expect(window.JournalMediaStore.put.mock.calls[0][0].sourceName).toBeUndefined();
+    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
 });
