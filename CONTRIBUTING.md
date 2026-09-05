@@ -263,6 +263,32 @@ The habit outlives the fix, because it is not really about Gradle:
   A quietly wrong count is worse than a missing one, because the next person
   builds on it.
 
+#### If you hand-edit `local.properties`, escape the drive colon
+
+Copying the file from the main checkout gets this right for free. Typing a value
+yourself does not: `vot.buildDir=D:/VOTReader-build` fails `:app:lintDebug` with
+`PropertyEscape`, because a drive-letter colon in a `.properties` value has to be
+escaped. Both of these pass, and mean the same thing to Gradle:
+
+```properties
+vot.buildDir=D\:/VOTReader-build
+vot.buildDir=D\:\\VOTReader-build
+```
+
+A lone backslash before a letter is a different trap: `.properties` drops unknown
+escapes, so `D\:\VOTReader-build` silently becomes `D:VOTReader-build`, which
+Gradle then reads as a path relative to the checkout — measured, and it surfaces as
+`Illegal char <:> at index 59` from `:app:generateDebugBuildConfig`, nowhere near
+the file that caused it. Double the separators or use forward slashes.
+
+**And `local.properties` is not a declared input to the lint task**, so editing it
+does not invalidate the cached analysis. Measured on 2026-09-04, four runs, one
+variable at a time: a deliberately broken value passes when lint does not re-run,
+and a value you have already fixed keeps failing with the stale message until it
+does. Re-run with `--rerun-tasks` after touching this file, or you are reading the
+cache. Which is the section heading again, one directory over: a green from a place
+you did not just cause to run is not a green.
+
 ### One checkout is `main`, and it is the primary one
 
 `D:\VOTReader-studio` itself is the canonical `main` checkout. Everything else —
