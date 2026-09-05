@@ -1138,12 +1138,25 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     // Preserved:
     expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
     expect(localStorage.getItem('other-non-vot-key')).toBe('untouched');
-    // BEHAVIOUR CHANGE, deliberate and named: `vot-ann-migrated` is a RETIRED
-    // migration flag, not a store, so the registry-derived set does not reach
-    // it and it now survives. That is one stale boolean per pre-W7.1 install,
-    // and the alternative is reintroducing a hand-maintained list of retired
-    // keys — the exact thing this change deletes. Raised with the Architect
-    // rather than decided here.
+    // BEHAVIOUR CHANGE, deliberate and ruled on: `vot-ann-migrated` is a
+    // RETIRED migration flag (`6e2618ca`, W7.1a), not a store, so the
+    // registry-derived set does not reach it and it now survives. One stale
+    // boolean per pre-W7.1 install.
+    //
+    // NOT because a retired-keys list would be the same mistake as
+    // LS_SKIP_LIST — it would not. LS_SKIP_LIST was an allowlist over an OPEN
+    // set: it had to grow every time anyone added a `vot-` key, forever, and
+    // forgetting cost DATA. A retired-keys denylist is a CLOSED historical set
+    // that grows only on a deliberate retirement, and forgetting costs a
+    // boolean. It would be safe; it is just not worth it.
+    //
+    // The principle instead (Architect, 2026-09-04): CLEANUP BELONGS TO THE
+    // CHANGE THAT CREATES THE GARBAGE. W2.4 made a heap of stale LS and
+    // shipped this sweep for it; the sweep should not now acquire a standing
+    // list of everyone else's leftovers. A future retirement that strands
+    // something that matters — a stale blob rather than a boolean — deletes it
+    // in the commit that retires it, one line, while the author still knows
+    // what it was. Smaller than a list, and it cannot rot.
     expect(localStorage.getItem('vot-ann-migrated')).toBe('1');
     // Flag set:
     expect(idbMeta['migrated-v1']).toBe(true);

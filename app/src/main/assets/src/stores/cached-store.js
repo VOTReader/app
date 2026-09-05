@@ -1130,9 +1130,12 @@ const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
  * can see the shim on the instance and does not need to be told the key.
  *
  * KNOWN AND DELIBERATE: a retired flag that was never a store's key survives
- * now, e.g. `vot-ann-migrated` (W7.1). That is one stale boolean per pre-W7.1
- * install, and the alternative is a hand-maintained list of retired keys — the
- * exact thing this deletes.
+ * now — `vot-ann-migrated` (`6e2618ca`, W7.1a) is the one nameable from history.
+ * One stale boolean per pre-W7.1 install. Do not add a retired-keys list for
+ * it: CLEANUP BELONGS TO THE CHANGE THAT CREATES THE GARBAGE (Architect,
+ * 2026-09-04). W2.4 made a heap of stale LS and shipped this sweep for it; a
+ * future retirement that strands something that matters deletes it in the
+ * commit that retires it, while the author still knows what it was.
  *
  * WHAT A PRE-MAY INSTALL SEES. `migrated-v1` is unset, so the sweep runs on its
  * first boot exactly as before and clears the legacy LS copy of every migrated
