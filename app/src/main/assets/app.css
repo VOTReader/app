@@ -6986,6 +6986,22 @@
     }
     .sw-empty-body { font-size: var(--fs-15); line-height: 1.65; }
     .sw-empty-body strong { color: var(--gold-bright); font-weight: 600; }
+    .sw-empty-close {
+      /* The panel is pointer-events:none so it never swallows a drag on the
+         web beneath it — the same pattern as .ann-hint-close, and it works
+         for the same reason: this is a real <button> with its own onClick,
+         nothing is delegated to the inert parent. */
+      pointer-events: auto;
+      position: absolute; top: -8px; right: -8px;
+      width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg3); border: 1px solid var(--gold-dim);
+      border-radius: 50%; cursor: pointer;
+      color: var(--gold); font-size: var(--fs-18); line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sw-empty-close:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .sw-empty-close:active { background: var(--bg2); }
 
     .sw-root.sw-narrow .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
     .sw-root.sw-narrow .sw-credit { bottom: calc(4px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-10); }

@@ -79,7 +79,7 @@ const COLOR_HINT = {
  * @param {object} props
  * @param {(endpoint:object, meta?:object) => void} props.navigateToLink
  * @param {() => void} props.onBack
- * @param {{webDensity?:string, theme?:string}} props.settings
+ * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean}} props.settings
  * @param {(key:string, value:any) => void} props.updateSetting
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting }) {
@@ -161,6 +161,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
     : { x: e.clientX, y: e.clientY }), []);
   const [mode, setMode] = React.useState('canonical');   // 'canonical' | 'personal'
+  // The empty-web notice hands focus back here when it closes, so a keyboard
+  // reader stays in the control they were using instead of at the document top.
+  const myWebBtnRef = React.useRef(null);
+  const [emptyDismissed, setEmptyDismissed] = React.useState(false);
   const [density, setDensity] = React.useState(() => {
     // `classic` was the old internal name; accept it once so existing
     // settings migrate naturally while the feature speaks in user terms.
@@ -333,6 +337,22 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     };
   }, [density, frame]);
 
+  /**
+   * Close the empty-web notice for good.
+   *
+   * The dismissal rides `settings` (vot-state — already exported, counted and
+   * shape-checked by the backup) rather than a sixth flag store, so there is no
+   * schema bump and no seven-legged registration; and it comes back on a fresh
+   * profile because a fresh profile has no key. Local state as well, so the
+   * notice goes the moment it is tapped rather than after the settings write
+   * round-trips, and so a host with no updateSetting still closes it.
+   */
+  const dismissEmpty = React.useCallback(() => {
+    setEmptyDismissed(true);
+    if (typeof updateSetting === 'function') updateSetting('swEmptyDismissed', true);
+    if (myWebBtnRef.current) myWebBtnRef.current.focus();
+  }, [updateSetting]);
+
   /** Everything the rail renderer needs to place a personal endpoint. */
   const railOpts = React.useCallback(() => {
     const v = viewRef.current, cam = camRef.current;
@@ -341,6 +361,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       width: v.W, height: v.H, DPR: v.DPR, base: f.base,
       chrome: chromeRef.current,
       votRail: personalRef.current && personalRef.current.votRail,
+      // Both rails ride this one camera. The top rail's own axis is even
+      // across the corpus, but it is spread across the SAME verse span the
+      // bottom rail uses, so a pinch moves both halves (rail-renderer's
+      // votRailX). Without verseTotal every top-rail x is NaN, by design.
+      verseTotal: cam.total,
       verseX: (verse) => verseToX(cam, v.W, verse),
       showUnderlay,
     };
@@ -832,7 +857,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
             aria-pressed={mode === 'canonical'} onClick={() => { setMode('canonical'); setDetail(null); setChoices(null); setListOpen(false); }}>Scripture</button>
-          <button type="button" className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
+          <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
             aria-pressed={mode === 'personal'} onClick={() => { setMode('personal'); setDetail(null); setChoices(null); setListOpen(false); }}>My web</button>
         </div>
         <button type="button" className={'sw-btn' + (goToOpen ? ' is-on' : '')}
@@ -904,8 +929,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </div>
       )}
 
-      {mode === 'personal' && graph && personalCount === 0 && (
-        <div className="sw-empty">
+      {mode === 'personal' && graph && personalCount === 0
+        && !emptyDismissed && !(settings && settings.swEmptyDismissed) && (
+        <div className="sw-empty" onKeyDown={(e) => { if (e.key === 'Escape') dismissEmpty(); }}>
           <div className="sw-empty-title">Your web is still being woven.</div>
           <div className="sw-empty-body">
             Select text anywhere in the app, tap <strong>Link</strong>, and pick a
@@ -914,6 +940,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             Volumes. The faint gold threads below are the connections the
             Volumes already make.
           </div>
+          <button type="button" className="sw-empty-close" aria-label="Dismiss"
+            onClick={dismissEmpty}>×</button>
         </div>
       )}
       {tip && <TipChip info={tip} viewport={viewRef.current} />}
