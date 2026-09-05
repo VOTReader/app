@@ -57,6 +57,95 @@
  * @typedef {Omit<MediaRecord, 'blob'>} MediaMetadata
  */
 
+/* How many leading bytes are read to size an image. A JPEG can carry a large
+   EXIF block (and an embedded thumbnail) before its SOF marker; 64 KB clears
+   every real one. Past that the size is simply unknown, which is a supported
+   answer here -- see sourcePixelSize. */
+var HEADER_PROBE_BYTES = 64 * 1024;
+
+/**
+ * The intrinsic pixel size an image declares in its own header, or null.
+ *
+ * journal-5 follow-up: `createImageBitmap`'s `resizeWidth` SETS the decode
+ * width, it does not cap it -- per spec the decoder produces exactly that
+ * width, upscaling a narrower source. So the hint can only be applied once
+ * the source's real size is known, and this is the cheap way to know it:
+ * the header states it, no decode required.
+ *
+ * Four formats are read. Anything else (HEIC, AVIF, TIFF, BMP, a file whose
+ * header is damaged) returns null, and the caller then decodes with no hint
+ * at all -- correct output at the cost of a full-size decode. Guessing is
+ * what produced the upscale; declining to guess is the fix.
+ *
+ * @param {Uint8Array} b  the first bytes of the file
+ * @returns {{ width: number, height: number } | null}
+ */
+function headerPixelSize(b) {
+  if (!b || b.length < 10) return null;
+  var dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+
+  // PNG: 8-byte signature, then an IHDR chunk carrying w,h as big-endian u32.
+  if (b.length >= 24 && dv.getUint32(0) === 0x89504E47 && dv.getUint32(12) === 0x49484452) {
+    return { width: dv.getUint32(16), height: dv.getUint32(20) };
+  }
+  // GIF: "GIF" then the logical screen size as little-endian u16.
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    return { width: dv.getUint16(6, true), height: dv.getUint16(8, true) };
+  }
+  // WebP: RIFF....WEBP, then one of three chunk layouts.
+  if (b.length >= 30 && dv.getUint32(0) === 0x52494646 && dv.getUint32(8) === 0x57454250) {
+    var fourcc = dv.getUint32(12);
+    if (fourcc === 0x56503820) {          // "VP8 " lossy: 14-bit dims after the start code
+      return { width: dv.getUint16(26, true) & 0x3FFF, height: dv.getUint16(28, true) & 0x3FFF };
+    }
+    if (fourcc === 0x5650384C) {          // "VP8L" lossless: 14-bit (w-1),(h-1) packed
+      var bits = dv.getUint32(21, true);
+      return { width: (bits & 0x3FFF) + 1, height: ((bits >>> 14) & 0x3FFF) + 1 };
+    }
+    if (fourcc === 0x56503858) {          // "VP8X" extended: 24-bit canvas (w-1),(h-1)
+      return {
+        width: (b[24] | (b[25] << 8) | (b[26] << 16)) + 1,
+        height: (b[27] | (b[28] << 8) | (b[29] << 16)) + 1,
+      };
+    }
+    return null;
+  }
+  // JPEG: walk the marker segments to the first frame header (SOF0..SOF15,
+  // minus DHT/JPG/DAC, which share that range without carrying dimensions).
+  if (b[0] === 0xFF && b[1] === 0xD8) {
+    var i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xFF) { i++; continue; }                    // resync
+      var marker = b[i + 1];
+      if (marker === 0xFF) { i++; continue; }                  // fill byte
+      if (marker === 0x01 || (marker >= 0xD0 && marker <= 0xD9)) { i += 2; continue; }
+      var len = dv.getUint16(i + 2);
+      if (len < 2) return null;
+      if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+        return { height: dv.getUint16(i + 5), width: dv.getUint16(i + 7) };
+      }
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+/**
+ * headerPixelSize over the first HEADER_PROBE_BYTES of a Blob. Never
+ * rejects: an unreadable header is the same answer as an unknown format.
+ *
+ * @param {File | Blob} blob
+ * @returns {Promise<{ width: number, height: number } | null>}
+ */
+function sourcePixelSize(blob) {
+  if (!blob || typeof blob.slice !== 'function') return Promise.resolve(null);
+  var head = blob.slice(0, HEADER_PROBE_BYTES);
+  if (!head || typeof head.arrayBuffer !== 'function') return Promise.resolve(null);
+  return head.arrayBuffer().then(function(buf) {
+    try { return headerPixelSize(new Uint8Array(buf)); } catch (_e) { return null; }
+  }, function() { return null; });
+}
+
 export var JournalMediaStore = (function() {
   var DB_NAME = 'vot-journal-media';
   var DB_VERSION = 2;
@@ -504,21 +593,44 @@ export var JournalMediaStore = (function() {
      * ordinary for a current flagship) is 8160*6120*4 = ~191 MB of RGBA
      * momentarily alive in the renderer heap, on top of whatever the
      * journal editor + loaded corpora + object-URL cache already hold.
-     * `resizeWidth` (below) tells the decoder to build the SMALL bitmap
-     * directly — giving only ONE of resizeWidth/resizeHeight is what keeps
-     * this aspect-ratio-correct: per spec, the browser computes the other
+     * `resizeWidth` tells the decoder to build the SMALL bitmap directly
+     * — giving only ONE of resizeWidth/resizeHeight is what keeps this
+     * aspect-ratio-correct: per spec, the browser computes the other
      * dimension from the SOURCE's own aspect ratio (which it already knows
      * from the file header), not from anything this function guesses.
      * Passing BOTH would stretch/distort every non-square photo instead.
-     * resizeWidth alone exactly hits the target for a landscape or square
-     * source (width is already the longer side); for a portrait source the
-     * decode comes out larger than the final target on its short axis, but
-     * still a large multiple smaller than the un-hinted full decode — the
-     * existing canvas draw below finishes the exact final crop either way.
-     * `maxDecodedPixels` is the backstop for the aspect ratios this hint
-     * doesn't fully tame (or hosts where it's silently ignored — the <img>
-     * fallback has no resize-hint mechanism at all): reject rather than
-     * hand the canvas a decode that's still unreasonably large.
+     *
+     * journal-5 follow-up: that same spec sentence is why the hint SETS the
+     * decode width rather than capping it. Handed a source narrower than
+     * `maxDim`, the decoder UPSCALES to exactly `maxDim`, and encodeFrom
+     * then reads the inflated bitmap as if it were the source: an 800x600
+     * photo was stored 1600x1200 at ~3.1x its own bytes, all interpolated,
+     * and a 1080x6000 stitched screenshot (6.5 Mpx, under the ceiling) was
+     * inflated to 14.2 Mpx and then rejected by the ceiling below — a
+     * backstop firing on an image the hint itself made oversized, with no
+     * fallback because the failure is `terminal`.
+     *
+     * So the hint is applied only when the source's own header says it
+     * cannot upscale: BOTH source dimensions at or above `maxDim`. That one
+     * comparison is deliberately conservative about EXIF. With
+     * `imageOrientation:'from-image'` an orientation 6/8 photo decodes with
+     * its axes SWAPPED relative to the header, so a rule that picked an axis
+     * ("hint the long edge") could hand `resizeWidth` a value larger than
+     * the decoded width and upscale again. When both dimensions clear
+     * `maxDim`, no swap can make `resizeWidth: maxDim` an upscale.
+     *
+     * The cost of being conservative is that an extreme aspect ratio whose
+     * SHORT edge is under `maxDim` (a panorama, a long screenshot) decodes
+     * un-hinted at its full size. That is what this function did before
+     * journal-5 and is still bounded by `maxDecodedPixels`; the ceiling
+     * rejecting a >10.24 Mpx un-hinted decode of that shape is a real
+     * residual, recorded rather than papered over.
+     *
+     * `maxDecodedPixels` is now the backstop for decodes this hint does not
+     * govern: an unreadable/unknown header (HEIC, AVIF, a damaged file), a
+     * host that silently ignores the hint, and the <img> fallback, which has
+     * no resize-hint mechanism at all. Note it runs AFTER the bitmap exists,
+     * so it protects the canvas step, not the allocation.
      *
      * @param {File | Blob} fileOrBlob
      * @param {{ maxDim?: number, quality?: number }} [opts]
@@ -532,7 +644,9 @@ export var JournalMediaStore = (function() {
       // journal-5: 4x the area of a perfect maxDim-by-maxDim square covers
       // every ordinary camera aspect ratio (up to ~2:1) with room to spare —
       // at the default maxDim=1600 that's 10.24M px (~41 MB of RGBA), still
-      // far below the 191 MB un-hinted worst case.
+      // far below the 191 MB un-hinted worst case. Every HINTED decode lands
+      // far under this; what it actually catches is the un-hinted ones (see
+      // the doc comment above).
       var maxDecodedPixels = maxDim * maxDim * 4;
 
       /**
@@ -602,29 +716,40 @@ export var JournalMediaStore = (function() {
       // the implicit default ('low').
       var canBitmap = (typeof createImageBitmap === 'function');
       if (canBitmap) {
-        return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image', resizeWidth: maxDim, resizeQuality: 'high' })
-          .then(function(bmp) {
-            return encodeFrom(bmp, bmp.width, bmp.height, function() {
-              try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
-            });
-          })
-          .catch(function(err) {
-            if (err && err.terminal) throw err;   // journal-5: encodeFrom's own failure — not retryable
-            // imageOrientation option unsupported or decode failed — retry
-            // without it, then fall back to the <img> path. The resize hint
-            // is kept here: it is what prevents the full-resolution decode,
-            // and losing correct EXIF orientation on this rare fallback is a
-            // far smaller cost than a 191 MB decode on the (likely still
-            // orientation-capable) host that only balked at one option.
-            return createImageBitmap(fileOrBlob, { resizeWidth: maxDim, resizeQuality: 'high' }).then(function(bmp) {
+        return sourcePixelSize(fileOrBlob).then(function(src) {
+          // The one comparison the hint hangs on — see the doc comment.
+          var canHint = !!src && Math.min(src.width, src.height) >= maxDim;
+          /** @type {ImageBitmapOptions} */
+          var hint = canHint ? { resizeWidth: maxDim, resizeQuality: 'high' } : {};
+          /** @type {ImageBitmapOptions} */
+          var primary = { imageOrientation: 'from-image' };
+          if (canHint) { primary.resizeWidth = maxDim; primary.resizeQuality = 'high'; }
+
+          return createImageBitmap(fileOrBlob, primary)
+            .then(function(bmp) {
               return encodeFrom(bmp, bmp.width, bmp.height, function() {
                 try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
               });
-            }).catch(function(err2) {
-              if (err2 && err2.terminal) throw err2;   // journal-5: same — never fall through to a full <img> decode
-              return imgPath();
+            })
+            .catch(function(err) {
+              if (err && err.terminal) throw err;   // journal-5: encodeFrom's own failure — not retryable
+              // imageOrientation option unsupported or decode failed — retry
+              // without it, then fall back to the <img> path. The hint
+              // DECISION carries over unchanged rather than being re-guessed:
+              // it is what prevents the full-resolution decode, and losing
+              // correct EXIF orientation on this rare fallback is a far
+              // smaller cost than a 191 MB decode on the (likely still
+              // orientation-capable) host that only balked at one option.
+              return createImageBitmap(fileOrBlob, hint).then(function(bmp) {
+                return encodeFrom(bmp, bmp.width, bmp.height, function() {
+                  try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+                });
+              }).catch(function(err2) {
+                if (err2 && err2.terminal) throw err2;   // journal-5: same — never fall through to a full <img> decode
+                return imgPath();
+              });
             });
-          });
+        });
       }
       return imgPath();
 

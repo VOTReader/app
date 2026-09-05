@@ -73,6 +73,55 @@ function makeBlob(bytes, type) {
   return new Blob([buf], { type });
 }
 
+/* ── Real image headers, for compressImage's size probe ─────────────────
+   compressImage decides whether a resize hint can be applied WITHOUT
+   upscaling by reading the source's own header. A blob of arbitrary bytes
+   has no size to read, so these build the smallest genuinely valid headers
+   for the two formats that carry every real case: a phone photo (JPEG) and
+   a stitched screenshot (PNG). The parser under test reads these; nothing
+   here is stubbed. */
+function jpegHeader(w, h) {
+  return new Uint8Array([
+    0xFF, 0xD8,                                        // SOI
+    0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,    // APP0/JFIF, len 16
+    0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+    0xFF, 0xC0, 0x00, 0x11, 0x08,                      // SOF0, len 17, 8-bit
+    (h >> 8) & 0xFF, h & 0xFF, (w >> 8) & 0xFF, w & 0xFF, 0x03,
+    0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+  ]);
+}
+function pngHeader(w, h) {
+  const u = new Uint8Array(24);
+  u.set([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], 0);
+  const dv = new DataView(u.buffer);
+  dv.setUint32(8, 13);                                 // IHDR length
+  u.set([0x49, 0x48, 0x44, 0x52], 12);                 // 'IHDR'
+  dv.setUint32(16, w);
+  dv.setUint32(20, h);
+  return u;
+}
+const jpegBlob = (w, h) => new Blob([jpegHeader(w, h)], { type: 'image/jpeg' });
+const pngBlob = (w, h) => new Blob([pngHeader(w, h)], { type: 'image/png' });
+
+/* A createImageBitmap that behaves like a DECODER: it honours the resize
+   hint it is handed, including by upscaling a source narrower than the hint,
+   which is exactly what the spec mandates and what real Chromium does. The
+   mock this replaces returned a fixed 1600x1200 whatever it was given, so
+   the suite could only ever assert what was REQUESTED — never what a decoder
+   does with it. That is how an upscale on every under-target photo passed
+   4,509 tests. */
+function decoderMock(srcW, srcH) {
+  return vi.fn((_blob, opts) => {
+    let w = srcW;
+    let h = srcH;
+    const rw = opts && opts.resizeWidth;
+    const rh = opts && opts.resizeHeight;
+    if (rw) { w = rw; h = Math.round(srcH * (rw / srcW)); }
+    else if (rh) { h = rh; w = Math.round(srcW * (rh / srcH)); }
+    return Promise.resolve({ width: w, height: h, close: vi.fn() });
+  });
+}
+
 describe('JournalMediaStore — put() + get() round-trip', () => {
   it('stores a small image blob and reads it back with same size/type', async () => {
     const blob = makeBlob(128, 'image/jpeg');
@@ -420,11 +469,12 @@ describe('JournalMediaStore — compressImage() (journal-5: decode-time downscal
 
   it('REPRO: passes resizeWidth + resizeQuality to createImageBitmap so the decoder never builds the full-resolution bitmap', async () => {
     installFakeCanvas();
-    const bmp = { width: 1600, height: 1200, close: vi.fn() };
-    const cib = vi.fn().mockResolvedValue(bmp);
+    const cib = decoderMock(3000, 2250);
     /** @type {any} */ (globalThis).createImageBitmap = cib;
 
-    await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+    // A source comfortably larger than maxDim on BOTH axes — the case where
+    // the hint is unambiguously a downscale.
+    await JournalMediaStore.compressImage(jpegBlob(3000, 2250), { maxDim: 1600, quality: 0.8 });
 
     expect(cib).toHaveBeenCalledTimes(1);
     const optsArg = cib.mock.calls[0][1];
@@ -456,7 +506,7 @@ describe('JournalMediaStore — compressImage() (journal-5: decode-time downscal
     const bmp = { width: 1600, height: 1200, close: vi.fn() };
     /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bmp);
 
-    const out = await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+    const out = await JournalMediaStore.compressImage(jpegBlob(3000, 2250), { maxDim: 1600, quality: 0.8 });
 
     expect(out.width).toBe(1600);
     expect(out.height).toBe(1200);
@@ -472,13 +522,143 @@ describe('JournalMediaStore — compressImage() (journal-5: decode-time downscal
       .mockResolvedValueOnce(bmp);
     /** @type {any} */ (globalThis).createImageBitmap = cib;
 
-    await JournalMediaStore.compressImage(makeBlob(10, 'image/jpeg'), { maxDim: 1600, quality: 0.8 });
+    await JournalMediaStore.compressImage(jpegBlob(3000, 2250), { maxDim: 1600, quality: 0.8 });
 
     expect(cib).toHaveBeenCalledTimes(2);
     const retryOpts = cib.mock.calls[1][1];
     expect(retryOpts.resizeWidth).toBe(1600);
     expect(retryOpts.resizeQuality).toBe('high');
     expect(retryOpts.imageOrientation).toBeUndefined();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   journal-5 follow-up: the resize hint SETS the decode width, it does not
+   cap it.
+   ─────────────────────────────────────────────────────────────────────────
+   `createImageBitmap(blob, { resizeWidth: 1600 })` produces a bitmap of
+   exactly 1600 px wide -- INCLUDING when the source is narrower, in which
+   case the decoder upscales and encodeFrom then derives its scale from an
+   inflated size it believes is the source. Measured in real Chromium on the
+   unfixed tree: an 800x600 / 4,177 B photo came back 1600x1200 / 13,429 B,
+   and a 1080x6000 stitched screenshot (6.5 Mpx, under the ceiling) was
+   inflated to 14.2 Mpx and then REJECTED by the ceiling the same commit
+   added -- terminal, so the attach is dropped with "Could not save that
+   image."
+
+   Every test above this block ran against a createImageBitmap stubbed to
+   return a fixed 1600x1200 whatever options it was handed, so they asserted
+   what was REQUESTED and never what a decoder does with it. These use
+   decoderMock, which honours the hint, and real headers, which is how
+   compressImage now learns whether the hint can be applied at all.
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('JournalMediaStore — compressImage() never upscales a source below the target', () => {
+  /** @type {any} */
+  let fakeCanvas;
+  /** @type {any} */
+  let createElementSpy;
+
+  function installFakeCanvas() {
+    fakeCanvas = {
+      width: 0, height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      toBlob: vi.fn((cb) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }))),
+    };
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'canvas') return fakeCanvas;
+      return realCreate(tag);
+    });
+  }
+
+  afterEach(() => {
+    if (createElementSpy) { createElementSpy.mockRestore(); createElementSpy = null; }
+    delete /** @type {any} */ (globalThis).createImageBitmap;
+  });
+
+  const hintOf = (cib) => {
+    const opts = cib.mock.calls[0][1] || {};
+    return opts.resizeWidth;
+  };
+
+  it('REPRO: an 800x600 photo is stored at 800x600, not decoded up to 1600x1200', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(800, 600);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(jpegBlob(800, 600), { maxDim: 1600, quality: 0.8 });
+
+    expect(out.width).toBe(800);
+    expect(out.height).toBe(600);
+    // The hint is what did the upscaling, so it must not be requested here.
+    expect(hintOf(cib)).toBeUndefined();
+  });
+
+  it('REPRO: a 1080x6000 stitched screenshot still attaches, at 288x1600', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(1080, 6000);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    // 1080*6000 = 6.48 Mpx, under the 10.24 Mpx ceiling. The hint inflated it
+    // to 1600x8889 = 14.2 Mpx, and the ceiling then rejected the image the
+    // hint had made oversized -- with `terminal` set, so no fallback ran.
+    const out = await JournalMediaStore.compressImage(pngBlob(1080, 6000), { maxDim: 1600, quality: 0.8 });
+
+    expect(out.width).toBe(288);
+    expect(out.height).toBe(1600);
+    expect(hintOf(cib)).toBeUndefined();
+  });
+
+  it('a portrait phone photo (3024x4032) still decodes small — the case the hint exists for', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(3024, 4032);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(jpegBlob(3024, 4032), { maxDim: 1600, quality: 0.8 });
+
+    expect(hintOf(cib)).toBe(1600);
+    expect(out.width).toBe(1200);
+    expect(out.height).toBe(1600);
+  });
+
+  it('a 50 MP flagship shot (8160x6120) is hinted down, not rejected', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(8160, 6120);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(jpegBlob(8160, 6120), { maxDim: 1600, quality: 0.8 });
+
+    expect(hintOf(cib)).toBe(1600);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+  });
+
+  it('a source whose header cannot be read is decoded un-hinted rather than guessed at', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(900, 700);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    // 10 arbitrary bytes: no magic this parser knows. Guessing a hint here is
+    // what produced the upscale; the post-decode ceiling is the guard instead.
+    const out = await JournalMediaStore.compressImage(makeBlob(10, 'image/heic'), { maxDim: 1600, quality: 0.8 });
+
+    expect(hintOf(cib)).toBeUndefined();
+    expect(out.width).toBe(900);
+    expect(out.height).toBe(700);
+  });
+
+  it('the imageOrientation retry carries the same hint decision, not a fresh guess', async () => {
+    installFakeCanvas();
+    const cib = vi.fn()
+      .mockRejectedValueOnce(new Error('imageOrientation unsupported'))
+      .mockResolvedValueOnce({ width: 800, height: 600, close: vi.fn() });
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+
+    const out = await JournalMediaStore.compressImage(jpegBlob(800, 600), { maxDim: 1600, quality: 0.8 });
+
+    expect(cib).toHaveBeenCalledTimes(2);
+    expect((cib.mock.calls[1][1] || {}).resizeWidth).toBeUndefined();
+    expect(out.width).toBe(800);
   });
 });
 
