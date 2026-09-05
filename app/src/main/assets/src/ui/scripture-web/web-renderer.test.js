@@ -15,14 +15,6 @@ import {
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const PICK_SRC = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'utils', 'scripture-web', 'pick.js'),
-  'utf-8',
-);
 
 describe('shader / CPU agreement', () => {
   it('inlines the SHARED height law rather than restating it', () => {
@@ -140,11 +132,19 @@ describe('deep-zoom declutter', () => {
      fade is gradual; the hard cull may only take the arcs that have arrived
      at exactly zero. */
   it('culls exactly the arcs pick.js already refuses — the same zero', () => {
-    expect(PICK_SRC).toContain(
-      'if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;');
-    // The threshold is a literal zero, not an epsilon standing in for one.
+    // The threshold is a LITERAL zero, not an epsilon standing in for one...
     const thresholds = [...SHADER_SOURCE.vertex.matchAll(/if \(dim <= ([^)]*)\)/g)].map((m) => m[1].trim());
     expect(thresholds).toEqual(['0.']);
+    // ...and that zero is the law's own, the one pick.js:87 refuses taps on
+    // (`if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue`).
+    // Asserted through the shared function rather than by reading pick.js's
+    // text: this tree is browser-scoped for tsc, so `node:fs` is not available
+    // here, and a behaviour check is the better pin anyway.
+    expect(flyOverDim(0, 1)).toBe(0);
+    // The band above it stays paintable AND tappable — that is the half the
+    // literal protects. A cull at any epsilon would blank these.
+    expect(flyOverDim(0, 0.8)).toBeGreaterThan(0);
+    expect(flyOverDim(0, 0.99)).toBeGreaterThan(0);
   });
 
   it('fades fly-over arcs to NOTHING at full depth, not to a residual band', () => {
