@@ -18,6 +18,11 @@
 #      batch-align.py's ship() rebuilds audio-sync.js from its run report, so
 #      a letter that raised — or that align-supervisor.py skipped for memory —
 #      used to be deleted from the shipped file. Coverage only goes up.
+#   1e. test_align_commit.py    when tools/_alignlib.py, tools/align-supervisor.py
+#      or its test changes. commit_gb() must read PrivateUsage from the _EX
+#      struct: reading the base struct's PagefileUsage printed 10.02 GB where
+#      the truth was 17.29 GB. CI holds the shape; this hook is on Windows so
+#      it also compares against an instrument outside the process.
 #
 #   2. lint-staged (Q3.5)    when any .js/.jsx source file changes
 #      Runs `eslint --max-warnings 0` ONLY on staged source files.
@@ -385,6 +390,36 @@ if [ -n "$ship_changed" ]; then
     exit 1
   fi
   echo "[pre-commit] Shipper carries forward unrun units."
+  echo ""
+fi
+
+# ─── Step 1e: the commit-charge reader (2026-09-05) ────────────────
+# Both alignment runners print a per-unit COMMIT charge, and align-supervisor.py
+# records it beside RSS when it kills a unit. The reader took PagefileUsage from
+# the BASE PROCESS_MEMORY_COUNTERS; the commit charge is PrivateUsage, which
+# only exists in the _EX struct. It printed 10.02 GB against a true 17.29 GB
+# that three external instruments agreed on — 40% low, and plausible, which is
+# worse than a zero because a zero is obviously broken. Machine Ops was sizing a
+# ceiling off that series. Unlike CI's ubuntu runner this hook is on Windows, so
+# BOTH halves run here: the shape of the struct and the live comparison against
+# Win32_Process PrivatePageCount for this very process. ~0.5s.
+mem_changed=$(echo "$staged" | grep -E '^(tools/_alignlib\.py|tools/align-supervisor\.py|test_align_commit\.py)$' || true)
+if [ -n "$mem_changed" ]; then
+  echo "[pre-commit] Memory instrumentation changed — running test_align_commit.py..."
+  python -m unittest test_align_commit
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Commit-charge reader FAILED — commit_gb() must read PrivateUsage"
+    echo "from the PROCESS_MEMORY_COUNTERS_EX struct, and must agree with"
+    echo "an instrument outside the process. A near-miss field reads like a"
+    echo "real number and silently under-reports what this job costs the"
+    echo "rest of the machine."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Commit charge agrees with an external instrument."
   echo ""
 fi
 

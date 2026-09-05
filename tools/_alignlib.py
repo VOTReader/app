@@ -819,6 +819,14 @@ def _self_mem(field):
         import ctypes
         import ctypes.wintypes as wt
 
+        # The _EX struct: the base PROCESS_MEMORY_COUNTERS plus PrivateUsage.
+        # PrivateUsage is the COMMIT CHARGE -- what Task Manager calls "Commit
+        # size" and what counts against the system limit. PagefileUsage in the
+        # base struct is NOT it and reads far lower: measured 2026-09-05 on the
+        # live aligner, PagefileUsage 10.02 GB against a true 17.29 GB that
+        # Get-Process PagedMemorySize64, Win32_Process PageFileUsage and
+        # Win32_Process PrivatePageCount all agree on. Reading the near-miss
+        # field is worse than reading none, because the number looks plausible.
         class PMC(ctypes.Structure):
             _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD),
                         ("PeakWorkingSetSize", ctypes.c_size_t),
@@ -828,7 +836,8 @@ def _self_mem(field):
                         ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
                         ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
                         ("PagefileUsage", ctypes.c_size_t),
-                        ("PeakPagefileUsage", ctypes.c_size_t)]
+                        ("PeakPagefileUsage", ctypes.c_size_t),
+                        ("PrivateUsage", ctypes.c_size_t)]
         k = ctypes.windll.kernel32
         k.GetCurrentProcess.restype = ctypes.c_void_p
         c = PMC()
@@ -861,7 +870,7 @@ def commit_gb():
     pin_memory, no non_blocking copy -- so this is the CUDA/WDDM backing reserve
     plus CTranslate2's arena, and the only thing that hands it back is releasing
     the allocator, which both runners now do per unit."""
-    return _self_mem("PagefileUsage")
+    return _self_mem("PrivateUsage")
 
 
 def vram_free_gb():
