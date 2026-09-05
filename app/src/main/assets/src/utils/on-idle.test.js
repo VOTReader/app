@@ -31,7 +31,11 @@ afterEach(() => { vi.useRealTimers(); });
 
 describe('onIdle', () => {
   it('uses requestIdleCallback where it exists, and passes the timeout through', () => {
-    const request = vi.fn(() => 42);
+    // Declared parameters, not `() => 42`: vi.fn infers a ZERO-ARG mock from a
+    // zero-arg implementation, so `mock.calls[0]` types as an empty tuple and
+    // `calls[0][0]` is a tsc error rather than a runtime one. The arity here is
+    // what makes the two assertions below type-check AND stay meaningful.
+    const request = vi.fn((/** @type {any} */ _fn, /** @type {any} */ _opts) => 42);
     const cancel = vi.fn();
     const restore = withIdle({ request, cancel });
     try {
@@ -87,7 +91,7 @@ describe('onIdle', () => {
   });
 
   it('omits the options object when no timeout is asked for', () => {
-    const request = vi.fn(() => 1);
+    const request = vi.fn((/** @type {any} */ _fn, /** @type {any} */ _opts) => 1);
     const restore = withIdle({ request, cancel: vi.fn() });
     try {
       onIdle(() => {});
