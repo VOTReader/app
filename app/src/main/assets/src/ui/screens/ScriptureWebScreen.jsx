@@ -347,6 +347,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
    * notice goes the moment it is tapped rather than after the settings write
    * round-trips, and so a host with no updateSetting still closes it.
    */
+  /* Whether the empty-web notice is on screen. ONE definition: the render
+     below and the Escape branch above both read it, because two spellings of
+     "is the notice up" is how a keystroke came to dismiss it and leave the
+     screen in the same breath. */
+  const emptyShown = mode === 'personal' && !!graph && personalCount === 0
+    && !emptyDismissed && !(settings && settings.swEmptyDismissed);
+
   const dismissEmpty = React.useCallback(() => {
     setEmptyDismissed(true);
     if (typeof updateSetting === 'function') updateSetting('swEmptyDismissed', true);
@@ -776,7 +783,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, MAX_ZOOM); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
-      if (goToOpen || listOpen || choices || detail || tip) {
+      // The notice is an overlay like the five below and goes first for the
+      // same reason they do: Escape dismisses what is on top before it leaves
+      // the screen. It lives HERE rather than in a handler of its own on the
+      // panel \u2014 a second handler closed the notice and let the keystroke
+      // through to onBack(), so one press both dismissed the tip and threw the
+      // reader out to the Library.
+      if (emptyShown) { dismissEmpty(); }
+      else if (goToOpen || listOpen || choices || detail || tip) {
         setGoToOpen(false); setListOpen(false); setChoices(null); setDetail(null); setTip(null);
         focusRef.current = { arc: -1, range: null }; schedule();
       }
@@ -788,7 +802,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const centre = Math.round(cam.x);
     if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [choices, detail, goToOpen, listOpen, tip, graph, onBack, resetView, schedule]);
+  }, [choices, detail, goToOpen, listOpen, tip, graph, onBack, resetView, schedule,
+      emptyShown, dismissEmpty]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
@@ -929,9 +944,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </div>
       )}
 
-      {mode === 'personal' && graph && personalCount === 0
-        && !emptyDismissed && !(settings && settings.swEmptyDismissed) && (
-        <div className="sw-empty" onKeyDown={(e) => { if (e.key === 'Escape') dismissEmpty(); }}>
+      {emptyShown && (
+        <div className="sw-empty">
           <div className="sw-empty-title">Your web is still being woven.</div>
           <div className="sw-empty-body">
             Select text anywhere in the app, tap <strong>Link</strong>, and pick a
