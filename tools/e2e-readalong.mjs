@@ -504,6 +504,9 @@ async function run() {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required', '--mute-audio'],
+    // Bounded so a hang surfaces in minutes rather than hanging the run — NOT
+    // headroom for a slow CDP call on a busy machine. See smoke-ci.js:157 and
+    // e2e-read-detector.mjs:29 for why: raising this can only hide a hang.
     protocolTimeout: 240000,
   });
 
