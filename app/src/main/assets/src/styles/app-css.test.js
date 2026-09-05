@@ -217,6 +217,24 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
   });
 });
 
+/* THE NEXT CARD MUST STAY ON THE SCREEN AT LARGE TYPE (design-perf, launch-day
+   live read part 2, 2026-09-05). `.bottom-nav` was `grid-template-columns: 1fr
+   1fr`; `1fr` is minmax(auto, 1fr), so the Cinzel caps label's min-content
+   pushed the tracks to 197 + 165 px in a 274 px row at Text Size 1.8 and the
+   Next card ran 74 px past a 360 px screen behind overflow-x: hidden ("Next
+   Lett"), on every letter and chapter. minmax(0, 1fr) lets the track shrink
+   below its content and the label wraps instead. */
+describe('app.css — bottom-nav cards fit the row at large type', () => {
+  it('the two tracks can shrink below their content', () => {
+    const nav = ruleBlock(CSS, '.bottom-nav {');
+    expect(nav).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/);
+  });
+  it('the caps label wraps rather than widening the card', () => {
+    const label = ruleBlock(CSS, '.bottom-nav-label {');
+    expect(label).toMatch(/overflow-wrap:\s*(anywhere|break-word)/);
+  });
+});
+
 describe('app.css — .sr-only utility', () => {
   it('exists with the standard visually-hidden pattern', () => {
     const block = ruleBlock(CSS, '.sr-only');

@@ -1684,7 +1684,10 @@
     
       /* ── BOTTOM NAV ── */
       .bottom-nav {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;
+        /* minmax(0, 1fr), not 1fr: 1fr's auto minimum let the caps label's min-content push the two
+           tracks to 197 + 165 px in a 274 px row at Text Size 1.8, and the Next card ran 74 px past the
+           screen behind overflow-x: hidden on every letter and chapter (2026-09-05). */
+        display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1rem; margin-top: 1.5rem;
       }
       .bottom-nav-card {
         background: var(--bg2); border: 1px solid var(--gold-border); border-radius: var(--radius);
@@ -1696,7 +1699,7 @@
       .bottom-nav-card.placeholder { opacity: 0.3; pointer-events: none; }
       .bottom-nav-label {
         font-family: 'Cinzel', serif; font-size: var(--fs-11); letter-spacing: 0.22em;
-        text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem;
+        text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem; overflow-wrap: break-word;
       }
       .bottom-nav-title { font-size: var(--fs-16); color: var(--cream); line-height: 1.4; }
       @media (hover: hover) { .bottom-nav-card:hover .bottom-nav-title { color: var(--gold-bright); } }
