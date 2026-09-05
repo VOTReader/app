@@ -143,10 +143,12 @@ describe('TourOverlay — ring and target', () => {
 describe('TourOverlay — the card never leaves the screen; the ring is kept on it', () => {
   const vh = () => window.innerHeight;
   it('a target past the bottom edge: the card is clamped inside the viewport, Skip and Next reachable', () => {
-    document.body.innerHTML = '<div id="app"><button class="hero-play-pill">Listen</button></div>';
-    const pill = document.querySelector('.hero-play-pill');
+    // The Export button, the stop that found this on a 699 px phone (Listen stops dock now, so the
+    // clamp is exercised on a beside-the-ring stop).
+    document.body.innerHTML = '<div id="app"><div data-settings-group="data"><button>Export</button></div></div>';
+    const pill = document.querySelector('[data-settings-group="data"] button');
     pill.getBoundingClientRect = rect(60, vh() + 120, 94, 25);      // below the fold, as Export was
-    startAt('listen');
+    startAt('backup');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
     const top = parseFloat(card.style.top);
@@ -168,11 +170,12 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
   });
 
   it('a card taller than the room beside the ring is capped to that room, so the ring stays visible', () => {
-    // 1.8 on a 699 px phone: the Listen card was 603 px tall and lay over the ringed control.
-    document.body.innerHTML = '<div id="app"><button class="hero-play-pill">Listen</button></div>';
-    const pill = document.querySelector('.hero-play-pill');
+    // 1.8 on a 699 px phone: the Listen card was 603 px tall and lay over the ringed control. Listen
+    // stops dock now; the same cap guards every beside-the-ring stop, here New Entry at the Journal.
+    document.body.innerHTML = '<div id="app"><button class="jrn-fab-newentry">New Entry</button></div>';
+    const pill = document.querySelector('.jrn-fab-newentry');
     pill.getBoundingClientRect = rect(60, Math.round(vh() * 0.4), 185, 59);
-    startAt('listen');
+    startAt('journal');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
     const ringH = 59 + 16;                                            // the pill plus the ring's 8 px pad
@@ -214,6 +217,37 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     expect(parseFloat(ring.style.top) + parseFloat(ring.style.height)).toBeLessThanOrEqual(vh());
   });
 
+  it('brings the target back when a layout shift pushes it off screen after the re-scroll window, and leaves the reader’s own scroll alone', async () => {
+    // Export at the backup stop, in a scroller whose content ABOVE it grows 456 px two seconds after
+    // arrival (a Settings group finishing its mount, emulator at 1.8, 2026-09-04): the target leaves
+    // the screen while scrollTop has not moved. A reader's scroll moves scrollTop; that is left alone.
+    vi.useFakeTimers();
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><div data-settings-group="data"><button>Export</button></div></div></div>';
+    const scroller = /** @type {any} */ (document.querySelector('.screen-scroll'));
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    let scrollTop = 2959;
+    Object.defineProperty(scroller, 'scrollTop', { get: () => scrollTop, set: (v) => { scrollTop = v; }, configurable: true });
+    const btn = document.querySelector('[data-settings-group="data"] button');
+    let y = 476;
+    btn.getBoundingClientRect = () => rect(60, y, 94, 40)();
+    const scrolls = vi.fn(() => { y = 300; });
+    btn.scrollIntoView = scrolls;
+    startAt('backup');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await act(async () => { vi.advanceTimersByTime(3000); });                 // past RESCROLL_WINDOW_MS
+    const before = scrolls.mock.calls.length;
+    y = 932;                                                                   // layout shift: scrollTop unchanged
+    await act(async () => { vi.advanceTimersByTime(700); });
+    expect(scrolls.mock.calls.length).toBeGreaterThan(before);
+    expect(y).toBe(300);
+    const after = scrolls.mock.calls.length;
+    scrollTop = 3400; y = -200;                                                // the reader scrolled it away
+    await act(async () => { vi.advanceTimersByTime(700); });
+    expect(scrolls.mock.calls.length).toBe(after);
+    vi.useRealTimers();
+  });
+
   it('after the press, the card says what to look for and Next moves on', () => {
     document.body.innerHTML = '<div id="app"><button class="hero-play-pill">Listen</button></div>';
     startAt('listen');
@@ -226,3 +260,123 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     expect(TourController.getState().step.id).toBe('bible');
   });
 });
+
+/* Corbin, on his phone (2026-09-04): at the Listen stops the lit sentence sat under the card and under
+   the dim. The rule now: while the tour is showing a highlight, the highlight is the brightest thing on
+   the screen and nothing sits over the text. */
+describe('TourOverlay — Listen stops dock at the bottom and open the reading column once pressed', () => {
+  const vh = () => window.innerHeight;
+  const letterScreen = (barTop) => {
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><main class="letter-body"><button class="hero-play-pill">Listen</button><p>Thus says The Lord…</p></main></div>'
+      + (barTop != null ? '<div class="audio-bar"></div>' : '') + '</div>';
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    scroller.getBoundingClientRect = rect(0, 56, 360, vh() - 56);
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    const pill = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
+    pill.getBoundingClientRect = rect(133, 271, 94, 25);
+    if (barTop != null) /** @type {HTMLElement} */ (document.querySelector('.audio-bar')).getBoundingClientRect = rect(8, barTop, 344, vh() - barTop);
+    return pill;
+  };
+  const dims = () => [...document.querySelectorAll('.tour-dim')].map((d) => { const el = /** @type {HTMLElement} */ (d); return { top: parseFloat(el.style.top), height: parseFloat(el.style.height), width: parseFloat(el.style.width) }; });
+
+  it('before the press: the card sits on the bottom edge, capped to 36 % of the screen, the pill ringed', () => {
+    letterScreen(null);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(true);
+    expect(card.style.top).toBe('');
+    expect(parseFloat(card.style.bottom)).toBe(12);
+    expect(parseFloat(card.style.maxHeight)).toBe(Math.round(vh() * 0.36));
+    expect(document.querySelector('.tour-ring')).toBeTruthy();
+    expect(document.querySelectorAll('.tour-dim').length).toBe(4);
+  });
+
+  it('with the player bar up, the card docks above the bar', () => {
+    letterScreen(vh() - 80);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(parseFloat(card.style.bottom)).toBe(12 + 80);
+  });
+
+  it('after the press: no ring, and the dims leave the reading column open from its scroller down to the card', () => {
+    const pill = letterScreen(vh() - 80);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(pill);
+    expect(TourController.getState().pressed).toBe(true);
+    expect(document.querySelector('.tour-ring')).toBeNull();
+    const d = dims();
+    expect(d.length).toBe(4);
+    const cardTop = vh() - (12 + 80) - 220;                 // CARD_EST_H before ResizeObserver reports
+    expect(d[0]).toEqual({ top: 0, height: 56, width: window.innerWidth });   // the nav only
+    expect(d[1].top).toBe(cardTop);                                     // dim resumes at the card
+    expect(d[2].width).toBe(0); expect(d[3].width).toBe(0);            // nothing beside the column
+    // The lit words, wherever read-along puts them between the nav and the card, sit under no pane.
+    for (const y of [60, 200, cardTop - 1]) expect(d.some((p) => p.width > 0 && y >= p.top && y < p.top + p.height)).toBe(false);
+  });
+
+  it('on a 699 px phone with the bar up, the card shrinks so 55 % of the screen stays open above it', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 699;
+    try {
+      const pill = letterScreen(699 - 100);                             // the bar at 1.8x is ~100 px
+      startAt('listen');
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      expect(parseFloat(card.style.bottom)).toBe(112);
+      expect(parseFloat(card.style.maxHeight)).toBe(Math.floor(699 - 112 - 699 * 0.55));   // 202, not 36 % = 252
+      fireEvent.click(pill);
+      const cardTop = dims()[1].top;
+      expect(cardTop).toBeGreaterThanOrEqual(699 * 0.55);
+    } finally { window.innerHeight = vh0; }
+  });
+
+  it('while docked, the reading column’s scroller carries the card as scroll-padding-bottom; gone with the tour', async () => {
+    const pill = letterScreen(vh() - 80);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    const cardTop = vh() - (12 + 80) - 220;
+    expect(scroller.style.scrollPaddingBottom).toBe((vh() - cardTop) + 'px');
+    fireEvent.click(pill);
+    expect(scroller.style.scrollPaddingBottom).toBe((vh() - cardTop) + 'px');          // kept across the press
+    await act(async () => { TourController.skip(); });
+    expect(scroller.style.scrollPaddingBottom).toBe('');
+  });
+
+  it('a bar the previous stop raised does not lift the next stop’s card once it is gone', async () => {
+    const pill = letterScreen(vh() - 80);
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(92);
+    fireEvent.click(pill);
+    document.querySelector('.audio-bar').remove();                      // the tour stopped the playback
+    await act(async () => { TourController.next(); });                   // → bible, on the same DOM
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(12);
+  });
+
+  it('the Bible stop docks the same way', () => {
+    letterScreen(null);
+    startAt('bible');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    expect(document.querySelector('.tour-card').classList.contains('docked')).toBe(true);
+  });
+
+  it('a stop that is not a Listen stop is placed beside its ring as before', () => {
+    document.body.innerHTML = '<div id="app"><button class="jrn-fab-newentry">New Entry</button></div>';
+    document.querySelector('.jrn-fab-newentry').getBoundingClientRect = rect(260, vh() - 120, 80, 56);
+    startAt('journal');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(false);
+    expect(card.style.top).not.toBe('');
+  });
+});
+

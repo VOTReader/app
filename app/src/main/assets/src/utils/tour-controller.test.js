@@ -16,7 +16,7 @@
      E) subscribe/getVersion notify on every state change (React reads it
         with useSyncExternalStore like every other store).
 */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TourController } from './tour-controller.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
@@ -289,3 +289,63 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
     expect(audio.stop).toHaveBeenCalledTimes(2);
   });
 });
+
+/* Corbin's device walk (2026-09-04): he pressed Listen on the tour's word and nothing lit up, because
+   "Chosen by God" opens with 26.75 s of lead-in before its first clause. The press now seeks into the
+   first lit clause, from AUDIO_SYNC, once the player knows the track's duration. */
+describe('TourController — the letter Listen stop seeks to the first lit clause', () => {
+  const pill = () => { document.body.innerHTML = '<button class="hero-play-pill">Listen</button>'; };
+  const toListen = () => { TourController.attachNav(nav()); TourController.start('prompt'); TourController.next(); TourController.next(); };
+  let audio, listeners, state;
+  beforeEach(() => {
+    listeners = new Set();
+    state = { time: 0, duration: 0 };
+    audio = {
+      stop: vi.fn(), syncKeepAlive: vi.fn(), seek: vi.fn(),
+      getState: () => state,
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+    };
+    /** @type {any} */ (globalThis).AudioPlayer = audio;
+    /** @type {any} */ (globalThis).AUDIO_SYNC = { 'one:chosen-by-god': [[26.75, 0, 0, 34, 0], [29.96, 0, 35, 84, 0]] };
+  });
+  afterEach(() => { delete (/** @type {any} */ (globalThis)).AUDIO_SYNC; });
+  const notify = () => { for (const cb of [...listeners]) cb(); };
+
+  it('seeks 0.4 s into the first clause once the duration is known, and only once', () => {
+    pill(); toListen();
+    TourController.next();                              // press
+    expect(audio.seek).not.toHaveBeenCalled();          // no metadata yet: a seek now would be discarded
+    state = { time: 0, duration: 312.4 }; notify();
+    expect(audio.seek).toHaveBeenCalledTimes(1);
+    expect(audio.seek.mock.calls[0][0]).toBeCloseTo(27.15, 5);
+    state = { time: 27, duration: 312.4 }; notify();
+    expect(audio.seek).toHaveBeenCalledTimes(1);
+    expect(listeners.size).toBe(0);                     // unsubscribed after the seek
+  });
+
+  it('does not rewind a resumed recording that is already past the first clause', () => {
+    pill(); toListen();
+    TourController.next();
+    state = { time: 140, duration: 312.4 }; notify();
+    expect(audio.seek).not.toHaveBeenCalled();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('without timing rows there is nothing to seek to, and no guess is made', () => {
+    delete (/** @type {any} */ (globalThis)).AUDIO_SYNC;
+    pill(); toListen();
+    TourController.next();
+    state = { time: 0, duration: 312.4 }; notify();
+    expect(audio.seek).not.toHaveBeenCalled();
+  });
+
+  it('the Bible stop has no seek key: John 3 starts where it starts', () => {
+    pill(); toListen();
+    TourController.next(); TourController.next();      // → bible
+    expect(TourController.getState().step.id).toBe('bible');
+    TourController.next();                              // press
+    state = { time: 0, duration: 200 }; notify();
+    expect(audio.seek).not.toHaveBeenCalled();
+  });
+});
+

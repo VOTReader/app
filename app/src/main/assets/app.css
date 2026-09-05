@@ -7108,6 +7108,11 @@
         max-height: calc(100vh - 24px); overflow-y: auto;
       }
       .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
+      /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
+         scrolls clear of it, as the last paragraph does of the player bar above. */
+      body.tour-prompt-open .screen-scroll {
+        padding-bottom: calc(var(--tour-prompt-h, 200px) + 28px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
+      }
       .tour-eyebrow {
         font-family: var(--font-cinzel); font-size: var(--fs-11);
         letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px;

@@ -93,11 +93,24 @@ async function facts() {
       skip: !!(card && [...card.querySelectorAll('button')].find((b) => /^Skip/.test(b.textContent.trim()))),
       prompt: !!document.querySelector('.tour-prompt'),
       tourDone: !!(window.TourDoneFlagStore && window.TourDoneFlagStore.is()),
-      scrollW: document.documentElement.scrollWidth, vw: window.innerWidth,
+      scrollW: document.documentElement.scrollWidth, vw: window.innerWidth, vh: window.innerHeight,
       fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim(),
       player: !!document.querySelector('.audio-bar'),
       step: (() => { const tc = window.TourController; const st = tc && tc.getState(); return st && st.step ? st.step.id : null; })(),
       pressed: !!(window.TourController && window.TourController.getState().pressed),
+      docked: !!(card && card.classList.contains('docked')),
+      bar: r(document.querySelector('.audio-bar')),
+      dimBoxes: [...document.querySelectorAll('.tour-dim')].map(r),
+      scrollerTop: (() => { const c = document.querySelector('.letter-body, .chapter-body'); const s = c && c.closest('.screen-scroll'); return s ? Math.max(0, s.getBoundingClientRect().top) : 0; })(),
+      // Read-along paints with the CSS Custom Highlight API ('vot-reading'): the lit words' box.
+      lit: (() => { try { const h = window.CSS && CSS.highlights && CSS.highlights.get('vot-reading'); if (!h) return null; const rg = [...h][0]; return rg ? r(rg) : null; } catch (_e) { return null; } })(),
+      // The lit range's FIRST line (a wrapped sentence at a large text size is several): the one the eye follows.
+      litFirst: (() => { try { const h = window.CSS && CSS.highlights && CSS.highlights.get('vot-reading'); const rg = h && [...h][0]; const b = rg && rg.getClientRects()[0]; return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null; } catch (_e) { return null; } })(),
+      litUnder: (() => { try { const h = window.CSS && CSS.highlights && CSS.highlights.get('vot-reading'); const rg = h && [...h][0]; if (!rg) return null; const b = rg.getClientRects()[0] || rg.getBoundingClientRect(); const at = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); if (!at) return 'nothing'; const o = at.closest('.tour-dim, .tour-card'); return o ? o.className : null; } catch (_e) { return 'error'; } })(),
+      // What the docked card declared to the reading column (read-along's band is measured under it).
+      scrollPad: (() => { const c = document.querySelector('.letter-body, .chapter-body'); const s = c && c.closest('.screen-scroll'); return s ? parseFloat(getComputedStyle(s).scrollPaddingBottom) || 0 : null; })(),
+      audioTime: (() => { try { return window.AudioPlayer ? Number(window.AudioPlayer.getState().time) || 0 : null; } catch (_e) { return null; } })(),
+      firstClause: (() => { try { const rows = window.AUDIO_SYNC && window.AUDIO_SYNC['one:chosen-by-god']; return rows ? rows[0][0] : null; } catch (_e) { return null; } })(),
       text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
       ringCovered: (() => { if (!ring) return null; const b = ring.getBoundingClientRect(); const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
         const tc = window.TourController; const target = tc ? tc.findTarget(tc.getState().step) : null;
@@ -141,26 +154,45 @@ async function relaunch() {
   sh('am', 'force-stop', PKG); await sleep(800);
   sh('am', 'start', '-n', ACT); await sleep(4000);
   await refresh();
-  await page.waitForFunction(() => document.querySelector('.about-continue') || document.querySelector('.tour-prompt') || document.querySelector('.home-nav-item'), { timeout: 60000 });
+  await page.waitForFunction(() => document.querySelector('.about-continue') || document.querySelector('.tour-prompt') || document.querySelector('.home-nav-item') || document.querySelector('.settings-group-head'), { timeout: 60000 });
+  // The app reopens on the screen it was killed on; the strip is a Home thing, so go Home if it
+  // came back elsewhere (Settings, after the text size was set there).
+  if (await page.evaluate(() => !!document.querySelector('.settings-group-head') && !document.querySelector('.home-nav-item'))) { await tapLabel('Home'); await sleep(700); }
 }
 
 async function setScale() {
   if (SCALE === 1) return;
-  // Through the app's own state so it survives relaunch (the boot writer reads it). The store
-  // hydrates from IDB after mount and a write that lands before that is overwritten, so write
-  // until the store reads it back, and fail loudly rather than walk at 1 under a 1.8 label.
-  for (let i = 0; i < 10; i++) {
-    const got = await page.evaluate((sc) => {
-      const S = window.StateStore; if (!S || !S.get || !S.set) return 'no store';
-      const st = S.get();
-      S.set({ ...st, settings: { ...(st.settings || {}), fontScale: String(sc) } });
-      document.documentElement.style.setProperty('--font-scale', String(sc));
-      return String((S.get().settings || {}).fontScale);
-    }, SCALE);
-    if (got === String(SCALE)) { await sleep(800); return; }
-    await sleep(700);
+  // Text Size as the reader sets it: the Settings slider, so the change goes through React and
+  // usePersistedState writes it (a direct StateStore.set is written back over by the hook's next
+  // effect tick: e2e-tour walked at 1 under a 1.8 label until 2026-09-04). Verified in the store and
+  // in the CSS var here, and again after the relaunch below.
+  // The Settings tile scrolled to the top of Home first: the tour strip sits over the bottom of the
+  // tiles on a phone, and a tap at the tile's centre landed on the strip.
+  await page.evaluate(() => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith('App Configuration')); b && b.scrollIntoView({ block: 'start', behavior: 'instant' }); });
+  await sleep(400);
+  await tapLabel('App Configuration');
+  await page.waitForFunction(() => /Settings/.test(document.title), { timeout: 8000 }).catch(async () => { throw new Error(`Settings did not open for the text size (on "${await page.evaluate(() => document.title)}")`); });
+  await sleep(500);
+  // A real tap opens the Appearance group (a synthetic click() did not toggle it in the WebView).
+  for (let i = 0; i < 4; i++) {
+    const appearance = await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent)); if (!h || h.getAttribute('aria-expanded') === 'true') return null; h.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = h.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+    if (!appearance) break;
+    await sleep(300);                                   // let the scroll settle before the tap lands
+    tapRect(appearance, 'Appearance group'); await sleep(800);
   }
-  throw new Error(`could not set --font-scale ${SCALE} through StateStore`);
+  const slid = await page.evaluate((sc) => {
+      const head = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent));
+      const el = document.querySelector('.txtsize-slider'); if (!el) return 'no slider (Appearance group ' + (head ? head.getAttribute('aria-expanded') : 'missing') + '; on "' + document.title + '", heads: ' + [...document.querySelectorAll('.settings-group-head')].map((h) => h.textContent.trim().slice(0, 20)).join(' | ') + ')';
+      el.scrollIntoView({ block: 'center' });
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(el, String(sc)); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+      return 'ok';
+    }, SCALE);
+  await sleep(800);
+  const got = await page.evaluate(() => ({ store: String((window.StateStore.get().settings || {}).fontScale), css: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() }));
+  if (slid !== 'ok' || got.store !== String(SCALE) || got.css !== String(SCALE)) throw new Error(`text size ${SCALE} did not take (${slid}; store ${got.store}, --font-scale ${got.css || 'unset'})`);
+  say(`  text size ${SCALE}x through the slider (store ${got.store}, --font-scale ${got.css})`);
+  await tapLabel('Home'); await sleep(700);
 }
 
 (async () => {
@@ -199,8 +231,10 @@ async function setScale() {
   await tapLabel('App Configuration'); await sleep(600);
   await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); });
   await sleep(300);
-  const helpRect = await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-  tapRect(helpRect, 'Help group'); await sleep(500);
+  // Only open Help when it is closed: a tap on an open group closes it (and the group's state can
+  // outlive a run), and then "Show me around" is not on the screen to tap.
+  const helpRect = await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); if (!h || h.getAttribute('aria-expanded') === 'true') return null; const r = h.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  if (helpRect) { tapRect(helpRect, 'Help group'); await sleep(500); }
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((b) => /Show me around/.test(b.textContent)); b && b.scrollIntoView({ block: 'center' }); });
   await sleep(300);
   shot(`${tag}-03-settings-help`);
@@ -216,7 +250,9 @@ async function setScale() {
     for (let t = 0; t < 24; t++) {
       await sleep(500); f = await facts();
       const sig = JSON.stringify([f.step, f.ring, f.card]);
-      if (f.active && f.step === id && sig === prev) break;
+      // A ringed stop has not arrived until its control is found: the Bible chapter mounts after its
+      // lazy corpus lands, and a card that is steady for a second before the ring is not a stop yet.
+      if (f.active && f.step === id && sig === prev && (f.ring || i === 0 || i === 6)) break;
       prev = sig;
     }
     lastTitle = f.title;
@@ -246,8 +282,38 @@ async function setScale() {
       else ok(`${id}: pressed Listen and stayed`);
       if (g && g.player) say(`  note ${id}: player bar up after the press (expected)`);
       if (g && g.cardOffscreen) fail(`${id}: the card is off screen after the press`);
+      // Corbin's walk (2026-09-04): the lit sentence sat under the card and under the dim, and on the
+      // letter nothing lit for 26 s. Now: the card docks above the bar, no ring, the column is open,
+      // and within a few seconds a line is lit, on screen, under no pane, with the letter's playback
+      // already past the recording's lead-in.
+      if (g && !g.docked) fail(`${id}: the card is not docked after the press`);
+      if (g && g.ring) fail(`${id}: a ring is still drawn after the press`);
+      let lit = null;
+      for (let t = 0; t < 16; t++) { await sleep(500); lit = await facts(); if (lit.lit && lit.lit.w > 0 && (id !== 'listen' || (lit.firstClause != null && lit.audioTime >= lit.firstClause))) break; }
+      // Read-along glides the lit line into its band over GLIDE_MS (260 ms): measure where it landed.
+      if (lit && lit.lit && lit.lit.w > 0) { await sleep(700); lit = await facts(); }
+      if (!lit || !lit.lit || !(lit.lit.w > 0)) fail(`${id}: no line lit up within 8 s of the press (time ${lit && lit.audioTime}, first clause ${lit && lit.firstClause})`);
+      else {
+        // The whole lit sentence sits in the open column when it can (its height within the 65 % of
+        // the column below the band's 35 % aim point); a sentence taller than that shows its first
+        // line in the column, under nothing, and the rest is what the reader scrolls for.
+        const b = lit.lit, f = lit.litFirst || b, ct = lit.card ? lit.card.y : lit.vh;
+        const open = ct - lit.scrollerTop, fits = b.h <= open * 0.65;
+        const vh = lit.vh;
+        // The docked card's contract (TourOverlay DOCK_OPEN_FRAC): its top at or below 55 % of the screen.
+        if (lit.card && ct < vh * 0.55 - 1) fail(`${id}: the card's top at ${Math.round(ct)} leaves ${Math.round(100 * ct / vh)} % of the screen open above it, expected 55 %`);
+        if (lit.card && Math.abs((lit.scrollPad || 0) - (vh - ct)) > 2) fail(`${id}: the scroller's scroll-padding-bottom is ${lit.scrollPad}, the docked card covers ${Math.round(vh - ct)}`);
+        if (f.y < lit.scrollerTop - 1 || f.y + f.h > ct + 1) fail(`${id}: the lit line's first row at ${Math.round(f.y)}..${Math.round(f.y + f.h)} is not in the open column ${Math.round(lit.scrollerTop)}..${Math.round(ct)}`);
+        else if (fits && b.y + b.h > ct + 1) fail(`${id}: the lit sentence at ${Math.round(b.y)}..${Math.round(b.y + b.h)} (${Math.round(b.h)} px) fits the open column (${Math.round(open)} px) but runs under the card at ${Math.round(ct)}`);
+        else if (lit.litUnder) fail(`${id}: the lit line sits under ${lit.litUnder}`);
+        else ok(`${id}: lit at ${Math.round(b.y)}..${Math.round(b.y + b.h)}${fits ? '' : ` (${Math.round(b.h)} px, taller than the ${Math.round(open)} px column can hold: first row shown)`}, column open ${Math.round(lit.scrollerTop)}..${Math.round(ct)} (${Math.round(100 * open / (vh - lit.scrollerTop))} %), scroll-padding ${Math.round(lit.scrollPad || 0)}${id === 'listen' ? `, audio at ${lit.audioTime.toFixed(1)} s past the ${lit.firstClause} s lead-in` : ''}`);
+        if (id === 'listen' && !(lit.audioTime >= lit.firstClause)) fail(`listen: audio at ${lit.audioTime} s, the first clause lights at ${lit.firstClause} s`);
+        const covered = lit.dimBoxes.filter((d) => d.w > 0 && d.h > 0 && lit.card && d.y < lit.card.y - 1 && d.y + d.h > lit.scrollerTop + 1);
+        if (covered.length) fail(`${id}: a dim pane covers the column between ${Math.round(lit.scrollerTop)} and the card`);
+        void vh;
+      }
       shot(`${tag}-1${i}-${id}-pressed`);
-      await sleep(1500);   // let the reader hear a line
+      await sleep(1000);   // let the reader hear a line
       g = await facts(); tapRect(g.primaryRect, `Next on ${id} (pressed)`);
     }
   }

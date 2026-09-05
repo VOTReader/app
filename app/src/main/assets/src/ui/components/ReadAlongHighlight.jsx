@@ -484,14 +484,28 @@ function _follow(range, mainRef, userScrollAt, glideRef) {
   if (!scroller) return;
   const box = scroller.getBoundingClientRect();
   if (!box.height) return;   // not laid out (hidden tab, jsdom) — nothing to aim at
+  // The band is a share of the room the reader can SEE. Whatever sits over the bottom of the
+  // scroller declares itself with scroll-padding-bottom (the tour's docked card, 2026-09-04: at
+  // 1.8x on a 699 px phone the band's 60 % line sat under a card whose top was at 48 %, and the
+  // lit sentence wrapped under it); the same property steers the engine's own scrollIntoView.
+  const vis = box.height - _bottomPad(scroller);
+  if (vis <= 0) return;
   const rect = range.getBoundingClientRect();
-  const bandTop = box.top + box.height * 0.25;
-  const bandBot = box.top + box.height * 0.6;
+  const bandTop = box.top + vis * 0.25;
+  const bandBot = box.top + vis * 0.6;
   if (rect.top >= bandTop && rect.bottom <= bandBot) return;
   // No manual clamp: each frame is an absolute assignment the engine clamps,
   // and the glide interpolates between two values fixed at its start, so an
   // out-of-range target can never accumulate into drift.
-  _glideTo(scroller, (scroller.scrollTop || 0) + (rect.top - (box.top + box.height * 0.35)), glideRef);
+  _glideTo(scroller, (scroller.scrollTop || 0) + (rect.top - (box.top + vis * 0.35)), glideRef);
+}
+
+/** The scroller's scroll-padding-bottom in px: the part of it something else is drawn over. */
+function _bottomPad(scroller) {
+  let p = NaN;
+  try { p = parseFloat(getComputedStyle(scroller).scrollPaddingBottom); } catch (_e) { /* jsdom */ }
+  if (!Number.isFinite(p)) p = parseFloat(scroller.style && scroller.style.scrollPaddingBottom);
+  return Number.isFinite(p) && p > 0 ? p : 0;
 }
 
 /**

@@ -44,6 +44,10 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
  * @property {string} text
  * @property {string} [tip]
  * @property {string} [after]      what the card says once the ringed control has been pressed (Listen stops)
+ * @property {string} [seekKey]    AUDIO_SYNC key of the recording the press starts: the tour seeks to its
+ *                                 first lit clause, so the words light up within a second of the press
+ *                                 instead of after the recording's silent lead-in (26.75 s on "Chosen by
+ *                                 God"; Corbin's device walk, 2026-09-04)
  * @property {string} primary        the primary button's label
  * @property {string} [settingsGroup] a Settings group the stop needs open
  */
@@ -67,7 +71,7 @@ export const TOUR_STEPS = Object.freeze([
   },
   {
     id: 'listen', number: 2, screen: 'vot-one-letter', enter: 'openLetter',
-    target: { selector: '.hero-play-pill' }, act: 'press',
+    target: { selector: '.hero-play-pill' }, act: 'press', seekKey: 'one:chosen-by-god',
     eyebrow: '2 of 6 · Listen',
     title: 'Hear it read aloud',
     text: 'Press Listen. The words light up as they are read, and the page follows along.',
