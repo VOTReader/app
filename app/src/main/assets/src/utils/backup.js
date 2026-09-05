@@ -374,10 +374,14 @@ export async function buildV3Manifest(ctx) {
   for (const name of Object.keys(storesMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = v; }
     catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
-
-  // R3: same stamp on the v3 path — see the v2 exporter above.
-  _stampFontScaleSource(data, stores, HYDRATION_FONT_SCALE_SOURCE, true);
   }
+  // R3: same stamp on the v3 path — see the v2 exporter above. AFTER the
+  // loop, mirroring v2's placement (R8): inside it, the stamp ran once per
+  // store and was right only because the last pass followed the last read —
+  // and with an EMPTY storesMap it never ran at all, so the manifest's LS
+  // mirror went out unstamped and still carrying this device's
+  // systemFontScale, into a backup meant to be restored elsewhere.
+  _stampFontScaleSource(data, stores, HYDRATION_FONT_SCALE_SOURCE, true);
   for (const name of Object.keys(flagMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = !!v; }
     catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }

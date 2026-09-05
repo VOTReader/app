@@ -401,6 +401,74 @@ describe('buildV3Manifest', () => {
 /* ─────────────────────────────────────────────────────────────────────
    PART 3 — applyImportPayload (fake ctx; no real IDB)
    ───────────────────────────────────────────────────────────────────── */
+/* R3/R3b on the V3 exporter (R8, Design & Performance 2026-09-04).
+   ─────────────────────────────────────────────────────────────────────
+   The v2 exporter has two of these; the v3 exporter had none, and the v3
+   exporter is the one the app uses. Its `_stampFontScaleSource` call sat
+   INSIDE `for (const name of Object.keys(storesMap))`, so it ran once per
+   store and was correct only because the last pass happened to follow the
+   last read. With an empty storesMap the loop body never runs and the stamp
+   never happens: the manifest's LS mirror goes out unstamped and still
+   carrying `systemFontScale`, which is the device value being written into a
+   backup that will be restored on some other device.
+
+   Not reachable from SettingsScreen, which passes a fixed store map. That is
+   exactly why it had no test and why the correctness was accidental.
+
+   Lifted from Design & Performance's probe rather than rewritten, so the cases
+   that found it are the cases that guard it. Note their caveat: the state
+   object must be fresh per test, because the stamp helper mutates in place.
+   ───────────────────────────────────────────────────────────────────── */
+describe('buildV3Manifest — fontScaleSource stamp (R3/R3b, R8)', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  const noEstimate = async () => ({ quota: null, usage: null });
+  const emptyMedia = { allIds: async () => [], get: async () => null };
+  const mk = () => ({ settings: { fontScale: '1', systemFontScale: '2' } });
+
+  it('vot-state read from IDB as the LAST store: stamped and stripped in both containers', async () => {
+    const state = mk(); localStorage.setItem('vot-state', JSON.stringify(state));
+    const res = await buildV3Manifest({
+      storesMap: { 'vot-bookmarks': { store: {}, method: 'replaceAll' }, 'vot-state': { store: {}, method: 'set' } },
+      flagMap: {},
+      idbAdapter: { get: async (n) => (n === 'vot-state' ? state : [{ id: 'x' }]) },
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(true);
+    for (const st of [JSON.parse(res.manifest.data['vot-state']).settings, res.manifest.stores['vot-state'].settings]) {
+      expect(st.fontScaleSource).toBe('system');
+      expect(st.systemFontScale).toBeUndefined();
+    }
+  });
+
+  it('vot-state read FIRST then another store: still stamped', async () => {
+    const state = mk(); localStorage.setItem('vot-state', JSON.stringify(state));
+    const res = await buildV3Manifest({
+      storesMap: { 'vot-state': { store: {}, method: 'set' }, 'vot-bookmarks': { store: {}, method: 'replaceAll' } },
+      flagMap: {},
+      idbAdapter: { get: async (n) => (n === 'vot-state' ? state : [{ id: 'x' }]) },
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.manifest.stores['vot-state'].settings.fontScaleSource).toBe('system');
+    expect(res.manifest.stores['vot-state'].settings.systemFontScale).toBeUndefined();
+  });
+
+  it('NO IDB stores at all: the LS mirror is still stamped and stripped', async () => {
+    // RED while the stamp sits inside the loop — the loop body never runs.
+    const state = mk(); localStorage.setItem('vot-state', JSON.stringify(state));
+    const res = await buildV3Manifest({
+      storesMap: {}, flagMap: {},
+      idbAdapter: { get: async () => undefined },
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(true);
+    const st = JSON.parse(res.manifest.data['vot-state']).settings;
+    expect(st.fontScaleSource).toBe('system');
+    expect(st.systemFontScale).toBeUndefined();
+  });
+});
+
 describe('applyImportPayload', () => {
   beforeEach(() => { localStorage.clear(); });
 
