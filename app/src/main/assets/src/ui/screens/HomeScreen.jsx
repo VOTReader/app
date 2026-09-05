@@ -67,8 +67,65 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     const load = id === 'scriptures' ? window.__loadBibleCorpus
       : id === 'settings' ? window.__loadScreensE
       : ['volumes', 'studies', 'library', 'listening'].includes(id) ? window.__loadVotCorpus : null;
-    if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));
+    // Returns whether a loader was FOUND, not whether it finished: the idle
+    // warm-up below needs to know it did something, and a lazily-loaded
+    // bundle means 'no loader yet' is an ordinary early state, not an error.
+    if (typeof load !== 'function') return false;
+    load().catch((e) => console.warn('Destination pre-load failed', e));
+    return true;
   };
+
+  /* codex-ux finding 3: on a touchscreen the hover warm-up above buys SIX
+     MILLISECONDS. Measured under touch emulation, pointerenter to click,
+     tapping the first tile. So on the owner's platform it does not replace the
+     mount-time preload it was introduced alongside — it moves the whole 3 MB
+     corpus download into the tap. Faster Home paint, slower first tile open,
+     and the mitigation only exists for a pointer that hovers.
+
+     This puts the warm-up back without giving up what its removal bought: not
+     at mount, where it competed with the first paint, but at the first IDLE
+     moment after it. `warmDestination` is reused rather than repeating the
+     loader choice — one definition of what "warm" means — and 'volumes' is the
+     VOT corpus, which backs four of the six tiles.
+
+     IT HAS TO RETRY, AND THAT IS THE WHOLE SUBTLETY. `window.__loadVotCorpus`
+     is installed by a lazily-loaded bundle, so at the first idle it is often
+     still undefined and `warmDestination` does nothing at all — silently, with
+     no error and no way for a caller to tell. Measured: the first version of
+     this effect never issued the request. So it asks again on a bounded
+     schedule and stops the moment it succeeds.
+
+     `requestIdleCallback` is Chromium-47+, comfortably under the chrome108
+     floor; the setTimeout arm is for a web build without it. The timeout stops
+     a permanently busy main thread from starving the callback forever, which
+     would put us back where the finding starts, and WARM_TRIES bounds the
+     whole thing so a build that never defines the loader does not poll for the
+     life of the screen. */
+  React.useEffect(() => {
+    let cancelled = false;
+    let handle = null;
+    let usedIdle = false;
+    let tries = 0;
+    const WARM_TRIES = 8;          // ~8 idles, or 8 x 250 ms without rIC
+    const attempt = () => {
+      if (cancelled) return;
+      if (warmDestination('volumes')) return;   // warmed — nothing more to do
+      if (++tries >= WARM_TRIES) return;
+      schedule();
+    };
+    const schedule = () => {
+      const idle = window.requestIdleCallback;
+      if (typeof idle === 'function') { usedIdle = true; handle = idle(attempt, { timeout: 2000 }); }
+      else { usedIdle = false; handle = setTimeout(attempt, 250); }
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (handle == null) return;
+      if (usedIdle && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle);
+      else if (!usedIdle) clearTimeout(handle);
+    };
+  }, []);
   const [surpriseBusy, setSurpriseBusy] = React.useState(false);
   const [homeStatus, setHomeStatus] = React.useState('');
   const surprisePending = React.useRef(false);
