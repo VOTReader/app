@@ -1768,7 +1768,7 @@ export const TEXTUS_RECEPTUS_ONLY_VERSES = Object.freeze([
  */
 export const VERSIFICATION_DIFFERENCES = Object.freeze([
   { file: 'bible-web.js', missing: ['romans 16:25', 'romans 16:26', 'romans 16:27'], extra: ['romans 14:24', 'romans 14:25', 'romans 14:26'], why: 'WEB prints the doxology at 14:24-26; translations.js _VERSIFICATION_ALIAS renders those rows at 16:25-27 (data-corpus-4, decided)' },
-  { file: 'bible-hnv.js', missing: ['romans 16:25', 'romans 16:26', 'romans 16:27'], extra: ['romans 14:24', 'romans 14:25', 'romans 14:26'], why: 'HNV prints the doxology at 14:24-26 (16:25 ships empty); translations.js _VERSIFICATION_ALIAS renders those rows at 16:25-27 (data-corpus-4, decided)' },
+  { file: 'bible-hnv.js', missing: ['romans 16:25', 'romans 16:26', 'romans 16:27'], extra: ['romans 14:24', 'romans 14:25', 'romans 14:26'], why: 'HNV prints the doxology at 14:24-26 and does not carry 16:25-27 at all; translations.js _VERSIFICATION_ALIAS renders those rows at 16:25-27 (data-corpus-4, decided). Until c45 this said "16:25 ships empty", which was true and is not any more: the file stored 16:25 as an empty string and c45 deleted it, so the verse is now genuinely ABSENT — which is the state this row exists to allow' },
 ]);
 
 /**
