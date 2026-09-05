@@ -517,6 +517,12 @@
       [role="tab"]:focus-visible, [role="switch"]:focus-visible,
       [role="radio"]:focus-visible, [role="slider"]:focus-visible,
       [role="combobox"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+      /* Native text selection in the app's own gold, everywhere (the picker used to paint Chrome's
+         blue, the reader whatever the engine chose). Text over the band is forced to the theme's body
+         ink so the gold description text keeps AA: computed on the blended band, dark #4a3d1a white
+         10.6:1, light #d4c8ac input-text 9.2:1 (gold on it would read 3.8:1). */
+      ::selection { background: rgba(232,192,80,0.32); color: var(--cream); }
+      body.light ::selection { background: rgba(122,92,16,0.28); color: var(--input-text); }
       /* Wave-0: the ring previously stopped at buttons/links/cards. The
          role selectors above extend the SAME token to the remaining
          interactive families — tabs (SearchScreen corpus tabs, LinkPicker
@@ -2776,9 +2782,11 @@
     .settings-row-desc li { margin-top:0.35em; }
     .settings-row-desc li::marker { color:var(--gold-dim); }
     .settings-data-value { font-size:var(--fs-13); color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
-    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
-    @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); border-color:var(--gold-dim); } }
-    .settings-info-btn[aria-expanded="true"]{ color:var(--gold); border-color:var(--gold); background:var(--gold-faint); }
+    /* Hit area is not paint: the target stays 44 px, the visible ⓘ is a 29 px hairline ring drawn
+       inside it (a 44 px bordered square stood taller than the 26 px Export button beside it). */
+    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:0; border-radius:50%; background:radial-gradient(circle, transparent 13px, var(--gold-border) 13.5px, var(--gold-border) 14.5px, transparent 15px); color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
+    @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); background:radial-gradient(circle, transparent 13px, var(--gold-dim) 13.5px, var(--gold-dim) 14.5px, transparent 15px); } }
+    .settings-info-btn[aria-expanded="true"]{ color:var(--gold); background:radial-gradient(circle, var(--gold-faint) 13.5px, var(--gold) 13.5px, var(--gold) 14.5px, transparent 15px); }
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
     .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; min-height:44px; background:var(--gold-faint); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; padding:0.35rem 0.55rem; font-family:inherit; max-width:60%; }
     .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
@@ -4763,14 +4771,6 @@
     .picker-verse-text {
       user-select: text; -webkit-user-select: text;
     }
-    .picker-verses ::selection,
-    .picker-body-letter ::selection {
-      background: rgba(31,121,165,0.55); color: var(--cream);
-    }
-    body.light .picker-verses ::selection,
-    body.light .picker-body-letter ::selection {
-      background: rgba(64,153,198,0.42); color: var(--input-text);
-    }
     /* Legacy whole-verse tap-select styling retained for any consumer that
        still emits .picker-verse rows. */
     .picker-verse {
@@ -4820,13 +4820,6 @@
       margin: 0 0 14px; padding: 0;
       /* Allow native text selection */
       user-select: text; -webkit-user-select: text;
-    }
-    /* Visual treatment for the active selection in the picker body */
-    .picker-body-letter ::selection {
-      background: rgba(31,121,165,0.55); color: var(--cream);
-    }
-    body.light .picker-body-letter ::selection {
-      background: rgba(64,153,198,0.42); color: var(--input-text);
     }
 
     /* ── NOTE SHEET (for highlight notes) ─────────────────────────── */

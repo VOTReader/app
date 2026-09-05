@@ -240,6 +240,46 @@ describe('app.css — bottom-nav cards fit the row at large type', () => {
   });
 });
 
+/* HIT AREA IS NOT PAINT (design-perf, 2026-09-04 install-guide read). The
+   Settings ⓘ button kept its 44 px touch target by painting a 44 px bordered
+   square, as tall as the row and taller than the 26 px Export button beside
+   it. The target stays 44 px; the paint is a ring drawn inside it. */
+describe('app.css — the Settings ⓘ button paints a ring smaller than its hit area', () => {
+  const block = ruleBlock(CSS, '.settings-info-btn {');
+  it('keeps the 44 px touch target', () => {
+    expect(block).toMatch(/width:\s*44px/);
+    expect(block).toMatch(/height:\s*44px/);
+  });
+  it('paints no box border; the visible ring is a gradient inside the cell', () => {
+    expect(block).toMatch(/border:\s*0\b/);
+    expect(block).not.toMatch(/border:\s*1px/);
+    expect(block).toMatch(/radial-gradient\(/);
+  });
+  it('the pressed state paints the same ring, filled', () => {
+    const open = ruleBlock(CSS, '.settings-info-btn[aria-expanded="true"]');
+    expect(open).toMatch(/radial-gradient\(/);
+    expect(open).not.toMatch(/border-color/);
+  });
+});
+
+/* SELECTION IN A GOLD-ON-BLACK APP (design-perf, cut 6 read). Native text
+   selection painted in Chrome's blue in the picker (a literal
+   rgba(31,121,165)) and in whatever the engine chose everywhere else. One
+   app-wide ::selection in the gold family, per theme; no blue literal left. */
+describe('app.css — ::selection is gold in both themes, app-wide', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  it('one app-wide rule per theme, in the gold family', () => {
+    expect(bare).toMatch(/\n\s*::selection\s*\{[^}]*rgba\(232,\s*192,\s*80,/);
+    expect(bare).toMatch(/body\.light ::selection\s*\{[^}]*rgba\(122,\s*92,\s*16,/);
+  });
+  it('the picker no longer carries its own blue ::selection (the link-blue chips beside it are a different family and stay)', () => {
+    const selectionBlocks = [...bare.matchAll(/[^{}]*::selection[^{]*\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(selectionBlocks.length).toBe(2);
+    for (const b of selectionBlocks) expect(b).not.toMatch(/31,\s*121,\s*165|64,\s*153,\s*198/);
+    expect(bare).not.toMatch(/\.picker-[a-z-]+ ::selection/);
+  });
+});
+
 describe('app.css — .sr-only utility', () => {
   it('exists with the standard visually-hidden pattern', () => {
     const block = ruleBlock(CSS, '.sr-only');
