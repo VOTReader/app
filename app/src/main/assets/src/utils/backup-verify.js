@@ -73,6 +73,12 @@ export function summarizeBackupManifest(manifest) {
  * @param {string} integrity  'ok' | 'absent' | 'mismatch' | 'malformed' |
  *                            'trailing' | 'truncated' — web readContainer /
  *                            native verify vocabularies both map onto these.
+ *                            ANY OTHER VALUE reports that the check did not
+ *                            complete, and never a defect in the file. The
+ *                            native bridge returns `error:<reason>` when its
+ *                            own verify session fails, and guessing on its
+ *                            behalf is how an owner gets told a good backup is
+ *                            corrupt.
  * @param {'v3'|'legacy'} kind
  * @param {{ count: number, bytes: number } | null} [salvaged]
  *   REQUIRED when `integrity` is 'truncated': the media frames the reader
@@ -151,8 +157,27 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
   } else if (integrity === 'mismatch') {
     tail = 'WARNING: the integrity check FAILED — this file may be corrupted. Your data here still imported-readable, but make a fresh Export as soon as possible.';
     level = 'warn';
-  } else { // 'malformed' / 'trailing' — structure read fine, trailer didn't
+  } else if (integrity === 'malformed' || integrity === 'trailing') {
+    // Structure read fine, the trailer did not. Named explicitly rather than
+    // left as a catch-all: this is a claim about the FILE, and it must only be
+    // made for the two values that actually mean it.
     tail = 'WARNING: unexpected bytes at the end of the file — it may have been truncated or altered. Consider making a fresh Export.';
+    level = 'warn';
+  } else {
+    // Anything this function does not recognise, and it is reachable today.
+    // `StorageManager.v3ImportVerify()` returns `error:<reason>` when the
+    // NATIVE verify session itself fails (AppInterface.kt's Failure branch),
+    // and `SettingsScreen`'s Android verify hands that straight through. Until
+    // this arm existed it fell into the trailing-bytes wording above: the
+    // app's own check had failed to run, and the owner was told his backup had
+    // unexpected bytes appended and to make a fresh Export — about a file that
+    // may be perfectly good.
+    //
+    // A value the report does not understand is not evidence about the file.
+    // Say that. The summary above is still real: the manifest was read and
+    // envelope-validated before this ran, so the counts are as good here as
+    // anywhere.
+    tail = 'WARNING: this backup could not be checked — the integrity check did not complete, so nothing here says whether the file is damaged. What is listed above was read from it. Try Verify again, and make a fresh Export if it keeps failing.';
     level = 'warn';
   }
   return { message: body + tail, level };

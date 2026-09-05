@@ -122,6 +122,38 @@ describe('formatVerifyReport', () => {
    chain rather than a hand-made integrity string, because the defect was in
    the seam between two modules that were each correct on their own.
    ───────────────────────────────────────────────────────────────────────── */
+/* An integrity value the report does not recognise is not evidence about the
+   file. `StorageManager.v3ImportVerify()` returns `error:<reason>` when the
+   NATIVE verify session itself fails, `SettingsScreen`'s Android branch hands
+   it straight to formatVerifyReport, and until 2026-09-04 it landed in the
+   malformed/trailing arm — so a failed CHECK was reported as a damaged FILE,
+   with a specific and wrong diagnosis, on Android, today. Found by the Verifier
+   looking for a reachable path that omits the salvage count and finding a
+   different one next to it. */
+describe('an unrecognised integrity value reports ignorance, not a defect', () => {
+  const s = summarizeBackupManifest(v3Manifest);
+
+  for (const value of ['error:no_session', 'error:read_failed', 'something-new']) {
+    it(`"${value}" does not accuse the file of anything`, () => {
+      const r = formatVerifyReport(s, value, 'v3');
+      expect(r.level).toBe('warn');
+      expect(r.message).not.toContain('unexpected bytes at the end of the file');
+      expect(r.message).not.toContain('truncated or altered');
+      expect(r.message).toContain('could not be checked');
+      // The manifest WAS read and validated, so the summary still stands.
+      expect(r.message).toContain('2 media files');
+    });
+  }
+
+  it('the two values that DO mean a damaged trailer still say so', () => {
+    for (const value of ['malformed', 'trailing']) {
+      const r = formatVerifyReport(s, value, 'v3');
+      expect(r.message).toContain('unexpected bytes at the end of the file');
+      expect(r.level).toBe('warn');
+    }
+  });
+});
+
 describe('a salvaged (truncated) container reports what it can give back', () => {
   async function pack(manifest, mediaEntries) {
     const chunks = [];
