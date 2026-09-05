@@ -50,7 +50,10 @@ const MIME = {
 };
 
 /* Same shape as e2e-readalong.mjs:108 — port 0 lets the OS pick, so the
-   origin is unique to this process and no other server can answer for it. */
+   origin is unique to this process and no other server can answer for it.
+
+   Prefer serveOwnTree() below: it hands back the page URL too, so a caller
+   builds nothing and there is only one place the origin can come from. */
 export function startServer() {
   const server = http.createServer((req, res) => {
     let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -130,4 +133,30 @@ export async function assertServingOwnTree(base) {
       + 'The harness is not serving the tree it was launched from.'
     );
   }
+}
+
+/**
+ * Start the server, prove it is serving this tree, and hand back the ONE
+ * origin and page URL a caller may use.
+ *
+ * THE POINT IS THAT THE CALLER BUILDS NOTHING. The first version of this
+ * module exported only `startServer`, so `e2e-read-detector.mjs` derived its
+ * own `BASE` from `server.address().port` and its own `URL` from that — two
+ * places the origin could be defined, with the guard covering one. The
+ * Verifier bite-checked the test by reverting the port fix while leaving
+ * `startServer()` in place: the server still bound an ephemeral port, the
+ * detector still navigated to a hardcoded 8097, and the suite passed 3/3.
+ *
+ * A test that pins a fix instead of catching its removal — on the guard built
+ * to stop that exact recurrence. Collapsing the two definitions to one is what
+ * makes the existing cases bite, the same move as a11y-ux-4's `scrollBehavior()`:
+ * when correctness depends on two things agreeing, delete one of them.
+ *
+ * @returns {Promise<{ server: import('node:http').Server, base: string, url: string }>}
+ */
+export async function serveOwnTree() {
+  const server = await startServer();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  await assertServingOwnTree(base);
+  return { server, base, url: `${base}/index.html` };
 }

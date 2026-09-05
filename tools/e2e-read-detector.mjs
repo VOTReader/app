@@ -39,17 +39,14 @@
    a green result about somebody else's work.
    ─────────────────────────────────────────────────────────────────── */
 import puppeteer from 'puppeteer';
-import { startServer, assertServingOwnTree } from './e2e-read-serve.mjs';
+import { serveOwnTree } from './e2e-read-serve.mjs';
 
-
-const server = await startServer();
-const BASE = `http://127.0.0.1:${server.address().port}`;
-// Before a browser exists: prove the bytes about to reach the page are this
-// tree's. Port 0 makes a collision impossible going forward, but nothing else
-// checks that what is served is what was built here -- and a gate that can
-// report green about a tree it never loaded is the failure this replaced.
-await assertServingOwnTree(BASE);
-const URL = `${BASE}/index.html`;
+// ONE origin, and this file does not build it. serveOwnTree() binds the port,
+// proves the bytes it is serving are this tree's, and hands back the URL --
+// so there is no second place an origin can come from, and no way to keep the
+// server while navigating somewhere else. That combination passed the harness
+// test 3/3 when it was possible; it is not possible now.
+const { server, url: URL } = await serveOwnTree();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({
