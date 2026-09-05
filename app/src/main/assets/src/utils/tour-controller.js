@@ -55,9 +55,43 @@ function runEnter(step) {
    Settings and covers the very controls the next stops ring (seen on emulator-5554, 2026-09-04).
    AudioPlayer is a bundle-d global; absent on a bare host. */
 function stopTourAudio() {
+  if (cancelSeek) cancelSeek();
   if (!state.pressed) return;
   const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
   try { if (ap && typeof ap.stop === 'function') ap.stop(); } catch (_e) { /* the player's problem */ }
+}
+/* A recording opens with a silent lead-in (the title, a breath): "Chosen by God" lights its first
+   clause at 26.75 s. A reader who pressed Listen on the tour's word and heard nothing light up for
+   half a minute has been told the feature does not work (Corbin, on his phone, 2026-09-04). So the
+   press seeks into the first clause, a real timestamp from AUDIO_SYNC, once the player knows the
+   track's duration (a seek before metadata is discarded by the element). Nothing is guessed: no
+   rows, no seek. */
+const TOUR_SEEK_LEAD_SEC = 0.4;
+const TOUR_SEEK_WAIT_MS = 10000;
+/** Cancels a seek still waiting on metadata; leaving the stop must not seek the next track. */
+let cancelSeek = null;
+function seekTourStart(step) {
+  const key = step && step.seekKey;
+  const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
+  if (!key || !ap || typeof ap.subscribe !== 'function' || typeof ap.seek !== 'function') return;
+  const started = Date.now();
+  let unsub = () => {};
+  let done = false;
+  if (cancelSeek) cancelSeek();
+  cancelSeek = () => { done = true; unsub(); cancelSeek = null; };
+  const attempt = () => {
+    if (done) return;
+    const g = /** @type {any} */ (globalThis);
+    const rows = g.AUDIO_SYNC && g.AUDIO_SYNC[key];
+    const st = ap.getState ? ap.getState() : null;
+    if (rows && rows.length && st && st.duration > 0) {
+      done = true; unsub(); cancelSeek = null;
+      const at = Number(rows[0][0]) + TOUR_SEEK_LEAD_SEC;
+      if ((st.time || 0) < at) { try { ap.seek(at); } catch (_e) { /* the player's problem */ } }
+    } else if (Date.now() - started > TOUR_SEEK_WAIT_MS) { done = true; unsub(); cancelSeek = null; }
+  };
+  try { unsub = ap.subscribe(attempt) || unsub; } catch (_e) { return; }
+  attempt();
 }
 function goTo(index, skipEnter) {
   stopTourAudio();
@@ -114,6 +148,7 @@ export const TourController = {
       const el = /** @type {HTMLElement|null} */ (findTarget(step));
       pressing = true;
       try { if (el && typeof el.click === 'function') el.click(); } finally { pressing = false; }
+      seekTourStart(step);
       // Stay: the reader should see what the press does. The next Next moves on.
       state = { ...state, pressed: true };
       bump();

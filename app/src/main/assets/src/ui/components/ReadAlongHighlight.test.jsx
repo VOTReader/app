@@ -452,6 +452,18 @@ describe('ReadAlongHighlight — follow-scroll obeys the scrollTop lease', () =>
     expect(scroller.scrollTop).toBe(0);
   });
 
+  it('measures the band over the room the reader can see: scroll-padding-bottom is not reading room', () => {
+    // The tour's docked card (2026-09-04) covers the bottom 400 px of the 800 px scroller and says so.
+    mount();
+    scroller.style.scrollPaddingBottom = '400px';
+    expect(scroller.style.scrollPaddingBottom).toBe('400px');          // the manipulation took
+    // A sentence at 300 is inside the 25–60 % band of 800 (200–480) but under the card: the band is
+    // now 100–240 of the visible 400, so the sentence glides to 35 % of 400 = 140: +160.
+    Range.prototype.getBoundingClientRect = () => ({ ...RANGE_RECT, top: 300, bottom: 324, y: 300 });
+    followOnce();
+    expect(scroller.scrollTop).toBeCloseTo(160, 5);
+  });
+
   it('NEVER uses browser-owned smooth scrolling (it cannot be interrupted)', () => {
     mount();
     followOnce();

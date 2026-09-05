@@ -10,6 +10,7 @@
      D) findTarget picks the VISIBLE control, never the pager's inert
         off-screen sibling, and matches by text when the step says so.
 */
+import { TOUR_LETTER } from '../hooks/use-tour.js';
 import { describe, it, expect, afterEach } from 'vitest';
 import { TOUR_STEPS, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
 
@@ -97,3 +98,12 @@ describe('tour-steps — findTarget', () => {
     expect(findTarget({ target: null })).toBeNull();
   });
 });
+
+describe('the Listen stop seeks into the recording the tour actually opens', () => {
+  it("the seek key names Volume One's letter that openLetter shows", () => {
+    const listen = TOUR_STEPS.find((s) => s.id === 'listen');
+    expect(listen.seekKey).toBe('one:' + TOUR_LETTER.id);
+    expect(TOUR_STEPS.find((s) => s.id === 'bible').seekKey).toBeUndefined();
+  });
+});
+

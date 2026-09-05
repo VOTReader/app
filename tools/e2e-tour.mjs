@@ -100,6 +100,13 @@ async function run(browser, { width, height, label, light }) {
       card: box(card), ring: box(ring), target: box(target),
       described: !!(target && target.getAttribute('aria-describedby')),
       dims: document.querySelectorAll('.tour-dim').length,
+      dimBoxes: [...document.querySelectorAll('.tour-dim')].map(box),
+      docked: !!(card && card.classList.contains('docked')),
+      bar: box(document.querySelector('.audio-bar')),
+      column: box(document.querySelector('.letter-body, .chapter-body')),
+      scrollerTop: (() => { const c = document.querySelector('.letter-body, .chapter-body'); const s = c && c.closest('.screen-scroll'); return s ? Math.max(0, s.getBoundingClientRect().top) : 0; })(),
+      fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim(),
+      scrollPad: (() => { const c = document.querySelector('.letter-body, .chapter-body'); const s = c && c.closest('.screen-scroll'); return s ? parseFloat(getComputedStyle(s).scrollPaddingBottom) || 0 : null; })(),
       skip: !!(card && [...card.querySelectorAll('button')].find((b) => /leave the tour/i.test(b.getAttribute('aria-label') || ''))),
       back: card ? (() => { const b = [...card.querySelectorAll('button')].find((b) => /previous stop/i.test(b.getAttribute('aria-label') || '')); return b ? (b.disabled ? 'disabled' : 'enabled') : 'missing'; })() : 'missing',
       primary: card ? (card.querySelector('.tour-btn.primary') || {}).textContent : null,
@@ -117,9 +124,25 @@ async function run(browser, { width, height, label, light }) {
   // About → Home; the strip appears on Home only.
   await clickLabel('Continue'); await clickLabel('Begin Reading');
   if (SCALE !== 1) {
-    // Text Size as the reader would have it: through the app's state (the boot writer restores it on reload).
-    await page.evaluate((sc) => { const st = window.StateStore.get(); window.StateStore.set({ ...st, settings: { ...(st.settings || {}), fontScale: String(sc) } }); document.documentElement.style.setProperty('--font-scale', String(sc)); }, SCALE);
+    // Text Size as the reader sets it: the Settings slider, so the change goes through React and
+    // usePersistedState writes it. Until 2026-09-04 this wrote StateStore directly, and the next
+    // effect tick from the hook wrote the old settings back: every "1.8" walk here had run at 1
+    // (the var read 1.8 for 400 ms, then hydration and the hook put 1 back). The stops re-check.
+    await clickLabel('App Configuration'); await sleep(500);
+    await page.evaluate(() => { const head = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent)); if (head && head.getAttribute('aria-expanded') !== 'true') head.click(); });
     await sleep(400);
+    const slid = await page.evaluate((sc) => {
+      const head = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent));
+      const el = document.querySelector('.txtsize-slider'); if (!el) return 'no slider (Appearance group ' + (head ? head.getAttribute('aria-expanded') : 'missing') + '; on "' + document.title + '", heads: ' + [...document.querySelectorAll('.settings-group-head')].map((h) => h.textContent.trim().slice(0, 20)).join(' | ') + ')';
+      el.scrollIntoView({ block: 'center' });
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(el, String(sc)); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+      return 'ok';
+    }, SCALE);
+    await sleep(700);
+    const got = await page.evaluate(() => ({ store: String((window.StateStore.get().settings || {}).fontScale), css: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() }));
+    if (slid !== 'ok' || got.store !== String(SCALE) || got.css !== String(SCALE)) fail(`text size ${SCALE} did not take (${slid}; store ${got.store}, --font-scale ${got.css || 'unset'})`); else ok(`text size ${SCALE}x through the slider (store ${got.store}, --font-scale ${got.css})`);
+    await clickLabel('Home'); await sleep(500);
   }
   await sleep(500);
   let f = await facts();
@@ -133,12 +156,14 @@ async function run(browser, { width, height, label, light }) {
   if ((await facts()).prompt) fail('Maybe later did not hide the strip'); else ok('Maybe later hides the strip');
   // A reload brings it back (session-only), then Don't show this again ends it for good.
   await page.reload({ waitUntil: 'load' });
+  if (SCALE !== 1) { await sleep(600); console.log(`  --font-scale after reload: ${(await facts()).fontScale} (store ${await page.evaluate(() => String((window.StateStore.get().settings || {}).fontScale))})`); }
   await page.waitForFunction(() => document.querySelector('.tour-prompt') || document.querySelector('.about-continue'), { timeout: 30000 });
   await sleep(500);
   if (!(await facts()).prompt) fail('the strip did not return after a reload following Maybe later'); else ok('Maybe later is session-only');
   await clickLabel('Don'); await sleep(300);
   if ((await facts()).prompt) fail("Don't show this again did not hide the strip");
   await page.reload({ waitUntil: 'load' });
+  if (SCALE !== 1) { await sleep(600); console.log(`  --font-scale after reload: ${(await facts()).fontScale} (store ${await page.evaluate(() => String((window.StateStore.get().settings || {}).fontScale))})`); }
   await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
   await sleep(900);
   f = await facts();
@@ -175,6 +200,14 @@ async function run(browser, { width, height, label, light }) {
         // that not even the card's 160 px floor fits beside it; then the card wins.
         const roomForFloor = f.target.b - f.target.t + 16 + 160 + 60 <= f.vh;
         if (f.card && roomForFloor && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
+        // Listen stops dock: the card sits on the bottom edge (above the player bar when it is up),
+        // never beside the ring, so the text column above it is the reader's (Corbin's walk, 2026-09-04).
+        if (id === 'listen' || id === 'bible') {
+          if (!f.docked) fail(`${id}: the card is not docked`);
+          const floor = f.bar ? f.bar.t : f.vh;
+          if (f.card && Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
+          if (f.card && f.card.h > Math.round(f.vh * 0.36) + 1) fail(`${id}: the docked card takes ${Math.round(f.card.h)} px of ${f.vh}, more than 36 %`);
+        } else if (f.docked) fail(`${id}: docked, but it is not a Listen stop`);
         if (f.ring.t < 0 || f.ring.b > f.vh + 1) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
         if (!f.described) fail(`${id}: the control is not described by the card`);
         if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);
@@ -193,6 +226,22 @@ async function run(browser, { width, height, label, light }) {
       else if (!/Hear it\?/.test(f.text || '')) fail(`${id}: after the press the card does not say what to look for ("${f.text}")`);
       else ok(`${id}: pressed Listen and stayed, the card says what to look for`);
       if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen after the press`);
+      // Once Listen is pressed the words are the ring: no ring, and no dim pane between the top of
+      // the reading column's scroller and the card, so wherever read-along lights a line it is the
+      // brightest thing on the screen. The card still sits above the player bar.
+      if (f.ring) fail(`${id}: a ring is still drawn after the press`);
+      if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes after the press, expected 4`);
+      if (f.card) {
+        const floor = f.bar ? f.bar.t : f.vh;
+        if (Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: after the press the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
+        const covered = f.dimBoxes.filter((d) => d.w > 0 && d.h > 0 && d.t < f.card.t - 1 && d.b > f.scrollerTop + 1);
+        if (covered.length) fail(`${id}: a dim pane covers the reading column between ${Math.round(f.scrollerTop)} and the card at ${Math.round(f.card.t)}: ${covered.map((d) => `${Math.round(d.t)}..${Math.round(d.b)}`).join(', ')}`);
+        if (Math.abs((f.scrollPad || 0) - (f.vh - f.card.t)) > 2) fail(`${id}: the scroller's scroll-padding-bottom is ${f.scrollPad}, the docked card covers ${Math.round(f.vh - f.card.t)} (read-along's band would run under it)`);
+        // The docked card's contract (TourOverlay DOCK_OPEN_FRAC): its top at or below 55 % of the screen.
+        if (f.column && f.card.t < f.vh * 0.55 - 1) fail(`${id}: the card's top at ${Math.round(f.card.t)} leaves ${Math.round(100 * f.card.t / f.vh)} % of the screen open above it, expected 55 %`);
+        else ok(`${id}: the reading column is open from ${Math.round(f.scrollerTop)} to the card at ${Math.round(f.card.t)} (${Math.round(100 * (f.card.t - f.scrollerTop) / (f.vh - f.scrollerTop))} % of it), card ${Math.round(f.card.b - f.card.t)} px, scroll-padding ${Math.round(f.scrollPad || 0)}, text ${f.fontScale || '1'}x, no ring`);
+        if (String(f.fontScale || '1') !== String(SCALE)) fail(`${id}: --font-scale is ${f.fontScale || 'unset'} at this stop, the walk asked for ${SCALE}`);
+      }
       await shot(`${STOPS.indexOf(id)}-${id}-pressed`);
     }
     if (id === 'listen') {

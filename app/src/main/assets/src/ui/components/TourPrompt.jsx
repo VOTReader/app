@@ -30,9 +30,25 @@ export function TourPrompt({ screen }) {
     React.useCallback((cb) => (_done ? _done.subscribe(cb) : () => {}), [_done]),
     () => (_done ? _done.getVersion() : 0)
   );
-  if (!ctl || !ctl.shouldPrompt({ screen })) return null;
+  const show = !!(ctl && ctl.shouldPrompt({ screen }));
+  // The strip is fixed over the foot of Home, and on a 699 px phone it covers the last tile
+  // (Settings) with nothing to scroll it clear (emulator, 2026-09-04). Like the player bar
+  // (body.audio-bar-open), it declares itself: a body class and its measured height, and
+  // app.css pads .screen-scroll by that much, so every tile can still be reached.
+  const ref = React.useRef(/** @type {HTMLElement|null} */ (null));
+  React.useLayoutEffect(() => {
+    if (!show) return undefined;
+    const root = document.documentElement;
+    const measure = () => { const el = ref.current; const h = el ? el.getBoundingClientRect().height : 0; if (h) root.style.setProperty('--tour-prompt-h', Math.round(h) + 'px'); };
+    document.body.classList.add('tour-prompt-open');
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(ref.current);
+    return () => { if (ro) ro.disconnect(); document.body.classList.remove('tour-prompt-open'); root.style.removeProperty('--tour-prompt-h'); };
+  }, [show]);
+  if (!show) return null;
   return (
-    <div className="tour-prompt" role="region" aria-labelledby="tour-prompt-title">
+    <div className="tour-prompt" role="region" aria-labelledby="tour-prompt-title" ref={ref}>
       <h2 className="tour-prompt-title" id="tour-prompt-title">New here?</h2>
       <p className="tour-prompt-text">Let me show you around: six short stops, about two minutes.</p>
       <div className="tour-row">
