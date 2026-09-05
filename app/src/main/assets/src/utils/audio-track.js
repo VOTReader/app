@@ -70,6 +70,12 @@ const RELEASE_PREFIXES = Object.freeze([
  *  Cross that boundary only through bibleSyncEditionFor/bibleSyncGlobalFor
  *  below; utils/audio-track.editions.test.js gates the two lists against the
  *  shipper so they cannot drift apart again. */
+/** The edition every book is guaranteed to be offered in — the fallback when
+ *  a selected edition does not carry a book. Named once: resolveBibleAudio
+ *  reads it, and a future partial edition must not turn it into a literal at
+ *  each call site. */
+export const BIBLE_AUDIO_DEFAULT = 'brm-kjv';
+
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
@@ -198,17 +204,99 @@ export function audioAssetUrl(id) {
  * @param {unknown} id
  * @returns {string}
  */
+/**
+ * What an asset-name stamp says: which release hosts it, and which EDITION
+ * recorded it. ONE table, because these are two readings of the same six
+ * characters and a second copy is a second thing to drift — read-along has to
+ * ask "which edition is playing" of the very name the URL builder routes on.
+ *
+ * A name matching no stamp is not a licence to guess: the URL falls through to
+ * audio-bible-v1 (which is what the legacy whole-book ids resolve to) and the
+ * edition reads as null.
+ */
+const BIBLE_ASSET_STAMPS = Object.freeze({
+  wop1_: Object.freeze({ host: AUDIO_WOP_OT_PREFIX, edition: 'wop-nkjv' }),
+  wop2_: Object.freeze({ host: AUDIO_WOP_NT_PREFIX, edition: 'wop-nkjv' }),
+  brm1_: Object.freeze({ host: AUDIO_BRM_OT_PREFIX, edition: 'brm-kjv' }),
+  brm2_: Object.freeze({ host: AUDIO_BRM_NT_PREFIX, edition: 'brm-kjv' }),
+  web1_: Object.freeze({ host: AUDIO_WEB_OT_PREFIX, edition: 'web-ebible' }),
+  web2_: Object.freeze({ host: AUDIO_WEB_NT_PREFIX, edition: 'web-ebible' }),
+});
+
+/** The stamp entry an asset name carries, or null. Stamps are 5 characters. */
+function _stampOf(asset) {
+  const stamp = asset.slice(0, 5);
+  return Object.prototype.hasOwnProperty.call(BIBLE_ASSET_STAMPS, stamp)
+    ? BIBLE_ASSET_STAMPS[stamp] : null;
+}
+
 export function bibleAudioAssetUrl(id) {
   const asset = typeof id === 'string' ? id.trim() : '';
   if (!/^[A-Za-z0-9_-]+$/.test(asset)) return '';
-  const prefix = asset.lastIndexOf('wop1_', 0) === 0 ? AUDIO_WOP_OT_PREFIX
-    : asset.lastIndexOf('wop2_', 0) === 0 ? AUDIO_WOP_NT_PREFIX
-    : asset.lastIndexOf('brm1_', 0) === 0 ? AUDIO_BRM_OT_PREFIX
-    : asset.lastIndexOf('brm2_', 0) === 0 ? AUDIO_BRM_NT_PREFIX
-    : asset.lastIndexOf('web1_', 0) === 0 ? AUDIO_WEB_OT_PREFIX
-    : asset.lastIndexOf('web2_', 0) === 0 ? AUDIO_WEB_NT_PREFIX
-    : AUDIO_BIBLE_RELEASE_PREFIX;
-  return prefix + asset + '.mp3';
+  const stamp = _stampOf(asset);
+  return (stamp ? stamp.host : AUDIO_BIBLE_RELEASE_PREFIX) + asset + '.mp3';
+}
+
+/**
+ * The EDITION ID that recorded this asset, read from its name stamp, or null
+ * when the name claims no known edition — a legacy whole-book id, or a body
+ * that ships audio under no edition of ours. Null means "do not paint", never
+ * "guess".
+ *
+ * @param {unknown} assetId  e.g. 'brm2_john_001'
+ * @returns {string | null}  e.g. 'brm-kjv'
+ */
+export function bibleEditionOfAsset(assetId) {
+  const asset = typeof assetId === 'string' ? assetId.trim() : '';
+  if (!/^[A-Za-z0-9_-]+$/.test(asset)) return null;
+  const stamp = _stampOf(asset);
+  return stamp ? stamp.edition : null;
+}
+
+/** The asset id inside a track's stream URL, or ''. */
+function _assetIdOfTrack(track) {
+  const url = (track && typeof track.url === 'string') ? track.url : '';
+  const tail = url.slice(url.lastIndexOf('/') + 1);
+  return tail.slice(-4).toLowerCase() === '.mp3' ? tail.slice(0, -4) : '';
+}
+
+/**
+ * The two different questions a Bible surface asks about editions, answered
+ * from DIFFERENT inputs and never confused for one another.
+ *
+ *   offer  — which edition this BOOK is offered in. The selected edition when
+ *            BIBLE_AUDIO_MANIFEST carries rows for it, else the default, else
+ *            null. Resolves with NOTHING playing, because the Listen pill has
+ *            to render before any audio exists. It FALLS BACK, and that is its
+ *            whole job: one partial edition must not blank 65 books.
+ *   paint  — which edition the recording CURRENTLY PLAYING belongs to, read
+ *            from its asset-name stamp. Null when nothing plays, and null when
+ *            the name claims no edition we know.
+ *
+ * `paint` NEVER falls back to `offer`. A fallback there would fire on exactly
+ * the case the fallback exists for — a reader on a book the selected edition
+ * lacks, playing a library track from a third edition — and paint one
+ * edition's clock over another's voice.
+ *
+ * @param {{settings?:any, bookId?:string, track?:any}} opts
+ * @returns {{offer: any, paint: any}}  registry entries, or null
+ */
+export function resolveBibleAudio(opts) {
+  const o = opts || {};
+  const selected = bibleAudioEdition(o.settings && o.settings.bibleAudio);
+  const manifest = /** @type {any} */ (globalThis).BIBLE_AUDIO_MANIFEST || null;
+  const carries = (ed) => !!(ed && manifest && o.bookId
+    && manifest[ed.volKey + ':' + o.bookId]);
+  // No bookId asked about → no per-book question to answer, so the selection
+  // stands as given. With one, a selected edition that lacks the book yields to
+  // the default rather than removing the pill from that book entirely.
+  let offer = selected;
+  if (selected && o.bookId && !carries(selected)) {
+    const fallback = BIBLE_AUDIO_EDITIONS[BIBLE_AUDIO_DEFAULT];
+    offer = carries(fallback) ? fallback : null;
+  }
+  const editionId = o.track ? bibleEditionOfAsset(_assetIdOfTrack(o.track)) : null;
+  return { offer: offer || null, paint: (editionId && BIBLE_AUDIO_EDITIONS[editionId]) || null };
 }
 
 /**

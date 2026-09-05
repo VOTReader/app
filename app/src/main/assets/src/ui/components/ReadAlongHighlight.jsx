@@ -89,7 +89,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { bibleSyncGlobalFor } from '../../utils/audio-track.js';
+import { bibleSyncGlobalFor, resolveBibleAudio } from '../../utils/audio-track.js';
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 
@@ -245,9 +245,12 @@ function _partOf(key, track) {
  * @param {string} key
  * @param {any} track
  * @param {number} [chapter] - the VIEWED chapter, for Bible surfaces only
+ * @param {string} [paintVolKey] - the volKey of the edition PLAYING, resolved
+ *   from the recording's own asset name. Bible surfaces only; '' or absent
+ *   means paint nothing rather than fall back to the Settings edition.
  * @returns {any[] | null}
  */
-function _syncFor(key, track, chapter) {
+function _syncFor(key, track, chapter, paintVolKey) {
   const g = /** @type {any} */ (globalThis);
   // Bible first, and never through the letters' primary-asset check below —
   // that reads AUDIO_MANIFEST, while Bible recordings live in
@@ -257,8 +260,11 @@ function _syncFor(key, track, chapter) {
     // chapter in the speakers drift apart as it plays. Painting this chapter's
     // verses to another chapter's clock is the most confident kind of wrong.
     if (AudioPlayer.bibleChapterOfTrack(track) !== chapter) return null;
-    const [volKey, bookId] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
-    return _bibleRowsFor(bookId, chapter, volKey);
+    // The table belongs to the RECORDING, never to the Settings edition. A
+    // recording whose name claims no edition we know paints nothing rather
+    // than borrowing whatever the setting happens to say.
+    if (!paintVolKey) return null;
+    return _bibleRowsFor(key.slice(key.indexOf(':') + 1), chapter, paintVolKey);
   }
   const alt = _altRowsFor(track);
   if (alt) return alt;
@@ -584,7 +590,24 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
   const track = st.queue[st.qi];
-  const loaded = !!track && track.key === key;
+  // WHICH EDITION IS ACTUALLY PLAYING, read from the recording's own asset name
+  // and never from `volKey` — which is the SETTINGS edition, handed down as
+  // bibleAudioProp. The Listening Library and "Resume last" rebuild queues from
+  // immutable URLs that know nothing about the setting, so the two diverge as
+  // soon as a reader plays anything but the selected edition. Null when nothing
+  // is playing, or when the name claims no edition we know (a legacy whole-book
+  // id; a body that ships audio under none of our editions).
+  const paintEd = chapter ? resolveBibleAudio({ track }).paint : null;
+  const paintVolKey = paintEd ? paintEd.volKey : '';
+  // A Bible track's key carries its own edition, so `track.key === key` asked
+  // "is this book playing IN THE SETTINGS EDITION" — and answered no for a
+  // library recording of the same book from any other edition, killing the wash
+  // outright on a chapter whose timings were already in memory. For a Bible
+  // surface the question is the BOOK; the edition is answered by paintVolKey
+  // above and by nothing else. Letters keep the exact key.
+  const loaded = !!track && (chapter
+    ? (!!paintVolKey && track.key === paintVolKey + ':' + letterId)
+    : track.key === key);
   const active = loaded && (st.status === 'playing' || st.status === 'loading');
   const time = st.time;
   const lastFrag = React.useRef(-1);
@@ -628,7 +651,10 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
 
   const needBibleSync = !!chapter && loaded && readAlongOn;
   React.useEffect(() => {
-    if (needBibleSync) loadBibleSync(volKey);
+    // The PLAYING edition's timings file, the same value _syncFor reads below.
+    // Fetching the setting's would download a table nothing paints from and
+    // leave the wash dead until the reader changed Settings to match.
+    if (needBibleSync) loadBibleSync(paintVolKey);
     // read-along-5: `chapter` and `playerVersion` are in the deps so a FAILED
     // load is asked again. The deps used to be [needBibleSync, volKey], and
     // NONE of the inputs a reader produces while staying on the book changes
@@ -656,7 +682,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     //
     // Re-asking after a SUCCESS is free: `_promise` is still set, so load()
     // returns it without touching the network.
-  }, [needBibleSync, volKey, chapter, playerVersion]);
+  }, [needBibleSync, paintVolKey, chapter, playerVersion]);
   // The letter timings are their own lazy file too (c41): asked for the moment
   // THIS letter's track is loaded with the wash on, and not otherwise — a
   // reader who never presses Listen, or keeps the wash off, never downloads
@@ -673,7 +699,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // loader's version, for the loop reason above.
   }, [needLetterSync, key, playerVersion]);
 
-  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter) : null;
+  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
   // nothing to them. Bible rows are per CHAPTER and likewise always part 0.

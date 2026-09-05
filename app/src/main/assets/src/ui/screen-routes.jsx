@@ -41,7 +41,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
-import { bibleAudioEdition } from '../utils/audio-track.js';
+import { bibleAudioEdition, resolveBibleAudio } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
@@ -267,7 +267,11 @@ export function buildScreenRoutes({
   // Recorded Bible editions (per-chapter): the selected edition (Settings →
   // Listening → Bible Audio), or null when off/unknown — which hides every
   // Bible Listen pill. Registry + policy live in utils/audio-track.js.
-  const _bibleAudioEd = bibleAudioEdition(settings.bibleAudio);
+  // No bookId here: this prop is built once for every screen, so it is the
+  // selection itself. Per-book resolution (a partial edition yielding to the
+  // default rather than blanking 65 books) lands with the first partial
+  // edition, where it can be bitten — every shipped edition carries all 66.
+  const _bibleAudioEd = resolveBibleAudio({ settings }).offer;
   const bibleAudioProp = _bibleAudioEd ? { volKey: _bibleAudioEd.volKey, label: _bibleAudioEd.label } : null;
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to

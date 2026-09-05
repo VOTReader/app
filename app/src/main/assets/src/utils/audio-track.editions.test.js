@@ -18,11 +18,25 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { BIBLE_AUDIO_EDITIONS } from './audio-track.js';
+import {
+  BIBLE_AUDIO_EDITIONS, bibleEditionOfAsset, bibleSyncEditionFor,
+} from './audio-track.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..', '..', '..', '..', '..');
 const BATCH_SRC = readFileSync(join(ROOT, 'tools', 'batch-align-bible.py'), 'utf8');
+
+/* The manifest is a classic script (var + IIFE), not a module. Run the REAL
+   generator rather than restating its output: the two gates at the foot of this
+   file are about what actually ships, and a hand-written copy of the data would
+   agree with itself and with nothing else. `var` inside a Function body is
+   function-scoped, so the trailing line is what publishes it. */
+{
+  const MANIFEST_SRC = readFileSync(
+    join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
+  // eslint-disable-next-line no-new-func
+  new Function('g', MANIFEST_SRC + ';g.BIBLE_AUDIO_MANIFEST = BIBLE_AUDIO_MANIFEST;')(globalThis);
+}
 const BUDGET_SRC = readFileSync(join(ROOT, 'tools', 'check-bundle-budget.js'), 'utf8');
 
 /**
@@ -83,6 +97,63 @@ describe('audio-track editions — BIBLE_AUDIO_EDITIONS matches the shipper', ()
   it('gives every edition a bundle-budget row for its sync file', () => {
     for (const id of REGISTRY_IDS) {
       expect(BUDGET_SRC, `check-bundle-budget.js has no row for bible-sync-${id}.js`).toContain(`'src/data/bible-sync-${id}.js'`);
+    }
+  });
+});
+
+/* Two properties of the SHIPPED manifest that the read-along selector now
+   depends on, derived from the data rather than listed by hand. */
+describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
+  const manifest = () => {
+    // The manifest is a classic script that assigns a global.
+    if (typeof globalThis.BIBLE_AUDIO_MANIFEST === 'undefined') {
+      throw new Error('BIBLE_AUDIO_MANIFEST is not loaded — this gate would be vacuous');
+    }
+    return globalThis.BIBLE_AUDIO_MANIFEST;
+  };
+
+  it('every asset name resolves to the edition its own manifest key names', () => {
+    // Read-along picks the timings table from the ASSET NAME, so a release
+    // whose names carry no registered stamp would kill the wash silently and
+    // look exactly like missing timings. The fixture in
+    // ReadAlongHighlight.retry.test.jsx used 'john-1' and did precisely that.
+    const m = manifest();
+    const keys = Object.keys(m);
+    expect(keys.length, 'manifest is empty').toBeGreaterThan(100);
+    let checked = 0;
+    for (const key of keys) {
+      const volKey = key.slice(0, key.lastIndexOf(':'));
+      const editionId = bibleSyncEditionFor(volKey);
+      expect(editionId, 'no edition claims volKey ' + volKey).toBeTruthy();
+      for (const part of m[key]) {
+        expect(bibleEditionOfAsset(part[0]), key + ' → ' + part[0]).toBe(editionId);
+        checked++;
+      }
+    }
+    // A loop that ran zero times passes every assertion inside it.
+    expect(checked, 'no assets examined').toBeGreaterThan(1000);
+  });
+
+  it('every edition carries every book — fires on the first partial edition', () => {
+    // PASSES TODAY AND IS MEANT TO. resolveBibleAudio's `offer` falls back to
+    // the default edition for a book the selected one lacks, and that arm is
+    // unreachable while this holds — so it is written and unit-tested but NOT
+    // wired per book at the four playBibleBook sites. This is the alarm: the
+    // branch that registers Matthew or John as an edition turns it red, and
+    // that is the branch that has to do the wiring.
+    const m = manifest();
+    const books = new Set(Object.keys(m).map((k) => k.slice(k.lastIndexOf(':') + 1)));
+    expect(books.size, 'book set looks wrong').toBe(66);
+    for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
+      const volKey = BIBLE_AUDIO_EDITIONS[id].volKey;
+      const missing = [...books].filter((b) => !m[volKey + ':' + b]);
+      expect(
+        missing,
+        id + ' does not carry ' + missing.length + ' book(s): ' + missing.slice(0, 5).join(', ')
+        + '\n  → this edition is PARTIAL, so resolveBibleAudio({settings, bookId}).offer'
+        + '\n    must now be wired per book at the four playBibleBook call sites'
+        + '\n    (screen-routes.jsx:270 builds one bibleAudioProp for every screen).',
+      ).toEqual([]);
     }
   });
 });
