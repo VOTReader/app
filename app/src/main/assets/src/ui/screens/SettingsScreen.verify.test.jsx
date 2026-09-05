@@ -96,10 +96,20 @@ describe('Verify a Backup (web)', () => {
     renderSettings();
     await clickVerify();
     // The manifest survived — its real contents are reported, not a blanket "corrupt" refusal.
-    const result = await screen.findByText(/WARNING.*truncated or altered/);
+    const result = await screen.findByText(/could not be read all the way through/);
     expect(result.textContent).toContain('3 notes');
     expect(result.textContent).toContain('2 bookmarks');
     expect(screen.queryByText(/corrupt or incomplete/)).toBeNull();
+
+    // ...and it does not promise media it cannot produce. The manifest declares
+    // one media file; the cut lands in that frame's header, so ZERO come back.
+    // This assertion replaces a pin on the old wording (/truncated or altered/),
+    // which was the malformed/trailing catch-all: it diagnosed bytes ADDED after
+    // the last frame on a file that is merely short, next to a count taken from
+    // the manifest's claim. An owner reading that keeps the backup and deletes
+    // the source, which is the one outcome this screen exists to prevent.
+    expect(result.textContent).toContain('0 of 1 media file');
+    expect(result.textContent).not.toContain('truncated or altered');
   });
 
   it('a genuinely unrecoverable file (bad magic — no manifest to salvage) still reports corrupt', async () => {

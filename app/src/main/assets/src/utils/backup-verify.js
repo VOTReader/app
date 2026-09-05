@@ -73,15 +73,22 @@ export function summarizeBackupManifest(manifest) {
  * @param {string} integrity  'ok' | 'absent' | 'mismatch' | 'malformed' |
  *                            'trailing' | 'truncated' — web readContainer /
  *                            native verify vocabularies both map onto these.
- *                            'truncated' (storage-backup-1: a media frame
- *                            ended early — readContainer salvaged the
- *                            manifest anyway) falls through to the same
- *                            catch-all warning as 'malformed'/'trailing'
- *                            below; its wording already fits.
  * @param {'v3'|'legacy'} kind
+ * @param {{ count: number, bytes: number } | null} [salvaged]
+ *   REQUIRED when `integrity` is 'truncated': the media frames the reader
+ *   actually got back, from its own entries array. storage-backup-1 made
+ *   readContainer SALVAGE a damaged media stream instead of throwing, which
+ *   is right for import — but the manifest still declares every frame the
+ *   export wrote, so `s.mediaCount` becomes a claim about bytes this file can
+ *   no longer produce. Verify exists to tell the owner what the file can give
+ *   back; reporting the claim instead of the salvage is how someone keeps a
+ *   gutted backup and deletes the source. readContainer is the only producer
+ *   of 'truncated' and its caller has `entries` in hand, so this is always
+ *   available on the path a reader can reach; omitting it costs the media
+ *   line entirely rather than printing an optimistic one.
  * @returns {{ message: string, level: 'ok' | 'warn' }}
  */
-export function formatVerifyReport(s, integrity, kind) {
+export function formatVerifyReport(s, integrity, kind, salvaged) {
   let when = 'date unknown';
   if (s.date) {
     const d = new Date(s.date);
@@ -93,10 +100,20 @@ export function formatVerifyReport(s, integrity, kind) {
   if (s.journal) parts.push(s.journal + (s.journal === 1 ? ' journal entry' : ' journal entries'));
   if (s.bookmarks) parts.push(s.bookmarks + (s.bookmarks === 1 ? ' bookmark' : ' bookmarks'));
   const detail = parts.length ? parts.join(', ') + ' — ' : '';
-  const mediaBit = s.mediaCount
-    ? ', plus ' + s.mediaCount + ' media file' + (s.mediaCount === 1 ? '' : 's')
-      + (s.mediaBytes ? ' (' + formatBytes(s.mediaBytes) + ')' : '')
-    : '';
+  const plural = s.mediaCount === 1 ? '' : 's';
+  let mediaBit = '';
+  if (integrity === 'truncated') {
+    // 'N of M', never M: M is what the export wrote, N is what survives.
+    const got = salvaged ? salvaged.count : 0;
+    const gotBytes = salvaged ? salvaged.bytes : 0;
+    if (s.mediaCount) {
+      mediaBit = ', plus ' + got + ' of ' + s.mediaCount + ' media file' + plural
+        + ' still readable' + (gotBytes ? ' (' + formatBytes(gotBytes) + ')' : '');
+    }
+  } else if (s.mediaCount) {
+    mediaBit = ', plus ' + s.mediaCount + ' media file' + plural
+      + (s.mediaBytes ? ' (' + formatBytes(s.mediaBytes) + ')' : '');
+  }
   const body = 'Backup from ' + when + ': ' + detail + s.records
     + ' record' + (s.records === 1 ? '' : 's') + ' across ' + s.storeCount
     + ' data store' + (s.storeCount === 1 ? '' : 's') + mediaBit + '. ';
@@ -109,6 +126,17 @@ export function formatVerifyReport(s, integrity, kind) {
     tail = 'Integrity check passed — the file looks intact.';
   } else if (integrity === 'absent') {
     tail = 'Contents read back correctly. (No checksum — this backup predates integrity checksums; your next Export will include one.)';
+  } else if (integrity === 'truncated') {
+    // Its own branch, not the catch-all below: that one diagnoses the OPPOSITE
+    // failure — bytes appended after the last frame. This file is short, or a
+    // frame disagrees with its manifest entry; either way the media stream
+    // could not be walked to the end. Saying 'unexpected bytes at the end'
+    // about a file that is merely cut off sends the owner looking for the
+    // wrong thing.
+    tail = 'WARNING: the media in this backup could not be read all the way through. '
+      + 'Everything listed above can still be restored; the rest of the media is lost. '
+      + 'Make a fresh Export.';
+    level = 'warn';
   } else if (integrity === 'mismatch') {
     tail = 'WARNING: the integrity check FAILED — this file may be corrupted. Your data here still imported-readable, but make a fresh Export as soon as possible.';
     level = 'warn';
