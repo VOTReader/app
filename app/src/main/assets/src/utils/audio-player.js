@@ -111,6 +111,9 @@ export function trackUrl(id) {
 
 /** @type {HTMLAudioElement | null} */
 let _el = null;
+/* Bumped by every start. A `loadedmetadata` seek captures it when armed and
+   refuses to fire once it has moved — see _seekOnMetadata. */
+let _seekGen = 0;
 /** @type {Set<() => void>} */
 const _listeners = new Set();
 let _version = 0;
@@ -768,6 +771,9 @@ function _countCompletion() {
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */
 function _start() {
+  // Before anything else: whatever this start does, a seek armed for the
+  // PREVIOUS track is no longer this element's business.
+  _seekGen++;
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
   if (!isVotAudioUrl(track.url)) {
@@ -1298,7 +1304,27 @@ function _seekOnMetadata(at) {
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     return;
   }
+  /* A DEFERRED SEEK IS A PROMISE ABOUT ONE TRACK, and nothing used to check
+     which track collected it. There is one element and one listener slot: if
+     this metadata never arrives before the reader taps something else, this
+     listener is still armed when the NEXT track's metadata fires, and the
+     reader opens a recording they have never played ten minutes in. Neither
+     the bar nor the position store looks wrong afterwards — the app believes
+     it is where it seeked to.
+     `noResume` (the desk's voice switch) is the worst case: it arms no seek of
+     its own, so it has nothing to overwrite the stale one with, and the
+     promise it exists to keep is precisely "start this again".
+     The generation is captured here and compared inside the handler, so a
+     start that happened in between makes this a no-op.
+     REMOVING the listener instead was the other option and is not done: `_el`
+     is assigned exactly once (see _ensureEl) so removal by reference would
+     work today, but it would make correctness depend on the element never
+     being replaced, and two mechanisms deciding which seek is current is one
+     more than can be kept in step. `{ once: true }` means a stale listener
+     costs one no-op call and then unregisters itself. */
+  const gen = _seekGen;
   _el.addEventListener('loadedmetadata', () => {
+    if (gen !== _seekGen) return;              // a later start owns the element now
     try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
   }, { once: true });
 }
@@ -1888,9 +1914,13 @@ function toggle() {
     // can't be set before then).
     const resumeAt = _errorTime;
     _el.src = track.url;
-    _el.addEventListener('loadedmetadata', () => {
-      try { /** @type {HTMLAudioElement} */ (_el).currentTime = resumeAt; } catch (_e) { /* unseekable — restart from 0 */ }
-    }, { once: true });
+    // Through the shared helper, not a hand-written listener: this seek is a
+    // promise about THIS track, and if the reader gives up and opens another
+    // one before the metadata arrives, the raw version landed on that one
+    // instead. _seekOnMetadata carries the generation guard that says so.
+    // (It also no-ops for resumeAt 0, which is the same nothing the old
+    // assignment achieved.)
+    _seekOnMetadata(resumeAt);
   }
   const p = _el.play();
   if (p && typeof p.catch === 'function') p.catch(() => {});
