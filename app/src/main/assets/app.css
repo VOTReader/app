@@ -1376,6 +1376,7 @@
          these SHOULD scale with Text Size. Same faint-gold gradient plate as
          .hd-playlist-btn, so both themes fall out of the vars. */
       .hero-play-pill {
+        position: relative;
         display: inline-flex; align-items: center; gap: 0.5em;
         padding: 0.45em 1.1em; border-radius: 999px;
         background: linear-gradient(180deg, var(--gold-faint), transparent);
@@ -1385,6 +1386,9 @@
         transition: border-color 0.18s, transform 0.18s;
       }
       .hero-play-pill svg { width: 1.15em; height: 1.15em; flex-shrink: 0; }
+      /* Hit area is not paint: the pill paints 25 px tall at Text Size 1 and the hit band is 44 px,
+         centred on the paint, never narrower than it. The tour rings the button's own rect. */
+      .hero-play-pill::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px); }
       @media (hover: hover) { .hero-play-pill:hover { border-color: var(--gold); transform: translateY(-1px); } }
       .hero-play-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
       .audio-sec-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
@@ -1409,7 +1413,9 @@
       /* ── HERO ── */
       .hero {
         position: relative; overflow: hidden;
-        padding: 5.5rem 1.8rem 4rem; text-align: center;
+        /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
+           hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
+        padding: min(5.5rem, 110px) 1.8rem min(4rem, 80px); text-align: center;
         border-bottom: 1px solid var(--gold-border);
       }
       .hero-bg {
@@ -7125,7 +7131,9 @@
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
         max-height: calc(100vh - 24px); overflow-y: auto;
       }
-      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
+      /* Never more than a third of the screen: at Text Size 1.8 the strip was 350 px of 800 with every
+         library tile under it (2026-09-05). Its type is chrome and stops growing past ~1.25x. */
+      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; max-height: 33vh; }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {
@@ -7139,9 +7147,10 @@
         font-family: var(--font-cinzel); font-weight: 600; font-size: var(--fs-20);
         line-height: 1.2; color: var(--cream); margin: 0 0 8px;
       }
-      .tour-prompt-title { font-size: var(--fs-18); margin-bottom: 4px; }
+      .tour-prompt-title { font-size: min(var(--fs-18), 22px); margin-bottom: 4px; }
       .tour-text, .tour-prompt-text { font-size: var(--fs-18); line-height: 1.4; margin: 0 0 14px; }
-      .tour-prompt-text { font-size: var(--fs-16); margin-bottom: 12px; }
+      .tour-prompt-text { font-size: min(var(--fs-16), 20px); margin-bottom: 12px; }
+      .tour-prompt .tour-btn { font-size: min(var(--fs-14), 16px); }
       .tour-tip { font-size: var(--fs-16); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
       .tour-row { display: flex; gap: 8px; align-items: center;
         /* Stuck to the card's bottom edge while its text scrolls (a tall card at a large text
