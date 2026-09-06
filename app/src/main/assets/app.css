@@ -6992,11 +6992,20 @@
        .sw-controls runs to 117: the notice covered the strip and its Dismiss
        button sat on the zoom group. Measured by design-perf at 800x360.
        58 % centres it at 209 on that frame, 26 px below the controls and well
-       above the credit at 341. The 190px floor only bites on a frame shorter
-       than ~328 CSS px, where a bare percentage would slide back under the
-       strip; it never moves the frame the numbers above were measured on.
+       above the credit at 341. The px floor only bites on a frame shorter than
+       ~345 CSS px, where a bare percentage would slide back under the strip; it
+       never moves the frame the numbers above were measured on.
+       THE FLOOR IS 200, NOT 190, AND THE DIFFERENCE IS A SHIPPING DEVICE.
+       568x320 is iPhone SE / iPhone 8 landscape - EIGHT px above the .sw-narrow
+       breakpoint (clientWidth <= 560), so this wide rule fires. At 320 tall the
+       58 % is 185.6 and the floor decides. Measured by the Verifier at 190px:
+       the Dismiss button's top edge lands at 116 against .sw-controls running
+       to 117, a 44x1 overlap. Centre - half the ~132 px panel - the close
+       button's own -8px offset must clear 117, so the floor has to be at least
+       191; 200 clears it by nine. Dropping the floor entirely is worse, not
+       neutral: top:58% alone overlaps by 44x5 on that frame.
        Portrait (.sw-narrow) keeps 42 %, which was measured clear. */
-    .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 190px); }
+    .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 200px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
          web beneath it — the same pattern as .ann-hint-close, and it works

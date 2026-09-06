@@ -334,6 +334,27 @@ describe('app.css — the My Web notice clears the control strip', () => {
     expect((wide / 100) * 360, 'centre on the 360 px frame').toBeGreaterThanOrEqual(183);
   });
 
+  it('the px floor clears the strip on the 320 px-tall landscape frame', () => {
+    // The case above reads the PERCENTAGE, so it cannot see the floor at all --
+    // and the floor is what decides on a short frame. 568x320 is iPhone SE /
+    // iPhone 8 landscape, EIGHT px above the .sw-narrow breakpoint
+    // (clientWidth <= 560), so this wide rule fires; at 320 tall the 58 % is
+    // 185.6 and the floor wins. At 190px the Verifier measured the Dismiss
+    // button's top edge at 116 against .sw-controls running to 117 -- a 44x1
+    // overlap on a shipping device. centre - half the ~132 px panel - the close
+    // button's own -8px offset must clear 117, so the floor has to be >= 191.
+    const CONTROLS_BOTTOM = 117;   // .sw-controls, measured on the locked frame
+    const HALF_PANEL = 66;         // ~132 px tall, translate(-50%, -50%)
+    const CLOSE_OFFSET = 8;        // .sw-empty-close { top: -8px }
+    const wide = ruleBlock(CSS, '.sw-root:not(.sw-narrow) .sw-empty');
+    const floor = /max\([^)]*?(\d+(?:\.\d+)?)px\s*\)/.exec(wide || '');
+    expect(floor, 'the wide rule has no px floor -- 58 % alone is 185.6 on a 320 px '
+      + 'frame and the notice slides back under the strip').toBeTruthy();
+    expect(parseFloat(floor[1]) - HALF_PANEL - CLOSE_OFFSET,
+      'the Dismiss button still overlaps .sw-controls on the 320 px frame')
+      .toBeGreaterThanOrEqual(CONTROLS_BOTTOM);
+  });
+
   it('leaves the portrait placement alone', () => {
     // design-perf re-measured every portrait row as green at 42 %. This fix is
     // the wide layout's, and a fix that moved both would be changing a frame
