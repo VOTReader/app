@@ -26,6 +26,7 @@ import importlib.util
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -51,21 +52,27 @@ class BumpCorpus(unittest.TestCase):
         d = tempfile.mkdtemp()
         sw = os.path.join(d, "service-worker.js")
         cache = os.path.join(d, "cache.js")
-        open(sw, "w", encoding="utf-8", newline="\n").write(sw_text)
-        open(cache, "w", encoding="utf-8", newline="\n").write(cache_text)
+        # Context managers, not bare open().write(): an unclosed handle here is
+        # a ResourceWarning in the runner log (CI 34021486271) and, on Windows,
+        # the shape that later flakes when the same path is reopened before the
+        # GC closes it.
+        with open(sw, "w", encoding="utf-8", newline="\n") as f:
+            f.write(sw_text)
+        with open(cache, "w", encoding="utf-8", newline="\n") as f:
+            f.write(cache_text)
         flock.SW, flock.CACHE = sw, cache
         return sw, cache
 
     def test_both_anchors_present_bumps_both_files(self):
         sw, cache = self._files(SW_GOOD, CACHE_GOOD)
         self.assertEqual(flock.bump_corpus(), 49)
-        sw_after = open(sw, encoding="utf-8").read()
+        sw_after = Path(sw).read_text(encoding="utf-8")
         self.assertIn("const CORPUS_VERSION = 'c49';", sw_after)
         self.assertIn("c48->c49", sw_after)
         # The previous entry survives: line 44 of the real file is one long
         # accumulating line and a bump PREPENDS to it, never replaces it.
         self.assertIn("c47->c48", sw_after)
-        self.assertIn("CORPUS_CONTENT_VERSION = 'c49'", open(cache, encoding="utf-8").read())
+        self.assertIn("CORPUS_CONTENT_VERSION = 'c49'", Path(cache).read_text(encoding="utf-8"))
 
     def test_reformatted_service_worker_anchor_raises(self):
         self._files(SW_REFORMATTED, CACHE_GOOD)
@@ -80,8 +87,8 @@ class BumpCorpus(unittest.TestCase):
         with self.assertRaises(RuntimeError) as e:
             flock.bump_corpus()
         self.assertIn("CORPUS_CONTENT_VERSION anchor missed", str(e.exception))
-        self.assertEqual(open(sw, encoding="utf-8").read(), SW_GOOD)
-        self.assertEqual(open(cache, encoding="utf-8").read(), CACHE_STALE_ANCHOR)
+        self.assertEqual(Path(sw).read_text(encoding="utf-8"), SW_GOOD)
+        self.assertEqual(Path(cache).read_text(encoding="utf-8"), CACHE_STALE_ANCHOR)
 
 
 if __name__ == "__main__":

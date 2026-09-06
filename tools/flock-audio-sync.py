@@ -82,13 +82,21 @@ def git(*args):
 
 
 def bump_corpus():
-    sw = open(SW, encoding="utf-8").read()
+    # Every handle here is closed on the statement that opens it. This is the
+    # unattended weekly job, and the write at the end of this function is
+    # immediately followed by `git add` of the same two paths: on Windows a
+    # handle still open at GC time is a shared-violation waiting for a slow
+    # machine, and the failure would arrive as an unexplained commit error in a
+    # job nobody is watching. CI 34021486271 surfaced it as a ResourceWarning.
+    with open(SW, encoding="utf-8") as f:
+        sw = f.read()
     m = re.search(r"const CORPUS_VERSION = 'c(\d+)';", sw)
     old, new = int(m.group(1)), int(m.group(1)) + 1
     stamp = f"c{old}->c{new} ({datetime.date.today()}): flock audio sync — new recordings joined audio-manifest."
     sw_out = sw.replace(f"const CORPUS_VERSION = 'c{old}'; //",
                         f"const CORPUS_VERSION = 'c{new}'; // {stamp} (", 1)
-    cj = open(CACHE, encoding="utf-8").read()
+    with open(CACHE, encoding="utf-8") as f:
+        cj = f.read()
     cj_out = cj.replace(f"CORPUS_CONTENT_VERSION = 'c{old}'",
                         f"CORPUS_CONTENT_VERSION = 'c{new}'")
     # str.replace returns its input UNCHANGED when the anchor misses, and this
@@ -114,8 +122,10 @@ def bump_corpus():
         raise RuntimeError(
             f"CORPUS_CONTENT_VERSION anchor missed in {CACHE}: expected "
             f"\"CORPUS_CONTENT_VERSION = 'c{old}'\" verbatim. Nothing was written.")
-    open(SW, "w", encoding="utf-8", newline="\n").write(sw_out)
-    open(CACHE, "w", encoding="utf-8", newline="\n").write(cj_out)
+    with open(SW, "w", encoding="utf-8", newline="\n") as f:
+        f.write(sw_out)
+    with open(CACHE, "w", encoding="utf-8", newline="\n") as f:
+        f.write(cj_out)
     return new
 
 
