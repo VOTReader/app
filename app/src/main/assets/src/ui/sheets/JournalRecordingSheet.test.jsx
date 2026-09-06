@@ -625,6 +625,65 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
   });
 
+  /* FOUR MORE CONTROLS, each added because a bite on the line it covers left the
+     suite green. Every one is another way the listing can look like evidence of
+     emptiness without being it, and the whole point of the guard is that only a
+     positive `"size": 0` row for THIS name counts. */
+
+  it('CONTROL: a listing that parses to a NON-ARRAY is not evidence of anything', async () => {
+    /* `JSON.parse('null')` returns null instead of throwing, so a try/catch alone
+       lets it through — the same family as atob(null) returning three bytes. */
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue('null');
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+  });
+
+  it('CONTROL: a row whose size is not the NUMBER 0 is not an empty file', async () => {
+    // A missing size, and the string "0", are both absent information rather than
+    // a measurement of nothing. `=== 0` is what keeps them out.
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue(
+      listing([{ name: SERVED_NAME, mtime: 1788000000000 }]));
+    await drive();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+
+    cleanup();
+    MockBridge.nativeListRecordings.mockReturnValue(
+      listing([{ name: SERVED_NAME, size: '0', mtime: 1788000000000 }]));
+    await drive();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL: SOMEONE ELSE\'S empty memo is not this reader\'s', async () => {
+    /* The sharpest of the four. Without the name match the first row decides, so
+       an unrelated zero-byte file left by another session would make THIS reader's
+       missing recording report as empty — a wrong cause attached to a real loss,
+       which is the exact defect this branch exists to fix, inverted. */
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue(listing([
+      { name: 'aaaaaaaa-1111-4aaa-8bbb-000000000000.m4a', size: 0, mtime: 1788000000000 },
+      { name: 'bbbbbbbb-2222-4aaa-8bbb-000000000000.m4a', size: 5120, mtime: 1788000000000 },
+    ]));
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+  });
+
+  it('CONTROL: a listing verb that THROWS is not evidence of an empty file', async () => {
+    // An APK without the verb at all: `undefined is not a function`. The reader
+    // gets the honest failure rather than being told their memo held nothing.
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockImplementation(() => {
+      throw new TypeError('nativeListRecordings is not a function');
+    });
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+  });
+
   it('does NOT reach for the expensive read before the reader has taken Try again', async () => {
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
     MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
