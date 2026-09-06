@@ -24,6 +24,10 @@ export function MatthewChapterView({
   // Bible Audio is off (screen-routes' bibleAudioProp, same prop bible-ch and
   // the chapter indexes take).
   bibleAudio = null,
+  // The reader's read-along settings, resolved ONCE in screen-routes
+  // (sharedViewProps) so this screen reads the same values every other
+  // read-along surface does rather than re-deriving them from `settings`.
+  readAlongOn = true, readAlongFollow = true,
   // Focus-hidden state (passed through to ChapterView)
   titleFocusHidden, setTitleFocusHidden,
   // Chain nav (from useReadingChainNav)
@@ -59,6 +63,7 @@ export function MatthewChapterView({
       <ChapterView
         book={MATTHEW} chapter={chapter} mode={mode} showStudy={showStudy} showEchoes={settings.showInlineEchoes !== false}
         bibleAudio={bibleAudio}
+        readAlongOn={readAlongOn} readAlongFollow={readAlongFollow}
         showChapterTitle={settings.showChapterTitle !== false}
         titleFocusHidden={titleFocusHidden}
         setTitleFocusHidden={setTitleFocusHidden}
