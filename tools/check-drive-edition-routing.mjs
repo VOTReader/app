@@ -19,7 +19,11 @@
  *   node tools/check-drive-edition-routing.mjs
  *     exit 0  every drive edition routes to its declared tag (or there are none)
  *     exit 1  a drive edition exists whose assets would 404
- *     exit 2  the check could not run — say so, never pass by accident
+ *     exit 2  the check could not run — say so, never pass by accident AND
+ *             never ACCUSE by accident. Both directions matter: the first cut
+ *             guarded only the passing one, so an unevaluable tree exited 1 and
+ *             the CI step reported "a drive edition exists whose assets would
+ *             404" about a tree this gate had not measured (drive-routing-crash-1).
  */
 import { readFileSync } from 'fs';
 import { runInNewContext } from 'vm';
@@ -80,18 +84,56 @@ if (badTag.length) {
   process.exit(1);
 }
 
+// EVERY exit from this loop that is not a routing measurement is a 2, not a 1.
+// The gate already refused to PASS on an unevaluable tree; it did not refuse to
+// ACCUSE one, and that is the direction that costs someone a hunt
+// (drive-routing-crash-1, Verifier arm A, 2026-09-06). Two shapes reach it:
+//
+//   `books` undefined -> `e.books[0]` THROWS, node exits 1, and the CI step for
+//     exit 1 reads "a drive edition exists whose assets would 404" — a defect
+//     this gate never measured, named against a tree it could not evaluate.
+//   `books: 'all'`    -> does not even throw. The string indexes to 'a', the key
+//     becomes `<volKey>:a`, no rows are found, and the gate accuses the MANIFEST
+//     of being unregenerated. None ships today; the generator hard-errors on it.
+//
+// A missing `volKey` is the same family with no throw either: the key becomes
+// the literal "undefined:<book>". So the declaration is checked by SHAPE before
+// the key is built, and the whole body is wrapped so anything unforeseen still
+// leaves through 2.
 const problems = [];
 let checked = 0;
 for (const [id, e] of drive) {
+  if (typeof e.volKey !== 'string' || !e.volKey
+      || !Array.isArray(e.books) || e.books.length !== 1 || typeof e.books[0] !== 'string') {
+    console.error('[drive-routing] INSTRUMENT DEAD: a drive-sourced edition cannot be keyed.');
+    console.error(`    ${id}: volKey ${JSON.stringify(e.volKey)}, books ${JSON.stringify(e.books)}`);
+    console.error('    A driveFolder edition must declare a volKey and exactly one app book id');
+    console.error('    as a one-element array (gen-bible-audio-manifest.mjs enforces the same).');
+    console.error('    Without both, no manifest key exists to look up — and a gate that cannot');
+    console.error('    form its own question must not answer it with a routing failure.');
+    process.exit(2);
+  }
+  let rows;
+  try {
+    rows = M[e.volKey + ':' + e.books[0]];
+  } catch (err) {
+    console.error(`[drive-routing] INSTRUMENT DEAD: edition ${id} could not be read — ${err.message}`);
+    process.exit(2);
+  }
   const key = e.volKey + ':' + e.books[0];
-  const rows = M[key];
   if (!Array.isArray(rows) || !rows.length) {
     problems.push(`${id}: the manifest has no rows at ${key} — regenerate with gen-bible-audio-manifest.mjs`);
     continue;
   }
   for (const row of rows) {
     checked++;
-    const url = bibleAudioAssetUrl(row[0], e.releaseTag);  // the 2nd arg is the TAG STRING (Web Builder, w-reltag 5c291e39)
+    let url;
+    try {
+      url = bibleAudioAssetUrl(row[0], e.releaseTag);  // the 2nd arg is the TAG STRING (Web Builder, w-reltag 5c291e39)
+    } catch (err) {
+      console.error(`[drive-routing] INSTRUMENT DEAD: routing ${id} ${row[0]} threw — ${err.message}`);
+      process.exit(2);
+    }
     if (typeof url !== 'string' || !url.startsWith(e.releaseTag)) {
       problems.push(`${id}: ${row[2] || row[0]} routes to\n      ${url || '(empty)'}\n    but its declared tag is\n      ${e.releaseTag}`);
       break;                                        // one example per edition is enough to act on
