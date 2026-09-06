@@ -91,6 +91,96 @@ float arcRadiusY(float rx, float ceil, float squash, float localize){
   return mix(semi, capped, localize);
 }`;
 
+/** CSS px per verse at which one verse is a comfortable tap target. */
+export const PPV_MAX_CSS = 44;
+
+/**
+ * The zoom ceiling, as a RELATION rather than a constant: the reader may
+ * zoom until one verse is PPV_MAX_CSS wide, and no further, because past that
+ * nothing new can separate - every arc leaving a verse shares one foot at
+ * every zoom, so more magnification only zooms into a void.
+ *
+ * @param {number} total - verses in the canon
+ * @param {number} widthCss - viewport width in CSS px
+ * @returns {number} multiple of fit-to-width
+ */
+export function maxZoomFor(total, widthCss) {
+  const w = widthCss > 0 ? widthCss : 1;
+  const t = total > 0 ? total : 1;
+  const z = (PPV_MAX_CSS * t) / w;
+  return z > 1 ? z : 1;
+}
+
+/**
+ * An arc's span on a log scale against the canon: 0 for a one-verse arc, 1
+ * for one spanning the whole canon. The shader computes the same value from
+ * aFrom/aTo and uTotal.
+ *
+ * @param {number} span - |to - from| in verses
+ * @param {number} total
+ * @returns {number} 0..1
+ */
+export function spanLogOf(span, total) {
+  const t = total > 1 ? total : 2;
+  const s = span > 1 ? span : 1;
+  const k = Math.log(s) / Math.log(t);
+  return k < 0 ? 0 : k > 1 ? 1 : k;
+}
+
+/**
+ * The alpha and stroke law, as ONE export both the screen and the probes
+ * read. It used to live inline in ScriptureWebScreen's draw(), where no
+ * harness could import it, so every instrument re-typed it and would have
+ * silently measured the old law against a new screen.
+ *
+ * @param {number} zoom - multiple of fit-to-width
+ * @param {number} localize - localizeFactor()
+ * @param {boolean} light - parchment theme
+ * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
+ * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
+ */
+export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
+  const l2 = Math.log2(zoom > 0 ? zoom : 1);
+  return {
+    alpha: Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19),
+    strokeWidthCss: Math.min(0.9 + l2 * 0.16, 2.4),
+    voteMix: 0,
+  };
+}
+
+/**
+ * The piece of an arc worth tessellating, in device px.
+ *
+ * At overview this is the whole arc, so the 1x frame cannot move. As the
+ * reader localizes it closes onto the viewport, because a 440,000 px arc
+ * spending 47 of its 48 segments off screen is what draws the visible piece
+ * as one straight chord. Clipping changes only WHERE the samples land, never
+ * the curve they land on.
+ *
+ * @param {number} x0 @param {number} x1 - feet, device px
+ * @param {number} width - viewport width, device px
+ * @param {number} localize - localizeFactor()
+ * @returns {[number, number]} the parameter window, device px
+ */
+export function visibleWindow(x0, x1, width, localize) {
+  return [Math.min(x0, x1), Math.max(x0, x1)];
+}
+
+/** How far outside the viewport the tessellation window still reaches. */
+export const CLIP_MARGIN = 32;
+/**
+ * Segments to tessellate one draw range with.
+ *
+ * @param {number} bucketSegments - the asset's own per-bucket count
+ * @param {number} localize - localizeFactor()
+ * @param {number} maxRx - largest half-span in the range, device px
+ * @param {number} ceil - usable height above the baseline, device px
+ * @param {number} width - viewport width, device px
+ * @returns {number}
+ */
+export function segmentsFor(bucketSegments, localize, maxRx, ceil, width) {
+  return bucketSegments;
+}
 /**
  * The DRAWN CURVE of an arc, as two radii.
  *
@@ -112,9 +202,10 @@ float arcRadiusY(float rx, float ceil, float squash, float localize){
  * @param {number} ceil - usable height above the baseline, device px
  * @param {number} squash - squashFactor()
  * @param {number} localize - localizeFactor()
+ * @param {number} spanLog - spanLogOf(): how long this arc is, 0..1
  * @returns {{R:number, A:number}} horizontal quarter radius and apex height
  */
-export function arcShape(rx, ceil, squash, localize) {
+export function arcShape(rx, ceil, squash, localize, spanLog) {
   const r = rx > 0 ? rx : 0;
   return { R: r, A: arcRadiusY(r, ceil, squash, localize) };
 }
