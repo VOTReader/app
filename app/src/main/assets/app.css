@@ -6992,9 +6992,7 @@
        .sw-controls runs to 117: the notice covered the strip and its Dismiss
        button sat on the zoom group. Measured by design-perf at 800x360.
        58 % centres it at 209 on that frame, 26 px below the controls and well
-       above the credit at 341. The px floor only bites on a frame shorter than
-       ~345 CSS px, where a bare percentage would slide back under the strip; it
-       never moves the frame the numbers above were measured on.
+       above the credit at 341.
        THE FLOOR IS 200, NOT 190, AND THE DIFFERENCE IS A SHIPPING DEVICE.
        568x320 is iPhone SE / iPhone 8 landscape - EIGHT px above the .sw-narrow
        breakpoint (clientWidth <= 560), so this wide rule fires. At 320 tall the
@@ -7004,6 +7002,20 @@
        button's own -8px offset must clear 117, so the floor has to be at least
        191; 200 clears it by nine. Dropping the floor entirely is worse, not
        neutral: top:58% alone overlaps by 44x5 on that frame.
+       WHICH HALF IS LOAD-BEARING CHANGED WHEN THE FLOOR WENT TO 200, and an
+       earlier wording here said the opposite. At 200 the floor clears the strip
+       on every frame MEASURED - 568x320, 800x360, 800x420, 800x500 - and no
+       frame was found where the percentage is what keeps the notice off the
+       strip. (Not found is not proven absent; that is the claim as measured,
+       Verifier 2026-09-05.) The percentage still has a job: at 360 tall it wins
+       by 8.8 px (208.8 against 200), so it PLACES the notice. It simply is not
+       what avoids the overlap any more.
+       So do not read the app-css.test.js case named "moves it DOWN, past the
+       strip" as geometric protection for the percentage. It asserts a NUMBER in
+       this text; the case named "the px floor clears the strip on the 320 px-tall
+       landscape frame" is the one that reads the floor, and the 568x320 probe
+       arm is what measures the geometry. Text guards the value, pixels guard
+       the layout, and neither substitutes for the other.
        Portrait (.sw-narrow) keeps 42 %, which was measured clear. */
     .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 200px); }
     .sw-empty-close {
