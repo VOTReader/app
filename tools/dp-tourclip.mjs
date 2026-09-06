@@ -29,6 +29,16 @@
 //       reader is not at the end. So the same assertion is the positive case at 1.8 on the small
 //       frame, the negative case at 1x where the card fits, and the leaves-at-the-end case, and no
 //       arm of it can be satisfied by hard-coding a frame.
+//   v3  TWO corrections the v2 run earned, both of which made it wrong in the strict direction:
+//       (a) a programmatic `scrollTop` fires its scroll event at the next rendering opportunity, so
+//           reading the class immediately afterwards read the state BEFORE the handler ran and said
+//           the affordance never leaves. It waits two frames now. The unit case (fireEvent.scroll)
+//           was green throughout, which is what said the fault was in the probe.
+//       (b) the gap floor now applies where it means something. A card that OVERFLOWS legitimately
+//           has text under the sticky row while the reader is mid-scroll; what must hold there is
+//           that the end is REACHABLE and clear, plus the affordance saying so. A card that FITS is
+//           held to the gap at first view, which is the original defect. Both numbers print either
+//           way, so the softer arm cannot hide a regression.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -165,11 +175,13 @@ try {
     }, false);
     // The same measurement with the card scrolled to its end: it separates "the reader is shown half a
     // line" from "the reader cannot reach the end at all", and the two want different fixes.
+    // (a) let the scroll event reach React before reading the class it sets.
+    await page.evaluate(() => { const c = document.querySelector('.tour-card'); if (c) c.scrollTop = c.scrollHeight; });
+    await sleep(400);
     const mEnd = await page.evaluate(() => {
       const card = document.querySelector('.tour-card');
       const row = card && card.querySelector('.tour-row');
       if (!card || !row) return null;
-      card.scrollTop = card.scrollHeight;
       const rowR = row.getBoundingClientRect();
       const walk = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
       let lowest = null, n;
@@ -210,9 +222,15 @@ try {
       else ok(`${tag}: the affordance is gone at the end`);
     }
 
+    // (b) the floor applies where it means something: at first view for a card that fits, at the
+    // end for one that must scroll (there the question is whether the reader can REACH the words).
+    const endGap = mEnd ? mEnd.gapAtEnd : null;
     if (gap === null) fail(`${tag}: no body text found in the card`);
-    else if (gap < MIN_GAP) fail(`${tag}: the last line's bottom is ${Math.round(gap)} px from the button row top, under the ${MIN_GAP} px floor` + (gap < 0 ? ' — the row covers it' : ''));
-    else ok(`${tag}: ${Math.round(gap)} px clear of the button row`);
+    else if (!overflows) {
+      if (gap < MIN_GAP) fail(`${tag}: the card fits and its last line is still ${Math.round(gap)} px from the button row top, under the ${MIN_GAP} px floor` + (gap < 0 ? ' — the row covers it' : ''));
+      else ok(`${tag}: fits, ${Math.round(gap)} px clear of the button row (end ${endGap === null ? 'n/a' : Math.round(endGap)} px)`);
+    } else if (endGap === null || endGap < MIN_GAP) fail(`${tag}: the card scrolls and even at its end the last line is ${endGap === null ? 'unmeasured' : Math.round(endGap) + ' px'} from the button row top, under the ${MIN_GAP} px floor`);
+    else ok(`${tag}: scrolls (first view ${Math.round(gap)} px, ${Math.round(m.scroll.height - m.scroll.client)} px below the fold), the end is reachable and ${Math.round(endGap)} px clear`);
     await ctx.close();
   }
 } finally {
