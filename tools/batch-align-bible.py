@@ -94,6 +94,20 @@ EDITIONS = {
         "mirror": r"D:\BibleAudio\mirror-web-release.py",
         "prefix": "web",
     },
+    # The TSOT reading of Matthew: ONE book, 28 chapters, and the only edition
+    # whose assets are the archive's Drive ids rather than a naming rule -- so
+    # its audio index comes from the Drive listing, not from a mirror script's
+    # collect(). Its reference is `vot-matthew` (matthew.js, the text the
+    # Matthew SCREEN renders); `nkjv` must keep resolving to matthew-plain.js
+    # because that is the Word of Promise's reference, and moving it would
+    # silently change what a future WOP Matthew belt was aligned against.
+    "tsot-matthew": {
+        "translation": "vot-matthew",
+        "family": "bible-tsot-matthew",
+        "mirror": None,
+        "prefix": None,
+        "driveFolder": "18. TSOT New Testament",
+    },
 }
 
 MIN_PROVEN = 0.60          # below this the chapter ships nothing (owner policy)

@@ -34,7 +34,38 @@ const verses = [];
 const headings = [];
 let bookTitle = bookId;
 
-if (translation === 'nkjv') {
+if (translation === 'vot-matthew') {
+  // The text the Matthew SCREEN renders: matthew.js / MATTHEW, with the
+  // restored divine names the TSOT recording actually speaks. This is its OWN
+  // code and not an alias, because `nkjv` must keep resolving Matthew to
+  // matthew-plain.js — that is the Word of Promise's reference, and moving it
+  // would silently change what a future WOP Matthew belt was aligned against.
+  // Same Format C shape as books.js: chapters[].sections[].verses[].
+  // Alignment target only: MATTHEW and MATTHEW_PLAIN score 0.907 against this
+  // recording with a shared versification, so one timeline serves both
+  // surfaces and the choice cannot make the wash land on the wrong verse.
+  // This edition IS one book, so a bookId it does not cover must be refused
+  // rather than quietly answered with Matthew's chapter of that number —
+  // `genesis 1 --translation vot-matthew` returned Matthew 1 and exit 0.
+  if (bookId !== 'matthew' && bookId !== 'matthew-plain') {
+    console.error(`vot-matthew covers only Matthew; asked for ${bookId}`);
+    process.exit(1);
+  }
+  const ctx = {};
+  runInNewContext(readFileSync(resolve(ASSETS, 'src', 'data', 'matthew.js'), 'utf8'), ctx, { filename: 'matthew.js' });
+  const book = ctx.MATTHEW;
+  if (!book) { console.error('MATTHEW not found in matthew.js'); process.exit(1); }
+  bookTitle = book.title || 'Matthew';
+  const chapter = (book.chapters || []).find((c) => c.num === chapterNum);
+  if (!chapter) { console.error(`chapter ${chapterNum} not found in matthew.js`); process.exit(1); }
+  // A FOURTH corpus shape: matthew.js nests verses directly under the chapter,
+  // with NO sections layer (books.js Format C has one; the flat-map editions
+  // have neither). Reading it as Format C returns zero verses and writes a
+  // perfectly valid empty file — the failure that reads like a result. The
+  // zero-verse guard below is what stops that for every branch, not just this one.
+  if (chapter.title) headings.push(chapter.title);
+  for (const v of chapter.verses || []) verses.push({ n: v.n, text: String(v.text) });
+} else if (translation === 'nkjv') {
   const isMatthew = bookId === 'matthew' || bookId === 'matthew-plain';
   const file = isMatthew ? 'matthew-plain.js' : 'books.js';
   const ctx = {};
@@ -66,6 +97,17 @@ if (translation === 'nkjv') {
   for (const v of rows) verses.push({ n: v.n, text: String(v.text) });
 }
 
+// A chapter with no verses is a READER bug, never a corpus fact — every
+// chapter of every shipped translation has verses. Writing the empty file
+// instead produces a valid JSON reference that aligns a whole chapter against
+// nothing, and the belt that comes back looks like a scoring failure rather
+// than an extraction one. Measured 2026-09-05: reading matthew.js as Format C
+// returned 0 verses and exit 0.
+if (!verses.length) {
+  console.error(`no verses extracted for ${bookId} ${chapterNum} [${translation}] — `
+    + 'the corpus shape this branch expects does not match the file. Nothing written.');
+  process.exit(1);
+}
 verses.sort((a, b) => a.n - b.n);
 const out = { book: bookTitle, bookId, translation, chapter: chapterNum, headings, verses };
 const outPath = outArg || resolve(HERE, '_align-work', 'bible', `${bookId}-${chapterNum}.${translation}.verses.json`);

@@ -253,7 +253,21 @@ describe('audio-track editions — an edition ships exactly the books it declare
       if (Array.isArray(e.books)) {
         expect(e.books.filter((b) => !ALL_BOOK_IDS.includes(b)), `edition ${id}`).toEqual([]);
       }
-      expect(typeof e.assetPrefix, `edition ${id} needs an assetPrefix`).toBe('string');
+      // EXACTLY ONE asset scheme. `assetPrefix` means the ids follow the
+      // <prefix><testament>_<book>_<NNN> naming rule and the release tag is
+      // read back out of the name; `driveFolder` means the ids are the
+      // archive's opaque Drive ids and the tag is DECLARED. Both would be
+      // ambiguous about routing, neither leaves the generator nothing to do.
+      const schemes = [e.assetPrefix, e.driveFolder].filter((v) => typeof v === 'string' && v);
+      expect(schemes.length, `edition ${id} needs exactly one of assetPrefix / driveFolder`).toBe(1);
+      // A declared tag is REQUIRED for the drive scheme, because nothing in an
+      // opaque id says which release it lives on — the failure is a 404 on a
+      // tag that exists, which is the quietest kind.
+      if (e.driveFolder) {
+        expect(typeof e.releaseTag, `edition ${id} (driveFolder) needs a releaseTag`).toBe('string');
+        expect(e.releaseTag, `edition ${id} releaseTag must be a release URL prefix`).toMatch(/^https:\/\/github\.com\/.+\/releases\/download\/.+\/$/);
+        expect(Array.isArray(e.books) && e.books.length, `edition ${id}: a drive edition is one book`).toBe(1);
+      }
     }
   });
 

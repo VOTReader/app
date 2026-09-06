@@ -193,9 +193,22 @@ describe('audio-track — display registries the listening UI renders from', () 
     expect(BIBLE_AUDIO_EDITIONS['brm-kjv'].short).toBe('KJV · BRM');
     expect(BIBLE_AUDIO_EDITIONS['wop-nkjv'].short).toBe('NKJV · Dramatized');
     expect(BIBLE_AUDIO_EDITIONS['web-ebible'].short).toBe('WEB');
-    for (const ed of Object.values(BIBLE_AUDIO_EDITIONS)) {
-      expect(ed.short.length).toBeLessThanOrEqual(ed.label.length);
-      expect(ed.short.toUpperCase().indexOf(ed.translation.toUpperCase())).toBe(0);
+    expect(BIBLE_AUDIO_EDITIONS['tsot-matthew'].short).toBe('Matthew · TSOT');
+    for (const [id, ed] of Object.entries(BIBLE_AUDIO_EDITIONS)) {
+      expect(ed.short.length, id).toBeLessThanOrEqual(ed.label.length);
+      if (ed.books === 'all') {
+        // A WHOLE-BIBLE edition's chip leads with its TRANSLATION, because on
+        // the same 66 books that is the only thing telling the editions apart.
+        expect(ed.short.toUpperCase().indexOf(ed.translation.toUpperCase()), id).toBe(0);
+      } else {
+        // A PARTIAL edition's chip leads with the BOOK, because that is what
+        // distinguishes it — and its `translation` is an extractor code
+        // (vot-matthew) that means nothing to a listener and must never reach
+        // a chip. Not a weaker rule: it is the same rule, on the field that
+        // actually identifies this family.
+        expect(Array.isArray(ed.books) && ed.books.length, id).toBe(1);
+        expect(ed.short.toUpperCase().indexOf(ed.books[0].toUpperCase()), id).toBe(0);
+      }
     }
   });
 

@@ -119,6 +119,22 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     assetPrefix: 'web',
     books: 'all',
   }),
+  'tsot-matthew': Object.freeze({
+    label: 'Matthew · The Sword of Truth (read by Benjamin)',
+    short: 'Matthew · TSOT',
+    translation: 'vot-matthew',
+    volKey: 'bible-tsot-matthew',
+    // No assetPrefix: this edition's assets are the archive's Drive ids, not a
+    // <prefix><testament>_<book>_<NNN> naming rule, so the manifest rows come
+    // from the Drive listing and the tag is DECLARED here instead of being
+    // encoded in the asset name (Architect section 11). An opaque id plus a
+    // declared tag is more honest than an id that secretly routes itself, and
+    // it avoids a permanent duplicate: every release tag is append-only, so a
+    // re-upload under bible naming could never have its first copy removed.
+    driveFolder: '18. TSOT New Testament',
+    releaseTag: AUDIO_RELEASE_PREFIX,
+    books: ['matthew'],
+  }),
 });
 
 /** Reader code → the human name every surface prints. ONE registry: the

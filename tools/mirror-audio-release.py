@@ -129,11 +129,24 @@ def release_id():
 
 def upload_asset(rid, path, name):
     """Upload with an EXPLICIT audio/mpeg content type. `gh release upload`
-    sends application/octet-stream, and the release CDN both echoes that type
-    AND serves X-Content-Type-Options: nosniff — a combination Chromium's
-    media elements refuse. The uploads API takes the asset's stored type from
-    this request's Content-Type header; the signed download URL then carries
-    rsct=audio/mpeg and <audio> plays it."""
+    sends application/octet-stream; the uploads API takes the asset's stored
+    type from this request's Content-Type header instead.
+
+    KEEP THIS, but the original premise is no longer true on the wire and a
+    reader should not inherit it. It said the CDN echoes octet-stream AND
+    serves X-Content-Type-Options: nosniff, a combination Chromium's media
+    elements refuse. Measured 2026-09-05 (Machine Ops): nosniff appears ONLY
+    on the github.com 302, never on the 206 asset response, which comes from
+    Azure via Fastly with no nosniff at all — so Chromium content-sniffs the
+    ID3 header and plays it. The app assigns el.src straight to the release
+    URL (audio-player.js), nothing wraps it in a blob, and all 807 previously
+    mirrored assets behave identically. This is a header read, not an
+    end-to-end playback proof; what it settles is that the specific mechanism
+    named above is measurably absent.
+
+    So the header is belt-and-braces today rather than load-bearing. It stays
+    because the day GitHub adds nosniff to the blob response it becomes
+    load-bearing again and nobody will be watching."""
     return subprocess.run(
         [GH, "api", "--method", "POST",
          "-H", "Content-Type: audio/mpeg",
@@ -156,7 +169,12 @@ def main():
         shard = (int(i), int(n_))
 
     ids = manifest_ids()
-    print(f"manifest ids: {len(ids)}")
+    # The TREE, not just the count. This reads the manifest in the checkout it
+    # runs in, which is correct — but run from the wrong worktree it finds a
+    # manifest without the new ids, uploads nothing, and prints DONE ok=0 fail=0.
+    # A silent no-op with a success line is the failure mode worth naming
+    # (2026-09-05: run from main for six ids that only existed on a branch).
+    print(f"manifest ids: {len(ids)}  from {MANIFEST}")
 
     have = existing_assets()
     if have is None:
@@ -184,6 +202,10 @@ def main():
     if limit:
         todo = todo[:limit]
     print(f"to mirror: {len(todo)}{' (dry run)' if dry else ''}")
+    if not todo:
+        print("NOTHING TO MIRROR — every id in this tree's manifest is already on the release.")
+        print("  If you expected uploads, check you are in the worktree whose manifest")
+        print("  carries the new ids; this tool reads the tree it runs in.")
     if dry:
         for i in todo[:10]:
             print("  would mirror", i)
