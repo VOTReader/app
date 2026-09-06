@@ -1,0 +1,137 @@
+// @ts-nocheck — free-var globals via settings-harness (SettingsScreen takes no ES imports)
+/* The scheduled reload must not outlive the screen that scheduled it.
+   ═══════════════════════════════════════════════════════════════════════
+   SettingsScreen schedules `window.location.reload()` on a bare setTimeout in
+   TWO places — the import apply (:1342, 600 ms clean / 5000 ms with problems)
+   and clear-all-personal-data (:1750, 600 ms) — and nothing cancels either.
+
+   Two consequences, one visible and one not:
+
+     · the reader has up to five seconds to navigate away and is then reloaded
+       out of wherever they went;
+     · in tests it fires after jsdom has torn down `window`, and vitest reports
+       `Errors 1` on a fully green suite — which is how landing 57's CI found it.
+
+   WHY THE FIX IS "FIRE ON UNMOUNT" AND NOT "CANCEL" (Architect, section 12
+   follow-up). Both timers fire after storage has been REPLACED (an import
+   applied) or WIPED (clear all). The reload exists to reboot into the new data;
+   _runBackupOperation deliberately holds the busy lock through the window
+   because "re-enabling controls in that 0.6-5s window permits a second
+   picker/stream to start against data that is about to be torn down".
+
+   So cancelling would fix the test signal and open a correctness hole: a reader
+   who navigates at second two browses a UI backed by stale in-memory state over
+   replaced storage, with no reload ever. A loss turned into a silent wrong
+   answer. Firing on unmount keeps the invariant and removes the surprise — the
+   reload happens AS you navigate, not five seconds after you arrive somewhere
+   else.
+
+   UNMOUNT MEANS THE READER NAVIGATED, and that is what makes this safe:
+   app.jsx:764 renders `<ErrorBoundary key={screen}>`, so the route subtree
+   unmounts exactly when `screen` changes, and 'settings' is a single route
+   entry with no peek clone and no keyed remount. An ErrorBoundary catch inside
+   Settings also unmounts the subtree, so a crash with a reload pending will
+   reload — DELIBERATE, and the behaviour we want after a crash on a screen that
+   just replaced storage.
+
+   THE ASSERTION THAT WAS ALMOST WRITTEN THE OTHER WAY. The brief said "unmount
+   before the timer fires, assert no reload". That would have pinned the
+   stale-state behaviour as correct — a RED enshrining the bug it was written to
+   prevent. The assertion here is "exactly once, immediately".
+*/
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen } from '@testing-library/react';
+import {
+  setupSettingsGlobals, teardownSettingsGlobals, renderSettings,
+} from './settings-harness.jsx';
+
+const btn = (text) => [...document.querySelectorAll('button')]
+  .find((b) => (b.textContent || '').trim() === text);
+
+/** Open the type-DELETE dialog and confirm it — the cheapest path that
+ *  schedules a reload (clearAllPersonalData, SettingsScreen.jsx:1750). */
+async function wipeEverything() {
+  await act(async () => { btn('Clear All My Data').click(); });
+  const input = screen.getByLabelText('Type DELETE to confirm');
+  await act(async () => { fireEvent.change(input, { target: { value: 'DELETE' } }); });
+  await act(async () => { btn('Delete Everything').click(); });
+  // let the async operation settle so the reload is actually scheduled
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+}
+
+describe('a scheduled reload does not outlive the screen that scheduled it', () => {
+  let reload;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setupSettingsGlobals();
+    // clearAllPersonalData awaits real IndexedDB deletions and THROWS if any
+    // fails; jsdom has no indexedDB, so without this the reload is never
+    // scheduled and every case below is vacuous. The CONTROL is what caught
+    // that — it failed on the first run alongside the two REDs, which is the
+    // difference between "the fix is missing" and "the harness cannot reach
+    // the code".
+    globalThis.indexedDB = {
+      deleteDatabase: (name) => {
+        const req = { onsuccess: null, onerror: null, onblocked: null, name };
+        queueMicrotask(() => { if (req.onsuccess) req.onsuccess(); });
+        return req;
+      },
+      databases: () => Promise.resolve([]),
+    };
+    reload = vi.fn();
+    // jsdom's location is not configurable in the usual way; replace the whole
+    // object so the component's `window.location.reload()` reaches the spy.
+    delete window.location;
+    window.location = { reload, href: 'http://localhost/', origin: 'http://localhost' };
+  });
+
+  afterEach(() => {
+    cleanup();
+    teardownSettingsGlobals();
+    vi.useRealTimers();
+  });
+
+  it('CONTROL: left alone, the reload still happens — the fix must not delete it', async () => {
+    // This passes before and after and says so. Without it, "no reload after
+    // unmount" is satisfied by a screen that never reloads at all, which is
+    // precisely the stale-state hole the Architect ruled against.
+    const { unmount } = renderSettings();
+    await wipeEverything();
+    expect(reload).not.toHaveBeenCalled();          // still inside the 600 ms window
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(reload).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('unmounting with a reload pending reloads IMMEDIATELY, not later', async () => {
+    const { unmount } = renderSettings();
+    await wipeEverything();
+    expect(reload).not.toHaveBeenCalled();
+    unmount();
+    expect(reload).toHaveBeenCalledTimes(1);        // fired BY the unmount
+  });
+
+  it('and exactly once — the pending timer does not fire after teardown', async () => {
+    // GREEN BEFORE THE FIX TOO, and for a different reason: today the unmount
+    // does nothing and the timer fires afterwards, which is also one call. It
+    // guards the SHAPE OF THE FIX — firing on unmount while leaving the timer
+    // armed would read 2 — so it can only go red once the fix exists. Kept
+    // because that double-fire is the obvious way to get this wrong.
+    const { unmount } = renderSettings();
+    await wipeEverything();
+    unmount();
+    await act(async () => { vi.advanceTimersByTime(10000); });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('a screen that scheduled nothing does not reload when it unmounts', async () => {
+    // The other half of "fire on the REF": the unmount effect must fire on the
+    // semantic flag that says storage was replaced, never on "this screen is
+    // going away". Merely visiting Settings and leaving must reload nothing.
+    const { unmount } = renderSettings();
+    unmount();
+    await act(async () => { vi.advanceTimersByTime(10000); });
+    expect(reload).not.toHaveBeenCalled();
+  });
+});
