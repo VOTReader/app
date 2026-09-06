@@ -92,6 +92,49 @@ float arcRadiusY(float rx, float ceil, float squash, float localize){
 }`;
 
 /**
+ * The DRAWN CURVE of an arc, as two radii.
+ *
+ * One family covers both regimes, so there is no branch anywhere that has to
+ * agree with another branch. The curve is:
+ *
+ *   d = distance in x from the nearer foot
+ *   u = 1 - clamp(d / R, 0, 1)          (1 at a foot, 0 once R px in)
+ *   height = A * sqrt(1 - u*u)
+ *
+ * With R = rx and A = the old arcRadiusY that is EXACTLY today's half-ellipse
+ * of radii (rx, ry): at the left foot d = x - x0 so u = (cx - x)/rx, and
+ * u*u is the ellipse's (x - cx)^2 / rx^2 term. Nothing about the overview
+ * picture moves. With R < rx the middle of the arc runs LEVEL at height A
+ * between the two quarter-ellipses, which is what lets a long arc leave the
+ * frame near its foot instead of creeping across it.
+ *
+ * @param {number} rx - half the arc's on-screen span, device px
+ * @param {number} ceil - usable height above the baseline, device px
+ * @param {number} squash - squashFactor()
+ * @param {number} localize - localizeFactor()
+ * @returns {{R:number, A:number}} horizontal quarter radius and apex height
+ */
+export function arcShape(rx, ceil, squash, localize) {
+  const r = rx > 0 ? rx : 0;
+  return { R: r, A: arcRadiusY(r, ceil, squash, localize) };
+}
+
+/**
+ * Height of the drawn curve above the baseline, `d` px in from the nearer
+ * foot. THE one definition of the curve's shape: arcDistance hit-tests it and
+ * the vertex shader draws it.
+ *
+ * @param {number} d - distance in x from the nearer foot, device px
+ * @param {number} R - quarter radius from arcShape()
+ * @param {number} A - apex height from arcShape()
+ */
+export function arcHeight(d, R, A) {
+  if (!(R > 0) || !(A > 0)) return 0;
+  const s = d <= 0 ? 0 : (d >= R ? 1 : d / R);
+  const u = 1 - s;
+  return A * Math.sqrt(1 - u * u);
+}
+/**
  * How far outside the viewport a foot may sit and still count as anchoring
  * its arc to the passage on screen. Device px, matching uRes.x's frame.
  */
@@ -158,32 +201,43 @@ float flyOverDim(float anchored, float localize){
  * Distance in device px from a point to an arc, or Infinity if the point is
  * outside the arc's bounding box.
  *
- * The arc is the upper half of an axis-aligned ellipse centred at (cx, base)
- * with radii (rx, ry). Rather than solving for the closest point (a quartic),
- * this takes the first-order distance to the implicit function
- * F = (u/rx)² + (v/ry)² − 1, i.e. |F| / |∇F|. That approximation is exact ON
- * the curve and accurate within a few px of it — which is the only place a
- * hit test ever asks.
+ * The curve is arcHeight()'s, written implicitly as
+ * F = (v/A)^2 + u^2 - 1 with v the height above the baseline and u as in
+ * arcHeight. Rather than solving for the closest point (a quartic), this takes
+ * the first-order distance |F| / |grad F|, which is exact ON the curve and
+ * accurate within a few px of it - the only place a hit test ever asks.
  *
- * @param {number} px @param {number} py — query point, device px, y down
- * @param {number} x0 @param {number} x1 — arc endpoints on the baseline
- * @param {number} base — baseline y, device px
- * @param {number} ry — vertical radius from arcRadiusY()
- * @param {number} tol — hit tolerance, device px
+ * With R = rx and A = ry this is algebraically the previous ellipse form, term
+ * for term; the level middle (u = 0) reduces to |v - A|, which is what a
+ * horizontal run should give.
+ *
+ * @param {number} px @param {number} py - query point, device px, y down
+ * @param {number} x0 @param {number} x1 - arc endpoints on the baseline
+ * @param {number} base - baseline y, device px
+ * @param {number} R - quarter radius from arcShape()
+ * @param {number} A - apex height from arcShape()
+ * @param {number} tol - hit tolerance, device px
  */
-export function arcDistance(px, py, x0, x1, base, ry, tol) {
+export function arcDistance(px, py, x0, x1, base, R, A, tol) {
   const rx = (x1 - x0) * 0.5;
   if (rx <= 0.25) return Infinity;
   const cx = x0 + rx;
   if (px < cx - rx - tol || px > cx + rx + tol) return Infinity;
-  const dy = base - py;
-  if (dy < -tol || dy > ry + tol) return Infinity;
-  const u = (px - cx) / rx, v = dy / ry;
-  const f = u * u + v * v - 1;
-  const gx = 2 * (px - cx) / (rx * rx), gy = 2 * dy / (ry * ry);
-  const g = Math.hypot(gx, gy);
-  if (g < 1e-9) return Infinity;
-  return Math.abs(f) / g;
+  const v = base - py;
+  if (v < -tol || v > A + tol) return Infinity;
+  if (!(R > 0) || !(A > 0)) return Infinity;
+  // Distance in x from the nearer foot, and how far that is through the
+  // quarter. Outside the quarters the curve is level, so du/dx is 0 there and
+  // the gradient is purely vertical - the correct answer for a flat run.
+  const d = Math.min(px - (cx - rx), (cx + rx) - px);
+  const inQuarter = d > 0 && d < R;
+  const u = d <= 0 ? 1 : (d >= R ? 0 : 1 - d / R);
+  const f = (v / A) * (v / A) + u * u - 1;
+  const gx = inQuarter ? (2 * u / R) * (px <= cx ? -1 : 1) : 0;
+  const gy = 2 * v / (A * A);
+  const gm = Math.hypot(gx, gy);
+  if (gm < 1e-9) return Infinity;
+  return Math.abs(f) / gm;
 }
 
 /**
