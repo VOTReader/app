@@ -9,6 +9,9 @@
    never turn the app into a generic remote loader. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import {
   AUDIO_RELEASE_PREFIX,
   AUDIO_BIBLE_RELEASE_PREFIX,
@@ -29,7 +32,23 @@ import {
   isVotAudioUrl,
   normalizeAudioTrack,
   resolveBibleAudio,
+  bibleReleaseTagFor,
 } from './audio-track.js';
+
+/* The shipped manifest, run rather than restated (classic var + IIFE), and
+   held in a LOCAL. It used to be published on globalThis, where the
+   resolveBibleAudio block's afterEach deletes it — so the invariant below
+   passed when run alone and failed in file order, which is the worst way for
+   a gate to be wrong. A gate owns its data; it does not inherit it from
+   another block's setup. */
+const SHIPPED_MANIFEST = (() => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const SRC = readFileSync(join(HERE, '..', 'data', 'bible-audio-manifest.js'), 'utf8');
+  const box = {};
+  // eslint-disable-next-line no-new-func
+  new Function('g', SRC + ';g.out = BIBLE_AUDIO_MANIFEST;')(box);
+  return box.out;
+})();
 
 describe('audio-track — release URL policy', () => {
   it('builds letter and Bible asset URLs on their own release tags', () => {
@@ -89,7 +108,7 @@ describe('audio-track — Bible edition registry', () => {
 });
 
 describe('audio-track — Word of Promise release routing', () => {
-  it('routes wop1_/wop2_ assets to their testament tags, everything else to audio-bible-v1', () => {
+  it('routes wop1_/wop2_ assets to their testament tags, and a whole-book id to its own', () => {
     expect(bibleAudioAssetUrl('wop1_jeremiah_013')).toBe(AUDIO_WOP_OT_PREFIX + 'wop1_jeremiah_013.mp3');
     expect(bibleAudioAssetUrl('wop2_matthew_001')).toBe(AUDIO_WOP_NT_PREFIX + 'wop2_matthew_001.mp3');
     expect(bibleAudioAssetUrl('brm-kjv_genesis')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
@@ -118,11 +137,16 @@ describe('audio-track — BRM per-chapter routing beside the permanent legacy ta
     expect(bibleAudioAssetUrl('brm2_revelation_022')).toBe(AUDIO_BRM_NT_PREFIX + 'brm2_revelation_022.mp3');
   });
 
-  it('legacy whole-book brm-kjv_* ids still resolve to audio-bible-v1', () => {
-    // 'brm-kjv_' shares three characters with 'brm1_' and must NOT be captured
-    // by the new routing — a saved track's URL has to stay byte-identical.
+  it('legacy whole-book <editionId>_<book> ids route to audio-bible-v1 by NAME', () => {
+    // 'brm-kjv_' shares three characters with 'brm1_' and is still not captured
+    // by the stamp routing. What changed is that it is now matched POSITIVELY
+    // against the registry rather than being the fall-through: 'brm-kjv' is an
+    // edition id, so '<it>_<book>' is a known shape and keeps its original host,
+    // byte-identical. A name belonging to no edition at all now returns '' —
+    // the case below.
     expect(bibleAudioAssetUrl('brm-kjv_genesis')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3');
     expect(bibleAudioAssetUrl('brm-kjv_revelation')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_revelation.mp3');
+    expect(bibleAudioAssetUrl('wop-nkjv_john')).toBe(AUDIO_BIBLE_RELEASE_PREFIX + 'wop-nkjv_john.mp3');
   });
 
   it('both brm tags join the trust boundary, and the legacy tag keeps its place', () => {
@@ -434,5 +458,106 @@ describe('resolveBibleAudio — what is offered and what is painted', () => {
     } finally {
       globalThis.BIBLE_AUDIO_MANIFEST = saved;
     }
+  });
+});
+
+/* releaseTag — an edition says where its bytes live, instead of the asset name
+   secretly encoding it (Architect §11).
+   ─────────────────────────────────────────────────────────────────────
+   Matthew's manifest ids are Drive ids, not the <prefix><testament>_<book>_<NNN>
+   scheme, so there is no stamp to route on. The edition declares its release
+   tag and the files stay where they are — no re-upload, no permanent duplicate
+   on an append-only tag.
+
+   AND THE FALLBACK GOES, which is the half that fixes a defect rather than
+   adding a feature. Routing an unrecognised name to audio-bible-v1 turned "I
+   do not know this edition" into a confident URL, so an undeclared Matthew
+   would have 404'd on all 28 chapters instead of failing once, visibly, where
+   it was built.
+
+   THE FALLBACK WAS NOT PROTECTING SAVED TRACKS, which is what its comment
+   implied and what made deleting it look risky. Measured: a saved library row
+   is identified by its `url` (audio-library-store's `_identity`), and
+   bibleAudioAssetUrl's only live callers build from MANIFEST ids
+   (audio-player `_assetUrlFor`). Nothing ever asks it to reproduce a legacy
+   URL — the row already holds one. The boundary still ACCEPTS those URLs, and
+   the control below is what says so.
+*/
+describe('audio-track — a declared release tag', () => {
+  const DRIVE_ID = '1AbC_dEfGh23IjKlMnOpQrStUvWxYz45';   // Matthew's id shape
+
+  it('builds a declared edition\u2019s URL on its own tag', () => {
+    expect(bibleAudioAssetUrl(DRIVE_ID, AUDIO_RELEASE_PREFIX))
+      .toBe(AUDIO_RELEASE_PREFIX + DRIVE_ID + '.mp3');
+  });
+
+  it('the URL a declared tag builds passes the trust boundary', () => {
+    // The point of declaring an EXISTING tag rather than a new host: the
+    // boundary does not move.
+    expect(isVotAudioUrl(bibleAudioAssetUrl(DRIVE_ID, AUDIO_RELEASE_PREFIX))).toBe(true);
+  });
+
+  it('returns nothing for a name belonging to no edition at all', () => {
+    // The deleted catch-all. '' is the same answer an invalid id gets, and it
+    // fails where it is built instead of 404ing 28 times where it is played.
+    // An undeclared Matthew is exactly this case.
+    expect(bibleAudioAssetUrl(DRIVE_ID)).toBe('');
+    expect(bibleAudioAssetUrl('notanedition_genesis')).toBe('');
+    expect(bibleAudioAssetUrl('brm_genesis')).toBe('');   // 'brm' is not an edition id
+  });
+
+  it('refuses a tag that is not a release prefix, rather than trusting it', () => {
+    // A declared tag is data. An undeclared host must not be able to
+    // impersonate one, or the trust boundary is decided by whoever edits the
+    // registry rather than by RELEASE_PREFIXES.
+    expect(bibleAudioAssetUrl(DRIVE_ID, 'https://example.test/')).toBe('');
+    expect(bibleAudioAssetUrl(DRIVE_ID, '')).toBe('');
+  });
+
+  it('a declared tag beats the name stamp when both are present', () => {
+    expect(bibleAudioAssetUrl('brm2_john_001', AUDIO_RELEASE_PREFIX))
+      .toBe(AUDIO_RELEASE_PREFIX + 'brm2_john_001.mp3');
+  });
+
+  it('CONTROL \u2014 stamped names still route to their own tags', () => {
+    expect(bibleAudioAssetUrl('brm2_john_001')).toBe(AUDIO_BRM_NT_PREFIX + 'brm2_john_001.mp3');
+    expect(bibleAudioAssetUrl('web1_genesis_001')).toBe(AUDIO_WEB_OT_PREFIX + 'web1_genesis_001.mp3');
+  });
+
+  it('CONTROL \u2014 a saved legacy URL is still accepted, it is only no longer BUILT', () => {
+    // The distinction the fallback's comment blurred. Deleting the builder's
+    // guess does not strand anybody's saved recording.
+    expect(isVotAudioUrl(AUDIO_BIBLE_RELEASE_PREFIX + 'brm-kjv_genesis.mp3')).toBe(true);
+  });
+
+  it('no edition declares a tag outside the trust boundary', () => {
+    // Derived from the registry rather than listed, so a new edition cannot
+    // introduce a host by declaring one.
+    for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
+      const tag = bibleReleaseTagFor(BIBLE_AUDIO_EDITIONS[id].volKey);
+      if (!tag) continue;
+      expect(isVotAudioUrl(tag + 'aaaa.mp3'), id + ' declares ' + tag).toBe(true);
+    }
+  });
+
+  it('every edition\u2019s every chapter builds a URL inside the boundary', () => {
+    // The Verifier's offline invariant (Architect §11): for every edition,
+    // every declared book, every chapter, the URL built from the manifest id
+    // and the edition's route passes isVotAudioUrl. This is the half that
+    // catches a declaration drifting from where the bytes actually are.
+    const m = SHIPPED_MANIFEST;
+    expect(m, 'manifest not loaded \u2014 this gate would be vacuous').toBeTruthy();
+    let checked = 0;
+    for (const key of Object.keys(m)) {
+      const volKey = key.slice(0, key.lastIndexOf(':'));
+      const tag = bibleReleaseTagFor(volKey);
+      for (const part of m[key]) {
+        const url = bibleAudioAssetUrl(part[0], tag);
+        expect(url, key + ' \u2192 ' + part[0]).not.toBe('');
+        expect(isVotAudioUrl(url), key + ' \u2192 ' + url).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked, 'no chapters examined').toBeGreaterThan(1000);
   });
 });
