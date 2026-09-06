@@ -338,6 +338,16 @@ describe('search-2 — a bare book name gets its card AND the text hits', () => 
     expect(r.results.length).toBe(5);
   });
 
+  it('the cap never OVERRIDES a caller asking for fewer', async () => {
+    /* `Math.min(limit, NAV_TEXT_LIMIT)`, not `limit = NAV_TEXT_LIMIT`. A bite that
+       replaced the min with a bare assignment reddened nothing, because every other
+       case here uses the default limit — so the cap was free to be a floor as well
+       as a ceiling. */
+    const r = await E.search('numbers', { limit: 2 });
+    expect(r.parsed.kind).toBe('ref-book');
+    expect(r.results.length).toBe(2);
+  });
+
   it('CONTROL: an EXPLICIT reference still returns zero text results', async () => {
     /* The arm that fails if the short-circuit is simply deleted — which would pass
        every case above perfectly. "num 1" is an address, not a word. */
