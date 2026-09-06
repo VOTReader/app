@@ -3,6 +3,9 @@
    PERF-3: the single-entry { n -> text } index must give the SAME results as the old
    linear scan AND rebuild on a chapter/translation change (no stale cross-chapter leak). */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { translateVerse, releaseTranslationsExcept, _translationLoaded, _translationPromises } from './translations.js';
 
 beforeEach(() => {
@@ -283,5 +286,42 @@ describe('releaseTranslationsExcept (boot-performance-4)', () => {
     releaseTranslationsExcept('web');
     expect(loaded()).toEqual(['web']);
     expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'web')).toBe('web 16');
+  });
+});
+
+/* THE CALLER, WHICH NOTHING ABOVE CAN REACH.
+   ----------------------------------------------------------------------
+   The sweep's BEHAVIOUR is pinned behaviourally above and those cases have
+   teeth. What no case here can reach is app.jsx's effect - the code that
+   decides to CALL it - and mounting App in jsdom to find out is not on offer.
+   A bite on that effect (arm I of bite_boot4.py) reddened NOTHING before this
+   block existed, which is the honest reason it is here.
+
+   So this is a text gate and it witnesses exactly one thing: the effect routes
+   through the helper on BOTH arms, including the nkjv arm it used to return
+   early on. It says nothing about whether the effect runs, or when. */
+describe('the translation effect reaches the sweep (boot-performance-4, source gate)', () => {
+  const SRC = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../app.jsx'), 'utf8');
+  /* A comment satisfies a text matcher in both directions, so strip first - and
+     the stripper gets its own control below, on this very file's hazard. */
+  const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('PRECONDITION: the stripper is alive and did not eat the program', () => {
+    expect(SRC).toContain('it used to be the one that freed nothing');       // lives in a comment
+    expect(stripped).not.toContain('it used to be the one that freed nothing');
+    expect(stripped).toContain('loadTranslation(code)');                 // still the program
+  });
+
+  it('the nkjv arm SWEEPS instead of returning early', () => {
+    expect(stripped).toContain("releaseTranslationsExcept('nkjv')");
+  });
+
+  it('the loaded arm sweeps AFTER the load resolves, never before', () => {
+    /* Order matters to the reader, not just to correctness: sweeping first
+       would leave them on NKJV for the length of the next download. */
+    const i = stripped.indexOf('loadTranslation(code).then(');
+    const j = stripped.indexOf('releaseTranslationsExcept(code)', i);
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(i);
   });
 });
