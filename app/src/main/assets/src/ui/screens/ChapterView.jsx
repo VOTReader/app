@@ -317,8 +317,11 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           to stop looking like. BRM already ships all 28 Matthew chapters.
 
           Whether the timings belong to the recording playing is resolved
-          inside ReadAlongHighlight, from the track's own asset name — this
-          screen only says which book and which chapter are on the page. */}
+          inside ReadAlongHighlight, from the track's own KEY, proved against the
+          manifest row that key names — NOT from the asset name, which is what
+          section 12 removed because it cannot see an edition whose assets are
+          Drive ids. This screen only says which book and which chapter are on
+          the page. */}
       {!inert && bibleAudio && (
         <ReadAlongHighlight
           volKey={bibleAudio.volKey}
