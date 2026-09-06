@@ -27,9 +27,9 @@ import timber.log.Timber
  * Activity-side cleanup paths (ViewModel.onCleared, onDestroy fallback) need to
  * safely race against the recorder state from main / UI threads.
  *
- * [readRecording] and [deleteRecording] are the two deliberate exceptions: they
- * touch only files already finished and handed off, never [recorder] or
- * [recordFile], so there is nothing for the lock to protect -- and taking it would
+ * [readRecording], [deleteRecording] and [listRecordings] are the three deliberate
+ * exceptions: they touch only files already finished and handed off, never [recorder]
+ * or [recordFile], so there is nothing for the lock to protect -- and taking it would
  * park a multi-megabyte base64 read in front of a [cancel] arriving from an
  * Activity teardown.
  *
@@ -44,16 +44,19 @@ class NativeAudioRecorder(private val context: Context) {
 
     /**
      * Names [stop] handed to JS, mapped to the [SystemClock.elapsedRealtime] at which
-     * it handed them over. The sweep must not touch a live claim: a served file
-     * becomes sweep-eligible 60 s after stop(), a fetch that keeps failing is retried
-     * for longer than that, and the user's natural response to a stuck memo is to
-     * record again -- a start(), which swept the one file journal-3 2a exists to
-     * rescue.
+     * it handed them over. The sweep must not touch a live claim: a served file becomes
+     * sweep-eligible [RECORDING_TTL_MS] after stop(), a fetch that keeps failing is
+     * retried for longer than that, and the user's natural response to a stuck memo is
+     * to record again -- a start(), which swept the one file journal-3 2a exists to
+     * rescue. (That window was 60 s until 2026-09-06, which is what made this map
+     * load-bearing rather than merely tidy.)
      *
      * BOUNDED AT [CLAIM_TTL_MS]. Only [deleteRecording] ends a claim deliberately, and
-     * NOTHING CALLS IT YET (see there), so without a ceiling a long-lived process
-     * would pin every memo it ever served -- twenty five-minute memos is ~72 MB of
-     * cacheDir held against a fetch that stopped being plausible many hours earlier.
+     * its caller runs only on the COMMIT path, so a memo the reader never commits --
+     * a session killed between the read and the put -- leaves a claim nobody releases.
+     * Without a ceiling a long-lived process would pin every such memo it ever served;
+     * twenty five-minute memos is ~72 MB of cacheDir held against a fetch that stopped
+     * being plausible many hours earlier.
      * A day is far outside anything a fetch or a recovery read could still want (the
      * happy path fetches within a second of stop()) and far inside "forever". The
      * sweep evicts expired entries as it passes, so the map is bounded too, not just
@@ -295,8 +298,9 @@ class NativeAudioRecorder(private val context: Context) {
         if (moved) {
             // JS now owns this name until it calls deleteRecording; the sweep skips it
             // until then, however old the FILE gets waiting for a fetch that keeps
-            // failing -- but not past CLAIM_TTL_MS, since nothing calls deleteRecording
-            // yet and an unreleasable claim would pin the file for the whole process.
+            // failing -- but not past CLAIM_TTL_MS, because the release runs only on
+            // the COMMIT path and a memo the reader never commits leaves a claim
+            // nobody ends, which would pin the file for the whole process.
             servedNames[served.name] = SystemClock.elapsedRealtime()
             recordFile = null
             return Result.Success(RecordingResult(base64 = null, durationMs = safeDur, fileName = served.name))
@@ -324,9 +328,11 @@ class NativeAudioRecorder(private val context: Context) {
      * suggests. Worth paying only because the alternative on this path is losing the
      * recording outright.
      *
-     * ONE null covers missing, unreadable, over-ceiling and refused alike -- JS needs
-     * no way to tell them apart and it leaks least -- but the interesting cases log
-     * DIFFERENT Timber lines, so a rejected name is greppable in logcat.
+     * ONE null covers missing, unreadable, over-ceiling, EMPTY and refused alike -- JS
+     * needs no way to tell them apart from the reader and it leaks least -- but the
+     * interesting cases log DIFFERENT Timber lines, so a rejected name is greppable in
+     * logcat. The empty case is the one JS can still distinguish, because
+     * [listRecordings] reports it as a row with `"size": 0` rather than by omitting it.
      */
     fun readRecording(name: String): String? {
         val f = resolveServedRecording(name) ?: return null
@@ -346,12 +352,23 @@ class NativeAudioRecorder(private val context: Context) {
      * [servedNames] keeps the file out of [sweepStaleRecordings] -- which exists for
      * the memos of a session that died, the only ones nobody is coming back for.
      *
-     * NOTHING CALLS THIS YET, and both halves of that are true at once: the bridge
-     * entry EXISTS on the JS side (`PlatformBridge.nativeDeleteRecording`, pinned in
-     * platform-bridge.test.js METHODS, a no-op returning false on web), but no call
-     * SITE does. The caller arrives with journal-3 Phase 2b, the Web Builder's, after
-     * Phase 1 lands. Until then every claim ends by ageing out at [CLAIM_TTL_MS]
-     * rather than by handshake, which is exactly why that ceiling is not optional.
+     * THIS SAID "NOTHING CALLS THIS YET" UNTIL 2026-09-06 AND THAT WAS FALSE. The
+     * caller landed in `90857ce7` (journal-3 2a-web) and lives at
+     * `JournalRecordingSheet.jsx:269`, inside `JournalMediaStore.put(record).then(...)`
+     * -- after the put RESOLVES, never before, because `put()` resolving is the
+     * durability line (STORE-3 resolves it on the transaction commit, not the
+     * request's onsuccess). Releasing the file any earlier opens a window where native
+     * has let go and JS has not yet got it, and a crash inside that window loses the
+     * recording with the bytes deleted from under it. It is witnessed by one positive
+     * and three negative assertions in `JournalRecordingSheet.test.jsx` (:517 fires,
+     * :514 / :582 / :601 must not fire before the put resolves), which is what makes
+     * it a handshake rather than a call.
+     *
+     * The stale sentence outlived the thing it described by a whole phase, and it was
+     * propagated into a commit message and three peer reports before the Web Builder
+     * grepped main. **A VERB WITH NO CALLER AND A VERB WHOSE CALLER YOU HAVE NOT
+     * LOOKED FOR PRODUCE THE SAME READING.** A caller list belongs in a commit, not in
+     * a KDoc, because the KDoc cannot notice when it stops being true.
      *
      * The claim is dropped even when the unlink fails: JS is finished with the file
      * either way, and a claim nothing can release would pin the file for the life of
@@ -370,7 +387,98 @@ class NativeAudioRecorder(private val context: Context) {
     }
 
     /**
-     * The trust boundary for both JS-facing file verbs: resolve [name] to a file in
+     * Every served memo still on disk, as a JSON array string. NEVER null.
+     *
+     * journal-3 2b: the recovery half. [readRecording] answers "give me this memo",
+     * which needs a name JS already has; this answers "what is still here", which is
+     * the only question a session that was KILLED can ask -- its in-flight name died
+     * with the page. Without it a memo written by a process that never got to hand the
+     * name over is unreachable until the sweep takes it.
+     *
+     *     [{"name":"<uuid>.m4a","size":<bytes>,"mtime":<epoch millis>}, ...]
+     *
+     * `mtime` is [File.lastModified], WALL CLOCK, and describes the FILE. The claim
+     * ceiling ([CLAIM_TTL_MS]) runs on [SystemClock.elapsedRealtime] and is invisible
+     * here -- deliberately: JS reconciles against its own store, not against a clock.
+     *
+     * TWO RETURN VALUES THAT MUST NOT COLLAPSE INTO EACH OTHER:
+     *
+     *   "[]"                 looked, and the directory is empty -- nothing to recover
+     *   "error:list_failed"  could not look ([File.listFiles] null, or a throw)
+     *
+     * A null must never be able to impersonate a value. `listFiles()` returns null for
+     * an I/O error and for a path that is not a directory, and the tempting `?: []`
+     * would report "nothing to recover" about a directory nobody managed to read. The
+     * failure answers a String (so the never-null rule holds) that fails
+     * JSON.parse-is-an-array on the JS side and lands in "could not enumerate".
+     *
+     * EVERY LISTED NAME HAS PASSED [resolveServedRecording], so the lister can never
+     * offer a row the reader will refuse, and the JS reconciliation cannot retry
+     * forever against a name nothing returns. That holds for the SIZE CEILING too --
+     * a file over [MAX_RECORDING_BYTES] is omitted rather than listed, because it
+     * reads back null. The one deliberate exception is a zero-byte file: it is listed
+     * with `"size": 0` and the reader still refuses it, which is what lets JS say
+     * "that memo is empty" rather than "could not read it".
+     *
+     * Hand-rolled JSON, following [BoundedLogTree.toJson] -- the org.json classes are
+     * Android-stub in a pure-JVM unit test. NO ESCAPING IS NEEDED HERE and that is a
+     * property of the filter, not an oversight: every name has matched [SERVED_NAME],
+     * which admits only lowercase hex, `-` and `.m4a`. A field carrying free text
+     * would need the escaping [BoundedLogTree] does.
+     *
+     * No size ceiling, unlike [encodeFileToBase64]: a row is bounded at ~70 bytes by
+     * [SERVED_NAME]'s fixed shape, so the reply grows with the file COUNT, which the
+     * sweep already bounds -- where a single base64 read is bounded by nothing but the
+     * file it was handed.
+     *
+     * Takes no lock, for the same reason [readRecording] and [deleteRecording] do not:
+     * it touches only files already finished and handed off, never [recorder] or
+     * [recordFile].
+     */
+    fun listRecordings(): String {
+        val files = try {
+            recordingsDir().listFiles()
+        } catch (e: Exception) {
+            Timber.w(e, "listRecordings: recordings/ could not be enumerated")
+            null
+        }
+        if (files == null) {
+            Timber.w("listRecordings: could not enumerate recordings/")
+            return LIST_FAILED
+        }
+        val sb = StringBuilder(files.size * 80 + 2).append('[')
+        var n = 0
+        for (f in files) {
+            // isFile AFTER the resolve, not before: resolveServedRecording hands back
+            // the name-built File when the path has vanished (an ordinary swept memo,
+            // or the sweep racing this loop), and that File must not become a row.
+            val real = resolveServedRecording(f.name) ?: continue
+            if (!real.isFile) continue
+            // OVER THE CEILING IS "name absent", not a row. The contract's own line is
+            // `unreadable (refused name, I/O, over the size ceiling) -> name absent`,
+            // and the first draft of this loop listed such a file anyway -- so the
+            // lister would have offered a row the reader refuses, which is the one
+            // thing the filter exists to make impossible, and JS would have retried
+            // that name forever. Caught by the Web Builder asking what "listed but
+            // reads null" means for a row that is NOT size 0. The zero-byte row stays
+            // the single deliberate exception.
+            val len = real.length()
+            if (len > MAX_RECORDING_BYTES) {
+                Timber.w("listRecordings: omitting %s, %d bytes is over the %d ceiling",
+                    real.name, len, MAX_RECORDING_BYTES)
+                continue
+            }
+            if (n++ > 0) sb.append(',')
+            sb.append("{\"name\":\"").append(real.name).append('"')
+                .append(",\"size\":").append(len)
+                .append(",\"mtime\":").append(real.lastModified())
+                .append('}')
+        }
+        return sb.append(']').toString()
+    }
+
+    /**
+     * The trust boundary for all three JS-facing file verbs: resolve [name] to a file in
      * [recordingsDir], or refuse it. Two locks, and they are not redundant by accident.
      *
      * 1. [SERVED_NAME] -- the name must be the uuid shape [stop] itself writes. It
@@ -441,7 +549,7 @@ class NativeAudioRecorder(private val context: Context) {
     }
 
     /**
-     * Whole-file base64, or null on any refusal or read error.
+     * Whole-file base64, or null on any refusal, read error, or empty file.
      *
      * Shared by [readRecording] and [stop]'s fallback branch so the size ceiling lives
      * in ONE place. The stop() read has had no ceiling since it was written; routing
@@ -457,6 +565,30 @@ class NativeAudioRecorder(private val context: Context) {
                 "refusing to encode %s: %d bytes is over the %d ceiling",
                 f.name, len, MAX_RECORDING_BYTES
             )
+            null
+        } else if (len == 0L) {
+            // journal-3 2b. A file that exists and holds nothing encodes to "", which
+            // is falsy in JS and lands in the caller's `if (!recovered)` branch beside
+            // a refusal -- so the reader is told "Could not read the recording from the
+            // device" about a file that was read perfectly and had nothing in it.
+            // Those are different things to tell someone about their own voice memo.
+            //
+            // Same family as the atob(null) case already guarded in
+            // JournalRecordingSheet: "null" is valid base64, three bytes
+            // [158,233,101], which would commit as a memo that plays as silence. A
+            // value that decodes into something plausible is worse than a refusal, and
+            // "" decoding to a zero-size Blob is the quieter version of it.
+            //
+            // HERE rather than in readRecording, because stop()'s fallback branch
+            // shares this function and has the same defect: a zero-byte temp file
+            // would be delivered to __onNativeRecordingComplete as an empty base64
+            // string instead of a Failure. One guard covers both callers.
+            //
+            // The 0/empty distinction survives into the listing: nativeListRecordings
+            // reports the file with "size": 0 while the reader refuses it, which is
+            // what lets JS say "that memo is empty" instead of retrying a name
+            // forever against a reader that will never hand back bytes.
+            Timber.i("served recording %s exists but holds no bytes", f.name)
             null
         } else {
             Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)
@@ -534,15 +666,48 @@ class NativeAudioRecorder(private val context: Context) {
 
     companion object {
         const val RECORDINGS_DIR = "recordings"
-        // A served memo is fetched by JS within a second of stop(); anything older
-        // than this in recordings/ is an orphan from an interrupted session.
-        const val RECORDING_TTL_MS = 60_000L
+
+        /**
+         * How long an orphaned served memo stays on disk before the sweep may take it.
+         *
+         * WAS 60 SECONDS, AND THAT NUMBER QUIETLY DEFEATED THE RECOVERY IT WAS MEANT TO
+         * ALLOW. The sweep runs inside [start], so at 60 s the real window was not a
+         * duration at all -- it was "until the reader records again". And the reader
+         * most likely to be holding an orphan is the one whose session was killed, whose
+         * first move on relaunch is often to record the thing again: the sweep ate the
+         * memo at exactly the moment they were about to be offered it. A recovery
+         * feature that only works for someone who launches, notices, and does NOT touch
+         * record is a feature for nobody. (Web Builder, journal-3 2b.)
+         *
+         * SEVEN DAYS IS ONLY SAFE WITH A COLLECTOR, AND THE COLLECTOR ALREADY SHIPS.
+         * [deleteRecording]'s caller landed in `90857ce7` at
+         * `JournalRecordingSheet.jsx:269`, on the COMMIT path -- the bytes are in
+         * JournalMediaStore, so release the file. Without it a week-long TTL would mean
+         * every served `.m4a` sitting in cacheDir for a week after a fetch that
+         * succeeded in the first second (~3.6 MB per five-minute memo); with it, the
+         * normal case costs nothing and this ceiling is left for what it was always
+         * for -- the memos of a session that died.
+         *
+         * I ARGUED FOR THIS MOVE ON THE GROUNDS THAT THE COLLECTOR WAS ARRIVING IN THE
+         * SAME BATCH. It had already been shipping. The conclusion was right and the
+         * premise was stale, which is the more dangerous of the two ways to be wrong:
+         * grep main for the caller before reasoning about whether one exists.
+         *
+         * The two ceilings are ordered on purpose. [CLAIM_TTL_MS] (24 h) expires well
+         * inside this, so an abandoned claim can never pin a file past its own TTL.
+         */
+        const val RECORDING_TTL_MS = 7L * 24L * 60L * 60L * 1000L
 
         /** How long a name handed to JS keeps its file out of the sweep. A ceiling,
          *  not a deadline: everything a fetch or a recovery read could plausibly want
          *  happens in the first seconds, and this only decides when an abandoned claim
-         *  stops costing cacheDir. It matters today because nothing calls
-         *  deleteRecording yet, so without it no claim would ever end. */
+         *  stops costing cacheDir.
+         *
+         *  A BACKSTOP, NOT THE MECHANISM -- and it has not been the mechanism since
+         *  `90857ce7`. The JS side releases by handshake as soon as the bytes are in
+         *  JournalMediaStore, so this only catches claims that never get released: a
+         *  session that died between the read and the put. Deliberately shorter than
+         *  [RECORDING_TTL_MS] so a stale claim cannot outlive the file it protects. */
         const val CLAIM_TTL_MS = 24L * 60L * 60L * 1000L
 
         /** Native recording-length backstop, 30 s above JournalRecordingSheet's
@@ -567,6 +732,13 @@ class NativeAudioRecorder(private val context: Context) {
          */
         val MAX_RECORDING_BYTES: Long =
             MAX_DURATION_MS / 1000L * (AUDIO_BIT_RATE / 8) * 3 / 2
+
+        /** [listRecordings] could not look, as distinct from looking and finding
+         *  nothing ("[]"). A String rather than null so the never-null rule on this
+         *  verb holds, and one that fails JSON.parse-is-an-array on the JS side rather
+         *  than parsing into an empty list. Pinned by name in NativeAudioRecorderTest
+         *  against the literal, so renaming it here reddens rather than passing. */
+        const val LIST_FAILED = "error:list_failed"
 
         /** Exactly the name shape [stop] writes: UUID.randomUUID().toString() + ".m4a". */
         private val SERVED_NAME = Regex("^[0-9a-f-]{36}\\.m4a$")
