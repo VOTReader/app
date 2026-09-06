@@ -247,6 +247,16 @@ export function bibleAudioAssetUrl(id, tag) {
   // still plays, so it is matched by NAME against the registry rather than
   // being whatever happens when nothing else matched. Derived, so a new
   // edition cannot silently join or leave it.
+  //
+  // ITS LIMIT, WRITTEN DOWN because deriving it from the registry is the one
+  // guess left in an otherwise fact-based function: the loop widens with every
+  // future edition, to cover ids that can never exist. 'tsot-matthew_matthew'
+  // would route here, and audio-bible-v1 holds brm-kjv's 66 whole-book tracks
+  // and nothing else, ever. Nothing constructs such an id today, so this is a
+  // limit and not a defect. THIS ROUTE MEANS "legacy whole-book on
+  // audio-bible-v1"; an edition that ships whole-book assets in future declares
+  // a releaseTag the way Matthew does rather than inheriting this. (Architect,
+  // §11 amendment.)
   for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
     if (asset.lastIndexOf(id + '_', 0) === 0) return AUDIO_BIBLE_RELEASE_PREFIX + asset + '.mp3';
   }
