@@ -238,10 +238,20 @@ export function bibleAudioAssetUrl(id) {
 }
 
 /**
- * The EDITION ID that recorded this asset, read from its name stamp, or null
- * when the name claims no known edition — a legacy whole-book id, or a body
- * that ships audio under no edition of ours. Null means "do not paint", never
- * "guess".
+ * The edition id THE STAMP TABLE NAMES for this asset id, or null.
+ *
+ * NOT the answer to "which edition is the reader hearing" — that is
+ * resolveBibleAudio's `paint`, which reads the track's own key and proves it
+ * against the manifest. This is a fact about the NAME, and it exists so the
+ * one-table invariant stays checkable: every stamp bibleAudioAssetUrl routes
+ * on also names an edition, so the two readings of an asset name can never
+ * disagree.
+ *
+ * The old docstring said "the EDITION ID that recorded this asset", which is
+ * what invited it to be used as identity, and it cannot serve as identity: an
+ * edition whose assets are archive ids (TSOT Matthew's 28 Drive ids) carries
+ * no stamp, so this returns null for a recording that is playing perfectly
+ * well. A wrong comment is part of a defect, so it is part of the fix.
  *
  * @param {unknown} assetId  e.g. 'brm2_john_001'
  * @returns {string | null}  e.g. 'brm-kjv'
@@ -251,6 +261,28 @@ export function bibleEditionOfAsset(assetId) {
   if (!/^[A-Za-z0-9_-]+$/.test(asset)) return null;
   const stamp = _stampOf(asset);
   return stamp ? stamp.edition : null;
+}
+
+/**
+ * The edition id of the recording a track holds, or null.
+ *
+ * Legacy whole-book tracks resolve to null here and that is correct: their
+ * clock is book-relative, so per-chapter verse timings would be wrong against
+ * them.
+ *
+ * @param {any} track
+ * @param {any} manifest — BIBLE_AUDIO_MANIFEST, or null before the corpus loads
+ * @returns {string | null}
+ */
+function _paintEditionOf(track, manifest) {
+  const key = (track && typeof track.key === 'string') ? track.key : '';
+  const divider = key.indexOf(':');
+  if (divider < 1 || divider >= key.length - 1) return null;
+  const rows = manifest && manifest[key];
+  if (!Array.isArray(rows)) return null;
+  const asset = _assetIdOfTrack(track);
+  if (!asset || !rows.some((row) => row && row[0] === asset)) return null;
+  return bibleSyncEditionFor(key.slice(0, divider));
 }
 
 /** The asset id inside a track's stream URL, or ''. */
@@ -270,8 +302,10 @@ function _assetIdOfTrack(track) {
  *            to render before any audio exists. It FALLS BACK, and that is its
  *            whole job: one partial edition must not blank 65 books.
  *   paint  — which edition the recording CURRENTLY PLAYING belongs to, read
- *            from its asset-name stamp. Null when nothing plays, and null when
- *            the name claims no edition we know.
+ *            from the track's own KEY and PROVED against the manifest row that
+ *            key names. Null when nothing plays, when the track carries no
+ *            key, when the key names no edition we know, and when the edition
+ *            it names does not carry the asset.
  *
  * `paint` NEVER falls back to `offer`. A fallback there would fire on exactly
  * the case the fallback exists for — a reader on a book the selected edition
@@ -295,7 +329,20 @@ export function resolveBibleAudio(opts) {
     const fallback = BIBLE_AUDIO_EDITIONS[BIBLE_AUDIO_DEFAULT];
     offer = carries(fallback) ? fallback : null;
   }
-  const editionId = o.track ? bibleEditionOfAsset(_assetIdOfTrack(o.track)) : null;
+  // Paint reads the KEY, not the asset name. The player builds every track's
+  // key as `volKey + ':' + letterId`, so the edition is already on the object;
+  // reading it out of the NAME instead was reaching for the instrument next to
+  // the question, and it cannot see an edition whose assets are archive ids
+  // (TSOT Matthew's 28 Drive ids carry no stamp, so paint was null for every
+  // one of them and the wash went dead whatever timings shipped).
+  //
+  // The manifest row is what turns the key from a claim into a fact. A key is
+  // stored data and a restored row can name an edition it does not hold; the
+  // asset id comes from the URL, so requiring the row that key names to
+  // CONTAIN it proves the key rather than trusting it. Without that, a lying
+  // key paints one edition's clock over another's voice — the defect this
+  // resolver exists to prevent, arriving through a different door.
+  const editionId = _paintEditionOf(o.track, manifest);
   return { offer: offer || null, paint: (editionId && BIBLE_AUDIO_EDITIONS[editionId]) || null };
 }
 

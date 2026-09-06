@@ -352,9 +352,10 @@ describe('resolveBibleAudio — what is offered and what is painted', () => {
       track: trackFor('1wwN1I2tBRsfi5b0fepRT865uZ1Q40cUQ', 'bible-web:mark'),
     });
     expect(r.paint && r.paint.volKey).toBe('bible-web');
-    // and offer is untouched: it still answers the book's question, not the
-    // recording's.
-    expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
+    // and offer is NULL here, which is the independence stated as a fact
+    // rather than as a comment: no edition in this fixture carries mark, so
+    // the book is offered in nothing while the recording still paints.
+    expect(r.offer).toBeNull();
   });
 
   it('paints NOTHING when the key names an edition that does not carry the asset', () => {
