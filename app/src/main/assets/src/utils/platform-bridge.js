@@ -62,6 +62,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => number} nativeRecordAmplitude
  * @property {() => void} nativeRecordStop
  * @property {() => void} nativeRecordCancel
+ * @property {() => string} nativeListRecordings
  * @property {(name: string) => string | null} nativeReadRecording
  * @property {(name: string) => boolean} nativeDeleteRecording
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
@@ -138,6 +139,12 @@ const androidImpl = {
   nativeRecordAmplitude: () => /** @type {any} */ (window).AndroidBridge.nativeRecordAmplitude(),
   nativeRecordStop: () => /** @type {any} */ (window).AndroidBridge.nativeRecordStop(),
   nativeRecordCancel: () => /** @type {any} */ (window).AndroidBridge.nativeRecordCancel(),
+  // Always a String, never null: a JSON array of {name, size, mtime} rows, or
+  // the sentinel "error:list_failed" when the directory could not be READ at
+  // all. That sentinel is deliberately not "[]" — could-not-enumerate is not
+  // nothing-to-recover, and a caller that folds them together turns "I cannot
+  // tell" into "there is nothing there".
+  nativeListRecordings: () => /** @type {any} */ (window).AndroidBridge.nativeListRecordings(),
   nativeReadRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeReadRecording(name),
   nativeDeleteRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeDeleteRecording(name),
   // Android takeScreenshot is sync (PixelCopy on a binder thread); wrap in
@@ -1129,6 +1136,9 @@ const webImpl = {
   // Web has no served-file dir: webNativeRecordStop hands the Blob straight to
   // __onNativeRecordingComplete, so there is never a second route to fall back to
   // and never a native copy to release. Inert, not unimplemented.
+  // '[]' rather than the error sentinel: on web the answer is genuinely "I
+  // looked and there is nothing", not "I could not look". Inert, not broken.
+  nativeListRecordings: () => '[]',
   nativeReadRecording: () => null,
   nativeDeleteRecording: () => false,
 
