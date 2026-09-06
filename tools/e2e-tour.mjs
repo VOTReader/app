@@ -206,7 +206,12 @@ async function run(browser, { width, height, label, light }) {
           if (!f.docked) fail(`${id}: the card is not docked`);
           const floor = f.bar ? f.bar.t : f.vh;
           if (f.card && Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
-          if (f.card && f.card.h > Math.round(f.vh * 0.36) + 1) fail(`${id}: the docked card takes ${Math.round(f.card.h)} px of ${f.vh}, more than 36 %`);
+          // The rule the 36 % preference exists to serve: at least DOCK_OPEN_FRAC of the screen stays
+          // open above the docked card. Asserting the fraction itself was wrong on a short screen —
+          // 36 % of 640 is 230 px where the Listen words need 270, so the card scrolled and its own
+          // button row covered the last sentence (2026-09-06). The card may now take what it needs up
+          // to this line, and this is the line.
+          if (f.card && f.card.t < Math.floor(f.vh * 0.55) - 1) fail(`${id}: the docked card leaves only ${Math.round(f.card.t)} px of ${f.vh} open above it, under 55 %`);
         } else if (f.docked) fail(`${id}: docked, but it is not a Listen stop`);
         if (f.ring.t < 0 || f.ring.b > f.vh + 1) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
         if (!f.described) fail(`${id}: the control is not described by the card`);

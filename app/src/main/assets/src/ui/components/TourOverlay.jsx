@@ -183,10 +183,17 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
 
   // The card's real height, so the clamp below can keep all of it (Skip and Next) on screen.
   const [cardH, setCardH] = React.useState(0);
+  /* What the card's CONTENT wants, which is not what the box got: `scrollHeight` ignores the
+     maxHeight the cap put on it, so reading it back cannot ratchet the cap down on itself. The
+     docked cap below needs this to tell "the card is short" from "the card was cut". */
+  const [cardNeed, setCardNeed] = React.useState(0);
   React.useLayoutEffect(() => {
     const el = cardRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const measure = () => { const h = el.getBoundingClientRect().height; if (h) setCardH((prev) => (prev === h ? prev : h)); };
+    const measure = () => {
+      const h = el.getBoundingClientRect().height; if (h) setCardH((prev) => (prev === h ? prev : h));
+      const need = el.scrollHeight; if (need) setCardNeed((prev) => (prev === need ? prev : need));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -224,7 +231,16 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const docked = !!(step && step.act === 'press');
   dockPadRef.current = 0;
   const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
-  const cap = docked ? Math.max(CARD_MIN_H, Math.min(Math.round(vh * DOCK_MAX_FRAC), Math.floor(vh - dockBottom - vh * DOCK_OPEN_FRAC)))
+  /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_FRAC is the rule. A fraction of the screen is the
+     wrong unit for a card whose content is measured in lines: on a 640 px screen 36 % is 230 px
+     while the Listen stop's words need 270, so the card scrolled and its own sticky button row
+     covered the last sentence — "Tap it now, or press Next and I will do it for you." cut in half
+     on a first run (Native Builder on device at 320x640 dp, 2026-09-06; headless read −29 px at
+     320x640 CSS px against +13 px at 426x952). So the card may exceed the fraction up to what its
+     content needs, and never past the room DOCK_OPEN_FRAC leaves open. On a tall screen the
+     content is well under the fraction and nothing moves. */
+  const dockRoom = Math.floor(vh - dockBottom - vh * DOCK_OPEN_FRAC);
+  const cap = docked ? Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom))
     : ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE;
   const h = Math.min(cardH || CARD_EST_H, cap);
   let below = false, cardTop = 0;
