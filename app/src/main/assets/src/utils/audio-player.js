@@ -1981,7 +1981,39 @@ function prev() {
  * @returns {void}
  */
 function seek(seconds) {
-  if (!_el) return;
+  if (!_el) {
+    /* THE BOOT-RESTORED BAR HAS NO ELEMENT YET, and returning silently here
+       was read-along-4: a reader who opens a timed chapter after a cold boot
+       and taps a verse got NOTHING. The bar is real, the timings are real,
+       and the only missing thing is the media element the placeholder never
+       created (the prewarm at :858 is guarded by _pendingRestore).
+
+       WRITING THE DESCRIPTOR *IS* THE SEEK: _rebuildRestoredQueue resumes at
+       `r.time || 0`, so the next play starts at the tapped verse.
+
+       It deliberately does NOT rebuild the queue the way play/next/prev do
+       at :1902/:1942/:1964. Those are play COMMANDS; a reposition is not
+       one, and _rebuildRestoredQueue toasts and aborts when offline — which
+       would turn a tap on a verse into an error message about the network.
+
+       AND IT IS NOT CLAMPED, which is the part not to tidy away. The clamp
+       below reads `_state.duration || _el.duration || 0`, and on a restored
+       bar every term of that is 0 — meaning UNKNOWN, not zero-length. Fall
+       through to it and `Math.min(seconds, 0)` seeks every tap to the START
+       of the recording: a wrong answer in place of no answer, which is the
+       worse trade. The real ceiling is applied by the element itself when
+       metadata arrives (_seekOnMetadata), and the only live caller reads its
+       target out of that recording's own timings file. */
+    if (!_pendingRestore) return;          // idle: no element and nothing to restore
+    const at = Math.max(0, Math.floor(seconds || 0));
+    _pendingRestore.time = at;
+    _state.time = at;
+    _lastTick = at;
+    _lastPersistSec = at;
+    _notify();
+    _persist();
+    return;
+  }
   const max = _state.duration || _el.duration || 0;
   const t = Math.max(0, Math.min(seconds || 0, max || 0));
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }
