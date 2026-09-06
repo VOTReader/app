@@ -231,12 +231,30 @@ jobs:
         # re-indexed by position; that would move every verse after a gap by one
         # for the rest of the chapter (WEB acts 8 has no :37, so verse 38 would
         # land at index 36) with every other gate green. The shipped brm-kjv
-        # file cannot catch it -- KJV is dense in all 1,161 chapters, so both
+        # file cannot catch it -- KJV is dense in all 1,189 chapters, so both
         # shippers emit identical bytes -- so the test carries a real gapped
         # chapter of its own.
+        #   1,189, not the 1,161 this line carried since b2447d03. That number
+        #   was never right, not merely stale: bible-kjv.js and
+        #   bible-sync-brm-kjv.js BOTH read 1,189 chapters at b2447d03 itself,
+        #   and nothing in the tree is 1,161. The reasoning it supports was
+        #   sound and only the figure was wrong, which is the dangerous shape --
+        #   a wrong number inside a correct argument gets quoted onward. It is
+        #   now PINNED rather than asserted in prose: test_the_kjv_is_dense
+        #   below fails the moment the KJV stops numbering every chapter 1..len,
+        #   which is the premise, and the count follows from it.
+        # test_bible_versification.py rides the same unittest call (2026-09-06,
+        # the Architect's, wired in here because this list is hand-maintained
+        # and a test not named in it runs nowhere): arr[n - 1] and max(n) are
+        # only safe while verse numbers inside a chapter are strictly increasing
+        # and unique. A duplicate silently overwrites a slot another verse owns;
+        # an out-of-order number puts a timing behind an earlier one. Both leave
+        # len(arr), max(n) and every length check in validate-bible-sync.py
+        # passing, so nothing else in the tree can see them. 0 violations across
+        # 9 editions and 8,768 chapters today, and it runs in 0.7 s.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit test_bible_versification -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)
