@@ -292,3 +292,59 @@ describe('app.css — .sr-only utility', () => {
     expect(block).toContain('white-space: nowrap');
   });
 });
+
+/* The My Web empty-state notice, on the frame a phone reader actually uses.
+   ─────────────────────────────────────────────────────────────────────
+   ScriptureWebScreen locks landscape on a coarse pointer, so the reader's
+   frame is 800x360 CSS, not portrait — and .sw-narrow (clientWidth <= 560) is
+   ABSENT there, so the wide control strip is in play. design-perf measured the
+   panel at top: 42 % landing under .sw-controls, with the 44 px Dismiss button
+   overlapping the strip by 44x40 and the zoom group by 16x34. The notice was
+   drawn on top of the controls, so the buttons under it could not be pressed.
+
+   jsdom computes no layout, so the rect gate is design-perf's (Dismiss
+   intersects no control rect; every .sw-controls button's centre still
+   resolves to itself while the notice is up). What is pinned HERE is the rule
+   that produces it, and that the portrait placement it does not apply to is
+   left alone. */
+describe('app.css — the My Web notice clears the control strip', () => {
+  const pct = (block, prop) => {
+    const m = new RegExp(prop + '\\s*:\\s*([^;]+);').exec(block || '');
+    if (!m) return null;
+    const p = /(\d+(?:\.\d+)?)\s*%/.exec(m[1]);
+    return p ? parseFloat(p[1]) : null;
+  };
+
+  it('the wide layout gives the notice its own vertical placement', () => {
+    const wide = ruleBlock(CSS, '.sw-root:not(.sw-narrow) .sw-empty');
+    expect(wide, 'no wide-layout rule for .sw-empty — the panel still sits at the base 42 % '
+      + 'on the 360 px-tall landscape frame, under .sw-controls').toBeTruthy();
+    expect(pct(wide, 'top'), 'the wide rule sets no top').not.toBeNull();
+  });
+
+  it('moves it DOWN, past the strip, rather than merely restating the base', () => {
+    // Derived, not restated: a rule that repeats 42 % would satisfy the case
+    // above and change nothing on the frame that is broken.
+    const base = pct(ruleBlock(CSS, '.sw-empty'), 'top');
+    const wide = pct(ruleBlock(CSS, '.sw-root:not(.sw-narrow) .sw-empty'), 'top');
+    expect(base, 'the base .sw-empty top went missing').toBe(42);
+    expect(wide).toBeGreaterThan(base);
+    // 360 CSS px tall frame: the controls end at 117 and the panel is ~132 tall,
+    // so its centre has to sit at 183 or lower for the top edge to clear them.
+    expect((wide / 100) * 360, 'centre on the 360 px frame').toBeGreaterThanOrEqual(183);
+  });
+
+  it('leaves the portrait placement alone', () => {
+    // design-perf re-measured every portrait row as green at 42 %. This fix is
+    // the wide layout's, and a fix that moved both would be changing a frame
+    // that was already right.
+    expect(pct(ruleBlock(CSS, '.sw-empty'), 'top')).toBe(42);
+  });
+
+  it('the Dismiss control is still the 44 px target, wherever the panel sits', () => {
+    // The control that says the placement fix did not quietly resize it.
+    const close = ruleBlock(CSS, '.sw-empty-close');
+    expect(close).toContain('width: 44px');
+    expect(close).toContain('height: 44px');
+  });
+});
