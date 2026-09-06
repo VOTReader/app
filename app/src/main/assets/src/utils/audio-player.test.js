@@ -546,6 +546,105 @@ describe('audio-player — listening controls + arbitration', () => {
 
    The asymmetry is the defect: the per-recording map is guarded and the snapshot
    is not, and the guard that exists is the model for the one that does not. */
+/* audio-player-4 — THE FORWARD-ONLY HORIZON IS PART-GRAINED AT PLAY TIME AND
+   KEY-GRAINED IN THE SNAPSHOT.
+
+   `playCollection` applies `startPartIndex` by SLICING, so a listener who starts
+   at "Part 2" gets a queue whose first track IS part 2 (audio-player.js:1807).
+   Nothing carries that across a reboot:
+
+     :1402  _persist   writes startKey / startIndex / startReader — not the part
+     :1444  _restore   reads the same three
+     :1587  the rebuild slices to the start KEY, and a multi-part letter shares
+            one key across its parts, so the queue regrows from part 1
+
+   So the reader who deliberately left part 1 behind is handed it again on the next
+   boot. It is the same forward-only promise the key-level horizon already keeps —
+   "a rebuilt queue never regrows the tracks that were deliberately left behind" —
+   applied one level down, where the code stops keeping it. */
+describe('audio-player — the part-grained horizon across a reboot (audio-player-4)', () => {
+  const snap = () => JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
+  const rebuildGlobals = () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+  };
+  const dropGlobals = () => {
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  };
+
+  it('CONTROL and precondition: starting at PART 2 really does slice the live queue', () => {
+    /* If playCollection's own slicing ever broke, every assertion below would be
+       about a queue that never had a part horizon — and "the rebuild matches the
+       live queue" would pass with both wrong. */
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One',
+      startId: 'letter-a', startPartIndex: 1,
+    });
+    const st = AudioPlayer.getState();
+    expect(st.queue).toHaveLength(2);                 // part 2, then Letter C
+    expect(st.queue[0].url).toBe(URL_OF('idA2'));
+    expect(st.queue[1].url).toBe(URL_OF('idC'));
+  });
+
+  it('the snapshot RECORDS the part the listener started at', () => {
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One',
+      startId: 'letter-a', startPartIndex: 1,
+    });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 30;
+    el().dispatchEvent(new Event('timeupdate'));
+    expect(snap().startKey).toBe('vol1:letter-a');
+    expect(snap().startPartIndex).toBe(1);
+  });
+
+  it('THE READER-FACING CONSEQUENCE: a reboot does not hand part 1 back', async () => {
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One',
+      startId: 'letter-a', startPartIndex: 1,
+    });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 30;
+    el().dispatchEvent(new Event('timeupdate'));
+
+    await load();                                      // a fresh session
+    rebuildGlobals();
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.restoring).toBe(false);
+      expect(st.queue).toHaveLength(2);                // NOT 3 — part 1 stays behind
+      expect(st.queue[0].url).toBe(URL_OF('idA2'));
+    } finally { dropGlobals(); }
+  });
+
+  it('CONTROL: a letter started with NO part horizon rebuilds unchanged', async () => {
+    /* The arm that fails if the part slice is applied unconditionally, or if a
+       missing field is read as anything other than "no part horizon". */
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a',
+    });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 30;
+    el().dispatchEvent(new Event('timeupdate'));
+    expect(AudioPlayer.getState().queue).toHaveLength(3);   // A1, A2, C
+
+    await load();
+    rebuildGlobals();
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue).toHaveLength(3);
+      expect(st.queue[0].url).toBe(URL_OF('idA1'));
+    } finally { dropGlobals(); }
+  });
+});
+
 describe('audio-player — the boot snapshot after a finished recording (audio-player-3)', () => {
   /** Play the collection and put a real clock on it, so there is something to write back. */
   const playedTo = (seconds) => {
