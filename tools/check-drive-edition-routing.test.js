@@ -156,6 +156,33 @@ describe('check-drive-edition-routing — refuses to ACCUSE a tree it could not 
       .not.toMatch(/regenerate with gen-bible-audio-manifest/);
   });
 
+  /* THE WHOLE-BODY WRAP, and why it is not the same as the two targeted catches
+     it replaced. The first cut caught the key construction and the routing call
+     and CLAIMED a whole-body wrap; the Verifier measured the gap. A throw
+     anywhere else in the body still exited 1 and still accused the tree — the
+     defect's own failure mode surviving inside its fix.
+
+     This fixture throws from the manifest ROW ITSELF, at the `for (const row of
+     rows)` element read, which is outside both of the old try blocks and inside
+     the new one. It is also why the old pair was the wrong shape rather than
+     merely incomplete: guessing which expressions are dangerous is the same
+     judgement that produced the hole. */
+  it('exits 2, not 1, when anything in the loop body throws where no targeted catch was', () => {
+    // `rows` passes Array.isArray(rows) && rows.length and then throws when the
+    // element is READ, which happens at `for (const row of rows)` — outside both
+    // of the try blocks the first cut used, and inside the wrap that replaced them.
+    const manifest = `var BIBLE_AUDIO_MANIFEST = (function () {
+  var rows = [['id0', 'B', 'Chapter 1']];
+  Object.defineProperty(rows, '0', { get: function () { throw new Error('row read blew up'); } });
+  var m = {}; m['bible-tsot-matthew:matthew'] = rows; return m;
+})();`;
+    const r = runGate(mirror({ manifest }));
+    expect(r.status, 'a throw with no targeted catch around it was reported as a routing 404: ' + r.all).toBe(2);
+    expect(r.stderr).toMatch(/INSTRUMENT DEAD/);
+    expect(r.stderr).toMatch(/could not be evaluated/);
+    expect(r.stderr, 'the gate named a routing failure it never measured').not.toMatch(/would 404/);
+  });
+
   it('exits 2, not 1, when a drive edition declares no volKey (key becomes "undefined:<book>")', () => {
     const track = withField('volKey', '');
     const r = runGate(mirror({ track }));

@@ -103,41 +103,52 @@ if (badTag.length) {
 const problems = [];
 let checked = 0;
 for (const [id, e] of drive) {
-  if (typeof e.volKey !== 'string' || !e.volKey
-      || !Array.isArray(e.books) || e.books.length !== 1 || typeof e.books[0] !== 'string') {
-    console.error('[drive-routing] INSTRUMENT DEAD: a drive-sourced edition cannot be keyed.');
-    console.error(`    ${id}: volKey ${JSON.stringify(e.volKey)}, books ${JSON.stringify(e.books)}`);
-    console.error('    A driveFolder edition must declare a volKey and exactly one app book id');
-    console.error('    as a one-element array (gen-bible-audio-manifest.mjs enforces the same).');
-    console.error('    Without both, no manifest key exists to look up — and a gate that cannot');
-    console.error('    form its own question must not answer it with a routing failure.');
-    process.exit(2);
-  }
-  let rows;
+  // ONE catch around the WHOLE body, and the comment above is now true of the
+  // code. The first cut used two TARGETED try/catch blocks and claimed a
+  // whole-body wrap; the Verifier measured the gap. It matters exactly where the
+  // fix is supposed to work: an unforeseen throw ANYWHERE ELSE in this body still
+  // exited 1 and still accused the tree — drive-routing-crash-1's own failure
+  // mode surviving in the residue of its fix.
+  //
+  // One of those two was unreachable as well, which is the other half of why the
+  // pair was the wrong shape: after the declaration guard below, `volKey + ':' +
+  // books[0]` is string+string and `M[...]` is a property read on an object
+  // already proved non-empty at the top of this file, so neither can throw.
+  // Wrapping the body makes the reachable case and every unforeseen one leave by
+  // the same door instead of guessing which expressions are dangerous.
+  //
+  // `process.exit()` does not throw, so the declaration guard still exits 2
+  // directly from inside the try.
   try {
-    rows = M[e.volKey + ':' + e.books[0]];
-  } catch (err) {
-    console.error(`[drive-routing] INSTRUMENT DEAD: edition ${id} could not be read — ${err.message}`);
-    process.exit(2);
-  }
-  const key = e.volKey + ':' + e.books[0];
-  if (!Array.isArray(rows) || !rows.length) {
-    problems.push(`${id}: the manifest has no rows at ${key} — regenerate with gen-bible-audio-manifest.mjs`);
-    continue;
-  }
-  for (const row of rows) {
-    checked++;
-    let url;
-    try {
-      url = bibleAudioAssetUrl(row[0], e.releaseTag);  // the 2nd arg is the TAG STRING (Web Builder, w-reltag 5c291e39)
-    } catch (err) {
-      console.error(`[drive-routing] INSTRUMENT DEAD: routing ${id} ${row[0]} threw — ${err.message}`);
+    if (typeof e.volKey !== 'string' || !e.volKey
+        || !Array.isArray(e.books) || e.books.length !== 1 || typeof e.books[0] !== 'string') {
+      console.error('[drive-routing] INSTRUMENT DEAD: a drive-sourced edition cannot be keyed.');
+      console.error(`    ${id}: volKey ${JSON.stringify(e.volKey)}, books ${JSON.stringify(e.books)}`);
+      console.error('    A driveFolder edition must declare a volKey and exactly one app book id');
+      console.error('    as a one-element array — gen-bible-audio-manifest.mjs:145 throws on the');
+      console.error('    same shape, in the loop AFTER the one that filters driveFolder editions');
+      console.error('    out of EDITION_ROWS (a filtered read of that file hides the enforcement).');
+      console.error('    Without both, no manifest key exists to look up — and a gate that cannot');
+      console.error('    form its own question must not answer it with a routing failure.');
       process.exit(2);
     }
-    if (typeof url !== 'string' || !url.startsWith(e.releaseTag)) {
-      problems.push(`${id}: ${row[2] || row[0]} routes to\n      ${url || '(empty)'}\n    but its declared tag is\n      ${e.releaseTag}`);
-      break;                                        // one example per edition is enough to act on
+    const key = e.volKey + ':' + e.books[0];
+    const rows = M[key];
+    if (!Array.isArray(rows) || !rows.length) {
+      problems.push(`${id}: the manifest has no rows at ${key} — regenerate with gen-bible-audio-manifest.mjs`);
+      continue;
     }
+    for (const row of rows) {
+      checked++;
+      const url = bibleAudioAssetUrl(row[0], e.releaseTag);  // the 2nd arg is the TAG STRING (Web Builder, w-reltag 5c291e39)
+      if (typeof url !== 'string' || !url.startsWith(e.releaseTag)) {
+        problems.push(`${id}: ${row[2] || row[0]} routes to\n      ${url || '(empty)'}\n    but its declared tag is\n      ${e.releaseTag}`);
+        break;                                      // one example per edition is enough to act on
+      }
+    }
+  } catch (err) {
+    console.error(`[drive-routing] INSTRUMENT DEAD: edition ${id} could not be evaluated — ${err && err.message}`);
+    process.exit(2);
   }
 }
 
