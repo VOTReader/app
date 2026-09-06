@@ -234,15 +234,28 @@ jobs:
         # file cannot catch it -- KJV is dense in all 1,189 chapters, so both
         # shippers emit identical bytes -- so the test carries a real gapped
         # chapter of its own.
-        #   1,189, not the 1,161 this line carried since b2447d03. That number
-        #   was never right, not merely stale: bible-kjv.js and
-        #   bible-sync-brm-kjv.js BOTH read 1,189 chapters at b2447d03 itself,
-        #   and nothing in the tree is 1,161. The reasoning it supports was
-        #   sound and only the figure was wrong, which is the dangerous shape --
-        #   a wrong number inside a correct argument gets quoted onward. It is
-        #   now PINNED rather than asserted in prose: test_the_kjv_is_dense
-        #   below fails the moment the KJV stops numbering every chapter 1..len,
-        #   which is the premise, and the count follows from it.
+        #   1,189, not the 1,161 this line carried since b2447d03. Both
+        #   bible-kjv.js and bible-sync-brm-kjv.js already read 1,189 chapters
+        #   at b2447d03 itself, so the figure was wrong from the start.
+        #
+        #   1,161 IS A REAL COUNT OF THE WRONG OBJECT, WHICH IS WHY IT SURVIVED.
+        #   books.js -- the app's own book data, and the natural file to reach
+        #   for when asking "how many chapters" -- holds exactly 1,161 across 65
+        #   ids, being the canon minus matthew-plain, whose 28 live in
+        #   matthew.js. (An earlier revision of this comment claimed nothing in
+        #   the tree was 1,161. That was false, and the Architect found it; the
+        #   claim is corrected here rather than only in a commit message,
+        #   because a comment is where the next reader picks it up.)
+        #
+        #   So the search that finds this class of error is a grep for the
+        #   number's OBJECT, not for the number: a count in prose has to name
+        #   the file it counts. The reasoning around it was sound and only the
+        #   figure was wrong, which is the dangerous shape -- a real number from
+        #   the neighbouring object passes every sanity check a made-up one
+        #   fails, and this one reached four documents. It is now PINNED rather
+        #   than asserted in prose: test_the_kjv_is_dense below fails the moment
+        #   the KJV stops numbering every chapter 1..len, which is the premise,
+        #   and the count follows from it.
         # test_bible_versification.py rides the same unittest call (2026-09-06,
         # the Architect's, wired in here because this list is hand-maintained
         # and a test not named in it runs nowhere): arr[n - 1] and max(n) are
