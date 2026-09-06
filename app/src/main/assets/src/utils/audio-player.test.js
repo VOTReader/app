@@ -527,6 +527,113 @@ describe('audio-player — listening controls + arbitration', () => {
 /* The fourth sleep option. A minute countdown cannot express "stop at the end
    of what I'm listening to": playback rate and buffering make any computed end
    time wrong, so the flag is read by the 'ended' EVENT, before the advance. */
+/* audio-player-3 — THE BOOT SNAPSHOT AFTER A FINISHED RECORDING.
+
+   The `ended` handler already knows a recording is finished and already protects
+   ONE of the two things that remember a position:
+
+     audio-player.js:537   _finishedUrl = (finished && finished.url) || null;
+                    :538   _forgetPosition(_finishedUrl);
+                    :1224  if (_finishedUrl && track.url === _finishedUrl) return;   <- _rememberPosition
+
+   `_persist()` — the BOOT SNAPSHOT — has no such guard. On the normal path that
+   does not matter, because next() advances qi and starts the new track BEFORE it
+   persists, so the url no longer matches. On the sleep-at-track-end path there is
+   no advance, so `_markPaused() -> _persist()` writes the finished recording at
+   its ending clock, and the next session resumes AT the end of something the
+   listener already heard. Pressing play fires `ended` again immediately, which
+   runs `_notifyListened` a SECOND time for the same recording.
+
+   The asymmetry is the defect: the per-recording map is guarded and the snapshot
+   is not, and the guard that exists is the model for the one that does not. */
+describe('audio-player — the boot snapshot after a finished recording (audio-player-3)', () => {
+  /** Play the collection and put a real clock on it, so there is something to write back. */
+  const playedTo = (seconds) => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = seconds;
+    el().dispatchEvent(new Event('timeupdate'));
+    return AudioPlayer.getState();
+  };
+  const snap = () => JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
+
+  it('CONTROL and precondition: a normal pause mid-track persists THAT track at its clock', () => {
+    /* The guard must not fire when nothing has finished. If this case ever goes
+       red, every assertion below is about a snapshot that stopped being written
+       at all, which looks identical to the fix working. */
+    const st = playedTo(300);
+    AudioPlayer.toggle();                                  // pause, mid-recording
+    expect(snap().track.url).toBe(st.queue[0].url);
+    expect(snap().time).toBe(300);
+    expect(snap().qi).toBe(0);
+  });
+
+  it('ADVANCES past the recording the listener finished', () => {
+    const st = playedTo(300);
+    const finished = st.queue[0], upNext = st.queue[1];
+    expect(AudioPlayer.setSleepAtTrackEnd()).toBe(true);
+
+    el().dispatchEvent(new Event('ended'));
+
+    /* The BAR is unchanged and that is deliberate: the reader who set a sleep
+       timer wakes to "this is where you got to", paused at the end. */
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    /* The SNAPSHOT is the thing the next session resumes from, and it must not
+       name a recording that is over. */
+    expect(snap().qi).toBe(1);
+    expect(snap().track.url).toBe(upNext.url);
+    expect(snap().track.url).not.toBe(finished.url);
+    expect(snap().time).toBe(0);
+  });
+
+  it('THE CONSEQUENCE: the next session does not count the same recording finished TWICE', async () => {
+    playedTo(300);
+    AudioPlayer.setSleepAtTrackEnd();
+    el().dispatchEvent(new Event('ended'));
+
+    // A fresh session, restoring from whatever the sleep path wrote.
+    const listened = vi.fn();
+    await load();
+    globalThis.__votAudioListened = listened;
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();                                // the reader presses play
+      await new Promise((r) => setTimeout(r, 0));
+      el().dispatchEvent(new Event('ended'));
+      /* Resuming AT the ending clock fires `ended` at once, and `_notifyListened`
+         credits the completion again. After the fix the snapshot starts at
+         letter-a part 1, whose completion is not announced until its LAST part —
+         so nothing is counted here at all, which is the correct answer. */
+      expect(listened).not.toHaveBeenCalled();
+    } finally {
+      delete globalThis.__votAudioListened;
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
+  it('finishing the LAST recording clears the snapshot, the same as reaching the end normally', () => {
+    /* next() calls stop() at the end of a queue, and stop() clears the snapshot
+       because "the boot snapshot is the part that must not resurrect the bar".
+       The sleep path must agree: there is nothing left to resume. */
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 120;
+    el().dispatchEvent(new Event('timeupdate'));
+    expect(AudioPlayer.getState().queue).toHaveLength(1);
+    expect(snap()).not.toBeNull();                          // it WAS written
+    AudioPlayer.setSleepAtTrackEnd();
+
+    el().dispatchEvent(new Event('ended'));
+
+    expect(snap()).toBeNull();
+  });
+});
+
 describe('audio-player — sleep at end of track', () => {
   it('pauses at the boundary instead of advancing, keeps the queue, and disarms itself', () => {
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
