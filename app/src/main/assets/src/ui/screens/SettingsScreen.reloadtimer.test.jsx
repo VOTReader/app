@@ -47,6 +47,17 @@ import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings,
 } from './settings-harness.jsx';
+import { writeContainer, readContainer, isContainerMagic } from '../../utils/backup-container.js';
+import { validateImportEnvelope } from '../../utils/import-validators.js';
+import { summarizeBackupManifest, formatVerifyReport } from '../../utils/backup-verify.js';
+
+const MANIFEST = {
+  app: 'VOTReader', exportVersion: 3, exportDate: '2026-07-01T12:00:00.000Z',
+  counts: { _media: 1, 'vot-notes': 3, 'vot-bookmarks': 2 },
+  data: {}, stores: { 'vot-notes': [1, 2, 3], 'vot-bookmarks': [1, 2] },
+  media: [{ id: 'm1', type: 'image', size: 4, mime: 'application/octet-stream' }],
+};
+let votbak;
 
 const btn = (text) => [...document.querySelectorAll('button')]
   .find((b) => (b.textContent || '').trim() === text);
@@ -65,7 +76,7 @@ async function wipeEverything() {
 describe('a scheduled reload does not outlive the screen that scheduled it', () => {
   let reload;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     setupSettingsGlobals();
     // clearAllPersonalData awaits real IndexedDB deletions and THROWS if any
@@ -82,6 +93,12 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
       },
       databases: () => Promise.resolve([]),
     };
+    if (!votbak) {
+      const chunks = [];
+      await writeContainer(MANIFEST, [{ blob: new Blob([new Uint8Array([1, 2, 3, 4])]) }],
+        (u8) => { chunks.push(u8.slice()); });
+      votbak = new Blob(chunks, { type: 'application/octet-stream' });
+    }
     reload = vi.fn();
     // jsdom's location is not configurable in the usual way; replace the whole
     // object so the component's `window.location.reload()` reaches the spy.
@@ -126,6 +143,45 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
     unmount();
     await act(async () => { vi.advanceTimersByTime(10000); });
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('the IMPORT caller schedules through it too — behaviourally, not by grep', async () => {
+    // THE REPAIR FOR BITE D, and it exists because my first reason for not
+    // having it was wrong. I argued the path was unreachable in jsdom; that
+    // was an argument about clearAllPersonalData (which awaits real IndexedDB
+    // deletions) and I never tested the claim for the IMPORT caller. It IS
+    // reachable: PlatformBridge.pickImportFile hands the screen a real .votbak
+    // blob, exactly as SettingsScreen.verify.test.jsx already does.
+    //
+    // The source gate below is the class-level net; this is the measurement.
+    setupSettingsGlobals({
+      readContainer, isContainerMagic, validateImportEnvelope,
+      summarizeBackupManifest, formatVerifyReport,
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
+        pickImportFile: () => Promise.resolve(votbak),
+      },
+      // The screen destructures the apply's result (:1339). The harness's
+      // default stub returns undefined, which throws before the reload is
+      // scheduled — a CLEAN apply is the precondition for the assertion below.
+      applyV3: () => Promise.resolve({
+        importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [],
+      }),
+    });
+    const { unmount } = renderSettings();
+    await act(async () => { btn('Import').click(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const confirm = btn('Import & Overwrite');
+    expect(confirm, 'the import confirm sheet did not open — this case measured nothing').toBeTruthy();
+    await act(async () => { confirm.click(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    // PRECONDITION, stated: if the apply did not get far enough to schedule,
+    // the assertions below are about a path that never ran.
+    expect(reload, 'a reload should not have happened yet').not.toHaveBeenCalled();
+    unmount();
+    expect(reload, 'the import caller does not schedule through the scheduler').toHaveBeenCalledTimes(1);
   });
 
   it('every reload in this screen goes through the scheduler — no inline timer survives', () => {
