@@ -25,7 +25,7 @@ import { readFileSync } from 'fs';
 import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { BIBLE_AUDIO_EDITIONS, bibleAudioAssetUrl } from '../app/src/main/assets/src/utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioAssetUrl, isVotAudioUrl } from '../app/src/main/assets/src/utils/audio-track.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -49,6 +49,35 @@ const M = ctx.BIBLE_AUDIO_MANIFEST;
 if (!M || !Object.keys(M).length) {
   console.error('[drive-routing] INSTRUMENT DEAD: the manifest evaluated to nothing.');
   process.exit(2);
+}
+
+// A declared tag outside RELEASE_PREFIXES is a SECOND, quieter way to get the
+// same empty URL: bibleAudioAssetUrl refuses an unrecognised host rather than
+// guessing one, which is the correct behaviour and an indistinguishable symptom
+// (Web Builder, 2026-09-05). Separate it here so the routing failure below
+// cannot be blamed for a bad declaration. isVotAudioUrl IS that boundary — do
+// not re-list the prefixes, or this gate drifts the day one is added.
+//
+// The controls prove the probe measures membership and not something else: a
+// tag known to be in the list must read true, and a plausible near-miss host
+// must read false. A probe that answered the same either way would pass every
+// declaration.
+const probe = (tag) => isVotAudioUrl(String(tag) + 'probe123.mp3');
+if (!probe('https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/') ||
+    probe('https://github.com/VOTReader/votreader-assets/releases/download/audio-v9/')) {
+  console.error('[drive-routing] INSTRUMENT DEAD: the release-prefix probe fails its own controls.');
+  process.exit(2);
+}
+const badTag = drive.filter(([, e]) => !probe(e.releaseTag));
+if (badTag.length) {
+  console.error('');
+  console.error('  ✖ a drive-sourced Bible edition declares a releaseTag that is not one of');
+  console.error('    RELEASE_PREFIXES, so bibleAudioAssetUrl returns \'\' for every one of its');
+  console.error('    assets. That is the RIGHT refusal and the WRONG declaration: fix the tag.');
+  console.error('');
+  for (const [id, e] of badTag) console.error(`    ${id}: releaseTag ${e.releaseTag}`);
+  console.error('');
+  process.exit(1);
 }
 
 const problems = [];
