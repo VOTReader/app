@@ -19,7 +19,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  BIBLE_AUDIO_EDITIONS, bibleEditionOfAsset, bibleSyncEditionFor,
+  BIBLE_AUDIO_EDITIONS, bibleSyncEditionFor, resolveBibleAudio,
 } from './audio-track.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -111,11 +111,28 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
     return globalThis.BIBLE_AUDIO_MANIFEST;
   };
 
-  it('every asset name resolves to the edition its own manifest key names', () => {
-    // Read-along picks the timings table from the ASSET NAME, so a release
-    // whose names carry no registered stamp would kill the wash silently and
-    // look exactly like missing timings. The fixture in
-    // ReadAlongHighlight.retry.test.jsx used 'john-1' and did precisely that.
+  it('every shipped asset paints as the edition its own manifest key names', () => {
+    // REPOINTED, and the old title is the reason. It read "every asset NAME
+    // resolves to..." and asserted through bibleEditionOfAsset, whose comment
+    // stated the premise: "Read-along picks the timings table from the ASSET
+    // NAME." After the Architect's section 12 it picks from the KEY, proved
+    // against the manifest row that key names — so the old form pinned a
+    // function nothing calls, and it would have gone red the moment an edition
+    // shipped opaque archive ids (TSOT Matthew's 28 Drive ids carry no stamp)
+    // while the app painted them perfectly well.
+    //
+    // The property it protected is unchanged and still worth a gate: every
+    // shipped asset must paint as SOME edition, and as the one its own key
+    // names. It is now asserted through the path the app actually takes.
+    //
+    // IT CANNOT CURRENTLY FAIL, AND IT SAYS SO RATHER THAN COUNTING AS A PASS.
+    // Measured: reverting paint to the asset-name stamp leaves this case GREEN,
+    // because every one of today's 3,567 shipped assets carries a registered
+    // stamp, so both routes agree on all of them. It becomes discriminating the
+    // day an edition ships opaque ids — c48's TSOT Matthew, whose 28 Drive ids
+    // carry no stamp and would paint null under the old route. Until then the
+    // CONTROL below is what has teeth: it is the only case in this file that
+    // reddens when either half of the key proof is removed.
     const m = manifest();
     const keys = Object.keys(m);
     expect(keys.length, 'manifest is empty').toBeGreaterThan(100);
@@ -125,12 +142,31 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
       const editionId = bibleSyncEditionFor(volKey);
       expect(editionId, 'no edition claims volKey ' + volKey).toBeTruthy();
       for (const part of m[key]) {
-        expect(bibleEditionOfAsset(part[0]), key + ' → ' + part[0]).toBe(editionId);
+        const track = { key, url: 'https://example.test/' + part[0] + '.mp3' };
+        const paint = resolveBibleAudio({ settings: { bibleAudio: 'off' }, track }).paint;
+        expect(paint && paint.volKey, key + ' → ' + part[0]).toBe(volKey);
         checked++;
       }
     }
     // A loop that ran zero times passes every assertion inside it.
     expect(checked, 'no assets examined').toBeGreaterThan(1000);
+  });
+
+  it('CONTROL for the gate above: a key that does not own its asset paints null', () => {
+    // Without this, "every asset paints as its key's edition" is satisfied by a
+    // resolver that says yes to everything. The manifest cannot contain a key
+    // that disagrees with its own asset, so the disagreement is built by hand.
+    const m = manifest();
+    const brm = Object.keys(m).find((k) => k.indexOf('bible-brm-kjv:') === 0);
+    const web = Object.keys(m).find((k) => k.indexOf('bible-web:') === 0);
+    expect(brm && web, 'fixture needs one key from each of two editions').toBeTruthy();
+    const stolen = m[brm][0][0];
+    expect(m[web].some((p) => p[0] === stolen), 'the two editions share an asset').toBe(false);
+    const paint = resolveBibleAudio({
+      settings: { bibleAudio: 'off' },
+      track: { key: web, url: 'https://example.test/' + stolen + '.mp3' },
+    }).paint;
+    expect(paint, web + ' must not paint ' + brm + ' asset ' + stolen).toBeNull();
   });
 
   it('every edition carries every book — fires on the first partial edition', () => {

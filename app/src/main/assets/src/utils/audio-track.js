@@ -277,11 +277,15 @@ export function bibleEditionOfAsset(assetId) {
 function _paintEditionOf(track, manifest) {
   const key = (track && typeof track.key === 'string') ? track.key : '';
   const divider = key.indexOf(':');
-  // A CHEAP SHAPE REJECT, NOT A CORRECTNESS GUARD, and the difference is
-  // measured: biting this line out leaves the suite green, because a malformed
-  // key finds no manifest row and the row check answers null anyway. It is
-  // here to keep a garbage string out of the lookup, and it says so rather
-  // than being read later as the thing that makes this function safe.
+  // LOAD-BEARING AGAINST A KEY SHAPE TODAY'S DATA HAPPENS NOT TO CONTAIN, which
+  // is a different claim from "unreachable" and the reason not to delete it.
+  // A colonless key gives divider === -1, and slice(0, -1) CHOPS ONE CHARACTER:
+  // 'bible-webx' becomes 'bible-web', a real volKey that resolves to a real
+  // edition. So this stops a name that never said 'bible-web' from painting
+  // bible-web's clock. Biting it out leaves the suite green only because all
+  // 198 shipped keys carry exactly one interior colon (Verifier, measured, with
+  // a control of two planted bad keys reading 2) — it goes live the day a
+  // generator emits a key without one.
   if (divider < 1 || divider >= key.length - 1) return null;
   const rows = manifest && manifest[key];
   if (!Array.isArray(rows)) return null;
