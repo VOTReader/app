@@ -123,6 +123,11 @@ const _VERSIFICATION_ALIAS = {
 // Bounded, so it can't grow unbounded (alt-translation globals load whole, so no
 // partial staleness — a cached index never goes stale because the data never mutates
 // after its script loads, and _verseIndex is only reached once the global exists).
+// THAT PROMISE NOW HAS ONE EXCEPTION AND IT IS NAMED HERE ON PURPOSE:
+// releaseTranslationsExcept() frees an edition's global, so the same code CAN be
+// loaded again afterwards - and a surviving entry from the first load would be
+// handed back for the second. It purges this map by key prefix, which is the
+// only reason that stays true.
 const _xlateCache = new Map();
 const _xlateCacheMax = 8;
 
@@ -141,9 +146,16 @@ const _xlateCacheMax = 8;
  *                   _translationPromises still holds one, so a global freed
  *                   with its promise left behind is permanently unloadable —
  *                   the promise resolves at once and the data never returns
- *   _xlateCache     keyed translation:book:chapter and holding the EXTRACTED
- *                   strings, so leaving it pins the parsed data and the
- *                   eviction frees a reference rather than memory
+ *   _xlateCache     keyed translation:book:chapter, and this one is a
+ *                   CORRECTNESS requirement, not a memory one. Its declaration
+ *                   promises "a cached index never goes stale because the data
+ *                   never mutates after its script loads" - true until an
+ *                   eviction makes a RE-load possible, and then a surviving
+ *                   entry answers with the previous load's text.
+ *                   MEASURED, because I wrote the memory reason first and
+ *                   checked it afterwards: the cache is capped at
+ *                   _xlateCacheMax = 8 chapters of extracted strings, which is
+ *                   kilobytes. It was never the 32 MB.
  *
  * And the BASE is not a nicety: KJV-R is a sparse overlay whose misses fall
  * through to KJV, so evicting KJV under a KJV-R reader does not fail loudly —
