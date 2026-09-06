@@ -146,7 +146,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
   });
 
   it('marks the + button aria-disabled at the ceiling and not before', async () => {
-    const { container } = await mount();
+    await mount();
     const plus = screen.getByLabelText('Zoom in');
     expect(plus.getAttribute('aria-disabled')).not.toBe('true');
     for (let i = 0; i < 40; i++) await press('+');
