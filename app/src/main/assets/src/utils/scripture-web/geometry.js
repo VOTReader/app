@@ -110,10 +110,24 @@ export const ALPHA_DEEP = 0.90;
 /**
  * Anchored arcs per CSS px of viewport width at which the deep alpha starts
  * being divided down. 0.20 clamps to 1 at every frame's ceiling (0.157-0.176
- * measured) and divides by 5.15 / 7.58 / 3.32 at 40x on phoneLand / phone375
- * / desktop1920.
+ * measured), so D1 is untouched by the exponent whatever it is.
  */
 export const DENSITY_K = 0.20;
+
+/**
+ * How hard crowding divides the deep alpha. 0.5 (a square root) was the first
+ * cut and it left D2's 40x band missed in the UP direction on every frame -
+ * measured, not predicted: phoneLand ink contrast p50 2.81 -> 3.72 (+32 %),
+ * desktop 1.39 -> 2.50 (+80 %). Most of that is the new geometry concentrating
+ * the same ink into steep rises rather than the style law, but on desktop the
+ * law genuinely brightened (alpha 0.271 against main's 0.19).
+ *
+ * 0.57 divides by 6.49 / 10.07 / 3.92 at 40x on phoneLand / phone375 /
+ * desktop1920 instead of 5.16 / 7.59 / 3.32. THE CEILING CANNOT MOVE: there
+ * `per / DENSITY_K` is below 1 on every frame, so the clamp wins whatever the
+ * exponent, which is what makes this one lever and not two.
+ */
+export const DENSITY_EXP = 0.57;
 
 /** Widest stroke, CSS px. At depth votes drive width from 1.4 up to this. */
 export const STROKE_DEEP_CSS = 2.4;
@@ -144,7 +158,7 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   // overlaps, so each ribbon is drawn alone and needs the full value; at 40x
   // there are thirty times as many and the same value would be a neon fog.
   const per = anchoredPerCssPx > 0 ? anchoredPerCssPx : 0;
-  const crowd = Math.max(1, Math.sqrt(per / DENSITY_K));
+  const crowd = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
   const deep = ALPHA_DEEP / crowd;
   return {
     alpha: alpha + (deep - alpha) * t,
