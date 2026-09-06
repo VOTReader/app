@@ -20,7 +20,9 @@ rather than against the corpus:
   A5  audit_facts against planted files       -> RED on bytes, on sha256, on assetId
   A5b a missing ffprobe                       -> None, never a traceback; and FULL
                                                  REFUSES rather than skipping every
-                                                 duration leg in silence
+                                                 duration leg in silence -- asserted
+                                                 as an EXIT CODE through the real CLI
+                                                 with PATH stripped, not as a predicate
   A6  --audio-facts with --structural         -> refused rather than silently ignored
 
 A4 is the control that makes the rest a measurement: without it, "the new gate
@@ -275,6 +277,37 @@ class SidecarGate(unittest.TestCase):
             vbs.require_ffprobe = real
         self.assertEqual(rc, 1, out)
         self.assertIn("FULL mode needs ffprobe on PATH", out)
+
+    def test_full_mode_exits_1_through_the_entry_point_with_no_ffprobe(self):
+        """The predicate is not the wiring, and the wiring is what pre-commit
+        reads. This runs the real CLI with PATH stripped of ffprobe and asserts
+        the EXIT CODE, so the invariant is enforced rather than described: on a
+        machine that cannot see the audio, a Bible timings change is RED by
+        design. Verified that Python still starts with an emptied PATH before
+        relying on it -- sys.executable is absolute and its DLLs sit beside it."""
+        empty = tempfile.mkdtemp(prefix="audio-facts-nopath-", dir=self.tmp)
+        env = dict(os.environ)
+        env["PATH"] = empty
+        r = subprocess.run([sys.executable, VBS, "--edition", "brm-kjv",
+                            "--data", self.data_file(self.onsets)],
+                           capture_output=True, encoding="utf-8", errors="replace",
+                           cwd=ROOT, env=env)
+        out = (r.stdout or "") + (r.stderr or "")
+        self.assertEqual(r.returncode, 1, out)
+        self.assertIn("FULL mode needs ffprobe on PATH", out)
+        self.assertIn("--audio-facts", out)          # and it names the way forward
+
+    @unittest.skipUnless(shutil.which("ffprobe"),
+                         "needs ffprobe on PATH; CI runners have none, which is the "
+                         "condition the refusal arm above covers")
+    def test_require_ffprobe_is_true_where_ffprobe_exists(self):
+        """The TRUE branch of the predicate, which nothing else exercises. It
+        skips with a reason that names ffprobe so a CI log says WHY rather than
+        only counting a skip -- and the skipped total is pinned nowhere: a rising
+        count with a different reason is a finding, a pinned number is a comment
+        that goes stale."""
+        vbs = _load(VBS, "validate_bible_sync_haveffprobe")
+        self.assertTrue(vbs.require_ffprobe())
 
     def test_the_duration_leg_of_the_audit_actually_fires(self):
         """The dur leg is the one arm the planted-file test cannot reach, because
