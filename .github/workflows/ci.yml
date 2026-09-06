@@ -299,6 +299,35 @@ jobs:
         # (which would silently leave existing web clients on stale scripture).
         run: node tools/check-corpus-version.js --check
 
+      - name: Verify drive-sourced Bible editions route to their declared tag
+        # A Bible edition with a `driveFolder` ships opaque Drive ids and declares
+        # its releaseTag, because nothing in such an id says which release it lives
+        # on. If bibleAudioAssetUrl is not routing by that declared tag, the ids
+        # fall through its asset-name prefix table to the append-only
+        # audio-bible-v1 and every chapter 404s against a release that genuinely
+        # exists — a real URL, a real tag, no asset.
+        #
+        # EXIT 2 IS A FAILURE, NOT A SKIP. The script exits 2 when it cannot
+        # evaluate the manifest at all, distinct from 1 for "routing is wrong",
+        # and `run:` fails the step on ANY non-zero status — which is the whole
+        # point of putting it here. `e2e:readalong` exiting 2 with "no keys with
+        # locally cached audio" was read as a skip by its runner on 2026-09-05,
+        # so a gate that measured nothing reported green on the one branch that
+        # touched the path.
+        #
+        # Keep this a BARE step, captured and never piped. Two edits would
+        # silently discard the exit code and neither looks wrong: `|| true`, and
+        # a pipe — `node tools/check-drive-edition-routing.mjs | tail` reports
+        # tail's status, not the gate's, so a red gate reads green. A bare `node`
+        # (or `npm run`, which propagates a non-zero status verbatim) is what
+        # makes this gate cost nothing to keep correct.
+        #
+        # It is on the LANDING path deliberately, not in pre-commit: it is red
+        # until the routing change lands, so it must block the merge without
+        # blocking the commits that carry the edition. It lifts itself with no
+        # marker to remove, and passes trivially while no drive edition exists.
+        run: node tools/check-drive-edition-routing.mjs
+
       - name: Verify ASSET_INTEGRITY describes the assets on disk
         # service-worker.js REFUSES to install a build whose bytes disagree with its
         # generated ASSET_INTEGRITY map, so a stale map means no client can update at
