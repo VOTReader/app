@@ -91,7 +91,7 @@ for (const [id, e] of drive) {
   }
   for (const row of rows) {
     checked++;
-    const url = bibleAudioAssetUrl(row[0], e);      // the second argument is the change being waited on
+    const url = bibleAudioAssetUrl(row[0], e.releaseTag);  // the 2nd arg is the TAG STRING (Web Builder, w-reltag 5c291e39)
     if (typeof url !== 'string' || !url.startsWith(e.releaseTag)) {
       problems.push(`${id}: ${row[2] || row[0]} routes to\n      ${url || '(empty)'}\n    but its declared tag is\n      ${e.releaseTag}`);
       break;                                        // one example per edition is enough to act on
@@ -107,10 +107,11 @@ if (problems.length) {
   console.error('');
   for (const p of problems) console.error('    ' + p);
   console.error('');
-  console.error('    THE MISSING CHANGE (Web Builder, audio-track.js): bibleAudioAssetUrl takes an');
-  console.error('    optional edition and returns edition.releaseTag + asset + \'.mp3\' when one is');
-  console.error('    given. The trust boundary does not move — AUDIO_RELEASE_PREFIX is already in');
-  console.error('    RELEASE_PREFIXES and a Drive-id name already satisfies isVotAudioUrl.');
+  console.error('    THE MISSING CHANGE (Web Builder, w-reltag 5c291e39, audio-track.js):');
+  console.error('    bibleAudioAssetUrl(id, tag) takes the TAG STRING as its second argument and');
+  console.error('    returns tag + asset + \'.mp3\' when RELEASE_PREFIXES.includes(tag). The trust');
+  console.error('    boundary does not move — AUDIO_RELEASE_PREFIX is already in RELEASE_PREFIXES');
+  console.error('    and a Drive-id name already satisfies isVotAudioUrl.');
   console.error('');
   process.exit(1);
 }
