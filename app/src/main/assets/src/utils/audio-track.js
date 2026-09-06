@@ -135,6 +135,34 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     releaseTag: AUDIO_RELEASE_PREFIX,
     books: ['matthew'],
   }),
+  'john-film': Object.freeze({
+    // The first LISTENING-ONLY edition. The Gospel of John film's narration is a
+    // translation this corpus does not carry: a CPU probe scored it 0.461 against
+    // KJV, BSB, LSV and YLT — four translations TIED at exactly that value, which
+    // is a match on function words and not a match at all. Forced-aligning it
+    // would paint the wrong words with HIGH confidence, which is worse than
+    // painting nothing, so it ships with audio and no timings.
+    label: 'John · The Gospel of John (film audio, no read-along)',
+    short: 'John · Film',
+    volKey: 'bible-john-film',
+    assetPrefix: 'gjn',
+    // gjn2_ is deliberately NOT in BIBLE_ASSET_STAMPS, and this edition must
+    // therefore DECLARE its host. c48 removed bibleAudioAssetUrl's catch-all
+    // fall-through to audio-bible-v1 ("a catch-all else is a guess"), so an
+    // unstamped name now returns '' rather than a confidently wrong URL — which
+    // is why the declaration is the mechanism this file already names: "an
+    // edition that ships whole-book assets in future declares a releaseTag the
+    // way Matthew does rather than inheriting this."
+    releaseTag: AUDIO_BIBLE_RELEASE_PREFIX,
+    books: ['john'],
+    // NO `translation`, and absent rather than null: nothing in src/ reads an
+    // edition's `.translation`, so null vs absent is unobservable today — but a
+    // null is a VALUE, and the first consumer to write
+    // `edition.translation || 'nkjv'` turns it into a confident wrong answer,
+    // while a missing key reads as "not declared". Naming an id here would be
+    // worse still: it would promise a text that cannot be produced.
+    timed: false,
+  }),
 });
 
 /** Reader code → the human name every surface prints. ONE registry: the

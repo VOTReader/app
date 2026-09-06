@@ -168,3 +168,42 @@ describe('sync-loaders — the Bible timings', () => {
     await expect(loadBibleSync('bible-brm-kjv')).resolves.toBeUndefined();
   });
 });
+
+describe('sync-loaders — an edition that declares itself untimed is never fetched', () => {
+  beforeEach(installFactory);
+
+  /* WHY THIS PAIR, AND WHY IN ONE TEST.
+     bibleSyncEditionFor is a LOOP over BIBLE_AUDIO_EDITIONS, so 'john-film'
+     passed the `!ed` guard the moment its entry existed and built a loader for a
+     bible-sync-john-film.js that will never be written. ReadAlongHighlight's
+     effect carries `playerVersion` — deliberately, so a real retry can succeed —
+     which made that one 404 per pause, resume, seek and track change for the
+     whole session.
+
+     "It did not fetch" is not on its own a measurement: a harness that never
+     reached the function produces exactly the same zero. So the assertion is a
+     NUMBER THAT MOVES AND THEN DOES NOT — one timed edition takes the count from
+     0 to 1, and the untimed one leaves it at 1, in the same test, with one field
+     of difference between them. (Web Builder, 2026-09-06.) */
+  it('a timed edition builds a loader and an untimed one leaves the count where it was', async () => {
+    await loadBibleSync('bible-brm-kjv');
+    expect(globalThis.__makeLazyLoader, 'the harness never reached the real function')
+      .toHaveBeenCalledTimes(1);
+
+    await loadBibleSync('bible-john-film');
+    expect(globalThis.__makeLazyLoader,
+           'the untimed edition built a loader for a sync file that will never exist')
+      .toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves rather than throwing, so a caller awaiting it is not a special case', async () => {
+    await expect(loadBibleSync('bible-john-film')).resolves.toBeUndefined();
+  });
+
+  it('never asks for a bible-sync-john-film.js by any path', async () => {
+    await loadBibleSync('bible-john-film');
+    const paths = globalThis.__makeLazyLoader.mock.calls.map((c) => c[1]);
+    expect(paths).not.toContain('src/data/bible-sync-john-film.js');
+    expect(paths.some((p) => String(p).includes('john-film'))).toBe(false);
+  });
+});
