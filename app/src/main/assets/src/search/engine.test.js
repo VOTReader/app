@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { VotSearchMini } from './engine.js';
 
 // ── Fixture corpus (window globals + VotSearchData), installed for the suite ──
@@ -163,5 +163,74 @@ describe('VotSearchMini engine', () => {
     expect(VotSearchMini.getState().ready).toBe(true);
     const { results } = await VotSearchMini.search('shepherd');
     expect(results.length).toBeGreaterThan(0);
+  });
+});
+
+/* search-6 — THE PARSE NEEDS NO INDEX AND MUST NOT WAIT FOR ONE.
+
+   `search()` awaited `ensureReady(options)` BEFORE parsing, and every non-text
+   kind returns `results: []` two lines later without touching MiniSearch:
+
+     engine.js:141   await ensureReady(options);          <- the ~10 s cold build
+            :143   const parsed = parseReference(query, { corpus });
+            :147   if (parsed.kind !== 'text') return { parsed, results: [], … };
+
+   `parseReference` reads only the `searchData()` tables, which ship in bundle-a
+   and are loaded before the app renders — the suggest box already proves it, since
+   it answers at one character with no index at all. So "gen 1:1" and "/home" were
+   held behind a build they have no use for.
+
+   THIS BLOCK OWNS ITS DATA. It installs its own globals and imports a FRESH engine
+   module, so `ready` is false with NO build in flight: the assertions below cannot
+   race a build started by someone else's setup, and the suite-wide beforeAll's
+   index cannot make a "did not build" assertion pass for the wrong reason. */
+describe('search-6 — a reference or command answers before the index exists', () => {
+  let prevData;
+  let E;
+  beforeEach(async () => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
+    vi.resetModules();
+    E = (await import('./engine.js')).VotSearchMini;
+  });
+  afterEach(() => {
+    window.VotSearchData = prevData;
+    for (const k of Object.keys(GLOBALS)) delete globalThis[k];
+  });
+
+  it('CONTROL and precondition: a fresh engine is NOT ready and has no build running', () => {
+    /* Every assertion below reads `ready` to decide whether the index was waited
+       on. If this case goes red the discriminator is gone and the others mean
+       nothing, whatever colour they show. */
+    expect(E.getState().ready).toBe(false);
+    expect(E.getState().building).toBe(false);
+  });
+
+  it('a COMMAND resolves without building the index', async () => {
+    const r = await E.search('/home');
+    expect(r.parsed).toBeTruthy();
+    expect(r.parsed.kind).toBe('command');
+    expect(r.results).toEqual([]);
+    // The index was never needed, so it was never waited for.
+    expect(E.getState().ready).toBe(false);
+  });
+
+  it('a bare BOOK reference resolves without building the index', async () => {
+    const r = await E.search('gen 1');
+    expect(r.parsed).toBeTruthy();
+    expect(r.parsed.kind).not.toBe('text');
+    expect(r.results).toEqual([]);
+    expect(E.getState().ready).toBe(false);
+  });
+
+  it('CONTROL: a TEXT query DOES build — the wait was moved, not deleted', async () => {
+    /* Without this, "the index was not built" is satisfied by a search() that
+       stopped building for everything, which would be a far worse defect than the
+       one being fixed. */
+    const r = await E.search('compassion');
+    expect(r.parsed.kind).toBe('text');
+    expect(E.getState().ready).toBe(true);
+    expect(r.results.length).toBeGreaterThan(0);
   });
 });
