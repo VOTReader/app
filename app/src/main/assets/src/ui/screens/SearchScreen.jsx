@@ -186,7 +186,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         // SRCH4: include the matched synonyms (when synonym search is on) so the
         // snippet highlights the word that actually surfaced the verse.
         const terms = expandSnippetTerms(
-          r.parsed, r.parsedTerms || [],
+          // search-2: under a nav card `parsed` is the CARD's kind, so the
+          // snippet terms have to come from the text reading of the same query
+          // or the hits arrive with nothing highlighted.
+          r.textQuery || r.parsed, r.parsedTerms || [],
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
           settings.searchSynonyms !== false,
         );

@@ -26,11 +26,30 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
+import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
+
+/**
+ * The parse kinds a direct-nav card answers ALONE.
+ *
+ * A POSITIVE LIST, not `kind !== 'text'` (search-2). These three are addresses
+ * and actions — an explicit chapter or verse, a volume/letter ref, a command —
+ * and text hits beneath them would be noise. Everything else falls through to
+ * the text pipeline, so a kind added later is VISIBLE rather than inheriting
+ * silence from a catch-all `else`.
+ */
+const NAV_ONLY_KINDS = new Set(['ref-bible', 'ref-letter', 'command']);
+
+/**
+ * How many text hits ride under a nav card. Five, the same count the search
+ * screen's own preview slice uses — a bare `Psalms` matches thousands of verses,
+ * and an uncapped wall of them reads as though the card had been buried.
+ */
+const NAV_TEXT_LIMIT = 5;
 
 const FUZZY = 0.2;
 
@@ -136,7 +155,7 @@ async function ensureReady(options) {
  */
 async function search(query, options) {
   options = options || {};
-  const limit = options.limit || 200;
+  let limit = options.limit || 200;
   const corpus = options.corpus || 'all';
 
   /* THE PARSE GOES FIRST, BECAUSE IT NEEDS NO INDEX (search-6). `parseReference`
@@ -157,11 +176,28 @@ async function search(query, options) {
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
-  if (parsed.kind !== 'text') return { parsed, results: [], parsedTerms: [], textQuery: null };
+  if (NAV_ONLY_KINDS.has(parsed.kind)) return { parsed, results: [], parsedTerms: [], textQuery: null };
 
   await ensureReady(options);
 
-  const p = parsed;
+  /* search-2 — A BARE BOOK NAME AND A NAMED-PASSAGE KEY KEEP THEIR CARD AND ALSO
+     RUN THE TEXT PIPELINE. Until now every non-text parse returned `results: []`,
+     so a reader who typed "Revelation" got a card to the book and not one verse
+     containing the word. The cost landed on the book names that are also ordinary
+     English words: Numbers, Judges, Kings, Chronicles, Job, Psalms, Proverbs,
+     Song, Acts, Revelation, Lamentations, James, Jude.
+
+     The card is untouched — SearchScreen already renders direct entries ABOVE the
+     results list — so the reader who wanted the book loses nothing and the reader
+     who wanted the word stops being told there is nothing. Owner's decision
+     (2026-09-06): card first, text below, capped.
+
+     `parsed` stays the NAV kind, because that is what builds the card; the text
+     pipeline needs the same query parsed as TEXT, which is what `p` is. Two
+     readings of one query, and the return carries both. */
+  const navAlso = parsed.kind !== 'text';
+  const p = navAlso ? parseTextQuery(query) : parsed;
+  if (navAlso) limit = Math.min(limit, NAV_TEXT_LIMIT);
   const D = searchData();
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.slice()).concat(p.must);
   const useStop = options.useStopWords !== false;
