@@ -24,7 +24,7 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle,
+  maxZoomFor, ribbonStyle, autoDensity,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -94,6 +94,16 @@ function anchoredDensity(cache, g, cam, v, density) {
 const RULER_H = 74;
 
 const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
+
+/* What the auto-switch says through .sw-live when it moves the density on the
+   reader's behalf. A switch nobody is told about is a silent one, and a screen
+   reader has no other way to know the picture changed. design-perf's spec gives
+   the Essential wording; the wording on the way back is mine, and it names the
+   control's own label ("Famous") as well as the spec's phrase, because
+   announcing "All connections" while the visible control reads Famous would
+   describe a UI this version does not have. */
+const DENSITY_AUTO_ON = 'Essential density, strongest connections only';
+const DENSITY_AUTO_OFF = 'Famous density, all connections';
 const COLOR_LABEL = { distance: 'Distance', testament: 'Testament', genre: 'Genre' };
 const DENSITY_HINT = {
   essential: 'only the strongest connections',
@@ -195,12 +205,23 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // reader stays in the control they were using instead of at the document top.
   const myWebBtnRef = React.useRef(null);
   const [emptyDismissed, setEmptyDismissed] = React.useState(false);
-  const [density, setDensity] = React.useState(() => {
+  // THE STORED PREFERENCE AND THE LIVE VALUE ARE TWO THINGS NOW. The
+  // auto-switch moves `density` at depth and must never touch `baseDensity`,
+  // because leaving the band has to return the reader to what THEY chose
+  // rather than to a constant.
+  const storedDensity = () => {
     // `classic` was the old internal name; accept it once so existing
     // settings migrate naturally while the feature speaks in user terms.
     const saved = settings && settings.webDensity === 'classic' ? 'famous' : settings && settings.webDensity;
     return DENSITY_STEPS.indexOf(saved) >= 0 ? saved : 'famous';
-  });
+  };
+  const [baseDensity, setBaseDensity] = React.useState(storedDensity);
+  const [density, setDensity] = React.useState(storedDensity);
+  // Any tap on the density control pins it FOR THE SESSION. Deliberately not
+  // persisted: a pin is about this visit, and storing it would turn the
+  // auto-switch off forever after one tap on a control the reader was only
+  // looking at.
+  const [densityPinned, setDensityPinned] = React.useState(false);
   const [colorMode, setColorMode] = React.useState('distance');
   const [detail, setDetail] = React.useState(null);      // the open sheet
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
@@ -431,6 +452,36 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       zoomInRef.current.setAttribute('aria-disabled',
         zoom >= maxZoomOf(g, v) - 1e-9 ? 'true' : 'false');
     }
+    /* THE ESSENTIAL AUTO-SWITCH, evaluated here rather than in a zoom handler
+       because EVERY route to a new ppv passes through a frame - pinch, fling
+       settle, keyboard, Go to, the zoom buttons - and a handler would have to
+       be patched in five places and would still miss the sixth. setState runs
+       only when the answer CHANGES, and the 2:1 hysteresis band is what makes
+       that rare instead of per frame.
+
+       Canonical only. Personal mode has no density control (and draws with a
+       fixed 'essential'), so moving this state there would silently change
+       what the reader finds when they switch back.
+
+       PLACED BELOW THE LABEL WRITES ON PURPOSE. Above them, the frame that
+       switches returned before writing the zoom readout, so the reader kept
+       seeing 721x for one frame while the camera was already at 1153x -
+       measured. The labels take only the camera and the zoom, so nothing
+       here needs the density and the stale frame is free to remove.
+
+       The early return matters: without it this frame draws at the density we
+       have just decided is wrong, and the reader sees one frame of the old
+       picture on every crossing. The setState schedules the replacement. */
+    if (mode === 'canonical') {
+      const wantDensity = autoDensity({
+        ppvCss: cam.ppv / v.DPR, current: density, pinned: densityPinned, base: baseDensity,
+      });
+      if (wantDensity !== density) {
+        setDensity(wantDensity);
+        setAnnounce(wantDensity === 'essential' ? DENSITY_AUTO_ON : DENSITY_AUTO_OFF);
+        return;
+      }
+    }
     if (mode === 'personal') {
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
@@ -471,7 +522,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-  }, [graph, colorMode, density, viewFor, mode, railOpts]);
+  }, [graph, colorMode, density, densityPinned, baseDensity, viewFor, mode, railOpts]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -938,7 +989,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
               <select className="sw-select" value={density} aria-label="Connection density"
                 onChange={(e) => {
                   const next = e.target.value;
-                  setDensity(next); flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
+                  // A tap is the reader saying what they want: it pins, so the
+                  // auto-switch stops moving them, and it becomes their base so
+                  // leaving the band returns here. Tapping Famous at the ceiling
+                  // is the one tap back the decision asks for.
+                  setDensity(next); setBaseDensity(next); setDensityPinned(true);
+                  flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);
                 }}>
                 <option value="essential">Essential</option>

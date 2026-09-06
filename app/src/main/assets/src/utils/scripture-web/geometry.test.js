@@ -628,6 +628,37 @@ describe('scripture-web — the Essential auto-switch', () => {
     expect(A(1, 'essential', false, 'essential')).toBe('essential');
   });
 
+  it('the band absorbs a +-2 % oscillation ON the edge: ONE switch, not forty', () => {
+    /* A finger resting at the entry edge while the fling settles. This is gate 3
+       of the spec, run as a unit rather than as a one-off probe, because the law
+       is pure and a probe that only ever ran once protects nothing later. */
+    let current = 'famous', switches = 0;
+    for (let i = 0; i < 40; i++) {
+      const ppvCss = DENSITY_ENTER_PPV_CSS * (i % 2 === 0 ? 1.02 : 0.98);
+      const next = autoDensity({ ppvCss, current, pinned: false, base: 'famous' });
+      if (next !== current) switches++;
+      current = next;
+    }
+    expect(switches).toBe(1);
+    expect(current).toBe('essential');
+  });
+
+  it('CONTROL for the oscillation: a sweep that never reaches the edge switches ZERO times', () => {
+    /* Without this, "exactly one switch" is equally satisfied by a law that
+       switches once ANYWHERE — including at a threshold this sweep never
+       crosses. The two together say the switch happened, once, and because of
+       the edge. */
+    let current = 'famous', switches = 0;
+    for (let i = 0; i < 40; i++) {
+      const ppvCss = 18 * (i % 2 === 0 ? 1.02 : 0.98);   // 17.64 to 18.36, all inside the band
+      const next = autoDensity({ ppvCss, current, pinned: false, base: 'famous' });
+      if (next !== current) switches++;
+      current = next;
+    }
+    expect(switches).toBe(0);
+    expect(current).toBe('famous');
+  });
+
   it('leaving returns the reader to THEIR base, never to a constant', () => {
     // The arm that reddens if `return o.base` is ever written as 'famous'.
     expect(A(5, 'essential', false, 'famous')).toBe('famous');
