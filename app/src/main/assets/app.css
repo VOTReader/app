@@ -6986,6 +6986,17 @@
     }
     .sw-empty-body { font-size: var(--fs-15); line-height: 1.65; }
     .sw-empty-body strong { color: var(--gold-bright); font-weight: 600; }
+    /* A phone reader is in LANDSCAPE here — ScriptureWebScreen locks it on a
+       coarse pointer — so the frame is about 360 CSS px tall and .sw-narrow is
+       absent. 42 % of that is 151, which put the panel's top edge at 85 while
+       .sw-controls runs to 117: the notice covered the strip and its Dismiss
+       button sat on the zoom group. Measured by design-perf at 800x360.
+       58 % centres it at 209 on that frame, 26 px below the controls and well
+       above the credit at 341. The 190px floor only bites on a frame shorter
+       than ~328 CSS px, where a bare percentage would slide back under the
+       strip; it never moves the frame the numbers above were measured on.
+       Portrait (.sw-narrow) keeps 42 %, which was measured clear. */
+    .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 190px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
          web beneath it — the same pattern as .ann-hint-close, and it works
