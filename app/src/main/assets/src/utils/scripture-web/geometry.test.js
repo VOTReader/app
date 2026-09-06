@@ -205,18 +205,18 @@ describe('arcDistance', () => {
   it('is ~0 on the curve and grows away from it', () => {
     const base = 500, ry = 200;
     // apex of an arc spanning 200..600
-    expect(arcDistance(400, base - ry, 200, 600, base, ry, 10)).toBeLessThan(0.01);
-    expect(arcDistance(400, base - ry + 5, 200, 600, base, ry, 10)).toBeGreaterThan(3);
+    expect(arcDistance(400, base - ry, 200, 600, base, 200, ry, 10)).toBeLessThan(0.01);
+    expect(arcDistance(400, base - ry + 5, 200, 600, base, 200, ry, 10)).toBeGreaterThan(3);
   });
 
   it('rejects points outside the bounding box', () => {
-    expect(arcDistance(50, 400, 200, 600, 500, 200, 6)).toBe(Infinity);   // left of span
-    expect(arcDistance(400, 900, 200, 600, 500, 200, 6)).toBe(Infinity);  // below baseline
-    expect(arcDistance(400, 100, 200, 600, 500, 200, 6)).toBe(Infinity);  // above apex
+    expect(arcDistance(50, 400, 200, 600, 500, 200, 200, 6)).toBe(Infinity);   // left of span
+    expect(arcDistance(400, 900, 200, 600, 500, 200, 200, 6)).toBe(Infinity);  // below baseline
+    expect(arcDistance(400, 100, 200, 600, 500, 200, 200, 6)).toBe(Infinity);  // above apex
   });
 
   it('ignores degenerate zero-width arcs', () => {
-    expect(arcDistance(300, 500, 300, 300, 500, 0, 6)).toBe(Infinity);
+    expect(arcDistance(300, 500, 300, 300, 500, 0, 0, 6)).toBe(Infinity);
   });
 });
 

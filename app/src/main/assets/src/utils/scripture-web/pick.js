@@ -13,7 +13,7 @@
 
    The one invariant that matters: this must use the SAME laws the vertex
    shader draws with. There are TWO of them, and geometry.js owns both.
-   Height (geometry.arcRadiusY) — or arcs become untappable exactly where
+   Height (geometry.arcShape) — or arcs become untappable exactly where
    they look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
    the reverse: at full localize an arc with neither foot near the viewport
    paints alpha 0, and picking it silently focuses a line nobody can see.
@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcRadiusY, flyOverDim, verseToX, xToVerse,
+  arcAnchored, arcDistance, arcShape, flyOverDim, verseToX, xToVerse,
 } from './geometry.js';
 import { bucketDrawCount } from './decode.js';
 
@@ -85,8 +85,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // exactly. Only a full zero is skipped: an arc still showing the
         // partial fly-over floor is dim, but it is there to be tapped.
         if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
-        const ry = arcRadiusY((x1 - x0) * 0.5, ceil, squash, localize);
-        const d = arcDistance(px, py, x0, x1, base, ry, tol);
+        const shape = arcShape((x1 - x0) * 0.5, ceil, squash, localize);
+        const d = arcDistance(px, py, x0, x1, base, shape.R, shape.A, tol);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
         while (at > 0 && best[at - 1].distance > d) at--;
