@@ -55,6 +55,42 @@ export function isLetterAudio(path) {
 }
 
 /**
+ * The Bible-Letter Studies folder, the ONLY place a study recording is looked
+ * for. The scope is load-bearing, not tidiness: a Bible/Letter Study is BUILT
+ * from letters, so its chapter titles are letter titles verbatim —
+ * `lamb-of-god-ch13` is "Wisdom Regarding Those Who Killed The Messiah…", which
+ * is letter V1.004. Measured 2026-09-05: matching titles across the whole
+ * listing claims 25 LETTER recordings as study chapters, in nine folders plus
+ * the AI songs. A stolen id is a real recording that reaches nothing, which
+ * looks exactly like a dropped one.
+ */
+export const STUDY_ROOT = /^17\. Bible-Letter Studies\//;
+
+/** Title text reduced to what survives punctuation, case and spacing drift:
+ *  the archive writes "Purity Part One_Purity is Important to God_1.1-1.4"
+ *  where the corpus says "Purity Part One: Purity is Important to God". */
+const _normTitle = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/**
+ * The study chapter a recording in the studies folder IS, or null.
+ *
+ * EXACTLY ONE match, by owner rule: zero (a PDF, or a reading of something not
+ * in the corpus) and many (one track spanning a whole study — the Lamb of God
+ * file covers fifteen chapters and must be CUT, not mapped) both mean "not a
+ * one-to-one study chapter" and are the caller's problem, not this function's.
+ *
+ * @param {string} path      listing path, e.g. "17. Bible-Letter Studies/Purity Part One_….mp3"
+ * @param {Array<{id: string, title: string}>} chapters  every study chapter in the corpus
+ * @returns {string|null} the studyChapterId, e.g. "purity-ch1"
+ */
+export function studyChapterFor(path, chapters) {
+  if (!STUDY_ROOT.test(path) || !/\.mp3$/i.test(path)) return null;
+  const name = _normTitle(String(path).split('/').pop());
+  const hits = chapters.filter((ch) => ch && ch.title && name.includes(_normTitle(ch.title)));
+  return hits.length === 1 ? hits[0].id : null;
+}
+
+/**
  * Compose reader R's own standalone rendition of a letter from its candidate
  * pool: same precedence as the primary flatten (full > sections > parts, one
  * addendum last), restricted to R's files, first-seen per slot (which is what

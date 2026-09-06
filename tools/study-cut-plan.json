@@ -1,0 +1,28 @@
+{
+ "note": "Hand-maintained. One entry per study recording that covers MANY chapters and must be CUT into per-chapter assets. gen-audio-manifest.mjs emits a study: row for a chapter ONLY when its startSec is a number, so this file is inert until the cut points exist and can never ship an asset id that resolves to nothing. Offsets come from ONE forced alignment of the whole recording against the chapters' concatenated text (the cut points ARE that belt's output, per the Architect 2026-09-05) — never from listening, never estimated. Cut with `ffmpeg -c copy`. Asset id is <sourceId>_ch<NN>, so a re-cut shows as NEW ids rather than silently shifted times, and belt times stay relative to the asset they were cut from.",
+ "lamb-of-god": {
+  "sourceId": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY",
+  "sourceName": "YahuShua-The Lamb of God_The TRUE Chronology of The Messiahs Crucifixion and Resurrection.mp3",
+  "reader": "V",
+  "coverageEvidence": "Two independent probes, 2026-09-05. (a) chars/second of 10.98 against the 10.40-14.12 band set by the six Purity files, same reader, known 1:1. (b) A CPU-only transcription: the head reads the title block then chapter 1 verbatim; the tail matches chapter 14 and only chapter 14, then a spoken credit. Both say the recording covers chapters 0-14 and stops.",
+  "omitted": ["lamb-of-god-ch15"],
+  "omittedReason": "Chapter 15 is 'The True Chronology Chart' — a chart, not prose. It is not read aloud, so it gets no audio and no row. If a future recording DOES include it, add it here rather than stretching chapter 14 to the end of the file.",
+  "chapters": [
+   { "id": "lamb-of-god-ch0",  "startSec": null },
+   { "id": "lamb-of-god-ch1",  "startSec": null },
+   { "id": "lamb-of-god-ch2",  "startSec": null },
+   { "id": "lamb-of-god-ch3",  "startSec": null },
+   { "id": "lamb-of-god-ch4",  "startSec": null },
+   { "id": "lamb-of-god-ch5",  "startSec": null },
+   { "id": "lamb-of-god-ch6",  "startSec": null },
+   { "id": "lamb-of-god-ch7",  "startSec": null },
+   { "id": "lamb-of-god-ch8",  "startSec": null },
+   { "id": "lamb-of-god-ch9",  "startSec": null },
+   { "id": "lamb-of-god-ch10", "startSec": null },
+   { "id": "lamb-of-god-ch11", "startSec": null },
+   { "id": "lamb-of-god-ch12", "startSec": null },
+   { "id": "lamb-of-god-ch13", "startSec": null },
+   { "id": "lamb-of-god-ch14", "startSec": null }
+  ]
+ }
+}
