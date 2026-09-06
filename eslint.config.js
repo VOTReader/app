@@ -89,6 +89,28 @@ export default [
       // React Hooks recommended (rules-of-hooks + exhaustive-deps)
       ...reactHooksPlugin.configs.recommended.rules,
       // Local tweaks
+      // `new Function` is eval by another name. It is not in
+      // eslint:recommended, so before this line any
+      // `eslint-disable-next-line no-new-func` in this tree was DEAD — it
+      // suppressed nothing and eslint reported it as an unused directive,
+      // which `--max-warnings 0` (the CI invocation) rejects. Two branches
+      // were handed over red on that in one night.
+      //
+      // The cause was a precedent, not carelessness: the only written-down
+      // example of the idiom lives at tools/e2e-read-harness.test.js:270,
+      // WITH a three-line justification and a directive — and `npm run lint`
+      // covers only app/src/main/assets/src, so tools/ is never linted and
+      // that directive is inert there. Copy it into a linted test and CI
+      // rejects it. A precedent that is only correct because nobody checks it
+      // is worse than no precedent, and the careful justification is exactly
+      // what made the wrong form look authoritative.
+      //
+      // Turning the rule ON makes the surviving directive necessary and
+      // honest instead of dead, and buys a real protection in place of a rule
+      // nobody enforced. Cost measured before proposing it: ONE `new Function`
+      // in the linted tree and zero `eval(`, so exactly one directive is
+      // added with this change and nothing else moves.
+      'no-new-func': 'error',
       // caughtErrorsIgnorePattern: '^_' makes `catch (_e)` exempt from
       // no-unused-vars's caughtErrors check (which defaults to 'all' in
       // ESLint 9). Matches the existing argsIgnorePattern / varsIgnorePattern

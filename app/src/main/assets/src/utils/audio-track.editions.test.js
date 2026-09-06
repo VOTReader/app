@@ -34,6 +34,14 @@ const BATCH_SRC = readFileSync(join(ROOT, 'tools', 'batch-align-bible.py'), 'utf
 {
   const MANIFEST_SRC = readFileSync(
     join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
+  // The point of this file is to gate the SHIPPED manifest, so it evaluates the
+  // shipped source rather than restating it; a hand-written copy would agree
+  // with itself and with nothing else. The input is a repo file read at test
+  // time, never user input. THE DIRECTIVE MUST BE THE LAST COMMENT LINE before
+  // the statement — eslint-disable-next-line applies to the line immediately
+  // after it, so a justification written BELOW it targets a comment and the
+  // rule still fires. (Measured: it did.)
+  // eslint-disable-next-line no-new-func
   new Function('g', MANIFEST_SRC + ';g.BIBLE_AUDIO_MANIFEST = BIBLE_AUDIO_MANIFEST;')(globalThis);
 }
 const BUDGET_SRC = readFileSync(join(ROOT, 'tools', 'check-bundle-budget.js'), 'utf8');
