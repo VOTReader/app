@@ -3,7 +3,7 @@
    PERF-3: the single-entry { n -> text } index must give the SAME results as the old
    linear scan AND rebuild on a chapter/translation change (no stale cross-chapter leak). */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { translateVerse } from './translations.js';
+import { translateVerse, releaseTranslationsExcept, _translationLoaded, _translationPromises } from './translations.js';
 
 beforeEach(() => {
   globalThis.BIBLE_KJV = {
@@ -162,5 +162,126 @@ describe('translateVerse — sparse overlay base chain', () => {
       expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'rkjv')).toBe('restored kjv 16');
       expect(translateVerse('john', 3, { n: 17, text: 'x' }, 'rkjv')).toBe('For God sent not his Son');
     }
+  });
+});
+
+/* boot-performance-4 — nothing has ever released a loaded translation.
+   ----------------------------------------------------------------------
+   Each shipped bible-<code>.js sets a ~32 MB window['BIBLE_<CODE>'] global, and
+   a reader who tries several editions in one session keeps every one of them for
+   the life of the page. `_translationPromises` is a code -> Promise map that is
+   never cleared, `_translationLoaded` a code -> true map likewise, and the data
+   itself hangs off window.
+
+   THE THREE THINGS AN EVICTION MUST NOT TAKE, and only the first is obvious:
+
+     1. the reader's SELECTION                       translations.js translateVerse
+     2. its registry BASE                            _baseOf: KJV-R falls back to KJV,
+                                                     so evicting KJV while KJV-R is
+                                                     selected reads undefined and every
+                                                     overlay miss silently becomes NKJV
+     3. the per-verse index cache                    _xlateCache is keyed by translation
+                                                     and holds the extracted strings; drop
+                                                     the global and leave those and the
+                                                     eviction frees a reference, not memory
+
+   The fourth reader, scripture-resolution.js's inline tag, needs no pin: it already
+   handles an absent global by firing loadTranslation and rendering NKJV once.
+
+   And the fifth, the search index, is NOT pinned here either — deliberately, with a
+   derivation rather than a hope. buildDocs is fully synchronous (no async, await,
+   yield or timer anywhere in index-builder.js) and reads the global exactly once at
+   :211, so no eviction can interleave with a running build. The window that DOES
+   exist is between engine.js's `await loadCached(sig)` and that call, and what makes
+   it dangerous is not the eviction but dataSignature carrying nothing about whether
+   the data was there. That is closed in cache.js, where it is one component, and it
+   fixes a hole that predates this branch. */
+describe('releaseTranslationsExcept (boot-performance-4)', () => {
+  const G = /** @type {any} */ (globalThis);
+  beforeEach(() => {
+    G.TRANSLATION_OPTIONS = [
+      { id: 'nkjv', label: 'NKJV', desc: 'x' },
+      { id: 'kjv', label: 'KJV', desc: 'x' },
+      { id: 'rkjv', label: 'KJV-R', desc: 'x', base: 'kjv' },
+      { id: 'web', label: 'WEB', desc: 'x' },
+      { id: 'asv', label: 'ASV', desc: 'x' },
+    ];
+    for (const c of ['kjv', 'rkjv', 'web', 'asv']) {
+      G['BIBLE_' + c.toUpperCase()] = { john: { 3: [{ n: 16, text: c + ' 16' }] } };
+      _translationLoaded[c] = true;
+      _translationPromises[c] = Promise.resolve();
+    }
+  });
+  afterEach(() => {
+    for (const c of ['kjv', 'rkjv', 'web', 'asv']) {
+      delete G['BIBLE_' + c.toUpperCase()];
+      delete _translationLoaded[c];
+      delete _translationPromises[c];
+    }
+    delete G.TRANSLATION_OPTIONS;
+  });
+
+  const loaded = () => ['kjv', 'rkjv', 'web', 'asv'].filter((c) => G['BIBLE_' + c.toUpperCase()]);
+
+  it('PRECONDITION: all four editions are loaded before any eviction', () => {
+    /* If the fixture ever stopped loading them, every case below would be about
+       an eviction with nothing to evict, and all of them would pass. */
+    expect(loaded()).toEqual(['kjv', 'rkjv', 'web', 'asv']);
+  });
+
+  it('THE POINT: the editions the reader is not using are freed', () => {
+    releaseTranslationsExcept('web');
+    expect(loaded()).toEqual(['web']);
+  });
+
+  it('the SELECTION survives', () => {
+    releaseTranslationsExcept('asv');
+    expect(G.BIBLE_ASV).toBeTruthy();
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'asv')).toBe('asv 16');
+  });
+
+  it('the selection\'s registry BASE survives, and the overlay chain still resolves', () => {
+    /* KJV-R is a sparse overlay whose misses fall through to KJV. Evicting KJV
+       while KJV-R is selected does not fail loudly - every miss just renders NKJV,
+       which is a wrong verse rather than a missing one. */
+    releaseTranslationsExcept('rkjv');
+    expect(loaded().sort()).toEqual(['kjv', 'rkjv']);
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'rkjv')).toBe('rkjv 16');
+    expect(translateVerse('john', 3, { n: 99, text: 'nkjv99' }, 'rkjv')).toBe('nkjv99');
+  });
+
+  it('switching all the way back to NKJV frees everything', () => {
+    /* The effect that owns this returns early on nkjv today, so the one switch
+       that could free the most frees nothing. */
+    releaseTranslationsExcept('nkjv');
+    expect(loaded()).toEqual([]);
+  });
+
+  it('the bookkeeping goes with the data, so a re-open actually re-fetches', () => {
+    /* _loadTranslationScript returns the cached promise when _translationPromises
+       still holds one, so an eviction that frees the global and leaves the promise
+       makes the edition permanently unloadable: the promise resolves instantly and
+       the global never comes back. */
+    releaseTranslationsExcept('web');
+    expect(_translationLoaded.asv).toBeUndefined();
+    expect(_translationPromises.asv).toBeUndefined();
+  });
+
+  it('the per-verse index cache is purged, or the eviction frees a reference and not memory', () => {
+    /* _xlateCache is keyed translation:book:chapter and holds the EXTRACTED verse
+       strings, so it pins the parsed data after the global is gone. Read through
+       the cache first to seed it, evict, then re-install the edition with DIFFERENT
+       text: a stale index answers with the old string. */
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'asv')).toBe('asv 16');
+    releaseTranslationsExcept('web');
+    G.BIBLE_ASV = { john: { 3: [{ n: 16, text: 'asv 16 SECOND LOAD' }] } };
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'asv')).toBe('asv 16 SECOND LOAD');
+  });
+
+  it('CONTROL: an eviction with nothing to evict leaves the selection alone', () => {
+    releaseTranslationsExcept('web');
+    releaseTranslationsExcept('web');
+    expect(loaded()).toEqual(['web']);
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'web')).toBe('web 16');
   });
 });
