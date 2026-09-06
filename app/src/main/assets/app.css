@@ -7204,6 +7204,17 @@
            size is capped to the room beside the ring): Skip, Back and Next never scroll away. */
         position: sticky; bottom: -14px; margin-bottom: -14px; padding: 10px 0 14px;
         background: var(--bg3); }
+      /* THERE IS MORE BELOW. The row's solid background makes a scrolled tail look finished rather
+         than continued: at Text Size 1.8 on a 320x640 screen the card holds 557 px of words in
+         276 px of room, and 51 % of them are under the fold with no scrollbar on touch
+         (tour-card-scroll-hint-1, measured 2026-09-06). So while the card overflows it wears a soft
+         fade into its own background above the row, and one small chevron; both leave at the end.
+         The fade is the row's own shadow rather than a pseudo-element, because ::before/::after on
+         a flex container become flex ITEMS and would sit in the button row. */
+      .tour-card.has-more .tour-row { box-shadow: 0 -14px 14px -12px var(--bg3); }
+      .tour-more { position: absolute; bottom: 100%; left: 50%; width: 9px; height: 9px;
+        margin: 0 0 3px -5px; border-right: 1.5px solid var(--gold-dim); border-bottom: 1.5px solid var(--gold-dim);
+        transform: rotate(45deg); opacity: 0.85; pointer-events: none; }
       .tour-sp { flex: 1; }
       .tour-btn {
         font-family: var(--font-cinzel); font-size: var(--fs-14); letter-spacing: 0.08em; text-transform: uppercase;

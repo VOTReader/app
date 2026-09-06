@@ -339,6 +339,67 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     } finally { window.innerHeight = vh0; }
   });
 
+  /* THE SCROLL AFFORDANCE (Corbin, 2026-09-06, on "best and most professional"): when the card's
+     content overflows, a soft fade above the sticky button row and a small centred chevron, both
+     gone once the reader reaches the end. No scrollbar styling, no text. RED first: at 320x640 and
+     text size 1.8 the LISTEN card holds 557 px of words in 276 px of room, and today it says
+     nothing about the 283 px below the fold.
+     Both stubs are needed for the same reason as the cap cases above: jsdom measures nothing and
+     the effect that reads the card is gated on ResizeObserver. */
+  const withCard = (scrollH, clientH, scrollTop, run) => {
+    const proto = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    const protoC = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    const ro0 = globalThis.ResizeObserver;
+    const isCard = (el) => el.classList && el.classList.contains('tour-card');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get() { return isCard(this) ? scrollH : 0; } });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get() { return isCard(this) ? clientH : 0; } });
+    globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+    try { run(); } finally {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', protoC || { configurable: true, get() { return 0; } });
+      globalThis.ResizeObserver = ro0;
+    }
+  };
+
+  it('a card whose words overflow says so: the fade and the chevron', () => {
+    letterScreen(null);
+    startAt('listen');
+    withCard(557, 276, 0, () => {
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      expect(card.classList.contains('has-more')).toBe(true);
+      const more = card.querySelector('.tour-more');
+      expect(more).toBeTruthy();
+      expect(more.getAttribute('aria-hidden')).toBe('true');   // decorative: the words are reachable
+      expect(more.textContent).toBe('');                        // a chevron, not a word
+    });
+  });
+
+  it('a card that fits says nothing', () => {
+    letterScreen(null);
+    startAt('listen');
+    withCard(226, 226, 0, () => {
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      expect(card.classList.contains('has-more')).toBe(false);
+      expect(card.querySelector('.tour-more')).toBeNull();
+    });
+  });
+
+  it('the affordance leaves once the reader reaches the end', () => {
+    letterScreen(null);
+    startAt('listen');
+    withCard(557, 276, 0, () => {
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      expect(card.classList.contains('has-more')).toBe(true);
+      card.scrollTop = 557 - 276;                       // the reader scrolls to the end
+      fireEvent.scroll(card);
+      expect(card.classList.contains('has-more')).toBe(false);
+      expect(card.querySelector('.tour-more')).toBeNull();
+    });
+  });
+
   it('with the player bar up, the card docks above the bar', () => {
     letterScreen(vh() - 80);
     startAt('listen');
