@@ -9,8 +9,22 @@ the tree looks at that property, so this is where it is pinned.
 
 It is a RULE over whatever is shipped, deliberately not a list of chapters. A list goes stale the day
 an edition is added or the corpus is refreshed, and it goes stale silently, which is the worst way.
-Measured when this was written (2026-09-06, main 7416be36): **0 violations across 9 editions and
-8,768 chapters**, in 0.7 s, so the rule costs nothing today and fires on a bad ingest.
+
+**Two shapes hold verse rows, and the first version of this file only knew one of them.**
+
+    A  bible-*.js        {book: {chapter: [rows]}}                 9 editions,  8,768 chapters
+    B  books.js          {id, title, chapters: [{num, sections: [{verses: [rows]}]}]}
+       matthew.js          (matthew.js hangs `verses` off the chapter with no sections)
+       matthew-plain.js                                           67 books,    1,217 chapters
+
+Shape B is the app's OWN text and it was missed entirely: `books.js` holds 30,031 rows and
+`matthew.js` 1,071, which is 31,102 — the canon verse count exactly. It carries no `bible-` prefix
+and is not shaped like an edition, so a walk built around `bible-*.js` never saw it. `test_no_file_
+holds_verse_rows_that_neither_reader_covers` is the arm that stops a third shape being missed the
+same way. Measured 2026-09-06 on main 7416be36: **0 violations in either shape**, whole suite 2.5 s.
+
+Shape B is checked per WHOLE chapter with its sections joined, because the numbers must be increasing
+and unique across the chapter and a section boundary is exactly where a duplicate would sit unseen.
 
 WHAT IT DELIBERATELY DOES NOT ASSERT. Which chapters are sparse. Sparse numbering is normal and it is
 NOT a WEB quirk with four instances, which is what a reader of the old comment in
@@ -139,6 +153,82 @@ def _editions(data=None):
     return editions, unknown
 
 
+# ---------------------------------------------------------------------------------------------
+# The SECOND verse-bearing shape. `bible-*.js` is `{book: {chapter: [rows]}}`; the app's primary text
+# is not shaped like that at all: `books.js` is 65 books and `matthew.js` / `matthew-plain.js` are one
+# book each, every one of them `{id, title, chapters: [{num, sections: [{verses: [rows]}]}]}` — and
+# `matthew.js` hangs `verses` straight off the chapter with no sections. That is 32,173 verse rows
+# this gate did not look at when it was written, on the files the reader actually reads.
+#
+# Concatenating the sections per chapter is the whole point of a separate reader: the verse numbers
+# have to be increasing and unique across a WHOLE chapter, and a section boundary is exactly where a
+# duplicate or a restart would sit unseen if each section were checked alone.
+
+def _is_book(v):
+    """A shape-B book. Every chapter must be a dict: `scripture-web-data.js` also has a `chapters`
+    key, holding 1,189 LISTS, and it is a chapter index rather than a book."""
+    return (isinstance(v, dict) and isinstance(v.get("chapters"), list) and v["chapters"]
+            and all(isinstance(c, dict) for c in v["chapters"]))
+
+
+def _books(payload):
+    """(label, book) for a shape-B payload: one book, or a map of them."""
+    if _is_book(payload):
+        yield payload.get("id") or "book", payload
+    elif isinstance(payload, dict):
+        for k, v in payload.items():
+            if _is_book(v):
+                yield k, v
+
+
+def _chapter_rows(ch):
+    """One chapter's verse rows, IN DOCUMENT ORDER, across however many sections it is cut into."""
+    if isinstance(ch.get("verses"), list):
+        return list(ch["verses"])                      # matthew.js: no sections
+    return [r for sec in ch.get("sections", []) if isinstance(sec, dict)
+            for r in sec.get("verses", [])]
+
+
+def _rows_anywhere(node, path, out):
+    """Every list of `{"n": ...}` rows at any depth, with the path that reached it. Used only to
+    prove the two readers above between them cover every file that holds verse rows — a shape this
+    gate has never seen must fail here rather than simply not being walked."""
+    if isinstance(node, list):
+        if node and isinstance(node[0], dict) and "n" in node[0]:
+            out.append(path)
+            return
+        for i, v in enumerate(node):
+            _rows_anywhere(v, "%s[%d]" % (path, i), out)
+    elif isinstance(node, dict):
+        for k, v in node.items():
+            _rows_anywhere(v, "%s/%s" % (path, k), out)
+
+
+def _uncovered(data):
+    """Files under `data` holding verse rows that neither reader claims. Takes a directory so the
+    bite can point it at a fixture instead of planting a file beside the shipped corpus."""
+    covered, uncovered = set(_editions(data)[0]), []
+    payloads = {}
+    for name in sorted(os.listdir(data)):
+        if not name.endswith(".js"):
+            continue
+        try:
+            payloads[name] = _payload(os.path.join(data, name))
+        except Exception:                              # noqa: BLE001 - not every .js here is data
+            continue
+        if list(_books(payloads[name])):
+            covered.add(name)
+    for name, payload in payloads.items():
+        if name in covered:
+            continue
+        paths = []
+        _rows_anywhere(payload, "", paths)
+        if paths:
+            uncovered.append("%s (verse rows at %s%s)"
+                             % (name, ", ".join(paths[:3]), " …" if len(paths) > 3 else ""))
+    return uncovered
+
+
 class VerseNumbering(unittest.TestCase):
 
     def test_every_chapter_is_strictly_increasing_and_unique(self):
@@ -164,6 +254,72 @@ class VerseNumbering(unittest.TestCase):
                         bad.append("%s %s %s: %s" % (name, book, ch, problem))
         self.assertEqual(bad, [], "verse numbering broken in %d place(s)" % len(bad))
         print("\n  %d editions, %d chapters checked" % (len(editions), chapters))
+
+    def test_the_sectioned_books_hold_the_same_rule_across_a_whole_chapter(self):
+        """`books.js` (65 books, 1,161 chapters) plus `matthew.js` and `matthew-plain.js` (28 each).
+        That is 32,173 rows, and together with `matthew.js`'s 1,071 it is the app's own Bible text:
+        30,031 + 1,071 = 31,102, the canon verse count. Checked per WHOLE chapter, sections joined."""
+        bad, chapters, rows_seen, files = [], 0, 0, []
+        for name in sorted(os.listdir(DATA)):
+            if not name.endswith(".js"):
+                continue
+            try:
+                payload = _payload(os.path.join(DATA, name))
+            except Exception:                          # noqa: BLE001 - not every .js here is data
+                continue
+            books = list(_books(payload))
+            if not books:
+                continue
+            files.append(name)
+            for label, book in books:
+                for ch in book["chapters"]:
+                    rows = _chapter_rows(ch)
+                    chapters += 1
+                    rows_seen += len(rows)
+                    for problem in violations(rows):
+                        bad.append("%s %s ch%s: %s" % (name, label, ch.get("num"), problem))
+        self.assertEqual(bad, [], "verse numbering broken in %d place(s)" % len(bad))
+        self.assertTrue(files, "no sectioned books found — the reader stopped matching, and a walk "
+                               "that matches nothing reports no violations")
+        print("\n  %s: %d chapters, %d rows" % (", ".join(files), chapters, rows_seen))
+
+    def test_no_file_holds_verse_rows_that_neither_reader_covers(self):
+        """The coverage arm, and the reason this gate is not just two hand-picked walks.
+
+        `bible-*.js` was the whole of it when it was written, and it missed `books.js` — the app's
+        primary text, 30,031 rows — because that file is shaped differently and does not carry the
+        prefix. A third shape would be missed the same way. So: find every list of `{"n": ...}` rows
+        anywhere under the data folder, and require that each file holding one is claimed by a reader.
+        """
+        self.assertEqual(_uncovered(DATA), [], "these files hold verse rows that no reader walks")
+
+    def test_the_coverage_arm_and_the_section_join_both_go_red(self):
+        """Bites for the two arms added last: neither had been seen to fail.
+
+        The section-join case is the one that matters. Each section alone is clean — 1,2 then 2,3 —
+        and only the CONCATENATION shows the duplicate. A reader that checked sections separately
+        would report this chapter green, which is precisely the hole the join exists to close.
+        """
+        import shutil
+        import tempfile
+
+        per_section = [[{"n": 1}, {"n": 2}], [{"n": 2}, {"n": 3}]]
+        for sec in per_section:
+            self.assertEqual(violations(sec), [], "each section alone is clean — the control")
+        chapter = {"num": 1, "sections": [{"verses": s} for s in per_section]}
+        self.assertTrue(any("duplicate" in v for v in violations(_chapter_rows(chapter))),
+                        "the join across sections did not surface the duplicate")
+
+        # And the coverage arm: a file holding verse rows in a shape neither reader claims must fail.
+        tmp = tempfile.mkdtemp(prefix="versenum-cov-")
+        try:
+            with open(os.path.join(tmp, "novel-shape.js"), "w", encoding="utf-8") as fh:
+                fh.write('var X = {"deep":{"er":{"still":[{"n":1,"text":"a"}]}}};')
+            uncovered = _uncovered(tmp)
+            self.assertTrue(any("novel-shape.js" in u for u in uncovered),
+                            "a new verse-row shape was not reported: %s" % uncovered)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_the_kjv_is_dense(self):
         """`tools/validate-bible-sync.py` and ci.yml both rest on this: because the KJV numbers every
