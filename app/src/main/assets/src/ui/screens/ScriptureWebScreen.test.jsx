@@ -121,6 +121,35 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     if (realDecode) vi.mocked(decodeGraph).mockImplementation(realDecode);
   });
 
+  /* A BOUNDED WAIT THAT GIVES UP SILENTLY IS A DEAD INSTRUMENT, and this one
+     gave up twice: once in mount() and once in the density case below. With no
+     canvas on screen, `.sw-root`'s key handler returns early on `!v.W` (viewRef.W
+     comes from the GL canvas's clientWidth, which jsdom reports as 0 when the
+     element is absent), so every press is a no-op and a case asserting "the
+     density did not change" holds for the wrong reason. The Verifier hit the
+     other face of it - a false RED on a contended box, where the same silence
+     hides WHY a case failed.
+
+     So: one waiter, a bound generous enough that a slow box does not reach it,
+     and a THROW rather than a return when it does. This carries two jobs and
+     says so: it is the wait, and it is the precondition for every assertion
+     after it. If it throws, nothing below that line is about the Scripture Web.
+
+     MEASURED, both arms: with the bound at 0 the file still read 25/25 passed
+     under the old silent form; under this one the cases that were running
+     without a canvas fail by name. */
+  const awaitCanvas = async (view) => {
+    for (let i = 0; i < 40 && !view.container.querySelector('.sw-canvas-gl'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    }
+    if (!view.container.querySelector('.sw-canvas-gl')) {
+      throw new Error('.sw-canvas-gl never mounted - nothing below this line is about the Scripture Web');
+    }
+    // viewRef.W is set by the effect that follows the mount; flush once more.
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    return view;
+  };
+
   const mount = async () => {
     for (const [prop, value] of SIZES) {
       Object.defineProperty(HTMLCanvasElement.prototype, prop, {
@@ -131,13 +160,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     if (!realDecode) realDecode = vi.mocked(decodeGraph).getMockImplementation();
     vi.mocked(decodeGraph).mockImplementation(() => graph());
     const view = render(<ScriptureWebScreen {...baseProps()} />);
-    // The canvas only mounts after the graph decodes, and viewRef.W is set by
-    // the effect that follows it. Wait for the element, then flush once more.
-    for (let i = 0; i < 8 && !view.container.querySelector('.sw-canvas-gl'); i++) {
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    }
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    return view;
+    return awaitCanvas(view);
   };
 
   const zoomText = (c) => c.querySelector('.sw-context-zoom').textContent;
@@ -324,10 +347,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
       vi.mocked(decodeGraph).mockImplementation(() => graph());
       const view = render(<ScriptureWebScreen {...baseProps()} settings={{ webDensity: 'essential' }} />);
-      for (let i = 0; i < 8 && !view.container.querySelector('.sw-canvas-gl'); i++) {
-        await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-      }
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await awaitCanvas(view);
       expect(shown()).toBe('essential');
       for (let i = 0; i < 15; i++) await pressFrame('+');
       expect(shown()).toBe('essential');
