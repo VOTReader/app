@@ -1342,7 +1342,39 @@ function _persist() {
   try {
     if (typeof localStorage === 'undefined') return;
     const src = _pendingRestore || _source;
-    const track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+    let qi = _pendingRestore ? _pendingRestore.qi : _state.qi;
+    let track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+    let time = Math.floor(_state.time || 0);
+    /* THE SNAPSHOT MUST NOT NAME A RECORDING THE LISTENER HEARD TO ITS END, and
+       until now only the OTHER writer refused to. `_rememberPosition` has this
+       exact guard (`if (_finishedUrl && track.url === _finishedUrl) return;`) and
+       the per-recording record is also dropped outright by `_forgetPosition`;
+       the boot snapshot had neither.
+
+       On the normal path the omission is invisible: next() moves qi and starts
+       the new track BEFORE it persists, so the url no longer matches. The
+       sleep-at-track-end path does not advance at all, so `_markPaused()` wrote
+       the finished recording at its ending clock — and the next session resumed
+       AT the end of something already heard. Pressing play fired `ended` again at
+       once, which ran `_notifyListened` a SECOND time and counted the completion
+       twice, then skipped a track the listener was not expecting to lose.
+
+       ADVANCING rather than rewinding, because the recording is over: rewinding to
+       0 would offer it again, which is the opposite of what finishing it means.
+       And when it was the LAST one, the snapshot is cleared — the same answer
+       next() reaches through stop(), whose own comment is "the boot snapshot is
+       the part that must not resurrect the bar".
+
+       THE LIVE BAR IS DELIBERATELY NOT TOUCHED. A reader who set a sleep timer
+       wakes to the recording they finished, paused at its end: that is "this is
+       where you got to", and it is the snapshot, not the bar, that the next
+       session reads. */
+    if (!_pendingRestore && _finishedUrl && track && track.url === _finishedUrl) {
+      if (qi + 1 >= _state.queue.length) { _clearPersist(); return; }
+      qi += 1;
+      track = _state.queue[qi];
+      time = 0;
+    }
     const savedTrack = normalizeAudioTrack(track);
     if (!src || !savedTrack) return;
     const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
@@ -1354,9 +1386,9 @@ function _persist() {
     localStorage.setItem(PERSIST_KEY, JSON.stringify({
       v: 2,
       mode: src.mode, volKey: src.volKey, label: src.label,
-      qi: _pendingRestore ? _pendingRestore.qi : _state.qi,
+      qi,
       key: savedTrack.key,
-      time: Math.floor(_state.time || 0),
+      time,
       track: savedTrack,
       customQueue,
       startKey: src.startKey || undefined,
