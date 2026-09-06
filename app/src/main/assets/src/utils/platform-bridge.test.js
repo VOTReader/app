@@ -32,6 +32,7 @@ const METHODS = [
   'nativeRecordAmplitude',
   'nativeRecordStop',
   'nativeRecordCancel',
+  'nativeListRecordings',
   'nativeReadRecording',
   'nativeDeleteRecording',
   'setZoomEnabled',
@@ -81,6 +82,7 @@ function mockAndroidBridge() {
     nativeRecordAmplitude: vi.fn(() => 8192),
     nativeRecordStop: vi.fn(),
     nativeRecordCancel: vi.fn(),
+    nativeListRecordings: vi.fn(() => '[]'),
     nativeReadRecording: vi.fn(() => 'YWJj'),
     nativeDeleteRecording: vi.fn(() => true),
     setZoomEnabled: vi.fn(),
@@ -192,6 +194,10 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeRecordAmplitude', [], 8192],
     // journal-3 2a: the second route to a finished memo, and the handshake that
     // releases it. Passthroughs like the rest -- the validation is Kotlin-side.
+    // journal-3 2b: the listing. NO ARGUMENTS, and the short name is the trap —
+    // a caller written against `listRecordings` forwards, compiles, passes
+    // against a stub and fails on device only as "undefined is not a function".
+    ['nativeListRecordings', [], '[]'],
     ['nativeReadRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], 'YWJj'],
     ['nativeDeleteRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], true],
     ['getZoomScale', [], 1.5],
