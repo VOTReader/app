@@ -234,3 +234,116 @@ describe('search-6 — a reference or command answers before the index exists', 
     expect(r.results.length).toBeGreaterThan(0);
   });
 });
+
+/* search-2 — A BARE BOOK NAME AND A NAMED-PASSAGE KEY GET A CARD AND SILENCE.
+
+   `search()` returns `results: []` for every non-text parse, and two of the five
+   kinds are ordinary reader input rather than an address:
+
+     ref-book        a bare book name and NOTHING else (ref-parser.js:247, `if (!rest)`)
+     named-passage   an exact key match
+
+   So "Revelation" answers with a card to the book and not one verse containing the
+   word. The cost lands on the book names that are also ordinary English words —
+   Numbers, Judges, Kings, Chronicles, Job, Psalms, Proverbs, Song, Acts,
+   Revelation, Lamentations, James, Jude.
+
+   The nav card is NOT what changes: `SearchScreen.jsx:259` already builds direct
+   entries from a parsed ref/passage/book and renders them ABOVE the results list,
+   so the reader who wanted the book loses nothing. The list simply stops being
+   empty.
+
+   THIS BLOCK OWNS ITS DATA, and it needs its own fixture for a reason the shared one
+   cannot give: it has to contain a book whose NAME also occurs as a word in another
+   book's text. The suite fixture has no such pair, so a case written against it
+   would go green or red for a corpus reason rather than for the fix. */
+describe('search-2 — a bare book name gets its card AND the text hits', () => {
+  const S2_STOP = new Set(['the', 'of', 'and', 'is', 'he', 'their', 'by', 'them']);
+  const S2_DATA = {
+    STOP_WORDS: S2_STOP,
+    STOP_WORDS_TRIMMED: S2_STOP,
+    SYNONYM_MAP: {},
+    BOOK_ABBREVS: { numbers: 'numbers', num: 'numbers', psalms: 'psalms', ps: 'psalms' },
+    BOOK_DISPLAY: { numbers: 'Numbers', psalms: 'Psalms' },
+    NAMED_PASSAGES: [{ keys: ['numbers psalm'], bookId: 'psalms', chapter: 147 }],
+    NAMED_PASSAGE_INDEX: { 'numbers psalm': { bookId: 'psalms', chapter: 147 } },
+    WORD_NUMS: {},
+    ROMAN_NUMS: {},
+    VOLUME_COLLECTIONS: [],
+    VOLUME_TOKEN_MAP: {},
+    OT_BOOK_IDS: ['numbers', 'psalms'],
+    NT_BOOK_IDS: [],
+    GENRE_GROUPS: {},
+    COMMANDS: [],
+    COMMAND_MAP: {},
+  };
+  /* SEVEN verses carrying the word, because the CAP cannot be witnessed with five
+     or fewer available — a cap asserted against four matches passes with no cap at
+     all. */
+  const S2_GLOBALS = {
+    BOOKS: {
+      numbers: { id: 'numbers', title: 'Numbers', chapters: [{ num: 1, sections: [{ heading: '', verses: [
+        { n: 1, text: 'And the Lord spake unto Moses in the wilderness of Sinai.' },
+      ] }] }] },
+      psalms: { id: 'psalms', title: 'Psalms', chapters: [{ num: 147, sections: [{ heading: '', verses:
+        Array.from({ length: 7 }, (_unused, i) => ({
+          n: i + 1, text: 'He telleth the numbers of the stars, saying ' + (i + 1) + '.',
+        })),
+      }] }] },
+    },
+  };
+
+  let prevData;
+  let E;
+  beforeEach(async () => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = S2_DATA;
+    for (const k of Object.keys(S2_GLOBALS)) globalThis[k] = S2_GLOBALS[k];
+    vi.resetModules();
+    E = (await import('./engine.js')).VotSearchMini;
+    await E.init();
+  });
+  afterEach(() => {
+    window.VotSearchData = prevData;
+    for (const k of Object.keys(S2_GLOBALS)) delete globalThis[k];
+  });
+
+  it('CONTROL and precondition: the fixture has a book name that IS a word, seven times over', async () => {
+    /* If this goes red the fixture stopped being the thing the other cases need,
+       and "no text results" would pass for a corpus reason rather than a code one. */
+    expect(E.getState().ready).toBe(true);
+    const r = await E.search('stars');
+    expect(r.parsed.kind).toBe('text');
+    expect(r.results.length).toBe(7);
+  });
+
+  it('a bare BOOK NAME keeps its nav parse AND returns text hits', async () => {
+    const r = await E.search('numbers');
+    expect(r.parsed.kind).toBe('ref-book');       // the card is unchanged
+    expect(r.parsed.bookId).toBe('numbers');
+    expect(r.results.length).toBeGreaterThan(0);  // …and the silence is over
+  });
+
+  it('a NAMED-PASSAGE key does the same', async () => {
+    const r = await E.search('numbers psalm');
+    expect(r.parsed.kind).toBe('named-passage');
+    expect(r.parsed.bookId).toBe('psalms');
+    expect(r.results.length).toBeGreaterThan(0);
+  });
+
+  it('the text hits under a card are CAPPED at five', async () => {
+    // Seven verses carry the word; five is the count the screen's own preview
+    // slice already uses, and the cap is what stops a card being buried.
+    const r = await E.search('numbers');
+    expect(r.results.length).toBe(5);
+  });
+
+  it('CONTROL: an EXPLICIT reference still returns zero text results', async () => {
+    /* The arm that fails if the short-circuit is simply deleted — which would pass
+       every case above perfectly. "num 1" is an address, not a word. */
+    const r = await E.search('num 1');
+    expect(r.parsed.kind).toBe('ref-bible');
+    expect(r.parsed.chapter).toBe(1);
+    expect(r.results).toEqual([]);
+  });
+});
