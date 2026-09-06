@@ -249,9 +249,20 @@ function App() {
   // BOOKS.chapters[].sections[].verses[].text); all others are ~4.5MB JS
   // files loaded on demand.
   useEffect(() => {
-    const code = settings.translation;
-    if (!code || code === 'nkjv') return;
-    loadTranslation(code).then(() => setTranslationTick((v) => v + 1));
+    const code = settings.translation || 'nkjv';
+    /* Free the editions this reader has left behind: each is a ~32 MB global and
+       nothing else ever releases one. AFTER the new edition loads, never before,
+       so a reader switching between two of them is not left staring at NKJV while
+       the second download runs.
+
+       Switching all the way back to NKJV frees every alt edition, which is why
+       this effect no longer returns early on it — that is the one switch with the
+       most to free, and it used to be the one that freed nothing. */
+    if (code === 'nkjv') { releaseTranslationsExcept('nkjv'); return; }
+    loadTranslation(code).then(() => {
+      releaseTranslationsExcept(code);
+      setTranslationTick((v) => v + 1);
+    });
   }, [settings.translation]);
 
   // One-time reclaim of the RETIRED Classic engine's index cache at boot.
