@@ -36,6 +36,7 @@ import {
   audioAssetUrl,
   audioReaderLabel,
   bibleAudioAssetUrl,
+  bibleReleaseTagFor,
   isVotAudioUrl,
   normalizeAudioRate,
   normalizeAudioTrack,
@@ -157,7 +158,12 @@ const _isBibleVol = (volKey) => typeof volKey === 'string' && volKey.lastIndexOf
 /** The manifest a volKey's entries live in. */
 const _mapFor = (volKey) => (_isBibleVol(volKey) ? _bibleManifest() : _manifest());
 /** Release-aware asset → stream URL for a volKey's tracks. */
-const _assetUrlFor = (volKey, id) => (_isBibleVol(volKey) ? bibleAudioAssetUrl(id) : trackUrl(id));
+// The edition's declared release tag travels with every Bible asset URL this
+// module builds. ONE place resolves it, so a URL built here and a URL
+// compared against a saved track cannot route differently.
+const _assetUrlFor = (volKey, id) => (_isBibleVol(volKey)
+  ? bibleAudioAssetUrl(id, bibleReleaseTagFor(volKey))
+  : trackUrl(id));
 
 /** The watchdog is valid only while playback is actively loading. */
 function _clearStallWatchdog() {
@@ -1655,7 +1661,7 @@ function _locateTrack(track) {
     const manifest = _bibleManifest();
     const parts = manifest && manifest[key];
     if (!Array.isArray(parts)) return null;
-    const at = parts.findIndex((p) => p && bibleAudioAssetUrl(p[0]) === track.url);
+    const at = parts.findIndex((p) => p && _assetUrlFor(volKey, p[0]) === track.url);
     return at < 0 ? null : { volKey, id, bible: true, partIndex: at, reader: '' };
   }
   for (const rendition of renditionsFor(volKey, { id, title: track.title || '' }, track.sub)) {

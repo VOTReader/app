@@ -230,11 +230,50 @@ function _stampOf(asset) {
     ? BIBLE_ASSET_STAMPS[stamp] : null;
 }
 
-export function bibleAudioAssetUrl(id) {
+export function bibleAudioAssetUrl(id, tag) {
   const asset = typeof id === 'string' ? id.trim() : '';
   if (!/^[A-Za-z0-9_-]+$/.test(asset)) return '';
+  // A DECLARED tag wins. An edition whose ids are opaque (Matthew ships
+  // Drive ids) says where its bytes live instead of hiding the routing in
+  // the name — and it must still be one of RELEASE_PREFIXES, or the trust
+  // boundary would be decided by whoever edits the registry.
+  if (typeof tag === 'string' && tag) {
+    return RELEASE_PREFIXES.includes(tag) ? tag + asset + '.mp3' : '';
+  }
+  // The per-chapter editions route by the stamp their names carry.
   const stamp = _stampOf(asset);
-  return (stamp ? stamp.host : AUDIO_BIBLE_RELEASE_PREFIX) + asset + '.mp3';
+  if (stamp) return stamp.host + asset + '.mp3';
+  // The whole-book ids are '<editionId>_<book>' — a shape this app shipped and
+  // still plays, so it is matched by NAME against the registry rather than
+  // being whatever happens when nothing else matched. Derived, so a new
+  // edition cannot silently join or leave it.
+  for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
+    if (asset.lastIndexOf(id + '_', 0) === 0) return AUDIO_BIBLE_RELEASE_PREFIX + asset + '.mp3';
+  }
+  // Everything else returns '', the same answer an invalid id gets. This used
+  // to fall through to audio-bible-v1, which turned "I do not know this
+  // edition" into a confidently wrong URL: an undeclared edition would 404 on
+  // every chapter, at play time, instead of failing once where it was built.
+  // A catch-all else is a guess; the two routes above are facts.
+  return '';
+}
+
+/**
+ * The release tag an edition declares, or '' when it routes by asset-name
+ * stamp. One lookup, so the URL builder and anything comparing built URLs
+ * cannot disagree about where an edition lives.
+ *
+ * @param {unknown} volKey
+ * @returns {string}
+ */
+export function bibleReleaseTagFor(volKey) {
+  const id = bibleSyncEditionFor(volKey);
+  // OPTIONAL BY DESIGN: an edition whose asset names carry a stamp needs no
+  // declaration, so the property is absent on every per-chapter entry and the
+  // frozen literal's inferred type does not have it.
+  const ed = id ? /** @type {{releaseTag?: string}} */ (
+    BIBLE_AUDIO_EDITIONS[/** @type {keyof typeof BIBLE_AUDIO_EDITIONS} */ (id)]) : null;
+  return (ed && ed.releaseTag) || '';
 }
 
 /**

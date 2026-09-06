@@ -47,8 +47,10 @@ function installGlobals() {
   globalThis.AUDIO_SECTIONS = { one: [['Part 1 · 1-2', 'sec1', 'V'], ['Part 2 · 3', 'sec2', 'V']] };
   globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis'], ['exodus', 'Exodus'], ['psalms', 'Psalms']];
   globalThis.BIBLE_AUDIO_MANIFEST = {
-    'bible-brm-kjv:genesis': [['brm_gen', '']],
-    'bible-brm-kjv:exodus': [['brm_exo', '']],
+    // Real whole-book ids: '<editionId>_<book>'. 'brm_gen' named no edition
+    // and no stamp, so it was a shape no release could ship.
+    'bible-brm-kjv:genesis': [['brm-kjv_genesis', '']],
+    'bible-brm-kjv:exodus': [['brm-kjv_exodus', '']],
   };
 }
 
@@ -187,7 +189,7 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
     expect(screen.queryByText('Psalms')).toBeNull();   // not in this edition's manifest
 
     fireEvent.click(screen.getByRole('button', { name: 'Play Exodus' }));
-    expect(queueUrls()).toEqual([BURL('brm_exo')]);    // Genesis stays behind the horizon
+    expect(queueUrls()).toEqual([BURL('brm-kjv_exodus')]);    // Genesis stays behind the horizon
   });
 
   /* A8 (2026-08-10): the screen withheld the Text icon from every Bible row
