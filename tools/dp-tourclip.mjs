@@ -21,6 +21,14 @@
 //     measuring the size.
 //   * The card's scroll state is reported beside every gap (scrollTop / scrollHeight / clientHeight),
 //     so a green that comes from the card no longer scrolling is visible rather than assumed.
+//
+// VERSIONS
+//   v1  the gap at first view and at the end, two frames, one run.
+//   v2  + the scroll affordance (tour-card-scroll-hint-1), asserted as a RELATION rather than a
+//       fixture: the fade and the chevron are present exactly when the card overflows and the
+//       reader is not at the end. So the same assertion is the positive case at 1.8 on the small
+//       frame, the negative case at 1x where the card fits, and the leaves-at-the-end case, and no
+//       arm of it can be satisfied by hard-coding a frame.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -139,6 +147,9 @@ try {
       lines.sort((a, b) => a.bottom - b.bottom);
       const lowest = lines[lines.length - 1] || null;
       const covered = lines.filter((l) => l.bottom > rowR.top + 0.5);
+      const more = card.querySelector('.tour-more');
+      const moreShown = !!(more && more.getBoundingClientRect().width > 0);
+      const fadeShown = getComputedStyle(row).boxShadow !== 'none';
       return {
         vh: window.innerHeight, vw: window.innerWidth,
         fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() || '1',
@@ -147,6 +158,7 @@ try {
         scroll: { top: card.scrollTop, height: card.scrollHeight, client: card.clientHeight, scrollable: card.scrollHeight > card.clientHeight + 1 },
         rowTop: rowR.top, rowHeight: rowR.height,
         lowest, lineCount: lines.length,
+        affordance: { klass: card.classList.contains('has-more'), chevron: moreShown, fade: fadeShown },
         coveredLines: covered.map((l) => ({ text: l.text, bottom: Math.round(l.bottom), over: Math.round(l.bottom - rowR.top) })),
       };
       function cardR(el) { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; }
@@ -168,8 +180,10 @@ try {
       }
       const g = lowest ? rowR.top - lowest.bottom : null;
       const top = card.scrollTop;
+      const moreEl = card.querySelector('.tour-more');
+      const aff = { klass: card.classList.contains('has-more'), chevron: !!(moreEl && moreEl.getBoundingClientRect().width > 0), fade: getComputedStyle(row).boxShadow !== 'none' };
       card.scrollTop = 0;
-      return { gapAtEnd: g === null ? null : +g.toFixed(1), scrolledTo: top, lowest: lowest && lowest.text };
+      return { gapAtEnd: g === null ? null : +g.toFixed(1), scrolledTo: top, lowest: lowest && lowest.text, affordance: aff };
     });
 
     if (m.error) { fail(m.error); await ctx.close(); continue; }
@@ -182,6 +196,19 @@ try {
     if (mEnd) console.log(`  scrolled to the end (${mEnd.scrolledTo}): gap ${mEnd.gapAtEnd === null ? 'n/a' : Math.round(mEnd.gapAtEnd)} px`);
     if (m.coveredLines.length) console.log(`  covered: ${JSON.stringify(m.coveredLines)}`);
     if (SHOTS) await page.screenshot({ path: resolve(SHOTS, `tourclip-${tag}-${SCALE}x-${SHA}.png`) });
+
+    // THE AFFORDANCE, as a relation: shown exactly when there is more below and the reader is not
+    // at the end. One assertion covers the positive, the negative and the leaves-at-the-end case.
+    const overflows = m.scroll.height - m.scroll.top - m.scroll.client > 2;
+    const shown = m.affordance.chevron && m.affordance.fade;
+    console.log(`  affordance at first view: chevron ${m.affordance.chevron}, fade ${m.affordance.fade} (more below: ${overflows})`);
+    if (shown !== overflows) fail(`${tag}: the affordance is ${shown ? 'shown' : 'absent'} while there ${overflows ? 'IS' : 'is NOT'} more below the fold`);
+    else ok(`${tag}: the affordance ${shown ? 'is shown, and there is more below' : 'is absent, and the card fits'}`);
+    if (mEnd && mEnd.affordance) {
+      const shownEnd = mEnd.affordance.chevron && mEnd.affordance.fade;
+      if (shownEnd) fail(`${tag}: the affordance is still shown with the card scrolled to its end`);
+      else ok(`${tag}: the affordance is gone at the end`);
+    }
 
     if (gap === null) fail(`${tag}: no body text found in the card`);
     else if (gap < MIN_GAP) fail(`${tag}: the last line's bottom is ${Math.round(gap)} px from the button row top, under the ${MIN_GAP} px floor` + (gap < 0 ? ' — the row covers it' : ''));
