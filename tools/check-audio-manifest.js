@@ -88,9 +88,22 @@ const AUDIO_MANIFEST = ctx.AUDIO_MANIFEST || {};
 const AUDIO_ALTERNATES = ctx.AUDIO_ALTERNATES || {};
 const AUDIO_SECTIONS = ctx.AUDIO_SECTIONS || {};
 // ── what the manifest ships ──────────────────────────────────────────────
-const primaryRows = Object.values(AUDIO_MANIFEST).flat();          // [id, reader, label?]
+// LETTER keys only. The manifest also carries `study:` keys (a different
+// surface, one recording per chapter, no reader choice); counting them here
+// reported 735 letters / 737 tracks against the generator's 729 / 731 for the
+// same run, and two instruments that disagree about one quantity say nothing
+// about which is right.
+const LETTER_KEYS = Object.keys(AUDIO_MANIFEST).filter((k) => !k.startsWith('study:'));
+const primaryRows = LETTER_KEYS.map((k) => AUDIO_MANIFEST[k]).flat();   // [id, reader, label?]
 const emitted = new Set();
 for (const row of primaryRows) emitted.add(row[0]);
+// Study assets are OUT of primaryRows (a different surface, and the reader
+// counts are a letters question) but IN `emitted`, which is a different
+// question again: is this a well-formed Drive id, and is it on the release?
+// Splitting the two is the point — a set that carries the ids must audit them.
+for (const k of Object.keys(AUDIO_MANIFEST)) {
+  if (k.startsWith('study:')) for (const row of AUDIO_MANIFEST[k]) emitted.add(row[0]);
+}
 
 /** letterKey -> [[reader, rows, note?], ...] */
 let altRenditions = 0;
@@ -162,7 +175,37 @@ if (lost.length) {
        lost.slice(0, 5).map((l) => `${l.key} [${l.reader}]`).join(', '));
 }
 
+// ── the Bible/Letter Studies, their own family ───────────────────────────
+// One recording per chapter and no reader choice, so the (letter, reader)
+// identity above does not describe them. The identity that does: every study
+// chapter the generator MAPPED is offered, and every study key offered was
+// mapped. Both directions, because one alone passes on an empty manifest.
+{
+  const studies = coverage.studies || {};
+  const offeredStudies = new Set([...offered.keys()].filter((k) => k.startsWith('study:'))
+    .map((k) => k.slice('study:'.length)));
+  for (const id of Object.keys(studies)) {
+    if (!offeredStudies.has(id)) fail(`study:${id}: mapped by the generator but the manifest offers no audio for it`);
+  }
+  for (const id of offeredStudies) {
+    if (!(id in studies)) { fail(`study:${id}: offered but the coverage file never mapped it — one of the two is stale`); continue; }
+    const want = studies[id];
+    const got = [...(offered.get('study:' + id) || [])];
+    if (got.length !== 1 || got[0] !== want) {
+      fail(`study:${id}: offered by ${got.join('/') || 'nobody'}, mapped from ${want}`);
+    }
+  }
+  // Not a failure: a studies-folder recording that is not one chapter is
+  // either a track awaiting a CUT (the Lamb of God file spans fifteen
+  // chapters) or a file nobody has looked at. Printed so a NEW one is visible
+  // — a count could not tell those apart, and silence could not show either.
+  for (const n of coverage.studiesUnresolved || []) {
+    console.log(`  note: studies-folder recording that is not one chapter: ${n}`);
+  }
+}
+
 for (const [key, readers] of offered) {
+  if (key.startsWith('study:')) continue;          // checked as its own family above
   if (!letters[key]) { fail(`${key}: the manifest offers audio the coverage file has never heard of — one of the two is stale`); continue; }
   const known = readersOf(key);
   for (const reader of readers) {
@@ -256,7 +299,8 @@ for (const v of Object.values(letters)) for (const n of Object.values(v.readers 
 // ── 5. report ────────────────────────────────────────────────────────────
 const primCounts = countByReader(primaryRows, (r) => r[1]);
 const altCounts = countByReader(altCountRows, (r) => r);
-console.log(`[audio-manifest] ${Object.keys(AUDIO_MANIFEST).length} letters, ${primaryRows.length} primary tracks (${formatReaderCounts(primCounts)})`);
+console.log(`[audio-manifest] ${LETTER_KEYS.length} letters, ${primaryRows.length} primary tracks (${formatReaderCounts(primCounts)})`);
+console.log(`[audio-manifest] ${Object.keys(coverage.studies || {}).length} study chapters with their own recording`);
 console.log(`[audio-manifest] ${Object.keys(AUDIO_ALTERNATES).length} letters with a reader choice, ${altRenditions} renditions / ${altTracks} tracks (${formatReaderCounts(altCounts)})`);
 console.log(`[audio-manifest] ${Object.keys(letters).length} letters mapped, ${candidateTotal} candidate recordings, ${emitted.size} distinct assets emitted, ${(coverage.collapsedByHash || []).length} same-audio duplicates collapsed`);
 

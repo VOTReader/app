@@ -35,6 +35,7 @@ import { fileURLToPath } from 'url';
 import {
   READER_RANK, composeAlternates, countByReader, dedupeByAudioHash, formatReaderCounts,
   readerFromFilename, isLetterAudio, NON_LETTER_ROOT,
+  STUDY_ROOT, studyChapterFor,
 } from './audio-renditions-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,8 @@ const COVERAGE = resolve(HERE, 'audio-manifest-coverage.json');
 // md5Checksum covers the ID3 tags this hash strips — so the map has to be produced
 // from D:\VOT-Archive. Absent, nothing is collapsed and the run is what it always was.
 const HASHES = resolve(HERE, '_audio-drive-hashes.json');
+// Hand-maintained cut points for study recordings that span many chapters.
+const CUTS = resolve(HERE, 'study-cut-plan.json');
 
 // ── corpus load (same vm technique as validate-schemas.js) ──────────────
 const DATA_FILES = [
@@ -57,6 +60,11 @@ const DATA_FILES = [
   'volume-five.js', 'volume-six.js', 'volume-seven.js',
   'letters-timothy.js', 'letters-flock.js', 'lords-rebuke.js',
   'wtlb-one.js', 'wtlb-two.js', 'the-blessed.js', 'holy-days.js',
+  // The Bible/Letter Studies are a different surface, not a fifteenth
+  // collection: they never join COLS and never reach the letter matcher. They
+  // are loaded for their CHAPTER TITLES alone, which is how a recording in the
+  // studies folder is resolved to the chapter it is (see the study pass below).
+  'bible-studies.js',
 ];
 const ctx = {};
 for (const f of DATA_FILES) {
@@ -450,6 +458,65 @@ for (const [key, e] of acc) {
   if (pairs.length) alternates.set(key, pairs);
 }
 
+// ── the Bible/Letter Studies ─────────────────────────────────────────────
+// A SEPARATE PASS, deliberately, rather than letting these files into the
+// letter walk above. The studies folder stays in NON_LETTER_ROOT, so `files`,
+// `tally` and the coverage sidecar are untouched and the letter half of this
+// manifest is byte-identical to what it was — a claim worth being able to make
+// when the diff also adds a namespace.
+//
+// The scope is load-bearing. A Bible/Letter Study is assembled FROM letters, so
+// its chapter titles are letter titles verbatim; matching titles across the
+// whole listing claims 25 LETTER recordings as study chapters (measured
+// 2026-09-05). studyChapterFor refuses anything outside the studies folder, and
+// audio-renditions-lib.test.js holds that refusal with a letter whose title IS
+// a study chapter's.
+//
+// Namespace: `study:<studyChapterId>`, volKey `study` — forced by the renderer,
+// which mounts LetterView with letterId={letter.id} on the study screen. Asset
+// ids stay Drive ids, so mirror-audio-release.py needs no change.
+const STUDY_CHAPTERS = [];
+for (const s of ctx.BIBLE_STUDIES || []) {
+  for (const ch of s.chapters || []) {
+    if (ch && ch.id && ch.title) STUDY_CHAPTERS.push({ id: ch.id, title: ch.title });
+  }
+}
+if (!STUDY_CHAPTERS.length) { console.error('FATAL: bible-studies.js loaded no chapters'); process.exit(1); }
+/** Study-folder recordings that are NOT one chapter — named, never merely counted. */
+const studyUnresolved = [];
+const studyClashes = [];
+let studyMapped = 0;
+for (const f of listing) {
+  if (!STUDY_ROOT.test(f.path) || !/\.mp3$/i.test(f.path)) continue;
+  const name = f.path.split('/').pop();
+  const chId = studyChapterFor(f.path, STUDY_CHAPTERS);
+  if (!chId) { studyUnresolved.push(name); continue; }
+  const key = 'study:' + chId;
+  // Two recordings claiming one chapter is not a thing to resolve quietly: the
+  // second would overwrite the first and the manifest would look complete.
+  if (manifest.has(key)) { studyClashes.push(`${chId} <- ${name}`); continue; }
+  manifest.set(key, [[f.id, readerFromFilename(name)]]);
+  studyMapped++;
+}
+
+// A recording that covers MANY chapters is cut, not mapped. The cut points come
+// from one forced alignment of the whole file and live in study-cut-plan.json;
+// a chapter with no startSec yet emits NOTHING, so the mechanism can ship now
+// and stay inert rather than offering asset ids that resolve to nothing.
+const CUT_PLAN = JSON.parse(readFileSync(CUTS, 'utf8'));
+let studyCut = 0, studyPending = 0;
+for (const [study, plan] of Object.entries(CUT_PLAN)) {
+  if (study === 'note' || !plan || !Array.isArray(plan.chapters)) continue;
+  plan.chapters.forEach((ch, i) => {
+    if (typeof ch.startSec !== 'number') { studyPending++; return; }
+    const key = 'study:' + ch.id;
+    if (manifest.has(key)) { studyClashes.push(`${ch.id} <- cut ${i} of ${study}`); return; }
+    // <sourceId>_ch<NN>: a re-cut is NEW ids, never silently shifted times.
+    manifest.set(key, [[`${plan.sourceId}_ch${String(i).padStart(2, '0')}`, plan.reader || 'V']]);
+    studyCut++;
+  });
+}
+
 // ── emit ─────────────────────────────────────────────────────────────────
 const keys = [...manifest.keys()].sort();
 const lines = keys.map((k) => JSON.stringify(k) + ':' + JSON.stringify(manifest.get(k)));
@@ -514,17 +581,46 @@ writeFileSync(COVERAGE,
   ' "listingRecords": ' + listing.length + ',\n' +
   ' "totals": ' + JSON.stringify({ listing: tally.listing, unmapped: tally.unmapped, compilations, unmappedIds: unmappedIds.sort() }) + ',\n' +
   ' "collapsedByHash": ' + JSON.stringify(collapsedByHash) + ',\n' +
+  // The studies are their OWN family, not letters: they have one recording per
+  // chapter and no reader choice, so the (letter, reader) identity above does
+  // not describe them and folding them in would make both halves harder to
+  // read. `unresolved` is the other half of the same accounting — every mp3 in
+  // the studies folder is either a mapped chapter here or a NAMED exception
+  // there, so a new upload that resolves to nothing shows up as a diff instead
+  // of vanishing into a count.
+  ' "studies": ' + JSON.stringify(Object.fromEntries(
+    [...manifest.entries()].filter(([k]) => k.startsWith('study:'))
+      .map(([k, rows]) => [k.slice('study:'.length), rows[0][1]])
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1)))) + ',\n' +
+  ' "studiesUnresolved": ' + JSON.stringify(studyUnresolved.slice().sort()) + ',\n' +
   ' "letters": {\n' + covLines.join(',\n') + '\n }\n}\n');
 
 // ── report ───────────────────────────────────────────────────────────────
 const perCol = new Map(COLS.map((c) => [c.volKey, { have: 0, total: (c.preface ? 1 : 0) + c.letters.length }]));
-for (const key of keys) perCol.get(key.split(':')[0]).have++;
-console.log(`audio-manifest: ${keys.length} letters with audio (${matched} files used, ${skipped} non-letter files excluded)`);
+// `study:` keys are not a collection and have no per-collection total; counting
+// them here read `perCol.get('study').have++` on undefined and killed the run.
+const letterKeys = keys.filter((k) => !k.startsWith('study:'));
+for (const key of letterKeys) perCol.get(key.split(':')[0]).have++;
+console.log(`audio-manifest: ${letterKeys.length} letters with audio (${matched} files used, ${skipped} non-letter files excluded)`);
+{
+  const total = STUDY_CHAPTERS.length;
+  console.log(`  studies:  ${studyMapped} of ${total} study chapters have their own recording`);
+  // Named, not counted. A study-folder recording that is not one chapter is
+  // either a track to CUT or a file nobody has looked at, and a bare number
+  // cannot tell those apart — nor can it stop a new upload being swallowed.
+  for (const n of studyUnresolved) console.log(`    not one chapter (cut or unmapped): ${n}`);
+  console.log(`    from the cut plan: ${studyCut} chapter asset(s) emitted, ${studyPending} awaiting an offset`);
+  for (const c of studyClashes) console.error(`    CLASH, second recording ignored: ${c}`);
+  if (studyClashes.length) { console.error('FATAL: two recordings claim one study chapter'); process.exit(1); }
+}
 {
   // Reader counts, primary and alternate, kept separate (FlockSync v2 §5.5) —
   // the one number that says whether Timothy's and Benjamin's readings actually
   // reached the app, and the number that regressed silently before this run.
-  const primRows = [...manifest.values()].flat();
+  // LETTER rows only. This line answers "did every reader's letter readings
+  // reach the app" (FlockSync v2 §5.5); folding the study recordings in moved
+  // it 731 -> 737 and diluted the reader counts with a different surface.
+  const primRows = letterKeys.map((k) => manifest.get(k)).flat();
   const primIds = new Set(primRows.map((r) => r[0]));
   const primCounts = countByReader(primRows, (r) => r[1]);
   console.log(`  primary:  ${primRows.length} tracks (${formatReaderCounts(primCounts)})`);

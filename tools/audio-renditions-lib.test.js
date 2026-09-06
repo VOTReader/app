@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   READER_RANK, renditionFor, slotCount, completenessNote,
   composeAlternates, dedupeByAudioHash, countByReader, formatReaderCounts,
+  studyChapterFor,
 } from './audio-renditions-lib.mjs';
 
 /** The rules as they stood before 2026-09-04 — kept ONLY to prove the change. */
@@ -271,5 +272,74 @@ describe('reader counting for the report', () => {
 
   it('says "none" rather than an empty string when nothing was counted', () => {
     expect(formatReaderCounts(countByReader([], (r) => r[1]))).toBe('none');
+  });
+});
+
+/* ── studyChapterFor — which recordings are study chapters ─────────────────
+   The RED is Purity: six recordings, six chapters, one-to-one. The controls
+   are what make it mean anything, because the naive version of this rule
+   (match a chapter title anywhere in a filename) passes Purity and then steals
+   letters — a Bible/Letter Study is assembled FROM letters, so its chapter
+   titles ARE letter titles. Measured over the real listing on 2026-09-05: 25
+   letter recordings across nine collection folders and the AI songs would be
+   claimed as study chapters if the folder scope were dropped. */
+describe('studyChapterFor — a study recording, or nothing', () => {
+  const CHAPTERS = [
+    { id: 'purity-ch1', title: 'Purity Part One: Purity is Important to God' },
+    { id: 'purity-ch2', title: 'Purity Part Two: Avoiding Sin' },
+    { id: 'purity-ch3', title: 'Purity Part Three: True Repentance' },
+    { id: 'purity-ch4', title: 'Purity Part Four: Purification Through the Word of God' },
+    { id: 'purity-ch5', title: 'Purity Part Five: Purified in the Spirit' },
+    { id: 'purity-ch6', title: 'Purity Part Six: Purified Through the Blood of Messiah' },
+    { id: 'lamb-of-god-ch13', title: 'Wisdom Regarding Those Who Killed The Messiah, Who Is Called Christ' },
+    { id: 'lamb-of-god-ch15', title: 'The True Chronology Chart' },
+  ];
+  const S = '17. Bible-Letter Studies/';
+
+  it('maps each of Purity\'s six recordings to its own chapter', () => {
+    // Real archive filenames: the separator drifts between ": ", " - " and "_",
+    // and each carries a trailing section range the corpus does not have.
+    const got = [
+      'Purity Part One_Purity is Important to God_1.1-1.4 (read by text-to-speech).mp3',
+      'Purity Part Two_Avoiding Sin_2.1-2.4 (read by text-to-speech).mp3',
+      'Purity Part Three - True Repentance_3.1-3.2 (read by text-to-speech).mp3',
+      'Purity Part Four - Purification Through the Word of God_4.1-4.2 (read by text-to-speech).mp3',
+      'Purity Part Five - Purified in the Spirit_5.0 (read by text-to-speech).mp3',
+      'Purity Part Six - Purified Through the Blood of Messiah_6.0-6.1 (read by text-to-speech).mp3',
+    ].map((n) => studyChapterFor(S + n, CHAPTERS));
+    expect(got).toEqual(['purity-ch1', 'purity-ch2', 'purity-ch3',
+                         'purity-ch4', 'purity-ch5', 'purity-ch6']);
+  });
+
+  it('refuses a LETTER whose title is a study chapter title verbatim', () => {
+    // THE control. V1.004 is a letter; lamb-of-god-ch13 is that same text
+    // inside a study. Only the folder tells them apart, so a rule without the
+    // scope check passes the test above and silently reassigns this recording.
+    const letter = '1. Volume 1 - Audio Letters/'
+      + 'V1.004_Wisdom Regarding Those Who Killed The Messiah, Who Is Called Christ (read by text-to-speech).mp3';
+    expect(studyChapterFor(letter, CHAPTERS)).toBeNull();
+    // ...and the same words INSIDE the studies folder do resolve, which is what
+    // proves the refusal above is about the folder and not about the title.
+    expect(studyChapterFor(S + 'Wisdom Regarding Those Who Killed The Messiah, Who Is Called Christ.mp3',
+                           CHAPTERS)).toBe('lamb-of-god-ch13');
+  });
+
+  it('refuses a track that spans a whole study rather than one chapter', () => {
+    // The Lamb of God recording covers chapters 0-14. It has to be CUT, and
+    // "many" must not collapse to "the first one" — that would ship fifteen
+    // chapters of audio under one chapter id, painting the wrong text.
+    expect(studyChapterFor(
+      S + 'YahuShua-The Lamb of God_The TRUE Chronology of The Messiahs Crucifixion and Resurrection.mp3',
+      CHAPTERS)).toBeNull();
+  });
+
+  it('refuses a non-mp3 in the studies folder', () => {
+    expect(studyChapterFor(S + 'Bible:Letter Study PDFs/Satan\'s Devices Part 2 Study.pdf', CHAPTERS)).toBeNull();
+  });
+
+  it('is case-insensitive about the extension', () => {
+    // One file in 5,151 is ".MP3" (TSOT_Matthew-Chapter-001.MP3). A
+    // case-sensitive test drops exactly one chapter and reads like an archive gap.
+    expect(studyChapterFor(S + 'Purity Part Two_Avoiding Sin_2.1-2.4.MP3', CHAPTERS)).toBe('purity-ch2');
   });
 });
