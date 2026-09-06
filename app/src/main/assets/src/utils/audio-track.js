@@ -277,6 +277,11 @@ export function bibleEditionOfAsset(assetId) {
 function _paintEditionOf(track, manifest) {
   const key = (track && typeof track.key === 'string') ? track.key : '';
   const divider = key.indexOf(':');
+  // A CHEAP SHAPE REJECT, NOT A CORRECTNESS GUARD, and the difference is
+  // measured: biting this line out leaves the suite green, because a malformed
+  // key finds no manifest row and the row check answers null anyway. It is
+  // here to keep a garbage string out of the lookup, and it says so rather
+  // than being read later as the thing that makes this function safe.
   if (divider < 1 || divider >= key.length - 1) return null;
   const rows = manifest && manifest[key];
   if (!Array.isArray(rows)) return null;
