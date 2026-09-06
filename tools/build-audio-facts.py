@@ -49,6 +49,14 @@ first comparison because the belts record `audioSize` and nothing else; the
 identity is the hash.
 
 Re-run this whenever the audio changes, and commit the result.
+
+THE CHECK TO HAND THE NEXT READER IS BYTES, NOT PARSED JSON. `--check`
+regenerates to a temporary file and compares sha256 with the committed one. A
+JSON compare would be blind to line endings, and line endings are a regression
+this generator has already had: it wrote CRLF into a repo whose .gitattributes is
+`* text=auto eol=lf`, so every regeneration differed on every line of the file
+for a reason with nothing to do with the audio -- and a parsed comparison would
+have called that identical.
 """
 import argparse
 import hashlib
@@ -185,6 +193,9 @@ def main():
     ap.add_argument("--edition", action="append",
                     help="edition to record (repeatable; default: every shipped one)")
     ap.add_argument("--out", default=DEFAULT_OUT)
+    ap.add_argument("--check", action="store_true",
+                    help="regenerate to a temp file and compare BYTES with --out, "
+                         "changing nothing; exit 1 if they differ")
     a = ap.parse_args()
 
     eds = a.edition or shipped_editions()
@@ -229,11 +240,35 @@ def main():
     # regeneration would then differ from the committed file in all 482 KB for a
     # reason that has nothing to do with the audio -- which destroys the one
     # check anyone would reach for, regenerate and compare bytes.
-    with open(a.out, "w", encoding="utf-8", newline="\n") as f:
+    target = a.out
+    if a.check:
+        target = a.out + ".check.tmp"
+    with open(target, "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1, sort_keys=True)
         f.write("\n")
-    print(f"wrote {a.out}  ({os.path.getsize(a.out):,} bytes)")
-    return 0
+    if not a.check:
+        print(f"wrote {a.out}  ({os.path.getsize(a.out):,} bytes)")
+        return 0
+
+    def sha(p):
+        return hashlib.sha256(open(p, "rb").read()).hexdigest()
+
+    try:
+        if not os.path.exists(a.out):
+            print(f"FAIL: --check has nothing to compare against; {a.out} does not exist")
+            return 1
+        got, want = sha(target), sha(a.out)
+        print(f"regenerated {got[:16]}  committed {want[:16]}")
+        if got != want:
+            print(f"FAIL: regenerating produces different BYTES than {a.out}. Either the audio "
+                  f"moved under the committed sidecar, or the generator does. Compare the "
+                  f"change report above before regenerating over it.")
+            return 1
+        print(f"OK: regenerating reproduces {a.out} byte for byte "
+              f"({os.path.getsize(a.out):,} bytes)")
+        return 0
+    finally:
+        os.remove(target)
 
 
 if __name__ == "__main__":

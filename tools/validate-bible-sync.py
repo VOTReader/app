@@ -53,16 +53,34 @@ def load(path, name):
 
 
 @functools.lru_cache(maxsize=None)
-def ffprobe_dur(path):
-    # Memoised: FULL mode asks for every chapter's duration twice -- once in the
-    # per-chapter loop and once in the sidecar audit -- and each miss is a
-    # process spawn. Without this the audit doubled the pre-commit gate.
+def _ffprobe_dur(path, mtime_ns, size):
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "csv=p=0", path], capture_output=True, text=True)
     try:
         return float(r.stdout.strip())
     except ValueError:
         return None
+
+
+def ffprobe_dur(path):
+    """The chapter's duration, memoised on (path, mtime, size).
+
+    Memoised because FULL mode asks for every chapter's duration TWICE -- once in
+    the per-chapter loop and once in the sidecar audit -- and each miss is a
+    process spawn; without it the audit doubled the pre-commit gate.
+
+    Keyed on the file's IDENTITY and not on its NAME: a cache keyed by path alone
+    is a stale read the moment one process writes an mp3 and then probes it,
+    which is what a re-encode pass regenerating in-process would do. The stat is
+    one syscall against a process spawn, so the guard is free.
+    Ceiling: mtime and size can collide in principle; hashing on every probe to
+    close that would cost more than the cache saves, and no caller re-encodes a
+    chapter to the same byte size inside one filesystem timestamp tick."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return _ffprobe_dur(path, st.st_mtime_ns, st.st_size)
 
 
 def flat_translation_map(translation):
