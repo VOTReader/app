@@ -29,6 +29,40 @@ describe('cache signature', () => {
     delete G.LETTERS_V1;
   });
 
+  it('busts when the alt-translation DATA is absent, so a partial index cannot be served as a whole one', () => {
+    /* buildDocs reads window['BIBLE_<CODE>'] once, and when it is absent it
+       builds the index with NO alt-translation text at all - silently, because
+       an absent global and a translation with nothing to add are the same value
+       to it. Nothing in this signature was derived from that data, so the partial
+       index cached under `tr:kjv` and the complete one cached under `tr:kjv`, and
+       whichever was written first is served for the life of the corpus version.
+
+       Live today without any eviction: a cold build that starts before the
+       translation script arrives (a 404, a slow network, or simply the build
+       being kicked first) produces exactly this. boot-performance-4 adds a second
+       route to it by freeing the global on purpose, which is what made me look. */
+    const G = /** @type {any} */ (globalThis);
+    delete G.BIBLE_KJV;
+    const without = dataSignature('kjv');
+    G.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'kjv 16' }] } };
+    const with_ = dataSignature('kjv');
+    delete G.BIBLE_KJV;
+    expect(with_).not.toBe(without);
+  });
+
+  it('CONTROL: nkjv has no alt global by design, so its signature does not move', () => {
+    /* NKJV text is baked into BOOKS, so there is no BIBLE_NKJV to be present or
+       absent. Without this arm the case above is satisfied by a component that
+       flips for every translation including the one it must not. */
+    const G = /** @type {any} */ (globalThis);
+    delete G.BIBLE_NKJV;
+    const a = dataSignature('nkjv');
+    G.BIBLE_NKJV = { john: { 3: [{ n: 16, text: 'never read' }] } };
+    const b = dataSignature('nkjv');
+    delete G.BIBLE_NKJV;
+    expect(a).toBe(b);
+  });
+
   it('busts when the translation changes', () => {
     expect(dataSignature('nkjv')).not.toBe(dataSignature('kjv'));
   });
