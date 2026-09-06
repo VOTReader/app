@@ -47,7 +47,7 @@
    constructed and nothing is fetched by accident.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { bibleSyncEditionFor } from './audio-track.js';
+import { bibleSyncEditionFor, BIBLE_AUDIO_EDITIONS } from './audio-track.js';
 
 /**
  * @typedef {Object} LazyCorpus
@@ -129,6 +129,24 @@ export function loadBibleSync(volKey) {
   if (typeof volKey !== 'string' || !/^bible-[a-z0-9-]+$/.test(volKey)) return Promise.resolve();
   const ed = bibleSyncEditionFor(volKey);
   if (!ed) return Promise.resolve();
+  // An edition that declares itself untimed has no sync file and never will.
+  // `=== false` is strict so ABSENCE means timed — no existing entry moves.
+  //
+  // WHY THIS IS NOT DOCUMENTATION. bibleSyncEditionFor is a LOOP over
+  // BIBLE_AUDIO_EDITIONS, not a hand-written map, so a new entry passes the
+  // `!ed` guard above the moment it exists and builds a lazy loader for a
+  // bible-sync-<id>.js that will never be written. The retry inputs are the
+  // reader's own — ReadAlongHighlight's effect carries `playerVersion`, chosen
+  // deliberately so a real retry can succeed — so a permanently absent file is
+  // one 404 per pause, resume, seek and track change, unbounded, for the whole
+  // session. Not a loop (read-along-5 fixed that), but bounded by the reader's
+  // fingers instead, which is no better a reason.
+  //
+  // It lands with the first `timed: false` entry rather than before it:
+  // BIBLE_AUDIO_EDITIONS is Object.freeze'd, so no test can inject an untimed
+  // edition, and shipping this line earlier would ship it ungated.
+  // (Web Builder, 2026-09-06.)
+  if (/** @type {any} */ (BIBLE_AUDIO_EDITIONS[ed]).timed === false) return Promise.resolve();
   let l = _bible.get(volKey);
   if (!l) {
     if (!_hasFactory()) return Promise.resolve();

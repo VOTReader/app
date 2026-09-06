@@ -226,7 +226,7 @@ var BIBLE_AUDIO_CHAPTERS = {
 ["jude",2,1],
 ["revelation",2,22]
   ];
-  var editions = [["bible-brm-kjv","brm","all"],["bible-wop-nkjv","wop","all"],["bible-web","web","all"]];
+  var editions = [["bible-brm-kjv","brm","all"],["bible-wop-nkjv","wop","all"],["bible-web","web","all"],["bible-john-film","gjn",["john"]]];
   for (var e = 0; e < editions.length; e++) {
     for (var b = 0; b < books.length; b++) {
       var id = books[b][0], testament = books[b][1], count = books[b][2];

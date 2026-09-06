@@ -75,6 +75,18 @@ const PARSED = [];
 
 const REGISTRY_IDS = Object.keys(BIBLE_AUDIO_EDITIONS).sort();
 
+/* TIMED editions only. Both assertions below are about a bible-sync-<id>.js —
+   the file batch-align-bible.py writes and check-bundle-budget.js weighs — and
+   an edition that declares `timed: false` has no such file and never will (the
+   Gospel of John film is a translation this corpus does not carry, so it ships
+   as listening only). Splitting the list here rather than relaxing either
+   assertion is the point: a timed edition missing from the shipper, or missing
+   its budget row, still FAILS exactly as before. The untimed half gets its own
+   contract in the describe at the bottom of this file, so the new family is
+   pinned rather than merely excused. */
+const TIMED_IDS = REGISTRY_IDS.filter((id) => BIBLE_AUDIO_EDITIONS[id].timed !== false);
+const UNTIMED_IDS = REGISTRY_IDS.filter((id) => BIBLE_AUDIO_EDITIONS[id].timed === false);
+
 describe('audio-track editions — extraction sanity', () => {
   it('parses a plausible number of EDITIONS entries, each with a family', () => {
     expect(PARSED.length, 'batch-align-bible.py EDITIONS parsed too small — the extractor may have missed the shape').toBeGreaterThanOrEqual(3);
@@ -84,7 +96,7 @@ describe('audio-track editions — extraction sanity', () => {
 
 describe('audio-track editions — BIBLE_AUDIO_EDITIONS matches the shipper', () => {
   it('has exactly the edition ids batch-align-bible.py knows how to align', () => {
-    expect(REGISTRY_IDS).toEqual(PARSED.map((e) => e.id).sort());
+    expect(TIMED_IDS).toEqual(PARSED.map((e) => e.id).sort());
   });
 
   it('names the same volKey ("family") for every edition', () => {
@@ -93,8 +105,8 @@ describe('audio-track editions — BIBLE_AUDIO_EDITIONS matches the shipper', ()
     }
   });
 
-  it('gives every edition a bundle-budget row for its sync file', () => {
-    for (const id of REGISTRY_IDS) {
+  it('gives every TIMED edition a bundle-budget row for its sync file', () => {
+    for (const id of TIMED_IDS) {
       expect(BUDGET_SRC, `check-bundle-budget.js has no row for bible-sync-${id}.js`).toContain(`'src/data/bible-sync-${id}.js'`);
     }
   });
@@ -277,5 +289,43 @@ describe('audio-track editions — an edition ships exactly the books it declare
       expect(['boolean', 'undefined'], `edition ${id}`).toContain(typeof e.timed);
       expect(e.timed !== false, `edition ${id} timed default`).toBe(e.timed === undefined || e.timed === true);
     }
+  });
+});
+
+/* The untimed half, pinned rather than excused. Splitting TIMED_IDS out of the
+   two assertions above would otherwise mean a `timed: false` entry is checked by
+   nothing at all — the shape of exclusion that lets a new family rot. */
+describe('audio-track editions — a timed: false edition is a DIFFERENT contract', () => {
+  it('the shipper does not know how to align it, and must not', () => {
+    const alignable = new Set(PARSED.map((e) => e.id));
+    for (const id of UNTIMED_IDS) {
+      expect(alignable.has(id),
+             `batch-align-bible.py claims it can align "${id}", which declares timed: false`).toBe(false);
+    }
+  });
+
+  it('has NO bundle-budget row, because there is no sync file to weigh', () => {
+    for (const id of UNTIMED_IDS) {
+      expect(BUDGET_SRC, `check-bundle-budget.js budgets bible-sync-${id}.js, which will never exist`)
+        .not.toContain(`'src/data/bible-sync-${id}.js'`);
+    }
+  });
+
+  it('still declares everything an edition must declare', () => {
+    for (const id of UNTIMED_IDS) {
+      const e = BIBLE_AUDIO_EDITIONS[id];
+      expect(typeof e.volKey, `${id}.volKey`).toBe('string');
+      expect(Array.isArray(e.books) || e.books === 'all', `${id}.books`).toBe(true);
+      expect(e.label && e.short, `${id} needs a label and a short`).toBeTruthy();
+      // An untimed edition carries no translation: naming one would promise a
+      // text that cannot be produced, and a null is a value the first
+      // `edition.translation || 'nkjv'` turns into a confident wrong answer.
+      expect('translation' in e, `${id} declares a translation it does not have`).toBe(false);
+    }
+  });
+
+  it('is not a way to sneak an edition past the checks — the timed set is still non-empty', () => {
+    expect(TIMED_IDS.length, 'every edition declared itself untimed; the assertions above check nothing')
+      .toBeGreaterThanOrEqual(3);
   });
 });
