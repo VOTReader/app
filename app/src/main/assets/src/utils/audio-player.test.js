@@ -1369,6 +1369,99 @@ describe('audio-player — queue shape the desk can read', () => {
   });
 });
 
+/* read-along-4 — TAP-TO-SEEK ON THE BOOT-RESTORED BAR.
+
+   The bar a cold boot paints is a PLACEHOLDER: _restoreFromSaved() installs one
+   track, status 'paused', duration 0, and NO media element (the prewarm at :858
+   is guarded by _pendingRestore). ReadAlongHighlight's fragment tap calls
+   AudioPlayer.seek() straight through, and seek()'s first line is
+   `if (!_el) return;` — so a reader who opens a timed chapter after a boot and
+   taps a verse gets NOTHING, silently, until they think to press play first.
+
+   MEASURED BEFORE WRITING THIS GATE, AND IT MOVED THE TARGET. seek() has three
+   external callers, and the brief named one. The other two are not symptoms:
+
+     AudioSeekSlider.jsx:74   `disabled={dur === 0}` and a restored bar reports
+                              duration 0, so the scrubber cannot be dragged
+     tour-controller.js:90    inside the tour's own `st.time < at` check, and no
+                              tour is running on a cold boot
+
+   So ReadAlongHighlight is the only live caller — and the fix still belongs in
+   seek() rather than at that call site, because it is the one place all three
+   route through and the guard would otherwise have to be written three times. */
+describe('audio-player — a seek on the boot-restored bar (read-along-4)', () => {
+  const SNAPSHOT = {
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0,
+    key: 'vol1:preface', time: 90,
+    track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+  };
+
+  /** A cold boot that finds a snapshot: one placeholder track, no element. */
+  async function restored() {
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+    await load();
+    return AudioPlayer.getState();
+  }
+
+  it('CONTROL, and the harness precondition every case below rests on: the restored bar has NO element and an UNKNOWN duration', async () => {
+    const st = await restored();
+    expect(st.restoring).toBe(true);
+    expect(st.time).toBe(90);
+    /* This case carries two jobs and says so. If either expectation below
+       changes, nothing else in this describe means anything whatever colour it
+       shows: the defect exists only while there is no element, and the clamp
+       trap exists only while duration reads 0. */
+    expect(el()).toBe(null);
+    expect(st.duration).toBe(0);
+  });
+
+  it('moves the clock to the tapped position instead of silently doing nothing', async () => {
+    await restored();
+    AudioPlayer.seek(150);
+    expect(AudioPlayer.getState().time).toBe(150);
+  });
+
+  it('is NOT clamped by the unknown duration — 0 there means UNKNOWN, not zero-length', async () => {
+    await restored();
+    AudioPlayer.seek(150);
+    /* seek()'s normal path clamps to `_state.duration || _el.duration || 0`.
+       On a restored bar that whole expression is 0, so routing this case
+       through that clamp seeks every tap to the START of the recording — a
+       wrong answer where the old code at least gave none. This is the case that
+       reddens if the guard is ever "tidied" into falling through. */
+    expect(AudioPlayer.getState().time).not.toBe(0);
+    expect(AudioPlayer.getState().time).toBe(150);
+  });
+
+  it('tells the snapshot, so closing the app right after the tap resumes there', async () => {
+    await restored();
+    AudioPlayer.seek(150);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(150);
+  });
+
+  it('THE READER-FACING CONSEQUENCE: play after the tap starts at the tapped verse, not at the snapshot', async () => {
+    await restored();
+    AudioPlayer.seek(150);
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(AudioPlayer.getState().restoring).toBe(false);
+      /* The rebuild resumes at the descriptor's own `time`
+         (_rebuildRestoredQueue: `resumeAt = r.time || 0`), armed as a DEFERRED
+         seek because assigning src drops the fake element back to readyState 0. */
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(150);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+});
+
 describe('audio-player — Android keep-alive bridge', () => {
   it('activates on playing, HOLDS through pause, deactivates on stop', () => {
     // Media-card rework 2026-08-09: pause no longer releases the anchor —
