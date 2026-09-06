@@ -6,7 +6,7 @@
  * any kind. This pins the wiring so it cannot silently drop out again.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,8 +23,28 @@ describe('tools/validate-bible-sync.py is wired into the gates', () => {
     expect(step).not.toMatch(/validate-bible-sync\.py --structural/); // the aligning machine runs the full proof
   });
 
-  it('CI runs it in --structural mode (no belts, no audio on the runner)', () => {
-    expect(ci).toMatch(/python tools\/validate-bible-sync\.py --structural/);
+  it('CI runs it against the committed audio facts, not merely --structural', () => {
+    // --structural was passed here deliberately for a real reason -- the belts
+    // and the mp3s are outside the repo -- and the cost was that NO landing gate
+    // ever checked a shipped timing against its audio. tools/audio-facts.json
+    // closes that leg, so CI must run the mode that reads it; pinning the flag
+    // is the only thing that stops a future edit quietly reverting to the
+    // weaker mode, which would look identical in a green log.
+    expect(ci).toMatch(/python tools\/validate-bible-sync\.py --audio-facts/);
+    expect(ci).not.toMatch(/validate-bible-sync\.py --structural/);
+  });
+
+  it('the sidecar CI depends on is committed, and its generator with it', () => {
+    // A gate wired to a file that is not in the repo is red on every clone, and
+    // a generator that is not committed makes the file unregenerable -- which is
+    // how an artifact becomes something nobody dares touch.
+    expect(existsSync(resolve(ROOT, 'tools', 'audio-facts.json'))).toBe(true);
+    expect(existsSync(resolve(ROOT, 'tools', 'build-audio-facts.py'))).toBe(true);
+  });
+
+  it('the unittest list names the sidecar test (it is hand-maintained)', () => {
+    // A python test not named on this line is run by nothing in CI.
+    expect(ci).toMatch(/python -m unittest[^\n]*\btest_audio_facts\b/);
   });
 
   it('the hook offers the case-only restamp, never a hand edit of the generated file', () => {

@@ -27,6 +27,7 @@ the letters, validate-schemas never looks at this file. Wired into pre-commit
 (full) and CI (structural) in c43.
 """
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -111,6 +112,82 @@ def rebuild(belt):
     return arr
 
 
+FACTS = os.path.join(BASE, "audio-facts.json")
+
+
+def load_audio_facts(path, ed):
+    """(book, chapter) -> the recorded facts, from the committed sidecar.
+
+    Returns None when this edition has no section, which is a different answer
+    from an empty one: an edition the sidecar has never heard of must fail loudly
+    rather than pass with nothing to check."""
+    doc = json.load(open(path, encoding="utf-8"))
+    section = doc.get("editions", {}).get(ed)
+    if section is None:
+        return None
+    # Keyed by asset id in the file; re-keyed here on the book and chapter the
+    # file records BESIDE the id, never re-derived from the id with a second copy
+    # of the naming regex -- the one naming rule lives in the producer.
+    return {(f["book"], f["chapter"]): dict(f, assetId=asset)
+            for asset, f in section.items()}
+
+
+def facts_shape_problems(ed, facts, prefix):
+    """Does every sidecar entry NAME the chapter it claims to describe?
+
+    The only identity leg a clone can run: an entry whose asset id does not end
+    in _<book>_<chapter> is mis-keyed, and a mis-keyed entry is a real record
+    that describes the wrong file -- which is exactly what a hand edit or a bad
+    regeneration produces. It cannot be checked against the audio (CI has none),
+    so it is checked against the book and chapter the entry records beside the
+    id. The volume digit is not reconstructed: audio_index() reads it off the
+    filename ([12]) and there is nothing in the repo that knows which."""
+    out = []
+    for (book, ch), f in sorted(facts.items()):
+        asset = f.get("assetId", "")
+        tag = "%s_%03d" % (book, ch)
+        if not asset.endswith("_%s_%03d" % (book, ch)):
+            out.append((tag, f"audio-facts asset id {asset!r} does not name {book} {ch}"))
+        elif prefix and not asset.startswith(prefix):
+            out.append((tag, f"audio-facts asset id {asset!r} is not a {prefix!r} asset "
+                             f"(wrong edition's entry in the {ed} section?)"))
+    return out
+
+
+def audit_facts(ed, idx, facts, hashes):
+    """FULL mode only: is the committed sidecar still true of the real audio?
+
+    Without this the sidecar is self-certifying -- it would agree with any belt,
+    including a wrong one, which is green in exactly the case it exists to catch.
+    FULL audits it; CI trusts it. bytes and dur are nearly free here because FULL
+    already stats and ffprobes every chapter; the sha256 leg re-reads ~780 MB and
+    is opt-in."""
+    out = []
+    for (book, ch), (path, asset) in sorted(idx.items()):
+        f = facts.get((book, ch))
+        tag = "%s_%03d" % (book, ch)
+        if not f:
+            out.append((tag, "audio on disk but no entry in audio-facts.json (regenerate it)"))
+            continue
+        if f.get("assetId") != asset:
+            out.append((tag, f"audio-facts assetId {f.get('assetId')} != {asset} on disk"))
+        if f.get("bytes") != os.path.getsize(path):
+            out.append((tag, "audio-facts bytes != local mp3 (sidecar is stale)"))
+        d = ffprobe_dur(path)
+        if d is not None and abs(d - f.get("dur", -1)) > 0.01:
+            out.append((tag, f"audio-facts dur {f.get('dur')} != ffprobe {d:.3f} (sidecar is stale)"))
+        if hashes:
+            h = hashlib.sha256()
+            with open(path, "rb") as fh:
+                for block in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(block)
+            if h.hexdigest() != f.get("sha256"):
+                out.append((tag, "audio-facts sha256 != local mp3 (sidecar is stale)"))
+    for (book, ch) in sorted(set(facts) - set(idx)):
+        out.append(("%s_%03d" % (book, ch), "audio-facts entry with no audio on disk"))
+    return out
+
+
 def check(ed, a):
     """Validate ONE edition's data file. Returns 0 when it is clean."""
     bab = load(os.path.join(BASE, "batch-align-bible.py"), "batch_align_bible")
@@ -120,7 +197,20 @@ def check(ed, a):
         return 1
     want = al.settings_hash(al.settings_for(bab.EDITIONS[ed]["family"]))
     structural = a.structural
-    idx = {} if structural else bab.audio_index(ed)
+    facts = None
+    if a.audio_facts:
+        facts = load_audio_facts(a.audio_facts, ed)
+        if facts is None:
+            print(f"FAIL: {a.audio_facts} has no section for edition {ed!r} "
+                  f"(regenerate it with tools/build-audio-facts.py --edition {ed})")
+            return 1
+        shape = facts_shape_problems(ed, facts, bab.EDITIONS[ed].get("prefix"))
+        if shape:
+            print(f"FAIL: {len(shape)} malformed entr(y/ies) in {a.audio_facts}")
+            for tag, why in shape[:200]:
+                print(f"  {tag:22s} {why}")
+            return 1
+    idx = {} if (structural or facts is not None) else bab.audio_index(ed)
     belts_dir = os.path.join(BASE, "_align-work", "bible", ed)
     flat = flat_translation_map(bab.EDITIONS[ed]["translation"])
     data_path = a.data or os.path.join(DATA, f"bible-sync-{ed}.js")
@@ -197,6 +287,21 @@ def check(ed, a):
                     last = v
             if structural:
                 continue
+            if facts is not None:
+                # FACTS mode: the two legs a clone can run with no audio and no
+                # belts. The belt legs below need tools/_align-work/, which is
+                # .gitignore'd, so they stay the aligning machine's job -- and the
+                # mode line says so, because a leg that quietly does not run reads
+                # exactly like a leg that passed.
+                f = facts.get((book, ch))
+                if not f:
+                    problems.append((tag, "no audio facts for this chapter "
+                                          "(regenerate tools/audio-facts.json)"))
+                    continue
+                if last / 100.0 >= f["dur"]:
+                    problems.append((tag, f"last onset {last / 100:.2f}s is past "
+                                          f"the audio end {f['dur']:.2f}s"))
+                continue
             entry = idx.get((book, ch))
             if not entry:
                 problems.append((tag, "no local audio for this chapter"))
@@ -223,7 +328,7 @@ def check(ed, a):
                 problems.append((tag, "shipped array != rebuilt from belt"))
     # every gate-clearing current belt must be in the file
     missing = []
-    for name in ([] if structural else os.listdir(belts_dir)):
+    for name in ([] if (structural or facts is not None) else os.listdir(belts_dir)):
         if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name or name.startswith(("CAMPAIGN", "progress", "audio-index")):
             continue
         d = json.load(open(os.path.join(belts_dir, name), encoding="utf-8"))
@@ -237,7 +342,27 @@ def check(ed, a):
     for tag in sorted(missing):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
 
-    mode = "STRUCTURAL (corpus shape only; belts + audio not checked)" if structural else "FULL"
+    audited = "ABSENT"
+    if not structural and facts is None:
+        # A missing sidecar is named in the mode line rather than skipped.
+        if os.path.exists(FACTS):
+            on_disk = load_audio_facts(FACTS, ed)
+            if on_disk is None:
+                problems.append(("audio-facts", f"no section for edition {ed!r}"))
+            else:
+                # PREPENDED, not appended. A stale sidecar makes every duration
+                # finding below it suspect, so the instrument's own health is the
+                # first thing to read -- and problems are printed truncated at
+                # 200, which had put these last where a bad run hid them.
+                problems[:0] = audit_facts(ed, idx, on_disk, a.audit_audio_hashes)
+                audited = "audited incl. sha256" if a.audit_audio_hashes else "audited, bytes+dur"
+    if structural:
+        mode = "STRUCTURAL (corpus shape only; belts + audio not checked)"
+    elif facts is not None:
+        mode = ("FACTS (corpus shape + audio duration and presence from the committed "
+                "sidecar; belts and audio bytes NOT checked)")
+    else:
+        mode = f"FULL (audio-facts.json {audited})"
     print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, "
           f"{zeros - len(absent)} unproven, {len(absent)} excluded by versification  "
           f"(settings {want}, audio index {len(idx)} chapters, mode {mode})")
@@ -254,6 +379,10 @@ def check(ed, a):
     if structural:
         print("OK (structural): every chapter has one integer slot per corpus verse and onsets never step back")
         return 0
+    if facts is not None:
+        print("OK (facts): every chapter's last onset lies inside the duration the committed "
+              "sidecar records, and every shipped chapter has an entry")
+        return 0
     print("OK: every chapter matches its corpus, its audio and its belt; every current belt is shipped")
     return 0
 
@@ -264,6 +393,13 @@ def main():
     ap.add_argument("--data", help="data file to check (default src/data/bible-sync-<edition>.js)")
     ap.add_argument("--structural", action="store_true",
                     help="corpus-shape checks only: no belts, no local audio, no ffprobe (CI)")
+    ap.add_argument("--audio-facts", nargs="?", const=FACTS, default=None,
+                    help="check every last onset against the durations in the committed "
+                         "audio-facts sidecar (CI, on a clone with no audio); the bare flag "
+                         "uses tools/audio-facts.json")
+    ap.add_argument("--audit-audio-hashes", action="store_true",
+                    help="FULL mode only: also re-hash every mp3 to prove the sidecar is "
+                         "current (~780 MB of reads); bytes and duration are audited anyway")
     # Both callers -- ci.yml and .githooks/pre-commit -- used to invoke this with
     # no --edition at all, so they checked brm-kjv and nothing else while their
     # own comments claimed "every chapter in src/data/bible-sync-*.js". The
@@ -274,6 +410,12 @@ def main():
     ap.add_argument("--all-editions", action="store_true",
                     help="check every src/data/bible-sync-<edition>.js on disk")
     a = ap.parse_args()
+    if a.audio_facts and a.structural:
+        ap.error("--structural runs no audio checks at all, so --audio-facts would have "
+                 "nothing to do; pick one")
+    if a.audit_audio_hashes and (a.structural or a.audio_facts):
+        ap.error("--audit-audio-hashes audits the sidecar against the real mp3s, which only "
+                 "FULL mode has")
     if not a.all_editions:
         return check(a.edition, a)
     if a.data:
