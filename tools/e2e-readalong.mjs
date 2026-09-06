@@ -45,7 +45,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const ASSETS = resolve(ROOT, 'app', 'src', 'main', 'assets');
 const DATA = resolve(ASSETS, 'src', 'data');
-const AUDIO_DIRS = [resolve(HERE, '_align-work', 'audio'), resolve(HERE, '_align-proof')];
 const OUT = resolve(HERE, '_align-work', 'e2e');
 
 const argv = process.argv.slice(2);
@@ -54,6 +53,17 @@ const opt = (name, dflt) => {
   const i = argv.indexOf('--' + name);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt;
 };
+
+// An edition whose recordings were never aligned has no belt directory and so
+// no audio-index.json for BIBLE_INDEX to read — but its files are named exactly
+// <assetId>.mp3, which is the form localAudio() already probes. `--audio-dir`
+// serves such a staging tree without hardcoding a machine path in this file or
+// writing an index into the shared _align-work tree.
+const AUDIO_DIRS = [
+  resolve(HERE, '_align-work', 'audio'),
+  resolve(HERE, '_align-proof'),
+  ...opt('audio-dir', '').split(',').map((d) => d.trim()).filter(Boolean),
+];
 const LEAD_S = 0.15;               // mirrors ReadAlongHighlight's one constant
 
 /* ───────────────────────────────────────────────────────── local audio ── */
@@ -105,10 +115,20 @@ function localAudio(assetId) {
   return null;
 }
 
-function startServer() {
+/**
+ * @param {Map<string, number>} syncHits edition id -> requests for its
+ *   src/data/bible-sync-<id>.js, counted HERE rather than by a spy in the page.
+ *   loadBibleSync's untimed guard is a claim about a fetch that must not
+ *   happen, and the server is the one observer outside the code under test:
+ *   a spy on the module can be satisfied by the module, an unmade request
+ *   cannot. A 404 still counts — the point is that the ask happened.
+ */
+function startServer(syncHits) {
   const server = http.createServer((req, res) => {
     let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
     if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
+    const sync = /\/bible-sync-([a-z0-9-]+)\.js$/.exec(urlPath);
+    if (sync) syncHits.set(sync[1], (syncHits.get(sync[1]) || 0) + 1);
     const filePath = normalize(resolve(ASSETS, '.' + urlPath));
     if (!filePath.startsWith(ASSETS) || !existsSync(filePath) || !statSync(filePath).isFile()) {
       res.writeHead(404); res.end('not found'); return;
@@ -345,9 +365,19 @@ async function openBibleChapter(page, edition, bookId, chapterNum) {
   return ok;
 }
 
-async function checkBible(page, spec, failures, report, ctx) {
-  const edition = opt('edition', 'brm-kjv');
-  const [bookId, chStr] = spec.split(':');
+/**
+ * @param {string} spec `[edition/]book:chapter`. The edition rides the SPEC and
+ *   not a run-wide `--edition` flag because the untimed arm needs its positive
+ *   control in the SAME run: "john-film paints nothing" is worth nothing beside
+ *   a harness that painted nothing all night, and one flag cannot say
+ *   `john-film/john:1` and `brm-kjv/psalms:3` at once. `--edition` remains the
+ *   default for a bare spec.
+ * @param {Map<string, number>} syncHits from startServer — see there.
+ */
+async function checkBible(page, spec, failures, report, ctx, syncHits) {
+  const slash = spec.lastIndexOf('/');
+  const edition = slash >= 0 ? spec.slice(0, slash) : opt('edition', 'brm-kjv');
+  const [bookId, chStr] = spec.slice(slash + 1).split(':');
   const chapterNum = Number(chStr);
   const opened = await openBibleChapter(page, edition, bookId, chapterNum);
   if (!opened.ok) { failures.push({ key: spec, kind: 'NAV', detail: opened.reason }); return; }
@@ -358,6 +388,55 @@ async function checkBible(page, spec, failures, report, ctx) {
     failures.push({ key: spec, kind: 'NO-DURATION', detail: 'metadata never arrived' });
     return;
   }
+  /* ── the UNTIMED contract, and why it is not the timed one relaxed ──────
+     An edition that declares `timed: false` has no bible-sync file and never
+     will, so waiting for its global yields a HARNESS FAILURE where the claim
+     needs a measured ZERO — "the run errored" and "the guard fired and nothing
+     painted" are different facts, and only the second is evidence.
+
+     Three numbers, because two booleans prove nothing here:
+       verses  the chapter's verse blocks are ON SCREEN (a zero paint count
+               means nothing if the reader never rendered),
+       probes  seeks spread across the real duration, each read after two
+               animation frames exactly as the timed arm reads them,
+       sync    requests the local server saw for bible-sync-<id>.js.
+     The timed spec in the same run is the control for all three. */
+  const timed = await page.evaluate((ed) => {
+    const e = window.BIBLE_AUDIO_EDITIONS && window.BIBLE_AUDIO_EDITIONS[ed];
+    return !(e && e.timed === false);
+  }, edition);
+  if (!timed) {
+    const probes = await page.evaluate(async (ed, id, ch, readSrc) => {
+      const readPaint = new Function('return ' + readSrc);
+      const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const verses = document.querySelectorAll('[data-hl-key^="bible:' + id + ':' + ch + ':"]').length;
+      const table = window['BIBLE_SYNC_' + ed.toUpperCase().replace(/-/g, '_')];
+      const dur = AudioPlayer.getState().duration;
+      const out = [];
+      for (const f of [0.02, 0.1, 0.25, 0.5, 0.75, 0.95]) {
+        AudioPlayer.seek(Math.max(0, dur * f));
+        await frame();
+        const p = readPaint();
+        out.push({ at: +(dur * f).toFixed(2), size: p.size, key: p.key || null });
+      }
+      return { verses, dur, tableExists: !!table, probes: out };
+    }, edition, bookId, chapterNum, READ_PAINT);
+
+    const painted = probes.probes.filter((p) => p.size > 0).length;
+    const hits = syncHits.get(edition) || 0;
+    if (!probes.verses) failures.push({ key: spec, kind: 'NO-VERSES-RENDERED', detail: 'the chapter never painted its text, so a zero highlight count means nothing' });
+    if (probes.tableExists) failures.push({ key: spec, kind: 'UNTIMED-HAS-TABLE', detail: `BIBLE_SYNC_${edition.toUpperCase().replace(/-/g, '_')} exists for an edition that declares timed:false` });
+    if (hits) failures.push({ key: spec, kind: 'UNTIMED-SYNC-FETCHED', detail: `the page asked for bible-sync-${edition}.js ${hits} time(s); loadBibleSync's guard did not hold` });
+    for (const p of probes.probes) {
+      if (p.size > 0) failures.push({ key: spec, kind: 'UNTIMED-PAINTED', detail: `at ${p.at}s: ${p.size} range(s), key ${p.key}` });
+    }
+    report.push({ key: spec, rows: probes.verses, sampled: probes.probes.length, painted, untimed: true, syncRequests: hits, domainBad: 0 });
+    console.log(`  ${spec.padEnd(58)} ${painted}/${probes.probes.length} probes painted` +
+      `  (${probes.verses} verses rendered, ${probes.dur.toFixed(1)}s audio, bible-sync-${edition}.js requested ${hits}x)`);
+    await page.evaluate(() => AudioPlayer.stop());
+    return;
+  }
+
   // The verse timings are their own lazy file; the component asks for it the
   // first time a Bible track plays, so give that fetch a moment to land.
   try {
@@ -418,9 +497,18 @@ async function checkBible(page, spec, failures, report, ctx) {
       else console.log(`    pixel proof: +${proof.delta.dR.toFixed(1)}R +${proof.delta.dG.toFixed(1)}G over the verse block`);
     }
   }
-  report.push({ key: spec, rows: sampled.length, sampled: sampled.filter((x) => !x.skipped).length, painted, domainBad: 0 });
+  // The FLOOR under the untimed arm's zero, and it is not tidiness: if a timed
+  // edition's sync file ever stops being FETCHED (bundled eagerly, inlined),
+  // syncHits can no longer move, and "bible-sync-john-film.js requested 0x"
+  // becomes a dead instrument that still reads green. Measured 1x for brm-kjv
+  // before this line was written, not assumed.
+  if (!(syncHits.get(edition) || 0)) {
+    failures.push({ key: spec, kind: 'SYNC-NEVER-FETCHED', detail: `a TIMED edition painted without the page ever asking for bible-sync-${edition}.js — the request counter can no longer distinguish an untimed edition's guard from a counter that cannot move` });
+  }
+  report.push({ key: spec, rows: sampled.length, sampled: sampled.filter((x) => !x.skipped).length, painted, syncRequests: syncHits.get(edition) || 0, domainBad: 0 });
   console.log(`  ${spec.padEnd(58)} ${painted}/${sampled.filter((x) => !x.skipped).length} verses painted` +
-    (sampled.some((x) => x.skipped) ? `  (${sampled.filter((x) => x.skipped).length} unproven, not painted)` : ''));
+    (sampled.some((x) => x.skipped) ? `  (${sampled.filter((x) => x.skipped).length} unproven, not painted)` : '') +
+    `  (bible-sync-${edition}.js requested ${syncHits.get(edition) || 0}x)`);
   await page.evaluate(() => AudioPlayer.stop());
 }
 
@@ -492,13 +580,17 @@ async function run() {
   mkdirSync(OUT, { recursive: true });
   const ctx = readData();
   const keys = pickKeys(ctx);
-  if (!keys.length) {
+  // A --bible run never touches the letter cache (the letters loop below is
+  // skipped for it), so an empty letter cache is not its problem to report.
+  if (!keys.length && !opt('bible', '')) {
     console.error('[e2e-readalong] no keys with locally cached audio — nothing to check.');
     console.error('  cache one with:  node tools/hone-sample.mjs <key> ... (it downloads)');
     process.exit(2);
   }
 
-  const server = await startServer();
+  /** @type {Map<string, number>} edition -> bible-sync-<id>.js requests */
+  const syncHits = new Map();
+  const server = await startServer(syncHits);
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await puppeteer.launch({
     headless: true,
@@ -524,7 +616,7 @@ async function run() {
     const bibleSpec = opt('bible', '');
     if (bibleSpec) {
       for (const spec of bibleSpec.split(',').map((x) => x.trim()).filter(Boolean)) {
-        await checkBible(page, spec, failures, report, ctx);
+        await checkBible(page, spec, failures, report, ctx, syncHits);
       }
     }
 
