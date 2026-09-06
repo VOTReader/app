@@ -31,6 +31,7 @@ Run: python -m unittest test_bible_versification -v
 """
 
 import json
+import re
 import os
 import unittest
 
@@ -39,15 +40,28 @@ DATA = os.path.join(HERE, "app", "src", "main", "assets", "src", "data")
 
 
 def _payload(path):
-    """The first object literal out of a `var X = {...};` data file.
+    """The first JSON value out of a `var X = ...;` data file.
 
-    `raw_decode` rather than a slice to the last brace: some of these files declare more than one
-    value, and slicing to `rindex("}")` then reports "Extra data" — a PARSE failure that reads
-    exactly like a corrupt file when the file is fine and merely has a second declaration.
+    Two things this got wrong before, both silent:
+
+    * `raw_decode` rather than a slice to the last brace. Some of these files declare more than one
+      value, and slicing to `rindex("}")` reports "Extra data" — a PARSE failure that reads exactly
+      like a corrupt file when the file is fine and merely has a second declaration.
+    * The value may be an ARRAY. `bible-studies.js` is a top-level array, so seeking `{` walked past
+      the array opener into the first element and returned ONE STUDY as if it were the whole payload
+      — a fragment that classifies fine and tells you nothing. A parser that silently returns part of
+      a file is worse than one that raises.
     """
     with open(path, encoding="utf-8") as fh:           # `with`, not a bare open(): this repo is
         text = fh.read()                               # counting ResourceWarnings, not ignoring them
-    return json.JSONDecoder().raw_decode(text, text.index("{"))[0]
+    # Anchored on the DECLARATION, not on a bracket and not on a bare `=`. These files open with a
+    # header comment that contains both: `[appBookId, title]` in one, and
+    # `BIBLE_SYNC_BRM_KJV[bookId][chapter] = [cs, cs, ...]` in another — so `[`, and even `= [`,
+    # match inside the prose. `var NAME = {` is the only thing that cannot.
+    m = re.search(r"\b(?:var|const|let)\s+\w+\s*=\s*[{\[]", text)
+    if not m:
+        raise ValueError("no `var NAME = {` or `= [` declaration in the file")
+    return json.JSONDecoder().raw_decode(text, m.end() - 1)[0]
 
 
 def violations(rows):
@@ -71,33 +85,57 @@ def violations(rows):
     return out
 
 
-def _editions():
-    """Every shipped file that IS a verse edition, recognised by shape rather than by a name list.
+# The files under `bible-*.js` that are NOT verse editions, each with the reason it is exempt. This
+# is a LIST on purpose, and it is the right shape here: the open set that grows (editions, and the
+# per-edition sync files) is covered by a rule below, and the closed set of one-off exceptions has to
+# be justified one at a time. Anything matching neither FAILS by name, which forces the decision onto
+# whoever adds the file and still knows what it holds.
+NOT_EDITIONS = {
+    "bible-audio-manifest.js": "an audio manifest: its object literal is empty in the source and is "
+                               "populated by a loop at the bottom of the file",
+    "bible-studies.js": "a top-level array of letter studies, not a book -> chapter -> verses map",
+}
 
-    Returns (editions, unknown). An allowlist over a growing set of data files fails SILENTLY when
-    somebody adds one; classifying by shape and failing on anything unrecognised forces the decision
-    at the moment the file is added, by whoever knows what it holds.
+
+def _editions(data=None):
+    """Classify every `bible-*.js` under `data`. Returns (editions, unknown).
+
+    An allowlist over a growing set of data files fails SILENTLY when somebody adds one, so editions
+    are recognised by SHAPE. But a shape test needs somewhere for "matched nothing" to go, and the
+    first version of this let it fall out of the loop: a file that parsed to `{}` was neither an
+    edition nor an unknown, and the suite passed green over it. Planted and confirmed 2026-09-06 —
+    exactly the vacuous pass this gate exists to prevent, in the gate itself. Every branch below now
+    ends in a classification.
     """
+    data = data or DATA
     editions, unknown = {}, []
-    for name in sorted(os.listdir(DATA)):
+    for name in sorted(os.listdir(data)):
         if not name.startswith("bible-") or not name.endswith(".js"):
             continue
-        path = os.path.join(DATA, name)
+        if name in NOT_EDITIONS:
+            continue                                   # exempt by name, with its reason recorded above
+        path = os.path.join(data, name)
         try:
             payload = _payload(path)
         except Exception as exc:                       # noqa: BLE001 - the filename is the point
             unknown.append("%s (could not parse: %s)" % (name, exc))
             continue
-        if not isinstance(payload, dict):
-            unknown.append("%s (top level is %s, not an object)" % (name, type(payload).__name__))
+        if not isinstance(payload, dict) or not payload:
+            unknown.append("%s (payload is %s, and empty or not an object)" % (name, type(payload).__name__))
             continue
-        # Look for the first NON-EMPTY chapter, not chapters[0]: an edition whose first chapter
-        # happened to be empty would otherwise be classified as "not an edition" and skipped whole.
+        # The first NON-EMPTY chapter, not chapters[0]: an edition whose first chapter happened to be
+        # empty would otherwise read as "not an edition" and be skipped whole.
         sample = next((ch for book in payload.values() if isinstance(book, dict)
                        for ch in book.values() if isinstance(ch, list) and ch), None)
-        if isinstance(sample, list) and isinstance(sample[0], dict) and "n" in sample[0]:
+        if sample is None:
+            unknown.append("%s (book-shaped but holds no chapter with any rows)" % name)
+        elif isinstance(sample[0], dict) and "n" in sample[0]:
             editions[name] = payload                    # rows of {"n": ..., "text": ...}
-        # Anything else is a timing/sync array file or a manifest, and is not this gate's business.
+        elif name.startswith("bible-sync-") and isinstance(sample[0], (int, float)):
+            continue                                    # a timing file: chapters are arrays of numbers
+        else:
+            unknown.append("%s (chapters hold %s, which is neither verse rows nor timings)"
+                           % (name, type(sample[0]).__name__))
     return editions, unknown
 
 
@@ -111,18 +149,21 @@ class VerseNumbering(unittest.TestCase):
 
         bad, chapters = [], 0
         for name, payload in editions.items():
+            # Anti-vacuity, per edition and RELATIONAL rather than a number in prose: an edition that
+            # parsed to something with no books, or a book with no chapters, has to fail here and not
+            # quietly contribute nothing to a global total. The Data Builder's note on the first
+            # version was right — a floor like "> 8,000 chapters" fails in the direction that blames
+            # the data the day the corpus legitimately shrinks, and it would not have caught a single
+            # empty edition sitting beside eight full ones anyway.
+            self.assertTrue(payload, "%s has no books" % name)
             for book, chs in payload.items():
+                self.assertTrue(chs, "%s %s has no chapters" % (name, book))
                 for ch, rows in chs.items():
                     chapters += 1
                     for problem in violations(rows):
                         bad.append("%s %s %s: %s" % (name, book, ch, problem))
         self.assertEqual(bad, [], "verse numbering broken in %d place(s)" % len(bad))
-        # A floor, so a walk that silently stopped reading cannot pass as a clean run: "0 violations"
-        # over 0 chapters is the vacuous pass this whole family of gate keeps producing. 8,768 today,
-        # and the floor sits below it with room rather than pinning the exact number, which would go
-        # stale on the next edition and fail for the wrong reason.
-        self.assertGreater(chapters, 8000, "only %d chapters walked" % chapters)
-        self.assertGreaterEqual(len(editions), 5, "only %d editions found" % len(editions))
+        print("\n  %d editions, %d chapters checked" % (len(editions), chapters))
 
     def test_the_kjv_is_dense(self):
         """`tools/validate-bible-sync.py` and ci.yml both rest on this: because the KJV numbers every
@@ -162,6 +203,41 @@ class VerseNumbering(unittest.TestCase):
         swapped = [dict(r) for r in rows]
         swapped[10]["n"], swapped[11]["n"] = swapped[11]["n"], swapped[10]["n"]
         self.assertTrue(any("out of order" in v for v in violations(swapped)))
+
+    def test_the_classifier_fails_on_anything_it_does_not_recognise(self):
+        """The bite for the classifier, which is the half a checker usually forgets to test.
+
+        The first version of `_editions()` let "matched no shape" fall out of the loop, so a data file
+        that parsed to `{}` was neither an edition nor an unknown and the whole suite passed green
+        over it — the vacuous pass this gate exists to prevent, sitting in the gate. These fixtures
+        are written to a temp directory rather than into the real data folder: a test that plants a
+        file beside the shipped corpus is one crash away from leaving it there.
+        """
+        import shutil
+        import tempfile
+
+        tmp = tempfile.mkdtemp(prefix="versenum-")
+        try:
+            def write(n, s):
+                with open(os.path.join(tmp, n), "w", encoding="utf-8") as fh:
+                    fh.write(s)
+
+            write("bible-good.js", 'var A = {"genesis":{"1":[{"n":1,"text":"x"},{"n":2,"text":"y"}]}};')
+            write("bible-sync-good.js", 'var B = {"genesis":{"1":[0,120,240]}};')
+            write("bible-empty.js", "var C = {};")
+            write("bible-books-no-chapters.js", 'var D = {"genesis":{}};')
+            write("bible-wrong-rows.js", 'var E = {"genesis":{"1":["just a string"]}};')
+            write("bible-broken.js", "var F = not json at all;")
+
+            editions, unknown = _editions(tmp)
+            self.assertEqual(sorted(editions), ["bible-good.js"], "only the real edition is an edition")
+            named = " | ".join(unknown)
+            for expected in ("bible-empty.js", "bible-books-no-chapters.js",
+                             "bible-wrong-rows.js", "bible-broken.js"):
+                self.assertIn(expected, named, "%s was skipped silently instead of failing" % expected)
+            self.assertNotIn("bible-sync-good.js", named, "a timing file is a known non-edition")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_a_gap_is_not_a_violation(self):
         """The control in the other direction: sparse numbering is legal and must stay legal, or this
