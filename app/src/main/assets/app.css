@@ -518,11 +518,23 @@
       [role="radio"]:focus-visible, [role="slider"]:focus-visible,
       [role="combobox"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
       /* Native text selection in the app's own gold, everywhere (the picker used to paint Chrome's
-         blue, the reader whatever the engine chose). Text over the band is forced to the theme's body
-         ink so the gold description text keeps AA: computed on the blended band, dark #4a3d1a white
-         10.6:1, light #d4c8ac input-text 9.2:1 (gold on it would read 3.8:1). */
-      ::selection { background: rgba(232,192,80,0.32); color: var(--cream); }
-      body.light ::selection { background: rgba(122,92,16,0.28); color: var(--input-text); }
+         blue, the reader whatever the engine chose). Text over the band is forced to a colour that
+         keeps AA on the blended band, and the BAND ITSELF clears the 3:1 non-text floor against the
+         page it sits on — that is what tells the reader what is selected.
+
+         a11y-selection-band-1 (design-perf, 2026-09-06). The first pass tuned only the text and left
+         the band at 0.32 / 0.28 alpha, which composites to 1.98:1 on --bg and 2.05:1 on --bg3 dark,
+         1.49:1 and 1.44:1 light — under 3:1 in both themes. Measured twice and in agreement: computed
+         from these tokens, and read back out of the painted pixels of a real Range in the reader by
+         tools/dp-selband.mjs (dark 2.00:1, light 1.48:1 at 98de630f).
+
+         Dark takes alpha 0.46: band 3.05:1 on --bg and 3.10:1 on --bg3, --cream still 6.87 / 6.49 on
+         it, so it stays a wash. LIGHT CANNOT: on parchment no wash clears 3:1 while keeping near-black
+         text — at the alpha where the band reaches 3:1 (0.70-0.76) --input-text falls to 4.51 / 3.77.
+         So light goes near-solid and INVERTS its text to --bg: band 4.53 / 4.16 / 3.89 on bg / bg2 /
+         bg3, text 4.53 / 4.60 / 4.66. Both floors, both themes, on all three grounds. */
+      ::selection { background: rgba(232,192,80,0.46); color: var(--cream); }
+      body.light ::selection { background: rgba(122,92,16,0.90); color: var(--bg); }
       /* Wave-0: the ring previously stopped at buttons/links/cards. The
          role selectors above extend the SAME token to the remaining
          interactive families — tabs (SearchScreen corpus tabs, LinkPicker

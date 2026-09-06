@@ -278,6 +278,52 @@ describe('app.css — ::selection is gold in both themes, app-wide', () => {
     for (const b of selectionBlocks) expect(b).not.toMatch(/31,\s*121,\s*165|64,\s*153,\s*198/);
     expect(bare).not.toMatch(/\.picker-[a-z-]+ ::selection/);
   });
+
+  /* a11y-selection-band-1: the band the reader sees must itself clear 3:1 against the page, not
+     only carry legible text. This computes both from the declared tokens rather than pinning a
+     literal, so a palette move is checked instead of silently passing. The paint was read back
+     separately by tools/dp-selband.mjs and agreed to 0.02 (dark 2.00 vs 1.98 computed at 98de630f). */
+  const toRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const token = (block, name) => {
+    const m = new RegExp('--' + name + ':\\s*(#[0-9a-fA-F]{6})').exec(block);
+    return m ? toRgb(m[1]) : null;
+  };
+  const chan = (u) => { const s = u / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lum = (c) => 0.2126 * chan(c[0]) + 0.7152 * chan(c[1]) + 0.0722 * chan(c[2]);
+  const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const blend = (fg, alpha, bg) => fg.map((v, i) => v * alpha + bg[i] * (1 - alpha));
+  const selRule = (sel) => {
+    const m = new RegExp('\\n\\s*' + sel + '\\s*\\{([^}]*)\\}').exec(bare);
+    const rgba = /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(m[1]);
+    return { fg: [+rgba[1], +rgba[2], +rgba[3]], alpha: +rgba[4], color: /color:\s*var\(--([a-z-]+)\)/.exec(m[1])[1] };
+  };
+
+  it('the band itself clears 3:1 against every ground, in both themes', () => {
+    for (const [sel, blockSel] of [['::selection', ':root'], ['body\\.light ::selection', 'body.light']]) {
+      const rule = selRule(sel);
+      const block = ruleBlock(CSS, blockSel);
+      for (const ground of ['bg', 'bg2', 'bg3']) {
+        const page = token(block, ground);
+        if (!page) continue; // a ground the theme does not redefine inherits and is covered by :root
+        const band = blend(rule.fg, rule.alpha, page);
+        expect(contrast(band, page), `${sel} band on --${ground}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('text on the band still clears 4.5:1, in both themes', () => {
+    for (const [sel, blockSel] of [['::selection', ':root'], ['body\\.light ::selection', 'body.light']]) {
+      const rule = selRule(sel);
+      const block = ruleBlock(CSS, blockSel);
+      const ink = token(block, rule.color) || token(ruleBlock(CSS, ':root'), rule.color);
+      for (const ground of ['bg', 'bg2', 'bg3']) {
+        const page = token(block, ground);
+        if (!page) continue;
+        const band = blend(rule.fg, rule.alpha, page);
+        expect(contrast(ink, band), `${sel} text on the band over --${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
 });
 
 describe('app.css — .sr-only utility', () => {
