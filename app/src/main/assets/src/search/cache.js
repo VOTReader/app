@@ -70,6 +70,16 @@ export function dataSignature(translation) {
     'v:' + MS_INDEX_VERSION,
     'cv:' + CORPUS_CONTENT_VERSION,
     'tr:' + (translation || 'nkjv'),
+    // Whether the alt-translation DATA was actually in memory when the index
+    // was built. buildDocs reads window['BIBLE_<CODE>'] once and builds with no
+    // alt text at all when it is absent — silently, because an absent global and
+    // a translation with nothing to add are the same value to it. Without this
+    // component that partial index caches under the SAME key as a complete one
+    // and is served for the life of the corpus version. NKJV is baked into BOOKS
+    // and has no global, so it is 'n' rather than a flapping 0.
+    'alt:' + (!translation || translation === 'nkjv'
+      ? 'n'
+      : (g('BIBLE_' + translation.toUpperCase()) ? '1' : '0')),
     'bk:' + kc(g('BOOKS')) + '.' + bookChapterCount(),
     'mt:' + (MATTHEW && MATTHEW.chapters ? MATTHEW.chapters.length : 0),
     'v1:' + ln(g('LETTERS_V1')), 'v2:' + ln(g('LETTERS')), 'v3:' + ln(g('LETTERS_V3')),

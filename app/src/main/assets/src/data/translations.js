@@ -125,6 +125,61 @@ const _VERSIFICATION_ALIAS = {
 // after its script loads, and _verseIndex is only reached once the global exists).
 const _xlateCache = new Map();
 const _xlateCacheMax = 8;
+
+/**
+ * Free every loaded alt translation except the reader's selection and the
+ * registry base it falls through to.
+ *
+ * Each shipped bible-<code>.js sets a ~32 MB window['BIBLE_<CODE>'] global and
+ * nothing has ever released one, so a reader who tries several editions keeps
+ * all of them for the life of the page.
+ *
+ * THREE THINGS GO TOGETHER OR THE EVICTION IS WORSE THAN NOTHING:
+ *
+ *   the global      the memory itself
+ *   the bookkeeping _loadTranslationScript returns the CACHED promise when
+ *                   _translationPromises still holds one, so a global freed
+ *                   with its promise left behind is permanently unloadable —
+ *                   the promise resolves at once and the data never returns
+ *   _xlateCache     keyed translation:book:chapter and holding the EXTRACTED
+ *                   strings, so leaving it pins the parsed data and the
+ *                   eviction frees a reference rather than memory
+ *
+ * And the BASE is not a nicety: KJV-R is a sparse overlay whose misses fall
+ * through to KJV, so evicting KJV under a KJV-R reader does not fail loudly —
+ * every miss quietly renders NKJV, which is a wrong verse rather than a
+ * missing one.
+ *
+ * The caller owns the selection because App owns it; keeping a second copy
+ * here would be two definitions that have to agree. scripture-resolution's
+ * inline-tag loader deliberately never calls this: it loads a translation the
+ * reader did not select, and it already handles an absent global by firing
+ * loadTranslation and rendering NKJV once.
+ *
+ * @param {string} selected - the reader's current translation ('nkjv' frees all)
+ * @returns {string[]} the codes actually freed, for the caller to log or test
+ */
+export function releaseTranslationsExcept(selected) {
+  const keep = new Set(['nkjv']);
+  if (selected) {
+    keep.add(selected);
+    const base = _baseOf(selected);
+    if (base) keep.add(base);
+  }
+  const freed = [];
+  for (const code of Object.keys(_translationLoaded)) {
+    if (keep.has(code)) continue;
+    try { delete (/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()]; } catch (_e) { /* a non-configurable global stays; the rest of the sweep still runs */ }
+    delete _translationLoaded[code];
+    delete _translationPromises[code];
+    const prefix = code + ':';
+    for (const key of [..._xlateCache.keys()]) {
+      if (key.lastIndexOf(prefix, 0) === 0) _xlateCache.delete(key);
+    }
+    freed.push(code);
+  }
+  return freed;
+}
 function _verseIndex(data, translation, bookId, chNum) {
   const key = translation + ':' + bookId + ':' + chNum;
   const hit = _xlateCache.get(key);
