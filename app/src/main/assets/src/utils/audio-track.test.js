@@ -45,6 +45,14 @@ const SHIPPED_MANIFEST = (() => {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const SRC = readFileSync(join(HERE, '..', 'data', 'bible-audio-manifest.js'), 'utf8');
   const box = {};
+  // Same idiom as audio-track.editions.test.js: evaluate the SHIPPED manifest
+  // rather than restate it, so this gate cannot agree with a hand-written copy
+  // of the thing it is gating. The input is a repo file read at test time,
+  // never user input. THE DIRECTIVE MUST BE THE LAST COMMENT LINE before the
+  // statement — eslint-disable-next-line applies to the line immediately after
+  // it, so a justification written BELOW it targets a comment and the rule
+  // still fires. (Measured: it did, in this same file family.)
+  // eslint-disable-next-line no-new-func
   new Function('g', SRC + ';g.out = BIBLE_AUDIO_MANIFEST;')(box);
   return box.out;
 })();

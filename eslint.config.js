@@ -89,6 +89,52 @@ export default [
       // React Hooks recommended (rules-of-hooks + exhaustive-deps)
       ...reactHooksPlugin.configs.recommended.rules,
       // Local tweaks
+      // `new Function` is eval by another name. It is not in
+      // eslint:recommended, so before this line any
+      // `eslint-disable-next-line no-new-func` in this tree was DEAD — it
+      // suppressed nothing and eslint reported it as an unused directive,
+      // which `--max-warnings 0` (the CI invocation) rejects. Two branches
+      // were handed over red on that in one night.
+      //
+      // The cause was a precedent, not carelessness: the only written-down
+      // example of the idiom lives at tools/e2e-read-harness.test.js:270,
+      // WITH a three-line justification and a directive — and `npm run lint`
+      // covers only app/src/main/assets/src, so tools/ is never linted and
+      // that directive is inert there. Copy it into a linted test and CI
+      // rejects it. A precedent that is only correct because nobody checks it
+      // is worse than no precedent, and the careful justification is exactly
+      // what made the wrong form look authoritative.
+      //
+      // Turning the rule ON makes the surviving directives necessary and
+      // honest instead of dead, and buys a real protection in place of a rule
+      // nobody enforced.
+      //
+      // COST, RE-MEASURED ON THE TREE THIS LANDS ON (main e97112e6): THREE
+      // `new Function` in the linted scope — `eslint app/src/main/assets/src`,
+      // which is what `npm run lint` covers — at audio-track.editions.test.js:37
+      // and :224, and audio-track.test.js:48, and zero `eval(`. So THREE
+      // directives are added with this change and nothing else moves.
+      //
+      // THAT NUMBER HAS NOW GONE STALE THREE TIMES, which is the fact worth
+      // carrying rather than the number:
+      //
+      //   d1b02128  1 site   "exactly one directive is added" — true of that base
+      //   98de630f  2 sites  a gate-owns-its-data fix added one, and its dead
+      //                      directive was dropped because this rule was off
+      //   e97112e6  3 sites  c48's own manifest evaluation (06a39577)
+      //
+      // A COST IS A CLAIM ABOUT A BASE AND IT EXPIRES WHEN MAIN MOVES. Every
+      // one of those landed changes is correct alone, and each was red against
+      // this branch until the count was re-read on the landing tree. The census
+      // is `web-builder-tools/nonewfunc-precut.sh <ref>`, and it is a PRE-CUT
+      // check to run on every main move, not once: it derives the lint scope
+      // from package.json, counts both forms the rule reports, and fails in
+      // BOTH directions — a missing directive is an error and a surplus one is
+      // an unused disable, which `--max-warnings 0` rejects just as hard.
+      //
+      // Anyone adding a `new Function` after this lands is told by CI, which is
+      // the whole point of the rule being on rather than a comment asking.
+      'no-new-func': 'error',
       // caughtErrorsIgnorePattern: '^_' makes `catch (_e)` exempt from
       // no-unused-vars's caughtErrors check (which defaults to 'all' in
       // ESLint 9). Matches the existing argsIgnorePattern / varsIgnorePattern

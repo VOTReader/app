@@ -34,6 +34,14 @@ const BATCH_SRC = readFileSync(join(ROOT, 'tools', 'batch-align-bible.py'), 'utf
 {
   const MANIFEST_SRC = readFileSync(
     join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
+  // The point of this file is to gate the SHIPPED manifest, so it evaluates the
+  // shipped source rather than restating it; a hand-written copy would agree
+  // with itself and with nothing else. The input is a repo file read at test
+  // time, never user input. THE DIRECTIVE MUST BE THE LAST COMMENT LINE before
+  // the statement — eslint-disable-next-line applies to the line immediately
+  // after it, so a justification written BELOW it targets a comment and the
+  // rule still fires. (Measured: it did.)
+  // eslint-disable-next-line no-new-func
   new Function('g', MANIFEST_SRC + ';g.BIBLE_AUDIO_MANIFEST = BIBLE_AUDIO_MANIFEST;')(globalThis);
 }
 const BUDGET_SRC = readFileSync(join(ROOT, 'tools', 'check-bundle-budget.js'), 'utf8');
@@ -213,6 +221,13 @@ describe('audio-track editions — an edition ships exactly the books it declare
     join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
   /** The generated file is a script, not a module — evaluate it for its globals. */
   const manifestCtx = {};
+  // Third of three in the linted tree, and the same reason as the other two:
+  // this block gates the SHIPPED manifest, so it evaluates the shipped source
+  // rather than restating it. The input is a repo file read at test time,
+  // never user input. THE DIRECTIVE IS THE LAST COMMENT LINE before the
+  // statement — prose written between it and the statement targets a comment
+  // and the rule still fires.
+  // eslint-disable-next-line no-new-func
   new Function('ctx', `with (ctx) { ${MANIFEST_SRC}; ctx.M = BIBLE_AUDIO_MANIFEST; ctx.B = BIBLE_AUDIO_BOOKS; }`)(manifestCtx);
   const ALL_BOOK_IDS = manifestCtx.B.map(([id]) => id);
 
