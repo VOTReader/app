@@ -652,25 +652,29 @@ describe('audio-player — the part-grained horizon across a reboot (audio-playe
     }
   });
 
-  /* NO CASE FOR THE `run === 0` GUARD, AND THE REASON IS A DEFECT UPSTREAM OF IT.
-     I wrote one, ran it, and it failed for a cause that is not this branch's.
-
-     `run === 0` needs the snapshot's startKey to be ABSENT from the rebuilt queue,
-     and that is the same condition under which _rebuildRestoredQueue leaves `qi` at
-     -1:
-
-         if (qi < 0 && r.key) { const hits = …; if (hits.length) { qi = … } }
-         else if (qi < 0)     { qi = clamp(r.qi) }     <- UNREACHABLE while r.key is set
-
-     With `r.key` set and no hits, the third block's `if` is TAKEN and its body does
-     nothing, so the fallback never runs. MEASURED on this tree with a probe: the bar
-     comes back with an EMPTY queue and qi = -1, whatever the part slice does.
-
-     So the two conditions cannot be separated by any snapshot, and the guard's effect
-     is invisible behind a bigger bug. The guard stays — without it the part slice
-     falls through to `slice(-1)`, which keeps exactly ONE track, a wrong answer that
-     looks like a horizon rather than an obvious failure. FILED as its own row; a qi
-     fallback is not a part horizon and does not belong in this branch. */
+  it('the run === 0 guard: a start letter that is GONE keeps the whole rebuild, not its last track', async () => {
+    /* WITNESSABLE AT LAST, and only because audio-player-5 fixed what masked it.
+       This guard's input is a startKey absent from the rebuilt queue — which was
+       the same condition that left _rebuildRestoredQueue's qi at -1, so _start()
+       emptied the bar whatever the guard did and no snapshot could separate the
+       two. With the qi fallback reached, the guard's two outcomes are visible and
+       different: the queue UNCHANGED (four tracks) against `slice(-1)`, which
+       keeps exactly one and dresses it as a horizon. */
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 1, time: 30,
+      key: 'vol1:letter-gone', startKey: 'vol1:letter-gone', startPartIndex: 2,
+      track: { key: 'vol1:letter-gone', title: 'A letter that is gone', sub: 'Volume One', url: URL_OF('idGone'), readerCode: 'B', partLabel: 'Part 3' },
+    }));
+    await load();
+    rebuildGlobals();
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(st.qi).toBe(1);
+    } finally { dropGlobals(); }
+  });
 
   it('a snapshot claiming a part the letter no longer has lands on its LAST part', async () => {
     /* The clamp. Letter A has two parts; a snapshot claiming part 5 must not
