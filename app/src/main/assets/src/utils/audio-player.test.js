@@ -622,6 +622,83 @@ describe('audio-player — the part-grained horizon across a reboot (audio-playe
     } finally { dropGlobals(); }
   });
 
+  it('survives a SECOND boot — the rebuild carries the horizon it just replayed', async () => {
+    /* The rebuild's own `_setSource` has to record startPartIndex, or the first
+       persist after a restore drops the horizon it has just replayed and the next
+       boot regrows part 1. A bite on that pass-through left every other case here
+       green, because none of them booted twice. */
+    AudioPlayer.playCollection({
+      volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One',
+      startId: 'letter-a', startPartIndex: 1,
+    });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 30;
+    el().dispatchEvent(new Event('timeupdate'));
+
+    for (let boot = 0; boot < 2; boot++) {
+      await load();
+      rebuildGlobals();
+      try {
+        AudioPlayer.toggle();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(AudioPlayer.getState().queue).toHaveLength(2);
+        expect(AudioPlayer.getState().queue[0].url).toBe(URL_OF('idA2'));
+        // …and this session persists the horizon again, for the next boot to find.
+        el().dispatchEvent(new Event('playing'));
+        el().currentTime = 45;
+        el().dispatchEvent(new Event('timeupdate'));
+        expect(snap().startPartIndex).toBe(1);
+      } finally { dropGlobals(); }
+    }
+  });
+
+  /* NO CASE FOR THE `run === 0` GUARD, AND THE REASON IS A DEFECT UPSTREAM OF IT.
+     I wrote one, ran it, and it failed for a cause that is not this branch's.
+
+     `run === 0` needs the snapshot's startKey to be ABSENT from the rebuilt queue,
+     and that is the same condition under which _rebuildRestoredQueue leaves `qi` at
+     -1:
+
+         if (qi < 0 && r.key) { const hits = …; if (hits.length) { qi = … } }
+         else if (qi < 0)     { qi = clamp(r.qi) }     <- UNREACHABLE while r.key is set
+
+     With `r.key` set and no hits, the third block's `if` is TAKEN and its body does
+     nothing, so the fallback never runs. MEASURED on this tree with a probe: the bar
+     comes back with an EMPTY queue and qi = -1, whatever the part slice does.
+
+     So the two conditions cannot be separated by any snapshot, and the guard's effect
+     is invisible behind a bigger bug. The guard stays — without it the part slice
+     falls through to `slice(-1)`, which keeps exactly ONE track, a wrong answer that
+     looks like a horizon rather than an obvious failure. FILED as its own row; a qi
+     fallback is not a part horizon and does not belong in this branch. */
+
+  it('a snapshot claiming a part the letter no longer has lands on its LAST part', async () => {
+    /* The clamp. Letter A has two parts; a snapshot claiming part 5 must not
+       `slice(5)` — that empties the queue outright and the bar comes back with
+       nothing to play. Clamped to the start item's own run, so it lands on part 2.
+
+       The saved track is part TWO, because that is what a real snapshot at part 5 of
+       a two-part letter carries. My first version said part ONE, and a snapshot that
+       disagrees with itself is correctly repaired by _withRestoredAlternate rebuilding
+       the whole letter — measured: 3 tracks, A1/A2/C, the slice undone. That was my
+       fixture, not the clamp. */
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0,
+      key: 'vol1:letter-a', time: 12,
+      track: { key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA2'), readerCode: 'B', partLabel: 'Part 2' },
+      startKey: 'vol1:letter-a', startPartIndex: 5,
+    }));
+    await load();
+    rebuildGlobals();
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue).toHaveLength(2);                    // NOT emptied by slice(5)
+      expect(st.queue[0].url).toBe(URL_OF('idA2'));        // the letter's last part
+    } finally { dropGlobals(); }
+  });
+
   it('CONTROL: a letter started with NO part horizon rebuilds unchanged', async () => {
     /* The arm that fails if the part slice is applied unconditionally, or if a
        missing field is read as anything other than "no part horizon". */

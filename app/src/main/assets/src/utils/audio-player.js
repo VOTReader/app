@@ -1366,6 +1366,13 @@ function _slicePartHorizon(queue, startKey, startPartIndex) {
   if (!(spi > 0) || !startKey) return queue;
   let run = 0;
   while (run < queue.length && queue[run].key === startKey) run++;
+  // A run of 0 means the startKey is not at the front of this queue at all —
+  // in practice, absent from it. Return the queue UNCHANGED rather than
+  // falling through to `slice(-1)`, which keeps exactly ONE track: a wrong
+  // answer that looks like a horizon. No behavioural case pins this, and the
+  // reason is filed: the same condition leaves _rebuildRestoredQueue's `qi` at
+  // -1 (its `else if (qi < 0)` fallback is unreachable while `r.key` is set),
+  // so the bar comes back empty whatever this line does. Measured, not assumed.
   if (run === 0) return queue;
   return queue.slice(Math.min(spi, run - 1));
 }
