@@ -236,7 +236,7 @@ jobs:
         # chapter of its own.
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit test_flock_bump -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)

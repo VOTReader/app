@@ -86,12 +86,36 @@ def bump_corpus():
     m = re.search(r"const CORPUS_VERSION = 'c(\d+)';", sw)
     old, new = int(m.group(1)), int(m.group(1)) + 1
     stamp = f"c{old}->c{new} ({datetime.date.today()}): flock audio sync — new recordings joined audio-manifest."
-    sw = sw.replace(f"const CORPUS_VERSION = 'c{old}'; //",
-                    f"const CORPUS_VERSION = 'c{new}'; // {stamp} (", 1)
-    open(SW, "w", encoding="utf-8", newline="\n").write(sw)
+    sw_out = sw.replace(f"const CORPUS_VERSION = 'c{old}'; //",
+                        f"const CORPUS_VERSION = 'c{new}'; // {stamp} (", 1)
     cj = open(CACHE, encoding="utf-8").read()
-    open(CACHE, "w", encoding="utf-8", newline="\n").write(
-        cj.replace(f"CORPUS_CONTENT_VERSION = 'c{old}'", f"CORPUS_CONTENT_VERSION = 'c{new}'"))
+    cj_out = cj.replace(f"CORPUS_CONTENT_VERSION = 'c{old}'",
+                        f"CORPUS_CONTENT_VERSION = 'c{new}'")
+    # str.replace returns its input UNCHANGED when the anchor misses, and this
+    # one pins the exact single space before `//`. Reformat that line and the
+    # bump becomes a silent no-op while this function still returns `new`; the
+    # run then commits changed content under the old version, and the version
+    # gate fails downstream saying "content changed but CORPUS_VERSION was not
+    # bumped" — a correct gate naming the wrong cause, hours from here, in an
+    # unattended weekly job. Re-anchoring on something looser leaves the same
+    # defect one reformat away. Asserting the write happened does not.
+    #
+    # Both checks run BEFORE either write, so a missed anchor can never leave a
+    # half-bumped tree: service-worker.js moved and cache.js not, which is the
+    # one state the corpus-version gate cannot describe (CORPUS_CONTENT_VERSION
+    # feeds the search-index cache signature, so a stale index would survive the
+    # corpus swap).
+    if sw_out == sw:
+        raise RuntimeError(
+            f"CORPUS_VERSION anchor missed in {SW}: expected "
+            f"\"const CORPUS_VERSION = 'c{old}'; //\" verbatim, one space before the //. "
+            "Nothing was written. Fix the anchor; do not re-run and hope.")
+    if cj_out == cj:
+        raise RuntimeError(
+            f"CORPUS_CONTENT_VERSION anchor missed in {CACHE}: expected "
+            f"\"CORPUS_CONTENT_VERSION = 'c{old}'\" verbatim. Nothing was written.")
+    open(SW, "w", encoding="utf-8", newline="\n").write(sw_out)
+    open(CACHE, "w", encoding="utf-8", newline="\n").write(cj_out)
     return new
 
 
