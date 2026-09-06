@@ -39,6 +39,9 @@
    stale-state behaviour as correct — a RED enshrining the bug it was written to
    prevent. The assertion here is "exactly once, immediately".
 */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import {
@@ -123,6 +126,33 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
     unmount();
     await act(async () => { vi.advanceTimersByTime(10000); });
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('every reload in this screen goes through the scheduler — no inline timer survives', () => {
+    // A SOURCE-TEXT GATE, and it says so. The cases above drive the clear-all
+    // path only; biting the IMPORT caller back to its own inline setTimeout
+    // left them all green, so that caller's use of the scheduler was
+    // unwitnessed. This is what witnesses it — and it is the gate that would
+    // have caught the original defect, since a second inline timer is exactly
+    // how the first one was copied.
+    //
+    // Comments are stripped first: this file's own header quotes the old form,
+    // and a matcher that reads prose would fire on the explanation rather than
+    // on the code.
+    const SCREEN = join(dirname(fileURLToPath(import.meta.url)), 'SettingsScreen.jsx');
+    const src = readFileSync(SCREEN, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    // The stripper carries its own control: a dead stripper leaves the file
+    // whole, which would read as "no inline timers" for the wrong reason.
+    expect(src.length, 'stripper removed nothing')
+      .toBeLessThan(readFileSync(SCREEN, 'utf8').length);
+    const inline = src.match(/setTimeout\([^;]*location\.reload/g) || [];
+    expect(inline, 'an inline reload timer bypasses _scheduleBackupReload').toEqual([]);
+    // and the scheduler is actually there — otherwise zero inline timers is
+    // satisfied by a screen that no longer reloads at all.
+    expect(src).toContain('const _scheduleBackupReload');
+    expect((src.match(/_scheduleBackupReload\(/g) || []).length,
+      'both callers reach the scheduler').toBeGreaterThanOrEqual(2);
   });
 
   it('a screen that scheduled nothing does not reload when it unmounts', async () => {
