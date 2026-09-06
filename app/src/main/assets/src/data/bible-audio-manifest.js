@@ -226,10 +226,15 @@ var BIBLE_AUDIO_CHAPTERS = {
 ["jude",2,1],
 ["revelation",2,22]
   ];
-  var editions = [['bible-brm-kjv', 'brm'], ['bible-wop-nkjv', 'wop'], ['bible-web', 'web']];
+  var editions = [["bible-brm-kjv","brm","all"],["bible-wop-nkjv","wop","all"],["bible-web","web","all"]];
   for (var e = 0; e < editions.length; e++) {
     for (var b = 0; b < books.length; b++) {
       var id = books[b][0], testament = books[b][1], count = books[b][2];
+      // A PARTIAL edition ships only the books it declares. Skipped here rather
+      // than filtered afterwards, so the declaration stays the single source: a
+      // book absent from the edition's book list never gets a row at all.
+      var only = editions[e][2];
+      if (only !== 'all' && only.indexOf(id) === -1) continue;
       var parts = [];
       for (var c = 1; c <= count; c++) {
         var num = c < 10 ? '00' + c : c < 100 ? '0' + c : '' + c;

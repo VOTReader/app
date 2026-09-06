@@ -76,24 +76,48 @@ const RELEASE_PREFIXES = Object.freeze([
  *  each call site. */
 export const BIBLE_AUDIO_DEFAULT = 'brm-kjv';
 
+/**
+ * THE edition declaration. tools/gen-bible-audio-manifest.mjs IMPORTS this and
+ * drives its per-chapter expansion from it, so the manifest and the registry
+ * cannot disagree about which editions exist, what their assets are named, or
+ * which books they cover — they used to be two hand-kept lists.
+ *
+ *   assetPrefix  the <prefix><testament>_<bookId>_<NNN> asset-name stem;
+ *                bibleAudioAssetUrl maps it to a release tag.
+ *   books        'all' for a whole-Bible edition, or an explicit array of app
+ *                book ids for a partial one. REQUIRED — an edition that does
+ *                not say what it covers cannot be checked against what it
+ *                ships, and a missing book is exactly what a silent 404 looks
+ *                like. Held to the manifest as a set difference BOTH ways.
+ *   timed        optional, default true. false means "audio, no timings" — the
+ *                loader must not keep asking for a sync file that does not
+ *                exist (the Gospel of John film is a translation this corpus
+ *                does not carry, so it ships as listening only).
+ */
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
     short: 'KJV · BRM',
     translation: 'kjv',
     volKey: 'bible-brm-kjv',
+    assetPrefix: 'brm',
+    books: 'all',
   }),
   'wop-nkjv': Object.freeze({
     label: 'NKJV · The Word of Promise (Dramatized)',
     short: 'NKJV · Dramatized',
     translation: 'nkjv',
     volKey: 'bible-wop-nkjv',
+    assetPrefix: 'wop',
+    books: 'all',
   }),
   'web-ebible': Object.freeze({
     label: 'WEB · World English Bible',
     short: 'WEB',
     translation: 'web',
     volKey: 'bible-web',
+    assetPrefix: 'web',
+    books: 'all',
   }),
 });
 

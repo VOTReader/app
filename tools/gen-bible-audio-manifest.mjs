@@ -18,6 +18,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+/* THE edition declaration, imported rather than restated. The expansion loop
+   below used to hold its own [volKey, assetPrefix] list, so an edition could
+   exist in one place and not the other and nothing would say so. `books` now
+   comes from the same object the app reads. */
+import { BIBLE_AUDIO_EDITIONS } from '../app/src/main/assets/src/utils/audio-track.js';
 
 const HERE = path.dirname(url.fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -93,6 +98,26 @@ if (fs.existsSync(CHAPTERS_JSON)) {
 
 const booksLines = BOOKS66.map(([id]) => JSON.stringify([id, titles.get(id)])).join(',\n');
 
+/* One row per edition, straight off the registry: [volKey, assetPrefix, books].
+   `books` is 'all' or an explicit list of app book ids. An edition that declares
+   neither is a HARD ERROR rather than a silently empty one — a partial edition
+   that shipped no rows would look exactly like a book that failed to map. */
+const ALL_IDS = new Set(BOOKS66.map(([id]) => id));
+const EDITION_ROWS = Object.entries(BIBLE_AUDIO_EDITIONS).map(([id, e]) => {
+  if (!e.assetPrefix) throw new Error(`edition ${id} declares no assetPrefix`);
+  if (e.books !== 'all' && !Array.isArray(e.books)) {
+    throw new Error(`edition ${id} declares no books — say 'all' or list the app book ids`);
+  }
+  if (Array.isArray(e.books)) {
+    if (!e.books.length) throw new Error(`edition ${id} declares an EMPTY book list`);
+    const unknown = e.books.filter((b) => !ALL_IDS.has(b));
+    if (unknown.length) throw new Error(`edition ${id} lists unknown book id(s): ${unknown.join(', ')}`);
+  }
+  return [e.volKey, e.assetPrefix, e.books === 'all' ? 'all' : e.books];
+});
+console.log('editions: ' + EDITION_ROWS
+  .map(([v, , b]) => `${v} (${b === 'all' ? '66 books' : b.length + ': ' + b.join(',')})`).join('; '));
+
 /* KJV chapter counts, canonical order — drives the per-chapter expansion for
    BOTH editions (2,378 written rows would be ~80 KB; the loop is ~1 KB).
    The OT/NT totals are also the per-release asset counts, so a bad testament
@@ -140,10 +165,15 @@ ${chapterRows.join(',\n')}
   var books = [
 ${chapterBookRows}
   ];
-  var editions = [['bible-brm-kjv', 'brm'], ['bible-wop-nkjv', 'wop'], ['bible-web', 'web']];
+  var editions = ${JSON.stringify(EDITION_ROWS)};
   for (var e = 0; e < editions.length; e++) {
     for (var b = 0; b < books.length; b++) {
       var id = books[b][0], testament = books[b][1], count = books[b][2];
+      // A PARTIAL edition ships only the books it declares. Skipped here rather
+      // than filtered afterwards, so the declaration stays the single source: a
+      // book absent from the edition's book list never gets a row at all.
+      var only = editions[e][2];
+      if (only !== 'all' && only.indexOf(id) === -1) continue;
       var parts = [];
       for (var c = 1; c <= count; c++) {
         var num = c < 10 ? '00' + c : c < 100 ? '0' + c : '' + c;

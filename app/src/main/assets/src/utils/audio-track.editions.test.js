@@ -218,3 +218,62 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
     }
   });
 });
+
+/* ── every edition declares its books, and ships exactly those ────────────
+   BIBLE_AUDIO_EDITIONS[id].books is the single declaration: 'all' for a
+   whole-Bible edition, or an explicit list of app book ids for a partial one
+   (the TSOT Matthew reading is 28 chapters of ONE book; the Gospel of John
+   film is 21 chapters of another). tools/gen-bible-audio-manifest.mjs drives
+   its per-chapter expansion off this same object, so the two cannot restate
+   each other — they used to be two hand-kept lists.
+
+   Held BOTH WAYS on purpose. Declared-but-not-shipped is a book whose pill
+   the reader can never reach; shipped-but-not-declared is audio nobody
+   checked, and it is the direction a one-way assertion misses. Either alone
+   passes on an edition that ships nothing at all. */
+describe('audio-track editions — an edition ships exactly the books it declares', () => {
+  const MANIFEST_SRC = readFileSync(
+    join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
+  /** The generated file is a script, not a module — evaluate it for its globals. */
+  const manifestCtx = {};
+  new Function('ctx', `with (ctx) { ${MANIFEST_SRC}; ctx.M = BIBLE_AUDIO_MANIFEST; ctx.B = BIBLE_AUDIO_BOOKS; }`)(manifestCtx);
+  const ALL_BOOK_IDS = manifestCtx.B.map(([id]) => id);
+
+  it('evaluated the generated manifest (guards every assertion below)', () => {
+    // Without this the `with` block could yield an empty object and every
+    // set difference below would be vacuously equal.
+    expect(ALL_BOOK_IDS.length).toBe(66);
+    expect(Object.keys(manifestCtx.M).length).toBeGreaterThan(60);
+  });
+
+  it('declares books for every edition, as "all" or a non-empty list of real book ids', () => {
+    for (const [id, e] of Object.entries(BIBLE_AUDIO_EDITIONS)) {
+      const ok = e.books === 'all' || (Array.isArray(e.books) && e.books.length > 0);
+      expect(ok, `edition ${id} must declare books`).toBe(true);
+      if (Array.isArray(e.books)) {
+        expect(e.books.filter((b) => !ALL_BOOK_IDS.includes(b)), `edition ${id}`).toEqual([]);
+      }
+      expect(typeof e.assetPrefix, `edition ${id} needs an assetPrefix`).toBe('string');
+    }
+  });
+
+  it('ships exactly the declared books — no book missing, no book unannounced', () => {
+    for (const [id, e] of Object.entries(BIBLE_AUDIO_EDITIONS)) {
+      const want = e.books === 'all' ? ALL_BOOK_IDS : e.books;
+      const got = Object.keys(manifestCtx.M)
+        .filter((k) => k.startsWith(e.volKey + ':'))
+        .map((k) => k.slice(e.volKey.length + 1));
+      expect([...want].sort(), `${id}: declared but not shipped`).toEqual([...got].sort());
+    }
+  });
+
+  it('timed defaults to true and is only ever a boolean', () => {
+    // `timed: false` means "audio, no timings" — the loader must stop asking
+    // for a sync file that does not exist. A missing field must READ as true,
+    // never as undefined-and-therefore-falsy at some call site.
+    for (const [id, e] of Object.entries(BIBLE_AUDIO_EDITIONS)) {
+      expect(['boolean', 'undefined'], `edition ${id}`).toContain(typeof e.timed);
+      expect(e.timed !== false, `edition ${id} timed default`).toBe(e.timed === undefined || e.timed === true);
+    }
+  });
+});
