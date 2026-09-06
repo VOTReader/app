@@ -740,6 +740,57 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // cannot replace the callback or consume the first operation's native stream.
   const backupBusyRef = React.useRef(false);
   const backupReloadPendingRef = React.useRef(false);
+  const backupReloadTimerRef = React.useRef(0);
+  /**
+   * Reboot into the data that was just written, after `ms` of reading time.
+   *
+   * ONE SCHEDULER, TWO CALLERS — the import apply and clear-all-personal-data.
+   * Both used to inline the same bare setTimeout, and a fix applied to only the
+   * one someone had looked at would have left the other to be rediscovered.
+   */
+  const _scheduleBackupReload = (ms) => {
+    backupReloadPendingRef.current = true;
+    if (backupReloadTimerRef.current) window.clearTimeout(backupReloadTimerRef.current);
+    backupReloadTimerRef.current = window.setTimeout(() => {
+      backupReloadTimerRef.current = 0;
+      backupReloadPendingRef.current = false;
+      window.location.reload();
+    }, ms);
+  };
+  /**
+   * If the reader leaves before that lands, reload NOW rather than never.
+   *
+   * Unmount means they navigated: app.jsx renders `<ErrorBoundary key={screen}>`
+   * so the route subtree unmounts exactly when `screen` changes, and 'settings'
+   * is a single route entry with no peek clone and no keyed remount.
+   *
+   * CANCELLING WOULD BE THE WRONG FIX. Both callers run after storage has been
+   * REPLACED (an import applied) or WIPED, and the reload is what reboots into
+   * it — _runBackupOperation even holds the busy lock through the window
+   * because "a second picker/stream against data that is about to be torn down"
+   * is the hazard. Cancel, and a reader who navigates at second two browses a
+   * UI backed by stale in-memory state over replaced storage, with no reload
+   * ever: a visible interruption traded for an invisible wrong answer.
+   *
+   * It fires on the REF, not on "a timer id exists" — the ref is the flag that
+   * says storage was replaced, and clearing it before reload() is what keeps
+   * this to exactly once even under a double-invoked cleanup.
+   *
+   * DELIBERATE CONSEQUENCE: an ErrorBoundary catch inside Settings also unmounts
+   * this subtree, so a crash with a reload pending reloads. That is wanted — a
+   * crash on the screen that just replaced storage is the last moment to still
+   * be running against the old state.
+   */
+  React.useEffect(() => () => {
+    if (backupReloadTimerRef.current) {
+      window.clearTimeout(backupReloadTimerRef.current);
+      backupReloadTimerRef.current = 0;
+    }
+    if (backupReloadPendingRef.current) {
+      backupReloadPendingRef.current = false;
+      window.location.reload();
+    }
+  }, []);
   const [backupBusy, setBackupBusy] = React.useState(false);
   const _runBackupOperation = async (operation) => {
     if (backupBusyRef.current) return;
@@ -1338,8 +1389,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       } catch (_e) { /* best-effort */ }
       // A clean import reloads fast; problems get reading time first — a 600ms
       // reload used to wipe the warning toast before anyone could read it.
-      backupReloadPendingRef.current = true;
-      setTimeout(() => window.location.reload(), problems.length ? 5000 : 600);
+      _scheduleBackupReload(problems.length ? 5000 : 600);
     };
 
     // BAK-INTEGRITY: a v3 backup carries a trailing CRC-32 of its manifest (all the
@@ -1746,8 +1796,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       _showToast('All personal data cleared. Reloading…', 0);
       // Keep the backup controls disabled through the reload window — a new
       // import starting against the just-wiped state would race the teardown.
-      backupReloadPendingRef.current = true;
-      setTimeout(() => window.location.reload(), 600);
+      _scheduleBackupReload(600);
     } catch (e) {
       console.warn('clear all personal data failed', e);
       // Wave-0: was alert('Clear failed. See console for details.') — native
