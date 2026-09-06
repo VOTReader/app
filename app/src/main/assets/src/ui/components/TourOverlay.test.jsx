@@ -33,11 +33,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
+/* Walks the tour to a stop BY ID (a Listen stop stays once pressed, so a count is the wrong unit).
+   It throws when it does not get there, and that throw is the point: without it the loop returns on
+   whatever stop it happened to land on, so renaming or reordering a step would leave 28 callers here
+   quietly asserting about the wrong card — a rename that breaks nothing and passes everything.
+   Latent today (seven steps, every id reachable in six presses), which is exactly when to fix it. */
 const startAt = (id) => {
   TourController.attachNav(nav());
   TourController.start('prompt');
-  // A Listen stop stays once pressed, so walk by id rather than by count.
   for (let i = 0; i < 12 && TourController.getState().step.id !== id; i++) TourController.targetPressed();
+  const at = TourController.getState().step.id;
+  if (at !== id) throw new Error(`startAt("${id}") never reached that stop: twelve presses from the start landed on "${at}". If a step was renamed or reordered, fix the id here rather than letting every case below assert about a different card.`);
 };
 
 describe('TourOverlay — dialog', () => {
