@@ -791,6 +791,19 @@ describe('audio-player — a dropped letter must not throw the rebuilt queue awa
     expect(el().currentTime).toBe(0);
   });
 
+  it('a saved index past the end of a SHRUNKEN collection lands inside it, not past it', async () => {
+    /* The clamp itself, and a second route to the same empty bar. A corpus that
+       retires letters makes last night's qi larger than tonight's queue; without
+       `Math.min(..., queue.length - 1)` the rebuild sets qi to 9, `_start()` reads
+       queue[9], finds undefined and calls stop(). Written because a bite on the
+       Math.min read 0 RED: every case above used an index the queue still had. */
+    const st = await boot(GONE_SNAPSHOT({ qi: 9 }));
+    expect(st.queue).toHaveLength(4);
+    expect(st.qi).toBe(3);
+    expect(el()).not.toBe(null);
+    expect(el().src).toBe(URL_OF('idC'));
+  });
+
   it('CONTROL: a saved track still in the corpus keeps BOTH its place and its clock', async () => {
     /* The arm that fails if the fallback is applied unconditionally, or if the
        clock is zeroed on the path where it still means something. */
