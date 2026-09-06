@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN,
-  localizeFactor, squashFactor, arcRadiusY, arcRadiusGLSL, arcDistance,
+  localizeFactor, squashFactor, arcDistance,
+  arcShape, arcShapeGLSL, arcHeight, spanLogOf, APEX_LIFT, FAN_FLOOR,
   arcAnchored, flyOverDim, flyOverGLSL,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
@@ -50,68 +51,114 @@ const VIEW = (over) => Object.assign({
   squash: squashFactor(480, 1000), density: 'famous', rulerDepth: 40,
 }, over);
 
-/** A point exactly ON an arc, at parameter t (0 = left foot, 1 = right foot). */
+/**
+ * A point exactly ON an arc, at fraction t across the piece of it that is on
+ * screen (0 = left edge of that piece, 1 = right edge). Reads the SAME two
+ * exports the shader and the picker do — a third copy of the curve here would
+ * let pick and draw drift apart while every test stayed green, which is the
+ * one thing this file exists to stop.
+ *
+ * t runs across the VISIBLE piece, not the whole span, because zoomed deep a
+ * long arc is hundreds of screens wide and every fraction of its full span but
+ * the first fraction of a percent is off screen — sampling the span would test
+ * points nobody can tap.
+ */
 function pointOnArc(g, cam, view, index, t) {
   const x0 = verseToX(cam, view.width, g.from[index]);
   const x1 = verseToX(cam, view.width, g.to[index]);
-  const rx = (x1 - x0) / 2, cx = x0 + rx;
-  const ry = arcRadiusY(rx, view.ceil, view.squash, view.localize);
-  const th = Math.PI * (1 - t);
-  return [cx + rx * Math.cos(th), view.base - ry * Math.sin(th)];
+  const left = Math.min(x0, x1), right = Math.max(x0, x1);
+  const { R, A } = arcShape((x1 - x0) / 2, view.ceil, view.squash, view.localize,
+    spanLogOf(Math.abs(g.to[index] - g.from[index]), g.total));
+  const lo = Math.max(left, 0), hi = Math.min(right, view.width);
+  const x = lo + (hi - lo) * t;
+  return [x, view.base - arcHeight(Math.min(x - left, right - x), R, A)];
 }
 
-describe('height law', () => {
+describe('the curve law', () => {
+  // arcShape returns the two radii of the curve that is DRAWN: R, the
+  // horizontal radius of the quarter-ellipse rising from each foot, and A,
+  // its apex. At overview they are (rx, rx * squash) and the curve is exactly
+  // the semi-ellipse this shipped with; localized, R stops following rx and
+  // the apex lifts above the frame so nothing level is left on screen.
+  const A = (rx, ceil, squash, loc, span) => arcShape(rx, ceil, squash, loc, span).A;
+
   it('is a true semicircle at overview (localize 0, squash 1)', () => {
-    expect(arcRadiusY(100, 480, 1, 0)).toBeCloseTo(100, 6);
-    expect(arcRadiusY(37.5, 480, 1, 0)).toBeCloseTo(37.5, 6);
+    expect(A(100, 480, 1, 0, 0.5)).toBeCloseTo(100, 6);
+    expect(A(37.5, 480, 1, 0, 0.5)).toBeCloseTo(37.5, 6);
+    expect(arcShape(100, 480, 1, 0, 0.5).R).toBe(100);
   });
 
   it('applies the squash so the widest arc fits a landscape frame', () => {
     const squash = squashFactor(300, 1000);   // 300 / 500
     expect(squash).toBeCloseTo(0.6, 6);
-    expect(arcRadiusY(500, 300, squash, 0)).toBeCloseTo(300, 6);
+    expect(A(500, 300, squash, 0, 0.5)).toBeCloseTo(300, 6);
   });
 
-  it('stretches — within limits — so a portrait phone is not left half empty', () => {
+  it('stretches \u2014 within limits \u2014 so a portrait phone is not left half empty', () => {
     // 1080x2400 phone: half the WIDTH is 540, but there is ~2000px of height.
     // An unstretched semicircle would sit in the bottom quarter.
     const tall = squashFactor(2000, 1080);
     expect(tall).toBe(MAX_STRETCH);
-    expect(arcRadiusY(540, 2000, tall, 0)).toBeCloseTo(540 * MAX_STRETCH, 6);
+    expect(A(540, 2000, tall, 0, 0.5)).toBeCloseTo(540 * MAX_STRETCH, 6);
     // and it never becomes a noodle
     expect(squashFactor(999999, 1080)).toBe(MAX_STRETCH);
     expect(squashFactor(300, 0)).toBe(1);
   });
 
-  it('saturates at the ceiling once localized, never exceeding it', () => {
+  it('lifts the apex ABOVE the frame once localized, and never further', () => {
+    // The old law saturated AT the ceiling, which put every long arc's flat
+    // top on screen at the same height - the apex smear S2 names.
     for (const rx of [10, 500, 5000, 100000]) {
-      expect(arcRadiusY(rx, 480, 1, 1)).toBeLessThanOrEqual(480);
+      expect(A(rx, 480, 1, 1, 1)).toBeLessThanOrEqual(480 * APEX_LIFT);
     }
-    expect(arcRadiusY(1e9, 480, 1, 1)).toBeCloseTo(480, 3);
+    expect(A(1e9, 480, 1, 1, 1)).toBeCloseTo(480 * APEX_LIFT, 3);
+    expect(A(1e9, 480, 1, 1, 1)).toBeGreaterThan(480);
+  });
+
+  it('bounds the quarter by the ceiling, so a long arc leaves near its foot', () => {
+    // R following rx is the whole of the squatty-lines defect: a 440,000 px
+    // radius near its foot is a horizontal line.
+    expect(arcShape(1e6, 480, 1, 1, 1).R).toBeLessThanOrEqual(480);
+    expect(arcShape(1e6, 480, 1, 1, 0).R).toBeCloseTo(480 * FAN_FLOOR, 6);
+    // A short arc keeps its own radius - there is nothing to bound.
+    expect(arcShape(30, 480, 1, 1, 1).R).toBe(30);
   });
 
   it('stays near-circular for small arcs even when localized', () => {
-    // tanh(x) ~ x for small x, so a short arc is still a proper semicircle —
+    // tanh(x) ~ x for small x, so a short arc is still a proper arch -
     // this is what makes deep zoom look right instead of flattened.
     const rx = 5;
-    expect(arcRadiusY(rx, 480, 1, 1)).toBeCloseTo(rx / CEIL_SOFTNESS, 2);
+    expect(A(rx, 480, 1, 1, 0.5)).toBeCloseTo(APEX_LIFT * rx / CEIL_SOFTNESS, 2);
   });
 
-  it('is monotonic in rx at every localize step', () => {
+  it('is monotonic in rx at every localize step, in both radii', () => {
     for (const loc of [0, 0.25, 0.5, 0.75, 1]) {
-      let prev = -1;
+      let prevA = -1, prevR = -1;
       for (let rx = 0; rx < 3000; rx += 37) {
-        const r = arcRadiusY(rx, 480, 0.9, loc);
-        expect(r).toBeGreaterThanOrEqual(prev);
-        prev = r;
+        const s = arcShape(rx, 480, 0.9, loc, 0.6);
+        expect(s.A).toBeGreaterThanOrEqual(prevA);
+        expect(s.R).toBeGreaterThanOrEqual(prevR);
+        prevA = s.A; prevR = s.R;
       }
     }
   });
 
-  it('publishes the same constant to the GLSL the shader inlines', () => {
-    expect(arcRadiusGLSL).toContain(String(CEIL_SOFTNESS));
-    expect(arcRadiusGLSL).toContain('tanh');
-    expect(arcRadiusGLSL).toContain('mix(semi, capped, localize)');
+  it('widens the quarter with the span, monotonically', () => {
+    let prev = -1;
+    for (let spanLog = 0; spanLog <= 1.0001; spanLog += 0.05) {
+      const R = arcShape(1e6, 480, 1, 1, spanLog).R;
+      expect(R).toBeGreaterThanOrEqual(prev);
+      prev = R;
+    }
+  });
+
+  it('publishes the same constants to the GLSL the shader inlines', () => {
+    expect(arcShapeGLSL).toContain(String(CEIL_SOFTNESS));
+    expect(arcShapeGLSL).toContain(String(APEX_LIFT));
+    expect(arcShapeGLSL).toContain(String(FAN_FLOOR));
+    expect(arcShapeGLSL).toContain('tanh');
+    expect(arcShapeGLSL).toContain('mix(r, deepR, localize)');
+    expect(arcShapeGLSL).toContain('mix(r*squash, deepA, localize)');
   });
 });
 

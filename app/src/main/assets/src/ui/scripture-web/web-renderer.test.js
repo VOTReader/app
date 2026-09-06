@@ -10,19 +10,32 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcRadiusGLSL, CEIL_SOFTNESS, flyOverDim, flyOverGLSL,
+  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, flyOverGLSL,
 } from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
 
 describe('shader / CPU agreement', () => {
-  it('inlines the SHARED height law rather than restating it', () => {
-    expect(SHADER_SOURCE.vertex).toContain(arcRadiusGLSL);
+  it('inlines the SHARED curve law rather than restating it', () => {
+    expect(SHADER_SOURCE.vertex).toContain(arcShapeGLSL);
   });
 
-  it('calls that law for the arc radius', () => {
-    expect(SHADER_SOURCE.vertex).toMatch(/arcRadiusY\(rx,\s*uCeil,\s*uSquash,\s*uLocalize\)/);
+  it('calls that law for the arc radii, and draws the curve it returns', () => {
+    expect(SHADER_SOURCE.vertex)
+      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog\)/);
+    // The point and its tangent come from the shared arcAt, not from a
+    // hand-written cos/sin pair beside it.
+    expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*R,\s*A,\s*P,/);
+    expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(lo,/);
+    expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(hi,/);
+  });
+
+  it('gives the fragment stage the PER-INSTANCE half width, not the uniform', () => {
+    // Votes drive stroke width at depth, so an antialias edge computed from
+    // uWidth would feather every ribbon at the widest arc's edge.
+    expect(SHADER_SOURCE.fragment).toContain('in float vHalfW;');
+    expect(SHADER_SOURCE.fragment).not.toContain('uWidth');
   });
 
   it('has exactly ONE definition of the softness constant in the vertex stage', () => {

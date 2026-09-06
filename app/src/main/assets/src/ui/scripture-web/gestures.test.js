@@ -52,7 +52,7 @@ function attach(el) {
   const detach = attachWebGestures(el, {
     loc: (e) => ({ x: e.clientX, y: e.clientY }),
     dpr: () => view.DPR, cam: () => cam, view: () => view,
-    handlers: () => handlers, schedule, maxZoom: 4000,
+    handlers: () => handlers, schedule, maxZoom: () => 4000,
     clampCamera, zoomAbout, xToVerse,
   });
   return { detach, cam, view, handlers, schedule };

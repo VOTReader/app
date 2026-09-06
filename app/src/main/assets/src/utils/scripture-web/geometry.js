@@ -64,33 +64,6 @@ export function squashFactor(ceil, width) {
   return Math.min(MAX_STRETCH, ceil / (width / 2));
 }
 
-/**
- * The vertical radius of an arc whose horizontal radius is `rx`.
- * MUST stay identical to arcRadiusGLSL below and to the shader that inlines it.
- * @param {number} rx — half the arc's on-screen span, device px
- * @param {number} ceil — usable height above the baseline, device px
- * @param {number} squash — squashFactor()
- * @param {number} localize — localizeFactor()
- */
-export function arcRadiusY(rx, ceil, squash, localize) {
-  const r = rx > 0 ? rx : 0;
-  const semi = r * squash;
-  const capped = ceil * Math.tanh(r / (Math.max(ceil, 1) * CEIL_SOFTNESS));
-  return semi + (capped - semi) * localize;
-}
-
-/**
- * The same law as GLSL ES 3.00, for the vertex shader to inline. Kept beside
- * arcRadiusY so the two can never drift apart unnoticed.
- */
-export const arcRadiusGLSL = `
-float arcRadiusY(float rx, float ceil, float squash, float localize){
-  float r = max(rx, 0.);
-  float semi = r*squash;
-  float capped = ceil * tanh(r/(max(ceil,1.)*${CEIL_SOFTNESS}));
-  return mix(semi, capped, localize);
-}`;
-
 /** CSS px per verse at which one verse is a comfortable tap target. */
 export const PPV_MAX_CSS = 44;
 
@@ -128,6 +101,27 @@ export function spanLogOf(span, total) {
 }
 
 /**
+ * Alpha every anchored ribbon reaches at the ceiling. The worst Distance stop
+ * needs an effective 0.83 on black and 0.85 on parchment to clear WCAG's 3:1
+ * non-text floor alone (design-perf, from the ramp and relative luminance).
+ */
+export const ALPHA_DEEP = 0.90;
+
+/**
+ * Anchored arcs per CSS px of viewport width at which the deep alpha starts
+ * being divided down. 0.20 clamps to 1 at every frame's ceiling (0.157-0.176
+ * measured) and divides by 5.15 / 7.58 / 3.32 at 40x on phoneLand / phone375
+ * / desktop1920.
+ */
+export const DENSITY_K = 0.20;
+
+/** Widest stroke, CSS px. At depth votes drive width from 1.4 up to this. */
+export const STROKE_DEEP_CSS = 2.4;
+
+/** Narrowest stroke at depth, CSS px - the floor a 0.30-strength arc gets. */
+export const STROKE_MIN_CSS = 1.4;
+
+/**
  * The alpha and stroke law, as ONE export both the screen and the probes
  * read. It used to live inline in ScriptureWebScreen's draw(), where no
  * harness could import it, so every instrument re-typed it and would have
@@ -141,10 +135,21 @@ export function spanLogOf(span, total) {
  */
 export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
+  const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
+  const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
+  const t = smoothstep(0.55, 1, localize);
+  if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
+  // Crowding, not zoom, is what decides whether the deep value washes: at the
+  // ceiling ~0.17 anchored arcs share each CSS px of width and almost nothing
+  // overlaps, so each ribbon is drawn alone and needs the full value; at 40x
+  // there are thirty times as many and the same value would be a neon fog.
+  const per = anchoredPerCssPx > 0 ? anchoredPerCssPx : 0;
+  const crowd = Math.max(1, Math.sqrt(per / DENSITY_K));
+  const deep = ALPHA_DEEP / crowd;
   return {
-    alpha: Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19),
-    strokeWidthCss: Math.min(0.9 + l2 * 0.16, 2.4),
-    voteMix: 0,
+    alpha: alpha + (deep - alpha) * t,
+    strokeWidthCss: strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
+    voteMix: t,
   };
 }
 
@@ -163,11 +168,28 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
  * @returns {[number, number]} the parameter window, device px
  */
 export function visibleWindow(x0, x1, width, localize) {
-  return [Math.min(x0, x1), Math.max(x0, x1)];
+  const lo = Math.min(x0, x1);
+  const hi = Math.max(x0, x1);
+  const a = lo + (Math.max(lo, -CLIP_MARGIN) - lo) * localize;
+  const b = hi + (Math.min(hi, width + CLIP_MARGIN) - hi) * localize;
+  return [a, b < a ? a : b];
 }
 
 /** How far outside the viewport the tessellation window still reaches. */
 export const CLIP_MARGIN = 32;
+/**
+ * Most segments one draw may use. It binds only on wide frames: phoneLand at
+ * its ceiling asks for 68. At 96 the desktop ceiling still drew a 24.4 CSS px
+ * segment against S3's 24, so the cap was what missed the target, not the law.
+ */
+export const SEGMENT_CAP = 128;
+
+/** Farthest a drawn chord may stray from the true curve, CSS px. */
+export const CHORD_TOL_CSS = 0.5;
+
+/** Longest on-screen straight segment we aim for, CSS px. */
+export const SEGMENT_TARGET_CSS = 16;
+
 /**
  * Segments to tessellate one draw range with.
  *
@@ -176,11 +198,49 @@ export const CLIP_MARGIN = 32;
  * @param {number} maxRx - largest half-span in the range, device px
  * @param {number} ceil - usable height above the baseline, device px
  * @param {number} width - viewport width, device px
+ * @param {number} dpr - device pixel ratio, so the target is in CSS px
  * @returns {number}
  */
-export function segmentsFor(bucketSegments, localize, maxRx, ceil, width) {
-  return bucketSegments;
+export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr) {
+  const base = bucketSegments > 0 ? bucketSegments : 8;
+  if (!(localize > 0)) return base;
+  const d = dpr > 0 ? dpr : 1;
+  const shape = arcShape(maxRx, ceil, 1, 1, 1);
+  // (1) LENGTH: no on-screen segment longer than the target. The tallest this
+  // range can reach on screen comes from the same apex law the shader draws
+  // with, not from a second estimate of it.
+  const apex = Math.min(ceil, shape.A);
+  const runCss = (Math.min(2 * maxRx, width + 2 * CLIP_MARGIN) + apex) / d;
+  const byLength = Math.ceil(runCss / SEGMENT_TARGET_CSS);
+  // (2) CURVATURE: a short arc is a whole semi-ellipse in half a screen, so it
+  // needs segments the length rule does not ask for. Sampling uniformly in the
+  // parameter, a step of dTau strays at most |p''| dTau^2 / 8 from its chord,
+  // and |p''| <= max(R, A). Measured, not assumed: without this a 2-verse arc
+  // at the ceiling reads 0.835 CSS px of chord error on the 8-segment floor.
+  const tol = CHORD_TOL_CSS * d;
+  const maxRA = Math.max(shape.R, shape.A);
+  const flatTau = shape.R > 0
+    ? Math.min(Math.max(0, (2 * maxRx - 2 * shape.R) / shape.R), (width + 2 * CLIP_MARGIN) / shape.R)
+    : 0;
+  const byCurve = Math.ceil((Math.PI + flatTau) * Math.sqrt(maxRA / (8 * tol)));
+  const want = byLength > byCurve ? byLength : byCurve;
+  const capped = want < 8 ? 8 : (want > SEGMENT_CAP ? SEGMENT_CAP : want);
+  const n = Math.round(base + (capped - base) * localize);
+  return n < 8 ? 8 : n;
 }
+/**
+ * How far above the frame a long arc's apex sits. Above 1 by design: an arc
+ * whose level run is ON screen is the apex smear the tanh ceiling produced.
+ */
+export const APEX_LIFT = 1.15;
+
+/**
+ * Narrowest quarter, as a share of the ceiling. The quarter widens with the
+ * arc's span, so the seven arcs leaving one verse leave at seven different
+ * angles instead of fanning across a few pixels.
+ */
+export const FAN_FLOOR = 0.25;
+
 /**
  * The DRAWN CURVE of an arc, as two radii.
  *
@@ -207,9 +267,105 @@ export function segmentsFor(bucketSegments, localize, maxRx, ceil, width) {
  */
 export function arcShape(rx, ceil, squash, localize, spanLog) {
   const r = rx > 0 ? rx : 0;
-  return { R: r, A: arcRadiusY(r, ceil, squash, localize) };
+  const c = ceil > 0 ? ceil : 1;
+  const k = FAN_FLOOR + (1 - FAN_FLOOR) * (spanLog > 0 ? (spanLog < 1 ? spanLog : 1) : 0);
+  const deepR = Math.min(r, c * k);
+  const deepA = APEX_LIFT * c * Math.tanh(r / (c * CEIL_SOFTNESS));
+  return {
+    R: r + (deepR - r) * localize,
+    A: r * squash + (deepA - r * squash) * localize,
+  };
 }
 
+/**
+ * Parameter length of the whole curve: a quarter at each foot (pi/2 each)
+ * plus the level run between them, measured in units of R so the run is
+ * sampled at the same speed as the quarter's top.
+ *
+ * @param {number} rx - half the arc's span, device px
+ * @param {number} R - quarter radius from arcShape()
+ */
+export function arcParamLength(rx, R) {
+  const r = rx > 0 ? rx : 0;
+  return Math.PI + (R > 0 ? Math.max(0, (2 * r - 2 * R) / R) : 0);
+}
+
+/**
+ * Parameter at a given x - the inverse of arcPointAt, so a caller can clip
+ * the parameter range to the part of the arc that is on screen.
+ * MUST stay identical to arcTau in arcShapeGLSL below.
+ */
+export function arcTauOf(x, left, right, R, P) {
+  if (!(R > 0)) return 0;
+  const clamp1 = (v) => (v < -1 ? -1 : (v > 1 ? 1 : v));
+  if (x <= left + R) return Math.acos(clamp1(1 - (x - left) / R));
+  if (x >= right - R) return P - Math.acos(clamp1(1 - (right - x) / R));
+  return Math.PI / 2 + (x - (left + R)) / R;
+}
+
+/**
+ * The point on the curve at parameter tau, and the tangent the ribbon offsets
+ * along. MUST stay identical to arcAt in arcShapeGLSL below.
+ *
+ * @returns {{x:number, h:number, tx:number, ty:number}} x, height above the
+ *   baseline, and the tangent (which points BACKWARDS along tau, matching the
+ *   sign the ribbon has always offset with).
+ */
+export function arcPointAt(tau, left, right, R, A, P) {
+  const HALF = Math.PI / 2;
+  if (tau <= HALF) {
+    return {
+      x: left + R * (1 - Math.cos(tau)), h: A * Math.sin(tau),
+      tx: -R * Math.sin(tau), ty: A * Math.cos(tau),
+    };
+  }
+  if (tau >= P - HALF) {
+    const s = P - tau;
+    return {
+      x: right - R * (1 - Math.cos(s)), h: A * Math.sin(s),
+      tx: -R * Math.sin(s), ty: -A * Math.cos(s),
+    };
+  }
+  return { x: left + R + (tau - HALF) * R, h: A, tx: -R, ty: 0 };
+}
+/**
+ * The same two laws as GLSL ES 3.00, for the vertex shader to inline. Kept
+ * beside their JS originals so the pair can never drift apart unnoticed;
+ * web-renderer.test.js asserts the shader contains this text verbatim.
+ *
+ * arcTau inverts x -> parameter, so the shader can spend its segments on the
+ * piece of the arc that is ON SCREEN. arcAt is the curve and its tangent.
+ */
+export const arcShapeGLSL = `
+const float ARC_HALF = 1.5707963;
+vec2 arcShape(float rx, float ceil, float squash, float localize, float spanLog){
+  float r = max(rx, 0.);
+  float c = max(ceil, 1.);
+  float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*clamp(spanLog, 0., 1.);
+  float deepR = min(r, c*k);
+  float deepA = ${APEX_LIFT}*c*tanh(r/(c*${CEIL_SOFTNESS}));
+  return vec2(mix(r, deepR, localize), mix(r*squash, deepA, localize));
+}
+float arcTau(float x, float left, float right, float R, float P){
+  if (R <= 0.) return 0.;
+  if (x <= left + R)  return acos(clamp(1. - (x - left)/R, -1., 1.));
+  if (x >= right - R) return P - acos(clamp(1. - (right - x)/R, -1., 1.));
+  return ARC_HALF + (x - (left + R))/R;
+}
+void arcAt(float tau, float left, float right, float R, float A, float P,
+           out float x, out float h, out vec2 tg){
+  if (tau <= ARC_HALF) {
+    x = left + R*(1. - cos(tau));   h = A*sin(tau);
+    tg = vec2(-R*sin(tau), A*cos(tau));
+  } else if (tau >= P - ARC_HALF) {
+    float s = P - tau;
+    x = right - R*(1. - cos(s));    h = A*sin(s);
+    tg = vec2(-R*sin(s), -A*cos(s));
+  } else {
+    x = left + R + (tau - ARC_HALF)*R;  h = A;
+    tg = vec2(-R, 0.);
+  }
+}`;
 /**
  * Height of the drawn curve above the baseline, `d` px in from the nearer
  * foot. THE one definition of the curve's shape: arcDistance hit-tests it and

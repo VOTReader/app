@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, flyOverDim, verseToX, xToVerse,
+  arcAnchored, arcDistance, arcShape, spanLogOf, flyOverDim, verseToX, xToVerse,
 } from './geometry.js';
 import { bucketDrawCount } from './decode.js';
 
@@ -85,7 +85,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // exactly. Only a full zero is skipped: an arc still showing the
         // partial fly-over floor is dim, but it is there to be tapped.
         if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
-        const shape = arcShape((x1 - x0) * 0.5, ceil, squash, localize);
+        const shape = arcShape((x1 - x0) * 0.5, ceil, squash, localize,
+          spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total));
         const d = arcDistance(px, py, x0, x1, base, shape.R, shape.A, tol);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
@@ -98,6 +99,35 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
     }
   }
   return best;
+}
+
+/**
+ * How many DRAWN arcs are anchored to the passage on screen.
+ *
+ * Not `stats.instances`, which counts what was submitted to the GPU: chunk
+ * extents overlapping the viewport, 18,944 on desktop at the ceiling against
+ * the 336 that actually paint — 50x off the population the eye sees. This
+ * applies the shader's own arcAnchored law to the same instances the shader
+ * draws, so the style law is fed the number a reader is looking at.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {number} width — viewport width, device px
+ * @param {import('./decode.js').Density} density
+ * @returns {number}
+ */
+export function countAnchored(g, cam, width, density) {
+  let n = 0;
+  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  for (const bucket of g.buckets) {
+    const end = bucket.off + bucketDrawCount(bucket, density);
+    for (let i = bucket.off; i < end; i++) {
+      const x0 = (g.from[i] - camX) * ppv + half;
+      const x1 = (g.to[i] - camX) * ppv + half;
+      if (arcAnchored(x0, x1, width)) n++;
+    }
+  }
+  return n;
 }
 
 /**

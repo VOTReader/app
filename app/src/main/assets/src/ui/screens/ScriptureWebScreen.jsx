@@ -24,9 +24,10 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
+  maxZoomFor, ribbonStyle,
 } from '../../utils/scripture-web/geometry.js';
 import {
-  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
+  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
   arcsTouching, findWebReference,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
@@ -59,7 +60,36 @@ const SHORT_STUDY = {
 };
 
 /** Deepest zoom, as a multiple of fit-to-width. Well past single-verse. */
-const MAX_ZOOM = 4000;
+/**
+ * The zoom ceiling, from the frame rather than from a constant. 44 CSS px
+ * per verse is the point past which nothing new can separate - every arc
+ * leaving a verse shares one foot at every zoom - so the old fixed 4000 was
+ * 247 CSS px per verse on a 1920 px desktop, 5.6x into a void, and about
+ * right on a 375 px phone only by accident.
+ */
+const maxZoomOf = (graph, v) => (graph
+  ? maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1))
+  : 4000);
+
+/** What the live region says when + does nothing because it can do nothing. */
+const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
+
+/**
+ * Anchored arcs per CSS px of viewport width, which is what decides whether
+ * the deep alpha reads as one clear ribbon or as fog. Counted over the drawn
+ * set with the shader's own arcAnchored law, cached until the camera moves
+ * more than 5 % - 64k pairs is under a millisecond but not per frame.
+ */
+function anchoredDensity(cache, g, cam, v, density) {
+  const moved = cache.W !== v.W || cache.density !== density
+    || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.05
+    || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
+  if (moved) {
+    cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
+    cache.value = countAnchored(g, cam, v.W, density);
+  }
+  return cache.value / ((v.W || 1) / (v.DPR || 1));
+}
 /** Height reserved below the baseline for the ruler + book names. */
 const RULER_H = 74;
 
@@ -200,6 +230,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const contextRef = React.useRef(null);
   const rangeRef = React.useRef(null);
   const zoomRef = React.useRef(null);
+  const zoomInRef = React.useRef(null);
+  const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
@@ -393,6 +425,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       const zoomLabel = zoom < 1.1 ? 'Overview' : (zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom) + 'x');
       zoomRef.current.textContent = zoomLabel;
     }
+    if (zoomInRef.current) {
+      // aria-disabled, not disabled: the control keeps its name and stays
+      // focusable, so a reader who lands on it is told why it does nothing.
+      zoomInRef.current.setAttribute('aria-disabled',
+        zoom >= maxZoomOf(g, v) - 1e-9 ? 'true' : 'false');
+    }
     if (mode === 'personal') {
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
@@ -414,15 +452,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }
       return;
     }
-    const strokeWidth = Math.min(0.9 + Math.log2(zoom) * 0.16, 2.4) * v.DPR;
-    // The Famous view is intentionally high-coverage, but
-    // 64k overlapping ribbons still need a quiet baseline. Let zoom bring
-    // detail forward without recreating the old neon wash at overview.
-    const alpha = Math.min(0.075 + Math.log2(zoom) * 0.028, chrome.isLight ? 0.42 : 0.19);
+    // The alpha and stroke law lives in geometry.js, not here: it used to be
+    // written inline where no harness could import it, so every probe re-typed
+    // it and would have measured the old law against a new screen.
+    const perCssPx = base.localize > 0
+      ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
+    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
-      strokeWidth,
-      alpha,
+      strokeWidth: style.strokeWidthCss * v.DPR,
+      alpha: style.alpha,
+      voteMix: style.voteMix,
+      dpr: v.DPR,
       colorMode, density, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
@@ -494,7 +535,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       glc.height = uic.height = H;
       const cam = camRef.current;
       if (!(cam.ppv > 0)) cam.ppv = fitPPV(cam, W);
-      clampCamera(cam, W, MAX_ZOOM);
+      clampCamera(cam, W, maxZoomOf(graph, viewRef.current));
       schedule();
     };
     resize();
@@ -539,7 +580,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current,
       view: () => viewRef.current, handlers: () => handlersRef.current,
-      schedule, maxZoom: MAX_ZOOM, clampCamera, zoomAbout, xToVerse,
+      schedule, maxZoom: () => maxZoomOf(graph, viewRef.current), clampCamera, zoomAbout, xToVerse,
     });
   }, [graph, schedule, loc]);
 
@@ -674,7 +715,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ? Math.min(800, Math.max(160, graph.total / Math.max(chapterVerses * 2.5, 1)))
       : Math.min(800, Math.max(16, graph.total / Math.max(chapterVerses * 4, 1)));
     cam.ppv = fitPPV(cam, v.W) * targetZoom;
-    clampCamera(cam, v.W, MAX_ZOOM);
+    clampCamera(cam, v.W, maxZoomOf(graph, v));
     focusRef.current = { arc: -1, range: [result.lo, result.hi] };
     setGoToOpen(false);
     setGoToValue('');
@@ -747,16 +788,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
-    zoomAbout(cam, v.W, cx * v.DPR, 2.5, MAX_ZOOM);
+    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v));
     schedule();
-  }, [schedule]);
+  }, [graph, schedule]);
 
   const changeZoom = React.useCallback((factor) => {
     const cam = camRef.current, v = viewRef.current;
     if (!cam || !v.W) return;
-    zoomAbout(cam, v.W, v.W / 2, factor, MAX_ZOOM);
+    const before = cam.ppv;
+    zoomAbout(cam, v.W, v.W / 2, factor, maxZoomOf(graph, v));
+    if (factor > 1 && cam.ppv === before) setAnnounce(ZOOM_MAX_MESSAGE);
     schedule();
-  }, [schedule]);
+  }, [graph, schedule]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
@@ -766,21 +809,27 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam) return;
     cam.ppv = fitPPV(cam, v.W);
     cam.x = cam.total / 2;
-    clampCamera(cam, v.W, MAX_ZOOM);
+    clampCamera(cam, v.W, maxZoomOf(graph, v));
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); setGoToOpen(false); schedule();
-  }, [schedule]);
+  }, [graph, schedule]);
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
     const cam = camRef.current, v = viewRef.current;
     if (!cam || !v.W) return;
     const step = (v.W / cam.ppv) * 0.12;
+    const ceiling = maxZoomOf(graph, v);
+    let atCeiling = false;
     if (e.key === 'ArrowLeft') { cam.x -= step; }
     else if (e.key === 'ArrowRight') { cam.x += step; }
-    else if (e.key === '+' || e.key === '=') { zoomAbout(cam, v.W, v.W / 2, 1.6, MAX_ZOOM); }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, MAX_ZOOM); }
+    else if (e.key === '+' || e.key === '=') {
+      const before = cam.ppv;
+      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling);
+      atCeiling = cam.ppv === before;
+    }
+    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
       // The notice is an overlay like the five below and goes first for the
@@ -798,9 +847,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     } else return;
     e.preventDefault();
-    clampCamera(cam, v.W, MAX_ZOOM);
+    clampCamera(cam, v.W, ceiling);
     const centre = Math.round(cam.x);
-    if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
+    if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
+    else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [choices, detail, goToOpen, listOpen, tip, graph, onBack, resetView, schedule,
       emptyShown, dismissEmpty]);
@@ -916,7 +966,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         )}
         <div className="sw-zoom" role="group" aria-label="Zoom">
           <button type="button" className="sw-btn sw-btn-zoom" onClick={() => changeZoom(1 / 1.8)} aria-label="Zoom out">−</button>
-          <button type="button" className="sw-btn sw-btn-zoom" onClick={() => changeZoom(1.8)} aria-label="Zoom in">+</button>
+          <button type="button" className="sw-btn sw-btn-zoom" ref={zoomInRef} onClick={() => changeZoom(1.8)} aria-label="Zoom in">+</button>
         </div>
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
       </div>

@@ -24,7 +24,10 @@
    nothing is drawn. Tests assert this shader contains them.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { arcRadiusGLSL, flyOverGLSL } from '../../utils/scripture-web/geometry.js';
+import {
+  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS,
+} from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
 
@@ -39,13 +42,14 @@ uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uCeil, uSquash, uLocalize;
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
+uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
-out vec4 vCol; out float vEdge;
-${arcRadiusGLSL}
+out vec4 vCol; out float vEdge; out float vHalfW;
+${arcShapeGLSL}
 ${flyOverGLSL}
 ${rampGLSL()}
 void main(){
@@ -54,16 +58,43 @@ void main(){
   float x1 = (b - uCamX)*uPPV + uRes.x*.5;
   float rx = (x1 - x0)*.5;
   float cx = x0 + rx;
-  float ry = arcRadiusY(rx, uCeil, uSquash, uLocalize);
+  float r = max(rx, 0.);
+  float left = cx - r, right = cx + r;
+  float spanLog = log(max(abs(b - a), 1.))/log(max(uTotal, 2.));
+  vec2 sh = arcShape(rx, uCeil, uSquash, uLocalize, spanLog);
+  float R = sh.x, A = sh.y;
+  // Parameter length: a quarter at each foot plus the level run between them,
+  // measured in units of R so the run is sampled at the quarter's own speed.
+  float P = 3.14159265 + (R > 0. ? max(0., (2.*r - 2.*R)/R) : 0.);
+
+  // The piece worth tessellating. At overview this is the whole arc, so the 1x
+  // frame cannot move; as the reader localizes it closes onto the viewport,
+  // because a 440,000 px arc spending 47 of its 48 segments off screen is what
+  // draws the visible piece as one straight chord. Clipping moves only WHERE
+  // the samples land — never the curve they land on. geometry.visibleWindow.
+  float m = ${CLIP_MARGIN}.;
+  float lo = mix(left,  max(left,  -m),         uLocalize);
+  float hi = mix(right, min(right, uRes.x + m), uLocalize);
+  hi = max(hi, lo);
 
   // Ribbon: two vertices per segment step, offset along the curve normal.
   int vid = gl_VertexID;
   float t = float(vid >> 1) / uSegments;
   float side = float(vid & 1)*2. - 1.;
-  float th = 3.14159265*(1. - t);
-  vec2 p = vec2(cx + rx*cos(th), uBase - ry*sin(th));
-  vec2 tg = normalize(vec2(-rx*sin(th), -ry*cos(th)) + vec2(1e-6, 0.));
-  float hw = uWidth*.5 + 1.0;                    // +1px feather skirt
+  float tau = mix(arcTau(lo, left, right, R, P), arcTau(hi, left, right, R, P), t);
+  float px, hgt; vec2 tgv;
+  arcAt(tau, left, right, R, A, P, px, hgt, tgv);
+  vec2 p = vec2(px, uBase - hgt);
+  vec2 tg = normalize(tgv + vec2(1e-6, 0.));
+
+  // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
+  // votes can no longer ride on alpha; they drive WIDTH instead. uVoteMix is
+  // the same fly-over crossover the cull uses, so there is never a zoom where
+  // an arc is culled under one law and styled under another.
+  float strength = clamp(aVotes/70., .30, 1.);
+  float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
+  float halfW = uWidth*.5*wScale;
+  float hw = halfW + 1.0;                        // +1px feather skirt
   p += vec2(-tg.y, tg.x)*side*hw;
 
   float id = float(gl_InstanceID) + uInstanceBase;
@@ -99,21 +130,21 @@ void main(){
   col = mix(col, vec3(1.), bright*.55);
   col *= uLightness;                              // parchment needs darker ink
 
-  float strength = clamp(aVotes/70., .30, 1.);
-  vCol = vec4(col, uAlpha*dim*strength*mix(1., 3.0, bright));
+  float aStrength = mix(strength, 1., uVoteMix);
+  vCol = vec4(col, uAlpha*dim*aStrength*mix(1., 3.0, bright));
   vEdge = side;
+  vHalfW = halfW;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
   gl_Position.y = -gl_Position.y;
 }`;
 
 const FRAG = `#version 300 es
 precision highp float;
-uniform float uWidth;
-in vec4 vCol; in float vEdge; out vec4 o;
+in vec4 vCol; in float vEdge; in float vHalfW; out vec4 o;
 void main(){
-  float hw = uWidth*.5 + 1.0;
+  float hw = vHalfW + 1.0;
   float d = abs(vEdge)*hw;
-  float aa = 1.0 - smoothstep(uWidth*.5 - .5, uWidth*.5 + .5, d);
+  float aa = 1.0 - smoothstep(vHalfW - .5, vHalfW + .5, d);
   float a = clamp(vCol.a, 0., 1.)*aa;
   o = vec4(vCol.rgb*a, a);                        // premultiplied
 }`;
@@ -176,10 +207,23 @@ export function createRenderer(canvas, graph, opts = {}) {
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uCeil', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
-    'uLightness', 'uSegments', 'uFocusRange', 'uFocusArc', 'uHoverArc',
-    'uInstanceBase']) {
+    'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
+    'uHoverArc', 'uInstanceBase']) {
     U[name] = gl.getUniformLocation(program, name);
   }
+
+  // Widest arc in each bucket, once. Tessellation is chosen per draw from the
+  // camera, and a bucket of 3-verse arcs must not be given 96 segments because
+  // a bucket of 10,000-verse ones needs them.
+  const bucketMaxSpan = graph.buckets.map((b) => {
+    let m = 0;
+    const end = b.off + b.len;
+    for (let i = b.off; i < end; i++) {
+      const s = Math.abs(graph.to[i] - graph.from[i]);
+      if (s > m) m = s;
+    }
+    return m;
+  });
 
   // Per-instance genre of the earlier endpoint — precomputed once so the
   // shader never walks the chapter table.
@@ -274,7 +318,8 @@ export function createRenderer(canvas, graph, opts = {}) {
      * Draw one frame.
      * @param {{width:number, height:number, base:number, ceil:number,
      *   squash:number, localize:number, camX:number, ppv:number,
-     *   strokeWidth:number, alpha:number, colorMode:string,
+     *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
+     *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string,
      *   focusRange:(number[]|null), focusArc:number, hoverArc?:number}} v
@@ -305,6 +350,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uNT, ntStart);
       gl.uniform1f(U.uColorMode, COLOR_MODES.indexOf(v.colorMode));
       gl.uniform1f(U.uLightness, v.light ? 0.72 : 1);
+      gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
@@ -316,11 +362,15 @@ export function createRenderer(canvas, graph, opts = {}) {
       const chunkSize = graph.chunkSize || 256;
 
       let instances = 0, draws = 0;
-      for (const bucket of graph.buckets) {
+      for (let bi = 0; bi < graph.buckets.length; bi++) {
+        const bucket = graph.buckets[bi];
         const count = bucketDrawCount(bucket, v.density);
         if (count <= 0) continue;
-        gl.uniform1f(U.uSegments, bucket.segments);
-        const verts = 2 * (bucket.segments + 1);
+        // Segments from what this bucket can put ON SCREEN, not from its span.
+        const segments = segmentsFor(bucket.segments, v.localize,
+          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1);
+        gl.uniform1f(U.uSegments, segments);
+        const verts = 2 * (segments + 1);
         // Walk chunks, coalescing adjacent visible ones into single draws.
         const chunks = bucket.chunks || [];
         let runStart = -1;

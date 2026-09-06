@@ -51,7 +51,7 @@ export function isChromeTarget(target) {
  *   view: () => {W:number, H:number, DPR:number},
  *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
  *   schedule: () => void,
- *   maxZoom: number,
+ *   maxZoom: () => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number) => void,
  *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
@@ -94,15 +94,15 @@ export function attachWebGestures(el, deps) {
     if (pinch && pointers.size === 2) {
       const [p, q] = Array.from(pointers.values());
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
-      clampCamera(c, W, maxZoom);
+      clampCamera(c, W, maxZoom());
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
-      clampCamera(c, W, maxZoom);
+      clampCamera(c, W, maxZoom());
       moved = true; schedule(); return;
     }
     if (drag) {
       if (Math.abs(pt.x - drag.x) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
-      clampCamera(c, W, maxZoom);
+      clampCamera(c, W, maxZoom());
       schedule(); return;
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
@@ -129,7 +129,7 @@ export function attachWebGestures(el, deps) {
     if (isChromeTarget(e.target)) return;
     e.preventDefault();
     const c = cam(), W = view().W;
-    zoomAbout(c, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), maxZoom);
+    zoomAbout(c, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), maxZoom());
     schedule();
   };
   el.addEventListener('pointerdown', down);

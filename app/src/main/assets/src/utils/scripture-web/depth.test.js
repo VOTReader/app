@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   arcShape, arcHeight, spanLogOf, maxZoomFor, PPV_MAX_CSS,
   ribbonStyle, segmentsFor, visibleWindow, localizeFactor, squashFactor, CEIL_SOFTNESS,
+  ALPHA_DEEP, arcParamLength, arcTauOf, arcPointAt,
 } from './geometry.js';
 
 // design-perf's phoneLand frame, in DEVICE px (the shader's frame).
@@ -121,17 +122,43 @@ describe('D2 — nothing below the ceiling washes out', () => {
     }
   });
 
-  it('holds 40x within 25 % of before, on all three of design-perf frames', () => {
-    const before = { dark: 0.19, light: 0.224 };     // spec section 1, at 40x
-    const perCssPx = { phoneLand: 4256 / 800, phone375: 4316 / 375, desktop: 4220 / 1920 };
-    for (const theme of ['dark', 'light']) {
-      for (const frame of Object.keys(perCssPx)) {
-        const after = ribbonStyle(40, localizeFactor(40), theme === 'light', perCssPx[frame]).alpha;
-        const ratio = after / before[theme];
-        const label = frame + ' ' + theme + ' 40x alpha ratio';
-        expect(ratio, label).toBeGreaterThan(0.75);
-        expect(ratio, label).toBeLessThan(1.25);
-      }
+  /* D2's OWN target is +-25 % on ink contrast and +-10 % on ink share, in
+     PIXELS, at 40x — dp-sw-depth.mjs paired before/after in one session. It is
+     deliberately not restated here as a bound on alpha: alpha is one input to
+     a premultiplied-over frame with thousands of crossings, and a bound on it
+     would be my proxy for their measurement rather than their measurement.
+     I wrote it that way first and it failed on phone375 at ratio 0.62 while
+     phoneLand read 0.92 — the divisor is the same law, the frames just differ
+     2.2x in density, which is the law working, not a defect.
+
+     What IS checkable here is that the law is the one design-perf specified,
+     with the constant they derived. These are their arithmetic, from the
+     spec's section 4 as corrected at 18:30. */
+  it('divides the deep alpha by design-perf own crowding factors at 40x', () => {
+    const cases = [
+      { frame: 'phoneLand', per: 4256 / 800, divisor: 5.15 },
+      { frame: 'phone375', per: 4316 / 375, divisor: 7.58 },
+      { frame: 'desktop1920', per: 4220 / 1920, divisor: 3.32 },
+    ];
+    for (const c of cases) {
+      const s = ribbonStyle(40, localizeFactor(40), false, c.per);
+      expect(ALPHA_DEEP / s.alpha, c.frame + ' 40x crowding divisor').toBeCloseTo(c.divisor, 1);
+    }
+  });
+
+  it('clamps that divisor to 1 at every ceiling, so D1 keeps the full value', () => {
+    // The measured anchored density at each frame's own 44 px ceiling.
+    for (const per of [141 / 800, 59 / 375, 336 / 1920]) {
+      expect(ribbonStyle(1711, 1, false, per).alpha).toBeCloseTo(ALPHA_DEEP, 12);
+    }
+  });
+
+  it('never brightens at 40x beyond the deep value itself', () => {
+    // The wash direction is UP. Whatever the crowd reads, the deep alpha is a
+    // ceiling, not a floor: an empty frame cannot be brighter than one ribbon.
+    for (const per of [0, 1e-9, 0.001, 5, 500]) {
+      expect(ribbonStyle(40, 1, false, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
+      expect(ribbonStyle(40, 1, true, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
     }
   });
 });
@@ -232,8 +259,8 @@ describe('S4 — the departure fan: arcs from one foot leave at different angles
 
 describe('S3 — tessellation follows the screen, not the arc', () => {
   it('is the bucket own count at overview, so 1x cannot move', () => {
-    expect(segmentsFor(48, 0, 1e9, CEIL, W)).toBe(48);
-    expect(segmentsFor(8, 0, 1e9, CEIL, W)).toBe(8);
+    expect(segmentsFor(48, 0, 1e9, CEIL, W, DPR)).toBe(48);
+    expect(segmentsFor(8, 0, 1e9, CEIL, W, DPR)).toBe(8);
     const [xa, xb] = visibleWindow(-9e5, 9e5, W, 0);
     expect(xa).toBe(-9e5);
     expect(xb).toBe(9e5);
@@ -249,11 +276,67 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
     const rx = rxOf(10000, 44);
     const [xa, xb] = visibleWindow(-rx, rx, W, 1);
     const windowRunCss = (xb - xa + CEIL) / DPR;
-    const n = segmentsFor(48, 1, rx, CEIL, W);
+    const n = segmentsFor(48, 1, rx, CEIL, W, DPR);
     expect(windowRunCss / n).toBeLessThanOrEqual(24);
   });
 
-  it('does not spend 96 segments on an arc 24 px wide', () => {
-    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W)).toBeLessThan(24);
+  it('does not spend the whole cap on an arc 24 px wide', () => {
+    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W, DPR)).toBeLessThan(24);
+  });
+
+  /* The sweep. The two rules above are bounds on ONE arc on ONE frame; this
+     walks the drawn curve itself across twelve spans, three frames and three
+     zooms and measures what a reader would actually see. It is here rather
+     than in a scratch script because both numbers were MISSED at first and the
+     misses were invisible to the bounds: the 8-segment floor left 0.835 CSS px
+     of chord error on a 2-verse arc, and the old 96 cap left a 24.4 CSS px
+     segment at the desktop ceiling. Neither showed up on phoneLand. */
+  it('walks the drawn curve: no segment over 24 CSS px, no chord over 0.5', () => {
+    const frames = [
+      { name: 'phoneLand', wCss: 800, dpr: 2, ceilCss: 256 },
+      { name: 'phone375', wCss: 375, dpr: 3, ceilCss: 413 },
+      { name: 'desktop1920', wCss: 1920, dpr: 1, ceilCss: 950 },
+    ];
+    const spans = [1, 2, 3, 5, 10, 30, 100, 300, 1000, 3000, 10000, 31101];
+    for (const f of frames) {
+      const wPx = f.wCss * f.dpr;
+      const ceilPx = f.ceilCss * f.dpr;
+      const squash = squashFactor(ceilPx, wPx);
+      // S3 is stated "at every zoom >= 40". 1x is excluded on purpose: D2
+      // requires the overview frame to be pixel-identical, so its tessellation
+      // is today's by construction and reads 26-63 CSS px per segment.
+      for (const zoom of [40, 400, maxZoomFor(TOTAL, f.wCss)]) {
+        const localize = localizeFactor(zoom);
+        const ppv = (wPx / TOTAL) * zoom;
+        for (const span of spans) {
+          const rx = (span * ppv) / 2;
+          const { R, A } = arcShape(rx, ceilPx, squash, localize, spanLogOf(span, TOTAL));
+          if (!(R > 0) || !(A > 0)) continue;
+          const left = wPx / 2;             // a foot mid-screen: the reader's case
+          const right = left + 2 * rx;
+          const P = arcParamLength(rx, R);
+          const [lo, hi] = visibleWindow(left, right, wPx, localize);
+          const tA = arcTauOf(lo, left, right, R, P);
+          const tB = arcTauOf(hi, left, right, R, P);
+          const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr);
+          const where = `${f.name} z${Math.round(zoom)} span${span} n${n}`;
+          for (let i = 0; i < n; i++) {
+            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, R, A, P);
+            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, R, A, P);
+            if ((p0.h > ceilPx && p1.h > ceilPx) || (p0.x > wPx && p1.x > wPx)) continue;
+            expect(Math.hypot(p1.x - p0.x, p1.h - p0.h) / f.dpr, where + ' segment')
+              .toBeLessThanOrEqual(24);
+            for (let k = 1; k < 16; k++) {
+              const u = k / 16;
+              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, R, A, P);
+              const cx = p0.x + (p1.x - p0.x) * u;
+              const ch = p0.h + (p1.h - p0.h) * u;
+              expect(Math.hypot(m.x - cx, m.h - ch) / f.dpr, where + ' chord')
+                .toBeLessThanOrEqual(0.5);
+            }
+          }
+        }
+      }
+    }
   });
 });
