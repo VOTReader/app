@@ -45,7 +45,6 @@ const SHIPPED_MANIFEST = (() => {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const SRC = readFileSync(join(HERE, '..', 'data', 'bible-audio-manifest.js'), 'utf8');
   const box = {};
-  // eslint-disable-next-line no-new-func
   new Function('g', SRC + ';g.out = BIBLE_AUDIO_MANIFEST;')(box);
   return box.out;
 })();
