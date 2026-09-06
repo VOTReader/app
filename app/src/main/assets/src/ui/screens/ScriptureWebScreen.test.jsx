@@ -49,6 +49,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 });
 
 import { createRenderer } from '../scripture-web/web-renderer.js';
+import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
 
 const baseProps = () => ({
@@ -68,6 +69,96 @@ afterEach(() => {
   setViewport(ORIG_W, ORIG_H);
   delete window.screen.orientation;
   vi.useRealTimers();
+});
+
+describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000', () => {
+  /* Corbin: "fully zoomed in still looks terrible". On a 1920 px desktop
+     today's 4000 is 247 CSS px per verse, 5.6x past the point where anything
+     new can separate — arcs from one verse share one foot at every zoom, so
+     it zooms into a void. The ceiling is 44 CSS px per verse (v2 note §7),
+     which is 1,711 on the 800 CSS px landscape frame a phone reader gets.
+
+     THE CANVAS IS SIZED ON PURPOSE. The screen reads `glc.clientWidth`, which
+     jsdom reports as 0, and every key and pointer path returns early on
+     `!v.W`. Without this every assertion below would pass vacuously — which is
+     what happened to the My Web Escape case earlier today. The first test in
+     this block is the control AND the precondition: if it goes red, nothing
+     else here means anything, whatever colour it shows. */
+  const CANON = 31102;
+  const FRAME_CSS = 800;
+  const graph = () => ({
+    total: CANON, count: 0, buckets: [],
+    books: [{ id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' }],
+    chapters: [[0, 1, 0, CANON]],
+    chapterOfVerse: new Uint16Array(CANON),
+    from: new Uint16Array(0), to: new Uint16Array(0), votes: new Uint8Array(0),
+    votEdges: [], prophecy: [], votLinks: [],
+  });
+
+  const SIZES = [['clientWidth', FRAME_CSS], ['clientHeight', 360]];
+  let realDecode = null;
+
+  // This block sizes a shared prototype and re-points a shared mock. Both are
+  // put back, or the neighbouring describes measure MY graph on MY canvas —
+  // the failure mode where a gate passes alone and fails in file order.
+  afterEach(() => {
+    for (const [prop] of SIZES) delete HTMLCanvasElement.prototype[prop];
+    if (realDecode) vi.mocked(decodeGraph).mockImplementation(realDecode);
+  });
+
+  const mount = async () => {
+    for (const [prop, value] of SIZES) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, {
+        configurable: true, get() { return value; },
+      });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
+    if (!realDecode) realDecode = vi.mocked(decodeGraph).getMockImplementation();
+    vi.mocked(decodeGraph).mockImplementation(() => graph());
+    const view = render(<ScriptureWebScreen {...baseProps()} />);
+    // The canvas only mounts after the graph decodes, and viewRef.W is set by
+    // the effect that follows it. Wait for the element, then flush once more.
+    for (let i = 0; i < 8 && !view.container.querySelector('.sw-canvas-gl'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    }
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    return view;
+  };
+
+  const zoomText = (c) => c.querySelector('.sw-context-zoom').textContent;
+  const press = async (key) => {
+    fireEvent.keyDown(document.querySelector('.sw-root'), { key });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  };
+
+  it('CONTROL and PRECONDITION: the canvas is sized, so + reaches the camera', async () => {
+    const { container } = await mount();
+    expect(zoomText(container)).toBe('Overview');
+    await press('+');
+    expect(zoomText(container)).not.toBe('Overview');
+  });
+
+  it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {
+    const { container } = await mount();
+    for (let i = 0; i < 40; i++) await press('+');
+    // maxZoomFor(31102, 800) = 1710.61 -> the label rounds to 1711x.
+    expect(zoomText(container)).toBe('1711x');
+  });
+
+  it('marks the + button aria-disabled at the ceiling and not before', async () => {
+    const { container } = await mount();
+    const plus = screen.getByLabelText('Zoom in');
+    expect(plus.getAttribute('aria-disabled')).not.toBe('true');
+    for (let i = 0; i < 40; i++) await press('+');
+    expect(plus.getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByLabelText('Zoom out').getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
+    const { container } = await mount();
+    for (let i = 0; i < 40; i++) await press('+');
+    expect(container.querySelector('.sw-live').textContent).toBe('Zoomed all the way in');
+  });
 });
 
 describe('scripture-web-5 — Try again re-decodes the graph', () => {
