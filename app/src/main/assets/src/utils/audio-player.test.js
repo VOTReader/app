@@ -616,6 +616,22 @@ describe('audio-player — the boot snapshot after a finished recording (audio-p
     }
   });
 
+  it('CONTROL: a NORMAL track boundary advances the snapshot exactly ONE track, not two', () => {
+    /* next() persists too, and it does so AFTER qi has already moved — so the
+       url comparison is what stops the guard taking a second bite there. Without
+       it, finishing a track normally writes a snapshot pointing one track past
+       where the listener actually is, and they lose a whole recording on the next
+       boot. A bite proved nothing witnessed this. */
+    const st = playedTo(300);
+    const upNext = st.queue[1];
+    el().dispatchEvent(new Event('ended'));                 // no sleep armed: a real advance
+
+    expect(AudioPlayer.getState().qi).toBe(1);              // the bar moved on
+    expect(snap().qi).toBe(1);                              // and the snapshot agrees
+    expect(snap().track.url).toBe(upNext.url);
+    expect(snap().track.url).not.toBe(st.queue[2].url);     // not two
+  });
+
   it('finishing the LAST recording clears the snapshot, the same as reaching the end normally', () => {
     /* next() calls stop() at the end of a queue, and stop() clears the snapshot
        because "the boot snapshot is the part that must not resurrect the bar".

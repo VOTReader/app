@@ -1369,6 +1369,14 @@ function _persist() {
        wakes to the recording they finished, paused at its end: that is "this is
        where you got to", and it is the snapshot, not the bar, that the next
        session reads. */
+    /* `!_pendingRestore` is a guard whose bad input cannot currently occur, and it
+       is kept rather than deleted for what it would cost if it did. `_finishedUrl`
+       is set only inside the `ended` handler, which needs a live media element,
+       and `_pendingRestore` means there is not one yet — so a bite on this clause
+       reddens nothing, correctly. But the restore placeholder is a ONE-track
+       queue, so were it ever to fire, `qi + 1 >= length` would hold and the arm
+       below would `_clearPersist()` — wiping the reader's resume point rather
+       than advancing it. A destructive misfire is worth one clause. */
     if (!_pendingRestore && _finishedUrl && track && track.url === _finishedUrl) {
       if (qi + 1 >= _state.queue.length) { _clearPersist(); return; }
       qi += 1;
