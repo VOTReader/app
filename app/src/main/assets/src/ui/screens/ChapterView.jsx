@@ -5,9 +5,11 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+  const bodyRef = React.useRef(null);
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   /* C2-C [C2]: this screen said "Matthew" in five places — three of them
@@ -186,7 +188,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       </header>
 
       <div className="page-wrapper">
-        <div className="chapter-body">
+        <div className="chapter-body" ref={bodyRef}>
           {mode === "pdf" ? (
             /* ── PDF MODE: clean flowing verse text + study panels below ── */
             <>
@@ -301,6 +303,33 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           </div>
         </div>
       </div>
+
+      {/* Read-along, on the same !inert contract as BibleChapterView and
+          LetterView: the swipe peek renders a REAL ChapterView clone, and two
+          live mounts would fight over the single global
+          ::highlight(vot-reading) registration.
+
+          ITS OWN hlKeyFn, and that is the whole of the wiring risk here. This
+          screen keys verses `studyHlKey(book.id + '-' + chapter.num, n)`; a
+          mount handed the Bible key fn would look up 'bible:matthew:1:1'
+          against a DOM that only ever carries 'study:matthew-1:1', paint
+          nothing, and read exactly like the missing timings this mount exists
+          to stop looking like. BRM already ships all 28 Matthew chapters.
+
+          Whether the timings belong to the recording playing is resolved
+          inside ReadAlongHighlight, from the track's own asset name — this
+          screen only says which book and which chapter are on the page. */}
+      {!inert && bibleAudio && (
+        <ReadAlongHighlight
+          volKey={bibleAudio.volKey}
+          letterId={book.id}
+          chapter={chapter.num}
+          mainRef={bodyRef}
+          hlKeyFn={(bookId, n) => studyHlKey(bookId + '-' + chapter.num, n)}
+          readAlongOn={readAlongOn}
+          readAlongFollow={readAlongFollow}
+        />
+      )}
       {/* position:fixed sheet, skipped in an inert peek (a clone is
           non-interactive; a duplicate sheet in <body> would be wrong). The live
           sheet portals to <body> itself (ScriptureSheet) so the page-swipe

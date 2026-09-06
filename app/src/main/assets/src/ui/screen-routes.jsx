@@ -1145,6 +1145,8 @@ export function buildScreenRoutes({
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
           fromStudies={fromStudies} settings={settings}
           bibleAudio={bibleAudioProp}
+          readAlongOn={sharedViewProps.readAlongOn}
+          readAlongFollow={sharedViewProps.readAlongFollow}
           titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
           prevChainEntry={prevChainEntry} nextChainEntry={nextChainEntry}
           goToChainEntryFirst={goToChainEntryFirst} goToChainEntryLast={goToChainEntryLast}
