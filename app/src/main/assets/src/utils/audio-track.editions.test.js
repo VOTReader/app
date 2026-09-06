@@ -186,12 +186,22 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
   });
 
   it('every edition carries every book — fires on the first partial edition', () => {
-    // PASSES TODAY AND IS MEANT TO. resolveBibleAudio's `offer` falls back to
+    // PASSES TODAY AND IS MEANT TO - but NOT for the reason it used to.
+    //
+    // It used to say the per-book fallback was "written and unit-tested but NOT
+    // wired at the four playBibleBook sites", and that the branch registering a
+    // partial edition had to do the wiring. THE WIRING IS DONE:
+    // screen-routes.jsx now builds bibleAudioFor(bookId) and calls it at each of
+    // the four, with screen-routes.bibleaudio.test.jsx holding the RED that
+    // pinned it. So this is no longer a to-do with an alarm attached; it is a
+    // plain invariant about the shipped corpus, and it stays because a partial
+    // edition is still worth announcing - the fallback now HANDLES one, which
+    // is a different thing from nobody noticing one arrived.
+    //
+    // (historical) resolveBibleAudio's `offer` falls back to
     // the default edition for a book the selected one lacks, and that arm is
-    // unreachable while this holds — so it is written and unit-tested but NOT
-    // wired per book at the four playBibleBook sites. This is the alarm: the
-    // branch that registers Matthew or John as an edition turns it red, and
-    // that is the branch that has to do the wiring.
+    // unreachable while this holds. The alarm is what turns red when the first
+    // partial edition arrives.
     const m = manifest();
     const books = new Set(Object.keys(m).map((k) => k.slice(k.lastIndexOf(':') + 1)));
     expect(books.size, 'book set looks wrong').toBe(66);
@@ -202,8 +212,8 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
         missing,
         id + ' does not carry ' + missing.length + ' book(s): ' + missing.slice(0, 5).join(', ')
         + '\n  → this edition is PARTIAL, so resolveBibleAudio({settings, bookId}).offer'
-        + '\n    must now be wired per book at the four playBibleBook call sites'
-        + '\n    (screen-routes.jsx:270 builds one bibleAudioProp for every screen).',
+        + '\n    is wired per book (screen-routes.jsx bibleAudioFor, all 4 sites),'
+        + '\n    so books it lacks yield to the default. Check that is intended here.',
       ).toEqual([]);
     }
   });

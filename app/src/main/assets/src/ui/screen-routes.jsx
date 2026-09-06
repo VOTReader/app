@@ -267,12 +267,20 @@ export function buildScreenRoutes({
   // Recorded Bible editions (per-chapter): the selected edition (Settings →
   // Listening → Bible Audio), or null when off/unknown — which hides every
   // Bible Listen pill. Registry + policy live in utils/audio-track.js.
-  // No bookId here: this prop is built once for every screen, so it is the
-  // selection itself. Per-book resolution (a partial edition yielding to the
-  // default rather than blanking 65 books) lands with the first partial
-  // edition, where it can be bitten — every shipped edition carries all 66.
-  const _bibleAudioEd = resolveBibleAudio({ settings }).offer;
-  const bibleAudioProp = _bibleAudioEd ? { volKey: _bibleAudioEd.volKey, label: _bibleAudioEd.label } : null;
+  // PER BOOK, because `offer`'s whole job is the fallback and it cannot do it
+  // without a bookId: "one partial edition must not blank 65 books". Built once
+  // for every screen, that arm was unreachable from the app — invisible while
+  // every shipped edition carried all 66, and live the moment one does not.
+  //
+  // It matters at TWO sites and they are not the same size. Three consumers
+  // guard the prop with AudioPlayer.hasAudio(volKey, book.id), so a volKey with
+  // no row for that book only HIDES the Listen pill. BibleChapterView's
+  // ReadAlongHighlight mount does NOT guard it, and that is where the volKey
+  // selects which timings file the wash reads.
+  const bibleAudioFor = (bookIdForAudio) => {
+    const ed = resolveBibleAudio({ settings, bookId: bookIdForAudio }).offer;
+    return ed ? { volKey: ed.volKey, label: ed.label } : null;
+  };
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
   // it, idempotently, from the same render that owns the setting. 'auto' and
@@ -1003,7 +1011,7 @@ export function buildScreenRoutes({
       return (
         <ChapterIndex
           book={MATTHEW}
-          bibleAudio={bibleAudioProp}
+          bibleAudio={bibleAudioFor(MATTHEW.id)}
           onSelect={selectMatthewCh}
           onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
@@ -1059,7 +1067,7 @@ export function buildScreenRoutes({
       if (book) return (
         <ChapterIndex
           book={book}
-          bibleAudio={bibleAudioProp}
+          bibleAudio={bibleAudioFor(book.id)}
           onSelect={selectBibleCh}
           onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
           backLabel={fromSearch ? 'Search' : _idxGenre ? _idxGenre.label : 'Scriptures'}
@@ -1087,7 +1095,7 @@ export function buildScreenRoutes({
       if (book && chapter) return (
       <BibleChapterView
         book={book} chapter={chapter}
-        bibleAudio={bibleAudioProp}
+        bibleAudio={bibleAudioFor(book.id)}
         onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
@@ -1144,7 +1152,7 @@ export function buildScreenRoutes({
         <MatthewChapterView
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
           fromStudies={fromStudies} settings={settings}
-          bibleAudio={bibleAudioProp}
+          bibleAudio={bibleAudioFor(MATTHEW.id)}
           readAlongOn={sharedViewProps.readAlongOn}
           readAlongFollow={sharedViewProps.readAlongFollow}
           titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
