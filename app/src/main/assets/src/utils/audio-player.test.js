@@ -1433,6 +1433,19 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
     expect(AudioPlayer.getState().time).toBe(150);
   });
 
+  it('tells subscribers, or the bar keeps painting the old position over the new state', async () => {
+    await restored();
+    const seen = vi.fn();
+    AudioPlayer.subscribe(seen);
+    const before = seen.mock.calls.length;
+    AudioPlayer.seek(150);
+    /* getState() reads the module's own object, so every other case here would
+       pass with no notify at all — and the reader would still see the old clock,
+       because the bar repaints on the subscription and nothing else. This case
+       exists because a bite proved the notify was otherwise unwitnessed. */
+    expect(seen.mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('tells the snapshot, so closing the app right after the tap resumes there', async () => {
     await restored();
     AudioPlayer.seek(150);
