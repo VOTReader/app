@@ -2006,13 +2006,45 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 /* Registry source of truth: utils/audio-track.js
                    (BIBLE_AUDIO_EDITIONS, published as a global for this
                    classic-globals screen). 'Off' is appended locally. */
-                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => ({
-                  id, label: /** @type {any} */ (ed).label,
-                  /* B2 (2026-08-10): "Whole-book audiobook" was true of BRM
-                     for one day in s3. All three shipped editions are 1,189
-                     per-chapter recordings. */
-                  desc: 'Per-chapter audiobook · ' + String(/** @type {any} */ (ed).translation || '').toUpperCase() + ' text',
-                })),
+                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => {
+                  /* B2 (2026-08-10): "Whole-book audiobook" was true of BRM for
+                     one day in s3. Every shipped edition is recorded a chapter
+                     at a time; how many chapters that is lives in the registry
+                     and its manifest, never in a number written here.
+
+                     ONLY A CODE THE APP'S OWN REGISTRY CARRIES MAY REACH THE
+                     READER. `translation` holds a real translation code for the
+                     editions that have matching text ('kjv', 'web') and an
+                     internal MARKER for the ones that do not ('vot-matthew'),
+                     and toUpperCase cannot tell those apart — it printed
+                     "Per-chapter audiobook · VOT-MATTHEW text" to readers from c48.
+                     A positive match keeps the clause for the first kind and
+                     drops it for the second, so a future edition with a real
+                     code is covered without anyone editing this line, and one
+                     with a marker falls through silently instead of leaking it.
+
+                     NOT translationLabel(): it falls back to the NKJV strings
+                     for an unknown code, which would describe Matthew as NKJV
+                     — a wrong answer in place of no answer.
+
+                     FREE VARIABLE, NOT globalThis: TRANSLATION_OPTIONS is a
+                     top-level `const` in index.html, so it lives in the global
+                     LEXICAL environment and is never assigned to window.
+                     Reading it off globalThis is `undefined` in the real app —
+                     every edition would silently lose its clause — while
+                     staying green in a harness that installs it as a property.
+                     Pinned by a text gate in
+                     SettingsScreen.editiondesc.test.jsx, because no rendered
+                     assertion can tell the two forms apart. */
+                  const code = String(/** @type {any} */ (ed).translation || '');
+                  const known = typeof TRANSLATION_OPTIONS !== 'undefined'
+                    && Array.isArray(TRANSLATION_OPTIONS)
+                    && TRANSLATION_OPTIONS.some((o) => o && o.id === code);
+                  return {
+                    id, label: /** @type {any} */ (ed).label,
+                    desc: 'Per-chapter audiobook' + (known ? ' · ' + code.toUpperCase() + ' text' : ''),
+                  };
+                }),
                 { id: "off", label: "Off", desc: "Hide the Bible Listen button" },
               ]}
               onChange={(v) => onSetting("bibleAudio", v)}
