@@ -1150,7 +1150,13 @@ const PERSIST_KEY = 'vot-audio-pos';
  * were deliberately left behind it. `startReader` records the voice chosen for
  * the start letter, so the rebuild resumes on that rendition and not the
  * manifest's primary one.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null } | null} */
+ *
+ * `startPartIndex` is the same promise ONE LEVEL DOWN, and it used to stop at
+ * the boundary of this object: a multi-part letter shares one key across its
+ * parts, so `startKey` alone rebuilds at part 1 however far in the listener
+ * actually began. Recorded here, written by _persist and replayed by the boot
+ * rebuild through the same slice playCollection uses.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -1335,6 +1341,35 @@ function _seekOnMetadata(at) {
   }, { once: true });
 }
 
+/**
+ * Advance a queue INTO the start item's parts — the part-grained half of the
+ * forward-only horizon.
+ *
+ * ONE definition, called by playCollection (which chooses the part) and by the
+ * boot rebuild (which has to reproduce it). Two copies of this slice is exactly
+ * how the two levels drifted apart: playCollection had the part logic, the
+ * rebuild had only the key logic, and nothing made them agree.
+ *
+ * `spi` is clamped to the start item's own run of parts, so a snapshot claiming
+ * a part the letter no longer has lands on its last one rather than slicing
+ * past the letter into the next. A run of 0 means the key is not at the front
+ * of this queue at all, and then there is no part horizon to apply — returning
+ * the queue unchanged rather than `slice(-1)`, which would keep ONE track.
+ *
+ * @param {Track[]} queue
+ * @param {string|null|undefined} startKey
+ * @param {number|null|undefined} startPartIndex
+ * @returns {Track[]}
+ */
+function _slicePartHorizon(queue, startKey, startPartIndex) {
+  const spi = Math.floor(Number(startPartIndex) || 0);
+  if (!(spi > 0) || !startKey) return queue;
+  let run = 0;
+  while (run < queue.length && queue[run].key === startKey) run++;
+  if (run === 0) return queue;
+  return queue.slice(Math.min(spi, run - 1));
+}
+
 function _persist() {
   // Durable per-recording memory rides the same call sites as the boot
   // snapshot, and ahead of its localStorage guard: the two are independent.
@@ -1401,6 +1436,7 @@ function _persist() {
       customQueue,
       startKey: src.startKey || undefined,
       startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
+      startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
       startReader: src.startReader || undefined,
     }));
   } catch (_e) { /* storage full/blocked — resume is best-effort */ }
@@ -1443,6 +1479,10 @@ function _restoreFromSaved() {
       queue: customQueue,
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
+      // A legacy snapshot has no part index, and ABSENCE means "no part
+      // horizon" rather than part 0 — the slice is a no-op either way, and
+      // null keeps the two readings from being confused later.
+      startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
     });
     _state.queue = [track];
@@ -1587,6 +1627,10 @@ async function _rebuildRestoredQueue() {
   if (r.startKey && r.mode !== 'custom' && r.mode !== 'section') {
     const horizon = queue.findIndex((item) => item.key === r.startKey);
     if (horizon > 0) queue = queue.slice(horizon);
+    // …and INTO its parts, which is the level this rebuild used to lose. The
+    // slice above lands on part 1 because a multi-part letter shares one key,
+    // so a listener who started at part 2 was handed part 1 again every boot.
+    queue = _slicePartHorizon(queue, r.startKey, r.startPartIndex);
   }
   let resumeAt = r.time || 0;
   if (!queue.length) {
@@ -1617,7 +1661,9 @@ async function _rebuildRestoredQueue() {
   } else if (qi < 0) {
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
   }
-  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null });
+  // startPartIndex rides along, or the first persist after a restore drops the
+  // horizon it just replayed and the SECOND boot regrows part 1.
+  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -1804,19 +1850,15 @@ function playCollection(opts) {
     // so a chosen READING and a chosen PART compose — a library row that names
     // "Part 2, read by Timothy" rebuilds to exactly that, where the older
     // order let the rendition swap re-grow the parts the index had trimmed.
-    const spi = Math.floor(Number(o.startPartIndex) || 0);
-    if (spi > 0) {
-      let run = 0;
-      while (run < queue.length && queue[run].key === startKey) run++;
-      queue = queue.slice(Math.min(spi, run - 1));
-    }
+    queue = _slicePartHorizon(queue, startKey, o.startPartIndex);
   }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
   _rememberOutgoingPosition();
   _setPendingRestore(null);
-  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader });
+  _setSource({ mode: 'collection', volKey: o.volKey, label: o.collectionLabel || null, startKey, startReader,
+    startPartIndex: startKey ? Math.floor(Number(o.startPartIndex) || 0) : 0 });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
