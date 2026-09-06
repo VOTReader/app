@@ -25,6 +25,10 @@ vi.mock('../../utils/platform-bridge.js', () => ({
     // would pass whatever this code sent it.
     nativeReadRecording: vi.fn(() => null),
     nativeDeleteRecording: vi.fn(() => true),
+    // journal-3 2b. Returns a STRING always: a JSON array of rows, or the
+    // sentinel 'error:list_failed'. '[]' is the honest default for a test that
+    // has not planted a served file.
+    nativeListRecordings: vi.fn(() => '[]'),
     startAudioSession: vi.fn(),
     endAudioSession: vi.fn(),
   },
@@ -476,6 +480,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     MockBridge.isAndroid = true;
     MockBridge.nativeReadRecording.mockReset().mockReturnValue(null);
     MockBridge.nativeDeleteRecording.mockReset().mockReturnValue(true);
+    MockBridge.nativeListRecordings.mockReset().mockReturnValue('[]');
     window.JournalMediaStore = {
       put: vi.fn(() => Promise.resolve('media-1')),
       delete: vi.fn(() => Promise.resolve()),
@@ -543,6 +548,81 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     expect(rec.sourceName).toBe(SERVED_NAME);
     // Recovered, therefore not lost: the error stage is gone.
     expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
+  });
+
+  /* journal-3 2b — THE ZERO-BYTE CASE, ported from the parked RED fbf5e325 with
+     one deliberate change to its mechanism, quoted in the commit.
+
+     The parked version made `nativeReadRecording` return the empty STRING,
+     because that is what a zero-byte served file returns TODAY. The native half
+     of this batch returns NULL for it instead — and null is also what JS gets for
+     gone, refused and over-ceiling, so after that change the read cannot carry
+     "empty" at all. The LISTING is the channel that can: a zero-byte file is
+     listed with `"size": 0`, which is a POSITIVE fact, while a swept one is
+     simply absent.
+
+     Every assertion of the parked test is kept: /empty/i present, the
+     could-not-read sentence absent, and JournalMediaStore.put never called,
+     because nothing empty may be committed as a memo whatever the sheet says.
+     The wording is asserted by MEANING and not by string — pinning the exact
+     sentence would make the test a second definition of the copy. */
+  const listing = (rows) => JSON.stringify(rows);
+  const drive = async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+  };
+
+  it('an empty served file is reported as EMPTY, not as a read that failed', async () => {
+    MockBridge.nativeReadRecording.mockReturnValue(null);            // native's answer for empty
+    MockBridge.nativeListRecordings.mockReturnValue(
+      listing([{ name: SERVED_NAME, size: 0, mtime: 1788000000000 }]));
+    await drive();
+
+    expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
+    // Nothing empty is ever committed as a memo.
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    // And the reason given is the true one.
+    expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
+    expect(screen.getByText(/empty/i)).toBeTruthy();
+  });
+
+  /* THREE CONTROLS, because "says empty" is satisfied by a sheet that says empty
+     for EVERY null read, and that would be a worse lie than the one being fixed:
+     a reader whose file was swept, or whose device could not be read at all,
+     would be told their recording held nothing. Each control is a different way
+     the listing can fail to be positive evidence. */
+
+  it('CONTROL: a null read with the file ABSENT from the listing keeps the loud failure', async () => {
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue(listing([]));    // looked, nothing there
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+  });
+
+  it('CONTROL: error:list_failed is NOT an empty file — could-not-enumerate is not nothing-to-recover', async () => {
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue('error:list_failed');
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
+  });
+
+  it('CONTROL: a listed file WITH bytes that still reads null is a failure, not an empty memo', async () => {
+    MockBridge.nativeReadRecording.mockReturnValue(null);
+    MockBridge.nativeListRecordings.mockReturnValue(
+      listing([{ name: SERVED_NAME, size: 91234, mtime: 1788000000000 }]));
+    await drive();
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
   });
 
   it('does NOT reach for the expensive read before the reader has taken Try again', async () => {
