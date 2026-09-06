@@ -179,8 +179,10 @@ export function autoDensity(o) {
   // writes the stored preference: pinning is for the session, `base` is theirs.
   if (o.pinned) return o.current;
   // A reader whose stored preference is already Essential sees nothing change,
-  // in or out - there is no denser mode to fall back to.
-  if (o.base === 'essential') return 'essential';
+  // in or out: the entry arm returns Essential and the exit arm returns their
+  // base, which IS Essential. There was an explicit short-circuit here and it
+  // is gone - a bite proved it changed no case, and worse, it MASKED the arm
+  // that catches the exit branch returning a constant instead of o.base.
   if (o.ppvCss >= DENSITY_ENTER_PPV_CSS) return 'essential';
   if (o.ppvCss <= DENSITY_EXIT_PPV_CSS) return o.base;
   return o.current;
