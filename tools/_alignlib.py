@@ -887,6 +887,119 @@ def vram_free_gb():
         return None
 
 
+def vram_total_gb():
+    """Total GPU memory as the DRIVER reports it to this process, in GiB, or None
+    without CUDA. Printed once per run beside the free figure because
+    torch.cuda.mem_get_info() and nvidia-smi disagree about free memory by a
+    few hundred MiB (Machine Ops, 2026-09-05: 465 MiB in one regime, 557 in
+    another, additive and flat from 256 MiB to 6.9 GB). Whether the two also
+    disagree about the TOTAL says where the difference lives -- a different
+    denominator is accounting, an identical denominator means somebody really
+    is holding that memory. Only a process with a CUDA context can ask, so the
+    aligner asks once and prints it rather than a probe paying for a context.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        _free, total = torch.cuda.mem_get_info()
+        return total / (1024 ** 3)
+    except Exception:                                               # noqa: BLE001
+        return None
+
+
+def vram_free_device_gb():
+    """DEVICE-GLOBAL free GPU memory in GiB, via nvidia-smi, or None if it cannot
+    be read. Use this to ask "is another tenant holding the card"; use
+    vram_free_gb() only to ask about THIS process.
+
+    MEASURED 2026-09-05, with a positive control: torch.cuda.mem_get_info() does
+    NOT subtract other processes on this machine. A probe process holding nothing
+    read 14,814 MiB free at the same instant nvidia-smi read 3,850, while the
+    aligner held about 11 GB -- and the probe's counter was live, not stale
+    (allocating a 512 MiB tensor moved it by exactly -512.0 MiB, and nvidia-smi
+    saw the same 512). Under WDDM cudaMemGetInfo reports a per-process budget,
+    not the device.
+
+    That is why this exists: vram_free_gb() is structurally blind to exactly the
+    scenario its own docstring names -- a game or a resident LLM server holding
+    the card -- because another process's allocation never appears in it.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=15)
+        if r.returncode != 0:
+            return None
+        # ponytail: first GPU only; every tool here already hardcodes one card.
+        # Sum the lines if a second one ever appears.
+        return float(r.stdout.strip().splitlines()[0]) / 1024
+    except Exception:                                               # noqa: BLE001
+        return None
+
+
+def vram_nontorch_gb():
+    """Device memory in use by everything EXCEPT torch's caching allocator, in
+    GiB, or None without CUDA. `total - free` is every byte the driver considers
+    in use by anyone; subtracting torch's own reserve leaves other processes'
+    contexts, the WDDM compositor, and CTranslate2's arena.
+
+    This is the quantity nobody had on 2026-09-05 when Machine Ops decomposed the
+    nvidia-smi / cudaMemGetInfo gap into a fixed 299 MiB that nvidia-smi reports
+    in neither used nor free and a VARIABLE remainder tracking the workload
+    (62 MiB at the released floor, 166-258 under load). Their leading guess was
+    that the variable part is CTranslate2 -- the allocation vram_peak_gb()'s
+    docstring says torch cannot see -- and they rejected it themselves because
+    cudaMemGetInfo returns device-global free and so should already include it.
+    This column tests that from inside: if the non-torch figure moves with
+    faster-whisper's transcription phase, the arena IS visible to the driver and
+    the variable remainder is something else.
+
+    Read it on the same line as the free figure, at one instant. The two are
+    derived from a single mem_get_info() call for exactly that reason.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        free, total = torch.cuda.mem_get_info()
+        return (total - free - torch.cuda.memory_reserved()) / (1024 ** 3)
+    except Exception:                                               # noqa: BLE001
+        return None
+
+
+def vram_peak_gb(reset=False):
+    """Torch's HIGH-WATER allocator reservation for the interval since the last
+    reset, in GiB, or None without CUDA. Optionally reset the counter.
+
+    Why this exists beside vram_free_gb(): free memory is an INSTANT, and Machine
+    Ops showed on 2026-09-05 with 942 samples at 2 s that the release phase is one
+    sample wide -- the card empties to ~9.5 GB free and is back under 1.2 GB two
+    seconds later. Both of the free-memory reads on the progress line land in
+    favourable phases (the pre-work read by construction, the pre-release read
+    because the chapter's last tensors have already dropped), so neither can
+    answer "how much did this chapter actually hold". A peak cannot be sampled
+    into the wrong phase: torch records it as it happens.
+
+    KNOWN CEILING: this counts TORCH only. faster-whisper runs on CTranslate2,
+    which allocates outside torch's caching allocator and is invisible here, so
+    this is a LOWER BOUND on the chapter's card usage. It covers the MMS forced
+    alignment -- the probe pass, which is the phase the per-probe cost question
+    is about.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        v = torch.cuda.max_memory_reserved() / (1024 ** 3)
+        if reset:
+            torch.cuda.reset_peak_memory_stats()
+        return v
+    except Exception:                                               # noqa: BLE001
+        return None
+
+
 def make_snap(intervals, back_off=0.05, max_snap=1.5):
     """snap_fn for belt(): a start inside a silence interval moves to the
     interval's end minus back_off (the voice onset), never more than max_snap."""

@@ -75,6 +75,11 @@ hb = _load(os.path.join(BASE, "hone-bible.py"), "hone_bible")
 # Per edition: the reference translation (it MUST match the recording — that is
 # the alignment invariant), the settings family, and the mirror script whose
 # collect() maps local files to asset ids.
+# How long the VRAM preflight waits for a busy card before giving up. Long,
+# deliberately: every chapter is banked, so waiting costs minutes and aborting
+# costs the whole overnight run.
+PREFLIGHT_WAIT_S = 900
+
 EDITIONS = {
     "brm-kjv": {
         "translation": "kjv",
@@ -304,8 +309,53 @@ def main():
         work = work[:a.limit]
     print(f"batch-align-bible {ed}: {len(work)} chapters  family {cfg['family']}  settings {want_settings}  "
           f"started {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+    _cf, _ct = al.vram_free_gb(), al.vram_total_gb()
+    if _cf is not None and _ct is not None:
+        # One line, once: nvidia-smi and torch disagree about FREE by 465-557 MiB.
+        # Printing the total the driver hands this process says whether the gap
+        # is a different denominator or a real allocation nvidia-smi attributes
+        # and torch does not (Machine Ops / Data Builder, 2026-09-05).
+        print(f"  card  torch mem_get_info: free {_cf * 1024:.0f} MiB  total {_ct * 1024:.0f} MiB",
+              flush=True)
     if a.min_free_vram_gb > 0:
-        free = al.vram_free_gb()
+        # DEVICE-GLOBAL, not this process's view. torch.cuda.mem_get_info() is a
+        # per-process budget under WDDM and never sees another tenant, so the
+        # original preflight was blind to the one thing it was written to catch
+        # (measured 2026-09-05: probe 14,814 MiB "free" against nvidia-smi's
+        # 3,850 at the same instant, with the aligner holding ~11 GB). Falling
+        # back to the process view is better than no guard at all, but say which
+        # one decided -- a guard that cannot see the danger must not read the
+        # same as one that looked and found nothing.
+        free = al.vram_free_device_gb()
+        which = "device (nvidia-smi)"
+        if free is None:
+            free, which = al.vram_free_gb(), "THIS PROCESS ONLY -- blind to other tenants"
+        elif free < a.min_free_vram_gb:
+            # WAIT, do not abort. The work is banked per chapter and resumable,
+            # so a run that waits loses minutes and a run that aborts loses the
+            # night. Two ways the card is briefly busy through no fault of a real
+            # tenant: the campaign runner starts the next chunk the moment the
+            # previous aligner exits and Windows does not always hand the dying
+            # process's VRAM back first, and the SUPERVISOR relaunches mid-chunk
+            # after a memory kill. Measured 2026-09-05: a 60-second neighbour
+            # (my own one-chapter drill) landed inside a supervisor relaunch and
+            # a 30-second retry was not patient enough -- exit 3 killed a
+            # 27-minute chunk over a tenant that was already leaving.
+            waited = 0
+            while free < a.min_free_vram_gb and waited < PREFLIGHT_WAIT_S:
+                print(f"  preflight  {free:.1f} GB free < {a.min_free_vram_gb} GB floor; "
+                      f"waiting ({waited}s of {PREFLIGHT_WAIT_S}s)", flush=True)
+                time.sleep(30)
+                waited += 30
+                again = al.vram_free_device_gb()
+                if again is None:
+                    break
+                free = again
+            if free >= a.min_free_vram_gb and waited:
+                which = f"device (nvidia-smi), card freed after {waited}s"
+        if free is not None:
+            print(f"  preflight  {free:.1f} GB free, floor {a.min_free_vram_gb} GB  [{which}]",
+                  flush=True)
         if free is not None and free < a.min_free_vram_gb:
             print(f"PREFLIGHT: only {free:.1f} GB of GPU memory free (< {a.min_free_vram_gb} GB); "
                   f"something else holds the card. Not starting.", flush=True)
@@ -361,7 +411,23 @@ def main():
         # Printed BEFORE the work, not with the result: tools/align-supervisor.py
         # names the unit in flight off the log, and a tag that only appears on
         # completion tells it nothing about the chapter that is eating the box.
-        print(f"  [{n}/{len(work)}] {tag}  start", flush=True)
+        # The wall clock is APPENDED, never prefixed: align-supervisor's
+        # --unit-re searches for "] <tag>  start" and a prefix would still match
+        # by luck, where an append cannot break it at all. Machine Ops joins a
+        # 2-second GPU sampler to these chapters and has had to RECONSTRUCT each
+        # window from cumulative durations off an assumed start, accumulating
+        # drift over forty-one chapters; two printed timestamps make the join
+        # measured instead (2026-09-05).
+        print(f"  [{n}/{len(work)}] {tag}  start {time.strftime('%H:%M:%S')}", flush=True)
+        # The card BEFORE this chapter does any work. Deliberately a different
+        # instant from the busy reading below, and that is the entire point: a
+        # median taken over a chapter's own duration is confounded, because a
+        # slow chapter dwells longer in the busiest state and so records a lower
+        # figure BECAUSE it was slow. A pre-work sample cannot be caused by the
+        # slowness that follows it, so if this predicts s/probe the causation
+        # can only run one way (Machine Ops, 2026-09-05).
+        vram_pre = al.vram_free_gb()
+        al.vram_peak_gb(reset=True)   # zero the high-water mark for THIS chapter
         if tag in skip_units:
             print(f"  [{n}/{len(work)}] {tag}  SKIPPED (memory ceiling)", flush=True)
             failed += 1
@@ -403,6 +469,32 @@ def main():
         # Windows WDDM spills allocations past the ceiling into system memory
         # over PCIe and torch never gives the cache back on its own. Returning
         # it costs milliseconds; the models stay resident either way.
+        # Sample commit BEFORE handing the allocator back. Everything below this
+        # line is a post-release TROUGH: a chapter that peaked at 30 GB and
+        # released cleanly logs the same ~10 GB as one that never grew at all,
+        # so a trough-only series can never show the pathological unit it exists
+        # to find. Measured 2026-09-05: peak 19.06 GB against a logged 10.00 for
+        # the same pid, the whole gap being sampling PHASE and not a bad field.
+        # An external sampler cannot replace this -- at 60 s granularity a short
+        # chapter peaks and releases entirely between two of its samples.
+        # BOTH readers, not just commit. The first cut of this fix moved
+        # commit_gb() up and left rss_gb() inside the print below, so the rss
+        # column stayed a trough while the commit column beside it reported a
+        # peak -- and a 2.54 -> 1.62 GB "drop" in that column cost an hour and a
+        # teammate's turn before it was identified as the same artefact one
+        # field over. Two readers on one line must be sampled at one moment.
+        # vramfree joins them on the SAME line for the same reason: 2026-09-05,
+        # three chapters ran 2.7-5x slower per probe than the other 35 and no
+        # host metric separated them. An external 30s sampler could not settle
+        # it either -- a 762s chapter gets 22 draws at the card's floor and a
+        # 40s chapter gets one, so a MINIMUM is biased by duration. Reading it
+        # here makes every chapter carry one unbiased sample at its busiest
+        # moment, which is the number a per-unit column can compare. It is
+        # FREE memory, so unlike rss and commit the pre-release figure is the
+        # LOW one -- read the pair as busiest/idle, not peak/trough.
+        peak_rss, peak_commit, vram_busy, vram_peak, vram_other = (
+            al.rss_gb(), al.commit_gb(), al.vram_free_gb(), al.vram_peak_gb(),
+            al.vram_nontorch_gb())
         al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
@@ -410,8 +502,12 @@ def main():
             per_book[book_id]["review"].append(tag)
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
               f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
-              f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB "
-              f"commit {al.commit_gb():.2f} GB", flush=True)
+              f"   {time.time() - t0:5.1f}s  rss {peak_rss:.2f}/{al.rss_gb():.2f} GB "
+              f"commit {peak_commit:.2f}/{al.commit_gb():.2f} GB"
+              f"{'' if (vram_pre is None or vram_busy is None) else f' vramfree pre {vram_pre:.2f} busy {vram_busy:.2f} GB'}"
+              f"{'' if vram_peak is None else f' vrampeak {vram_peak:.2f} GB'}"
+              f"{'' if vram_other is None else f' nontorch {vram_other:.2f} GB'}"
+              f"  end {time.strftime('%H:%M:%S')}", flush=True)
         checkpoint(tag)
     if last_book is not None:
         book_summary(last_book)
