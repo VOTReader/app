@@ -722,6 +722,99 @@ describe('audio-player — the part-grained horizon across a reboot (audio-playe
   });
 });
 
+describe('audio-player — a dropped letter must not throw the rebuilt queue away (audio-player-5)', () => {
+  /* A corpus bump that renames or retires a letter leaves last night's snapshot
+     naming a key the rebuild cannot produce. The url search misses, the alternate
+     swap misses, the by-key search finds no hits — and the clamp that exists for
+     exactly this case sat behind an `else`, so it never ran. `_state.qi` stayed at
+     -1, `_start()` read `queue[-1]`, found undefined and called `stop()`, which
+     threw away the queue it had just rebuilt correctly. Measured before the fix:
+     `len=0 qi=0 status=idle` where the rebuild had produced four real tracks. */
+  const rebuildGlobals = () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+  };
+  const dropGlobals = () => {
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  };
+
+  const GONE_SNAPSHOT = (over) => Object.assign({
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 1, time: 1200,
+    key: 'vol1:letter-gone', startKey: 'vol1:letter-gone', startPartIndex: null,
+    track: { key: 'vol1:letter-gone', title: 'A letter that is gone', sub: 'Volume One', url: URL_OF('idGone'), readerCode: 'B', partLabel: null },
+  }, over || {});
+
+  async function boot(snapshot) {
+    localStorage.setItem('vot-audio-pos', JSON.stringify(snapshot));
+    await load();
+    rebuildGlobals();
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+    } finally { dropGlobals(); }
+    return AudioPlayer.getState();
+  }
+
+  it('PRECONDITION: the fixture corpus really has no letter-gone, so the fallback is the only route', () => {
+    /* If the fixture ever grew this letter, every case below would be about a queue
+       that CONTAINS the saved track, and the fallback would never be reached. */
+    expect(ITEMS.some((i) => i.id === 'letter-gone')).toBe(false);
+    expect(Object.keys(MANIFEST)).not.toContain('vol1:letter-gone');
+  });
+
+  it('THE READER-FACING CONSEQUENCE: the rebuilt collection survives the letter it lost', async () => {
+    const st = await boot(GONE_SNAPSHOT());
+    expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    expect(st.qi).toBe(1);
+    expect(st.status).not.toBe('idle');
+    expect(el()).not.toBe(null);
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
+  it('the saved clock does NOT follow into a recording it never belonged to', async () => {
+    /* The snapshot's 1,200 seconds are an offset into the letter that is gone.
+       Carrying it into whatever the clamp lands on seeks twenty minutes into a
+       three-minute recording, which ends the track at once and skips it. The
+       honest answer on this path is no position, not someone else's position. */
+    const st = await boot(GONE_SNAPSHOT());
+    expect(st.queue).not.toHaveLength(0);
+    expect(el()).not.toBe(null);
+    el().duration = 180;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('CONTROL: a saved track still in the corpus keeps BOTH its place and its clock', async () => {
+    /* The arm that fails if the fallback is applied unconditionally, or if the
+       clock is zeroed on the path where it still means something. */
+    const st = await boot(GONE_SNAPSHOT({
+      qi: 1, time: 123, key: 'vol1:letter-a', startKey: 'vol1:letter-a',
+      track: { key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA2'), readerCode: 'B', partLabel: 'Part 2' },
+    }));
+    expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    expect(st.qi).toBe(1);
+    el().duration = 500;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(123);
+  });
+
+  it('CONTROL: a stale URL whose KEY still exists lands by key, clock intact', async () => {
+    /* The branch immediately above the fallback. Turning its `else if` into a
+       plain `if` must not cost the by-key search its answer. */
+    const st = await boot(GONE_SNAPSHOT({
+      qi: 0, time: 77, key: 'vol1:letter-c', startKey: null,
+      track: { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', url: URL_OF('idRetired'), readerCode: 'T', partLabel: null },
+    }));
+    expect(st.queue[st.qi].url).toBe(URL_OF('idC'));
+    el().duration = 400;
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(77);
+  });
+});
+
 describe('audio-player — the boot snapshot after a finished recording (audio-player-3)', () => {
   /** Play the collection and put a real clock on it, so there is something to write back. */
   const playedTo = (seconds) => {
