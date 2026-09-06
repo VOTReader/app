@@ -274,6 +274,48 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  it('search-2: the screen hands the hits their TERMS under a nav card', async () => {
+    /* WHAT THIS CAN AND CANNOT SEE, because it decides what the assertion is.
+       This file stubs `SrchCard` and `SrchGroup` to `() => null`, so no snippet and
+       no `<mark>` can ever render here — measured: with a nav parse and one result,
+       the summary reads "1 match" while both `.srch-groups` containers are EMPTY.
+       Asserting the highlight would mean swapping in the real components and then
+       testing my own wiring of them.
+
+       So the witness sits one boundary earlier: the `terms` the screen PASSES. That
+       is exactly what the fix changes — `expandSnippetTerms` returns [] unless the
+       parse it is handed is a TEXT one, so under a nav card the terms would be empty
+       and the hits would render bare. The `<mark>` itself is the e2e harness's to
+       see; nothing in this file can. */
+    vi.useFakeTimers();
+    const seenTerms = [];
+    const realGroup = /** @type {any} */ (globalThis).SrchGroup;
+    /** @type {any} */ (globalThis).SrchGroup = (props) => { seenTerms.push(props.terms); return null; };
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      // the CARD's kind…
+      parsed: { kind: 'ref-book', bookId: 'numbers', bookTitle: 'Numbers' },
+      // …and the same query read as TEXT, which is what the highlighter needs.
+      textQuery: { kind: 'text', phrase: null, terms: ['numbers'], must: [], mustNot: [] },
+      parsedTerms: ['numbers'],
+      results: [{ score: 1, doc: { kind: 'verse', ref: 'Ps 147:4', text: 'He telleth the numbers of the stars.' } }],
+    }));
+    try {
+      const props = baseProps();
+      const { rerender } = render(<SearchScreen {...props} />);
+      rerender(<SearchScreen {...props} query="numbers" />);
+      act(() => { vi.advanceTimersByTime(200); });
+      await act(async () => { await Promise.resolve(); });
+
+      // The group was rendered at all — otherwise the assertion below is vacuous.
+      expect(seenTerms.length).toBeGreaterThan(0);
+      const last = seenTerms[seenTerms.length - 1] || [];
+      expect(last).toContain('numbers');
+    } finally {
+      /** @type {any} */ (globalThis).SrchGroup = realGroup;
+      vi.useRealTimers();
+    }
+  });
+
   it('(b) each recent search is individually removable via ConfirmStrip ("remove" vocabulary)', () => {
     /** @type {any} */ (window).getRecentSearches = () => ['mercy', 'grace'];
     /** @type {any} */ (window).removeRecentSearch = vi.fn(() => ['grace']);
