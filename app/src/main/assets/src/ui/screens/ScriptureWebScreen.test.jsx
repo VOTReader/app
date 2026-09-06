@@ -22,11 +22,13 @@
 */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
-/* Every draw the mocked renderer was asked to make, in order. Declared with
-   `var` because vi.mock factories are hoisted above the imports and a `const`
-   in TDZ would throw on the first draw. */
-// eslint-disable-next-line no-var
-var DRAWN = [];
+/* Every draw the mocked renderer was asked to make, in order. MEASURED that a
+   plain `const` works here: vi.mock's factory is hoisted but only RUNS at import
+   time, by which point this initialiser has executed, so there is no TDZ window.
+   A `var` plus an eslint-disable was the first form and it failed CI, because
+   `no-var` is configured nowhere and the directive was an unused disable — the
+   third time that shape has held a branch tonight, and this one was mine. */
+const DRAWN = [];
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
 
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
