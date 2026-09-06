@@ -95,7 +95,7 @@ import {
 } from '../stores/thumb-store.js';
 import {
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
-  loadTranslation, loadBibleStudies, translateVerse,
+  loadTranslation, loadBibleStudies, translateVerse, releaseTranslationsExcept,
   translationLabel, translationName,
 } from '../data/translations.js';
 
@@ -253,7 +253,7 @@ Object.assign(window, {
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll, idbAllKeys,
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
-  loadTranslation, loadBibleStudies, translateVerse,
+  loadTranslation, loadBibleStudies, translateVerse, releaseTranslationsExcept,
   translationLabel, translationName,
   // Components
   Segments, ProphecyCard, ProphecyGroup,

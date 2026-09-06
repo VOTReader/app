@@ -460,6 +460,7 @@ export const projectGlobals = {
   readingMinutes: "readonly",
   recordUserDataSample: "readonly",
   relativeDate: "readonly",
+  releaseTranslationsExcept: "readonly",
   removeRecentSearch: "readonly",
   renderCommentaryCite: "readonly",
   renderTextWithScripRefs: "readonly",

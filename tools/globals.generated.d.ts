@@ -461,6 +461,7 @@ declare const readingFontCss: any;
 declare const readingMinutes: any;
 declare const recordUserDataSample: any;
 declare const relativeDate: any;
+declare const releaseTranslationsExcept: any;
 declare const removeRecentSearch: any;
 declare const renderCommentaryCite: any;
 declare const renderTextWithScripRefs: any;
