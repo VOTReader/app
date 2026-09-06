@@ -33,6 +33,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -54,12 +55,30 @@ def load(path, name):
 
 @functools.lru_cache(maxsize=None)
 def _ffprobe_dur(path, mtime_ns, size):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                        "-of", "csv=p=0", path], capture_output=True, text=True)
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                            "-of", "csv=p=0", path], capture_output=True, text=True)
+    except OSError:
+        # ffprobe is not installed. Returning None keeps every caller's "no
+        # duration for this file" path working instead of raising out of a
+        # library function -- and require_ffprobe() below is what stops that
+        # None from being read as a passing check.
+        return None
     try:
         return float(r.stdout.strip())
     except ValueError:
         return None
+
+
+def require_ffprobe():
+    """Is the tool FULL mode's duration legs depend on actually installed?
+
+    Every duration check skips when the probe returns None, so a FULL run on a
+    machine without ffprobe would pass them all by NOT RUNNING THEM -- an
+    instrument silent for a reason unrelated to what it measures, which is the
+    exact failure this whole gate was built to stop. FULL refuses instead.
+    A clone without ffprobe has --audio-facts, which needs no probe at all."""
+    return shutil.which("ffprobe") is not None
 
 
 def ffprobe_dur(path):
@@ -242,6 +261,11 @@ def check(ed, a):
             for tag, why in shape[:200]:
                 print(f"  {tag:22s} {why}")
             return 1
+    if not structural and facts is None and not require_ffprobe():
+        print("FAIL: FULL mode needs ffprobe on PATH -- without it every duration check "
+              "would skip silently and the run would look clean. Use --audio-facts "
+              "(the committed sidecar, no probe needed) on a machine without it.")
+        return 1
     idx = {} if (structural or facts is not None) else bab.audio_index(ed)
     belts_dir = os.path.join(BASE, "_align-work", "bible", ed)
     flat = flat_translation_map(bab.EDITIONS[ed]["translation"])

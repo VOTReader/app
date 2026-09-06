@@ -18,13 +18,19 @@ rather than against the corpus:
   A3b a mis-keyed entry (wrong chapter/edition) -> RED, with no audio at all
   A4  --structural over the SAME fixtures     -> GREEN: what the old gate could not see
   A5  audit_facts against planted files       -> RED on bytes, on sha256, on assetId
+  A5b a missing ffprobe                       -> None, never a traceback; and FULL
+                                                 REFUSES rather than skipping every
+                                                 duration leg in silence
   A6  --audio-facts with --structural         -> refused rather than silently ignored
 
 A4 is the control that makes the rest a measurement: without it, "the new gate
 is red" says nothing about whether the old one would have been too.
 """
+import argparse
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -45,6 +51,17 @@ def _load(path, name):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
+
+class _Capture(io.StringIO):
+    """StringIO that tolerates sys.stdout.reconfigure().
+
+    check() loads batch-align-bible.py, whose module body reconfigures stdout for
+    UTF-8 -- a bare StringIO has no such method, so redirecting stdout around it
+    raises AttributeError from an import rather than from the code under test."""
+
+    def reconfigure(self, **kw):
+        pass
 
 
 def run_vbs(*args):
@@ -213,6 +230,76 @@ class SidecarGate(unittest.TestCase):
                             vbs.audit_facts("brm-kjv", idx, {}, False)))
         self.assertTrue(any("no audio on disk" in w for _, w in
                             vbs.audit_facts("brm-kjv", {}, {("genesis", 1): real}, False)))
+
+    # -- A5b  ffprobe is not everywhere, and its ABSENCE must not read as a pass
+    def test_a_missing_ffprobe_returns_none_instead_of_raising(self):
+        """Caught by branch CI, not by three local 28/28 gate sets: the runner has
+        no ffprobe, and subprocess raised FileNotFoundError out of a library
+        function. A tool that only works where its dependencies happen to be
+        installed is not a gate."""
+        vbs = _load(VBS, "validate_bible_sync_ffprobe_missing")
+        d = tempfile.mkdtemp(prefix="audio-facts-noffprobe-", dir=self.tmp)
+        path = os.path.join(d, "x.mp3")
+        with open(path, "wb") as f:
+            f.write(b"not audio")
+        real_run = vbs.subprocess.run
+
+        def boom(*a, **k):
+            raise FileNotFoundError(2, "No such file or directory", "ffprobe")
+
+        vbs.subprocess.run = boom
+        try:
+            self.assertIsNone(vbs.ffprobe_dur(path))
+        finally:
+            vbs.subprocess.run = real_run
+
+    def test_full_mode_refuses_when_ffprobe_is_absent(self):
+        """And the None must not be read as a passing check. Every duration leg
+        skips on None, so FULL without ffprobe would pass them all by not running
+        them -- silent for a reason unrelated to what it measures. It refuses,
+        and the refusal fires BEFORE audio_index(), which needs a drive no clone
+        has, so this arm runs anywhere."""
+        vbs = _load(VBS, "validate_bible_sync_refusal")
+        self.assertTrue(vbs.require_ffprobe.__doc__)      # it exists and is documented
+        ns = argparse.Namespace(edition="brm-kjv", data=self.data_file(self.onsets),
+                                structural=False, audio_facts=None,
+                                audit_audio_hashes=False, all_editions=False)
+        real = vbs.require_ffprobe
+        vbs.require_ffprobe = lambda: False
+        try:
+            io_ = _Capture()
+            with contextlib.redirect_stdout(io_):
+                rc = vbs.check("brm-kjv", ns)
+            out = io_.getvalue()
+        finally:
+            vbs.require_ffprobe = real
+        self.assertEqual(rc, 1, out)
+        self.assertIn("FULL mode needs ffprobe on PATH", out)
+
+    def test_the_duration_leg_of_the_audit_actually_fires(self):
+        """The dur leg is the one arm the planted-file test cannot reach, because
+        ffprobe returns None on a file that is not audio -- so without this the
+        leg is uncovered and would read as covered."""
+        vbs = _load(VBS, "validate_bible_sync_durleg")
+        d = tempfile.mkdtemp(prefix="audio-facts-durleg-", dir=self.tmp)
+        path = os.path.join(d, "brm1_genesis_001.mp3")
+        with open(path, "wb") as f:
+            f.write(b"pretend audio")
+        idx = {("genesis", 1): (path, "brm1_genesis_001")}
+        facts = {("genesis", 1): {"book": "genesis", "chapter": 1,
+                                  "bytes": os.path.getsize(path), "dur": 10.0,
+                                  "sha256": hashlib.sha256(b"pretend audio").hexdigest(),
+                                  "assetId": "brm1_genesis_001"}}
+        real = vbs.ffprobe_dur
+        vbs.ffprobe_dur = lambda _p: 12.5          # the file really is 12.5 s
+        try:
+            found = vbs.audit_facts("brm-kjv", idx, facts, False)
+        finally:
+            vbs.ffprobe_dur = real
+        self.assertTrue(any("dur 10.0" in w and "12.500" in w for _, w in found), found)
+        # and it must NOT name a cause it cannot know
+        self.assertTrue(all("sidecar is stale" not in w for _, w in found), found)
+        self.assertTrue(any("find which before regenerating" in w for _, w in found), found)
 
     # -- A6 ----------------------------------------------------------------
     def test_the_two_no_audio_modes_refuse_to_combine(self):
