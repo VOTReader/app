@@ -135,10 +135,14 @@ describe('D2 — nothing below the ceiling washes out', () => {
      with the constant they derived. These are their arithmetic, from the
      spec's section 4 as corrected at 18:30. */
   it('divides the deep alpha by design-perf own crowding factors at 40x', () => {
+    // The 0.57 exponent, not the first cut's square root: 0.5 left this band
+    // missed in the UP direction on every frame, measured on the real GPU.
+    // These are design-perf's numbers for 0.57, predicted before the change
+    // and reproduced by it.
     const cases = [
-      { frame: 'phoneLand', per: 4256 / 800, divisor: 5.15 },
-      { frame: 'phone375', per: 4316 / 375, divisor: 7.58 },
-      { frame: 'desktop1920', per: 4220 / 1920, divisor: 3.32 },
+      { frame: 'phoneLand', per: 4256 / 800, divisor: 6.49 },
+      { frame: 'phone375', per: 4316 / 375, divisor: 10.07 },
+      { frame: 'desktop1920', per: 4220 / 1920, divisor: 3.92 },
     ];
     for (const c of cases) {
       const s = ribbonStyle(40, localizeFactor(40), false, c.per);
