@@ -293,6 +293,52 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     expect(document.querySelectorAll('.tour-dim').length).toBe(4);
   });
 
+  /* A card whose words need more than the fraction takes what it needs, and stops at the room
+     DOCK_OPEN_FRAC leaves. jsdom measures nothing, so `scrollHeight` is stubbed here on purpose:
+     without it `cardNeed` is 0 at every viewport and the branch under test is unreachable — the
+     other cap tests above pass whatever this code does, which is why this one exists.
+     320x640 (Native Builder on device, 2026-09-06): 36 % is 230 px, the Listen words need 270, the
+     room is 640 - 12 - 352 = 276. The card gets 270 and the sticky button row stops covering the
+     last sentence. */
+  it('a docked card whose content needs more than 36 % gets it, up to the open-space rule', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 640;
+    try {
+      letterScreen(null);
+      startAt('listen');
+      const proto = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get() { return this.classList && this.classList.contains('tour-card') ? 270 : 0; } });
+      // The measuring effect is gated on ResizeObserver, which jsdom does not have: without this
+      // stub the effect returns before it measures and the branch under test never runs.
+      const ro0 = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+      try {
+        render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+        const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+        expect(parseFloat(card.style.maxHeight)).toBe(270);            // not Math.round(640 * 0.36) = 230
+        expect(640 - 12 - 270).toBeGreaterThanOrEqual(Math.floor(640 * 0.55));   // 358 open, the rule holds
+      } finally { Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } }); globalThis.ResizeObserver = ro0; }
+    } finally { window.innerHeight = vh0; }
+  });
+
+  it('a docked card that wants more than the room is still stopped by the open-space rule', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 640;
+    try {
+      letterScreen(null);
+      startAt('listen');
+      const proto = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get() { return this.classList && this.classList.contains('tour-card') ? 900 : 0; } });
+      const ro0 = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+      try {
+        render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+        const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+        expect(parseFloat(card.style.maxHeight)).toBe(Math.floor(640 - 12 - 640 * 0.55));   // 276, the room
+      } finally { Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } }); globalThis.ResizeObserver = ro0; }
+    } finally { window.innerHeight = vh0; }
+  });
+
   it('with the player bar up, the card docks above the bar', () => {
     letterScreen(vh() - 80);
     startAt('listen');
