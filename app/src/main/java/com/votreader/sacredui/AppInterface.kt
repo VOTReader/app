@@ -393,6 +393,17 @@ class AppInterface(
     @JavascriptInterface
     fun nativeDeleteRecording(name: String): Boolean = vm.audioRecorder.deleteRecording(name)
 
+    /** journal-3 2b: the recovery half. Every served memo still on disk, as a JSON
+     *  array string — `[{"name":..,"size":..,"mtime":..}]`, `"[]"` for a directory
+     *  that was read and is empty, `"error:list_failed"` for one that could not be
+     *  read. Never null, and the two failure-shaped answers stay distinguishable on
+     *  purpose: "nothing to recover" and "could not tell" are different things to act
+     *  on. nativeReadRecording needs a name JS already has; this is the only question
+     *  a session that was KILLED can ask, since its in-flight name died with the page.
+     *  The full return table lives in BridgeContractTest beside the pinned row. */
+    @JavascriptInterface
+    fun nativeListRecordings(): String = vm.audioRecorder.listRecordings()
+
     @JavascriptInterface
     fun setZoomEnabled(enabled: Boolean) {
         host.postToUi {

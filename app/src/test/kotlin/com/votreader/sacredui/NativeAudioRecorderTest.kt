@@ -215,6 +215,238 @@ class NativeAudioRecorderTest {
         assertTrue(fresh.exists(), "a just-served recording must survive (fetch may be in flight)")
     }
 
+    // ─── journal-3 2b: the zero-byte served memo ───────────────────────────
+    // Written first as a parked RED (park-zerobyte-red fbf5e325) so the surface was
+    // agreed before either half existed; it goes green with the guard in
+    // encodeFileToBase64 that lands beside it.
+    //
+    // A served file that exists and holds nothing used to read back as "":
+    // resolveServedRecording passes, isFile is true, 0 is under the ceiling, and
+    // Base64.encodeToString(ByteArray(0), NO_WRAP) is the empty string. JS then does
+    // atob("") -> a zero-size Blob -> the caller's !recovered guard, whose message is
+    // "Could not read the recording from the device." That sentence is honest about a
+    // file it could not use and wrong about WHY: the file was read perfectly and there
+    // was nothing in it.
+    //
+    // Same family as atob(null) giving three bytes [158,233,101] that commit as a memo
+    // playing silence -- measured, and guarded in JournalRecordingSheet. A value that
+    // decodes into something plausible is worse than a refusal.
+    @Test
+    fun `a served recording with no bytes reads as null, not an empty string`() {
+        val empty = File(servedDir(), servedName()).apply { writeBytes(ByteArray(0)) }
+        assertTrue(empty.exists() && empty.length() == 0L, "the fixture must be a real zero-byte file")
+
+        assertNull(
+            recorder.readRecording(empty.name),
+            "an existing but empty served file must read as null -- \"\" decodes to a " +
+                "zero-size blob the caller cannot tell from a read it could not do"
+        )
+    }
+
+    @Test
+    fun `the zero-byte case is not vacuous - the same name with bytes reads back`() {
+        // The control. Without it, `returns null` above would pass just as happily
+        // against a name resolveServedRecording refused outright, which is a different
+        // verdict about a different file.
+        val name = servedName()
+        File(servedDir(), name).writeBytes(byteArrayOf(1, 2, 3))
+
+        assertNotNull(
+            recorder.readRecording(name),
+            "a served file WITH bytes must still read back, or the null above proves nothing"
+        )
+    }
+
+    @Test
+    fun `an orphan from a killed session survives the reader recording again`() {
+        // THE BEHAVIOUR THE TTL CHANGE IS FOR, and it fails on the old 60 s constant.
+        // The sweep runs inside start(), so at 60 s the recovery window was not a
+        // duration -- it was "until the reader records again". The reader most likely
+        // to hold an orphan is the one whose session was killed, and their first move
+        // on relaunch is often to record the thing again, so the sweep took the memo at
+        // exactly the moment nativeListRecordings would have offered it.
+        //
+        // One hour old: far past the old ceiling, far inside the new one. No claim on
+        // it, because a claim dies with the process that made it -- which is precisely
+        // what makes this file an orphan rather than a live memo.
+        val orphan = File(servedDir(), servedName()).apply { writeBytes(byteArrayOf(7, 7, 7)) }
+        orphan.setLastModified(System.currentTimeMillis() - 60L * 60L * 1000L)
+        assertTrue(
+            orphan.lastModified() < System.currentTimeMillis() - 60_000L,
+            "the fixture must be older than the 60 s this test exists to replace"
+        )
+
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+
+        assertTrue(
+            orphan.exists(),
+            "an hour-old orphan must survive a fresh recording -- at 60 s the sweep ate " +
+                "the memo the recovery listing exists to offer"
+        )
+        assertTrue(
+            listedNames(recorder.listRecordings()).contains(orphan.name),
+            "and it must still be enumerable, which is the whole point of surviving"
+        )
+    }
+
+    @Test
+    fun `an orphan past the new TTL is still swept`() {
+        // The other side, so the change is a longer window and not a disabled sweep.
+        // Without this, "the file survives" is equally satisfied by deleting the sweep.
+        val ancient = File(servedDir(), servedName()).apply { writeBytes(byteArrayOf(1)) }
+        ancient.setLastModified(
+            System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L
+        )
+
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+
+        assertFalse(
+            ancient.exists(),
+            "past RECORDING_TTL_MS the sweep must still take it, or the TTL is not a TTL"
+        )
+    }
+
+    // ─── journal-3 2b: nativeListRecordings ────────────────────────────────
+    // The recovery half. readRecording answers "give me this memo", which needs a name
+    // JS already has; the lister answers "what is still here", which is the only
+    // question a session that was KILLED can ask -- its in-flight name died with the
+    // page. The return table these pin lives beside the row in BridgeContractTest.
+    //
+    // Asserted against the EXACT STRING rather than a parsed structure wherever there
+    // is one row: the agreement between the two halves is the byte shape, so key order
+    // and an unexpected extra field must redden here rather than pass a lenient parse.
+    // Multi-row cases read names back with `listedNames` because listFiles() order is
+    // not specified and the contract does not promise one.
+
+    @Test
+    fun `a recordings directory that was read and is empty lists as an empty array`() {
+        assertTrue(servedDir().isDirectory, "the directory must exist, or this is the failure case")
+
+        assertEquals(
+            "[]", recorder.listRecordings(),
+            "an empty directory answers \"[]\" -- nothing to recover, as distinct from could not tell"
+        )
+    }
+
+    @Test
+    fun `a served memo is listed with its name, size and mtime`() {
+        val name = servedName()
+        val f = File(servedDir(), name).apply { writeBytes(ByteArray(1234)) }
+
+        assertEquals(
+            "[{\"name\":\"$name\",\"size\":1234,\"mtime\":${f.lastModified()}}]",
+            recorder.listRecordings(),
+            "the row shape is the agreement between the Kotlin verb and the JS caller"
+        )
+    }
+
+    @Test
+    fun `a zero-byte memo is LISTED with size 0 even though the reader refuses it`() {
+        // The one deliberate asymmetry in the 2b table, and the reason the zero-byte
+        // guard above does not simply hide the file: LISTED so JS can say "that memo is
+        // empty", REFUSED by the reader so nothing empty is ever committed as a memo.
+        // Omitting it instead would leave JS reconciling forever against a name that is
+        // on disk, is not in its store, and never returns bytes.
+        val name = servedName()
+        File(servedDir(), name).writeBytes(ByteArray(0))
+
+        assertTrue(
+            recorder.listRecordings().contains("\"name\":\"$name\",\"size\":0,"),
+            "an empty served memo must be listed with size 0, not omitted"
+        )
+        assertNull(
+            recorder.readRecording(name),
+            "and the reader must still refuse it, or the asymmetry this test is about does not exist"
+        )
+    }
+
+    @Test
+    fun `the listing offers no name the reader would refuse`() {
+        // THE POISON IS THE POINT. A lister that simply returned listFiles() would pass
+        // every other test in this block and hand JS two names the reader refuses --
+        // which is a reconciliation loop that never terminates, because the name is on
+        // disk, absent from the JS store, and unreadable forever.
+        val legal = servedName()
+        File(servedDir(), legal).writeBytes(byteArrayOf(1))
+        plantAtNaivePath("evil.txt", byteArrayOf(2))
+        plantAtNaivePath("NOT-A-UUID-SHAPED-NAME-AT-ALL-XXXXXX.m4a", byteArrayOf(3))
+
+        // The control: the poison must really be in the directory, or "one row" is a
+        // statement about an empty directory rather than about the filter.
+        assertEquals(
+            3, servedDir().listFiles()?.size,
+            "all three files must be on disk, or the filter is not being tested"
+        )
+
+        val names = listedNames(recorder.listRecordings())
+        assertEquals(listOf(legal), names, "only a name the reader accepts may be listed")
+        for (n in names) {
+            assertNotNull(
+                recorder.readRecording(n),
+                "the lister offered $n and the reader refuses it -- the two verbs must agree"
+            )
+        }
+    }
+
+    @Test
+    fun `a file over the size ceiling is omitted from the listing, because the reader refuses it`() {
+        // The contract's line is `unreadable (refused name, I/O, over the size ceiling)
+        // -> name absent`, and the first draft of listRecordings listed such a file
+        // anyway: a row the reader refuses, which is a JS reconciliation loop that
+        // never terminates. Sparse via setLength -- a real 5.9 MB write would be the
+        // slowest test in the class.
+        val big = File(servedDir(), servedName())
+        RandomAccessFile(big, "rw").use { it.setLength(NativeAudioRecorder.MAX_RECORDING_BYTES + 1) }
+        assertTrue(
+            big.length() > NativeAudioRecorder.MAX_RECORDING_BYTES,
+            "the fixture must really be over the ceiling, or this proves nothing"
+        )
+        val ok = servedName()
+        File(servedDir(), ok).writeBytes(byteArrayOf(1, 2, 3))
+
+        // The control is the SECOND file: without it, "the big one is absent" is
+        // equally satisfied by a lister that returned "[]" for an unrelated reason.
+        assertEquals(
+            listOf(ok), listedNames(recorder.listRecordings()),
+            "an over-ceiling file must be omitted while a normal one is still listed"
+        )
+        assertNull(
+            recorder.readRecording(big.name),
+            "and the reader must refuse it -- that refusal is WHY it is omitted"
+        )
+    }
+
+    @Test
+    fun `a listing that could not look says so, and cannot answer that the directory was empty`() {
+        // Poison: make recordings/ a FILE. mkdirs() then fails without throwing and
+        // listFiles() returns null -- the exact path that must NOT collapse into "[]".
+        // The tempting `?: emptyList()` would report "nothing to recover" about a
+        // directory nobody managed to read, which is a null impersonating a value.
+        val dir = servedDir()
+        dir.deleteRecursively()
+        dir.writeBytes(byteArrayOf(0))
+        assertTrue(
+            dir.isFile,
+            "the poison must leave recordings/ a non-directory, or listFiles() never returns null"
+        )
+
+        // The LITERAL, deliberately, not NativeAudioRecorder.LIST_FAILED: this string
+        // crosses the bridge and the JS side matches on it, so renaming the constant
+        // must redden here rather than follow along quietly.
+        assertEquals(
+            "error:list_failed", recorder.listRecordings(),
+            "a listing that could not look must not be able to say the directory was empty"
+        )
+    }
+
+    /** Names out of a listing, in the order the lister emitted them. listFiles() order
+     *  is unspecified and the contract does not promise one, so multi-row assertions
+     *  compare membership rather than a byte-exact string. */
+    private fun listedNames(json: String): List<String> =
+        Regex("\"name\":\"([^\"]+)\"").findAll(json).map { it.groupValues[1] }.toList()
+
     @Test
     fun `a served memo JS has not released survives the sweep`() {
         // The loss journal-3 2a exists to prevent, from the other side. A served file
@@ -234,6 +466,12 @@ class NativeAudioRecorderTest {
         }
         val memo = File(servedDir(), served)
         assertTrue(memo.exists(), "the served memo must be on disk before the sweep runs")
+        // This test builds its fixture inline rather than through serveOneMemo(), so it
+        // needs the same correction: Robolectric's ShadowMediaRecorder captures no
+        // audio, the served file is ZERO BYTES, and readRecording used to answer "" for
+        // it -- which is what the assertNotNull below has been passing on since it was
+        // written. Plant what a real recorder would have left.
+        memo.writeBytes(byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7))
 
         val orphan = File(servedDir(), servedName()).apply { writeBytes(ByteArray(4)) }
         val old = System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L
@@ -293,9 +531,25 @@ class NativeAudioRecorderTest {
         val stopped = assertIs<NativeAudioRecorder.Result.Success<NativeAudioRecorder.RecordingResult>>(
             recorder.stop()
         )
-        return requireNotNull(stopped.value.fileName) {
+        val name = requireNotNull(stopped.value.fileName) {
             "stop() must have taken the fetch-bridge path, or this test proves nothing"
         }
+        // ROBOLECTRIC'S ShadowMediaRecorder CAPTURES NO AUDIO, so the file stop() moved
+        // into recordings/ is ZERO BYTES -- and that was invisible until the journal-3
+        // 2b zero-byte guard landed. readRecording used to answer "" for an empty file,
+        // so both `assertNotNull(recorder.readRecording(served))` assertions below
+        // passed on an empty string: the "and it must still be recoverable" half of the
+        // two sweep tests was decorative, and the guard is what made it say so.
+        //
+        // Plant the bytes a real recorder would have written and assert they are there.
+        // Callers age the file AFTER this, so the write does not disturb their mtime.
+        val f = File(servedDir(), name)
+        f.writeBytes(byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7))
+        assertTrue(
+            f.length() > 0,
+            "the served fixture must hold bytes, or every readRecording assertion on it is vacuous"
+        )
+        return name
     }
 
     /**
