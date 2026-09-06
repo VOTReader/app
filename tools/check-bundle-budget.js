@@ -65,6 +65,8 @@ const BUDGETS = [
   { file: 'src/data/bible-sync-brm-kjv.js', measured: 184000, max: 215000, optional: true },
   { file: 'src/data/bible-sync-wop-nkjv.js', measured: 184000, max: 215000, optional: true },
   { file: 'src/data/bible-sync-web-ebible.js', measured: 184000, max: 215000, optional: true },
+  // One book, 28 chapters — two orders of magnitude smaller than a whole Bible.
+  { file: 'src/data/bible-sync-tsot-matthew.js', measured: 6000, max: 20000, optional: true },
   // The letter read-along timings (AUDIO_SYNC / AUDIO_SYNC_ALT), lazy since c41:
   // loaded only while a letter recording plays with the wash on. The ceiling is
   // set from the PROJECTED full corpus, not today's tranche: 617 keys / 497,951 B
