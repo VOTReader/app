@@ -121,23 +121,27 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     if (realDecode) vi.mocked(decodeGraph).mockImplementation(realDecode);
   });
 
-  /* A BOUNDED WAIT THAT GIVES UP SILENTLY IS A DEAD INSTRUMENT, and this one
-     gave up twice: once in mount() and once in the density case below. With no
-     canvas on screen, `.sw-root`'s key handler returns early on `!v.W` (viewRef.W
-     comes from the GL canvas's clientWidth, which jsdom reports as 0 when the
-     element is absent), so every press is a no-op and a case asserting "the
-     density did not change" holds for the wrong reason. The Verifier hit the
-     other face of it - a false RED on a contended box, where the same silence
-     hides WHY a case failed.
+  /* ONE WAITER FOR THE GL CANVAS, AND IT THROWS RATHER THAN GIVING UP SILENTLY.
+     There were two copies of this loop - mount()'s, inherited from main, and a
+     second one added below - and both ran out and continued anyway.
 
-     So: one waiter, a bound generous enough that a slow box does not reach it,
-     and a THROW rather than a return when it does. This carries two jobs and
-     says so: it is the wait, and it is the precondition for every assertion
-     after it. If it throws, nothing below that line is about the Scripture Web.
+     WHAT A SILENT GIVE-UP WOULD COST: with no canvas on screen, `.sw-root`'s key
+     handler returns early on `!v.W` (viewRef.W is the GL canvas's clientWidth,
+     which is 0 when the element is absent), so every press is a no-op and a case
+     asserting "the density did NOT change" holds for the wrong reason.
 
-     MEASURED, both arms: with the bound at 0 the file still read 25/25 passed
-     under the old silent form; under this one the cases that were running
-     without a canvas fail by name. */
+     WHAT IT COSTS TODAY: nothing, because the wait never waits. Measured under
+     the lock - bound at 0 with this throw in place, all 25 cases still pass, so
+     the canvas is present on the FIRST check and the loop body has never run.
+     So this is a guard awaiting its first bad input, NOT a repair of a live
+     vacuity, and its whole value is that it will not be silent when that input
+     arrives: a slower mount, a renamed class, a regression in the decode path.
+     An earlier version of this comment claimed the cases had been running
+     without a canvas. They had not. Do not upgrade the claim back.
+
+     It carries two jobs and this is the second: it is the wait, and it is the
+     precondition for every assertion after it. If it throws, nothing below that
+     line is about the Scripture Web. */
   const awaitCanvas = async (view) => {
     for (let i = 0; i < 40 && !view.container.querySelector('.sw-canvas-gl'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
