@@ -1665,8 +1665,20 @@ async function _rebuildRestoredQueue() {
       const withinKey = Math.max(0, Math.min(hits.length - 1, (r.qi || 0) - hits[0].i));
       qi = hits[withinKey].i;
     }
-  } else if (qi < 0) {
+  }
+  if (qi < 0) {
+    // Nothing in this queue IS the saved track — the corpus dropped or renamed
+    // the letter between sessions. This clamp has always existed for exactly that
+    // case, and behind an `else` it could never run for a snapshot carrying a key,
+    // which is every snapshot the app writes. qi stayed at -1, _start() read
+    // queue[-1] and stop() threw away a queue that had just rebuilt correctly.
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
+    // The saved clock is an offset into a recording that is NOT in this queue.
+    // Carrying it across seeks an arbitrary distance into whatever the clamp
+    // lands on — past the end, for a long position, which ends the track at once
+    // and skips it. No position is the honest answer here; another recording's
+    // position is not.
+    resumeAt = 0;
   }
   // startPartIndex rides along, or the first persist after a restore drops the
   // horizon it just replayed and the SECOND boot regrows part 1.
