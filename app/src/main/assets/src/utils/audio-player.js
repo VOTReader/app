@@ -1369,10 +1369,11 @@ function _slicePartHorizon(queue, startKey, startPartIndex) {
   // A run of 0 means the startKey is not at the front of this queue at all —
   // in practice, absent from it. Return the queue UNCHANGED rather than
   // falling through to `slice(-1)`, which keeps exactly ONE track: a wrong
-  // answer that looks like a horizon. No behavioural case pins this, and the
-  // reason is filed: the same condition leaves _rebuildRestoredQueue's `qi` at
-  // -1 (its `else if (qi < 0)` fallback is unreachable while `r.key` is set),
-  // so the bar comes back empty whatever this line does. Measured, not assumed.
+  // answer that looks like a horizon. Pinned by 'the run === 0 guard: a start
+  // letter that is GONE' in audio-player.test.js. That case was impossible until
+  // audio-player-5: the same condition used to leave _rebuildRestoredQueue's `qi`
+  // at -1 (its fallback sat behind an `else` and could not run while `r.key` was
+  // set), so the bar came back EMPTY whatever this line did. Both halves measured.
   if (run === 0) return queue;
   return queue.slice(Math.min(spi, run - 1));
 }
