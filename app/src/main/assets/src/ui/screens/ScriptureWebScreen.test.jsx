@@ -21,6 +21,12 @@
    (which are proven separately in web-renderer.test.js).
 */
 import { describe, it, expect, afterEach, vi } from 'vitest';
+
+/* Every draw the mocked renderer was asked to make, in order. Declared with
+   `var` because vi.mock factories are hoisted above the imports and a `const`
+   in TDZ would throw on the first draw. */
+// eslint-disable-next-line no-var
+var DRAWN = [];
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
 
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
@@ -42,7 +48,14 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
     .../** @type {any} */ (real),
     createRenderer: vi.fn(() => ({
       gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
-      draw: () => ({ instances: 0, draws: 0 }),
+      // Each draw records the (ppv, density) it was actually asked for. The
+      // auto-switch's early return suppresses ONE frame, and with a mock that
+      // throws its arguments away that frame is invisible — which is exactly how
+      // a line ends up unwitnessed. Recording is additive; no other case reads it.
+      draw: (opts) => {
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density });
+        return { instances: 0, draws: 0 };
+      },
       dispose: vi.fn(),
     })),
   };
@@ -236,6 +249,65 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
          and both of those are correct things for it to say. */
       expect(live(container)).not.toBe(DENSITY_ON);
       expect(live(container)).not.toBe(DENSITY_OFF);
+    });
+
+    it('never draws a frame at the density it has just decided is wrong', async () => {
+      /* WHAT THE EARLY RETURN IS FOR, and it needs the renderer's own arguments
+         to be visible at all: a bite that removed the return left every case
+         green, because the mock threw its opts away. This asserts the property
+         directly instead of counting frames — no draw may carry Famous at a ppv
+         at or past the entry edge.
+
+         SAY WHICH KIND OF GUARD THIS IS: the return protects WHAT THE READER SEES
+         for one frame. It is not a correctness guard — the state is already right
+         either way, and nothing downstream reads the suppressed frame. */
+      const { container } = await mount();
+      for (let i = 0; i < 14; i++) await pressFrame('+');
+      DRAWN.length = 0;
+      await pressFrame('+');                                   // the crossing frame
+      // ONE 20 ms WAIT IS ONE rAF TICK, and the crossing frame consumes it
+      // without drawing — that is the whole point of the return. The replacement
+      // frame needs a second tick, and without it DRAWN comes back EMPTY, which
+      // satisfies the filter below for the wrong reason. My own anti-vacuity
+      // check is what caught that.
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(zoomText(container)).toBe('1153x');
+      expect(shown()).toBe('essential');
+      // The harness really recorded, and it recorded past the edge — the filter
+      // below is trivially satisfied by an empty array or by frames that never
+      // got there.
+      expect(DRAWN.length).toBeGreaterThan(0);
+      expect(DRAWN.some((d) => d.ppv / d.dpr >= 22 && d.density === 'essential')).toBe(true);
+      const stale = DRAWN.filter((d) => d.ppv / d.dpr >= 22 && d.density === 'famous');
+      expect(stale).toEqual([]);
+    });
+
+    it('does NOT switch while the reader is in My Web — and switching back proves it', async () => {
+      /* The canonical-only guard, which no case reached: personal mode does not
+         render the density control, so the state has to be read after switching
+         BACK. Without the guard the reader returns from My Web to find Essential,
+         announced at, having never been in the Scripture Web at that zoom. */
+      const { container } = await mount();
+      fireEvent.click(screen.getByText('My web'));
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      for (let i = 0; i < 15; i++) await pressFrame('+');       // past the edge, in My Web
+      /* WHAT THE GUARD ACTUALLY DOES: nothing is announced, because the reader is
+         not looking at the Scripture Web. Without it the switch fires here and
+         .sw-live tells them about a density change in a view that has no density
+         control — the '+' key writes the verse label first and the draw writes the
+         announcement after, so the announcement is what would be standing. */
+      expect(container.querySelector('.sw-live').textContent).not.toBe(DENSITY_ON);
+
+      /* AND WHAT IT MUST NOT DO. Coming back to the Scripture Web at a zoom past
+         the edge SWITCHES, and that is correct — the reader is now looking at the
+         picture the rule is about. Asserted so this case cannot pass by the whole
+         mechanism being broken, which is what "expect famous here" would have
+         allowed. My first version asserted exactly that and was wrong. */
+      fireEvent.click(screen.getByText('Scripture'));
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(shown()).toBe('essential');
+      expect(container.querySelector('.sw-live').textContent).toBe(DENSITY_ON);
     });
 
     it('a reader whose stored preference is Essential is never announced at, in or out', async () => {
