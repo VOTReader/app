@@ -23,6 +23,7 @@ import {
   audioAssetUrl,
   audioReaderLabel,
   bibleAudioAssetUrl,
+  bibleEditionOfAsset,
   bibleAudioEdition,
   displayPartLabel,
   isVotAudioUrl,
@@ -244,9 +245,23 @@ describe('resolveBibleAudio — what is offered and what is painted', () => {
     'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1']],
     'bible-brm-kjv:genesis': [['brm1_genesis_001', '', 'Chapter 1']],
     'bible-web:john': [['web2_john_001', '', 'Chapter 1']],
+    'bible-wop-nkjv:john': [['wop2_john_001', '', 'Chapter 1']],
+    'bible-wop-nkjv:genesis': [['wop1_genesis_001', '', 'Chapter 1']],
+    // An edition whose assets are opaque archive ids and carry no stamp. This
+    // is the shape TSOT Matthew ships (1wwN1I2tBRsfi5b0fepRT865uZ1Q40cUQ and
+    // 27 more, five-char prefixes all different, none of them a stamp) — the
+    // reason paint cannot be a property of the asset NAME. Registered here
+    // under an edition that exists, because a fixture no release could produce
+    // asserts about a world that does not exist.
+    'bible-web:mark': [['1wwN1I2tBRsfi5b0fepRT865uZ1Q40cUQ', '', 'Chapter 1']],
     // deliberately NO 'bible-web:genesis' — a partial edition
   };
-  const trackFor = (asset) => ({ url: 'https://example.test/' + asset + '.mp3' });
+  // A track as the player builds it: `key` is `volKey + ':' + letterId`
+  // (audio-player.js:859 and :1059), which is why the edition is already on
+  // the object every caller passes.
+  const trackFor = (asset, key) => ({
+    key: key || null, url: 'https://example.test/' + asset + '.mp3',
+  });
 
   beforeEach(() => { globalThis.BIBLE_AUDIO_MANIFEST = MANIFEST; });
   afterEach(() => { delete globalThis.BIBLE_AUDIO_MANIFEST; });
@@ -281,7 +296,9 @@ describe('resolveBibleAudio — what is offered and what is painted', () => {
 
   it('paints from the asset stamp of the track that is playing', () => {
     const r = resolveBibleAudio({
-      settings: { bibleAudio: 'web-ebible' }, bookId: 'john', track: trackFor('brm2_john_001'),
+      settings: { bibleAudio: 'web-ebible' },
+      bookId: 'john',
+      track: trackFor('brm2_john_001', 'bible-brm-kjv:john'),
     });
     expect(r.paint && r.paint.volKey).toBe('bible-brm-kjv');
     expect(r.offer && r.offer.volKey).toBe('bible-web');
@@ -291,27 +308,130 @@ describe('resolveBibleAudio — what is offered and what is painted', () => {
     // An asset naming no known edition (a legacy whole-book id) is not a
     // licence to guess: paint is null and nothing is painted.
     const r = resolveBibleAudio({
-      settings: { bibleAudio: 'brm-kjv' }, bookId: 'genesis', track: trackFor('brm-kjv_genesis'),
+      settings: { bibleAudio: 'brm-kjv' },
+      bookId: 'genesis',
+      track: trackFor('brm-kjv_genesis', 'bible-brm-kjv:genesis'),
     });
     expect(r.paint).toBeNull();
     expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
   });
 
-  it('reads the edition off every stamp the URL builder routes on', () => {
-    // The stamps and the release hosts are ONE table; this pins that every
-    // stamp bibleAudioAssetUrl routes on also names an edition, so the two
-    // readings of an asset name can never disagree.
-    for (const [asset, volKey] of [
-      ['brm1_genesis_001', 'bible-brm-kjv'], ['brm2_john_001', 'bible-brm-kjv'],
-      ['wop1_genesis_001', 'bible-wop-nkjv'], ['wop2_john_001', 'bible-wop-nkjv'],
-      ['web1_genesis_001', 'bible-web'], ['web2_john_001', 'bible-web'],
+  it('the stamp table and the release hosts stay ONE table', () => {
+    // RE-AIMED, and the rename is the point. This used to assert through
+    // resolveBibleAudio, which no longer reads the stamp at all — it would
+    // have gone on passing while describing a path it no longer describes.
+    // The invariant is real and belongs to ROUTING: every stamp
+    // bibleAudioAssetUrl routes on also names an edition, so the two readings
+    // of an asset NAME can never disagree.
+    for (const [asset, editionId] of [
+      ['brm1_genesis_001', 'brm-kjv'], ['brm2_john_001', 'brm-kjv'],
+      ['wop1_genesis_001', 'wop-nkjv'], ['wop2_john_001', 'wop-nkjv'],
+      ['web1_genesis_001', 'web-ebible'], ['web2_john_001', 'web-ebible'],
     ]) {
-      const r = resolveBibleAudio({
-        settings: { bibleAudio: 'off' }, bookId: 'john', track: trackFor(asset),
-      });
-      expect(r.paint && r.paint.volKey, asset).toBe(volKey);
-      // and the same stamp still routes to a release host, not the fallthrough
+      expect(bibleEditionOfAsset(asset), asset).toBe(editionId);
       expect(bibleAudioAssetUrl(asset), asset).toContain(asset);
+    }
+  });
+
+  /* Section 12 (Architect, 2026-09-05), which REVERSES the stamp route above
+     for paint. The stamp cannot see an edition whose assets are archive ids,
+     so paint is null for every TSOT Matthew recording whatever timings ship —
+     the same rule, two books, opposite verdicts. The edition is already on the
+     track: the player builds `key` as `volKey + ':' + letterId`.
+
+     The manifest check is NOT belt-and-braces. A key is stored data — a
+     restored or imported row can name an edition it does not hold — and a
+     lying key paints one edition's clock over another's voice, which is the
+     defect this whole line of work exists to close. The asset id comes from
+     the URL, so matching it against the row the key names PROVES the key
+     instead of trusting it. */
+  it('paints an edition whose assets carry no stamp at all', () => {
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'brm-kjv' },
+      bookId: 'mark',
+      track: trackFor('1wwN1I2tBRsfi5b0fepRT865uZ1Q40cUQ', 'bible-web:mark'),
+    });
+    expect(r.paint && r.paint.volKey).toBe('bible-web');
+    // and offer is untouched: it still answers the book's question, not the
+    // recording's.
+    expect(r.offer && r.offer.volKey).toBe('bible-brm-kjv');
+  });
+
+  it('paints NOTHING when the key names an edition that does not carry the asset', () => {
+    // The only arm that fails if someone later drops the manifest check as
+    // redundant (Architect). The asset is real and belongs to brm-kjv; the key
+    // claims web-ebible. Neither answer is safe, so there is no answer.
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'off' },
+      bookId: 'john',
+      track: trackFor('brm2_john_001', 'bible-web:john'),
+    });
+    expect(r.paint).toBeNull();
+  });
+
+  it('paints nothing for a track with no key, rather than guessing from the name', () => {
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'off' }, bookId: 'john', track: trackFor('brm2_john_001'),
+    });
+    expect(r.paint).toBeNull();
+  });
+
+  it('paints nothing for a key that is not a Bible edition at all', () => {
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'off' },
+      bookId: 'john',
+      track: { key: 'letters:a-blemish-and-a-stain', url: 'https://example.test/x.mp3' },
+    });
+    expect(r.paint).toBeNull();
+  });
+
+  it('CONTROL, and it must hold on BOTH sides of this change', () => {
+    // A stamped brm asset under its own key paints brm-kjv. It passes on the
+    // stamp route and on the key route, so on its own it proves nothing about
+    // which one is running — which is exactly why it is here: without it,
+    // "every drive edition paints null" and "the resolver is broken for
+    // everything" print the same line.
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'off' },
+      bookId: 'john',
+      track: trackFor('brm2_john_001', 'bible-brm-kjv:john'),
+    });
+    expect(r.paint && r.paint.volKey).toBe('bible-brm-kjv');
+    expect(resolveBibleAudio({
+      settings: { bibleAudio: 'off' },
+      bookId: 'john',
+      track: trackFor('not-an-asset-at-all', 'bible-brm-kjv:john'),
+    }).paint).toBeNull();
+  });
+
+  it('paints nothing for a legacy whole-book track, on either route', () => {
+    // Their clock is book-relative, so per-chapter verse timings would be
+    // wrong against them (Architect). Null today because the id carries no
+    // stamp, null after because it is in no manifest row — the verdict is the
+    // same and the reason changes, which is worth pinning while it is true.
+    const r = resolveBibleAudio({
+      settings: { bibleAudio: 'brm-kjv' },
+      bookId: 'genesis',
+      track: trackFor('brm-kjv_genesis', 'bible-brm-kjv:genesis'),
+    });
+    expect(r.paint).toBeNull();
+  });
+
+  it('reads the manifest off globalThis, which is where the app puts it', () => {
+    // A probe that evaluates the manifest into a private vm context sees every
+    // paint lookup miss, so a CORRECT implementation reports failure — the
+    // Data Builder lost two runs to exactly this. Pinning the contract here so
+    // the next reader knows where to look before blaming the resolver.
+    const saved = globalThis.BIBLE_AUDIO_MANIFEST;
+    try {
+      delete globalThis.BIBLE_AUDIO_MANIFEST;
+      expect(resolveBibleAudio({
+        settings: { bibleAudio: 'off' },
+        bookId: 'john',
+        track: trackFor('brm2_john_001', 'bible-brm-kjv:john'),
+      }).paint).toBeNull();
+    } finally {
+      globalThis.BIBLE_AUDIO_MANIFEST = saved;
     }
   });
 });
