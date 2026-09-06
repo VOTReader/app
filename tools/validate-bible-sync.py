@@ -27,6 +27,7 @@ the letters, validate-schemas never looks at this file. Wired into pre-commit
 (full) and CI (structural) in c43.
 """
 import argparse
+import functools
 import hashlib
 import importlib.util
 import json
@@ -51,7 +52,11 @@ def load(path, name):
     return m
 
 
+@functools.lru_cache(maxsize=None)
 def ffprobe_dur(path):
+    # Memoised: FULL mode asks for every chapter's duration twice -- once in the
+    # per-chapter loop and once in the sidecar audit -- and each miss is a
+    # process spawn. Without this the audit doubled the pre-commit gate.
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "csv=p=0", path], capture_output=True, text=True)
     try:
@@ -159,6 +164,12 @@ def audit_facts(ed, idx, facts, hashes):
 
     Without this the sidecar is self-certifying -- it would agree with any belt,
     including a wrong one, which is green in exactly the case it exists to catch.
+
+    A finding here NAMES BOTH PARTIES on purpose. Every leg fires identically
+    when the sidecar drifted and when the AUDIO was swapped under it -- which is
+    the case the guard exists for -- and a message that said "sidecar is stale"
+    invited a reflex regeneration that would launder the swap into a green
+    sidecar. The tool cannot tell which side moved; the reader can.
     FULL audits it; CI trusts it. bytes and dur are nearly free here because FULL
     already stats and ffprobes every chapter; the sha256 leg re-reads ~780 MB and
     is opt-in."""
@@ -172,17 +183,20 @@ def audit_facts(ed, idx, facts, hashes):
         if f.get("assetId") != asset:
             out.append((tag, f"audio-facts assetId {f.get('assetId')} != {asset} on disk"))
         if f.get("bytes") != os.path.getsize(path):
-            out.append((tag, "audio-facts bytes != local mp3 (sidecar is stale)"))
+            out.append((tag, "audio-facts bytes != local mp3 "
+                             "(sidecar or audio changed; find which before regenerating)"))
         d = ffprobe_dur(path)
         if d is not None and abs(d - f.get("dur", -1)) > 0.01:
-            out.append((tag, f"audio-facts dur {f.get('dur')} != ffprobe {d:.3f} (sidecar is stale)"))
+            out.append((tag, f"audio-facts dur {f.get('dur')} != ffprobe {d:.3f} "
+                             f"(sidecar or audio changed; find which before regenerating)"))
         if hashes:
             h = hashlib.sha256()
             with open(path, "rb") as fh:
                 for block in iter(lambda: fh.read(1 << 20), b""):
                     h.update(block)
             if h.hexdigest() != f.get("sha256"):
-                out.append((tag, "audio-facts sha256 != local mp3 (sidecar is stale)"))
+                out.append((tag, "audio-facts sha256 != local mp3 "
+                                 "(sidecar or audio changed; find which before regenerating)"))
     for (book, ch) in sorted(set(facts) - set(idx)):
         out.append(("%s_%03d" % (book, ch), "audio-facts entry with no audio on disk"))
     return out
@@ -343,6 +357,7 @@ def check(ed, a):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
 
     audited = "ABSENT"
+    n_audit = 0
     if not structural and facts is None:
         # A missing sidecar is named in the mode line rather than skipped.
         if os.path.exists(FACTS):
@@ -354,7 +369,14 @@ def check(ed, a):
                 # finding below it suspect, so the instrument's own health is the
                 # first thing to read -- and problems are printed truncated at
                 # 200, which had put these last where a bad run hid them.
-                problems[:0] = audit_facts(ed, idx, on_disk, a.audit_audio_hashes)
+                audit = audit_facts(ed, idx, on_disk, a.audit_audio_hashes)
+                # PREPENDED, and counted separately below: a stale sidecar makes
+                # every duration finding under it suspect, so the instrument's
+                # own health is the first thing to read. Findings print truncated
+                # at 200, and appending had put these last -- where a run with
+                # 1,188 other problems hid them completely.
+                n_audit = len(audit)
+                problems[:0] = audit
                 audited = "audited incl. sha256" if a.audit_audio_hashes else "audited, bytes+dur"
     if structural:
         mode = "STRUCTURAL (corpus shape only; belts + audio not checked)"
@@ -372,7 +394,9 @@ def check(ed, a):
         print(f"  excluded by versification ({len(absent)}): {', '.join(absent[:20])}"
               f"{' …' if len(absent) > 20 else ''}")
     if problems:
-        print(f"FAIL: {len(problems)} problem(s)")
+        print(f"FAIL: {len(problems)} problem(s)"
+              + (f", of which {n_audit} are audio-facts audit findings (listed first)"
+                 if n_audit else ""))
         for tag, why in problems[:200]:
             print(f"  {tag:22s} {why}")
         return 1

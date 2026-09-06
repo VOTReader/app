@@ -114,6 +114,64 @@ def facts_for(ed):
     return out
 
 
+def report_changes(out_path, editions):
+    """What is this regeneration about to change? Printed BEFORE the write.
+
+    A regeneration is the moment someone decides to trust new facts, and the
+    tell that they should not is on screen only if it is printed here: hashes
+    moving for chapters nobody re-encoded is a swapped recording being laundered
+    into a green sidecar, and git diff afterwards is too late to stop the
+    decision. A hash that moves while bytes AND duration hold is the strongest
+    form of that tell -- a real re-encode almost always moves the size."""
+    if not os.path.exists(out_path):
+        print("no existing sidecar at %s -- writing a new one" % out_path)
+        return
+    try:
+        old = json.load(open(out_path, encoding="utf-8")).get("editions", {})
+    except (OSError, ValueError) as e:
+        print("existing sidecar at %s is unreadable (%s) -- writing a new one" % (out_path, e))
+        return
+    total = 0
+    for ed, new in editions.items():
+        o = old.get(ed)
+        if o is None:
+            print(f"{ed}: NEW section, {len(new)} entries")
+            total += len(new)
+            continue
+        added = sorted(set(new) - set(o))
+        gone = sorted(set(o) - set(new))
+        hash_only, resized, redurated = [], [], []
+        for k in sorted(set(new) & set(o)):
+            a_, b_ = o[k], new[k]
+            if a_.get("sha256") == b_["sha256"] and a_.get("bytes") == b_["bytes"] \
+                    and a_.get("dur") == b_["dur"]:
+                continue
+            if a_.get("bytes") != b_["bytes"]:
+                resized.append(k)
+            elif a_.get("dur") != b_["dur"]:
+                redurated.append(k)
+            else:
+                hash_only.append(k)
+        n = len(added) + len(gone) + len(hash_only) + len(resized) + len(redurated)
+        total += n
+        if not n:
+            print(f"{ed}: unchanged against the existing sidecar (all {len(new)} entries)")
+            continue
+        print(f"{ed}: {n} entr(y/ies) change")
+        for label, ks in (("added", added), ("removed", gone),
+                          ("resized", resized), ("duration moved", redurated)):
+            if ks:
+                print(f"  {label:16s} {len(ks):4d}  {', '.join(ks[:8])}"
+                      f"{' ...' if len(ks) > 8 else ''}")
+        if hash_only:
+            print(f"  CONTENT CHANGED WITH THE SAME SIZE AND DURATION  {len(hash_only)}  "
+                  f"{', '.join(hash_only[:8])}{' ...' if len(hash_only) > 8 else ''}")
+            print("  ^ a re-encode almost always moves the byte size. Identify these "
+                  "before you commit the regenerated file.")
+    if not total:
+        print("NOTHING CHANGED -- the committed sidecar already describes this audio.")
+
+
 def shipped_editions():
     """The editions that actually have a data file to gate, so the default run
     covers exactly what CI will ask about."""
@@ -153,6 +211,8 @@ def main():
         print(f"{ed}: {n} chapters  {sizes} distinct sizes  {hashes} distinct hashes"
               f"{'' if hashes == n else '   <-- IDENTICAL AUDIO SHARED BY CHAPTERS'}")
 
+    report_changes(a.out, editions)
+
     doc = {
         # "README", not "note": json.dump sorts keys, and "note" would put the
         # sentence saying what this file CANNOT prove at the very end of 482 KB,
@@ -164,7 +224,12 @@ def main():
                  "file against the real files and fails when it is stale."),
         "editions": editions,
     }
-    with open(a.out, "w", encoding="utf-8") as f:
+    # newline="\n": .gitattributes is `* text=auto eol=lf`, so the repo stores
+    # AND checks out LF. Python's default text mode would write CRLF here, and a
+    # regeneration would then differ from the committed file in all 482 KB for a
+    # reason that has nothing to do with the audio -- which destroys the one
+    # check anyone would reach for, regenerate and compare bytes.
+    with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1, sort_keys=True)
         f.write("\n")
     print(f"wrote {a.out}  ({os.path.getsize(a.out):,} bytes)")
