@@ -89,6 +89,42 @@ export default [
       // React Hooks recommended (rules-of-hooks + exhaustive-deps)
       ...reactHooksPlugin.configs.recommended.rules,
       // Local tweaks
+      // `new Function` is eval by another name. It is not in
+      // eslint:recommended, so before this line any
+      // `eslint-disable-next-line no-new-func` in this tree was DEAD — it
+      // suppressed nothing and eslint reported it as an unused directive,
+      // which `--max-warnings 0` (the CI invocation) rejects. Two branches
+      // were handed over red on that in one night.
+      //
+      // The cause was a precedent, not carelessness: the only written-down
+      // example of the idiom lives at tools/e2e-read-harness.test.js:270,
+      // WITH a three-line justification and a directive — and `npm run lint`
+      // covers only app/src/main/assets/src, so tools/ is never linted and
+      // that directive is inert there. Copy it into a linted test and CI
+      // rejects it. A precedent that is only correct because nobody checks it
+      // is worse than no precedent, and the careful justification is exactly
+      // what made the wrong form look authoritative.
+      //
+      // Turning the rule ON makes the surviving directives necessary and
+      // honest instead of dead, and buys a real protection in place of a rule
+      // nobody enforced.
+      //
+      // COST, RE-MEASURED ON THE TREE THIS LANDS ON (main 98de630f), because
+      // the first measurement went stale under it: TWO `new Function` in the
+      // linted scope — `eslint app/src/main/assets/src`, which is what `npm run
+      // lint` covers — at audio-track.editions.test.js:37 and
+      // audio-track.test.js:48, and zero `eval(`. So TWO directives are added
+      // with this change and nothing else moves.
+      //
+      // The first count said ONE, and it was true of base d1b02128. Main then
+      // grew the second `new Function` (the "a gate owns its data" fix) and
+      // separately DROPPED that file's directive as an unused disable, correctly,
+      // because this rule was still off. Each landed change is right alone and
+      // together they are red: a cost measured against an old base is a stale
+      // measurement, and the count has to be re-read on the tree the rule is
+      // switched on in. Anyone adding a `new Function` after this lands is told
+      // by CI, which is the point of the rule being on.
+      'no-new-func': 'error',
       // caughtErrorsIgnorePattern: '^_' makes `catch (_e)` exempt from
       // no-unused-vars's caughtErrors check (which defaults to 'all' in
       // ESLint 9). Matches the existing argsIgnorePattern / varsIgnorePattern
