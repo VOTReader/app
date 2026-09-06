@@ -125,14 +125,30 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
     // shipped asset must paint as SOME edition, and as the one its own key
     // names. It is now asserted through the path the app actually takes.
     //
-    // IT CANNOT CURRENTLY FAIL, AND IT SAYS SO RATHER THAN COUNTING AS A PASS.
-    // Measured: reverting paint to the asset-name stamp leaves this case GREEN,
-    // because every one of today's 3,567 shipped assets carries a registered
-    // stamp, so both routes agree on all of them. It becomes discriminating the
-    // day an edition ships opaque ids — c48's TSOT Matthew, whose 28 Drive ids
-    // carry no stamp and would paint null under the old route. Until then the
-    // CONTROL below is what has teeth: it is the only case in this file that
-    // reddens when either half of the key proof is removed.
+    // THIS CASE AND THE CONTROL BELOW COVER DISJOINT FAILURES, AND NEITHER
+    // SURVIVES ALONE. Measured, three bites (Verifier):
+    //
+    //   revert paint to the asset-name stamp   -> only the CONTROL reddens
+    //   drop the manifest containment check    -> only the CONTROL reddens
+    //   drop the volKey->edition translation   -> only THIS LOOP reddens, all 3,567
+    //
+    // This loop cannot catch either identity bite, because every one of today's
+    // 3,567 shipped assets carries a registered stamp, so both routes agree on
+    // all of them; it becomes discriminating the day an edition ships opaque
+    // ids (c48's TSOT Matthew, whose 28 Drive ids carry no stamp and would
+    // paint null under the old route). And the CONTROL cannot catch the
+    // translation bite, because a resolver that paints null for EVERYTHING
+    // satisfies "a lying key must paint null" perfectly.
+    //
+    // So each is the other's guard against passing vacuously. DO NOT DROP
+    // EITHER: this loop is the only thing in this file that catches a broken
+    // bibleSyncEditionFor, which is the single step where the two names
+    // diverge (bible-web -> web-ebible).
+    //
+    // The floor below says "more than 1,000". It actually examines 3,567 — the
+    // whole row count, 198 keys, derived independently from the manifest — and
+    // a loop-based gate with a floor is one dead filter away from checking
+    // twelve rows and printing a pass.
     const m = manifest();
     const keys = Object.keys(m);
     expect(keys.length, 'manifest is empty').toBeGreaterThan(100);
