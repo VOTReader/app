@@ -187,18 +187,28 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
      maxHeight the cap put on it, so reading it back cannot ratchet the cap down on itself. The
      docked cap below needs this to tell "the card is short" from "the card was cut". */
   const [cardNeed, setCardNeed] = React.useState(0);
+  /* Is there more of the card below the fold? At a large text size on a small screen the words do
+     not fit at any cap (557 px in 276 px of room at 1.8 on 320x640) and the sticky row's own
+     background makes the tail look finished rather than continued. So when it overflows the card
+     wears a fade and a chevron, and both leave at the end. */
+  const [hasMore, setHasMore] = React.useState(false);
+  const checkMore = React.useCallback(() => {
+    const el = cardRef.current;
+    if (el) setHasMore(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+  }, []);
   React.useLayoutEffect(() => {
     const el = cardRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const measure = () => {
       const h = el.getBoundingClientRect().height; if (h) setCardH((prev) => (prev === h ? prev : h));
       const need = el.scrollHeight; if (need) setCardNeed((prev) => (prev === need ? prev : need));
+      checkMore();
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [active, st.ready, st.index, st.pressed]);
+  }, [active, st.ready, st.index, st.pressed, checkMore]);
   const setCardEl = React.useCallback((el) => { cardRef.current = el; if (trapRef) trapRef.current = el; }, [trapRef]);
 
   // While a card is docked, the reading column's scroller carries the card's height as
@@ -281,7 +291,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       ))}
       {ring && !opened && <div className="tour-ring" aria-hidden="true" style={{ left: px(ring.left), top: px(ring.top), width: px(ring.width), height: px(ring.height) }} />}
       {ring && clear && <div className={'tour-arrow ' + (below ? 'up' : 'down')} aria-hidden="true" style={{ left: px(ring.left + ring.width / 2 - 10), top: below ? px(cardTop - 20) : px(cardTop + h) }} />}
-      <div className={'tour-card' + (docked ? ' docked' : '')} ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle}>
+      <div className={'tour-card' + (docked ? ' docked' : '') + (hasMore ? ' has-more' : '')} ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle} onScroll={checkMore}>
         <div className="tour-eyebrow">{step.eyebrow}</div>
         <h2 className="tour-title" id="tour-title">{step.title}</h2>
         <div aria-live="polite">
@@ -289,6 +299,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
           {hint && <p className="tour-tip">{hint}</p>}
         </div>
         <div className="tour-row">
+          {/* Decorative on purpose: the words below are reachable by scrolling and a screen reader
+              already has the whole card, so this says nothing it would have to repeat. */}
+          {hasMore && <span className="tour-more" aria-hidden="true" />}
           <button type="button" className="tour-btn quiet" aria-label="Leave the tour" onClick={() => ctl.skip()}>Skip</button>
           <span className="tour-sp" />
           <button type="button" className="tour-btn" aria-label="Previous stop" disabled={first} onClick={() => ctl.back()}>Back</button>
