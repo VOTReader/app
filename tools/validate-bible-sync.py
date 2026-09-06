@@ -158,6 +158,30 @@ def check(ed, a):
             # against a fixture built by ship()'s own formula, and it would
             # have blocked the WEB ship. rebuild() below already used max(n);
             # the two legs of this gate disagreed and only one of them fired.
+            #
+            # AND SPARSE NUMBERING IS NOT A WEB QUIRK WITH FOUR INSTANCES,
+            # which is what the four names above read like on their own.
+            # Censused across every shipped edition, 2026-09-06 on main
+            # 7416be36:
+            #     kjv / lsv / ylt   1189 chapters   sparse 0
+            #     web / hnv         1189            sparse 4   (the same four)
+            #     asv / bsb         1189            sparse 15  (+ matthew
+            #                                       17, 18, 23; mark 7, 9, 11)
+            #     rkjv               223            sparse 221 } partial
+            #     rnkjv              222            sparse 220 } editions,
+            #                                       26 books, sparse by
+            #                                       construction
+            # So: three editions have no gaps at all (a dense-shipper bug can
+            # never surface on them), the ASV and the BSB have nearly four
+            # times the WEB's, and for the two partial editions a per-chapter
+            # verse COUNT means something different from max(n) entirely.
+            # Tune nothing here against "the four".
+            #
+            # What actually has to hold for arr[n - 1] and max(n) to be safe
+            # is narrower and it is pinned in test_bible_versification.py:
+            # inside a chapter the verse numbers are strictly increasing and
+            # unique. A duplicate silently overwrites a slot another verse
+            # owns while every length check in this file still passes.
             nums = {v["n"] for v in verses}
             if not nums:
                 # The old len() comparison degraded into a plain problem line
