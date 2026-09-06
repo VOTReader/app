@@ -295,6 +295,42 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         setError('Could not read the recording from the device.');
         setStage('error');
       }
+      /* Does the device POSITIVELY report this served file as existing and holding
+         nothing? Only a row with size 0 answers yes (journal-3 2b).
+
+         A null read cannot answer it. Native returns ONE null for gone, refused,
+         over the ceiling and empty, deliberately — so from the read alone "your
+         recording held nothing" and "your recording is missing" are the same
+         value, and they are very different things to tell someone about their own
+         voice memo. The listing carries the distinction in one direction only: a
+         zero-byte file is LISTED, with "size": 0, while a swept one is absent.
+         That asymmetry is why a zero-byte memo is listed at all.
+
+         EVERYTHING ELSE RETURNS FALSE, as one branch and not four. An absent row,
+         'error:list_failed', a parse that is not an array, a row with bytes that
+         still reads null — none of those is evidence of emptiness, and the
+         reader's correct outcome for all of them is the loud failure they already
+         saw. A positive match is a fact; a catch-all else is a guess, and an
+         "empty-ish" branch for any of them would tell a reader whose file was
+         swept that their recording held nothing.
+
+         'error:list_failed' is deliberately not '[]' on the native side, because
+         could-not-enumerate is not nothing-to-recover. And the ARRAY is checked
+         rather than the parse trusted: JSON.parse('null') returns null instead of
+         throwing, so a catch alone would let a non-array through. */
+      function servedIsEmpty(name) {
+        if (!name) return false;
+        var raw = null;
+        try { raw = PlatformBridge.nativeListRecordings(); } catch (_e) { return false; }
+        var rows = null;
+        try { rows = JSON.parse(raw); } catch (_e) { return false; }
+        if (!Array.isArray(rows)) return false;
+        for (var i = 0; i < rows.length; i++) {
+          // === 0, so a string "0" or a missing size is not read as empty either.
+          if (rows[i] && rows[i].name === name) return rows[i].size === 0;
+        }
+        return false;
+      }
 
       try {
         // 1) Web: the Blob is handed to us directly (avoids a redundant base64 copy).
@@ -365,7 +401,21 @@ export function JournalRecordingSheet({ onSave, onClose }) {
                 // finalize() sees size 3 > 0 and commits them as the reader's
                 // recording. A missing file would become a three-byte memo that
                 // plays as silence, which is worse than the loss it hides.
-                if (!recovered) { fail(e); return; }
+                if (!recovered) {
+                  /* The null is now asked WHY, once, and only the affirmative
+                     answer changes what the reader is told. Before this, a memo
+                     that existed and held nothing produced "Could not read the
+                     recording from the device." — honest about the outcome and
+                     wrong about the cause. The file was read perfectly; there was
+                     nothing in it. */
+                  if (servedIsEmpty(servedName)) {
+                    console.warn('recording recovered as an empty file', servedName);
+                    setError('That recording is empty — nothing was captured. Try again and speak after the timer starts.');
+                    setStage('error');
+                    return;
+                  }
+                  fail(e); return;
+                }
                 try { finalize(decodeB64(recovered)); } catch (e2) { fail(e2); }
               });
           };
