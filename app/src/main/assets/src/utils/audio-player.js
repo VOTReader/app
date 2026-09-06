@@ -1673,6 +1673,10 @@ async function _rebuildRestoredQueue() {
     // case, and behind an `else` it could never run for a snapshot carrying a key,
     // which is every snapshot the app writes. qi stayed at -1, _start() read
     // queue[-1] and stop() threw away a queue that had just rebuilt correctly.
+    // The floor is a shape guard, not a correctness guard, and a bite says so:
+    // _restoreFromSaved already clamps r.qi at 0, and an empty queue ends in
+    // stop() through queue[0] exactly as it would through queue[-1]. Only the
+    // Math.min is load-bearing here (1 RED, on the shrunken-collection case).
     qi = Math.max(0, Math.min(r.qi || 0, queue.length - 1));
     // The saved clock is an offset into a recording that is NOT in this queue.
     // Carrying it across seeks an arbitrary distance into whatever the clamp
