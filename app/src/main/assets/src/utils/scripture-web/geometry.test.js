@@ -15,6 +15,7 @@ import {
   arcAnchored, flyOverDim, flyOverGLSL,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
+  autoDensity, DENSITY_ENTER_PPV_CSS, DENSITY_EXIT_PPV_CSS, PPV_MAX_CSS,
 } from './geometry.js';
 import {
   pickArc, pickArcs, arcsTouching, countTouching, pickChapter, pickVerse,
@@ -574,5 +575,62 @@ describe('decode', () => {
   it('throws on missing data rather than rendering nothing silently', () => {
     expect(() => decodeGraph(null)).toThrow(/missing/);
     expect(() => decodeGraph({ count: 0 })).toThrow(/missing/);
+  });
+});
+
+/* The Essential auto-switch band. design-perf's spec supplies the two edges and
+   the state rule; the decision is the owner's (scripture-web-v2-design.md,
+   Decisions, 2026-09-05). Every case here is a pure call — no camera, no screen,
+   no globals — so a neighbour's teardown cannot switch this gate off. */
+describe('scripture-web — the Essential auto-switch', () => {
+  const A = (ppvCss, current, pinned, base) => autoDensity({ ppvCss, current, pinned, base });
+
+  it('the edges are FRACTIONS OF THE CEILING, so one pair governs every device', () => {
+    // Written as a relationship, not as 22 and 11. A literal pair would keep
+    // passing if PPV_MAX_CSS ever moved and the band would silently stop being
+    // half and a quarter of the ceiling the reader actually hits.
+    expect(DENSITY_ENTER_PPV_CSS).toBe(PPV_MAX_CSS / 2);
+    expect(DENSITY_EXIT_PPV_CSS).toBe(PPV_MAX_CSS / 4);
+    expect(DENSITY_ENTER_PPV_CSS).toBe(22);
+    expect(DENSITY_EXIT_PPV_CSS).toBe(11);
+  });
+
+  it('enters Essential AT the edge and not a hair below it', () => {
+    expect(A(21.9, 'famous', false, 'famous')).toBe('famous');
+    expect(A(22.0, 'famous', false, 'famous')).toBe('essential');
+  });
+
+  it('leaves AT the lower edge and not a hair above it', () => {
+    expect(A(11.1, 'essential', false, 'famous')).toBe('essential');
+    expect(A(11.0, 'essential', false, 'famous')).toBe('famous');
+  });
+
+  it('inside the band it returns WHAT IT ALREADY WAS — the memory that makes this hysteresis', () => {
+    // The same ppv, two answers, decided only by where the reader came from.
+    // This is the case that separates a band from a threshold, and the one the
+    // flap bite reddens.
+    expect(A(15, 'essential', false, 'famous')).toBe('essential');
+    expect(A(15, 'famous', false, 'famous')).toBe('famous');
+  });
+
+  it('a PINNED reader is immovable at both edges', () => {
+    expect(A(44, 'famous', true, 'famous')).toBe('famous');
+    expect(A(1, 'essential', true, 'famous')).toBe('essential');
+    // …including one who pinned Famous at the ceiling, which is the one tap back.
+    expect(A(DENSITY_ENTER_PPV_CSS, 'famous', true, 'famous')).toBe('famous');
+  });
+
+  it('a reader whose stored preference IS Essential sees nothing change, in or out', () => {
+    for (const ppv of [1, 10.9, 11, 15, 22, 44]) {
+      expect(A(ppv, 'essential', false, 'essential')).toBe('essential');
+    }
+    // …and leaving returns them to their own base, not to a hard-coded Famous.
+    expect(A(1, 'essential', false, 'essential')).toBe('essential');
+  });
+
+  it('leaving returns the reader to THEIR base, never to a constant', () => {
+    // The arm that reddens if `return o.base` is ever written as 'famous'.
+    expect(A(5, 'essential', false, 'famous')).toBe('famous');
+    expect(A(5, 'essential', false, 'essential')).toBe('essential');
   });
 });
