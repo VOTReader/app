@@ -1415,6 +1415,20 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
     expect(st.duration).toBe(0);
   });
 
+  it('an IDLE player is untouched — no element AND nothing restoring means nothing to seek', () => {
+    /* Not an edge case: this is the COMMON one for the very same tap. A reader
+       opens a timed chapter with the player empty and taps a verse. Without the
+       `if (!_pendingRestore) return;` line, `_pendingRestore.time = at` runs on
+       null and every such tap throws a TypeError — and a bite proved nothing in
+       this file witnessed that guard until this case existed. beforeEach clears
+       the snapshot, so the player here is genuinely idle. */
+    expect(AudioPlayer.getState().restoring).toBe(false);
+    expect(el()).toBe(null);
+    expect(() => AudioPlayer.seek(150)).not.toThrow();
+    expect(AudioPlayer.getState().time).toBe(0);
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);
+  });
+
   it('moves the clock to the tapped position instead of silently doing nothing', async () => {
     await restored();
     AudioPlayer.seek(150);
