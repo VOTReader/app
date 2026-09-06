@@ -185,38 +185,6 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
     expect(paint, web + ' must not paint ' + brm + ' asset ' + stolen).toBeNull();
   });
 
-  it('every edition carries every book — fires on the first partial edition', () => {
-    // PASSES TODAY AND IS MEANT TO - but NOT for the reason it used to.
-    //
-    // It used to say the per-book fallback was "written and unit-tested but NOT
-    // wired at the four playBibleBook sites", and that the branch registering a
-    // partial edition had to do the wiring. THE WIRING IS DONE:
-    // screen-routes.jsx now builds bibleAudioFor(bookId) and calls it at each of
-    // the four, with screen-routes.bibleaudio.test.jsx holding the RED that
-    // pinned it. So this is no longer a to-do with an alarm attached; it is a
-    // plain invariant about the shipped corpus, and it stays because a partial
-    // edition is still worth announcing - the fallback now HANDLES one, which
-    // is a different thing from nobody noticing one arrived.
-    //
-    // (historical) resolveBibleAudio's `offer` falls back to
-    // the default edition for a book the selected one lacks, and that arm is
-    // unreachable while this holds. The alarm is what turns red when the first
-    // partial edition arrives.
-    const m = manifest();
-    const books = new Set(Object.keys(m).map((k) => k.slice(k.lastIndexOf(':') + 1)));
-    expect(books.size, 'book set looks wrong').toBe(66);
-    for (const id of Object.keys(BIBLE_AUDIO_EDITIONS)) {
-      const volKey = BIBLE_AUDIO_EDITIONS[id].volKey;
-      const missing = [...books].filter((b) => !m[volKey + ':' + b]);
-      expect(
-        missing,
-        id + ' does not carry ' + missing.length + ' book(s): ' + missing.slice(0, 5).join(', ')
-        + '\n  → this edition is PARTIAL, so resolveBibleAudio({settings, bookId}).offer'
-        + '\n    is wired per book (screen-routes.jsx bibleAudioFor, all 4 sites),'
-        + '\n    so books it lacks yield to the default. Check that is intended here.',
-      ).toEqual([]);
-    }
-  });
 });
 
 /* ── every edition declares its books, and ships exactly those ────────────
@@ -231,6 +199,15 @@ describe('BIBLE_AUDIO_MANIFEST — what the sync selector relies on', () => {
    the reader can never reach; shipped-but-not-declared is audio nobody
    checked, and it is the direction a one-way assertion misses. Either alone
    passes on an edition that ships nothing at all. */
+// SUPERSEDES the 66-books alarm ("every edition carries every book"), retired in
+// c48 by the Architect's ruling. That alarm demanded per-book wiring; the wiring
+// LANDED as 9bdd517c (resolve the Bible-audio offer PER BOOK at all four call
+// sites), pinned by the behaviour red 6347eaa6, which stays. The alarm could not
+// self-lift because it was a manifest-SHAPE assertion, not a behaviour one -- an
+// expect(...).toEqual([]) whose message said "Check that is intended here" but
+// which could only block, never announce. For books: 'all' the pair below is the
+// same assertion plus the reverse direction; tsot-matthew is the first partial
+// edition and the reason this became reachable.
 describe('audio-track editions — an edition ships exactly the books it declares', () => {
   const MANIFEST_SRC = readFileSync(
     join(ROOT, 'app', 'src', 'main', 'assets', 'src', 'data', 'bible-audio-manifest.js'), 'utf8');
@@ -278,6 +255,17 @@ describe('audio-track editions — an edition ships exactly the books it declare
         .filter((k) => k.startsWith(e.volKey + ':'))
         .map((k) => k.slice(e.volKey.length + 1));
       expect([...want].sort(), `${id}: declared but not shipped`).toEqual([...got].sort());
+    }
+  });
+
+  it('the three shipped whole-Bible editions still declare every book', () => {
+    // CLOSES A CIRCULARITY the old 66-books alarm closed by accident. The pair
+    // above checks each edition against ITS OWN declaration, so flipping
+    // brm-kjv to books: ['matthew'] would make the generator emit one book, the
+    // manifest follow, and both assertions agree on a wrong world. A list over a
+    // CLOSED set is honest; new editions stay unconstrained by design.
+    for (const id of ['brm-kjv', 'wop-nkjv', 'web-ebible']) {
+      expect(BIBLE_AUDIO_EDITIONS[id].books, `${id} ships the whole Bible`).toBe('all');
     }
   });
 
