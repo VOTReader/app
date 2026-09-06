@@ -138,13 +138,28 @@ async function search(query, options) {
   options = options || {};
   const limit = options.limit || 200;
   const corpus = options.corpus || 'all';
-  await ensureReady(options);
 
+  /* THE PARSE GOES FIRST, BECAUSE IT NEEDS NO INDEX (search-6). `parseReference`
+     reads only the `searchData()` tables, which ship in bundle-a and are loaded
+     before the app renders — the suggest box already relies on that, answering at
+     one character with no index at all.
+
+     `await ensureReady` used to sit above this line, so a command and every
+     structured reference waited for a ~10 s cold build and then returned
+     `results: []` without ever touching MiniSearch. The reader typed "gen 1" and
+     got nothing for ten seconds, for a lookup the index has no part in.
+
+     ONLY THE TEXT BRANCH WAITS NOW, and it waits in the same place it always did
+     — the wait was moved, not removed. A case asserts a text query still builds,
+     because "the index was not built" is otherwise satisfied by a search() that
+     stopped building for everything. */
   const parsed = parseReference(query, { corpus });
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
   if (parsed.kind !== 'text') return { parsed, results: [], parsedTerms: [], textQuery: null };
+
+  await ensureReady(options);
 
   const p = parsed;
   const D = searchData();

@@ -331,6 +331,54 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* search-6 — the SCREEN half. `search()` parsing before it waits is useless while
+     the screen refuses to call it: `if (!buildInfo.ready) return;` sat at the top of
+     the debounced effect, so during a ~10 s cold build a reference or a command
+     produced nothing at all. These two cases are the reader-facing statement, and
+     the second is what stops the first passing for the wrong reason. */
+  it('search-6: a reference is searched for while the index is still building', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false, building: true });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn(() => new Promise(() => {}));
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: { kind: 'bible', bookId: 'genesis', bookTitle: 'Genesis', chapter: 1, label: 'Genesis 1' },
+      results: [], parsedTerms: [],
+    }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="gen 1" />);
+    await act(async () => { vi.advanceTimersByTime(200); await Promise.resolve(); });
+
+    // The engine was ASKED, with the index nowhere near ready.
+    expect(/** @type {any} */ (window).VotSearchMini.search).toHaveBeenCalled();
+    expect(/** @type {any} */ (window).VotSearchMini.getState().ready).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('search-6 CONTROL: a build that never finishes is genuinely never finished', async () => {
+    /* Without this, the case above is satisfied by a harness whose `init` quietly
+       resolved and made the index ready — which would prove nothing about the
+       building window at all. */
+    vi.useFakeTimers();
+    let initSettled = false;
+    /** @type {any} */ (window).VotSearchMini.getState = () => ({ ready: false, building: true });
+    /** @type {any} */ (window).VotSearchMini.init = vi.fn(() => new Promise(() => {}).then(() => { initSettled = true; }));
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: { kind: 'command', action: 'home', label: 'Go home' }, results: [], parsedTerms: [],
+    }));
+    // baseProps' onCommand is a noop, and this case needs to see the call.
+    const props = Object.assign(baseProps(), { onCommand: vi.fn() });
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="/home" />);
+    await act(async () => { vi.advanceTimersByTime(200); await Promise.resolve(); });
+
+    expect(/** @type {any} */ (window).VotSearchMini.search).toHaveBeenCalled();
+    expect(initSettled).toBe(false);          // the build really did not complete
+    // …and the command reached the screen's own handler, which is what a reader sees.
+    expect(props.onCommand).toHaveBeenCalledWith('home');
+    vi.useRealTimers();
+  });
+
   it('unmounting mid-build and mid-search leaves no dangling setState (back out of Search)', async () => {
     vi.useFakeTimers();
     let progressCb = null;

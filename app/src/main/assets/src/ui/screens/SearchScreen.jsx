@@ -151,7 +151,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
-    if (!buildInfo.ready) return;
+    /* NO `if (!buildInfo.ready) return;` HERE — that line was half of search-6.
+       `search()` now parses before it waits, so a command or a reference answers
+       immediately whatever the index is doing, and a TEXT query waits inside the
+       engine exactly where it always did. Gating here as well would put the
+       decision in two places and only one of them would know the query's kind. */
     const q = (query || '').trim();
     if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
