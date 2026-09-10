@@ -717,3 +717,61 @@ describe('TourOverlay — the demonstration leaves by every door', () => {
     expect(TourController.getState().pressed).toBe(true);
   });
 });
+
+/* THE DOCKED CARD IS OPAQUE, so "on screen" for a docked stop ends at its top edge.
+   Found when 320x640 joined e2e-tour (2026-09-10): the Bible stop says "Press Listen" while its
+   pill sits under the card at that frame. The pill was on screen by every measurement the overlay
+   made — top >= 0, bottom <= innerHeight — and under the card to the reader. At 360x800 the same
+   pill clears the card, which is why two viewports never saw it. */
+describe('TourOverlay — a docked stop brings a target out from under its own card', () => {
+  const vh = () => window.innerHeight;
+  /** A letter screen whose Listen pill sits in the band a docked card owns, and a card that says so.
+   *  jsdom measures nothing, so the CARD's rect is stubbed too: without it the overlay reads the
+   *  card's top as 0, the guard below treats that as "no restriction", and this whole branch is
+   *  unreachable — a case that could only ever print green. */
+  const setUp = (pillTop) => {
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><main class="letter-body">'
+      + '<button class="hero-play-pill">Listen</button><p>Thus says The Lord…</p></main></div></div>';
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    scroller.getBoundingClientRect = rect(0, 56, 360, vh() - 56);
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    const pill = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
+    pill.getBoundingClientRect = rect(133, pillTop, 94, 25);
+    const calls = [];
+    pill.scrollIntoView = (opts) => { calls.push(opts && opts.block); };
+    return { pill, calls };
+  };
+  /** The docked card, occupying the bottom third — the band the reader cannot see through. */
+  const stubCard = () => {
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    card.getBoundingClientRect = rect(12, Math.round(vh() * 0.62), 336, Math.round(vh() * 0.38));
+    return card;
+  };
+
+  it('scrolls a pill that is on screen but under the card to the top of its scroller', async () => {
+    const { calls } = setUp(Math.round(vh() * 0.75));       // inside the viewport, inside the card's band
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = stubCard();
+    expect(card.classList.contains('docked')).toBe(true);
+    // Past RESCROLL_EVERY_MS (300): the first tick's scroll is unconditional, a re-scroll is not.
+    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    // 'start', not 'center': centring in a viewport whose bottom the card owns can put the target
+    // straight back underneath it. The first tick always scrolls (block null → 'center'), so this
+    // asks whether a LATER tick, once the card has been measured, asked for 'start'.
+    expect(calls).toContain('start');
+  });
+
+  /* CONTROL, and it is what stops the case above from being satisfied by "always scroll to start":
+     the same docked stop with its pill high on the screen, clear of the card, is left alone. */
+  it('leaves a pill that is already clear of the card where it is', async () => {
+    const { calls } = setUp(120);                            // high, well above the docked card
+    startAt('listen');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    stubCard();
+    // Past RESCROLL_EVERY_MS (300): the first tick's scroll is unconditional, a re-scroll is not.
+    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    expect(calls).not.toContain('start');
+  });
+});

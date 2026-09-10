@@ -162,7 +162,16 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       if (el) {
         const r = _rect(el);
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const off = r.top < 0 || r.top + r.height > vh;
+        /* WHERE THE READER CAN ACTUALLY SEE THE TARGET ENDS AT THE DOCKED CARD, NOT AT THE VIEWPORT.
+           A docked card sits over the bottom of the screen, so a control between the card's top and
+           the viewport's bottom is on screen by every measurement and under the card to the reader —
+           and the card is opaque. The Bible stop reads "Press Listen" while its pill sits under the
+           card at 320x640 (found when that frame joined e2e-tour, 2026-09-10); at 360x800 the same
+           pill clears it, which is why two viewports never saw it. Bringing such a target to the top
+           of its scroller, rather than to the centre, is what puts it above a card that owns the
+           bottom of the screen. */
+        const dockFloor = docked && cardRef.current ? Math.min(vh, cardRef.current.getBoundingClientRect().top || vh) : vh;
+        const off = r.top < 0 || r.top + r.height > dockFloor;
         const now = Date.now();
         // The scroller's position the last time the target was on screen: unchanged and off = layout shift.
         const sc = _scrollerEl(el);
@@ -181,7 +190,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         const top0 = sc ? Math.max(0, sc.getBoundingClientRect().top) : 0;
         scrollerTopRef.current = top0;
         const fitsAtStart = top0 + ringH + CARD_GAP + ch + CARD_EDGE <= vh;
-        const block = off ? 'center' : (!docked && !fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > top0 + 1 ? 'start' : null);
+        // A docked stop scrolls an out-of-reach target to the TOP of its scroller: centring it in a
+        // viewport whose bottom the card owns can land it right back under the card.
+        const block = off ? (docked ? 'start' : 'center') : (!docked && !fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > top0 + 1 ? 'start' : null);
         if (!scrolled || (block && (now - started < RESCROLL_WINDOW_MS || shifted) && now - lastScroll >= RESCROLL_EVERY_MS)) {
           scrolled = true; lastScroll = now;
           try { el.scrollIntoView({ block: block || 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
