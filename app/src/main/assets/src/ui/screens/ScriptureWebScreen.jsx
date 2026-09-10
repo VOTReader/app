@@ -248,6 +248,35 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const rendererRef = React.useRef(null);
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
+  const topbarRef = React.useRef(null);
+  /* The orientation note's top, measured off the topbar's own box. Null until
+     the first measurement, which is exactly when the CSS floor applies — and
+     the floor is the SMALLEST box the topbar can have, so the note is already
+     clear of it in that window. The observer exists for the case the floor
+     cannot cover: a topbar that has GROWN, from a wrapped title or a hint line
+     (measured: 62 px tall becomes 89 px once flashHint() adds its line).
+
+     `rotated` IS IN THE DEPS BECAUSE A RESIZE OBSERVER WATCHES SIZE AND THIS
+     IS A POSITION. Measured on the first draft, which observed only on mount:
+     at 426x952 the screen is still CSS-rotated when this effect first runs, the
+     topbar's VIEWPORT box is then the rotated one, and the note was placed at
+     299 px instead of 82 — while `.sw-narrow` at 320x640, which never rotates,
+     read 82. An ancestor's transform changes no element's content box, so the
+     observer never fired again and the wrong value stuck, differing between two
+     text scales on the same frame: a flaky instrument, which is worse than a
+     constant. Re-measuring when the rotation clears closes it, and the stale
+     direction was safe anyway — a rotated bar's box is TALLER, so the note was
+     too low rather than over the Back button. */
+  const [noteTop, setNoteTop] = React.useState(/** @type {string|null} */ (null));
+  React.useEffect(() => {
+    const el = topbarRef.current;
+    if (!el || typeof ResizeObserver !== 'function') return undefined;
+    const measure = () => setNoteTop(Math.round(el.getBoundingClientRect().bottom + 10) + 'px');
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rotated, orientationHint]);
   const contextRef = React.useRef(null);
   const rangeRef = React.useRef(null);
   const zoomRef = React.useRef(null);
@@ -956,7 +985,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
       {!graph && <div className="sw-loading">Weaving the web…</div>}
 
-      <div className="sw-topbar">
+      <div className="sw-topbar" ref={topbarRef}>
         <button type="button" className="sw-btn sw-btn-icon" onClick={onBack} aria-label="Back">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
@@ -1082,7 +1111,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       </div>
     </div>
     {orientationHint && isPortrait && (
-      <div className="sw-orientation-note" role="status">
+      <div className="sw-orientation-note" role="status"
+        style={noteTop ? { top: noteTop } : undefined}>
         <strong>Best in landscape</strong>
         <span>Turn your device sideways to read the full canon clearly.</span>
         <button type="button" className="sw-btn" onClick={requestLandscape}>Try landscape</button>

@@ -6769,10 +6769,30 @@
     .sw-canvas-gl { z-index: 1; }
     .sw-canvas-ui { z-index: 2; pointer-events: none; }
 
+    /* THE SCRIPTURE WEB'S SHARED CHROME MEASUREMENTS, ONE DEFINITION EACH.
+       Both were copies before. `.sw-topbar` and `.sw-controls` each spelled the
+       same top offset out in full, and `.sw-credit` carried a hand-measured
+       198px mirror of the control strip's height which went stale when the
+       strip grew — the CC-BY line ended up INSIDE the strip on a 320px phone.
+       Two definitions that must agree is the shape of both defects on this
+       branch, so both are deleted rather than corrected. */
+    :root {
+      --sw-chrome-top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+      --sw-topbar-pad: 8px;
+      /* The topbar's FLOOR, and it is not a measurement of today's topbar: it
+         is the SMALLEST box it can have — a 44px tap target (the .sw-btn
+         minimum) inside its own padding and border — which is what the
+         orientation note falls back to in the window before the ResizeObserver
+         has reported. Derived from --sw-topbar-pad so changing the padding
+         cannot leave a stale copy behind. */
+      --sw-topbar-floor: calc(44px + 2 * var(--sw-topbar-pad) + 2px);
+    }
+
     .sw-topbar {
       position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
-      left: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
-      padding: 8px 10px 8px 8px; background: var(--bg3);
+      left: 14px; top: var(--sw-chrome-top);
+      padding: var(--sw-topbar-pad) 10px var(--sw-topbar-pad) var(--sw-topbar-pad);
+      background: var(--bg3);
       border: 1px solid var(--border); border-radius: var(--radius);
     }
     .sw-title h1 {
@@ -6787,7 +6807,7 @@
 
     .sw-controls {
       position: absolute; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px;
-      right: 14px; top: calc(10px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
+      right: 14px; top: var(--sw-chrome-top);
       max-width: 62vw; justify-content: flex-end; padding: 7px;
       background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
     }
@@ -6859,8 +6879,21 @@
     }
     .sw-goto-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
     .sw-goto-help { margin-top: 8px; color: var(--cream-muted); font-size: var(--fsc-11); }
+    /* BELOW THE TOPBAR AND UNDER IT, because it was over the one control that
+       gets a reader off this screen. At z-index 20 and top:14px the note is
+       ~292px wide on a 320px frame and covered the Back button outright: a
+       sweep of the button's own 44x44 box found 4 reachable points out of 121,
+       all in its leftmost column. The note is a SIBLING of .sw-root, which has
+       no z-index of its own, so 3 really does paint under the topbar's 4 — and
+       the rotated case cannot arise, because `orientationHint` is only ever set
+       by showPortraitFallback(), which clears `rotated` in the same breath.
+
+       `top` is the note's own measured position when the ResizeObserver has
+       reported the topbar's box, and the topbar's FLOOR before that — never a
+       constant, because a constant is what went stale in .sw-credit. */
     .sw-orientation-note {
-      position: fixed; z-index: 20; left: 50%; top: 14px; transform: translateX(-50%);
+      position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+      top: calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 10px);
       display: flex; align-items: center; gap: 10px; max-width: calc(100% - 28px);
       padding: 9px 12px; background: var(--bg3); border: 1px solid var(--gold-border);
       border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,0.3);
