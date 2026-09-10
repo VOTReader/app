@@ -203,8 +203,23 @@ async function run(browser, { width, height, label, light }) {
     const want = EXPECT_SCREEN[id];
     if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
     if (['letters', 'listen', 'highlight', 'bible', 'journal', 'backup'].includes(id)) {
-      // The target may arrive a frame or two after the screen; give the ring a moment.
-      for (let i = 0; i < 20 && !(await facts()).ring; i++) await sleep(150);
+      /* Wait for the ring to EXIST and then to STOP MOVING, and the second half is not a
+         nicety. The overlay re-scrolls an off-screen target for up to RESCROLL_WINDOW_MS,
+         so a small control is settled on the frame its ring appears and a TALL one is not:
+         the highlight stop rings a 583 px paragraph, and read on its first frame the ring
+         sat at -5..562 of 800 while its settled position is 134..733. Measuring the first
+         frame reported "the ring is off screen" about a ring that was on its way to being
+         perfectly placed. Bounded at 4.5 s (past the 2.5 s window), and every assertion
+         below still runs on whatever this loop ends on -- a ring that never settles fails,
+         it does not wait forever. */
+      let ringSig = null;
+      for (let i = 0; i < 30; i++) {
+        const g = await facts();
+        const cur = g.ring ? `${Math.round(g.ring.t)}:${Math.round(g.ring.b)}` : null;
+        if (cur && cur === ringSig) break;
+        ringSig = cur;
+        await sleep(150);
+      }
       f = await facts();
       if (!f.ring || !f.target) fail(`${id}: no ring on the control (target ${f.target ? 'found' : 'missing'})`);
       else {
