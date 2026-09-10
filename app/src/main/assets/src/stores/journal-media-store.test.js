@@ -919,3 +919,130 @@ describe('JournalMediaStore connection lifecycle', () => {
     expect((await JournalMediaStore.get('after-clear')).type).toBe('audio');
   });
 });
+
+/* journal-media-lru-claim (2026-09-10) — RED FIRST.
+   ───────────────────────────────────────────────
+   THE DEFECT. `_cacheUrl` evicts the oldest entry unconditionally once the cache
+   passes URL_CACHE_MAX = 24, and the header above it promised that was invisible
+   because "objectUrl() transparently re-creates a URL on a later miss". THERE IS
+   NO LATER MISS. The only two consumers are JournalImageBlock and JournalAudioBlock,
+   both through useMediaUrl, which resolves ONCE per mediaId and keeps the string in
+   React state. So the 25th resolution revokes the 1st block's URL while that block
+   is still mounted: <img> goes blank, <audio> does nothing when tapped, and `missing`
+   is derived from the RECORD, so the block reports missing:false and paints a healthy
+   control over a dead source. It reads as data loss when the bytes are fine.
+
+   WHY NOT NOTIFY. The epoch this branch also carries deliberately does NOT bump on
+   this eviction, and its comment says why: the eviction happens inside the objectUrl()
+   call a block just made. Even the refined form — announce only the evicted id — is an
+   infinite loop, not a fix: 25 blocks against a cap of 24 means block 1 re-resolves,
+   evicting block 2, which re-resolves, evicting block 3, forever. A silent blank image
+   would become a thrash loop, which is worse. The gap is not in the notification, it is
+   in the cap: the cache is smaller than the set of URLs simultaneously in use.
+
+   WHY THE CLAIM IS RIGHT AND NOT MERELY SAFE. Revoking a URL a mounted <img> is
+   already displaying FREES NOTHING — the decoded image holds the bytes whatever the
+   URL's validity. So the eviction that breaks the block was not achieving its purpose
+   either. Skipping held entries costs no heap; the old behaviour lost on both counts.
+   The cap keeps its whole value for the case it was written for: UNMOUNTED blocks from
+   entries browsed past, which is where the unbounded leak actually was.
+
+   These four cases are the store half. The half that carries the row — that useMediaUrl
+   actually TAKES a hold and RELEASES it on unmount — is in
+   JournalViewerScreen.mediaclaim.test.jsx, because a store case proves the store honours
+   a hold and says nothing about whether anything takes one. */
+describe('JournalMediaStore — the LRU cap never evicts a URL a mounted block still holds', () => {
+  /** Every URL passed to revokeObjectURL, in order. Installed per case. */
+  let revoked = [];
+  let mint = 0;
+  let origCreate;
+  let origRevoke;
+
+  /** Empty the store AND the cache, then install counting URL stubs. */
+  async function seed(prefix, n) {
+    const already = await JournalMediaStore.allIds();
+    await Promise.all(already.map((id) => JournalMediaStore.delete(id)));
+    JournalMediaStore.releaseObjectUrls();
+    origCreate = URL.createObjectURL;
+    origRevoke = URL.revokeObjectURL;
+    mint = 0;
+    revoked = [];
+    URL.createObjectURL = () => 'blob:claim-' + (++mint);
+    URL.revokeObjectURL = (u) => { revoked.push(u); };
+    for (let i = 0; i < n; i++) {
+      await JournalMediaStore.put({ id: prefix + i, type: 'image', blob: new Blob([new Uint8Array([i & 255])]) });
+    }
+    // put() caches a URL of its own; drop those so each case measures only what it resolves.
+    JournalMediaStore.releaseObjectUrls();
+    revoked = [];
+  }
+
+  afterEach(() => {
+    if (origCreate) URL.createObjectURL = origCreate;
+    if (origRevoke) URL.revokeObjectURL = origRevoke;
+    origCreate = null;
+    origRevoke = null;
+  });
+
+  it('25 held ids: not one URL a holder is displaying is revoked, and the cache is allowed to exceed the cap', async () => {
+    await seed('hold', 25);
+    const urls = [];
+    for (let i = 0; i < 25; i++) urls.push(await JournalMediaStore.holdUrl('hold' + i));
+    // Precondition, not the assertion: 25 real, distinct URLs actually got minted. Without
+    // this the case below passes for a store that resolved null 25 times.
+    expect(urls.filter((u) => typeof u === 'string').length).toBe(25);
+    expect(new Set(urls).size).toBe(25);
+
+    expect(urls.filter((u) => revoked.includes(u))).toEqual([]);
+    // The cache HOLDING 25 past a cap of 24 is the correct outcome while all 25 are on
+    // screen — releaseObjectUrls reports the cache size, so this is the size assertion.
+    expect(JournalMediaStore.releaseObjectUrls()).toBe(25);
+  });
+
+  it('the cap still evicts what nothing holds — the case that fails if the fix degenerates into disabling the LRU', async () => {
+    // Deliberately a DIFFERENT matcher from the case above: that one asserts a filtered
+    // set is empty, this one names the exact URL that must appear and the exact count.
+    // A fix that simply never evicts satisfies the first perfectly and fails this.
+    await seed('free', 25);
+    const urls = [];
+    for (let i = 0; i < 25; i++) urls.push(await JournalMediaStore.objectUrl('free' + i));
+    expect(revoked).toEqual([urls[0]]);
+    expect(JournalMediaStore.releaseObjectUrls()).toBe(24);
+  });
+
+  it('a hold released is evictable again — otherwise the cap is dead after the first busy entry', async () => {
+    await seed('rel', 25);
+    const held = [];
+    for (let i = 0; i < 24; i++) held.push(await JournalMediaStore.holdUrl('rel' + i));
+    expect(revoked).toEqual([]);            // nothing over the cap yet
+    JournalMediaStore.unholdUrl('rel0');
+    await JournalMediaStore.holdUrl('rel24');
+    expect(revoked).toEqual([held[0]]);     // exactly the one that let go
+    expect(revoked).not.toContain(held[1]);
+  });
+
+  it('two holds on one id: the first unmount does not expose the URL the second is still showing', async () => {
+    // An imported entry can reference one media id from two blocks. A Set-shaped claim
+    // passes every case above and fails this one, which is why it is written.
+    await seed('dup', 25);
+    const shared = await JournalMediaStore.holdUrl('dup0');
+    const sharedAgain = await JournalMediaStore.holdUrl('dup0');
+    expect(sharedAgain).toBe(shared);
+    for (let i = 1; i < 24; i++) await JournalMediaStore.holdUrl('dup' + i);
+    JournalMediaStore.unholdUrl('dup0');   // one of the two blocks unmounts
+    await JournalMediaStore.holdUrl('dup24');
+    expect(revoked).not.toContain(shared);
+  });
+
+  it('CONTROL, not built for this fix: a hold does not silence delete() or the trim purge', async () => {
+    // The claim guards the CAP. A genuine revocation must stay loud, or the fix trades a
+    // blank image for a URL that outlives its record.
+    await seed('ctl', 2);
+    const u1 = await JournalMediaStore.holdUrl('ctl0');
+    const u2 = await JournalMediaStore.holdUrl('ctl1');
+    await JournalMediaStore.delete('ctl0');
+    expect(revoked).toContain(u1);
+    expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
+    expect(revoked).toContain(u2);
+  });
+});
