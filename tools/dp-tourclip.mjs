@@ -174,6 +174,7 @@ try {
         rowTop: rowR.top, rowHeight: rowR.height,
         lowest, lineCount: lines.length,
         affordance: { klass: card.classList.contains('has-more'), chevron: moreShown, fade: fadeShown },
+        barTop: (() => { const b = document.querySelector('.audio-bar'); return b ? b.getBoundingClientRect().top : null; })(),
         coveredLines: covered.map((l) => ({ text: l.text, bottom: Math.round(l.bottom), over: Math.round(l.bottom - rowR.top) })),
       };
       function cardR(el) { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; }
@@ -236,6 +237,33 @@ try {
       else ok(`${tag}: fits, ${Math.round(gap)} px clear of the button row (end ${endGap === null ? 'n/a' : Math.round(endGap)} px)`);
     } else if (endGap === null || endGap < MIN_GAP) fail(`${tag}: the card scrolls and even at its end the last line is ${endGap === null ? 'unmeasured' : Math.round(endGap) + ' px'} from the button row top, under the ${MIN_GAP} px floor`);
     else ok(`${tag}: scrolls (first view ${Math.round(gap)} px, ${Math.round(m.scroll.height - m.scroll.client)} px below the fold), the end is reachable and ${Math.round(endGap)} px clear`);
+
+    /* (c) A SCROLLING CARD IS ONLY ACCEPTABLE WHEN IT COULD NOT HAVE GROWN, and until this arm
+       existed the probe could not tell those apart: every assertion above is about the
+       affordance being honest and the end being reachable, both of which a card that scrolled
+       for no reason satisfies perfectly. That is the gap that let the 36 % height cap ship a
+       card scrolling under its own button row at 320x640 — the words needed 270 px and the cap
+       gave 230, with 390 px of room standing unused.
+
+       THE ROOM is the rule the tour stack landed: the card may take what its content needs, and
+       never past the line that keeps DOCK_OPEN_FRAC (55 %) of the screen open above it — less
+       when the player bar is up. So room = vh - dockBottom - 0.55*vh, the same arithmetic
+       TourOverlay does. Growth available and not taken is a FAULT; room 390 against card 343 is
+       47 px left on the table (RED), 276 against 276 is a card that took everything there was
+       (green). Docked cards only: a card placed beside a ring is capped by the ring, not by
+       this rule, and it says so rather than passing silently. */
+    if (overflows && m.docked) {
+      const CARD_EDGE = 12, DOCK_OPEN_FRAC = 0.55, SLACK = 4;
+      const dockBottom = CARD_EDGE + (m.barTop != null && m.barTop > 0 && m.barTop < m.vh ? m.vh - m.barTop : 0);
+      const room = Math.floor(m.vh - dockBottom - m.vh * DOCK_OPEN_FRAC);
+      const took = Math.round(m.card.height);
+      const spare = room - took;
+      console.log(`  growth: room ${room} px, card ${took} px, bar ${m.barTop == null ? 'none' : Math.round(m.barTop)}`);
+      if (spare > SLACK) fail(`${tag}: the card scrolls with ${spare} px of room it did not take (room ${room}, card ${took}) — the reader is scrolling for nothing`);
+      else ok(`${tag}: it scrolls because it must — room ${room} px, card ${took} px, nothing left on the table`);
+    } else if (overflows && !m.docked) {
+      console.log(`  growth: not checked — this card is placed beside its ring, so the ring caps it, not the open-space rule`);
+    }
     await ctx.close();
   }
 } finally {
