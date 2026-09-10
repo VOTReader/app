@@ -76,7 +76,7 @@ describe('TourOverlay — dialog', () => {
     startAt('listen');
     const r = render(<TourOverlay />);
     expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
-    expect(screen.getByText(/2 of 6/)).toBeTruthy();
+    expect(screen.getByText(/2 of 7/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /previous stop/i }));
     expect(TourController.getState().step.id).toBe('letters');
     r.unmount();
@@ -264,7 +264,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     expect(screen.getByText(/light up/i)).toBeTruthy();
     expect(screen.queryByText(/press Next and I will do it/i)).toBeNull();
     fireEvent.click(screen.getByText('Next'));
-    expect(TourController.getState().step.id).toBe('bible');
+    expect(TourController.getState().step.id).toBe('highlight');
   });
 });
 
@@ -470,6 +470,13 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(92);
     fireEvent.click(pill);
     document.querySelector('.audio-bar').remove();                      // the tour stopped the playback
+    /* The next DOCKED stop is now two on, because the highlight stop sits between them and is
+       placed beside its ring like any other. It is walked through rather than skipped to: the bar
+       being gone has to survive the stop in between, which is the whole of what this case is about.
+       This fixture's paragraph carries no .letter-para, so the demonstration finds nothing to paint
+       and this case stays about the card's geometry. */
+    await act(async () => { TourController.next(); });                   // → highlight
+    await act(async () => { TourController.next(); });                   // shows the demonstration, stays
     await act(async () => { TourController.next(); });                   // → bible, on the same DOM
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(TourController.getState().step.id).toBe('bible');
@@ -614,5 +621,78 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     expect(TourController.getState().active).toBe(false);
     expect(annCount()).toBe(before);
     expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+  });
+});
+
+/* The three exits the block above does not reach, and one arm that is about the SIGNAL rather
+   than about the paint. Kept separate because each is a different mechanism: the registry's
+   dismiss (Escape and Android Back share it), React unmounting the overlay under a live paint,
+   and the difference between a selection bar that APPEARS and one that was already up. */
+describe('TourOverlay — the demonstration leaves by every door', () => {
+  const letterWithParas = () => {
+    document.body.innerHTML = '<div id="app"><main class="letter-body">'
+      + '<p class="letter-para" id="on">Thus says The Lord: I AM calling out to My people.</p>'
+      + '</main></div>';
+    const on = /** @type {HTMLElement} */ (document.querySelector('#on'));
+    on.getBoundingClientRect = rect(24, 120, 312, 96);
+    return on;
+  };
+  const annCount = () => Object.values(AnnotationStore.all() || {}).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
+
+  /* Escape and Android Back are the SAME exit — one dispatcher, use-android-back, reached through
+     useModalRegistry — so the registry's dismiss is the faithful way to drive both. Driving a
+     keydown here would test jsdom's key handling and leave the Android path unwitnessed. */
+  it("the registry's dismiss (Escape, and Android Back) takes the colour with it", () => {
+    const on = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    act(() => { modalRegistry.peek().dismiss(); });
+    expect(TourController.getState().active).toBe(false);
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+    expect(annCount()).toBe(before);
+  });
+
+  /* The screen changing under a live paint. goTo and end cannot see this one — the tour has not
+     moved and has not ended — so the overlay's own effect cleanup is what clears it. */
+  it('the overlay unmounting under a live demonstration clears it', () => {
+    const on = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    const r = render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    r.unmount();
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+    expect(annCount()).toBe(before);
+  });
+
+  /* THE SIGNAL IS AN EDGE, AND A LEVEL CHECK WOULD PASS EVERY OTHER CASE HERE. A selection the
+     reader left up before this stop — from the Listen stop, or from before the tour — is not
+     them doing the thing being taught, and advancing on it would skip the stop on its first
+     frame with nothing shown. The bar must go from absent to present. */
+  it('a selection bar already up when the stop opens does not advance it', async () => {
+    letterWithParas();
+    document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(TourController.getState().step.id).toBe('highlight');
+    expect(TourController.getState().pressed).toBe(false);
+    expect(screen.getByText(/Try it now/i)).toBeTruthy();
+    // And it still answers the real gesture: the bar goes down, then comes back up.
+    await act(async () => {
+      document.querySelector('.sel-toolbar').remove();
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    await act(async () => {
+      document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    expect(TourController.getState().pressed).toBe(true);
   });
 });

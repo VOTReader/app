@@ -124,6 +124,12 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     // it is "no bar", or the bar the previous stop's playback raised would dock this stop's card
     // 70 px too high (e2e-tour, the Bible stop after Listen, 2026-09-04).
     let last = null, lastBar;
+    /* THE READER'S OWN LONG PRESS, on the highlight stop. A long press does not raise a click, so
+       the target listener below cannot see it; the real selection bar appearing is the signal. It
+       is read as an EDGE and never as a level: a bar left up from before the stop (a selection the
+       reader made on the Listen stop, say) would otherwise advance this stop on its first frame
+       with nothing taught. `selUp` starts null so the entry frame can only RECORD, never fire. */
+    let selUp = null;
     const docked = !!(step && step.act === 'press');
     const detach = () => {
       const t = targetRef.current;
@@ -137,6 +143,12 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       const bar = document.querySelector('.audio-bar');
       const bt = bar ? bar.getBoundingClientRect().top : null;
       if (bt !== lastBar) { lastBar = bt; setBarTop(bt); }
+      if (step && step.act === 'highlightDemo') {
+        const up = !!document.querySelector('.sel-toolbar');
+        // getState(), not the `st` this effect closed over: `pressed` moves without re-running it.
+        if (selUp === false && up && ctl && !ctl.getState().pressed) ctl.targetPressed();
+        selUp = up;
+      }
       if (el !== targetRef.current) {
         detach();
         if (el) { targetRef.current = el; el.addEventListener('click', onTargetClick); el.setAttribute('aria-describedby', descId); }
@@ -177,7 +189,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       raf = requestAnimationFrame(tick);
     };
     tick();
-    return () => { stopped = true; cancelAnimationFrame(raf); detach(); };
+    /* The demonstration's colour goes when the stop does. goTo and end clear it already; this is
+       the path they cannot see — the SCREEN changing under a stop, and the overlay unmounting. */
+    return () => { stopped = true; cancelAnimationFrame(raf); detach(); if (ctl) ctl.clearHighlightDemo(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, st.ready, st.index, waitMs]);
 
