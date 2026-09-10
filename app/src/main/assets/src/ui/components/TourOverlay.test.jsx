@@ -531,6 +531,27 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
   /** Every annotation segment in the store, flattened — the unit the "nothing was written" claim is about. */
   const annCount = () => Object.values(AnnotationStore.all() || {}).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
 
+  /* IT DOCKS, for the Listen stops' reason and for a second one of its own. The rule is that while
+     the tour is showing something ON the text, nothing sits over the text — which is what this stop
+     does. And the geometry insists: a letter paragraph measures 551–583 px on a 360x800 phone whose
+     reading column starts at 67, so a card placed BESIDE that ring has nowhere to go (measured in
+     the browser: ring at -5..562 with the card over its lower half). Docked, the paragraph has the
+     room above the card. */
+  it('the card docks, the way it does on the stops that show something on the text', () => {
+    letterWithParas();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(true);
+    expect(card.style.top).toBe('');
+    expect(parseFloat(card.style.bottom)).toBe(12);
+    // Before the demonstration the paragraph is still ringed; the ring goes once the colour is on.
+    expect(document.querySelector('.tour-ring')).toBeTruthy();
+    fireEvent.click(screen.getByText('Next'));
+    expect(document.querySelector('.tour-ring')).toBeNull();
+    expect(document.querySelectorAll('.tour-dim').length).toBe(4);
+  });
+
   it('Next paints the ringed paragraph, says what to look for, and stays on the stop', () => {
     const { off, on } = letterWithParas();
     const before = annCount();

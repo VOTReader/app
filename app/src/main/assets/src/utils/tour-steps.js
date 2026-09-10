@@ -91,7 +91,9 @@ export const TOUR_STEPS = Object.freeze([
      screen the Listen stop already opened (same `screen`, same `enter`, so no navigation is
      added) and rings a PARAGRAPH rather than a control, because here the text is the thing
      being taught. `highlightDemo` paints the real highlight's colour on that paragraph and
-     writes NOTHING: see tour-controller.js, where the paint and its removal live. */
+     writes NOTHING: see tour-controller.js, where the paint and its removal live. Its card DOCKS
+     like the Listen stops' — same rule (nothing sits over text the tour is showing something on)
+     and the geometry insists too, a letter paragraph being most of a phone screen. */
   {
     id: 'highlight', number: 3, screen: 'vot-one-letter', enter: 'openLetter',
     target: { selector: '.letter-para' }, act: 'highlightDemo',
