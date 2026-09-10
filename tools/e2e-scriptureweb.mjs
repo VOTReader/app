@@ -496,24 +496,39 @@ async function walk(page, url, frame, scale) {
     return;
   }
 
-  // Settled: painted, not loading, publishing a ppv.
+  /* Settled means PAINTED AND NOT LOADING, and deliberately not "publishing a
+     ppv". ARM 2 OWES ARM 1 NOTHING: the chrome geometry is the same question on
+     a tree that has never heard of the density law, and an earlier draft of
+     this walk returned on the missing publisher and took arm 2 down with it —
+     so a tree without the publisher reported four 1a failures and NOTHING about
+     the chrome, which is how one arm's precondition silently switches off an
+     independent one. */
   try {
     await page.waitForFunction(() => {
       const el = document.querySelector('.sw-root');
-      return !!el && !document.querySelector('.sw-loading') && el.getAttribute('data-ppv-css') !== null;
+      return !!el && !document.querySelector('.sw-loading');
     }, { timeout: SETTLE_MS, polling: 100 });
   } catch (_e) {
-    const s = await state(page);
-    if (s.ppvRaw === null) {
-      fails.push(`${tag} 1a the screen does not publish data-ppv-css on .sw-root. The auto-switch's own input is then `
-        + 'unobservable and its law is unmeasurable from a browser — that is a defect in the instrument\'s contract, not a skip.');
-    } else {
-      fails.push(`${tag} 1a the web never settled within ${SETTLE_MS} ms: ${JSON.stringify(s)}`);
-    }
+    fails.push(`${tag} the web never settled within ${SETTLE_MS} ms: ${JSON.stringify(await state(page))}`);
     return;
   }
 
+  /* ARM 2 FIRST, and before any gesture: a drag that ends in a tap would open a
+     sheet, and arm 2 is about the chrome a reader meets on arrival. */
+  const geo = await page.evaluate(readGeometry, CHROME);
+  if (String(geo.fontScale || '1') !== String(scale)) {
+    fails.push(`${tag} the text scale did not take: --font-scale reads ${JSON.stringify(geo.fontScale)} and root font-size ${geo.rootFontPx}, wanted ${scale}. Arm 2 would be measuring the wrong frame.`);
+  }
+  notes.push(`${tag} 2 --font-scale ${geo.fontScale || '1'} root ${geo.rootFontPx} viewport ${geo.innerWidth}x${geo.innerHeight}`);
+  armChrome(tag, geo);
+
   const start = await state(page);
+  if (start.ppvRaw === null) {
+    fails.push(`${tag} 1a the screen does not publish data-ppv-css on .sw-root. The auto-switch's own input is then `
+      + 'unobservable and its law is unmeasurable from a browser — that is a defect in the instrument\'s contract, not a skip.');
+    notes.push(`${tag} arms 1 and 3 did not run (no ppv publisher, so the zoom ladder has nothing to step on); arm 2 above DID run`);
+    return;
+  }
   if (start.density === null) {
     fails.push(`${tag} 1a the canvas is up but there is no density control (select[aria-label="Connection density"])`);
     return;
@@ -527,15 +542,6 @@ async function walk(page, url, frame, scale) {
   const rise = await zoomArc(page, +1, (s) => s.ppv >= DENSITY_ENTER_PPV_CSS);
   const atCeiling = await zoomArc(page, +1, () => false);          // run to the stop for arm 3
   const top = atCeiling[atCeiling.length - 1];
-
-  /* Geometry BEFORE the pan: a drag that ends in a tap would open a sheet, and
-     arm 2 is about the chrome a reader meets on arrival, not after a gesture. */
-  const geo = await page.evaluate(readGeometry, CHROME);
-  if (String(geo.fontScale || '1') !== String(scale)) {
-    fails.push(`${tag} the text scale did not take: --font-scale reads ${JSON.stringify(geo.fontScale)} and root font-size ${geo.rootFontPx}, wanted ${scale}. Arm 2 would be measuring the wrong frame.`);
-  }
-  notes.push(`${tag} 2 --font-scale ${geo.fontScale || '1'} root ${geo.rootFontPx} viewport ${geo.innerWidth}x${geo.innerHeight}`);
-  armChrome(tag, geo);
 
   const ft = await frameTime(page, PAN_MS).catch((e) => ({ err: e.message }));
   if (ft && ft.err) notes.push(`${tag} 3 frame time UNMEASURED (${ft.err})`);
