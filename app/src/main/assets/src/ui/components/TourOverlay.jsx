@@ -51,9 +51,15 @@ const CARD_GAP = 18;
    the button row stuck to its bottom edge (app.css .tour-row). The ringed control stays visible and
    tappable; below this floor the card wins and covers the ring's far edge instead. */
 const CARD_MIN_H = 160;
-/* LISTEN STOPS DOCK. While the tour is showing a highlight, the highlight is the brightest thing on
-   the screen and nothing sits over the text (Corbin, on his phone, 2026-09-04: the lit sentence was
-   under the card and under the dim). So a press stop's card sits on the bottom edge, above the player
+/* THE STOPS THAT SHOW SOMETHING ON THE TEXT DOCK. While the tour is showing a highlight, the
+   highlight is the brightest thing on the screen and nothing sits over the text (Corbin, on his
+   phone, 2026-09-04: the lit sentence was under the card and under the dim). That is the Listen
+   stops' read-along wash and, since 2026-09-10, the highlight stop's demonstration: the same rule,
+   the same reason, and the geometry insists on it as well. A letter paragraph is 583 px on a 360x800
+   phone and the reading column's scroller starts at 67, so a card placed BESIDE that ring has
+   nowhere to go — measured: ring at -5..562 with the card over its lower half. Docked, the card is
+   on the bottom edge and the paragraph has the room above it.
+   So such a stop's card sits on the bottom edge, above the player
    bar when it is up, never beside the ring; and once Listen has been pressed the dim panes leave the
    reading column open from the top of its scroller down to the card, with no ring: the words are the
    ring. The card takes at most DOCK_MAX_FRAC of the screen, and less when the player bar is up, so
@@ -130,7 +136,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
        reader made on the Listen stop, say) would otherwise advance this stop on its first frame
        with nothing taught. `selUp` starts null so the entry frame can only RECORD, never fire. */
     let selUp = null;
-    const docked = !!(step && step.act === 'press');
+    const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo'));
     const detach = () => {
       const t = targetRef.current;
       if (t) { t.removeEventListener('click', onTargetClick); if (t.getAttribute('aria-describedby') === descId) t.removeAttribute('aria-describedby'); }
@@ -252,7 +258,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
   const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
   const top0 = ringOn && targetRef.current ? _scrollerTop(targetRef.current) : 0;
-  const docked = !!(step && step.act === 'press');
+  const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo'));
   dockPadRef.current = 0;
   const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
   /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_FRAC is the rule. A fraction of the screen is the

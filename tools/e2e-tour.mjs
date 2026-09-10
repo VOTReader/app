@@ -224,15 +224,22 @@ async function run(browser, { width, height, label, light }) {
       if (!f.ring || !f.target) fail(`${id}: no ring on the control (target ${f.target ? 'found' : 'missing'})`);
       else {
         const pad = 8;
+        /* A TEXT TARGET IS NOT A CONTROL, and two of the assertions here are about controls.
+           The highlight stop rings a PARAGRAPH — 551 to 583 px of a 360x800 phone, measured —
+           and the reading column's scroller starts at 67, so "the whole ring is on screen with
+           the card clear of it" is arithmetically impossible and says nothing about whether the
+           stop works. What matters for a paragraph is that the reader can SEE the colour and
+           reach the text to long-press it, which is asserted below instead — not skipped. */
+        const textTarget = id === 'highlight';
         if (!(f.ring.l <= f.target.l - pad + 1 && f.ring.t <= f.target.t - pad + 1 && f.ring.r >= f.target.r + pad - 1 && f.ring.b >= f.target.b + pad - 1)) fail(`${id}: the ring does not wrap the control`);
         // The card never covers the control: at a large text size it is capped to the room beside the
         // ring and scrolls inside itself (device run 2026-09-04). The one exception is a ring so tall
         // that not even the card's 160 px floor fits beside it; then the card wins.
         const roomForFloor = f.target.b - f.target.t + 16 + 160 + 60 <= f.vh;
-        if (f.card && roomForFloor && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
+        if (f.card && roomForFloor && !textTarget && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
         // Listen stops dock: the card sits on the bottom edge (above the player bar when it is up),
         // never beside the ring, so the text column above it is the reader's (Corbin's walk, 2026-09-04).
-        if (id === 'listen' || id === 'bible') {
+        if (id === 'listen' || id === 'bible' || id === 'highlight') {
           if (!f.docked) fail(`${id}: the card is not docked`);
           const floor = f.bar ? f.bar.t : f.vh;
           if (f.card && Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
@@ -242,8 +249,20 @@ async function run(browser, { width, height, label, light }) {
           // button row covered the last sentence (2026-09-06). The card may now take what it needs up
           // to this line, and this is the line.
           if (f.card && f.card.t < Math.floor(f.vh * 0.55) - 1) fail(`${id}: the docked card leaves only ${Math.round(f.card.t)} px of ${f.vh} open above it, under 55 %`);
-        } else if (f.docked) fail(`${id}: docked, but it is not a Listen stop`);
-        if (f.ring.t < 0 || f.ring.b > f.vh + 1) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
+        } else if (f.docked) fail(`${id}: docked, but it is not a stop that shows something on the text`);
+        if (!textTarget && (f.ring.t < 0 || f.ring.b > f.vh + 1)) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
+        if (textTarget) {
+          /* What a paragraph target owes the reader, in place of the two control assertions:
+             a band of it visible between the top of the reading column and the docked card,
+             big enough to see a colour on and to put a finger on. 120 px is about three lines
+             at 1x and one at 1.8x. Reported with its numbers either way, so a green here is a
+             measurement and not an absence. */
+          const openTop = Math.max(f.target.t, f.scrollerTop);
+          const openBot = Math.min(f.target.b, f.card ? f.card.t : f.vh);
+          const band = Math.round(openBot - openTop);
+          if (band < 120) fail(`${id}: only ${band} px of the paragraph is between the column top (${Math.round(f.scrollerTop)}) and the card (${Math.round(f.card ? f.card.t : f.vh)}) — the reader cannot see or reach it`);
+          else ok(`${id}: ${band} px of the paragraph is open between the column top and the card (paragraph ${Math.round(f.target.b - f.target.t)} px)`);
+        }
         if (!f.described) fail(`${id}: the control is not described by the card`);
         if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);
         ok(`${id}: ringed on ${f.title}`);
@@ -296,6 +315,15 @@ async function run(browser, { width, height, label, light }) {
       else ok('highlight: one paragraph on screen wears the real highlight, and the card names it');
       if (f.annCount !== annBefore) fail(`highlight: the demonstration wrote to the annotation store (${annBefore} \u2192 ${f.annCount})`);
       if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail('highlight: the card is off screen after the demonstration');
+      // Once the colour is on, the paragraph is the ring: the gold ring goes and the dims leave
+      // the reading column open, so the thing the reader was told to look at is the brightest
+      // thing on the screen. Same contract as a pressed Listen stop, same reason.
+      if (f.ring) fail('highlight: a ring is still drawn after the demonstration');
+      if (f.dims !== 4) fail(`highlight: ${f.dims} dim panes after the demonstration, expected 4`);
+      if (f.card) {
+        const covered = f.dimBoxes.filter((d) => d.w > 0 && d.h > 0 && d.t < f.card.t - 1 && d.b > f.scrollerTop + 1);
+        if (covered.length) fail(`highlight: a dim pane covers the reading column between ${Math.round(f.scrollerTop)} and the card at ${Math.round(f.card.t)}`);
+      }
       await shot(`${STOPS.indexOf(id)}-${id}-painted`);
     }
     if (id === 'listen') {
@@ -378,6 +406,10 @@ async function run(browser, { width, height, label, light }) {
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-gpu'] });
 try {
   const errs = [];
+  // 320x640 first: every tour defect anyone has measured came from that frame, and neither the
+  // 36 % cap nor the 55 % floor binds at 800 tall, so a two-viewport run could not see the rule
+  // it was judging (the Verifier, 2026-09-10).
+  errs.push(...await run(browser, { width: 320, height: 640, label: 'small-phone' }));
   errs.push(...await run(browser, { width: 360, height: 800, label: 'phone' }));
   errs.push(...await run(browser, { width: 800, height: 1280, label: 'tablet', light: true }));
   const real = errs.filter((e) => !/ERR_FAILED|Failed to load resource|404|net::/.test(e));
