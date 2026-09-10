@@ -136,6 +136,8 @@ void main(){
   // The law lives in geometry.js, inlined above, because pick.js applies the
   // same test \u2014 an arc faded to nothing here must not win a tap there.
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
+  // zero-alpha cull: why, and why exactly zero, above this shader
+  if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
   vec3 col;
   if (uColorMode < .5) {
