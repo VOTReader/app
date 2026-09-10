@@ -446,6 +446,22 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       const zoomLabel = zoom < 1.1 ? 'Overview' : (zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom) + 'x');
       zoomRef.current.textContent = zoomLabel;
     }
+    /* THE AUTO-SWITCH'S OWN INPUT, PUBLISHED, and it is the difference between a browser
+       gate that asserts the law and one that asserts a proxy for it.
+
+       `autoDensity` switches on CSS px per verse. The DOM published the density (the
+       select's value) and the ZOOM MULTIPLE (.sw-context-zoom) and nothing else, so an
+       out-of-process probe could see the answer and not the question: it could drive the
+       zoom buttons until the density flipped, but it could not assert that a frame sitting
+       BETWEEN the two thresholds stays put — which is the whole of the hysteresis, and the
+       only arm a threshold-shaped regression would break. Deriving ppv from zoom instead
+       means re-typing fitPPV outside the screen, and a probe that re-types the law measures
+       its own copy of it: the comment on ribbonStyle above says exactly this, and it is why
+       that function lives in geometry.js rather than in draw().
+
+       Read-only, one attribute, no behaviour attached. It is the ANSWER to the same
+       question .sw-context-zoom answers for humans, in the currency the law actually uses. */
+    if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', String(Math.round((cam.ppv / v.DPR) * 100) / 100));
     if (zoomInRef.current) {
       // aria-disabled, not disabled: the control keeps its name and stays
       // focusable, so a reader who lands on it is told why it does nothing.
