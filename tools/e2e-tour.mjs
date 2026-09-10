@@ -60,8 +60,8 @@ const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
 const ok = (m) => console.log('  ok  ' + m);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const STOPS = ['welcome', 'letters', 'listen', 'bible', 'journal', 'backup', 'done'];
-const EXPECT_SCREEN = { letters: 'home', listen: 'vot-one-letter', bible: 'bible-ch', journal: 'journal-home', backup: 'settings' };
+const STOPS = ['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'done'];
+const EXPECT_SCREEN = { letters: 'home', listen: 'vot-one-letter', highlight: 'vot-one-letter', bible: 'bible-ch', journal: 'journal-home', backup: 'settings' };
 
 async function run(browser, { width, height, label, light }) {
   console.log(`\n== ${label} ${width}x${height} ${light ? 'light' : 'dark'}`);
@@ -115,6 +115,21 @@ async function run(browser, { width, height, label, light }) {
       overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
       tourDone: !!(window.TourDoneFlagStore && window.TourDoneFlagStore.is()),
       pressed: !!(st && st.pressed),
+      // THE DEMONSTRATION. `demo` is every element wearing the marker; `demoOn` is the subset
+      // that also carries the real highlight's wash AND is on screen, so "it painted" cannot be
+      // satisfied by a class on the pager's parked copy of the page.
+      demo: document.querySelectorAll('.tour-hl-demo').length,
+      demoOn: [...document.querySelectorAll('.letter-para.tour-hl-demo.hl-mark')].filter((p) => {
+        const r = p.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.right > 0 && r.left < window.innerWidth;
+      }).length,
+      // Segments in the annotation store. The tour must not add one, at any exit.
+      annCount: (() => {
+        try {
+          const all = window.AnnotationStore && window.AnnotationStore.all ? window.AnnotationStore.all() : null;
+          return all ? Object.values(all).reduce((n, a) => n + (a ? a.length : 0), 0) : -1;
+        } catch (_e) { return -1; }
+      })(),
       text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
       vh: window.innerHeight,
     };
@@ -187,7 +202,7 @@ async function run(browser, { width, height, label, light }) {
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
     const want = EXPECT_SCREEN[id];
     if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
-    if (['letters', 'listen', 'bible', 'journal', 'backup'].includes(id)) {
+    if (['letters', 'listen', 'highlight', 'bible', 'journal', 'backup'].includes(id)) {
       // The target may arrive a frame or two after the screen; give the ring a moment.
       for (let i = 0; i < 20 && !(await facts()).ring; i++) await sleep(150);
       f = await facts();
@@ -249,15 +264,45 @@ async function run(browser, { width, height, label, light }) {
       }
       await shot(`${STOPS.indexOf(id)}-${id}-pressed`);
     }
+    if (id === 'highlight') {
+      /* THE DEMONSTRATION, and the whole of what makes it safe. Next paints the real
+         highlight's colour on the ringed paragraph and the tour STAYS, the same shape as a
+         Listen press. Exactly one paragraph wears it and that one is on screen: a count of one
+         is what separates "it painted the paragraph the reader is looking at" from "it painted
+         every paragraph in the document", which every other assertion here would accept. */
+      const annBefore = (await facts()).annCount;
+      if (annBefore < 0) fail('highlight: the annotation store could not be read, so nothing below is evidence about it');
+      await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
+      await sleep(600);
+      f = await facts();
+      if (f.step !== id || !f.pressed) fail(`highlight: the tour did not stay after the demonstration (at ${f.step}, pressed ${f.pressed})`);
+      if (f.demoOn !== 1) fail(`highlight: ${f.demoOn} paragraphs carry the wash on screen, expected exactly 1 (marker total ${f.demo})`);
+      else if (!/See the colour/.test(f.text || '')) fail(`highlight: after the demonstration the card does not say what to look for ("${f.text}")`);
+      else ok('highlight: one paragraph on screen wears the real highlight, and the card names it');
+      if (f.annCount !== annBefore) fail(`highlight: the demonstration wrote to the annotation store (${annBefore} \u2192 ${f.annCount})`);
+      if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail('highlight: the card is off screen after the demonstration');
+      await shot(`${STOPS.indexOf(id)}-${id}-painted`);
+    }
     if (id === 'listen') {
       // Tab stays inside the card; the reader can press Next with the keyboard.
       await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
       if (!(await facts()).focusInside) fail('listen: Tab left the card');
     }
     await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
-    await sleep(id === 'letters' || id === 'listen' || id === 'bible' || id === 'journal' || id === 'backup' || id === 'welcome' ? 1400 : 400);
+    await sleep(id === 'letters' || id === 'listen' || id === 'highlight' || id === 'bible' || id === 'journal' || id === 'backup' || id === 'welcome' ? 1400 : 400);
+    if (id === 'highlight') {
+      // The colour goes with the stop. Asserted on the way out rather than at the end of the
+      // walk, because by then the letter screen is gone and its absence would prove nothing.
+      const g = await facts();
+      if (g.demo !== 0) fail(`highlight: ${g.demo} elements still carry the demonstration after moving on`);
+      else ok('highlight: the colour left with the stop');
+    }
   }
   f = await facts();
+  if (f.annCount > 0) fail(`the whole tour left ${f.annCount} annotation(s) in the store; a tour must teach highlighting without saving one`);
+  else if (f.annCount === 0) ok('the whole tour wrote not one annotation');
+  else fail('the annotation store could not be read at the end of the walk');
+  if (f.demo !== 0) fail(`${f.demo} elements still carry the demonstration after Done`);
   if (f.active) fail('the tour is still active after Done');
   if (!f.tourDone) fail('Done did not record the flag');
   if (f.prompt) fail('the strip came back after the tour');
@@ -274,6 +319,42 @@ async function run(browser, { width, height, label, light }) {
   await page.keyboard.press('Escape'); await sleep(300);
   f = await facts();
   if (f.active) fail('Escape did not skip the tour'); else ok('Escape means Skip');
+
+  /* LEAVING FROM THE DEMONSTRATION ITSELF. The walk above proves the tour that RUNS TO THE END
+     saves nothing; a reader who leaves while the colour is on the page is the other half, and
+     it is the half where an undo would have to run. Skip, not Escape, because Skip is the
+     button on the card and Escape is already covered above. */
+  await clickLabel('App Configuration'); await sleep(400);
+  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); });
+  await sleep(300);
+  await clickLabel('Show me around');
+  await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
+  {
+    let at = null;
+    // By id, never by a count: the stops that stay take two presses each.
+    for (let i = 0; i < 14; i++) {
+      at = (await facts()).step;
+      if (at === 'highlight') break;
+      await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
+      await sleep(1200);
+    }
+    if (at !== 'highlight') fail(`the Skip arm never reached the highlight stop (stopped at ${at})`);
+    else {
+      const before = (await facts()).annCount;
+      await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });   // paint
+      await sleep(600);
+      const painted = await facts();
+      if (painted.demoOn !== 1) fail(`the Skip arm did not paint anything to leave behind (demoOn ${painted.demoOn})`);
+      await page.evaluate(() => { const b = [...document.querySelectorAll('.tour-card button')].find((x) => /leave the tour/i.test(x.getAttribute('aria-label') || '')); b && b.click(); });
+      await sleep(500);
+      const after = await facts();
+      if (after.active) fail('Skip from the highlight stop did not end the tour');
+      if (after.demo !== 0) fail(`Skip from the highlight stop left ${after.demo} element(s) wearing the demonstration`);
+      if (after.annCount !== before) fail(`Skip from the highlight stop changed the annotation store (${before} \u2192 ${after.annCount})`);
+      if (!after.active && after.demo === 0 && after.annCount === before) ok('Skip from the demonstration: the colour goes, the store is untouched');
+    }
+  }
+
   await page.close();
   await context.close();
   return errors;

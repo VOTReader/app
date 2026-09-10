@@ -11,7 +11,11 @@
    'press' taps the ringed control for the reader AND STAYS on the stop with
    `after` as the card's words, so the reader sees what the press does (the
    words lighting up); the next Next moves on, and the tour stops the playback
-   it started. A nav key navigates; null just moves on. The reader may also tap the ringed control themselves — the
+   it started. 'highlightDemo' is the same shape for a stop that has no control
+   to press: it paints the real highlight's colour on the ringed paragraph and
+   stays, and the tour takes the colour back on every way out. A nav key
+   navigates; null just moves on. The reader may also do the thing themselves —
+   tap the ringed control, or raise the selection bar with a long press — and the
    overlay notices and moves on without acting twice.
 
    THE WORDS are the trailer's (Creative, 2026-09-04): "Press Listen", "The
@@ -26,6 +30,8 @@ export const TOUR_WORDS = Object.freeze([
   'The Volumes of Truth', 'The Scriptures of Truth', 'Press Listen',
   'The words light up as they are read', 'verse by verse', 'Journal', 'New Entry',
   'a backup', 'Export', 'Import', 'Your Data',
+  // The two words the real selection bar shows, so the reader recognises them under their finger.
+  'Highlight', 'Note',
 ]);
 
 /** Words an older reader should never have to decode. Matched whole, case-insensitive. */
@@ -34,11 +40,11 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
 /**
  * @typedef {Object} TourStep
  * @property {string} id
- * @property {number} number         0 for the welcome card, then 1..6
+ * @property {number} number         0 for the welcome card, then 1..7
  * @property {string} screen         the screen the stop lives on
  * @property {string|null} enter     nav key the tour calls to get there
  * @property {{selector:string,text?:string}|null} target  the control to ring
- * @property {'press'|string|null} act   what Next does before moving on
+ * @property {'press'|'highlightDemo'|string|null} act   what Next does before moving on
  * @property {string} eyebrow
  * @property {string} title
  * @property {string} text
@@ -58,13 +64,13 @@ export const TOUR_STEPS = Object.freeze([
     id: 'welcome', number: 0, screen: 'home', enter: 'goHome', target: null, act: null,
     eyebrow: 'Show me around',
     title: 'Welcome to VOTReader',
-    text: 'This is a short tour: six stops, about two minutes. You can leave at any time with Skip, and see it again from Settings.',
+    text: 'This is a short tour: seven stops, about two minutes. You can leave at any time with Skip, and see it again from Settings.',
     primary: 'Start',
   },
   {
     id: 'letters', number: 1, screen: 'home', enter: 'goHome',
     target: { selector: '.home-nav-item', text: 'The Volumes of Truth' }, act: 'openLetter',
-    eyebrow: '1 of 6 · The Letters',
+    eyebrow: '1 of 7 · The Letters',
     title: 'The Letters live here',
     text: 'Tap a Volume, then a letter. Tap this tile now, or press Next and I will open one for you.',
     primary: 'Next',
@@ -72,43 +78,62 @@ export const TOUR_STEPS = Object.freeze([
   {
     id: 'listen', number: 2, screen: 'vot-one-letter', enter: 'openLetter',
     target: { selector: '.hero-play-pill' }, act: 'press', seekKey: 'one:chosen-by-god',
-    eyebrow: '2 of 6 · Listen',
+    eyebrow: '2 of 7 · Listen',
     title: 'Hear it read aloud',
     text: 'Press Listen. The words light up as they are read, and the page follows along.',
     tip: 'Tap it now, or press Next and I will do it for you.',
     after: 'Hear it? The words light up as they are read, and the page follows along. Press Next when you are ready.',
     primary: 'Next',
   },
+  /* HIGHLIGHTING GETS A STOP (Corbin, 2026-09-10). It used to be a clause in the closing
+     card — "Hold on any text to highlight it or add a note" — which tells the reader a
+     feature exists at the moment the tour stops showing them anything. This rides the letter
+     screen the Listen stop already opened (same `screen`, same `enter`, so no navigation is
+     added) and rings a PARAGRAPH rather than a control, because here the text is the thing
+     being taught. `highlightDemo` paints the real highlight's colour on that paragraph and
+     writes NOTHING: see tour-controller.js, where the paint and its removal live. */
   {
-    id: 'bible', number: 3, screen: 'bible-ch', enter: 'openBible',
+    id: 'highlight', number: 3, screen: 'vot-one-letter', enter: 'openLetter',
+    target: { selector: '.letter-para' }, act: 'highlightDemo',
+    eyebrow: '3 of 7 · Highlight',
+    title: 'Mark what speaks to you',
+    text: 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note. Your highlights and notes collect in the Library.',
+    tip: 'Try it now, or press Next and I will show you.',
+    after: 'See the colour? Hold on any line to do this yourself, any time. Press Next when you are ready.',
+    primary: 'Next',
+  },
+  {
+    id: 'bible', number: 4, screen: 'bible-ch', enter: 'openBible',
     target: { selector: '.hero-play-pill' }, act: 'press',
-    eyebrow: '3 of 6 · The Scriptures',
+    eyebrow: '4 of 7 · The Scriptures',
     title: 'The Bible too, verse by verse',
     text: 'I opened John 3 for you: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen and the verses light up one by one as they are read.',
     after: 'Hear it? Each verse lights up as it is read. Press Next when you are ready.',
     primary: 'Next',
   },
   {
-    id: 'journal', number: 4, screen: 'journal-home', enter: 'goJournalHub',
+    id: 'journal', number: 5, screen: 'journal-home', enter: 'goJournalHub',
     target: { selector: '.jrn-fab-newentry' }, act: null,
-    eyebrow: '4 of 6 · Journal',
+    eyebrow: '5 of 7 · Journal',
     title: 'Keep your own notes in the Journal',
     text: 'Your Journal is in the Library. Tap New Entry to write one. It saves by itself as you write.',
     primary: 'Next',
   },
   {
-    id: 'backup', number: 5, screen: 'settings', enter: 'openSettingsData', settingsGroup: 'data',
+    id: 'backup', number: 6, screen: 'settings', enter: 'openSettingsData', settingsGroup: 'data',
     target: { selector: '[data-settings-group="data"] button', text: 'Export' }, act: null,
-    eyebrow: '5 of 6 · Your Data',
+    eyebrow: '6 of 7 · Your Data',
     title: 'Keep a backup',
     text: 'Your notes stay on your device. One tap on Export saves a backup file. Import brings it back.',
     primary: 'Next',
   },
   {
-    id: 'done', number: 6, screen: 'home', enter: 'goHome', target: null, act: null,
-    eyebrow: '6 of 6',
+    id: 'done', number: 7, screen: 'home', enter: 'goHome', target: null, act: null,
+    eyebrow: '7 of 7',
     title: "That's the tour",
-    text: 'Hold on any text to highlight it or add a note. You can see this tour again from Settings › Help. Enjoy your reading.',
+    // Highlighting used to be taught here, in passing. It has its own stop now, so teaching it
+    // again on the way out would repeat it at the one moment nothing can be shown.
+    text: 'You can see this tour again from Settings › Help. Enjoy your reading.',
     primary: 'Done',
   },
 ]);

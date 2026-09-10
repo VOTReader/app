@@ -9,7 +9,8 @@
    WHO CALLS WHAT
      TourPrompt (Home strip)  start('prompt') · dismissPrompt('later'|'never')
      SettingsScreen (Help)    start('settings') · reads step.settingsGroup
-     TourOverlay              next() · back() · skip() · targetPressed()
+     TourOverlay              next() · back() · skip() · targetPressed() ·
+                              clearHighlightDemo()
      App (hooks/use-tour.js)  attachNav({ goHome, openLetter, openBible,
                               goJournalHub, openSettingsData })
 
@@ -56,10 +57,46 @@ function runEnter(step) {
    AudioPlayer is a bundle-d global; absent on a bare host. */
 function stopTourAudio() {
   if (cancelSeek) cancelSeek();
-  if (!state.pressed) return;
+  /* `pressed` means "this stop has done its thing and is showing `after`", which is TWO different
+     facts now that a stop can demonstrate without pressing anything. Only a 'press' stop starts
+     playback, so only leaving one of those should stop it — otherwise leaving the highlight stop
+     stops audio the tour never began, which is the reader's own playback if they started any.
+     Read before the state moves: goTo and end both call this while `index` is still the stop
+     being left. */
+  const leaving = TOUR_STEPS[state.index];
+  if (!state.pressed || !leaving || leaving.act !== 'press') return;
   const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
   try { if (ap && typeof ap.stop === 'function') ap.stop(); } catch (_e) { /* the player's problem */ }
 }
+/* THE HIGHLIGHT DEMONSTRATION, and the whole of its safety.
+   The stop teaches a gesture that has no control to press, so the tour does to a real paragraph
+   what the reader's own long press would do — and must leave nothing behind. It is TWO CLASSES on
+   the element, never an annotation: `hl-mark` and `hl-yellow` are plain classes in app.css (not
+   scoped to <mark>), so the paragraph wears the real highlight's exact wash with no DOM surgery,
+   and `classList.remove` is the whole of the undo. Yellow is the app's own default (note-store).
+
+   NOTHING REACHES AnnotationStore. That is the point of doing it this way rather than adding a
+   real annotation and deleting it afterwards: a write that is undone is still a write, and the
+   undo is a thing that can fail. There is no path from here to the store to fail on.
+
+   THE SWEEP IS BY MARKER CLASS, NOT BY A HELD REFERENCE. React owns these paragraphs and may
+   replace the node between the paint and the undo (a re-render, a pager move); a stored element
+   reference would then clear a node nobody is looking at and leave the visible one yellow. One
+   querySelectorAll over the marker cannot miss that way, and clears a repaint that somehow
+   happened twice. Called on every exit: goTo (Next, Back), end (Skip, Done, Android Back through
+   the modal registry), and the overlay's own effect cleanup when the stop or the screen changes. */
+const TOUR_HL_CLASSES = ['tour-hl-demo', 'hl-mark', 'hl-yellow'];
+function clearTourHighlight() {
+  if (typeof document === 'undefined') return;
+  for (const el of document.querySelectorAll('.tour-hl-demo')) {
+    try { el.classList.remove(...TOUR_HL_CLASSES); } catch (_e) { /* a detached node's problem */ }
+  }
+}
+function paintTourHighlight(el) {
+  clearTourHighlight();
+  if (el && el.classList) { try { el.classList.add(...TOUR_HL_CLASSES); } catch (_e) { /* best-effort */ } }
+}
+
 /* A recording opens with a silent lead-in (the title, a breath): "Chosen by God" lights its first
    clause at 26.75 s. A reader who pressed Listen on the tour's word and heard nothing light up for
    half a minute has been told the feature does not work (Corbin, on his phone, 2026-09-04). So the
@@ -95,12 +132,14 @@ function seekTourStart(step) {
 }
 function goTo(index, skipEnter) {
   stopTourAudio();
+  clearTourHighlight();
   state = { ...state, index, pressed: false };
   if (!skipEnter) runEnter(TOUR_STEPS[index]);
   bump();
 }
 function end() {
   stopTourAudio();
+  clearTourHighlight();
   state = { ...state, active: false, pressed: false };
   // Playback the reader began during the tour by some other control ran under the held
   // keep-alive edge (audio-player.js holds it while the tour shows); raise it now.
@@ -120,6 +159,10 @@ export const TourController = {
 
   /** The control a stop rings, if it is on screen (bundle-e's overlay reaches findTarget through here). */
   findTarget(step) { return findTarget(step); },
+
+  /** Take the demonstration's colour back. goTo and end already do; the overlay calls this from its
+      per-stop effect cleanup, which is the one that fires when the SCREEN changes under a stop. */
+  clearHighlightDemo() { clearTourHighlight(); },
 
   /** The app hands over the five navigation verbs the stops use. Idempotent; call on every render if you like. */
   attachNav(n) { nav = n || {}; },
@@ -153,7 +196,16 @@ export const TourController = {
       state = { ...state, pressed: true };
       bump();
       return;
-    } else if (step.act && typeof nav[step.act] === 'function') {
+    }
+    if (step.act === 'highlightDemo' && !state.pressed) {
+      // Same shape as a press: show it, stay, and let the next Next move on (goTo takes the
+      // colour back). No click to fence off — nothing is being pressed and nothing is saved.
+      paintTourHighlight(/** @type {HTMLElement|null} */ (findTarget(step)));
+      state = { ...state, pressed: true };
+      bump();
+      return;
+    }
+    if (step.act && typeof nav[step.act] === 'function') {
       // A navigating act already took the reader where the next stop lives; running that
       // stop's `enter` too would navigate twice (and re-render the letter mid-arrival).
       try { nav[step.act](); } catch (_e) { /* see runEnter */ }
@@ -170,7 +222,10 @@ export const TourController = {
     if (!state.active) return;
     if (state.index >= TOUR_STEPS.length - 1) { end(); return; }
     const step = TOUR_STEPS[state.index];
-    if (step.act === 'press' && !state.pressed) { state = { ...state, pressed: true }; bump(); return; }
+    // The reader did it themselves — pressed the pill, or raised the selection bar with a long
+    // press. Either way they have already seen what the demonstration would have shown, so the
+    // card moves to its `after` words and NOTHING is acted or painted.
+    if ((step.act === 'press' || step.act === 'highlightDemo') && !state.pressed) { state = { ...state, pressed: true }; bump(); return; }
     goTo(nextIndex(state.index));
   },
 
@@ -199,5 +254,5 @@ export const TourController = {
     return true;
   },
 
-  _resetForTests() { state = fresh(); nav = {}; pressing = false; listeners.clear(); version = 0; },
+  _resetForTests() { clearTourHighlight(); state = fresh(); nav = {}; pressing = false; listeners.clear(); version = 0; },
 };
