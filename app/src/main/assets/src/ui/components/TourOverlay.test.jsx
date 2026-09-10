@@ -775,3 +775,40 @@ describe('TourOverlay — a docked stop brings a target out from under its own c
     expect(calls).not.toContain('start');
   });
 });
+
+/* THE CONTROLLER CLEARS THE COLOUR WITHOUT AN OVERLAY, and until these two cases existed nothing
+   said so: with an overlay mounted, its per-stop effect cleanup clears on the same events, so
+   biting the controller's own clears reddened NOTHING. Two mechanisms, one witnessed. The overlay
+   is always mounted while the tour runs, so this is defence in depth rather than a live path —
+   which is exactly the kind of line that gets deleted later as dead. Driven with no overlay at all,
+   so only the controller can be the thing that cleared it. */
+describe('TourController — the demonstration is cleared by the controller itself', () => {
+  const para = () => {
+    document.body.innerHTML = '<main class="letter-body"><p class="letter-para" id="on">Thus says The Lord.</p></main>';
+    const on = /** @type {HTMLElement} */ (document.querySelector('#on'));
+    on.getBoundingClientRect = rect(24, 120, 312, 96);
+    return on;
+  };
+
+  it('goTo takes it back on Next, with no overlay mounted', () => {
+    const on = para();
+    startAt('highlight');
+    act(() => { TourController.next(); });               // paint
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    act(() => { TourController.next(); });               // → bible
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+  });
+
+  it('end takes it back on Skip, with no overlay mounted', () => {
+    const on = para();
+    startAt('highlight');
+    act(() => { TourController.next(); });               // paint
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    act(() => { TourController.skip(); });
+    expect(TourController.getState().active).toBe(false);
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+  });
+});
