@@ -1042,16 +1042,43 @@ describe('JournalMediaStore — the LRU cap never evicts a URL a mounted block s
     const u2 = await JournalMediaStore.holdUrl('ctl1');
     await JournalMediaStore.delete('ctl0');
     expect(revoked).toContain(u1);
+
+    /* THE HOLD GOES WITH THE RECORD, and this assertion has to come BEFORE the purge
+       below or it proves nothing: the first draft read the count last, the purge had
+       already cleared the whole ledger, and the bite table caught it — removing
+       delete()'s own `_urlHolds.delete(id)` reddened NOTHING. A count read after a
+       purge is satisfied by the purge.
+
+       A refcount fails in the opposite direction to a set: a hold that is never dropped
+       pins its id forever and the cap silently stops applying to it, which no
+       eviction-shaped assertion can see. */
+    expect(JournalMediaStore.holdCount('ctl0')).toBe(0);
+    expect(JournalMediaStore.holdCount('ctl1')).toBe(1);   // still mounted, still held
+
     expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
     expect(revoked).toContain(u2);
+    expect(JournalMediaStore.holdCount('ctl1')).toBe(0);   // and the purge drops it too
+  });
 
-    /* AND THE HOLDS THEMSELVES ARE GONE, read as a number rather than inferred from a
-       later eviction. A refcount fails in the opposite direction to a set: a hold that
-       is never dropped pins its id forever and the cap silently stops working for it,
-       which is invisible until someone measures the count. The record is deleted and
-       the cache purged, so nothing can be holding either id. */
-    expect(JournalMediaStore.holdCount('ctl0')).toBe(0);
-    expect(JournalMediaStore.holdCount('ctl1')).toBe(0);
+  it('an import replacement drops every hold — no URL survives it', async () => {
+    /* The other half of the same rule, and the other line the bite table found
+       unwitnessed. commitImportReplace() revokes and clears the whole cache inside its
+       own transaction; a hold left behind would pin an id whose URL no longer exists,
+       and the cap would stop applying to that id until the next trim signal. */
+    await seed('imp', 2);
+    await JournalMediaStore.holdUrl('imp0');
+    await JournalMediaStore.holdUrl('imp1');
+    expect(JournalMediaStore.holdCount('imp0')).toBe(1);
+
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'fresh', type: 'image', blob: new Blob([new Uint8Array([9])]) });
+    await JournalMediaStore.commitImportReplace();
+
+    expect(JournalMediaStore.holdCount('imp0')).toBe(0);
+    expect(JournalMediaStore.holdCount('imp1')).toBe(0);
+    // ... and the replacement really happened, so this is not a count read off an
+    // operation that quietly did nothing.
+    expect(await JournalMediaStore.allIds()).toEqual(['fresh']);
   });
 
   it('unholding an id that was never held does not drive the count below zero', async () => {
