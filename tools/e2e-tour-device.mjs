@@ -98,6 +98,20 @@ async function facts() {
       player: !!document.querySelector('.audio-bar'),
       step: (() => { const tc = window.TourController; const st = tc && tc.getState(); return st && st.step ? st.step.id : null; })(),
       pressed: !!(window.TourController && window.TourController.getState().pressed),
+      // The highlight demonstration: everything wearing the marker, and the subset that also
+      // carries the real wash AND is on screen (the pager parks a copy of the neighbouring page).
+      demo: document.querySelectorAll('.tour-hl-demo').length,
+      demoOn: [...document.querySelectorAll('.letter-para.tour-hl-demo.hl-mark')].filter((p) => {
+        const b = p.getBoundingClientRect();
+        return b.width > 0 && b.height > 0 && b.right > 0 && b.left < window.innerWidth;
+      }).length,
+      // Segments in the annotation store. A tour that teaches highlighting must add none.
+      annCount: (() => {
+        try {
+          const all = window.AnnotationStore && window.AnnotationStore.all ? window.AnnotationStore.all() : null;
+          return all ? Object.values(all).reduce((n, a) => n + (a ? a.length : 0), 0) : -1;
+        } catch (_e) { return -1; }
+      })(),
       docked: !!(card && card.classList.contains('docked')),
       bar: r(document.querySelector('.audio-bar')),
       dimBoxes: [...document.querySelectorAll('.tour-dim')].map(r),
@@ -241,7 +255,7 @@ async function setScale() {
   await tapLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
 
-  const expected = ['welcome', 'letters', 'listen', 'bible', 'journal', 'backup', 'done'];
+  const expected = ['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'done'];
   let lastTitle = null;
   for (let i = 0; i < expected.length; i++) {
     const id = expected[i];
@@ -252,7 +266,7 @@ async function setScale() {
       const sig = JSON.stringify([f.step, f.ring, f.card]);
       // A ringed stop has not arrived until its control is found: the Bible chapter mounts after its
       // lazy corpus lands, and a card that is steady for a second before the ring is not a stop yet.
-      if (f.active && f.step === id && sig === prev && (f.ring || i === 0 || i === 6)) break;
+      if (f.active && f.step === id && sig === prev && (f.ring || i === 0 || i === expected.length - 1)) break;
       prev = sig;
     }
     lastTitle = f.title;
@@ -264,7 +278,7 @@ async function setScale() {
     if (f.cardOffscreen) fail(`${id}: the card is off screen (y ${Math.round(f.card.y)}, h ${Math.round(f.card.h)}, viewport ${f.vw}x${await page.evaluate(() => window.innerHeight)})`);
     if (!f.skip) fail(`${id}: Skip is not on the card`);
     if (f.scrollW > f.vw) fail(`${id}: sideways scroll ${f.scrollW} > ${f.vw}`);
-    if (i > 0 && i < 6 && !f.ring) fail(`${id}: no ring`);
+    if (i > 0 && i < expected.length - 1 && !f.ring) fail(`${id}: no ring`);
     if (f.ring && f.card) {
       const overlap = !(f.card.y >= f.ring.y + f.ring.h || f.card.y + f.card.h <= f.ring.y || f.card.x >= f.ring.x + f.ring.w || f.card.x + f.card.w <= f.ring.x);
       if (overlap) fail(`${id}: the card covers the ring`);
@@ -316,8 +330,36 @@ async function setScale() {
       await sleep(1000);   // let the reader hear a line
       g = await facts(); tapRect(g.primaryRect, `Next on ${id} (pressed)`);
     }
+    if (id === 'highlight') {
+      /* The demonstration paints the real highlight's colour on the ringed paragraph and STAYS.
+         Exactly one paragraph on screen wears it — a count of one is what separates painting the
+         paragraph the reader is looking at from painting every paragraph in the letter. And it
+         writes nothing: the store's count is read on both sides of the press. */
+      const annBefore = f.annCount;
+      if (annBefore < 0) fail('highlight: the annotation store could not be read, so nothing below is evidence about it');
+      let g = null;
+      for (let t = 0; t < 12; t++) { await sleep(500); g = await facts(); if (g.pressed) break; }
+      if (!g || g.step !== id || !g.pressed) fail('highlight: the tour did not stay after the demonstration');
+      else if (g.demoOn !== 1) fail(`highlight: ${g.demoOn} paragraphs carry the wash on screen, expected exactly 1 (marker total ${g.demo})`);
+      else if (!/See the colour/.test(g.text || '')) fail('highlight: after the demonstration the card does not say what to look for');
+      else ok('highlight: one paragraph on screen wears the real highlight, and the card names it');
+      if (g && g.annCount !== annBefore) fail(`highlight: the demonstration wrote to the annotation store (${annBefore} \u2192 ${g.annCount})`);
+      if (g && g.cardOffscreen) fail('highlight: the card is off screen after the demonstration');
+      shot(`${tag}-1${i}-${id}-painted`);
+      g = await facts(); tapRect(g.primaryRect, 'Next on highlight (painted)');
+      // The colour goes with the stop, and this is the only moment the letter screen is still
+      // on to witness it: by the end of the walk its absence would prove nothing.
+      await sleep(1200);
+      const h = await facts();
+      if (h.demo !== 0) fail(`highlight: ${h.demo} elements still carry the demonstration after moving on`);
+      else ok('highlight: the colour left with the stop');
+    }
   }
   await sleep(1200); f = await facts();
+  if (f.annCount > 0) fail(`the whole tour left ${f.annCount} annotation(s) in the store; a tour must teach highlighting without saving one`);
+  else if (f.annCount === 0) ok('the whole tour wrote not one annotation');
+  else fail('the annotation store could not be read at the end of the walk');
+  if (f.demo !== 0) fail(`${f.demo} elements still carry the demonstration after Done`);
   if (f.active) fail('the tour is still active after Done'); else ok('Done ends the tour');
   if (!f.tourDone) fail('Done did not record the flag');
   if (f.prompt) fail('the strip came back after Done'); else ok('strip stays away after Done');

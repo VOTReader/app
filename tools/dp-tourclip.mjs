@@ -52,6 +52,10 @@ const SCALE = Number(arg('--scale', '1'));
 const MIN_GAP = Number(arg('--gap', '8'));
 const SHOTS = arg('--shots', null);
 const OUT = arg('--out', null);
+// Which stop's card to grade. The defect was found on the LISTEN stop, so that stays the
+// default and every existing invocation is unchanged; `--stop highlight` aims the same
+// measurement at the highlight stop's copy, which is longer and therefore the new worst case.
+const STOP = arg('--stop', 'listen');
 if (SHOTS) mkdirSync(resolve(SHOTS), { recursive: true });
 if (OUT) mkdirSync(resolve(OUT), { recursive: true });
 
@@ -61,7 +65,7 @@ if (dirty && !dirty.split('\n').every((l) => l.includes('dp-tourclip'))) {
   process.exit(2);
 }
 const SHA = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
-console.log(`dp-tourclip  SHA ${SHA}  frames ${FRAMES.map((f) => f.w + 'x' + f.h).join(',')}  text size ${SCALE}x  floor ${MIN_GAP} px`);
+console.log(`dp-tourclip  SHA ${SHA}  stop ${STOP}  frames ${FRAMES.map((f) => f.w + 'x' + f.h).join(',')}  text size ${SCALE}x  floor ${MIN_GAP} px`);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
@@ -123,15 +127,16 @@ try {
     await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
     await sleep(600);
 
-    // Advance to the LISTEN stop (stop 2 of 6), the one the device saw clipped.
+    // Advance to the graded stop by ID, never by a count: the stops that STAY once acted take
+    // two presses each, so a fixed number lands on a different card the day one is added.
     let step = null;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 14; i++) {
       step = await page.evaluate(() => { const s = window.TourController && window.TourController.getState(); return s && s.step ? s.step.id : null; });
-      if (step === 'listen') break;
+      if (step === STOP) break;
       await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
       await sleep(900);
     }
-    if (step !== 'listen') { fail(`never reached the listen stop (stopped at ${step})`); await ctx.close(); continue; }
+    if (step !== STOP) { fail(`never reached the ${STOP} stop (stopped at ${step})`); await ctx.close(); continue; }
     // The ring and the dock settle a frame or two after the screen mounts.
     for (let i = 0; i < 25 && !(await page.evaluate(() => !!document.querySelector('.tour-ring'))); i++) await sleep(150);
     await sleep(500);

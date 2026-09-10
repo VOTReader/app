@@ -2414,7 +2414,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         <SettingsGroup label="Help" sub="Show me around & About" {...groupProps('help')}>
           <div className="settings-card">
             <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
-            <p className="settings-help-note">A short tour of the app: six stops, about two minutes. It points at the real buttons; you can leave at any time.</p>
+            <p className="settings-help-note">A short tour of the app: seven stops, about two minutes. It points at the real buttons; you can leave at any time.</p>
           </div>
         </SettingsGroup>
         </div>

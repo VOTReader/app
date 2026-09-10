@@ -117,7 +117,9 @@ describe('TourController — moving', () => {
     expect(onClick).not.toHaveBeenCalled();
     expect(TourController.getState().step.id).toBe('listen');
     expect(TourController.getState().pressed).toBe(true);
-    TourController.next();                            // → bible, without a second click
+    // Three stops on, through the highlight demonstration, and the pill is still not clicked.
+    TourController.next();                            // → highlight
+    TourController.next(); TourController.next();      // demonstrate, stay; then → bible
     expect(onClick).not.toHaveBeenCalled();
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);
@@ -136,8 +138,9 @@ describe('TourController — moving', () => {
     TourController.next();                            // press Listen, stay
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(TourController.getState().step.id).toBe('listen');
-    TourController.next();                            // → bible
-    expect(onClick).toHaveBeenCalledTimes(1);
+    TourController.next();                            // → highlight
+    TourController.next(); TourController.next();      // demonstrate, stay; then → bible
+    expect(onClick).toHaveBeenCalledTimes(1);         // once, and only on the stop that asked for it
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);     // the bible stop's enter
   });
@@ -146,10 +149,17 @@ describe('TourController — moving', () => {
     const n = nav();
     TourController.attachNav(n);
     TourController.start('prompt');
-    TourController.next(); TourController.next(); TourController.next(); TourController.next();   // bible (listen takes two)
+    // welcome → letters → listen (press, stay) → highlight (demonstrate, stay) → bible.
+    // A count is the wrong unit here — the press-style stops take two next()s each — so the walk
+    // is asserted at its destination rather than trusted.
+    for (let i = 0; i < 6; i++) TourController.next();
+    expect(TourController.getState().step.id).toBe('bible');
+    const entered = n.openLetter.mock.calls.length;
     TourController.back();
-    expect(TourController.getState().step.id).toBe('listen');
-    expect(n.openLetter).toHaveBeenCalledTimes(2);   // once on the way there, once coming back
+    expect(TourController.getState().step.id).toBe('highlight');
+    // Re-entering means the stop's own `enter` runs again, which is what keeps the picture matching
+    // the words. Measured as a delta so it does not encode how many stops share openLetter.
+    expect(n.openLetter.mock.calls.length).toBe(entered + 1);
   });
 
   it('back() on the welcome card stays put', () => {
@@ -162,7 +172,7 @@ describe('TourController — moving', () => {
   it('next() on the closing card finishes and records the flag', () => {
     TourController.attachNav(nav());
     TourController.start('prompt');
-    for (let i = 0; i < 8; i++) TourController.next();   // the two Listen stops take two each
+    for (let i = 0; i < 10; i++) TourController.next();   // the three stops that stay take two each
     expect(TourController.getState().step.id).toBe('done');
     TourController.next();
     expect(TourController.getState().active).toBe(false);
@@ -240,7 +250,7 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
     expect(TourController.getState().step.id).toBe('listen');
     expect(TourController.getState().pressed).toBe(true);
     TourController.next();
-    expect(TourController.getState().step.id).toBe('bible');
+    expect(TourController.getState().step.id).toBe('highlight');
     expect(TourController.getState().pressed).toBe(false);
     expect(clicks).toHaveBeenCalledTimes(1);
   });
@@ -282,7 +292,9 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
 
   it('a stop the tour did not press is left alone', () => {
     pill(); toListen();
-    TourController.next(); TourController.next();   // → bible, stopped once
+    TourController.next(); TourController.next();   // press Listen, → highlight: stopped once
+    TourController.next(); TourController.next();   // demonstrate, → bible: the demonstration starts no audio
+    expect(audio.stop).toHaveBeenCalledTimes(1);
     TourController.next(); TourController.next();   // press John 3, → journal: stopped twice
     expect(audio.stop).toHaveBeenCalledTimes(2);
     TourController.next(); TourController.next(); TourController.next();  // backup, done, end
@@ -341,7 +353,8 @@ describe('TourController — the letter Listen stop seeks to the first lit claus
 
   it('the Bible stop has no seek key: John 3 starts where it starts', () => {
     pill(); toListen();
-    TourController.next(); TourController.next();      // → bible
+    TourController.next(); TourController.next();      // press Listen, → highlight
+    TourController.next(); TourController.next();      // demonstrate, → bible
     expect(TourController.getState().step.id).toBe('bible');
     TourController.next();                              // press
     state = { time: 0, duration: 200 }; notify();
