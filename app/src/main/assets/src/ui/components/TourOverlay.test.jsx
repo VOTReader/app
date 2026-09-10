@@ -739,7 +739,9 @@ describe('TourOverlay — a docked stop brings a target out from under its own c
     const pill = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
     pill.getBoundingClientRect = rect(133, pillTop, 94, 25);
     const calls = [];
-    pill.scrollIntoView = (opts) => { calls.push(opts && opts.block); };
+    // `opts` is `boolean | ScrollIntoViewOptions` in the DOM lib; the overlay always passes the
+    // object form, and this reads the block off it without asserting that from the type.
+    pill.scrollIntoView = (opts) => { calls.push(opts && typeof opts === 'object' ? opts.block : null); };
     return { pill, calls };
   };
   /** The docked card, occupying the bottom third — the band the reader cannot see through. */
