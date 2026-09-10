@@ -47,7 +47,7 @@ const BUDGETS = [
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.
   // Deliberate — this is the feature's lazy bundle, not the cold boot path.
-  { file: 'bundle-f.js', measured: 57610, max: 66400 },
+  { file: 'bundle-f.js', measured: 65543, max: 66400 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
