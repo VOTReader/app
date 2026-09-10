@@ -180,15 +180,64 @@ export var JournalMediaStore = (function() {
   // voice-memos accreted hundreds of MB of decoded blobs (only an explicit delete()
   // ever freed one). The Map's insertion order IS the LRU order (oldest first):
   // _cacheUrl evicts + revokes the oldest past the cap; _touchUrl moves a hit to the
-  // MRU end. objectUrl() transparently re-creates a URL on a later miss, so eviction
-  // is invisible to callers.
+  // MRU end.
+  //
+  // THIS HEADER USED TO SAY "objectUrl() transparently re-creates a URL on a later
+  // miss, so eviction is invisible to callers". THERE IS NO LATER MISS, and the wrong
+  // comment is why the defect below survived: JournalImageBlock and JournalAudioBlock
+  // both reach the store through useMediaUrl, which resolves ONCE per mediaId and keeps
+  // the string in React state. A block that has already rendered never asks again, so
+  // the 25th resolution revoked the 1st block's URL while it was still mounted — a
+  // blank <img>, a player that did nothing, and `missing` derived from the RECORD, so
+  // the block went on reporting missing:false over a dead source. It read as data loss
+  // with the bytes intact.
+  //
+  // THE FIX IS A CLAIM, NOT A NOTIFICATION, and the notification was ruled out on its
+  // merits: announcing this eviction re-runs the effect of the block that just
+  // resolved, which resolves again, which evicts again. Even announcing only the
+  // EVICTED id is an infinite loop — 25 blocks against a cap of 24 means block 1
+  // re-resolves, evicting block 2, forever. A silent blank image would become a thrash
+  // loop, which is worse. The gap was never in the notification; it was that the cache
+  // is smaller than the set of URLs simultaneously IN USE.
+  //
+  // WHY SKIPPING HELD ENTRIES IS FREE, which is what makes this right rather than
+  // merely safe: revoking a URL a mounted <img> is already displaying FREES NOTHING —
+  // the decoded image holds the bytes whatever the URL's validity. The eviction that
+  // broke the block was not achieving its purpose either. The cap keeps its whole value
+  // for the case it was written for, UNMOUNTED blocks from entries browsed past, which
+  // is where the unbounded leak actually was. When everything cached is on screen the
+  // cache exceeds the cap, and that is the correct outcome.
   /** @type {Map<string, string>} */
   var _urlCache = new Map();
   var URL_CACHE_MAX = 24;
+  // id -> how many mounted blocks are displaying it. A COUNT and not a Set: an imported
+  // entry can reference one media id from two blocks, and with a Set the first unmount
+  // would expose the URL the second is still showing.
+  /** @type {Map<string, number>} */
+  var _urlHolds = new Map();
+  function _hold(id) {
+    _urlHolds.set(id, (_urlHolds.get(id) || 0) + 1);
+  }
+  function _unhold(id) {
+    var n = (_urlHolds.get(id) || 0) - 1;
+    // FLOORED AT ZERO deliberately. delete() and the bulk purges drop holds out from
+    // under blocks that are still mounted; each of those blocks then releases a hold
+    // that is already gone. Without the floor the count goes negative and that id
+    // becomes permanently un-evictable the next time it IS held — the same leak this
+    // whole mechanism exists to prevent, reached through the fix instead of the bug.
+    if (n > 0) _urlHolds.set(id, n);
+    else _urlHolds.delete(id);
+  }
   function _cacheUrl(id, url) {
     _urlCache.set(id, url);
     while (_urlCache.size > URL_CACHE_MAX) {
-      var lruId = _urlCache.keys().next().value;   // first inserted = least-recently-used
+      // The oldest UNHELD entry, not simply the oldest.
+      var lruId = null;
+      var it = _urlCache.keys();
+      for (var k = it.next(); !k.done; k = it.next()) {
+        if (!_urlHolds.has(k.value)) { lruId = k.value; break; }
+      }
+      if (lruId === null) break;   // everything cached is on screen: the cap yields
       var victim = _urlCache.get(lruId);
       _urlCache.delete(lruId);
       try { URL.revokeObjectURL(victim); } catch (_e) { /* best-effort */ }
@@ -198,6 +247,25 @@ export var JournalMediaStore = (function() {
     var url = _urlCache.get(id);
     _urlCache.delete(id);
     _urlCache.set(id, url);
+  }
+  /** Shared body of objectUrl / holdUrl. `store` is the public object, because the
+   *  miss path goes back through its own get(). */
+  function _resolveUrl(store, id, hold) {
+    if (!id) return Promise.resolve(null);
+    if (_urlCache.has(id)) {
+      _touchUrl(id);
+      if (hold) _hold(id);
+      return Promise.resolve(_urlCache.get(id));
+    }
+    return store.get(id).then(function(rec) {
+      if (!rec || !rec.blob) return null;      // nothing to display, so nothing to hold
+      try {
+        var url = URL.createObjectURL(rec.blob);
+        if (hold) _hold(id);                   // BEFORE the insert, so this id is never
+        _cacheUrl(id, url);                    // the victim of its own arrival
+        return url;
+      } catch (_e) { return null; }
+    });
   }
 
   // REVOCATION EPOCH.
@@ -369,6 +437,7 @@ export var JournalMediaStore = (function() {
             try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
           });
           _urlCache.clear();
+          _urlHolds.clear();   // same reason as releaseObjectUrls: no URL survives this
           _bumpUrlEpoch();
           resolve();
         });
@@ -511,6 +580,9 @@ export var JournalMediaStore = (function() {
      */
     delete: function(id) {
       if (!id) return Promise.resolve();
+      // The record is going: any hold on it is stale whether or not a URL was cached.
+      // The holder's own unholdUrl then floors at zero rather than going negative.
+      _urlHolds.delete(id);
       if (_urlCache.has(id)) {
         try { URL.revokeObjectURL(_urlCache.get(id)); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         _urlCache.delete(id);
@@ -652,29 +724,56 @@ export var JournalMediaStore = (function() {
      * Cached object URL for a media id. First call creates + caches the
      * URL; subsequent calls return the cached value. Resolves null when
      * id is unknown or createObjectURL throws.
+     *
+     * The URL this hands back is subject to the cap: a later resolution can evict and
+     * revoke it. Anything that KEEPS the string — anything that will not ask again —
+     * must use holdUrl() instead.
      * @param {string | null | undefined} id
      * @returns {Promise<string | null>}
      */
-    objectUrl: function(id) {
-      if (!id) return Promise.resolve(null);
-      if (_urlCache.has(id)) { _touchUrl(id); return Promise.resolve(_urlCache.get(id)); }
-      return this.get(id).then(function(rec) {
-        if (!rec || !rec.blob) return null;
-        try {
-          var url = URL.createObjectURL(rec.blob);
-          _cacheUrl(id, url);
-          return url;
-        } catch (_e) { return null; }
-      });
-    },
+    objectUrl: function(id) { return _resolveUrl(this, id, false); },
+
+    /**
+     * As objectUrl(), and the caller is DISPLAYING the result until it calls
+     * unholdUrl(id): the cap will not evict a held URL. Every hold must be paired with
+     * exactly one unholdUrl on every path out — normal unmount, an effect re-run, and a
+     * crash caught by an error boundary.
+     *
+     * The hold is taken INSIDE this call, in the same synchronous step that caches the
+     * URL, and that is not a detail: with 25 blocks mounting at once their resolutions
+     * interleave, so a caller that resolved first and claimed afterwards would have its
+     * URL evicted in the gap by a caller that resolved second.
+     * @param {string | null | undefined} id
+     * @returns {Promise<string | null>}
+     */
+    holdUrl: function(id) { return _resolveUrl(this, id, true); },
+
+    /**
+     * Release one hold taken by holdUrl(). Idempotent and floored at zero, so a block
+     * whose record was deleted under it can release safely.
+     * @param {string | null | undefined} id
+     * @returns {void}
+     */
+    unholdUrl: function(id) { if (id) _unhold(id); },
+
+    /**
+     * How many holds are outstanding for an id. Diagnostics, and the only way to see
+     * the failure mode a refcount actually has: a hold that is never released pins its
+     * id forever and the cap silently stops applying to it, which no eviction-shaped
+     * assertion can distinguish from a count of one.
+     * @param {string | null | undefined} id
+     * @returns {number}
+     */
+    holdCount: function(id) { return (id && _urlHolds.get(id)) || 0; },
 
     /**
      * TRIM: revoke every cached object URL and empty the LRU. Each entry pins
      * its decoded blob in heap, so this frees that memory on an OS memory-
      * pressure signal (Android MainActivity.onTrimMemory → window.__onTrimMemory).
-     * Safe by construction — objectUrl() transparently re-creates a URL from IDB
-     * on the next miss, so this is a CACHE DROP, not data loss. Returns the count
-     * released (diagnostics). Never throws.
+     * A CACHE DROP and not data loss — but NOT "safe by construction", which is what
+     * this block used to claim: the blocks that already resolved keep a string that no
+     * longer resolves. What makes it safe is the epoch, which ANNOUNCES the revocation
+     * so they re-ask. Returns the count released (diagnostics). Never throws.
      * @returns {number}
      */
     /**
@@ -694,6 +793,11 @@ export var JournalMediaStore = (function() {
         try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
       });
       _urlCache.clear();
+      // Every URL is gone, so every hold on one is meaningless. The epoch bump below
+      // makes the mounted blocks re-ask, and each takes a fresh hold on the URL it is
+      // actually displaying. This is also what makes a leaked hold self-healing: the
+      // next trim signal clears the whole ledger.
+      _urlHolds.clear();
       _bumpUrlEpoch();
       return n;
     },

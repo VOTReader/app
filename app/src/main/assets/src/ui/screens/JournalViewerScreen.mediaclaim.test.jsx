@@ -1,3 +1,6 @@
+// @ts-nocheck - two harness artefacts, neither about the assertions: `node:buffer` has no
+// types installed (journal-media-store.test.js carries the same directive for the same
+// import), and JournalImageBlock's JSDoc props do not admit React's own `key`.
 /* Journal media blocks vs the object-URL cap — the case that carries the row.
    ─────────────────────────────────────────────────────────────────────────
    journal-media-lru-claim (2026-09-10). RED FIRST.
@@ -30,7 +33,10 @@ import { Blob as NodeBlob } from 'node:buffer';
 /** @type {any} */ (globalThis).Blob = NodeBlob;
 
 import 'fake-indexeddb/auto';
-import React from 'react';
+// The GLOBAL React, like every other checked test file here — this was the only one
+// importing it, and `import React from 'react'` pulls @types/react into scope, which
+// then rejects the app's own ErrorBoundary as a JSX component (it extends the global
+// React, typed `any`). Same runtime, and tsc agrees with its neighbours.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { JournalImageBlock } from './JournalViewerScreen.jsx';
@@ -103,6 +109,23 @@ async function mountAll(container) {
 }
 
 const srcsOf = (el) => Array.from(el.querySelectorAll('img')).map((img) => img.getAttribute('src'));
+
+/** Flush turns until `want` blocks have actually painted an <img>.
+ *
+ *  `await act(async () => render(...))` IS NOT ENOUGH under StrictMode, and this is
+ *  measured rather than assumed: the double invoke starts TWO resolutions, both go to
+ *  IndexedDB, and they settle on different turns. Reading the hold count straight after
+ *  `act` returns caught the ledger mid-flight at 0 while the settled value is 1 — a
+ *  number that was true of an instant nobody cares about. An <img> in the DOM is the
+ *  settled condition worth waiting for: it means the surviving effect's resolution
+ *  landed AND the cancelled one has already released. */
+async function settle(container, want) {
+  for (let i = 0; i < 20; i++) {
+    if (container.querySelectorAll('img').length >= want) return;
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  }
+  throw new Error('settle: only ' + container.querySelectorAll('img').length + ' of ' + want + ' blocks painted');
+}
 
 /** The real store with a counted holdUrl. Delegating (never spreading) keeps `this`
  *  inside the store, which objectUrl relies on for its own get(). */
@@ -183,6 +206,7 @@ describe('the hold is taken and released by the same effect, on every path out',
        would be proving nothing about the double mount it is named for. */
     expect(calls.hold).toBe(2);
 
+    await settle(out.container, 1);
     expect(JournalMediaStore.holdCount(ids[0])).toBe(1);
     await act(async () => { out.unmount(); });
     expect(JournalMediaStore.holdCount(ids[0])).toBe(0);
@@ -205,6 +229,7 @@ describe('the hold is taken and released by the same effect, on every path out',
           </ErrorBoundary>,
         );
       });
+      await settle(out.container, 1);
       expect(JournalMediaStore.holdCount(ids[1])).toBe(1);
 
       await act(async () => {

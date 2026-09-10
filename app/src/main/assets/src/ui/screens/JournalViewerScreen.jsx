@@ -377,6 +377,21 @@ function _mediaUrlEpoch() {
   return (S && typeof S.getUrlEpoch === 'function') ? S.getUrlEpoch() : 0;
 }
 
+/** holdUrl when the injected store has it, objectUrl when it does not. Guarded the same
+ *  way as the epoch verbs above: the media suite's stub store and the web/PWA harnesses
+ *  supply only objectUrl, and must degrade rather than throw.
+ *  @param {string} mediaId @returns {Promise<any>} */
+function _resolve(mediaId) {
+  var S = /** @type {any} */ (window).JournalMediaStore;
+  return (S && typeof S.holdUrl === 'function') ? S.holdUrl(mediaId) : S.objectUrl(mediaId);
+}
+
+/** @param {string} mediaId @returns {void} */
+function _release(mediaId) {
+  var S = /** @type {any} */ (window).JournalMediaStore;
+  if (S && typeof S.unholdUrl === 'function') S.unholdUrl(mediaId);
+}
+
 function useMediaUrl(mediaId) {
   const [state, setState] = React.useState({ url: null, missing: false });
   // The store revokes cached object URLs in bulk (the memory-trim purge, the
@@ -388,11 +403,18 @@ function useMediaUrl(mediaId) {
   const epoch = React.useSyncExternalStore(_subscribeMediaUrls, _mediaUrlEpoch);
   React.useEffect(function() {
     var cancelled = false;
+    var held = false;
     if (!mediaId) { setState({ url: null, missing: true }); return undefined; }
     if (typeof JournalMediaStore === 'undefined') { setState({ url: null, missing: false }); return undefined; }
     setState({ url: null, missing: false });   // a new id is loading again, not missing
-    JournalMediaStore.objectUrl(mediaId).then(function(url) {
-      if (cancelled) return undefined;
+    _resolve(mediaId).then(function(url) {
+      // The hold belongs to THIS effect run, so this run's cleanup is what releases it —
+      // including the cleanup strict mode fires between its double setup, and the one an
+      // error boundary fires when a sibling throws. If the resolution lands AFTER the
+      // cleanup already ran, release it here instead: the store took the hold before this
+      // promise settled, so nobody else is going to.
+      if (url) held = true;
+      if (cancelled) { if (held) { held = false; _release(mediaId); } return undefined; }
       if (url) { setState({ url: url, missing: false }); return undefined; }
       return JournalMediaStore.get(mediaId).then(function(rec) {
         if (cancelled) return;
@@ -404,7 +426,10 @@ function useMediaUrl(mediaId) {
       // An IDB error tells us about the database, not about the recording.
       if (!cancelled) { console.warn('journal media lookup failed', mediaId, e); setState({ url: null, missing: false }); }
     });
-    return function() { cancelled = true; };
+    return function() {
+      cancelled = true;
+      if (held) { held = false; _release(mediaId); }
+    };
   }, [mediaId, epoch]);
   return state;
 }
