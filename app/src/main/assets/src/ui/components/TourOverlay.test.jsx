@@ -814,3 +814,30 @@ describe('TourController — the demonstration is cleared by the controller itse
     expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
   });
 });
+
+/* The same rule, driven through the HIGHLIGHT stop. A bite proved this needed saying: reverting
+   the effect-scope `docked` to press-only reddened nothing, because every case that exercises the
+   dock floor uses the Listen stop — which is a press stop and stays docked either way. So the rule
+   was witnessed and this stop's participation in it was not. */
+describe('TourOverlay — the highlight stop obeys the dock floor too', () => {
+  const vh = () => window.innerHeight;
+
+  it('a paragraph sitting in the card’s band is scrolled to the top of its scroller', async () => {
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><main class="letter-body">'
+      + '<p class="letter-para" id="on">Thus says The Lord.</p></main></div></div>';
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    scroller.getBoundingClientRect = rect(0, 56, 360, vh() - 56);
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    const on = /** @type {HTMLElement} */ (document.querySelector('#on'));
+    on.getBoundingClientRect = rect(24, Math.round(vh() * 0.72), 312, 90);   // low: inside the card's band
+    const calls = [];
+    on.scrollIntoView = (opts) => { calls.push(opts && typeof opts === 'object' ? opts.block : null); };
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    card.getBoundingClientRect = rect(12, Math.round(vh() * 0.62), 336, Math.round(vh() * 0.38));
+    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    expect(calls).toContain('start');
+  });
+});
