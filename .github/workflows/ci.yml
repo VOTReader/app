@@ -429,6 +429,31 @@ jobs:
         # local gate until CI has audio to run it against.
         run: npm run e2e:read
 
+      - name: End-to-end Scripture Web walk
+        # e2e-scriptureweb.mjs reaches the Scripture Web the way a reader does
+        # (Home -> Library -> The Whole Counsel) and drives the real zoom
+        # buttons against the real WebGL canvas at 320x640 and 426x952, text
+        # scale 1 and 1.8.
+        #
+        # WHY IT IS HERE. Landing 67 (the Essential auto-switch) shipped with
+        # geometry.test.js as its only witness — a unit pair over the pure
+        # function. No browser gate reached the screen at all: e2e:read never
+        # goes there and smoke:ci touches it only through the Home tile. So
+        # nothing proved the law the unit test pins is the law the SCREEN runs.
+        #
+        # It serves the assets itself on an OS-assigned port, exactly as
+        # e2e:read does above and for the same reason, so it always measures
+        # the bundles this job just built.
+        #
+        # EXIT CODES ARE NOT INTERCHANGEABLE HERE. 0 pass, 1 an arm failed,
+        # 3 harness fault, and 2 is NOTHING TO CHECK — the screen could not
+        # draw at all (no WebGL2), so no arm is meaningful. `run:` fails the
+        # step on any non-zero, which is the correct treatment: 2 is INCOMPLETE,
+        # never a skip and never a pass. If Actions ever loses WebGL2 this step
+        # goes red saying so, rather than quietly becoming a gate that only
+        # skips — which is what kept `e2e:readalong` out of CI (see above).
+        run: npm run e2e:scriptureweb
+
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest
