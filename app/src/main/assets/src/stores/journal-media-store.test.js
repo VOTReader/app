@@ -1044,5 +1044,29 @@ describe('JournalMediaStore — the LRU cap never evicts a URL a mounted block s
     expect(revoked).toContain(u1);
     expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
     expect(revoked).toContain(u2);
+
+    /* AND THE HOLDS THEMSELVES ARE GONE, read as a number rather than inferred from a
+       later eviction. A refcount fails in the opposite direction to a set: a hold that
+       is never dropped pins its id forever and the cap silently stops working for it,
+       which is invisible until someone measures the count. The record is deleted and
+       the cache purged, so nothing can be holding either id. */
+    expect(JournalMediaStore.holdCount('ctl0')).toBe(0);
+    expect(JournalMediaStore.holdCount('ctl1')).toBe(0);
+  });
+
+  it('unholding an id that was never held does not drive the count below zero', async () => {
+    // The floor exists because delete() and the purge drop holds out from under a block
+    // that is still mounted; that block's unmount then releases a hold that is already
+    // gone. Without a floor the count goes negative and the id becomes permanently
+    // un-evictable the next time it IS held - the leak this whole family is about.
+    await seed('flr', 2);
+    JournalMediaStore.unholdUrl('flr0');
+    JournalMediaStore.unholdUrl('flr0');
+    expect(JournalMediaStore.holdCount('flr0')).toBe(0);
+    const u = await JournalMediaStore.holdUrl('flr0');
+    expect(JournalMediaStore.holdCount('flr0')).toBe(1);
+    JournalMediaStore.unholdUrl('flr0');
+    expect(JournalMediaStore.holdCount('flr0')).toBe(0);
+    expect(typeof u).toBe('string');
   });
 });
