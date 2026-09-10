@@ -19,6 +19,7 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { TourOverlay } from './TourOverlay.jsx';
 import { TourController } from '../../utils/tour-controller.js';
 import { TourDoneFlagStore } from '../../stores/app-flag-stores.js';
+import { AnnotationStore } from '../../stores/annotation-store.js';
 
 const nav = () => ({ goHome: vi.fn(), openLetter: vi.fn(), openBible: vi.fn(), goJournalHub: vi.fn(), openSettingsData: vi.fn() });
 const rect = (x, y, w, h) => () => /** @type {any} */ ({ x, y, width: w, height: h, left: x, right: x + w, top: y, bottom: y + h });
@@ -493,3 +494,125 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
   });
 });
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The highlight stop — a demonstration that writes nothing
+   ═══════════════════════════════════════════════════════════════════════
+   Corbin, 2026-09-10: "Make sure the introductory tutorial has a thing for
+   highlighting text if it doesn't already." The stop shows the colour on a real
+   paragraph so the reader knows what to look for under their own finger.
+
+   THE PAINT IS NOT AN ANNOTATION. It is two classes on the paragraph the stop
+   already rings, and nothing reaches AnnotationStore. Every case below carries the
+   store assertion rather than one case owning it, because "the tour did not write"
+   has to be true at each exit — Next, Skip, and the reader's own long press — and a
+   single end-of-tour check would pass while an intermediate write was undone.
+*/
+describe('TourOverlay — the highlight stop paints a demonstration and never saves one', () => {
+  const paras = () => [...document.querySelectorAll('.letter-para')].map((p) => /** @type {HTMLElement} */ (p));
+  /** The letter screen the Listen stop leaves open: one visible paragraph and one the pager parks off-screen. */
+  const letterWithParas = () => {
+    document.body.innerHTML = '<div id="app"><main class="letter-body">'
+      + '<p class="letter-para" id="off">A page the pager keeps beside this one.</p>'
+      + '<p class="letter-para" id="on">Thus says The Lord: I AM calling out to My people.</p>'
+      + '</main></div>';
+    const [off, on] = paras();
+    off.getBoundingClientRect = rect(-360, 120, 312, 96);
+    on.getBoundingClientRect = rect(24, 120, 312, 96);
+    return { off, on };
+  };
+  /** Every annotation segment in the store, flattened — the unit the "nothing was written" claim is about. */
+  const annCount = () => Object.values(AnnotationStore.all() || {}).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
+
+  it('Next paints the ringed paragraph, says what to look for, and stays on the stop', () => {
+    const { off, on } = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    fireEvent.click(screen.getByText('Next'));
+    expect(TourController.getState().step.id).toBe('highlight');
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    expect(on.classList.contains('hl-yellow')).toBe(true);
+    // The pager's off-screen copy is not the paragraph the reader is looking at.
+    expect(off.classList.contains('hl-mark')).toBe(false);
+    expect(screen.getByText(/See the colour/i)).toBeTruthy();
+    expect(screen.queryByText(/press Next and I will show you/i)).toBeNull();
+    expect(annCount()).toBe(before);
+  });
+
+  it('the next Next moves on and takes the colour with it', () => {
+    const { on } = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    fireEvent.click(screen.getByText('Next'));
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(on.classList.contains('hl-yellow')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+    expect(annCount()).toBe(before);
+  });
+
+  it('Back takes the colour with it too', () => {
+    const { on } = letterWithParas();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    fireEvent.click(screen.getByText('Back'));
+    expect(TourController.getState().step.id).toBe('listen');
+    expect(on.classList.contains('hl-mark')).toBe(false);
+  });
+
+  it('leaving the tour mid-demonstration leaves no colour behind', () => {
+    const { on } = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));
+    expect(on.classList.contains('hl-mark')).toBe(true);
+    fireEvent.click(screen.getByText('Skip'));
+    expect(TourController.getState().active).toBe(false);
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+    expect(annCount()).toBe(before);
+  });
+
+  /* Same rule as the tap-through on Listen: the reader who does it themselves has already seen
+     what the demonstration would have shown, so the tour moves on and paints nothing. The signal
+     is the real selection bar being up — a long press does not raise a click, so the overlay's
+     click listener cannot see this one. */
+  it("the reader's own long press moves the tour on without painting anything", async () => {
+    const { on } = letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    expect(TourController.getState().step.id).toBe('highlight');
+    await act(async () => {
+      document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    expect(TourController.getState().pressed).toBe(true);
+    expect(on.classList.contains('hl-mark')).toBe(false);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+    expect(annCount()).toBe(before);
+  });
+
+  /* The whole walk, because the claim Corbin cares about is about the tour and not about one
+     stop: a reader who takes the tour end to end has nothing new in their Library. */
+  it('a whole tour, demonstration included, writes not one annotation', () => {
+    letterWithParas();
+    const before = annCount();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    fireEvent.click(screen.getByText('Next'));            // paint
+    fireEvent.click(screen.getByText('Next'));            // on to the Bible stop
+    for (let i = 0; i < 12 && TourController.getState().active; i++) TourController.targetPressed();
+    expect(TourController.getState().active).toBe(false);
+    expect(annCount()).toBe(before);
+    expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
+  });
+});
