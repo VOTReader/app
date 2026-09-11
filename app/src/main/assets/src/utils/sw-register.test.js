@@ -1,3 +1,4 @@
+// @ts-nocheck — the capture gate reads index.html through node:fs, which has no types under this tsconfig; the sibling update-toast.test.js is nocheck for the same reason
 /* sw-register tests — P7pwa visibility-gated controllerchange reload.
    ──────────────────────────────────────────────────────────────────
    Mocks navigator.serviceWorker (capturing the controllerchange handler),

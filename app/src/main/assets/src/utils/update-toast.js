@@ -35,6 +35,12 @@
      shown    — stored differs: the profile has just moved builds. Say so,
                 briefly, on whatever screen the reader is on (showToast mounts
                 on document.body, above every screen and sheet), then store.
+     reloading — this page has already begun its update reload (sw-register's
+                takeover flag: the early claim reloads AT registration, four
+                lines before this runs). Nothing is ours to decide: the reload
+                flag is the NEXT document's, and the key path would ask the NEW
+                worker and write the key and a toast into a page being torn
+                down — the document that follows would then read 'same'.
 
    WHERE IT RUNS: once, from bundle-b's entry right after the service worker
    registers, before any screen has an opinion. On the web that is the boot
@@ -157,9 +163,10 @@ function controlled() {
  * Compare the running build with the last one this profile saw; announce a
  * change once. Resolves to which of the four answers it took, for tests and
  * for anyone reading a boot log.
- * @returns {Promise<'unknown'|'first'|'same'|'shown'>}
+ * @returns {Promise<'unknown'|'first'|'same'|'shown'|'reloading'>}
  */
 export async function announceUpdateIfAny() {
+  if (typeof window !== 'undefined' && /** @type {any} */ (window).__votSwTookOver) return 'reloading';   // see the header: not ours to decide
   if (takeUpdateReload()) {
     // THE RELOAD IS THE EVIDENCE (w-toast-reload-flag, 2026-09-11). sw-register reloaded
     // THIS document onto a new worker and said so in the tab's own sessionStorage before
