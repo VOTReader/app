@@ -10,16 +10,29 @@
    the controlling service worker answers GET_VERSION; inside the Android
    WebView there is no service worker, and the APK's own service-worker.js is
    read by the same fetch Settings already uses for its App version row — so
-   both platforms answer with the same string for the same build. One
-   localStorage key remembers the last build this profile saw.
+   both platforms answer with the same string for the same build. An
+   UNCONTROLLED web page (a first visit: the worker is still installing)
+   fetched every byte from the network moments ago, so the server's
+   service-worker.js is its own build too, and it is read the Android way; a
+   controlled page whose worker does not answer stays unknown, because the
+   server may be ahead of the cache that page runs from. One localStorage key
+   remembers the last build this profile saw.
 
    THE THREE ANSWERS, and only one of them is a toast:
      unknown  — the version could not be read. NOTHING is written and nothing
                 is shown: a null must never impersonate a value, and writing
                 it would turn the next real read into a false "updated".
-     first    — nothing stored yet (first ever boot, or the one-time vot-*
-                sweep ran before us). Store silently; there is nothing to
-                compare against, so there is nothing to announce.
+     first    — nothing stored AND nothing of the app's in storage: a fresh
+                profile's first boot. Store silently; there is nothing to
+                compare against, so there is nothing to announce. A USED
+                profile with nothing stored is not this: it was on a build
+                older than this key and has just crossed (2026-09-11, the
+                first update into the build that introduced the key was
+                silent for every existing reader) — that is `shown`, the
+                plain text; the old page never flushed a clock to offer.
+                The history is read BEFORE the first await, while nothing of
+                this boot has written yet: the entry calls us before any
+                screen mounts, and the stores write on hydration and on use.
      same     — stored equals running. Nothing to say.
      shown    — stored differs: the profile has just moved builds. Say so,
                 briefly, on whatever screen the reader is on (showToast mounts
@@ -96,14 +109,36 @@ export function _resetUpdateToast() { pendingResume = null; announced = false; }
 if (typeof window !== 'undefined') /** @type {any} */ (window).__votUpdateToastResume = offerListeningResume;
 
 /** The build this page is running, or null when nobody can say. Web: the
- *  controlling service worker. Android: the APK's own service-worker.js — the
- *  same two calls Settings' App version row makes, in the same order. */
+ *  controlling service worker. Android, and an UNCONTROLLED web page (which
+ *  came from the network, so the server's file is its own build): the
+ *  deployed service-worker.js — the same two calls Settings' App version row
+ *  makes, in the same order. A controlled page whose worker is silent stays
+ *  null: it runs from a cache the server may be ahead of. */
 async function runningBuild() {
   const sw = await getBuildVersion();
   if (sw && sw.cacheVersion) return sw.cacheVersion;
-  if (!PlatformBridge.isAndroid) return null;
-  const apk = await fetchServerBuildVersion();
-  return apk && apk.cacheVersion ? apk.cacheVersion : null;
+  if (!PlatformBridge.isAndroid && controlled()) return null;
+  const file = await fetchServerBuildVersion();
+  return file && file.cacheVersion ? file.cacheVersion : null;
+}
+
+/** Whether a service worker controls this page (jsdom and a first visit: no). */
+function controlled() {
+  try { return !!(navigator.serviceWorker && navigator.serviceWorker.controller); } catch (_e) { return false; }
+}
+
+/** Whether this profile has been used: any vot-* key of the app's in
+ *  localStorage other than our own. Every used profile carries at least the
+ *  vot-state shim (index.html reads it before React mounts). Synchronous, so
+ *  it can be read before this boot writes anything. */
+function profileUsed() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('vot-') === 0 && k !== LAST_SEEN_BUILD_KEY) return true;
+    }
+  } catch (_e) { /* no storage: no history to have */ }
+  return false;
 }
 
 /**
@@ -113,13 +148,14 @@ async function runningBuild() {
  * @returns {Promise<'unknown'|'first'|'same'|'shown'>}
  */
 export async function announceUpdateIfAny() {
+  const used = profileUsed();           // before the first await: nothing of this boot has written yet
   const running = await runningBuild();
   if (!running) return 'unknown';
   let seen = null;
   try { seen = localStorage.getItem(LAST_SEEN_BUILD_KEY); } catch (_e) { seen = null; }
   if (seen === running) return 'same';
   try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode: announce anyway, next boot repeats */ }
-  if (seen == null) return 'first';
+  if (seen == null && !used) return 'first';
   announced = true;
   const resume = pendingResume;
   pendingResume = null;
