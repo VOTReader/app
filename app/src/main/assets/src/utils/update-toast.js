@@ -22,17 +22,15 @@
      unknown  — the version could not be read. NOTHING is written and nothing
                 is shown: a null must never impersonate a value, and writing
                 it would turn the next real read into a false "updated".
-     first    — nothing stored AND nothing of the app's in storage: a fresh
-                profile's first boot. Store silently; there is nothing to
-                compare against, so there is nothing to announce. A USED
-                profile with nothing stored is not this: it was on a build
-                older than this key and has just crossed (2026-09-11, the
-                first update into the build that introduced the key was
-                silent for every existing reader) — that is `shown`, the
-                plain text; the old page never flushed a clock to offer.
-                The history is read BEFORE the first await, while nothing of
-                this boot has written yet: the entry calls us before any
-                screen mounts, and the stores write on hydration and on use.
+     first    — nothing stored. Store silently; there is nothing to compare
+                against, so there is nothing to announce. (91 toasted here for
+                a USED profile, reading absence as "crossed from a build older
+                than this key"; retired 2026-09-11 — the 89 → 90 silence it was
+                cut against was a sibling document writing the key first, and
+                absence is ambiguous: a kill inside localStorage's first commit
+                window leaves a used profile with no key on the SAME build. The
+                web crossing rides the reload flag; Android crosses from a
+                pre-key build silently once and the key carries the rest.)
      same     — stored equals running. Nothing to say.
      shown    — stored differs: the profile has just moved builds. Say so,
                 briefly, on whatever screen the reader is on (showToast mounts
@@ -155,20 +153,6 @@ function controlled() {
   try { return !!(navigator.serviceWorker && navigator.serviceWorker.controller); } catch (_e) { return false; }
 }
 
-/** Whether this profile has been used: any vot-* key of the app's in
- *  localStorage other than our own. Every used profile carries at least the
- *  vot-state shim (index.html reads it before React mounts). Synchronous, so
- *  it can be read before this boot writes anything. */
-function profileUsed() {
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.indexOf('vot-') === 0 && k !== LAST_SEEN_BUILD_KEY) return true;
-    }
-  } catch (_e) { /* no storage: no history to have */ }
-  return false;
-}
-
 /**
  * Compare the running build with the last one this profile saw; announce a
  * change once. Resolves to which of the four answers it took, for tests and
@@ -176,7 +160,6 @@ function profileUsed() {
  * @returns {Promise<'unknown'|'first'|'same'|'shown'>}
  */
 export async function announceUpdateIfAny() {
-  const used = profileUsed();           // before the first await: nothing of this boot has written yet
   if (takeUpdateReload()) {
     // THE RELOAD IS THE EVIDENCE (w-toast-reload-flag, 2026-09-11). sw-register reloaded
     // THIS document onto a new worker and said so in the tab's own sessionStorage before
@@ -197,7 +180,7 @@ export async function announceUpdateIfAny() {
   try { seen = localStorage.getItem(LAST_SEEN_BUILD_KEY); } catch (_e) { seen = null; }
   if (seen === running) return 'same';
   try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode: announce anyway, next boot repeats */ }
-  if (seen == null && !used) return 'first';
+  if (seen == null) return 'first';
   return announce();
 }
 
