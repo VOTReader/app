@@ -271,11 +271,19 @@ const BAND_FLOOR = {
     '320x640': 135,   // x 52..187 of 320 along the rotated root, chrome 52.2% — identical in all three runs
     '426x952': 290,   // x 52..342 of 426 along the rotated root, chrome 27.7% — identical in all three runs
   },
-  /* linux: DELIBERATELY UNREGISTERED. Registering a guess would be worse than
-     the gap — an unregistered platform says "this has never been measured
-     here", which is true and actionable, while a guessed number says "the band
-     shrank" about a machine nobody has measured. It fails exactly the way an
-     unregistered FRAME does, and for the same reason. */
+  /* linux: REGISTERED 2026-09-11 from three attempts of CI run 34582458348
+     (ubuntu-latest, Chrome 152, renderer SwiftShader — named on every 2d line),
+     all three identical and equal to win32's. Equal by MECHANISM, not by luck:
+     the band's edges are the topbar's and the strip's rotated extents, which are
+     44 px tap targets plus fixed padding — pixel-pinned, so the platform's font
+     metrics never reach them. Before this the platform was DELIBERATELY
+     UNREGISTERED and the step was red here by design: a guessed number says "the
+     band shrank" about a machine nobody has measured, while an unregistered one
+     says "never measured here", which is true and actionable. */
+  linux: {
+    '320x640': 135,   // x 52..187 of 320 along the rotated root, chrome 52.2% — attempts 1, 2, 3 identical
+    '426x952': 290,   // x 52..342 of 426 along the rotated root, chrome 27.7% — attempts 1, 2, 3 identical
+  },
 };
 const BAND_FLOOR_PLATFORM = BAND_FLOOR[process.platform];
 
