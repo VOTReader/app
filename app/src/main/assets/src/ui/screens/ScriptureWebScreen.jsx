@@ -946,9 +946,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       </div>
 
-      {/* HIDE ALL — outside everything it hides, because it is the way back.
-          The label stays constant and aria-pressed carries the state, the same
-          convention as the Scripture / My web seg. */}
+      {/* HIDE ALL — outside everything it hides, because it is the way back;
+          bottom-right, the one free corner on the smallest frame (app.css says
+          why). The label stays constant and aria-pressed carries the state, the
+          same convention as the Scripture / My web seg. */}
       <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
         aria-label="Hide controls" aria-pressed={chromeHidden} onClick={toggleChrome}>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
