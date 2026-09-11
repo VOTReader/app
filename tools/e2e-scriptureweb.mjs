@@ -52,6 +52,13 @@
  *         what comes back is whatever is behind. 2a's rect overlap is what
  *         covers such an element.
  *     2c  nothing spills the viewport horizontally
+ *     2f  the chrome whose ABSENCE is a defect — the topbar (the only way off
+ *         this screen) and the CC-BY line (a licence obligation) — is PAINTED,
+ *         not merely present. Nothing else in arm 2 can see that: 2a skips the
+ *         credit's pair because the fix nests it, 2b drops an unpainted element
+ *         from the hit list rather than failing it, and an unpainted required
+ *         selector is a note. Without 2f the passing state "2a finds nothing
+ *         about the credit" is equally satisfied by a credit that is not there
  *   and every frame prints what arm 2 RAN — the blocks it found, the pairs it
  *   compared, the elements it hit-tested — because 0 failures and 0 checks are
  *   the same output, and a renamed selector shrinks the check set silently.
@@ -145,6 +152,22 @@ const CHROME = ['.sw-topbar', '.sw-controls', '.sw-context', '.sw-legend', '.sw-
    rename-detection would fire on it every run. It belongs in the overlap set
    because it is the card that covered the Back button. */
 const CHROME_WHEN_SHOWN = ['.sw-orientation-note'];
+/* REQUIRED TO BE PAINTED, not merely present. Without this the walk has no
+   positive control on the CC-BY line at all: 2a skips its pair because the fix
+   puts it INSIDE `.sw-controls` (a child's rect is a subset of its parent's),
+   2b drops it from the hit list when it is not painted rather than failing it,
+   and an unpainted required selector is only a `notPainted=[...]` note. Every
+   arm therefore goes quiet for "the attribution is GONE" in the same way it
+   goes quiet for "the attribution is fine".
+
+   `.sw-legend` is deliberately NOT on this list: it is `display: none` at a
+   narrow frame by design, and a list that over-claims fires on a layout choice.
+   `.sw-controls` is not on it either, and has a stronger witness — arm 1 drives
+   the zoom buttons inside it and cannot pass without them. What is left is the
+   chrome whose absence is a defect rather than a layout choice: the topbar,
+   which is the only way off this screen, and the credit, which is a licence
+   obligation. */
+const REQUIRED_PAINTED = ['.sw-topbar', '.sw-credit'];
 /* The portrait hint is placed 10 px below the topbar. The ceiling is not a pin
    on the 10 — it catches a MEASUREMENT THAT HAS GONE STALE, which is not a
    hypothetical: a draft that observed the topbar only on mount read its
@@ -166,6 +189,7 @@ const PARAMS = [
   'panMs=' + PAN_MS,
   'chrome=' + CHROME.join('|'),
   'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
+  'requiredPainted=' + REQUIRED_PAINTED.join('|'),
   'noteGapMax=' + NOTE_GAP_MAX,
 ].join(' ');
 
@@ -397,6 +421,13 @@ function armChrome(tag, geo) {
      are printed and the empty case is a failure rather than a pass. */
   if (geo.blocksMissing.length) {
     fail(`2 the chrome selectors ${geo.blocksMissing.join(' ')} match nothing in the DOM — renamed, and every check that used them silently left the set`);
+  }
+  const goneDark = geo.blocksInvisible.filter((sel) => REQUIRED_PAINTED.includes(sel));
+  if (goneDark.length) {
+    fail(`2f ${goneDark.join(' ')} is present in the DOM but NOT PAINTED — every other arm is silent about this, `
+      + 'because 2a skips a nested pair, 2b drops an unpainted element from the hit list, and a required '
+      + 'selector that matches but does not paint is only a note. An absent CC-BY line is worse than an '
+      + 'unreadable one, and this is the only arm that can see it');
   }
   if (!geo.pairs) fail('2a compared ZERO block pairs — the overlap check did not run, which is not the same as passing');
   if (!geo.hits) fail('2b hit-tested ZERO elements — the reachability check did not run, which is not the same as passing');
