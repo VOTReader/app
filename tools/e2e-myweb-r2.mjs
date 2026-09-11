@@ -56,7 +56,12 @@ const TREE = resolve(arg('before', OWN));
 const OUT = arg('out', '');
 const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
 const NAV_MS = 60000;
-const STREAK_HORIZ = 0.35;   // v3 gate: main (ce710380) and the tip read in the log; set between them with the number
+/* v3 gate. Measured 2026-09-11 on the RTX 5080 with this instrument: main
+   ce710380 reads 0.874 (800x360) / 0.900 (1920x1080); the tip ae30374e reads
+   0.365 / 0.219. The gate sits at the midpoint so a regression halfway back to
+   the streak field fails. The phone frame's 0.365 is its geometry, not a
+   defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
+const STREAK_HORIZ = 0.5;
 const ARMS = arg('arms', 'S,T').split(',');
 const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
