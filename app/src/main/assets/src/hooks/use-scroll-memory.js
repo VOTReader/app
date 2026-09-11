@@ -167,6 +167,17 @@ function captureAnchor(el) {
   return { anchorKey: anchor.getAttribute('data-hl-key'), anchorOff: Math.round(cRect.top - anchor.getBoundingClientRect().top) };
 }
 
+// The scroller's position AS IT STANDS: pixel y, fraction, and the content anchor.
+// One reader for the debounced flush and the update reload's synchronous write,
+// so the two can never disagree about what "where the reader is" means.
+function liveScrollRecord() {
+  if (!__scrollEl) return null;
+  const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
+  const max = Math.max(scrollHeight - clientHeight, 1);
+  const a = captureAnchor(__scrollEl);
+  return { y: scrollTop, pct: Math.max(0, Math.min(1, scrollTop / max)), anchorKey: a.anchorKey, anchorOff: a.anchorOff };
+}
+
 // Content-coordinate Y of an anchor element's top (distance from the top of the
 // scrollable content), or null if it isn't in the DOM yet. Invariant of the
 // current scrollTop because the rect-delta and scrollTop cancel.
@@ -300,13 +311,10 @@ export function useScrollMemory({
   const flushScrollToActiveTab = React.useCallback(() => {
     if (tabsOverviewOpenRef.current) return; // don't overwrite with overview scroll
     const key = scrollKeyRef.current;
-    if (!key || !__scrollEl) return;
-    const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
-    const max = Math.max(scrollHeight - clientHeight, 1);
-    const pct = Math.max(0, Math.min(1, scrollTop / max));
-    const a = captureAnchor(__scrollEl);
+    const rec = liveScrollRecord();
+    if (!key || !rec) return;
     updateActiveTab((t) => ({
-      scrollPositions: mergeScrollPosition(t.scrollPositions, key, { y: scrollTop, pct, anchorKey: a.anchorKey, anchorOff: a.anchorOff })
+      scrollPositions: mergeScrollPosition(t.scrollPositions, key, rec)
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRef ref read via .current — call-time fresh, stable object identity. Per HARD INVARIANT above, deps are intentionally [updateActiveTab] only.
   }, [updateActiveTab]);
@@ -348,10 +356,35 @@ export function useScrollMemory({
     const onVis = () => {if (document.visibilityState === 'hidden') flushScrollToActiveTab();};
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pagehide', flushScrollToActiveTab);
+    /* The update's self-reload (sw-register fires this right before reload()).
+       pagehide's flush is a React state update, and a document that is one call
+       from reload() does not render again — so the debounced persist never
+       carries it. Write the live record straight into the persisted union
+       through usePersistedState's patched flush instead. The state update is
+       still made (it is what the export path and a same-document survivor
+       read); when no flush is published the state update is all there is. */
+    const onBeforeReload = () => {
+      flushScrollToActiveTab();
+      if (tabsOverviewOpenRef.current) return;
+      const key = scrollKeyRef.current;
+      const rec = liveScrollRecord();
+      const flush = /** @type {any} */ (window).__flushPersistState;
+      if (!key || !rec || typeof flush !== 'function') return;
+      flush((u) => {
+        if (!u || !Array.isArray(u.tabs)) return u;
+        const i = typeof u.activeTabIdx === 'number' ? u.activeTabIdx : 0;
+        return { ...u, tabs: u.tabs.map((t, j) => (j === i && t
+          ? { ...t, scrollPositions: mergeScrollPosition(t.scrollPositions, key, rec) }
+          : t)) };
+      });
+    };
+    window.addEventListener('vot:before-update-reload', onBeforeReload);
     return () => {
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('pagehide', flushScrollToActiveTab);
+      window.removeEventListener('vot:before-update-reload', onBeforeReload);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef and scrollKeyRef are refs read via .current
   }, [flushScrollToActiveTab]);
 
   // ── Effect 3: screen-change → update key + restore saved scroll ────────
