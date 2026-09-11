@@ -72,6 +72,11 @@
  *         it — topbar and location readout both — and not far below it — the gap is printed either way, and "the hint is not up at
  *         this frame" is reported as its own answer rather than as a pass
  *     2d  the open canvas band — the tallest run of viewport height no chrome
+ *         covers — against a REGISTERED PER-FRAME FLOOR, measured rather than
+ *         chosen, with no tolerance band. Chrome that stops overlapping itself
+ *         has not necessarily got out of the reader's way: landing 70 cut this
+ *         band 39%% at 320x640 with every other arm green. A frame with no
+ *         registered floor FAILS rather than passing — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
  *         reading-column question was really asking about, and no threshold
  *         for it has been agreed.
@@ -181,6 +186,34 @@ const REQUIRED_PAINTED = [
    CSS-rotated box and placed the note 227 px out, at 299 px against a topbar
    ending at 72. */
 const NOTE_GAP_MAX = num('SWWEB_NOTE_GAP_MAX', 30);
+/* 2d's FLOOR, PER FRAME — the READER'S reading area, which until now nothing
+   gated. 2d was the only arm on this screen with no `fail()` at all, and a
+   measurement with no threshold is a note, which is what a reader skims. The
+   cost of that: landing 70 cut this band from 253 to 154 px at 320x640
+   (−39.1%) and from 584 to 518 at 426x952 **with every arm green**, signed off
+   by two people including me. CHROME THAT STOPS OVERLAPPING ITSELF HAS NOT
+   NECESSARILY GOT OUT OF THE READER'S WAY, and only this number tells them
+   apart.
+
+   MEASURED, NOT CHOSEN: three consecutive control runs against main at f32380ea,
+   agreeing at every frame in POSITION as well as height, across both text
+   scales and under CPU contention. A stable height whose y range slides would
+   be a passing number produced by a racing measurement.
+
+   ZERO TOLERANCE BAND, deliberately, and the reason is not fussiness: a floor
+   at exactly the measured value makes a 1 px shrink RED, which is the point —
+   any shrink is a cost to the reader and wants justifying. The bundle CEILING
+   carries 15% headroom because a ceiling is room for growth; a floor is a
+   claim about the present, and jitter in the present is an instrument fault,
+   not something to leave slack for. A floor that has been lowered once to stop
+   a flake is decoration. Moving one takes a commit showing the arithmetic.
+
+   A FRAME WITH NO REGISTERED FLOOR FAILS rather than passing: a default that
+   passes is indistinguishable from a gate that is not watching that frame. */
+const BAND_FLOOR = {
+  '320x640': 154,   // y 237..391, chrome 70.6% -- same in all three runs
+  '426x952': 518,   // y 237..755, chrome 42% -- same in all three runs
+};
 
 const PARAMS = [
   'frames=' + FRAMES.map((f) => f.w + 'x' + f.h).join(','),
@@ -198,6 +231,7 @@ const PARAMS = [
   'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
   'requiredPainted=' + REQUIRED_PAINTED.map((r) => r.sel).join('|'),
   'noteGapMax=' + NOTE_GAP_MAX,
+  'bandFloor=' + Object.entries(BAND_FLOOR).map(([k, v]) => k + ':' + v).join('|'),
 ].join(' ');
 
 console.log('[e2e-swweb] PARAMS ' + PARAMS);
@@ -435,6 +469,19 @@ function armChrome(tag, geo) {
       fail(`2e the portrait hint floats ${geo.noteGap} px below ${geo.noteAgainst} against an intended 10 — its placement measurement `
         + 'has gone stale, which is what a draft observing the topbar only on mount produced (299 px against a topbar ending at 72)');
     }
+  }
+  /* Built from the fields the object ALREADY carries. A second copy of the
+     viewport size would be two definitions that must agree. */
+  const frameKey = `${Math.round(geo.innerWidth)}x${geo.innerHeight}`;
+  const floor = BAND_FLOOR[frameKey];
+  if (floor === undefined) {
+    fail(`2d ${frameKey} has NO REGISTERED FLOOR for the open reading band (${geo.band.h} px measured). `
+      + 'A new frame needs a measured floor, not a default — a default that passes is indistinguishable '
+      + 'from a gate that is not watching this frame at all');
+  } else if (geo.band.h < floor) {
+    fail(`2d the open reading band is ${geo.band.h} px at ${frameKey}, BELOW the registered floor of ${floor} px `
+      + `— the chrome took ${floor - geo.band.h} px from the reader. Chrome that stops overlapping itself has not `
+      + 'necessarily got out of the reader\'s way, and this is the only arm that can tell the difference');
   }
   notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; chrome covers ${geo.coveredPct}%`);
 
