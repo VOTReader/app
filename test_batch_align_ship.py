@@ -187,5 +187,36 @@ class ShipRecordsWhichRecordingEachTimelineBelongsTo(unittest.TestCase):
         self.assertNotIn("one:retired", self._ship())
 
 
+class OnlyNamesUnitsTheVolumeActuallyHas(unittest.TestCase):
+    """--only <keys> aligns the named units and lets ship() carry the volume's
+    others forward (one chapter per commit, 2026-09-11). The check that earns
+    its keep: a key the volume does not carry must refuse up front. Without it
+    a typo aligns nothing, ships nothing new, and exits 0 with every key
+    reported as carried forward -- a run that looks finished and did no work.
+    Runs main() only as far as the manifest (in the repo): no fragments, no
+    model, no audio."""
+
+    def _main(self, *argv):
+        import sys
+        saved = sys.argv
+        sys.argv = ["batch-align.py", *argv]
+        try:
+            with self.assertRaises(SystemExit) as cm:
+                bam.main()
+        finally:
+            sys.argv = saved
+        return cm.exception
+
+    def test_a_key_outside_the_volume_refuses_before_any_work(self):
+        e = self._main("--volkeys", "study", "--no-ship", "--only", "study:not-a-chapter")
+        self.assertIn("study:not-a-chapter", str(e))
+        self.assertIn("--only names keys not in volumes", str(e))
+
+    def test_the_volume_prefix_is_checked_too(self):
+        # A real letter key under the wrong --volkeys is the same mistake.
+        e = self._main("--volkeys", "study", "--no-ship", "--only", "one:christmas")
+        self.assertIn("one:christmas", str(e))
+
+
 if __name__ == "__main__":
     unittest.main()
