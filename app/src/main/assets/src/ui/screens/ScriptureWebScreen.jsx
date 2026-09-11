@@ -402,7 +402,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     /* The zoom's own input, published for the browser walks (the same line the
        scripture-web walk branch carries, so the two merge as one): a walk that
        reads pixels after "three zoom steps" must first know the steps took. */
-    if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', String(Math.round((cam.ppv / v.DPR) * 100) / 100));
+    if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
     const chrome = chromeRef.current;
     const base = viewFor();
     /* THE ESSENTIAL AUTO-SWITCH, evaluated here rather than in a zoom handler
