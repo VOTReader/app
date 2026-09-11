@@ -308,3 +308,45 @@ describe('usePersistedState — export flush bridge (window.__flushPersistState)
     expect(setSpy).toHaveBeenCalledTimes(2); // immediate write left nothing pending
   });
 });
+
+/* ── the update reload: a synchronous, patched write (2026-09-10) ──
+   sw-register owns the reload, so the record can be written right before it. The
+   debounce serves crashes and tab kills and stays; this is the one caller that may
+   not wait 250 ms, and it needs to fold the live scroll position in without a render
+   in between (a document does not re-render after pagehide, and the takeover's
+   reload() is one call away). */
+describe('usePersistedState — window.__flushPersistState(patch)', () => {
+  it('writes the LATEST union through the patch at once, even with nothing pending', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { rerender(withQuery('abc')); });
+    act(() => { vi.advanceTimersByTime(300); });     // the debounced write has happened; nothing pending
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    const flush = /** @type {any} */ (window).__flushPersistState;
+    act(() => { flush((u) => ({ ...u, tabs: [{ ...u.tabs[0], scrollPositions: { k: { y: 900 } } }] })); });
+    expect(setSpy, 'a patched flush is a write, pending or not').toHaveBeenCalledTimes(2);
+    const written = setSpy.mock.calls[1][0];
+    expect(written.tabs[0].searchQuery, 'patched on top of the latest union, not a stale one').toBe('abc');
+    expect(written.tabs[0].scrollPositions).toEqual({ k: { y: 900 } });
+  });
+
+  it('a patched flush supersedes a pending debounced union rather than racing it', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { rerender(withQuery('typing')); });    // pending inside the 250 ms window
+    const flush = /** @type {any} */ (window).__flushPersistState;
+    act(() => { flush((u) => ({ ...u, activeReadKey: 'patched' })); });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy.mock.calls[0][0].tabs[0].searchQuery).toBe('typing');
+    expect(setSpy.mock.calls[0][0].activeReadKey).toBe('patched');
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(setSpy, 'the pending union was consumed by the patched write; the timer writes nothing more').toHaveBeenCalledTimes(1);
+  });
+
+  it('CONTROL: a bare flush with nothing pending is still a no-op (unchanged contract)', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+});

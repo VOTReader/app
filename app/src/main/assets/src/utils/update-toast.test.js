@@ -31,7 +31,7 @@ vi.mock('./toast.js', async (importOriginal) => {
 });
 
 import { showToast } from './toast.js';
-import { announceUpdateIfAny, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT } from './update-toast.js';
+import { announceUpdateIfAny, offerListeningResume, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
 const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb';
@@ -132,5 +132,62 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
 
   it('its localStorage key survives the one-time vot-* sweep (LS_SKIP_LIST)', () => {
     expect(LS_SKIP_LIST).toContain(LAST_SEEN_BUILD_KEY);
+  });
+});
+
+/* ── "Tap to continue listening." (Corbin, 2026-09-10) ──
+   When the browser refuses the resume after the update's reload, the update toast
+   carries the tap. The audio player (bundle-d) reaches this through
+   window.__votUpdateToastResume; the two can arrive in either order — the announcer
+   may still be waiting on GET_VERSION when the player learns play() was refused —
+   and the text must be the same either way, with no flicker between the two. */
+describe('offerListeningResume — the update toast carries the tap', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    const stale = document.getElementById(UPDATED_TOAST_ID);
+    if (stale) stale.remove();
+  });
+
+  it('after the announcer showed the toast: the text gains the tap, one tap calls back once and closes it', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    expect(el).not.toBeNull();
+    expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
+    expect(UPDATED_TOAST_LISTEN_TEXT).toBe('VOTReader was just updated. Tap to continue listening.');
+    expect(el.getAttribute('role')).toBe('button');
+    el.click();
+    expect(onTap).toHaveBeenCalledTimes(1);
+    el.click();
+    expect(onTap, 'one offer, one tap').toHaveBeenCalledTimes(1);
+    expect(document.getElementById(UPDATED_TOAST_ID), 'the toast closes on the tap').toBeNull();
+  });
+
+  it('offered BEFORE the announcer decides: the toast appears once, already carrying the tap', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    expect(document.getElementById(UPDATED_TOAST_ID), 'nothing to show yet — no new build known').toBeNull();
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
+    expect(showToast, 'one toast, not a plain one replaced by a tap one').toHaveBeenCalledTimes(1);
+    el.click();
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('with no new build (same version) an offer shows nothing — the tap rides an update toast or not at all', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, NEW);
+    offerListeningResume(vi.fn());
+    expect(await announceUpdateIfAny()).toBe('same');
+    expect(document.getElementById(UPDATED_TOAST_ID)).toBeNull();
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('is published for bundle-d as window.__votUpdateToastResume (the player cannot import bundle-b)', () => {
+    expect(window.__votUpdateToastResume).toBe(offerListeningResume);
   });
 });

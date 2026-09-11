@@ -3160,3 +3160,103 @@ describe('audio-player — the tour defers the notification ask', () => {
     expect(bridge.setAudioActive).toHaveBeenLastCalledWith(true);
   });
 });
+
+/* ── the update reload (Corbin, 2026-09-10): "land reader back exactly where they were" ──
+   For a listener that is the same recording at the EXACT clock, playing again if the
+   browser allows it, and one tap away if it does not. The periodic snapshot is up to
+   five seconds late and whole-second; the reload event is answered with the element's
+   own currentTime, and the boot after the reload tries play() before asking for a tap. */
+describe('audio-player — resume across the update reload', () => {
+  const REC_KEY = 'vot-audio-resume-after-update';
+  const rebuildGlobals = () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+  };
+  const dropGlobals = () => { delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr; };
+  const SNAP = { v: 2, mode: 'letter', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:letter-c', time: 40,
+    track: { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', url: URL_OF('idC'), readerCode: 'T', partLabel: null } };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  class Counting extends FakeAudio { constructor() { super(); this.playCalls = 0; } play() { this.playCalls += 1; return super.play(); } }
+  class Refusing extends Counting { play() { this.playCalls += 1; this.played = true; this.paused = true; return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' })); } }
+  afterEach(() => { sessionStorage.removeItem(REC_KEY); delete window.__votUpdateToastResume; });
+
+  it('the reload event while PLAYING records the recording and the EXACT clock, and refreshes the snapshot', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().readyState = 4; el().duration = 60;
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 41.37;
+    window.dispatchEvent(new Event('vot:before-update-reload'));
+    const rec = JSON.parse(sessionStorage.getItem(REC_KEY) || 'null');
+    expect(rec && rec.url).toBe(URL_OF('idC'));
+    expect(rec.time, 'the element clock, not the whole-second store value').toBe(41.37);
+    expect(typeof rec.at).toBe('number');
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the durable snapshot is refreshed at the same instant (its own whole-second format)').toBe(41);
+  });
+
+  it('the reload event while idle or paused leaves NO record — a stale flag must not impersonate the reader\'s choice', () => {
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 5, at: Date.now() }));
+    window.dispatchEvent(new Event('vot:before-update-reload'));
+    expect(sessionStorage.getItem(REC_KEY)).toBeNull();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.toggle();                                  // paused by the reader
+    window.dispatchEvent(new Event('vot:before-update-reload'));
+    expect(sessionStorage.getItem(REC_KEY)).toBeNull();
+  });
+
+  it('boot with the record rebuilds the bar, seeks to the EXACT clock and tries play() — no tap asked for', async () => {
+    globalThis.Audio = Counting;
+    const offer = vi.fn(); window.__votUpdateToastResume = offer;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick();
+      expect(sessionStorage.getItem(REC_KEY), 'consumed on boot, never replayed').toBeNull();
+      expect(el() && el().playCalls, 'play() was tried without a gesture').toBe(1);
+      el().readyState = 1; el().duration = 60; el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(41.37);
+      expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(URL_OF('idC'));
+      expect(offer).not.toHaveBeenCalled();
+    } finally { dropGlobals(); }
+  });
+
+  it('a play() the browser refuses (NotAllowedError) parks the bar PAUSED and offers ONE tap through the update toast; the tap plays', async () => {
+    globalThis.Audio = Refusing;
+    const offer = vi.fn(); window.__votUpdateToastResume = offer;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick(); await tick();
+      expect(offer).toHaveBeenCalledTimes(1);
+      expect(typeof offer.mock.calls[0][0]).toBe('function');
+      expect(AudioPlayer.getState().status, 'not stuck in loading: the bar shows Play').toBe('paused');
+      expect(el().playCalls).toBe(1);
+      offer.mock.calls[0][0]();                           // the reader taps the toast
+      await tick();
+      expect(el().playCalls, 'the tap is a play command at the same clock').toBe(2);
+    } finally { dropGlobals(); }
+  });
+
+  it('a record for ANOTHER recording, or older than two minutes, is dropped without a play attempt', async () => {
+    globalThis.Audio = Counting;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idA1'), time: 41.37, at: Date.now() }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick();
+      expect(sessionStorage.getItem(REC_KEY)).toBeNull();
+      expect(el() ? el().playCalls : 0).toBe(0);
+      expect(AudioPlayer.getState().status).toBe('paused');   // the ordinary restored bar
+    } finally { dropGlobals(); }
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() - 3 * 60 * 1000 }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick();
+      expect(sessionStorage.getItem(REC_KEY)).toBeNull();
+      expect(el() ? el().playCalls : 0).toBe(0);
+    } finally { dropGlobals(); }
+  });
+});
