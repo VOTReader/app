@@ -145,7 +145,9 @@ async function zoomBandTo(page, c, r0, which, label, frac) {
     const band = bands.find((b) => b.label.toLowerCase().startsWith(label.toLowerCase()));
     if (!band) return { ok: false, why: `band ${label} not visible after ${i} notches; visible ${bands.length}: ${bands[0] && bands[0].label}..${bands[bands.length - 1] && bands[bands.length - 1].label}; cam ${JSON.stringify(r.cam)} camV ${JSON.stringify(r.camV)}` };
     if ((band.x1 - band.x0) / c.w >= frac) return { ok: true, band, steps: i };
-    const cx = c.l + Math.max(20, Math.min(c.w - 20, (band.x0 + band.x1) / 2));
+    // anchor INSIDE the band: Revelation is 10 px wide at fit on 800 px, and a
+    // 20 px edge clamp put the anchor in Jude, so the zoom pushed it off screen
+    const cx = c.l + Math.max(4, Math.min(c.w - 4, (band.x0 + band.x1) / 2));
     await page.mouse.move(cx, which === 'top' ? c.t + r0.topY + 12 : c.t + r0.bottomY - 12);
     await page.mouse.wheel({ deltaY: -120 }); await sleep(160);
   }
