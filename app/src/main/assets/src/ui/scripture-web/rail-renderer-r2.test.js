@@ -88,6 +88,27 @@ describe('My Web r2 — G1 full resolution', () => {
     const c2 = fakeCtx(); drawPersonalWeb(c2, null, fan, opts);
     expect(c2.calls.stroke - ctx0.calls.stroke).toBe(1);
   });
+  it('while a gesture is live a corridor keeps LIVE_CAP layers; at rest every visible one; the cap eases in coverage', () => {
+    const base = { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) };
+    const ctx0 = fakeCtx(); drawPersonalWeb(ctx0, null, base, opts);
+    const n = 40;
+    const corridor = { count: n, versePos: new Float32Array(n).map((_, i) => 50 + i * 0.01), votPos: new Float32Array(n).fill(20) };
+    const rest = fakeCtx(); drawPersonalWeb(rest, null, corridor, opts);
+    expect(rest.calls.stroke - ctx0.calls.stroke).toBe(n);   // 40 < the full cap at this alpha
+    const liveCtx = fakeCtx(); drawPersonalWeb(liveCtx, null, corridor, Object.assign({}, opts, { capFraction: 0 }));
+    expect(liveCtx.calls.stroke - ctx0.calls.stroke).toBe(RR.LIVE_CAP + 1);   // LIVE_CAP layers + the shared overflow
+    // coverage, not the layer count, is what eases: at f = 0.5 the cap sits where
+    // coverage is halfway between the live and the full coverage
+    const a = 0.04;
+    const cov = (k) => 1 - Math.pow(1 - a, k);
+    const full = RR.layerCap(a, 1), liveCap = RR.layerCap(a, 0), mid = RR.layerCap(a, 0.5);
+    expect(liveCap).toBe(RR.LIVE_CAP);
+    expect(full).toBeGreaterThan(100);
+    expect(Math.abs(cov(mid) - (cov(liveCap) + cov(full)) / 2)).toBeLessThan(0.02);
+    // monotone in f
+    let prev = 0;
+    for (let f = 0; f <= 1.0001; f += 0.05) { const c = RR.layerCap(a, f); expect(c).toBeGreaterThanOrEqual(prev); prev = c; }
+  });
 });
 
 /** Longest run of consecutive samples that stays within `flat` px of one y

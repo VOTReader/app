@@ -38,6 +38,12 @@ const REACH_MARGIN = 0.12;
 const REACH_GAPS = 1.4;
 /** The level run along the far rail is drawn at this share of the thread's alpha. */
 export const RUN_ALPHA = 0.3;
+/** Layers per colour bin while a gesture is live (opts.capFraction 0): about
+ * 250 strokes a frame instead of a thousand, so a pinch on a phone keeps its
+ * frames; at rest the cap is the full one (every visible layer) and the
+ * picture is the approved one. Between the two the cap follows a coverage
+ * ease, so the corridors brighten back over the fade without a step. */
+export const LIVE_CAP = 16;
 
 /**
  * Where the two rails sit.
@@ -278,6 +284,28 @@ export function threadPath(a, b, crossRail, o) {
  * the far rail (when there is one) at RUN_ALPHA of it, in its own batch, so a
  * thread to an off-screen book reads as a line diving into its rail.
  */
+/**
+ * Layers a corridor keeps at this alpha: the full count is the one past which
+ * one more thread moves a pixel by under 1/255; the live count is LIVE_CAP;
+ * between them the cap is chosen so the corridor's COVERAGE eases linearly
+ * (smoothstep) in the fraction, never the layer count, because coverage is
+ * what the eye sees and the first layers carry most of it.
+ * @param {number} alpha
+ * @param {number} f 0 live .. 1 full
+ */
+export function layerCap(alpha, f) {
+  const a = Math.min(0.99, Math.max(0.001, alpha));
+  const full = Math.max(1, Math.ceil(Math.log(1 / 255) / Math.log(1 - a)));
+  const live = Math.min(full, LIVE_CAP);
+  const u = Math.min(1, Math.max(0, f));
+  if (u >= 1) return full;
+  if (u <= 0) return live;
+  const s = u * u * (3 - 2 * u);
+  const cLive = 1 - Math.pow(1 - a, live), cFull = 1 - Math.pow(1 - a, full);
+  const c = cLive + (cFull - cLive) * s;
+  return Math.min(full, Math.max(live, Math.ceil(Math.log(1 - c) / Math.log(1 - a))));
+}
+
 class ContextBatches {
   constructor() {
     /** @type {Array<{bin:number, bx:number, tx:number, layer:number, pts:Array<[number, number]>}>} */
@@ -296,9 +324,10 @@ class ContextBatches {
    * @param {CanvasRenderingContext2D} ctx
    * @param {number} alpha
    * @param {number} near device px within which two ends count as one line
+   * @param {number} [capFraction] 0 = live cap, 1 = full (default)
    * @returns {number} strokes made
    */
-  stroke(ctx, alpha, near) {
+  stroke(ctx, alpha, near, capFraction) {
     const th = this.threads;
     th.sort((p, q) => p.bin - q.bin || p.bx - q.bx);
     /** @type {Map<number, Array<{pts:Array<[number, number]>, i0:number, i1:number}>>} */
@@ -312,7 +341,7 @@ class ContextBatches {
     // Layers beyond which one more thread moves a pixel by under 1/255 at this
     // alpha: (1 - alpha)^n * 255 < 1. 0.04 at 1x needs 136 of them, 0.23 at
     // 10x needs 21, 0.45 needs 9; past the cap threads share and nothing shows.
-    const cap = Math.max(1, Math.ceil(Math.log(1 / 255) / Math.log(1 - Math.min(0.99, Math.max(0.001, alpha)))));
+    const cap = layerCap(alpha, capFraction == null ? 1 : capFraction);
     const held = new Int32Array(cap + 1);   // stamp = i + 1 when a neighbour holds that layer
     let binStart = 0;
     for (let i = 0; i < th.length; i++) {
@@ -384,7 +413,7 @@ export function distanceToPath(pts, px, py) {
  *   bPos:Float32Array, kind:Uint8Array}|null} personal
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array}|null} underlay
  * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
- *   DPR:number, base:number, chrome:any, showUnderlay?:boolean,
+ *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, capFraction?:number,
  *   hoverIndex?:number, focusIndex?:number}} opts
  */
 /**
@@ -488,7 +517,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       if (!pts) continue;
       batches.add(myWebCanonT({ verse: underlay.versePos[i], verseTotal: opts.verseTotal }), a[0], b[0], pts);
     }
-    batches.stroke(ctx, cx.alpha, ctx.lineWidth * 4);
+    batches.stroke(ctx, cx.alpha, ctx.lineWidth * 4, opts.capFraction);
   }
 
   if (!personal || !personal.count) return rails;
