@@ -91,6 +91,14 @@ describe('app.css — milestone toast (P1-5)', () => {
   });
 });
 
+describe('app.css — the update toast\'s tap (utils/update-toast.js showListeningToast)', () => {
+  it('.vot-toast is not a target; .vot-toast-action is — the "Tap to continue listening." toast carries the second class', () => {
+    // The first `.vot-toast {` in the file is the base rule (L35); the second is a theme override.
+    expect(ruleBlock(CSS, '.vot-toast {')).toContain('pointer-events: none');
+    expect(ruleBlock(CSS, '.vot-toast-action {')).toContain('pointer-events:auto');
+  });
+});
+
 describe('app.css — annotation-hint coach-mark (P1-1)', () => {
   it('pill container is click-through and its text is not selectable', () => {
     const block = ruleBlock(CSS, '.ann-hint-pill');

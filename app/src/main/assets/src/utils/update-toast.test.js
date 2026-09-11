@@ -161,6 +161,14 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
     expect(UPDATED_TOAST_LISTEN_TEXT).toBe('VOTReader was just updated. Tap to continue listening.');
     expect(el.getAttribute('role')).toBe('button');
+    /* app.css: .vot-toast is pointer-events:none (a toast is not a target). A toast that IS the
+       target opts in with .vot-toast-action (the export-escape precedent), and showToast sets
+       className only when it CREATES the element: the announcer created this one, so the class
+       has to be added to the element, not passed. Measured (walk r5, refused policy): the click
+       fell through the toast and "sound never came back"; this unit test had passed by calling
+       the offer's callback directly. jsdom cannot see the stylesheet, so the class is the
+       witness here and app-css.test.js pins the rule it names. */
+    expect(el.classList.contains('vot-toast-action'), 'the tap toast must be hittable: .vot-toast alone is pointer-events:none').toBe(true);
     el.click();
     expect(onTap).toHaveBeenCalledTimes(1);
     el.click();
@@ -178,6 +186,7 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     const el = document.getElementById(UPDATED_TOAST_ID);
     expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
     expect(showToast, 'one toast, not a plain one replaced by a tap one').toHaveBeenCalledTimes(1);
+    expect(el.classList.contains('vot-toast-action'), 'created by the offer itself: hittable on this path too').toBe(true);
     el.click();
     expect(onTap).toHaveBeenCalledTimes(1);
   });
