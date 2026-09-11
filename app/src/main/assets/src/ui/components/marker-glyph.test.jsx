@@ -19,7 +19,9 @@
  *
  * The rasteriser understands M/L/H/V/Z and their relative forms, and treats an elliptical
  * arc as a straight line to its endpoint (the bookmark's corners are 2 units on a 24 grid).
- * Anything else THROWS, so a future glyph the instrument cannot read fails loudly instead of
+ * Anything else THROWS (every letter is tokenised, so an unknown command reaches the throw rather
+ * than being dropped — verifier-2 found C/S/Q/T falling through as lineTo), so a future glyph the
+ * instrument cannot read fails loudly instead of
  * reading as "distinct".
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -34,7 +36,9 @@ const SAME_ABOVE = 0.6;
 
 /** Flatten one SVG path `d` into subpaths: [{ points:[[x,y]...], closed }]. */
 function flatten(d) {
-  const tokens = d.match(/[MmLlHhVvZzAa]|-?\d*\.?\d+(?:e-?\d+)?/g) || [];
+  // EVERY letter is a token, so a command the switch does not handle reaches its throw. A
+  // class listing only the handled letters dropped C/S/Q/T silently (verifier-2, 09-11).
+  const tokens = d.match(/[A-Za-z]|-?\d*\.?\d+(?:e-?\d+)?/g) || [];
   const subs = [];
   let cur = null, x = 0, y = 0, sx = 0, sy = 0, cmd = null, i = 0;
   const num = () => { const t = tokens[i++]; if (t === undefined || /[A-Za-z]/.test(t)) throw new Error('path: number expected in ' + d); return parseFloat(t); };
@@ -159,5 +163,17 @@ describe('the Reading Position Marker does not wear the Bookmark glyph', () => {
     const oldRibbon = silhouette(host.querySelector('svg'));
     const overlap = iou(oldRibbon, silhouette(navBookmarkSvg()));
     expect(overlap, 'old ribbon vs bookmark IoU = ' + overlap.toFixed(3)).toBeGreaterThan(SAME_ABOVE);
+  });
+
+  it('CONTROL — a command the rasteriser does not know THROWS instead of flattening: a cubic (C) path', () => {
+    // verifier-2, 09-11: the tokenizer's class admitted only the letters the switch handles, so
+    // `C`/`S`/`Q`/`T` were dropped and their numbers fell through as implicit lineTo — this path
+    // silhouetted as a polyline through its control points and passed as "distinct" with nothing
+    // saying so. Red on that tokenizer (it returned a shape); green once every letter reaches the
+    // switch and the unknown ones hit its throw.
+    expect(() => flatten('M2 12C6 2 18 2 22 12')).toThrow(/unsupported command C/);
+    expect(() => flatten('M2 12S6 2 22 12')).toThrow(/unsupported command S/);
+    expect(() => flatten('M2 12Q12 2 22 12')).toThrow(/unsupported command Q/);
+    expect(() => flatten('M2 12T22 12')).toThrow(/unsupported command T/);
   });
 });
