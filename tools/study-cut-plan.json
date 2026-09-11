@@ -5,24 +5,484 @@
   "sourceName": "YahuShua-The Lamb of God_The TRUE Chronology of The Messiahs Crucifixion and Resurrection.mp3",
   "reader": "V",
   "coverageEvidence": "Two independent probes, 2026-09-05. (a) chars/second of 10.98 against the 10.40-14.12 band set by the six Purity files, same reader, known 1:1. (b) A CPU-only transcription: the head reads the title block then chapter 1 verbatim; the tail matches chapter 14 and only chapter 14, then a spoken credit. Both say the recording covers chapters 0-14 and stops.",
-  "omitted": ["lamb-of-god-ch15"],
+  "omitted": [
+   "lamb-of-god-ch0",
+   "lamb-of-god-ch15"
+  ],
   "omittedReason": "Chapter 15 is 'The True Chronology Chart' — a chart, not prose. It is not read aloud, so it gets no audio and no row. If a future recording DOES include it, add it here rather than stretching chapter 14 to the end of the file.",
+  "tailNote": "Chapter 14 runs to the end of the file. After its last spoken word ('...Volume 4', ends 3236.54 s) the tail is: silence to 3238.41, an outro MUSIC sting 3238.41-3243.77 s, silence to EOF 3246.30. Measured 2026-09-11: whisper large-v3 and CPU small both hear no words there; spectral flatness 0.126 and centroid 790 Hz, the same signature as the intro sting at 0.74-4.51 s (0.121, 722 Hz), against 0.27-0.33 / ~1500 Hz for speech; -28.8 dB mean. Kept, as the head sting is kept in ch1.",
   "chapters": [
-   { "id": "lamb-of-god-ch0",  "startSec": null },
-   { "id": "lamb-of-god-ch1",  "startSec": null },
-   { "id": "lamb-of-god-ch2",  "startSec": null },
-   { "id": "lamb-of-god-ch3",  "startSec": null },
-   { "id": "lamb-of-god-ch4",  "startSec": null },
-   { "id": "lamb-of-god-ch5",  "startSec": null },
-   { "id": "lamb-of-god-ch6",  "startSec": null },
-   { "id": "lamb-of-god-ch7",  "startSec": null },
-   { "id": "lamb-of-god-ch8",  "startSec": null },
-   { "id": "lamb-of-god-ch9",  "startSec": null },
-   { "id": "lamb-of-god-ch10", "startSec": null },
-   { "id": "lamb-of-god-ch11", "startSec": null },
-   { "id": "lamb-of-god-ch12", "startSec": null },
-   { "id": "lamb-of-god-ch13", "startSec": null },
-   { "id": "lamb-of-god-ch14", "startSec": null }
-  ]
+   {
+    "id": "lamb-of-god-ch0",
+    "startSec": null,
+    "evidence": {
+     "cleared": 1,
+     "fragments": 9,
+     "unspoken": 7
+    }
+   },
+   {
+    "id": "lamb-of-god-ch1",
+    "startSec": 0.0,
+    "evidence": {
+     "cleared": 38,
+     "fragments": 39,
+     "firstOnset": 24.22,
+     "rule": "first read chapter: file start"
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch01",
+     "bytes": 2570613,
+     "durationSec": 183.56,
+     "endSec": 183.55
+    }
+   },
+   {
+    "id": "lamb-of-god-ch2",
+    "startSec": 183.55,
+    "evidence": {
+     "cleared": 39,
+     "fragments": 39,
+     "firstOnset": 197.95,
+     "prevSpeechEnd": 181.64,
+     "prevSpeechEndVia": "fi47 6/19 From The Volumes of Truth, \"I Am The Pas",
+     "window": 16.31,
+     "silence": [
+      181.92,
+      184.35
+     ],
+     "silenceSec": 2.43,
+     "runnerUpSec": 2.07,
+     "frontMatterFirst": [
+      181.64,
+      184.88
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "from the volumes of truth volume 2",
+     "wordsAfter": "the messiah the lamb of god the true",
+     "rule": "longest of 3 silences in the window   ...volumes of truth volume 2 | the messiah the lamb of god..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch02",
+     "bytes": 2229766,
+     "durationSec": 159.22,
+     "endSec": 342.77
+    }
+   },
+   {
+    "id": "lamb-of-god-ch3",
+    "startSec": 342.77,
+    "evidence": {
+     "cleared": 146,
+     "fragments": 146,
+     "firstOnset": 350.12,
+     "prevSpeechEnd": 340.96,
+     "prevSpeechEndVia": "fi86 3/3 — Zechariah 9:9",
+     "window": 9.16,
+     "silence": [
+      341.33,
+      343.57
+     ],
+     "silenceSec": 2.25,
+     "runnerUpSec": 1.7,
+     "frontMatterFirst": [
+      343.02,
+      343.7
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "the foal of a donkey zechariah 9 9",
+     "wordsAfter": "tuesday night passover yahushua institutes the new covenant",
+     "rule": "longest of 3 silences in the window   ...a donkey zechariah 9 9 | tuesday night passover yahushua institutes the..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch03",
+     "bytes": 7800327,
+     "durationSec": 557.11,
+     "endSec": 899.89
+    }
+   },
+   {
+    "id": "lamb-of-god-ch4",
+    "startSec": 899.89,
+    "evidence": {
+     "cleared": 76,
+     "fragments": 76,
+     "firstOnset": 904.92,
+     "prevSpeechEnd": 898.06,
+     "prevSpeechEndVia": "fi232 1/2 — John 17",
+     "window": 6.86,
+     "silence": [
+      898.46,
+      900.69
+     ],
+     "silenceSec": 2.23,
+     "runnerUpSec": null,
+     "frontMatterFirst": [
+      898.06,
+      901.18
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "in them and i in them john 17",
+     "wordsAfter": "prays in the the garden of gethsemane then",
+     "rule": "longest of 1 silences in the window   ...i in them john 17 | prays in the the garden of..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch04",
+     "bytes": 4361881,
+     "durationSec": 311.51,
+     "endSec": 1211.38
+    }
+   },
+   {
+    "id": "lamb-of-god-ch5",
+    "startSec": 1211.38,
+    "evidence": {
+     "cleared": 47,
+     "fragments": 47,
+     "firstOnset": 1218.87,
+     "prevSpeechEnd": 1209.5,
+     "prevSpeechEndVia": "fi308 3/4 — Psalm 109:2-4",
+     "window": 9.37,
+     "silence": [
+      1209.77,
+      1212.18
+     ],
+     "silenceSec": 2.41,
+     "runnerUpSec": 1.71,
+     "frontMatterFirst": [
+      1211.84,
+      1212.52
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "prayer psalm 109 2 4",
+     "wordsAfter": "wednesday morning passover yahushua is sent to pilate",
+     "rule": "longest of 4 silences in the window   ...prayer psalm 109 2 4 | wednesday morning passover yahushua is sent..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch05",
+     "bytes": 3035069,
+     "durationSec": 216.74,
+     "endSec": 1428.14
+    }
+   },
+   {
+    "id": "lamb-of-god-ch6",
+    "startSec": 1428.14,
+    "evidence": {
+     "cleared": 65,
+     "fragments": 65,
+     "firstOnset": 1436.14,
+     "prevSpeechEnd": 1426.2,
+     "prevSpeechEndVia": "fi355 3/4 — Luke 23:13-15",
+     "window": 9.94,
+     "silence": [
+      1426.53,
+      1428.94
+     ],
+     "silenceSec": 2.41,
+     "runnerUpSec": 0.86,
+     "frontMatterFirst": [
+      1428.24,
+      1429.02
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "him luke 23 13 15",
+     "wordsAfter": "wednesday morning and afternoon passover pilate has yahushua",
+     "rule": "longest of 2 silences in the window   ...him luke 23 13 15 | wednesday morning and afternoon passover pilate..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch06",
+     "bytes": 3731390,
+     "durationSec": 266.48,
+     "endSec": 1694.6
+    }
+   },
+   {
+    "id": "lamb-of-god-ch7",
+    "startSec": 1694.6,
+    "evidence": {
+     "cleared": 49,
+     "fragments": 49,
+     "firstOnset": 1703.31,
+     "prevSpeechEnd": 1692.64,
+     "prevSpeechEndVia": "fi420 5/5 — 1 Peter 2:21-24",
+     "window": 10.67,
+     "silence": [
+      1693.14,
+      1695.4
+     ],
+     "silenceSec": 2.27,
+     "runnerUpSec": 1.75,
+     "frontMatterFirst": [
+      1694.88,
+      1695.56
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "you were healed 1 peter 2 21 24",
+     "wordsAfter": "wednesday afternoon passover yahushua is crucified on passover",
+     "rule": "longest of 3 silences in the window   ...1 peter 2 21 24 | wednesday afternoon passover yahushua is crucified..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch07",
+     "bytes": 3323983,
+     "durationSec": 237.37,
+     "endSec": 1931.97
+    }
+   },
+   {
+    "id": "lamb-of-god-ch8",
+    "startSec": 1931.97,
+    "evidence": {
+     "cleared": 12,
+     "fragments": 12,
+     "firstOnset": 1943.4,
+     "prevSpeechEnd": 1930.28,
+     "prevSpeechEndVia": "fi469 8/11 Once Received, Forever Shall It Belong t",
+     "window": 13.12,
+     "silence": [
+      1930.45,
+      1932.77
+     ],
+     "silenceSec": 2.32,
+     "runnerUpSec": 1.65,
+     "frontMatterFirst": [
+      1930.28,
+      1933.12
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "received forever shall it belong to the redeemed",
+     "wordsAfter": "evening near sundown passover yahushua is buried by",
+     "rule": "longest of 4 silences in the window   ...it belong to the redeemed | evening near sundown passover yahushua is..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch08",
+     "bytes": 825058,
+     "durationSec": 58.88,
+     "endSec": 1990.85
+    }
+   },
+   {
+    "id": "lamb-of-god-ch9",
+    "startSec": 1990.85,
+    "evidence": {
+     "cleared": 34,
+     "fragments": 35,
+     "firstOnset": 1996.63,
+     "prevSpeechEnd": 1989.24,
+     "prevSpeechEndVia": "fi481 3/3 — Isaiah 53:9",
+     "window": 7.39,
+     "silence": [
+      1989.51,
+      1991.65
+     ],
+     "silenceSec": 2.14,
+     "runnerUpSec": null,
+     "frontMatterFirst": [
+      1991.58,
+      1992.1
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "any deceit in his mouth isaiah 53 9",
+     "wordsAfter": "yahushua sleeps in his tomb for three days",
+     "rule": "longest of 1 silences in the window   ...his mouth isaiah 53 9 | yahushua sleeps in his tomb for..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch09",
+     "bytes": 2312053,
+     "durationSec": 165.09,
+     "endSec": 2155.95
+    }
+   },
+   {
+    "id": "lamb-of-god-ch10",
+    "startSec": 2155.95,
+    "evidence": {
+     "cleared": 29,
+     "fragments": 29,
+     "firstOnset": 2165.35,
+     "prevSpeechEnd": 2152.88,
+     "prevSpeechEndVia": "fi515 4/7 From The Volumes of Truth, \"Judgment, Tr",
+     "window": 12.47,
+     "silence": [
+      2154.42,
+      2156.75
+     ],
+     "silenceSec": 2.32,
+     "runnerUpSec": 1.73,
+     "frontMatterFirst": [
+      2156.26,
+      2156.98
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "saved from the volumes of truth volume 2",
+     "wordsAfter": "saturday evening at sundown the beginning of the",
+     "rule": "longest of 3 silences in the window   ...volumes of truth volume 2 | saturday evening at sundown the beginning..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch10",
+     "bytes": 1779938,
+     "durationSec": 127.09,
+     "endSec": 2283.04
+    }
+   },
+   {
+    "id": "lamb-of-god-ch11",
+    "startSec": 2283.04,
+    "evidence": {
+     "cleared": 83,
+     "fragments": 83,
+     "firstOnset": 2294.3,
+     "prevSpeechEnd": 2281.24,
+     "prevSpeechEndVia": "fi545 6/10 From The Volumes of Truth, \"I AM RISEN\" ",
+     "window": 13.06,
+     "silence": [
+      2281.59,
+      2283.84
+     ],
+     "silenceSec": 2.25,
+     "runnerUpSec": 0.88,
+     "frontMatterFirst": [
+      2281.24,
+      2283.94
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "israel from the volumes of truth volume 3",
+     "wordsAfter": "sunday morning the feast of firstfruits yahushua appears",
+     "rule": "longest of 2 silences in the window   ...volumes of truth volume 3 | sunday morning the feast of firstfruits..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch11",
+     "bytes": 5344555,
+     "durationSec": 381.7,
+     "endSec": 2664.75
+    }
+   },
+   {
+    "id": "lamb-of-god-ch12",
+    "startSec": 2664.75,
+    "evidence": {
+     "cleared": 78,
+     "fragments": 78,
+     "firstOnset": 2674.56,
+     "prevSpeechEnd": 2663.0,
+     "prevSpeechEndVia": "fi628 6/8 From The Volumes of Truth, \"Unleavened\" ",
+     "window": 11.56,
+     "silence": [
+      2663.32,
+      2665.55
+     ],
+     "silenceSec": 2.24,
+     "runnerUpSec": 1.65,
+     "frontMatterFirst": [
+      2665.24,
+      2665.92
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "from the volumes of truth volume 3",
+     "wordsAfter": "sunday the feast of first fruits yahushua appears",
+     "rule": "longest of 4 silences in the window   ...volumes of truth volume 3 | sunday the feast of first fruits..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch12",
+     "bytes": 4464646,
+     "durationSec": 318.85,
+     "endSec": 2983.58
+    }
+   },
+   {
+    "id": "lamb-of-god-ch13",
+    "startSec": 2983.58,
+    "evidence": {
+     "cleared": 32,
+     "fragments": 34,
+     "firstOnset": 2990.32,
+     "prevSpeechEnd": 2981.74,
+     "prevSpeechEndVia": "fi706 2/3 — Matthew 28:20",
+     "window": 8.58,
+     "silence": [
+      2982.14,
+      2984.38
+     ],
+     "silenceSec": 2.25,
+     "runnerUpSec": null,
+     "frontMatterFirst": [
+      2983.94,
+      2984.62
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "the end of the age matthew 28 20",
+     "wordsAfter": "wisdom regarding those who killed the messiah who",
+     "rule": "longest of 1 silences in the window   ...the age matthew 28 20 | wisdom regarding those who killed the..."
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch13",
+     "bytes": 2120053,
+     "durationSec": 151.38,
+     "endSec": 3134.98
+    }
+   },
+   {
+    "id": "lamb-of-god-ch14",
+    "startSec": 3134.98,
+    "evidence": {
+     "cleared": 22,
+     "fragments": 23,
+     "firstOnset": 3139.96,
+     "prevSpeechEnd": 3132.36,
+     "prevSpeechEndVia": "fi739 4/12 From The Volumes of Truth, \"Wisdom Regar",
+     "window": 7.6,
+     "silence": [
+      3133.91,
+      3135.78
+     ],
+     "silenceSec": 1.88,
+     "runnerUpSec": 1.47,
+     "frontMatterFirst": [
+      3135.28,
+      3135.92
+     ],
+     "frontMatterAgrees": true,
+     "wordsBefore": "god from the volumes of truth volume one",
+     "wordsAfter": "walking in the footsteps of the messiah's passion",
+     "rule": "longest of 2 silences in the window   ...volumes of truth volume one | walking in the footsteps of the...",
+     "tail": {
+      "lastSpeechEnd": 3236.54,
+      "eof": 3246.3,
+      "soundAfterSpeech": [
+       [
+        3238.41,
+        3243.77
+       ]
+      ],
+      "kept": "to EOF; see tailNote"
+     }
+    },
+    "cut": {
+     "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch14",
+     "bytes": 1559412,
+     "durationSec": 111.23,
+     "endSec": null
+    }
+   }
+  ],
+  "pointsEvidence": {
+   "belt": "_align-work/hone/cut__lamb-of-god.large-v3.json",
+   "settingsHash": "f850ee6305",
+   "starBetweenBlocks": true,
+   "coverage": 0.987,
+   "confirmed": 370,
+   "probed": 381,
+   "review": 5,
+   "fragments": 764,
+   "shipped": 756,
+   "sourceDurationSec": 3246.3,
+   "lastSpeechEnd": 3236.54,
+   "leadS": 0.8,
+   "minSilenceS": 0.5,
+   "rule": "each cut sits 0.8 s before the end of the longest silence (>= 0.5 s) between the previous chapter's last spoken word and this chapter's first fragment onset, so every asset opens on a 0.8 s breath before its spoken title; a second reader (the latest silence ending before the chapter's first spoken title/heading word) must name the same silence or `cut` refuses"
+  },
+  "omittedNotes": {
+   "lamb-of-god-ch0": "not read: the belt cleared 1 of 9 fragments (7 UNSPOKEN); a read chapter clears at least half"
+  }
  }
 }
