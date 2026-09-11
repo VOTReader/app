@@ -129,65 +129,6 @@ export const DENSITY_K = 0.20;
  */
 export const DENSITY_EXP = 0.57;
 
-/**
- * The Essential auto-switch band, as FRACTIONS OF THE CEILING so one pair of
- * numbers governs every device.
- *
- * SWITCH ON CSS PX PER VERSE, NOT ON ZOOM. Zoom is a multiple of fit-to-width,
- * so the same "800x" is a different picture on a 360 px phone and a 1920 px
- * desktop; ppvCss is the same picture everywhere, and it is already the currency
- * of the 44 px ceiling. Measured (design-perf, spec-essential-autoswitch.md, on
- * main 98de630f): at equal ppv the two wide frames agree on separability across
- * a 2.4x difference in width - phoneLand 0.519 / 0.649 / 0.733 at ppv 10.29 /
- * 20.58 / 44 against desktop1920 0.560 / 0.662 / 0.786 at ppv 10.99 / 21.98 /
- * 44.02.
- *
- * ENTER at half the ceiling. There the two densities are not close: Famous puts
- * 305 anchored arcs on the landscape frame and 3.0 % of them can be followed as
- * individual lines, while Essential puts 37 there and 64.9 % can. A twenty-fold
- * difference in what the eye can do, which is the owner's "individual lines are
- * nearly impossible to see" stated as a number.
- *
- * LEAVE at a QUARTER of the ceiling, not a hair below the entry, because the two
- * densities are two reading MODES rather than two settings: at ppv 11 the web is
- * back to being a fabric (448 arcs on that frame, so many the separability
- * instrument's 400-arc cap declines to score it) and that is the picture Famous
- * exists to draw. A 2:1 band in ppv is one full doubling of zoom, so no pinch
- * jitter and no fling settle can flap it.
- */
-export const DENSITY_ENTER_PPV_CSS = PPV_MAX_CSS / 2;   // 22
-export const DENSITY_EXIT_PPV_CSS = PPV_MAX_CSS / 4;    // 11
-
-/**
- * Which density the web should be showing, given where the camera is and what
- * the reader has asked for. A PURE function, exported, so the screen holds no
- * copy of the thresholds and a probe cannot measure a law the screen does not
- * run - the same reason ribbonStyle lives here.
- *
- * `current` is the live density; `base` is the reader's stored preference;
- * `pinned` is true once they have touched the density control this session.
- *
- * THE MIDDLE OF THE BAND RETURNS `current` AND THAT IS THE WHOLE MECHANISM.
- * It is not a third state and not a default - it is the memory that makes this
- * hysteresis rather than a threshold, and a `base` there would flap.
- *
- * @param {{ppvCss: number, current: string, pinned: boolean, base: string}} o
- * @returns {string} 'essential' | 'famous'
- */
-export function autoDensity(o) {
-  // A pinned reader is never moved, at either edge. The auto-switch also never
-  // writes the stored preference: pinning is for the session, `base` is theirs.
-  if (o.pinned) return o.current;
-  // A reader whose stored preference is already Essential sees nothing change,
-  // in or out: the entry arm returns Essential and the exit arm returns their
-  // base, which IS Essential. There was an explicit short-circuit here and it
-  // is gone - a bite proved it changed no case, and worse, it MASKED the arm
-  // that catches the exit branch returning a constant instead of o.base.
-  if (o.ppvCss >= DENSITY_ENTER_PPV_CSS) return 'essential';
-  if (o.ppvCss <= DENSITY_EXIT_PPV_CSS) return o.base;
-  return o.current;
-}
-
 /** Widest stroke, CSS px. At depth votes drive width from 1.4 up to this. */
 export const STROKE_DEEP_CSS = 2.4;
 
