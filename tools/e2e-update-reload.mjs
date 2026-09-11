@@ -38,6 +38,16 @@
  *      (probe-kill-durability.mjs, 2026-09-11): under a tree kill localStorage comes back at its
  *      FIRST commit and nothing after — Chromium commits it 5 s after the first write and then at
  *      most ~60 times an hour — while IndexedDB comes back with the last write, every time.
+ *      ONE document at the relaunch: a persistent profile restores the previous session's tabs,
+ *      and a restored document of the origin boots the player beside the measured page against
+ *      the same localStorage (the Verifier's 06:35 line; kill-cadence-armd-sibling-1). The arm
+ *      counts and names every page the launch brought back and closes them while page3 is still
+ *      about:blank; the report line carries the count, so "0 of the app" is a measurement.
+ *
+ * A position is a reading only once the scroller is STILL (update-walk-follow-sample-1): after
+ * each reload the walk polls scrollTop until it has not moved for 500 ms (at most 6 s) and prints
+ * the moves before it classifies — one sample read 887 against 900 while the read-along follow
+ * was still carrying the page to 698 and was called "moved for no reason" (e2e-walk-lib.mjs).
  *
  * Autoplay is measured twice: under Chrome's DEFAULT policy (desktop; this machine allows the
  * resume after a real gesture before the reload) and, with --autoplay-refused, under
@@ -96,6 +106,7 @@ import { mkdirSync, readFileSync, existsSync, statSync, mkdtempSync, rmSync } fr
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import puppeteer from 'puppeteer';
+import { settleRead, classifyRestoredPages, settleLine } from './e2e-walk-lib.mjs';
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -440,7 +451,13 @@ try {
     note(`${arm} scrollTop after boot (ms:y/max, R = restoring): ${steps.join(' ')}`);
     const edges = await page.evaluate(() => ({ edges: window.__e2eRestoreEdges || [], err: window.__e2eObsErr }));
     note(`${arm} scroll-restoring flag edges (ms:on/off@y): ${edges.edges.map((e) => `${e.at}ms:${e.on ? 'ON' : 'off'}@${e.y}`).join(' ') || 'none seen'}${edges.err ? ' — observer error ' + edges.err : ''}`);
-    return readPage();
+    // A position is a reading only once the scroller is STILL: the read-along follow may still be
+    // carrying the page toward the spoken sentence (update-walk-follow-sample-1 read 887 mid-follow
+    // and called it a move for no reason). Wait for 500 ms without a change, at most 6 s, and
+    // hand the record to assertScroll so a verdict names what the scroller was doing.
+    const settle = await settleRead(() => page.evaluate(() => { const el = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll'); return el ? Math.round(el.scrollTop) : null; }), { stillMs: 500, maxMs: 6000, everyMs: 50 });
+    note(`${arm} scroller before the read: ${settleLine(settle)}`);
+    return Object.assign(await readPage(), { settle });
   };
   // What the boot FOUND, before the app touched anything: the two sessionStorage records
   // written on the reload event, and the IDB record — which says whether the put issued
@@ -474,8 +491,9 @@ try {
     else note(`${arm} the restore landed at ${landed.y} px = the ${yWritten} px written before the reload, ${landed.at} ms after document start`);
     if (P.y === yWritten) return;
     const lit = P.lit;
-    if (P.status === 'playing' && lit && lit.inBand) note(`${arm} the page now sits at ${P.y} px: the read-along follow moved it to the spoken sentence ("${lit.text}…", top at ${lit.top} px, band ${lit.bandTop}–${lit.bandBot}) — the same writer that follows the voice before a reload`);
-    else fail(`${arm} the page moved from ${yWritten} px to ${P.y} px after the restore for no reason this walk can name (status ${P.status}, lit sentence ${lit ? `top ${lit.top} px, band ${lit.bandTop}–${lit.bandBot}, inBand=${lit.inBand}` : 'none'})`);
+    const scroller = P.settle ? `; scroller ${settleLine(P.settle)}` : '';
+    if (P.status === 'playing' && lit && lit.inBand) note(`${arm} the page now sits at ${P.y} px: the read-along follow moved it to the spoken sentence ("${lit.text}…", top at ${lit.top} px, band ${lit.bandTop}–${lit.bandBot}) — the same writer that follows the voice before a reload${scroller}`);
+    else fail(`${arm} the page moved from ${yWritten} px to ${P.y} px after the restore for no reason this walk can name (status ${P.status}, lit sentence ${lit ? `top ${lit.top} px, band ${lit.bandTop}–${lit.bandBot}, inBand=${lit.inBand}` : 'none'}${scroller})`);
   };
   void LIVE;
 
@@ -672,6 +690,19 @@ try {
       await killBrowserTree();
       browser = await puppeteer.launch(LAUNCH);
       const page3 = await browser.newPage();
+      // ONE document at the relaunch (kill-cadence-armd-sibling-1). A persistent profile restores the
+      // previous session's tabs at launch, so a restored document of the origin would boot the player
+      // beside page3 against the same localStorage. Wait for the launch's page list to be still, name
+      // what it holds, and close everything but page3 while page3 is still about:blank — so the boot
+      // measured below is the only one. (page3 is opened first: closing a browser's last page closes
+      // the browser.)
+      const pagesStill = await settleRead(async () => (await browser.pages()).length, { stillMs: 400, maxMs: 3000, everyMs: 50 });
+      const siblings = (await browser.pages()).filter((p) => p !== page3);
+      const restored = classifyRestoredPages(siblings.map((p) => p.url()), BASE);
+      for (const p of siblings) await p.close().catch(() => {});
+      const left = (await browser.pages()).length;
+      note(`D relaunch: ${restored.total} page(s) open besides the measured one — ${restored.appTabs} of the app [${restored.appUrls.join(', ') || 'none'}], other [${restored.others.join(', ') || 'none'}]; page count ${settleLine(pagesStill)}; all closed before the boot, ${left} page open now`);
+      if (left !== 1) fail(`D relaunch: ${left} pages open after closing the siblings — the boot below is not the only document`);
       await stubAudio(page3);
       await page3.goto(BASE, { waitUntil: 'load' });
       await page3.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
