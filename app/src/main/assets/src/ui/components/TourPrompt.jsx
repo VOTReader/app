@@ -50,7 +50,9 @@ export function TourPrompt({ screen }) {
   return (
     <div className="tour-prompt" role="region" aria-labelledby="tour-prompt-title" ref={ref}>
       <h2 className="tour-prompt-title" id="tour-prompt-title">New here?</h2>
-      <p className="tour-prompt-text">Let me show you around: six short stops, about two minutes.</p>
+      {/* The count comes from the tour itself: this line said "six" for a day after the tour grew to
+          seven, because it was typed here, a bundle away from the array it counts (2026-09-10). */}
+      <p className="tour-prompt-text">Let me show you around: {ctl.stopsWord()} short stops, about two minutes.</p>
       <div className="tour-row">
         <button type="button" className="tour-btn primary" onClick={() => ctl.start('prompt')}>Show me around</button>
         <button type="button" className="tour-btn" onClick={() => ctl.dismissPrompt('later')}>Maybe later</button>
