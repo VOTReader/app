@@ -116,6 +116,8 @@ const DENSITY_HINT = {
    swept by the vot-* localStorage migration and is per-tab, which is the
    scope the flag means. */
 const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
+const LIVE_HOLD_MS = 150;
+const FADE_MS = 250;
 function readChromeHidden() {
   try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
 }
@@ -279,6 +281,30 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
   }, []);
+
+  // r2 (Orchestrator's ruling, 2026-09-11): while a gesture is live the
+  // context's corridors keep LIVE_CAP layers a bin (a phone's frame budget);
+  // at rest every layer (the approved picture). A wheel notch holds "live"
+  // for LIVE_HOLD_MS so a run of notches never flickers between the two, and
+  // the way back is a FADE_MS coverage ease, brightness only: nothing is
+  // re-laid-out or re-bucketed, the cap is the one knob.
+  const liveUntilRef = React.useRef(0);
+  const releaseAtRef = React.useRef(0);
+  const live = React.useCallback(() => {
+    liveUntilRef.current = performance.now() + LIVE_HOLD_MS;
+    releaseAtRef.current = 0;
+  }, []);
+  /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while fading. */
+  const capFractionNow = React.useCallback(() => {
+    const now = performance.now();
+    if (now < liveUntilRef.current) return 0;
+    if (!liveUntilRef.current) return 1;
+    if (!releaseAtRef.current) releaseAtRef.current = now;
+    const f = Math.min(1, (now - releaseAtRef.current) / FADE_MS);
+    if (f >= 1) { liveUntilRef.current = 0; releaseAtRef.current = 0; return 1; }
+    schedule();
+    return f;
+  }, [schedule]);
 
   // A frame requested while the page is hidden never runs, so rafRef stays
   // set and EVERY later schedule() short-circuits — the view would come back
@@ -486,8 +512,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         const p = personalRef.current;
         const ro = railOpts();
         drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(ro, {
-          hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc,
+          hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc, capFraction: capFractionNow(),
         }));
+        if (wrapRef.current) wrapRef.current.setAttribute('data-cap-fraction', String(ro.capFraction));
         publishRails(ro, p, g, cam, camV, v);
         // the per-rail reset pills show only while that rail is zoomed;
         // setState from the frame loop runs only when the answer changes
@@ -524,7 +551,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts, chromeHidden, zoomCapFor]);
+  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts, chromeHidden, zoomCapFor, capFractionNow]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -633,10 +660,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!el || !graph) return;
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
-      view: () => viewRef.current, handlers: () => handlersRef.current,
+      view: () => viewRef.current, handlers: () => handlersRef.current, live,
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;

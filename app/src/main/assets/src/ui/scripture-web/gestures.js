@@ -49,6 +49,7 @@ export function isChromeTarget(target) {
  *   dpr: () => number,
  *   cam: () => {x:number, ppv:number, total:number},
  *   camFor?: (yDevice:number) => {x:number, ppv:number, total:number},
+ *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
  *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
  *   schedule: () => void,
@@ -106,14 +107,14 @@ export function attachWebGestures(el, deps) {
       clampCamera(c, W, zoomCap(c));
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
       clampCamera(c, W, zoomCap(c));
-      moved = true; schedule(); return;
+      moved = true; if (deps.live) deps.live(); schedule(); return;
     }
     if (drag) {
       const c = drag.cam;
       if (Math.abs(pt.x - drag.x) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
       clampCamera(c, W, zoomCap(c));
-      schedule(); return;
+      if (deps.live) deps.live(); schedule(); return;
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
   };
@@ -145,6 +146,7 @@ export function attachWebGestures(el, deps) {
     const pt = loc(e), W = view().W;
     const c = camAt(pt.y);
     zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c));
+    if (deps.live) deps.live();
     schedule();
   };
   el.addEventListener('pointerdown', down);
