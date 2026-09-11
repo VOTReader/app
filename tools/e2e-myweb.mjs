@@ -31,7 +31,8 @@
  *        draw clears before it paints, on every tree) so a ceiling cannot be
  *        met by not drawing; strokes/frame is printed as information (main
  *        strokes the context as ONE path, the branch per edge). Ceilings are
- *        measured numbers with their SHA.
+ *        registered per renderer string by the Verifier (three identical runs
+ *        at the landing tip, zero margin); an unregistered renderer FAILS.
  *   C    control: with 0 links and context OFF the band is empty (coverage <=
  *        CONTROL_MAX); a reading off a canvas that draws something else is
  *        not a reading of the context
@@ -75,18 +76,21 @@ const LINK_CORE = num('MYWEB_LINK_CORE', 210);      // main 197-205 on the three
 const CONTEXT_P50 = num('MYWEB_CONTEXT_P50', 60);   // main 10; prototype 16-49 (the arm is the PAIR with LINK_CORE)
 const PANEL_COVER = num('MYWEB_PANEL_COVER', 0.45); // fraction of band rows; main ~1.0 at 800x360
 const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.0296 (800x360: rail ticks)
-/* R5 ceilings: min-of-two p50 rAF ms during a 1.5 s pan, per frame, measured
-   with NO getImageData before the timing (a read-back canvas is demoted to
-   software raster and times the demotion). Main baf0f9ea, 2026-09-10, headless
-   Chrome @2, Radeon 890M; rAF quantised at ~4.2 ms. */
-const R5_OVERVIEW_MS = num('MYWEB_R5_OVERVIEW', 12.6);  // main 4.2 on every frame (the rAF floor); three quanta
-const R5_ZOOM_MS = { phoneLand: num('MYWEB_R5_ZOOM_PHONELAND', 30), phone: num('MYWEB_R5_ZOOM_PHONE', 75), desktop: num('MYWEB_R5_ZOOM_DESKTOP', 130) };  // main's worst read x 1.2: 24.9 / 62.5 / 108.4 (main tripped a best-read x 1.2 ceiling on its own dry run)
-/* THE CEILINGS ARE NUMBERS FROM ONE GPU. They assert only when the renderer string
-   contains R5_RENDERER; on any other renderer (CI's SwiftShader, an integrated GPU)
-   the arm prints and does not judge, because a number from another GPU is not this
-   number (Charter, 2026-09-10). */
-const R5_RENDERER = process.env.MYWEB_R5_RENDERER || 'NVIDIA GeForce RTX 5080';
-let R5_ASSERT = false;
+/* R5 ceilings: min-of-two p50 rAF ms during a 1.5 s pan, per frame and state,
+   measured with NO getImageData before the timing (a read-back canvas is
+   demoted to software raster and times the demotion). REGISTERED PER RENDERER
+   STRING, the way the 2d floors are: the Verifier records them from three
+   identical runs of its own instrument at the landing tip, zero margin. A
+   renderer with no entry FAILS the arm; a number from another GPU is not this
+   number (Charter, 2026-09-10), so nothing is compared against nothing. The
+   Radeon 890M readings that chose the layer are in the note, not here.
+   Key: a substring of UNMASKED_RENDERER_WEBGL. Value: { overview, phoneLand,
+   phone, desktop } in ms (overview shared by every frame; the rest at three
+   zoom steps). MYWEB_R5_CEILINGS='{"NVIDIA GeForce RTX 5080":{...}}' overrides. */
+const R5_CEILINGS = process.env.MYWEB_R5_CEILINGS ? JSON.parse(process.env.MYWEB_R5_CEILINGS) : {
+  // none registered yet: the Verifier fills this from three runs at the landing tip
+};
+let R5 = null;  // the registered entry for this run's renderer, or null
 const R5_MIN_CLEARS = num('MYWEB_R5_MIN_CLEARS', 0.8);   // ui-canvas clearRect per opportunity (min(moves, frames)); main and the branch read ~1.0
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -253,9 +257,9 @@ async function perfArm(page, tag, state, ceiling) {
   const b = await frameTime(page, 1500); await sleep(300);
   if (!a || !b) { fails.push(`${tag} R5 ${state}: no rAF frames recorded during the pan`); return; }
   const min = Math.min(a.p50, b.p50);
-  note(`${tag} R5 ${state} rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, moves ${a.moves}/${b.moves}, p95 ${a.p95}/${b.p95}, clears/opportunity ${a.clearsPerOpportunity}/${b.clearsPerOpportunity}, strokes/frame ${a.strokesPerFrame}/${b.strokesPerFrame}); ceiling ${ceiling}`);
+  note(`${tag} R5 ${state} rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, moves ${a.moves}/${b.moves}, p95 ${a.p95}/${b.p95}, clears/opportunity ${a.clearsPerOpportunity}/${b.clearsPerOpportunity}, strokes/frame ${a.strokesPerFrame}/${b.strokesPerFrame}); ceiling ${ceiling == null ? 'UNREGISTERED' : ceiling}`);
   if (Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity) < R5_MIN_CLEARS) fails.push(`${tag} R5 ${state}: ${Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity)} ui-canvas clears per opportunity < ${R5_MIN_CLEARS}: the draw did not run when it could, so the frame time is not the draw's`);
-  if (!R5_ASSERT) { note(`${tag} R5 ${state}: printed only, the renderer is not ${JSON.stringify(R5_RENDERER)}`); return; }
+  if (ceiling == null) { fails.push(`${tag} R5 ${state}: min-of-two p50 ${min} ms against NO ceiling: this renderer is not registered in R5_CEILINGS (the Verifier registers it from three runs at the landing tip)`); return; }
   if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two p50 ${min} ms > ceiling ${ceiling} ms`);
 }
 async function makeLink(page, route, verseIdx, ref) {
@@ -310,10 +314,10 @@ async function walk(page, url, fname) {
   }
   if (PERF) {
     // TIMING FIRST, PIXELS AFTER: getImageData demotes the canvas (note 3b).
-    await perfArm(page, tag, 'overview', R5_OVERVIEW_MS);
+    await perfArm(page, tag, 'overview', R5 ? R5.overview : null);
     await clickIfPresent(page, 'Reset the view'); await sleep(500);
     await zoom3(page, tag);
-    await perfArm(page, tag, 'three zoom steps', R5_ZOOM_MS[fname] || 1e9);
+    await perfArm(page, tag, 'three zoom steps', R5 && R5[fname] != null ? R5[fname] : null);
     await clickIfPresent(page, 'Reset the view'); await sleep(700);
   }
   await shot(page, `${fname}-0links-overview`);
@@ -357,8 +361,9 @@ try {
   const renderer = await probe.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; });
   await probe.close();
   console.log('[e2e-myweb] renderer ' + JSON.stringify(renderer));
-  R5_ASSERT = !!(renderer && String(renderer).includes(R5_RENDERER));
-  if (PERF && !R5_ASSERT) console.log('[e2e-myweb] R5 ceilings are for ' + JSON.stringify(R5_RENDERER) + '; on this renderer they PRINT and do not judge');
+  const r5key = Object.keys(R5_CEILINGS).find((k) => renderer && String(renderer).includes(k));
+  R5 = r5key ? R5_CEILINGS[r5key] : null;
+  if (PERF) console.log('[e2e-myweb] R5 ceilings: ' + (R5 ? 'registered for ' + JSON.stringify(r5key) + ' ' + JSON.stringify(R5) : 'NONE registered for this renderer; every R5 arm FAILS until the Verifier registers it'));
   for (const fname of WANT) {
     const ctx = await browser.createBrowserContext();
     const page = await ctx.newPage();
