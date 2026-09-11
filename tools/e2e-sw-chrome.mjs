@@ -30,6 +30,13 @@
  *       transparent.
  *   F3  every pill's text clears 4.5:1 against the pill's own fill composited
  *       on black (the darkest ground; the web behind is brighter, which is why
+ *   F3w the same text over the WORST ground the phone gives it: the web pans
+ *       under the fixed strip, so each resting pill's ground is read from
+ *       screenshotted pixels (the pill's inner edge strip, 3..8 CSS px inside
+ *       the border, where no glyph is drawn) at every pan position, overview
+ *       and at three zoom steps, and the ink must clear 3:1 (label grade)
+ *       over the brightest pixel found. A pill under which nothing bright
+ *       ever passed says so; that pill is not proven either way.
  *       the fill carries a scrim), computed from the same computed styles
  *
  * EXIT: 0 pass, 1 fail, 2 nothing-to-check (the screen never drew), 3 harness.
@@ -53,6 +60,9 @@ const WANT = arg('frames', 'phone,small,desktop').split(',');
 const NAV_MS = 30000;
 const CORNER = num('SWCHROME_CORNER', 16);       // px from the root's right/top edges
 const MIN_TEXT_CR = num('SWCHROME_TEXT_CR', 4.5);
+const MIN_LABEL_CR = num('SWCHROME_LABEL_CR', 3);   // F3w: worst ground under a panning web, label grade
+const PAN_STEPS = num('SWCHROME_PAN_STEPS', 10);
+const ZOOM_TARGET = 1.8 ** 3;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [], notes = [];
@@ -113,7 +123,7 @@ const READ = () => {
       const cs = getComputedStyle(el);
       const textEl = el.classList.contains('sw-seg') ? el.querySelector('.sw-seg-btn:not(.is-on)') || el : el;
       return { name: (el.getAttribute('aria-label') || el.textContent.trim() || el.className).slice(0, 28), on: el.classList.contains('is-on'),
-        bg: cs.backgroundColor, border: cs.borderColor, color: getComputedStyle(textEl).color };
+        bg: cs.backgroundColor, border: cs.borderColor, color: getComputedStyle(textEl).color, box: box(el) };
     });
   return { rotated, root: { w: rr.width, h: rr.height }, items: items.map((i) => ({ ...i, inside: inside(i.box) })), cornerRight, cornerTop, pills };
 };
@@ -128,6 +138,74 @@ function contrast(fg, bg) {
   const ink = over(f.slice(0, 3), f[3], ground);
   const L1 = lum(ink), L2 = lum(ground);
   return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+}
+
+/** sRGB contrast of an 'rgb(a)(...)' ink over a measured ground pixel [r,g,b]. */
+function contrastOn(fg, ground) {
+  const m = /rgba?\(([^)]+)\)/.exec(fg || ''); const p = m ? m[1].split(',').map(Number) : [0, 0, 0];
+  const a = p.length > 3 ? p[3] : 1;
+  const lum = ([r, g, b]) => { const c = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ink = p.slice(0, 3).map((v, i) => v * a + ground[i] * (1 - a));
+  const L1 = lum(ink), L2 = lum(ground);
+  return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+}
+
+/** F3w ground read: screenshot the viewport, decode it in a FRESH in-page canvas
+ * (never the app's, which a readback would demote), and return, per pill box, the
+ * brightest pixel in its inner left strip (x in [l+3, l+8), y in [t+3, b-3)); the
+ * strip is inline padding on a flat pill and block padding on a rotated one, so
+ * no glyph reaches it either way. */
+async function brightestGround(page, boxes, dpr) {
+  const b64 = await page.screenshot({ encoding: 'base64' });
+  return page.evaluate(async (b64, boxes, dpr) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const lum = (r, gg, b) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+    return boxes.map((r) => {
+      let best = null, bl = -1;
+      for (let x = Math.ceil((r.l + 3) * dpr); x < (r.l + 8) * dpr; x++) for (let y = Math.ceil((r.t + 3) * dpr); y < (r.b - 3) * dpr; y++) {
+        const i = (y * c.width + x) * 4; const l = lum(d[i], d[i + 1], d[i + 2]);
+        if (l > bl) { bl = l; best = [d[i], d[i + 1], d[i + 2]]; }
+      }
+      return best;
+    });
+  }, b64, boxes, dpr);
+}
+
+const readPpv = (page) => page.evaluate(() => { const w = document.querySelector('.sw-wrap'); return w ? Number(w.getAttribute('data-ppv-css')) : NaN; });
+async function zoom3(page, tag) {
+  const p0 = await readPpv(page);
+  if (!(p0 > 0)) { note(`${tag} F3w: the screen publishes no data-ppv-css; the zoomed arm is skipped`); return false; }
+  const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  await page.mouse.move(c.x, c.y);
+  let ratio = 1;
+  for (let i = 0; i < 24 && ratio < ZOOM_TARGET * 0.97; i++) { await page.mouse.wheel({ deltaY: -280 }); await sleep(250); ratio = (await readPpv(page)) / p0; }
+  await sleep(500);
+  if (ratio < ZOOM_TARGET * 0.9) { fails.push(`${tag} F3w the zoom did not take: ${ratio.toFixed(2)}x, wanted ${ZOOM_TARGET.toFixed(2)}x`); return false; }
+  return true;
+}
+
+/** F3w: pan the web under the strip PAN_STEPS times (a slow circle of drags),
+ * reading every pill's brightest ground after each; keep the worst per pill. */
+async function worstGround(page, pills, dpr, worst, state) {
+  const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; });
+  for (let k = 0; k <= PAN_STEPS; k++) {
+    if (k > 0) {
+      const ang = (k / PAN_STEPS) * Math.PI * 2, amp = Math.min(c.w, c.h) * 0.3;
+      await page.mouse.move(c.x, c.y); await page.mouse.down();
+      for (let s = 1; s <= 8; s++) await page.mouse.move(c.x + Math.cos(ang) * amp * s / 8, c.y + Math.sin(ang) * amp * s / 8);
+      await page.mouse.up(); await sleep(350);
+    }
+    const g = await brightestGround(page, pills.map((p) => p.box), dpr);
+    pills.forEach((p, i) => {
+      if (!g[i]) return;
+      const cr = contrastOn(p.color, g[i]);
+      const w = worst.get(p.name) || { cr: Infinity };
+      if (cr < w.cr) worst.set(p.name, { cr, ground: g[i], state, step: k });
+    });
+  }
 }
 
 async function walk(page, url, fname) {
@@ -149,6 +227,18 @@ async function walk(page, url, fname) {
   for (const p of r.pills) {
     const cr = contrast(p.color, p.bg);
     if (cr < MIN_TEXT_CR) fails.push(`${tag} F3 ${p.name}: text ${p.color} on fill ${p.bg} over black is ${cr.toFixed(2)}:1 < ${MIN_TEXT_CR}`);
+  }
+  // F3w: the worst ground the phone gives each resting pill, from pixels
+  const worst = new Map();
+  const resting = r.pills.filter((p) => !p.on);
+  await worstGround(page, resting, f.dpr, worst, 'overview');
+  if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps');
+  for (const p of resting) {
+    const w = worst.get(p.name);
+    if (!w) { note(`${tag} F3w ${p.name}: no ground read`); continue; }
+    const seen = w.ground.reduce((a, v) => a + v, 0) / 3;
+    note(`${tag} F3w ${p.name}: ink ${p.color} over worst ground rgb(${w.ground.join(',')}) = ${w.cr.toFixed(2)}:1 (${w.state}, pan step ${w.step})${seen < 20 ? '; NOTHING BRIGHT PASSED UNDER IT, not proven' : ''}`);
+    if (w.cr < MIN_LABEL_CR) fails.push(`${tag} F3w ${p.name}: ink ${p.color} over the worst ground rgb(${w.ground.join(',')}) is ${w.cr.toFixed(2)}:1 < ${MIN_LABEL_CR} (${w.state}, pan step ${w.step})`);
   }
 }
 

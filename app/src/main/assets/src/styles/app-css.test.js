@@ -408,4 +408,17 @@ describe('app.css — one pill grammar in the Scripture Web strip', () => {
     expect(sel[1].trim()).toBe(btn[1].trim());
     expect(seg[1].trim()).toBe(btn[1].trim());
   });
+
+  it('the seg\'s un-selected option is inked like every other resting pill', () => {
+    // The Verifier's phone-pixel pass on sw-chrome-fit: the "Which web" seg's
+    // resting option was --cream-muted (204,196,180) while its siblings are
+    // --cream-dim; under the worst ground (the canvas's own cream labels panning
+    // under the 50 % scrim, ground ~121,118,114) that is 2.58:1, below the 3:1
+    // label bar, where --cream-dim reads 3.83:1. One resting ink for the strip;
+    // the selected option keeps --gold-bright on --gold-faint.
+    const btn = /(?:^|\s)color\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-btn {') || '');
+    const opt = /(?:^|\s)color\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-seg-btn {') || '');
+    expect(btn && opt, 'a pill rule has no color').toBeTruthy();
+    expect(opt[1].trim()).toBe(btn[1].trim());
+  });
 });
