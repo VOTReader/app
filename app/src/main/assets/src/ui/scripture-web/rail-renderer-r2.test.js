@@ -132,6 +132,23 @@ describe('My Web r2 — G2 a thread is a line with endpoints on its books', () =
       prev = y;
     }
   });
+  it('on a wide, shallow frame a thread to a far-off book dives within two gaps of its visible end', () => {
+    // 800x360: the gap is 144 px under an 800 px width. Spread over the width
+    // the rise is a 0.18 slope, and 2,095 of them were the field again on the
+    // phone-landscape capture (streak 0.443). The far end being more than
+    // three screens away, the rise completes within REACH_GAPS of the top end.
+    const w = 800, g = 144;
+    const top = 96, bottom = 240;
+    const pts = threadPath([400, top], [-8000, bottom], true, { width: w, gap: g });
+    const reached = pts.findIndex((p) => Math.abs(p[1] - bottom) < 0.5);
+    expect(reached).toBeGreaterThan(0);
+    expect(Math.abs(pts[reached][0] - 400)).toBeLessThanOrEqual(2 * g + 1);
+    // and the level run along the far rail is marked, so the renderer can draw it faint
+    expect(/** @type {any} */ (pts).rise).toBeGreaterThan(0);
+    // a far end just off screen keeps the edge reach (continuity with the on-screen ribbon)
+    const near = threadPath([400, top], [-40, bottom], true, { width: w, gap: g });
+    expect(/** @type {any} */ (near).rise).toBe(-1);
+  });
   it('an intra-rail arc with one end off screen rises and exits, it does not run flat along the apex', () => {
     const pts = threadPath([500, rails.bottomY], [-9000, rails.bottomY], false, { width: W, gap, up: true, maxRy: gap * 0.78 });
     expect(pts).not.toBeNull();

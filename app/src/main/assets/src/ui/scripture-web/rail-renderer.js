@@ -29,6 +29,14 @@ export const EDGE_MARGIN = 24;
  * rise, as a fraction of the width; grows with the log of the distance so a
  * thread to a far book exits shallower than one to the next book over. */
 const REACH_MARGIN = 0.12;
+/** A thread to a FAR-off book (more than a screen away, blended in over one
+ * to three screens) completes its rise within this many gaps of its visible
+ * end and then runs level along the far rail: on a frame whose gap is a
+ * fraction of its width (800x360: 144 px under 800) a rise spread over the
+ * whole width is a shallow streak, and 2,095 of them are the field again. */
+const REACH_GAPS = 1.4;
+/** The level run along the far rail is drawn at this share of the thread's alpha. */
+export const RUN_ALPHA = 0.3;
 
 /**
  * Where the two rails sit.
@@ -201,9 +209,16 @@ export function threadPath(a, b, crossRail, o) {
   const vis = onA ? a : b, far = onA ? b : a;
   const sign = far[0] >= vis[0] ? 1 : -1;
   const distToEdge = sign > 0 ? (W + EDGE_MARGIN) - vis[0] : vis[0] + EDGE_MARGIN;
-  const reach = (onA && onB) ? adx
-    : Math.min(adx, distToEdge + W * REACH_MARGIN * (1 + Math.log10(1 + adx / W)));
+  const capEdge = distToEdge + W * REACH_MARGIN * (1 + Math.log10(1 + adx / W));
+  const capGap = Math.min(capEdge, (o.gap || W) * REACH_GAPS);
+  // smoothstep over adx from one screen to three: a far end just off screen
+  // keeps the edge reach (continuous with the on-screen shape), a far-off one
+  // dives within REACH_GAPS of its visible end
+  const sf = Math.min(1, Math.max(0, (adx - W) / (2 * W)));
+  const far3 = sf * sf * (3 - 2 * sf);
+  const reach = (onA && onB) ? adx : Math.min(adx, capEdge + (capGap - capEdge) * far3);
   let pts;
+  let rise = -1;   // index of the last sample of the rise; the run to the far end follows
   if (crossRail) {
     // a cubic from the visible end to where the rise completes, then level to the far end
     const ex = vis[0] + sign * reach, ey = far[1];
@@ -215,7 +230,7 @@ export function threadPath(a, b, crossRail, o) {
       pts.push([u * u * u * vis[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * ex,
         u * u * u * vis[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * ey]);
     }
-    if (reach < adx) pts.push([far[0], far[1]]);
+    if (reach < adx) { rise = pts.length - 1; pts.push([far[0], far[1]]); }
   } else {
     // a quarter-ellipse rising over `reach` (never more than the half span),
     // a level run at the apex, a quarter down to the far end
@@ -229,15 +244,49 @@ export function threadPath(a, b, crossRail, o) {
       const th = (Math.PI / 2) * (i / half);
       pts.push([vis[0] + sign * rx * (1 - Math.cos(th)), vis[1] + dir * ry * Math.sin(th)]);
     }
-    if (rx < rxFull) pts.push([far[0] - sign * rx, vis[1] + dir * ry]);
+    if (rx < rxFull) { rise = pts.length - 1; pts.push([far[0] - sign * rx, vis[1] + dir * ry]); }
     for (let i = 1; i <= half; i++) {
       const th = (Math.PI / 2) * (1 - i / half);
       pts.push([far[0] - sign * rx * (1 - Math.cos(th)), vis[1] + dir * ry * Math.sin(th)]);
     }
   }
-  if (!onA) pts.reverse();
+  if (!onA) { pts.reverse(); if (rise >= 0) rise = pts.length - 1 - rise; }
   pts[0] = [a[0], a[1]]; pts[pts.length - 1] = [b[0], b[1]];
+  /** @type {any} */ (pts).rise = rise;
+  /** @type {any} */ (pts).fromA = onA;
   return pts;
+}
+
+/**
+ * Stroke a thread: the rise at the context's alpha, the level run along the
+ * far rail (when there is one) at RUN_ALPHA of it, so a thread to an
+ * off-screen book reads as a line diving into its rail, not a streak.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<[number, number]>} pts
+ * @param {string} rgb
+ * @param {number} alpha
+ */
+function strokeThread(ctx, pts, rgb, alpha) {
+  const rise = /** @type {any} */ (pts).rise;
+  const fromA = /** @type {any} */ (pts).fromA;
+  if (rise < 0) {
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + alpha + ')';
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.stroke();
+    return;
+  }
+  // the rise is [0..rise] when the visible end is a, [rise..end] when it is b
+  const segs = fromA ? [[0, rise, alpha], [rise, pts.length - 1, alpha * RUN_ALPHA]]
+    : [[0, rise, alpha * RUN_ALPHA], [rise, pts.length - 1, alpha]];
+  for (const [i0, i1, al] of segs) {
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + al + ')';
+    ctx.beginPath();
+    ctx.moveTo(pts[i0][0], pts[i0][1]);
+    for (let k = i0 + 1; k <= i1; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.stroke();
+  }
 }
 
 /**
@@ -368,11 +417,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
       if (!pts) continue;
       const rgb = scheme === 'kind' ? cx.rgb : myWebColor(scheme, { verse: underlay.versePos[i], verseTotal: opts.verseTotal, bridge: true });
-      ctx.strokeStyle = 'rgba(' + rgb + ',' + cx.alpha + ')';
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-      ctx.stroke();
+      strokeThread(ctx, pts, rgb, cx.alpha);
     }
   }
 
