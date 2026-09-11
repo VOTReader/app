@@ -263,13 +263,15 @@ export function threadPath(a, b, crossRail, o) {
  * overlap (a corridor of forty citations reads darker than one; R1), and
  * overlapping segments of ONE path are painted once, so a thread cannot share
  * a path with a thread it runs along. Two threads run along each other when
- * they join near-adjacent verses to the same Volumes passage; so a thread's
- * path is keyed by its colour bin and its RANK among the threads of that bin
- * that end on the same passage: corridor members get their own layers,
- * threads to different passages share one. The 5080 read 8.3 ms a frame with
- * a stroke per thread (2,100 strokeStyle changes and stroke() calls) and 4.2
- * with one path: the batches bring the count to about the number of
- * (bin, layer) pairs in view.
+ * BOTH their endpoints sit within a few stroke widths on screen (at 1x, forty
+ * Matthew notes to the letters of one Volume are one line); so within a
+ * colour bin the threads are sorted by their Bible end and each takes the
+ * lowest layer no near-coincident thread (both ends within `near` device px)
+ * already holds. Corridor members get their own layers; threads that merely
+ * cross share one, and lose accumulation only where they cross. The 5080
+ * read 8.3 ms a frame with a stroke per thread (2,100 strokeStyle changes
+ * and stroke() calls) and 4.2 with one path: the batches bring the count to
+ * the number of (bin, layer) pairs in view.
  *
  * The rise of a thread is stroked at the context's alpha; the level run along
  * the far rail (when there is one) at RUN_ALPHA of it, in its own batch, so a
@@ -277,44 +279,55 @@ export function threadPath(a, b, crossRail, o) {
  */
 class ContextBatches {
   constructor() {
-    /** @type {Map<number, Array<{pts:Array<[number, number]>, i0:number, i1:number}>>} */
-    this.paths = new Map();
-    /** @type {Map<number, number>} */
-    this.ranks = new Map();
+    /** @type {Array<{bin:number, bx:number, tx:number, layer:number, pts:Array<[number, number]>}>} */
+    this.threads = [];
   }
   /**
    * @param {number} t canon position 0..1
-   * @param {number} passage the Volumes node the thread ends on
+   * @param {number} bx the Bible end's x (device px)
+   * @param {number} tx the Volumes end's x (device px)
    * @param {Array<[number, number]>} pts
    */
-  add(t, passage, pts) {
-    const bin = Math.min(CONTEXT_BINS - 1, Math.floor(t * CONTEXT_BINS));
-    const rk = bin * 1000000 + Math.round(passage);
-    const layer = Math.min(255, this.ranks.get(rk) || 0);
-    this.ranks.set(rk, layer + 1);
-    const rise = /** @type {any} */ (pts).rise;
-    const fromA = /** @type {any} */ (pts).fromA;
-    if (rise < 0) { this.push(bin, layer, 0, pts, 0, pts.length - 1); return; }
-    // the rise is [0..rise] when the visible end is a, [rise..end] when it is b
-    if (fromA) { this.push(bin, layer, 0, pts, 0, rise); this.push(bin, layer, 1, pts, rise, pts.length - 1); }
-    else { this.push(bin, layer, 1, pts, 0, rise); this.push(bin, layer, 0, pts, rise, pts.length - 1); }
-  }
-  /** @param {number} bin @param {number} layer @param {number} run @param {Array<[number, number]>} pts @param {number} i0 @param {number} i1 */
-  push(bin, layer, run, pts, i0, i1) {
-    const key = (bin * 256 + layer) * 2 + run;
-    let list = this.paths.get(key);
-    if (!list) { list = []; this.paths.set(key, list); }
-    list.push({ pts, i0, i1 });
+  add(t, bx, tx, pts) {
+    this.threads.push({ bin: Math.min(CONTEXT_BINS - 1, Math.floor(t * CONTEXT_BINS)), bx, tx, layer: 0, pts });
   }
   /**
    * @param {CanvasRenderingContext2D} ctx
    * @param {number} alpha
+   * @param {number} near device px within which two ends count as one line
    * @returns {number} strokes made
    */
-  stroke(ctx, alpha) {
+  stroke(ctx, alpha, near) {
+    const th = this.threads;
+    th.sort((p, q) => p.bin - q.bin || p.bx - q.bx);
+    /** @type {Map<number, Array<{pts:Array<[number, number]>, i0:number, i1:number}>>} */
+    const paths = new Map();
+    const push = (bin, layer, run, pts, i0, i1) => {
+      const key = (bin * 4096 + Math.min(layer, 4095)) * 2 + run;
+      let list = paths.get(key);
+      if (!list) { list = []; paths.set(key, list); }
+      list.push({ pts, i0, i1 });
+    };
+    let used = 0;   // bitmask of layers held by near-coincident neighbours (32 is plenty; beyond it, share)
+    for (let i = 0; i < th.length; i++) {
+      const e = th[i];
+      used = 0;
+      for (let j = i - 1; j >= 0 && th[j].bin === e.bin && e.bx - th[j].bx <= near; j--) {
+        if (Math.abs(th[j].tx - e.tx) <= near && th[j].layer < 32) used |= (1 << th[j].layer);
+      }
+      let layer = 0;
+      while (layer < 32 && (used & (1 << layer))) layer++;
+      e.layer = layer;
+      const rise = /** @type {any} */ (e.pts).rise;
+      const fromA = /** @type {any} */ (e.pts).fromA;
+      if (rise < 0) push(e.bin, layer, 0, e.pts, 0, e.pts.length - 1);
+      // the rise is [0..rise] when the visible end is a, [rise..end] when it is b
+      else if (fromA) { push(e.bin, layer, 0, e.pts, 0, rise); push(e.bin, layer, 1, e.pts, rise, e.pts.length - 1); }
+      else { push(e.bin, layer, 1, e.pts, 0, rise); push(e.bin, layer, 0, e.pts, rise, e.pts.length - 1); }
+    }
     let n = 0;
-    for (const [key, list] of this.paths) {
-      const run = key & 1, bin = Math.floor(key / 512);
+    for (const [key, list] of paths) {
+      const run = key & 1, bin = Math.floor(key / 8192);
       ctx.strokeStyle = 'rgba(' + myWebBinColor(bin) + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
       ctx.beginPath();
       for (const seg of list) {
@@ -459,9 +472,9 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
       if (!pts) continue;
-      batches.add(myWebCanonT({ verse: underlay.versePos[i], verseTotal: opts.verseTotal }), underlay.votPos[i], pts);
+      batches.add(myWebCanonT({ verse: underlay.versePos[i], verseTotal: opts.verseTotal }), a[0], b[0], pts);
     }
-    batches.stroke(ctx, cx.alpha);
+    batches.stroke(ctx, cx.alpha, ctx.lineWidth * 4);
   }
 
   if (!personal || !personal.count) return rails;
