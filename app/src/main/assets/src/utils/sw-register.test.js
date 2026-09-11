@@ -23,6 +23,9 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
   beforeEach(() => {
     controllerChangeHandler = null;
     reloadSpy = vi.fn();
+    // The takeover flag lives on the shared window: a reload in an earlier case
+    // leaves it set, and the ordering pin below would then read a leak as a pass.
+    delete window.__votSwTookOver;
     const swMock = {
       controller: {}, // a controller exists → it's an UPDATE, not first install
       addEventListener: (type, cb) => { if (type === 'controllerchange') controllerChangeHandler = cb; },
@@ -71,18 +74,25 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     // "toast and update should happen no matter what screen user happens to be
     // on." The visible-mid-session deferral (wait for backgrounding, or offer a
     // Reload toast) is gone; the app's own state restore across the reload is
-    // the safety. No toast is offered and no flag is left for the lazy loader.
+    // the safety. No toast is offered. The takeover flag IS set, before the
+    // reload: reload() does not unload the page in the same tick, and a lazy
+    // load in that gap must refuse (service-worker-1.contract.test.js drives
+    // the loader itself; this pins the flag's ordering).
     vi.useFakeTimers();
     try {
       setVisibility('visible');
       registerServiceWorker();
       vi.advanceTimersByTime(60_000);         // well past the old boot window
+      let flagAtReload;
+      reloadSpy.mockImplementationOnce(() => { flagAtReload = window.__votSwTookOver; });
       controllerChangeHandler();
       expect(reloadSpy).toHaveBeenCalledTimes(1);
-      expect(window.__votSwTookOver).toBeUndefined();
+      expect(window.__votSwTookOver).toBe(true);
+      expect(flagAtReload, 'the flag must be visible to a loader that runs before the reload lands').toBe(true);
       expect(document.getElementById('vot-toast-update')).toBeNull();
     } finally {
       vi.useRealTimers();
+      delete window.__votSwTookOver;
     }
   });
 
