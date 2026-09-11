@@ -165,7 +165,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     return view;
   };
 
-  const mount = async () => {
+  const mount = async (props = {}, graphFn = graph) => {
     for (const [prop, value] of SIZES) {
       Object.defineProperty(HTMLCanvasElement.prototype, prop, {
         configurable: true, get() { return value; },
@@ -173,8 +173,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     }
     window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
     if (!realDecode) realDecode = vi.mocked(decodeGraph).getMockImplementation();
-    vi.mocked(decodeGraph).mockImplementation(() => graph());
-    const view = render(<ScriptureWebScreen {...baseProps()} />);
+    vi.mocked(decodeGraph).mockImplementation(() => graphFn());
+    const view = render(<ScriptureWebScreen {...baseProps()} {...props} />);
     return awaitCanvas(view);
   };
 
@@ -218,166 +218,87 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(container.querySelector('.sw-live').textContent).toBe('Zoomed all the way in');
   });
 
-  /* ── the Essential auto-switch, gate 2 of design-perf's spec ─────────────
-     Nested here because this block owns the SIZED-CANVAS harness and two
-     copies of a harness that must agree is worse than an imperfect title.
-     Everything below needs the same 800x360 frame and the same graph.
+  /* ── the density is the reader's choice at every zoom (w-sw-zoom-pan, item 2) ──
+     Corbin, 2026-09-11: "verify that fully zoomed in, the full corpus and all 63000 lines are
+     visible and interactable, UNLESS the user has it set to essential." His first explicit word
+     on the matter; it replaces the 09-05 decision (made on his behalf) that switched the web to
+     Essential past 22 CSS px per verse. The switch and its hysteresis band are gone: `density`
+     is the stored choice, the pill writes it through updateSetting, and nothing moves it.
 
-     THE ARITHMETIC OF THIS FRAME, so no case depends on counting presses:
-       fitPPV = 800 / 31102 = 0.025722 CSS px per verse at 1x
-       the + key multiplies by 1.6, ceiling maxZoomFor(31102, 800) = 1710.6x
-       ppvCss 22 (enter) = 855.3x   ->  reached at 1.6^15 = 1152x
-       ppvCss 11 (leave) = 427.6x
-       1.6^14 = 720x = ppvCss 18.5  ->  the last step BELOW the edge
-     So 14 presses is deliberately short of the edge and 15 is past it, with
-     both still below the ceiling. */
-  describe('the Essential auto-switch, driven through the real controls', () => {
-    const DENSITY_ON = 'Essential density, strongest connections only';
-    const DENSITY_OFF = 'Famous density, all connections';
-    const live = (c) => c.querySelector('.sw-live').textContent;
+     Nested here because this block owns the SIZED-CANVAS harness (800x360, the + key, the
+     recorded draws). Forty presses reach the 44 px ceiling (1,711x on this frame). */
+  describe('the density is the reader\'s choice at every zoom, Famous unless they chose Essential', () => {
     const shown = () => screen.getByLabelText('Connection density').value;
-    /* ONE MACROTASK DOES NOT FLUSH ONE rAF. The shared `press` above awaits
-       setTimeout(0), and jsdom's requestAnimationFrame runs on a ~16 ms timer,
-       so the zoom label lagged by whole presses — fifteen presses reported
-       450x, which reads exactly like the camera going backwards. The existing
-       cases here never saw it because they press 40 times and read a settled
-       value at the ceiling. 20 ms is one frame, so each press draws exactly
-       once and every number below is the camera's, not the label's lag. */
     const pressFrame = async (key) => {
       fireEvent.keyDown(document.querySelector('.sw-root'), { key });
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     };
+    const toCeiling = async () => { for (let i = 0; i < 40; i++) await pressFrame('+'); };
+    const lastDensity = () => DRAWN[DRAWN.length - 1].density;
 
-    it('CONTROL: at Overview the control reads Famous and nothing has been announced', async () => {
+    it('CONTROL: at Overview the control reads Famous and the frame is drawn Famous', async () => {
       const { container } = await mount();
       expect(zoomText(container)).toBe('Overview');
       expect(shown()).toBe('famous');
-      expect(live(container)).not.toBe(DENSITY_ON);
+      expect(lastDensity()).toBe('famous');
     });
 
-    it('CONTROL: fourteen presses is a real zoom that stays SHORT of the edge and does not switch', async () => {
-      /* This is what makes the next case mean "crossing 22 switched it" rather
-         than "zooming switched it". Without it, a law that switched at any zoom
-         at all would satisfy the case below perfectly. */
+    it('RED today: at the ceiling the web is STILL drawn Famous — the control reads Famous, every frame past 22 px/verse drew Famous, nothing was announced', async () => {
       const { container } = await mount();
-      for (let i = 0; i < 14; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('721x');   // ppvCss 18.55, short of 22
-      expect(shown()).toBe('famous');
-      expect(live(container)).not.toBe(DENSITY_ON);
+      await toCeiling();
+      expect(zoomText(container)).toBe('1711x');
+      expect(shown(), 'the density control').toBe('famous');
+      const deep = DRAWN.filter((d) => d.ppv / d.dpr >= 22);
+      expect(deep.length, 'frames drawn past 22 CSS px per verse').toBeGreaterThan(0);
+      expect(deep.map((d) => d.density), 'every deep frame').toEqual(deep.map(() => 'famous'));
+      expect(container.querySelector('.sw-live').textContent).not.toMatch(/Essential density/);
     });
 
-    it('crossing the entry edge switches to Essential AND says so', async () => {
-      const { container } = await mount();
-      for (let i = 0; i < 15; i++) await pressFrame('+');
-      /* The crossing press's own frame is the one the auto-switch's early
-         return SUPPRESSES (draw() sets the density state and returns before
-         asking the renderer), so the camera's new ppv is drawn on the frame
-         after that state lands. One more frame, then read the camera. */
-      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      expect(zoomText(container)).toBe('1153x');  // ppvCss 29.66, past 22
-      // Both, or a silent switch passes: the rail shows the live value…
-      expect(shown()).toBe('essential');
-      // …and the reader is told, which is the only way a screen reader knows.
-      expect(live(container)).toBe(DENSITY_ON);
+    it('RED today: at the ceiling a thread that exists only in Famous (7 votes) is tappable and brings up its connection card', async () => {
+      /* One 7-vote link, 15548 -> 15555, sitting AFTER the Essential prefix of its bucket
+         (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
+         nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
+         the camera settles on verse 15551 and the feet land at (15548 - 15551) * 44 + 400 = 268
+         and 576 CSS px. On this 800x360 frame (base 260, ceil 256) arcShape gives R 100, A 90:
+         the apex is at y = 260 - 90 = 170 and runs level from x 368 to 476, so the tap goes to
+         the midpoint (422, 170) - measured distance 0.22 px at Famous, nothing at Essential,
+         and it is above the rail band pickChapter owns (y >= 258). */
+      const linked = () => Object.assign(graph(), {
+        count: 1,
+        books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
+        chapters: [[0, 1, 15000, 1000]],
+        from: new Uint16Array([15548]), to: new Uint16Array([15555]), votes: new Int16Array([7]),
+        buckets: [{ off: 0, len: 1, off20: 0, off10: 1, segments: 8, chunks: [[15548, 15555]] }],
+        chunkSize: 256,
+      });
+      const { container } = await mount({}, linked);
+      await toCeiling();
+      expect(zoomText(container)).toBe('1711x');
+      const root = container.querySelector('.sw-root');
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 422, clientY: 170 });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 422, clientY: 170 });
+      await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
+      const sheet = container.querySelector('.sw-sheet');
+      expect(sheet, 'the connection card opened for the 7-vote thread').toBeTruthy();
+      expect(sheet.textContent).toMatch(/Isaiah/);
     });
 
-    it('tapping Famous is the ONE TAP BACK: it pins, and the ceiling cannot move it', async () => {
-      const { container } = await mount();
-      for (let i = 0; i < 15; i++) await pressFrame('+');
+    it('CONTROL: a reader whose stored choice is Essential stays Essential at Overview and at the ceiling (cannot fail today; it guards the fix from over-correcting)', async () => {
+      await mount({ settings: { webDensity: 'essential' } });
       expect(shown()).toBe('essential');
-
-      fireEvent.change(screen.getByLabelText('Connection density'), { target: { value: 'famous' } });
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-      expect(shown()).toBe('famous');
-
-      for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');       // the ceiling, well past 22
-      expect(shown()).toBe('famous');                  // pinned, and it held
-      /* "The live region did not fire AGAIN" is asserted as "no density
-         announcement", not as "the text is unchanged" — the zoom key writes the
-         centre verse's label on every press and the ceiling message at the top,
-         and both of those are correct things for it to say. */
-      expect(live(container)).not.toBe(DENSITY_ON);
-      expect(live(container)).not.toBe(DENSITY_OFF);
+      expect(lastDensity()).toBe('essential');
+      await toCeiling();
+      expect(shown()).toBe('essential');
+      expect(lastDensity()).toBe('essential');
     });
 
-    it('never draws a frame at the density it has just decided is wrong', async () => {
-      /* WHAT THE EARLY RETURN IS FOR, and it needs the renderer's own arguments
-         to be visible at all: a bite that removed the return left every case
-         green, because the mock threw its opts away. This asserts the property
-         directly instead of counting frames — no draw may carry Famous at a ppv
-         at or past the entry edge.
-
-         SAY WHICH KIND OF GUARD THIS IS: the return protects WHAT THE READER SEES
-         for one frame. It is not a correctness guard — the state is already right
-         either way, and nothing downstream reads the suppressed frame. */
-      const { container } = await mount();
-      for (let i = 0; i < 14; i++) await pressFrame('+');
-      DRAWN.length = 0;
-      await pressFrame('+');                                   // the crossing frame
-      // ONE 20 ms WAIT IS ONE rAF TICK, and the crossing frame consumes it
-      // without drawing — that is the whole point of the return. The replacement
-      // frame needs a second tick, and without it DRAWN comes back EMPTY, which
-      // satisfies the filter below for the wrong reason. My own anti-vacuity
-      // check is what caught that.
-      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      expect(zoomText(container)).toBe('1153x');
-      expect(shown()).toBe('essential');
-      // The harness really recorded, and it recorded past the edge — the filter
-      // below is trivially satisfied by an empty array or by frames that never
-      // got there.
-      expect(DRAWN.length).toBeGreaterThan(0);
-      expect(DRAWN.some((d) => d.ppv / d.dpr >= 22 && d.density === 'essential')).toBe(true);
-      const stale = DRAWN.filter((d) => d.ppv / d.dpr >= 22 && d.density === 'famous');
-      expect(stale).toEqual([]);
-    });
-
-    it('does NOT switch while the reader is in My Web — and switching back proves it', async () => {
-      /* The canonical-only guard, which no case reached: personal mode does not
-         render the density control, so the state has to be read after switching
-         BACK. Without the guard the reader returns from My Web to find Essential,
-         announced at, having never been in the Scripture Web at that zoom. */
-      const { container } = await mount();
-      fireEvent.click(screen.getByText('My web'));
-      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      for (let i = 0; i < 15; i++) await pressFrame('+');       // past the edge, in My Web
-      /* WHAT THE GUARD ACTUALLY DOES: nothing is announced, because the reader is
-         not looking at the Scripture Web. Without it the switch fires here and
-         .sw-live tells them about a density change in a view that has no density
-         control — the '+' key writes the verse label first and the draw writes the
-         announcement after, so the announcement is what would be standing. */
-      expect(container.querySelector('.sw-live').textContent).not.toBe(DENSITY_ON);
-
-      /* AND WHAT IT MUST NOT DO. Coming back to the Scripture Web at a zoom past
-         the edge SWITCHES, and that is correct — the reader is now looking at the
-         picture the rule is about. Asserted so this case cannot pass by the whole
-         mechanism being broken, which is what "expect famous here" would have
-         allowed. My first version asserted exactly that and was wrong. */
-      fireEvent.click(screen.getByText('Scripture'));
-      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      expect(shown()).toBe('essential');
-      expect(container.querySelector('.sw-live').textContent).toBe(DENSITY_ON);
-    });
-
-    it('a reader whose stored preference is Essential is never announced at, in or out', async () => {
-      /* base === 'essential' means there is nothing to switch away from, so the
-         auto-switch must be completely silent for them rather than announcing a
-         change it did not make. */
-      for (const [prop, value] of [['clientWidth', FRAME_CSS], ['clientHeight', 360]]) {
-        Object.defineProperty(HTMLCanvasElement.prototype, prop, {
-          configurable: true, get() { return value; },
-        });
-      }
-      window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
-      vi.mocked(decodeGraph).mockImplementation(() => graph());
-      const view = render(<ScriptureWebScreen {...baseProps()} settings={{ webDensity: 'essential' }} />);
-      await awaitCanvas(view);
-      expect(shown()).toBe('essential');
-      for (let i = 0; i < 15; i++) await pressFrame('+');
-      expect(shown()).toBe('essential');
-      expect(live(view.container)).not.toBe(DENSITY_ON);
-      expect(live(view.container)).not.toBe(DENSITY_OFF);
+    it('CONTROL: choosing Essential on the pill persists it as the setting (updateSetting webDensity) — green today, stated as such', async () => {
+      const updateSetting = vi.fn();
+      await mount({ updateSetting });
+      fireEvent.change(screen.getByLabelText('Connection density'), { target: { value: 'essential' } });
+      expect(updateSetting).toHaveBeenCalledWith('webDensity', 'essential');
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(lastDensity()).toBe('essential');
     });
   });
 });
