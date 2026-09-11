@@ -73,9 +73,13 @@
         true }) — the live scroll record folded into the latest union.
         StateStore.set is asynchronous by construction (a Web Lock, an IDB
         read, the 3-way merge, then the put) and a document that is one
-        call from reload() may never finish it: the browser walk measured
-        the reader coming back at 612 px against 900 with that write in
-        place. So the reload flush ALSO writes the union to sessionStorage
+        call from reload() is not owed its completion: a self-initiated
+        reload may abort the transaction, and a restore built on the
+        browser finishing it during unload is a manufactured survivor
+        (Orchestrator's ruling, 2026-09-11). The walk's boot-time read has
+        seen that put land 12 of 12 times on one machine; that is a fact
+        about one machine, which is exactly why nothing is built on it.
+        So the reload flush ALSO writes the union to sessionStorage
         (RESUME_STATE_KEY, synchronous, same tab only) and the next boot
         takes that record FIRST — useSavedState → takeResumeState() —
         applies it through the same validation as the store, and clears
