@@ -3282,9 +3282,11 @@
        it overlaps nothing and is excluded from tab thumbnails for free (the
        nav is cropped natively / ignored by html2canvas). 40px hit target. */
     .reading-dot-nav { width:2.5rem; height:2.5rem; flex-shrink:0; border-radius:50%; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
-    /* The ribbon glyph keeps the dot's token (gold) and its breath; the glow moves
-       from box-shadow (a circle's) to drop-shadow (a shape's). Same 40 px target. */
-    .reading-dot-nav .rdg-glyph { display:block; width:14px; height:16px; color:var(--gold); animation: ribbon-pulse 2.8s ease-in-out infinite; }
+    /* The marker glyph (text lines with a pointer at the one you were on; a bookmark
+       ribbon for a day, until it was the Bookmark button's icon too) keeps the dot's
+       token (gold) and its breath; the glow moves from box-shadow (a circle's) to
+       drop-shadow (a shape's). 16 px square so the pointer survives at 1x; same 40 px target. */
+    .reading-dot-nav .rdg-glyph { display:block; width:16px; height:16px; color:var(--gold); animation: ribbon-pulse 2.8s ease-in-out infinite; }
     @keyframes ribbon-pulse { 0%,100% { filter:drop-shadow(0 0 3px var(--gold-glow)); opacity:0.7; } 50% { filter:drop-shadow(0 0 7px var(--gold)); opacity:1; } }
     .history-empty {
       text-align:center; color:var(--cream-dim);
@@ -6862,7 +6864,7 @@
     /* Hidden = the controls, not the legend: the colour key stays with the book
        rail on the canvas (Corbin, 2026-09-11: "keep the web legend … just hide
        the interactable UI"). */
-    .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls) { display: none; }
+    .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-tip) { display: none; }
     .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
     .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
     /* r2: one pill per zoomed rail, sitting just inside its rail (the rail's
