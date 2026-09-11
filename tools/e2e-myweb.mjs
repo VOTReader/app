@@ -81,7 +81,13 @@ const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.
    Chrome @2, Radeon 890M; rAF quantised at ~4.2 ms. */
 const R5_OVERVIEW_MS = num('MYWEB_R5_OVERVIEW', 12.6);  // main 4.2 on every frame (the rAF floor); three quanta
 const R5_ZOOM_MS = { phoneLand: num('MYWEB_R5_ZOOM_PHONELAND', 30), phone: num('MYWEB_R5_ZOOM_PHONE', 75), desktop: num('MYWEB_R5_ZOOM_DESKTOP', 130) };  // main's worst read x 1.2: 24.9 / 62.5 / 108.4 (main tripped a best-read x 1.2 ceiling on its own dry run)
-const R5_MIN_CLEARS = num('MYWEB_R5_MIN_CLEARS', 0.8);   // ui-canvas clearRect per rAF frame; main and the prototypes read ~1.0
+/* THE CEILINGS ARE NUMBERS FROM ONE GPU. They assert only when the renderer string
+   contains R5_RENDERER; on any other renderer (CI's SwiftShader, an integrated GPU)
+   the arm prints and does not judge, because a number from another GPU is not this
+   number (Charter, 2026-09-10). */
+const R5_RENDERER = process.env.MYWEB_R5_RENDERER || 'NVIDIA GeForce RTX 5080';
+let R5_ASSERT = false;
+const R5_MIN_CLEARS = num('MYWEB_R5_MIN_CLEARS', 0.8);   // ui-canvas clearRect per opportunity (min(moves, frames)); main and the branch read ~1.0
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [], notes = [];
@@ -146,16 +152,25 @@ async function toMyWeb(page) {
   await sleep(900);
   return true;
 }
-/** Three 1.8x steps: the button where the tree has one, else the wheel. */
-async function zoom3(page) {
+const ZOOM_TARGET = Math.pow(1.8, 3);   // three of the old button's steps
+const readPpv = (page) => page.evaluate(() => Number((document.querySelector('.sw-root') || { getAttribute: () => 'NaN' }).getAttribute('data-ppv-css')));
+/** Three 1.8x steps, ASSERTED: the button where the tree has one, else wheel
+    notches until the published ppv reads the target (the wheel's delta is
+    scaled by the browser; a notch is not a step until the screen says so). */
+async function zoom3(page, tag) {
+  const p0 = await readPpv(page);
+  if (!(p0 > 0)) { fails.push(`${tag} the screen publishes no data-ppv-css, so no zoom can be asserted`); return 0; }
   const hasBtn = await page.evaluate(() => !!document.querySelector('button[aria-label="Zoom in"]'));
-  if (hasBtn) { for (let i = 0; i < 3; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } }
+  let ratio = 1;
+  if (hasBtn) { for (let i = 0; i < 3; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } ratio = (await readPpv(page)) / p0; }
   else {
     const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
     await page.mouse.move(c.x, c.y);
-    for (let i = 0; i < 3; i++) { await page.mouse.wheel({ deltaY: -280 }); await sleep(450); }
+    for (let i = 0; i < 24 && ratio < ZOOM_TARGET * 0.97; i++) { await page.mouse.wheel({ deltaY: -280 }); await sleep(250); ratio = (await readPpv(page)) / p0; }
   }
   await sleep(700);
+  if (ratio < ZOOM_TARGET * 0.9) fails.push(`${tag} the zoom did not take: ppv ${p0} -> ${(p0 * ratio).toFixed(2)} = ${ratio.toFixed(2)}x, wanted ${ZOOM_TARGET.toFixed(2)}x`);
+  return ratio;
 }
 
 /** Pixel statistics of the 2D canvas in the central band (rails and labels excluded). */
@@ -227,7 +242,10 @@ async function frameTime(page, panMs) {
   const c = await page.evaluate(() => { const c = Object.assign({}, window.__sw2d || {}); if (window.__sw2d) { window.__sw2d.stroke = 0; window.__sw2d.clear = 0; } return c; });
   if (!d.length) return null;
   const q = (p) => +d[Math.min(d.length - 1, Math.floor(d.length * p))].toFixed(1);
-  return { n: d.length, p50: q(0.5), p95: q(0.95), strokesPerFrame: Math.round((c.stroke || 0) / d.length), clearsPerFrame: +((c.clear || 0) / d.length).toFixed(2) };
+  // a draw is scheduled per pointer move, so on a fast tree rAF ticks outnumber
+  // moves and clears/frame reads below 1 for a draw that ran on every chance it had:
+  // the witness is clears per OPPORTUNITY, min(moves, frames)
+  return { n: d.length, p50: q(0.5), p95: q(0.95), moves: k, strokesPerFrame: Math.round((c.stroke || 0) / d.length), clearsPerFrame: +((c.clear || 0) / d.length).toFixed(2), clearsPerOpportunity: +((c.clear || 0) / Math.min(k, d.length)).toFixed(2) };
 }
 /** Two runs, min-of-two p50; strokes/frame must show the draw ran. */
 async function perfArm(page, tag, state, ceiling) {
@@ -235,8 +253,9 @@ async function perfArm(page, tag, state, ceiling) {
   const b = await frameTime(page, 1500); await sleep(300);
   if (!a || !b) { fails.push(`${tag} R5 ${state}: no rAF frames recorded during the pan`); return; }
   const min = Math.min(a.p50, b.p50);
-  note(`${tag} R5 ${state} rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, p95 ${a.p95}/${b.p95}, clears/frame ${a.clearsPerFrame}/${b.clearsPerFrame}, strokes/frame ${a.strokesPerFrame}/${b.strokesPerFrame}); ceiling ${ceiling}`);
-  if (Math.min(a.clearsPerFrame, b.clearsPerFrame) < R5_MIN_CLEARS) fails.push(`${tag} R5 ${state}: ${Math.min(a.clearsPerFrame, b.clearsPerFrame)} ui-canvas clears/frame < ${R5_MIN_CLEARS}: the draw did not run every frame, so the frame time is not the draw's`);
+  note(`${tag} R5 ${state} rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, moves ${a.moves}/${b.moves}, p95 ${a.p95}/${b.p95}, clears/opportunity ${a.clearsPerOpportunity}/${b.clearsPerOpportunity}, strokes/frame ${a.strokesPerFrame}/${b.strokesPerFrame}); ceiling ${ceiling}`);
+  if (Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity) < R5_MIN_CLEARS) fails.push(`${tag} R5 ${state}: ${Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity)} ui-canvas clears per opportunity < ${R5_MIN_CLEARS}: the draw did not run when it could, so the frame time is not the draw's`);
+  if (!R5_ASSERT) { note(`${tag} R5 ${state}: printed only, the renderer is not ${JSON.stringify(R5_RENDERER)}`); return; }
   if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two p50 ${min} ms > ceiling ${ceiling} ms`);
 }
 async function makeLink(page, route, verseIdx, ref) {
@@ -293,7 +312,7 @@ async function walk(page, url, fname) {
     // TIMING FIRST, PIXELS AFTER: getImageData demotes the canvas (note 3b).
     await perfArm(page, tag, 'overview', R5_OVERVIEW_MS);
     await clickIfPresent(page, 'Reset the view'); await sleep(500);
-    await zoom3(page);
+    await zoom3(page, tag);
     await perfArm(page, tag, 'three zoom steps', R5_ZOOM_MS[fname] || 1e9);
     await clickIfPresent(page, 'Reset the view'); await sleep(700);
   }
@@ -305,11 +324,11 @@ async function walk(page, url, fname) {
   if (structure < STRUCTURE) fails.push(`${tag} R1a the context has no structure: p95/p50 = ${zero.ctx.p95}/${zero.ctx.p50} = ${structure.toFixed(2)} < ${STRUCTURE} (a flat stain)`);
   if (fname === 'phoneLand' && zero.on.panelCover > PANEL_COVER) fails.push(`${tag} R3 the empty panel covers ${zero.on.panelCover} of the band's rows > ${PANEL_COVER}: the invitation hides the web it invites the reader into`);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
-  await zoom3(page);
+  const z3 = await zoom3(page, tag);
   await shot(page, `${fname}-0links-zoom3`);
   const zeroZoom = await readBoth(page);
   const reward = zero.ctx.p50 ? zeroZoom.ctx.p50 / zero.ctx.p50 : 0;
-  note(`${tag} 0 links at three steps: context p50 ${zeroZoom.ctx.p50} p95 ${zeroZoom.ctx.p95}; reward ${reward.toFixed(2)}x${f.rewardArm ? '' : ' (printed, not asserted on the portrait frame)'}`);
+  note(`${tag} 0 links at three steps (zoom ${z3.toFixed(2)}x): context p50 ${zeroZoom.ctx.p50} p95 ${zeroZoom.ctx.p95}; reward ${reward.toFixed(2)}x${f.rewardArm ? '' : ' (printed, not asserted on the portrait frame)'}`);
   if (f.rewardArm && reward < ZOOM_REWARD) fails.push(`${tag} R1b zoom does not reward: p50 ${zeroZoom.ctx.p50} at three steps vs ${zero.ctx.p50} at overview = ${reward.toFixed(2)}x < ${ZOOM_REWARD}x`);
   // five links through the real UI
   const made = [];
@@ -321,7 +340,7 @@ async function walk(page, url, fname) {
   note(`${tag} ${made.length} links (${made.join('; ')}) overview: links-only p95 ${five.off.p95} max ${five.off.max}; context p50 ${zero.ctx.p50}; subtitle ${JSON.stringify(five.on.title)}`);
   if (!/5 links/.test(five.on.title)) fails.push(`${tag} the five links did not all land through the UI: subtitle reads ${JSON.stringify(five.on.title)}`);
   if (five.off.p95 < LINK_CORE || zero.ctx.p50 > CONTEXT_P50) fails.push(`${tag} R2 a reader's link is not unmistakable: link p95 ${five.off.p95} (>= ${LINK_CORE}) against context p50 ${zero.ctx.p50} (<= ${CONTEXT_P50})`);
-  await zoom3(page);
+  await zoom3(page, tag);
   await shot(page, `${fname}-5links-zoom3`);
   const fiveZoom = await readBoth(page);
   note(`${tag} ${made.length} links at three steps: links-only p95 ${fiveZoom.off.p95}; context p50 ${fiveZoom.ctx.p50}`);
@@ -338,6 +357,8 @@ try {
   const renderer = await probe.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; });
   await probe.close();
   console.log('[e2e-myweb] renderer ' + JSON.stringify(renderer));
+  R5_ASSERT = !!(renderer && String(renderer).includes(R5_RENDERER));
+  if (PERF && !R5_ASSERT) console.log('[e2e-myweb] R5 ceilings are for ' + JSON.stringify(R5_RENDERER) + '; on this renderer they PRINT and do not judge');
   for (const fname of WANT) {
     const ctx = await browser.createBrowserContext();
     const page = await ctx.newPage();
