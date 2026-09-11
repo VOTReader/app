@@ -172,7 +172,9 @@ describe('TourController — moving', () => {
   it('next() on the closing card finishes and records the flag', () => {
     TourController.attachNav(nav());
     TourController.start('prompt');
-    for (let i = 0; i < 10; i++) TourController.next();   // the three stops that stay take two each
+    // Every stop takes one Next, the three that stay (press / highlightDemo) take two; the walk
+    // is bounded so a tour that never reaches the closing card fails here rather than spinning.
+    for (let i = 0; i < 40 && TourController.getState().step.id !== 'done'; i++) TourController.next();
     expect(TourController.getState().step.id).toBe('done');
     TourController.next();
     expect(TourController.getState().active).toBe(false);

@@ -35,6 +35,7 @@ import {
 import { writeContainer, readContainer } from './backup-container.js';
 import { renderHook } from '@testing-library/react';
 import { usePersistedState } from '../hooks/use-persisted-state.js';
+import { useSettings } from '../hooks/use-settings.js';
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { hydrateAllStores, hasAnyPendingStores } from '../stores/cached-store.js';
@@ -1187,6 +1188,53 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(rec.width).toBe(4);
     const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
+  }, 20000);
+
+  /* 2026-09-10 (settings-builder): the default flips (dice, reading marker, Auto-Continue) are a
+     MIGRATION keyed on `defaultsRev` INSIDE settings, and a backup carries settings whole. So a
+     backup taken before tonight must import UNSTAMPED — the import restores bytes, it does not
+     migrate — and be flipped exactly once on the boot that follows; and a backup taken after the
+     reader switched the dice off must carry its stamp and its touched record through the same
+     round trip and stay off. The boot is the real hook (useSettings) over the settings the
+     hydrated StateStore hands back, which is what App() does after the import's reload. */
+  it('a pre-flip backup imports unstamped and is flipped on the next boot; a post-flip explicit OFF stays OFF', async () => {
+    /** @type {any} */ (globalThis).GARDEN_DEFAULT_TIER = 'standard';
+    const roundTrip = async (settings) => {
+      StateStore.set({ theme: 'dark', settings, tabs: [], activeTabIdx: 0 });
+      await flushAll();
+      const built = await buildExportPayload({
+        storesMap: storesMap(), flagMap: flagMap(), idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+        diagnosticLog: [], nowIso: () => '2026-09-10T00:00:00.000Z',
+      });
+      expect(built.ok).toBe(true);
+      const json = JSON.stringify(built.payload);
+      StateStore.set({}); await flushAll(); localStorage.clear();
+      const res = await applyImportPayload(JSON.parse(json), {
+        storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord,
+      });
+      expect(res.importFailures).toBe(0);
+      ALL_STORES.forEach((s) => s._resetForTests()); IDBAdapter._resetForTests(); await hydrateAllStores();
+      return StateStore.get().settings;
+    };
+    const boot = (saved) => renderHook(() => useSettings({ savedSettings: saved, theme: 'dark' })).result.current.settings;
+
+    // (a) a profile from before tonight: no stamp, the dice off because that was the default
+    const old = await roundTrip({ showSurpriseButton: false, showReadingDot: false, translation: 'kjv' });
+    expect(old.defaultsRev).toBeUndefined();
+    expect(old.showSurpriseButton).toBe(false);
+    const booted = boot(old);
+    expect(booted.showSurpriseButton).toBe(true);
+    expect(booted.showReadingDot).toBe(true);
+    expect(booted.defaultsRev).toBe(1);
+    expect(booted.translation).toBe('kjv');
+
+    // (b) a backup taken after the reader switched the dice off: stamp and choice survive the trip
+    const chosen = await roundTrip({ showSurpriseButton: false, showReadingDot: true, defaultsRev: 1, touched: { showSurpriseButton: true } });
+    expect(chosen.defaultsRev).toBe(1);
+    expect(chosen.touched).toEqual({ showSurpriseButton: true });
+    const booted2 = boot(chosen);
+    expect(booted2.showSurpriseButton).toBe(false);
+    expect(booted2.showReadingDot).toBe(true);
   }, 20000);
 
   /* T7 — boot end-state with one store left DEGRADED. Pins the shipped
