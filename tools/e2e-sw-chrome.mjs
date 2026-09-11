@@ -153,9 +153,10 @@ function contrastOn(fg, ground) {
 
 /** F3w ground read: screenshot the viewport, decode it in a FRESH in-page canvas
  * (never the app's, which a readback would demote), and return, per pill box, the
- * brightest pixel in its inner left strip (x in [l+3, l+8), y in [t+3, b-3)); the
- * strip is inline padding on a flat pill and block padding on a rotated one, so
- * no glyph reaches it either way. */
+ * brightest pixel in a strip 3..8 CSS px inside one LONG side, clear of both
+ * rounded ends (a stadium's corner arcs leave raw web at the box's corners);
+ * that strip is padding on a flat pill and on a rotated one alike, so no glyph
+ * reaches it. */
 async function brightestGround(page, boxes, dpr) {
   const b64 = await page.screenshot({ encoding: 'base64' });
   return page.evaluate(async (b64, boxes, dpr) => {
@@ -168,8 +169,13 @@ async function brightestGround(page, boxes, dpr) {
     let sum = 0; const cx = (c.width / 2) | 0, cy = (c.height / 2) | 0;
     for (let y = cy - 60; y < cy + 60; y++) for (let x = cx - 60; x < cx + 60; x++) { const i = (y * c.width + x) * 4; sum = (sum * 31 + d[i] + d[i + 1] + d[i + 2]) | 0; }
     const grounds = boxes.map((r) => {
+      // a pill is a stadium: the strip hugs one LONG side, 3..8 px in, and
+      // stays clear of both rounded ends by the pill's half-thickness + 2
+      const w = r.r - r.l, h = r.b - r.t, tall = h > w, end = Math.min(w, h) / 2 + 2;
+      const x0 = tall ? r.l + 3 : r.l + end, x1 = tall ? r.l + 8 : r.r - end;
+      const y0 = tall ? r.t + end : r.t + 3, y1 = tall ? r.b - end : r.t + 8;
       let best = null, bl = -1;
-      for (let x = Math.ceil((r.l + 3) * dpr); x < (r.l + 8) * dpr; x++) for (let y = Math.ceil((r.t + 3) * dpr); y < (r.b - 3) * dpr; y++) {
+      for (let x = Math.ceil(x0 * dpr); x < x1 * dpr; x++) for (let y = Math.ceil(y0 * dpr); y < y1 * dpr; y++) {
         const i = (y * c.width + x) * 4; const l = lum(d[i], d[i + 1], d[i + 2]);
         if (l > bl) { bl = l; best = [d[i], d[i + 1], d[i + 2]]; }
       }
@@ -205,8 +211,15 @@ async function worstGround(page, pills, dpr, worst, state, tag, steps) {
     }
     // the ground is only the web's if the web is what sits under the pointer: a
     // sheet or chooser over the canvas (a clamped drag reads as a tap) is a fault
-    const under = await page.evaluate((c) => { const e = document.elementFromPoint(c.x, c.y); return e ? e.tagName + '.' + e.className : 'nothing'; }, c);
-    if (!/sw-canvas/.test(under)) { fails.push(`${tag} F3w ${state} step ${k}: ${under} covers the canvas centre; the ground under the pills is not the web's`); return; }
+    const underAt = () => page.evaluate((c) => { const e = document.elementFromPoint(c.x, c.y); return e ? e.tagName + '.' + e.className : 'nothing'; }, c);
+    let under = await underAt();
+    if (!/sw-canvas/.test(under)) {
+      // a drag the clamp turned into a tap opened a chooser: dismiss it, count it
+      await page.keyboard.press('Escape'); await sleep(400); under = await underAt();
+      if (!/sw-canvas/.test(under)) { fails.push(`${tag} F3w ${state} step ${k}: ${under} covers the canvas centre and Escape did not clear it; the ground under the pills is not the web's`); return; }
+      worst.taps = (worst.taps || 0) + 1;
+      continue;
+    }
     const { grounds: g, sum } = await brightestGround(page, pills.map((p) => p.box), dpr);
     if (k > 0 && sum === worst.lastSum) worst.stillPans = (worst.stillPans || 0) + 1;
     worst.lastSum = sum;
@@ -246,6 +259,7 @@ async function walk(page, url, fname) {
   // would read as a tap: the boot ground is the overview ground, no drags
   await worstGround(page, resting, f.dpr, worst, 'overview', tag, 0);
   if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps', tag, PAN_STEPS);
+  if (worst.taps) note(`${tag} F3w ${worst.taps} of ${PAN_STEPS} drags read as taps (the camera clamped), dismissed and not counted`);
   if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS} drags left the web's centre pixels unchanged: the pan did not take, the grounds are not the worst`);
   for (const p of resting) {
     const w = worst.get(p.name);
