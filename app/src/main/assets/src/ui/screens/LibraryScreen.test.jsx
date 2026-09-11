@@ -117,16 +117,23 @@ describe('Scripture Web is reachable from the Library, and no longer says it is 
 });
 
 describe('LibraryScreen — empty-tile guidance captions', () => {
+  /* The tiles that CAN be empty: every tile but Scripture Web, which ships full (63,418
+     cross-references) and so has nothing to explain. Its "Still under construction." caption of
+     2026-09-05 rode the guide span while the Home shortcut was gone; both are back to before
+     (2026-09-11), so the count here is derived from the order MINUS that one tile. */
+  const EMPTIABLE = DEFAULT_LIBRARY_ORDER.filter((id) => id !== 'scripture-web');
+
   it('every empty tile explains how its content happens', () => {
     setupGlobals();
     renderLibrary();
     const guides = [...document.querySelectorAll('.library-tile-guide')];
     /* DERIVED, not re-typed. This was a hard 7 while the shared stub carried a
        hand-copied seven-id order, and the two agreed only by accident — the app
-       had eight tiles. Counting against DEFAULT_LIBRARY_ORDER means adding a
-       tile fails this case for the right reason (its caption is missing) rather
-       than for the wrong one (a number nobody updated). */
-    expect(guides).toHaveLength(DEFAULT_LIBRARY_ORDER.length);
+       had eight tiles. Counting against the order means adding a tile fails
+       this case for the right reason (its caption is missing) rather than for
+       the wrong one (a number nobody updated). */
+    expect(EMPTIABLE).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 1);   // the filter found its tile
+    expect(guides).toHaveLength(EMPTIABLE.length);
     guides.forEach((g) => expect(g.textContent.length).toBeGreaterThan(10));
     // Spot-pin the voice/accuracy of each caption against the destination
     // screens' own empty-state copy.
@@ -137,10 +144,8 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
     expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
     expect(tileEl('Milestones').querySelector('.library-tile-guide').textContent).toMatch(/listening/i);
-    // The eighth. Its caption says the tile is unfinished rather than how to
-    // fill it, which is the honest caption for a screen under construction —
-    // and the case above claims EVERY tile, so it has to be named here too.
-    expect(tileEl('Scripture Web').querySelector('.library-tile-guide').textContent).toMatch(/under construction/i);
+    // The eighth is never empty, so it is the one tile with no guide at all.
+    expect(tileEl('Scripture Web').querySelector('.library-tile-guide')).toBeNull();
   });
 
   it('a tile with real content drops its caption', () => {
@@ -150,14 +155,14 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
     // A first note also earns the matching milestone, so those TWO tiles now
     // have real content; every other tile keeps its caption.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 2);
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 2);
   });
 
   it('the Progress tile drops its caption once anything is read', () => {
     setupGlobals();
     renderLibrary({ totalReadCount: 7 });
     expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 1);
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 1);
   });
 
   it('updates the Milestones tile while Library stays open', () => {
