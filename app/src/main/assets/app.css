@@ -6826,12 +6826,20 @@
     .sw-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     .sw-btn.is-on, .sw-toggle.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); }
     .sw-btn-icon { padding: 0; }
-    /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back),
-       top-right beside the strip; the strip yields it 44 px + the 8 px gap. In
-       the hidden state it is a small quiet glyph — the border goes, the glyph
-       shrinks, the 44 px tap target does not. */
-    .sw-hide-all { position: absolute; z-index: 5; right: 14px; top: calc(var(--sw-chrome-top) + 7px); }
-    .sw-root:not(.sw-narrow) .sw-controls { right: calc(14px + 44px + 8px); }
+    /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back), in
+       the bottom-right corner — the one corner nothing else uses on any frame.
+       It was top-right first, with the strip shifted 52 px left to make room;
+       the walk measured the strip back over the title on the rotated 320x640
+       root (2a: 60x23 px), because the strip's rotated max-width was tuned to
+       clear the title with the strip at right:14px and the smallest frame has
+       no 44 px to spare between them. In the hidden state it is a small quiet
+       glyph — the border goes, the glyph shrinks, the 44 px tap target does not. */
+    .sw-hide-all {
+      position: absolute; z-index: 5; right: 14px;
+      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+    }
+    /* A narrow root parks the strip bottom-left at full width; it yields the corner. */
+    .sw-root.sw-narrow .sw-controls { max-width: calc(100% - 76px); }
     .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-legend) { display: none; }
     .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
     .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
