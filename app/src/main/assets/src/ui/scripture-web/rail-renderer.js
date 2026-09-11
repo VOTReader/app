@@ -17,7 +17,7 @@
    links, which is years away and would be a good problem to have.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { LINK_KIND_COLORS, myWebColor } from '../../utils/scripture-web/palette.js';
+import { myWebColor } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 
 /** Clearance below the top chrome before the VOT rail is drawn, in CSS px. */
@@ -319,7 +319,7 @@ export function distanceToPath(pts, px, py) {
  *   bPos:Float32Array, kind:Uint8Array}|null} personal
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array}|null} underlay
  * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
- *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, scheme?:string,
+ *   DPR:number, base:number, chrome:any, showUnderlay?:boolean,
  *   hoverIndex?:number, focusIndex?:number}} opts
  */
 /**
@@ -339,8 +339,8 @@ export function personalInk(z) {
   const zz = Math.max(1, z || 1);
   const t = Math.min(1, Math.log(zz) / Math.log(40));
   return {
-    // rgb is the 'kind' scheme's cream; the canon scheme colours each thread
-    // by myWebColor() and takes only the alpha and width from here
+    // each thread's rgb comes from myWebColor() (its canon position); only
+    // the alpha and width are the ink law's
     context: { rgb: '204,196,180', alpha: Math.min(0.45, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
     // the link thickens with depth like a canon ribbon (2.0 -> 2.6 at 40x), so it
     // stays 6x a context thread with its halo even where the thread is 0.45 · 1.3
@@ -406,7 +406,6 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
   const z = Math.max(zB, zV);
   const gap = Math.abs(rails.bottomY - rails.topY);
-  const scheme = opts.scheme || 'canon';
   const geo = { width, gap };
   if (underlay && opts.showUnderlay && underlay.count) {
     const cx = personalInk(z).context;
@@ -421,7 +420,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
       if (!pts) continue;
-      const rgb = scheme === 'kind' ? cx.rgb : myWebColor(scheme, { verse: underlay.versePos[i], verseTotal: opts.verseTotal, bridge: true });
+      const rgb = myWebColor({ verse: underlay.versePos[i], verseTotal: opts.verseTotal });
       strokeThread(ctx, pts, rgb, cx.alpha);
     }
   }
@@ -436,9 +435,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const cross = personal.aRail[i] !== personal.bRail[i];
     const pts = threadPath(a, b, cross, Object.assign({ n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }, geo));
-    const rgb = scheme === 'kind'
-      ? (LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0]).map((n) => Math.round(n * 255)).join(',')
-      : myWebColor(scheme, { link: true, kind: personal.kind[i] });
+    const rgb = myWebColor({ link: true });
     paths.push({ a, b, pts, rgb });
   }
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
