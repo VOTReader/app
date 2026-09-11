@@ -76,7 +76,7 @@ describe('TourOverlay — dialog', () => {
     startAt('listen');
     const r = render(<TourOverlay />);
     expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
-    expect(screen.getByText(/2 of 7/)).toBeTruthy();
+    expect(screen.getByText(/2 of 8/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /previous stop/i }));
     expect(TourController.getState().step.id).toBe('letters');
     r.unmount();

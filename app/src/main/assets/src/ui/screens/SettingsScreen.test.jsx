@@ -1056,7 +1056,7 @@ describe('settings groups — collapsible accordion', () => {
     fireEvent.click(groupHead('Appearance'));
     expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
     expect(row('Light Theme')).toBeTruthy();
-    expect(row('Reading Position Dot')).toBeUndefined(); // other groups stay closed
+    expect(row('Reading Position Marker')).toBeUndefined(); // other groups stay closed
     fireEvent.click(groupHead('Appearance'));
     expect(row('Light Theme')).toBeUndefined();
   });

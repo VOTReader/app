@@ -61,7 +61,10 @@ describe('useSettings — defaults + migration', () => {
     expect(s.doubleTapFullscreen).toBe(true);
     expect(s.fullscreenHintCount).toBe(0);
     expect(s.gardenTier).toBe(2); // GARDEN_DEFAULT_TIER global
-    expect(s.showReadingDot).toBe(false);
+    // Corbin, 2026-09-10: the dice and the reading marker are on out of the box.
+    expect(s.showReadingDot).toBe(true);
+    expect(s.showSurpriseButton).toBe(true);
+    expect(s.autoScrollNext).toBe(true);
   });
 
   it('saved settings override defaults', () => {
@@ -204,5 +207,82 @@ describe('useSettings — PlatformBridge mirror', () => {
     expect(PlatformBridge.setKeepScreenOn).toHaveBeenLastCalledWith(true);
     mount({ savedSettings: { keepScreenOn: false } });
     expect(PlatformBridge.setKeepScreenOn).toHaveBeenLastCalledWith(false);
+  });
+});
+
+/* THE 2026-09-10 DEFAULT FLIPS ARE A MIGRATION, NOT A NEW LITERAL (Corbin: "make surprise me
+   dice button and reading dot on by default"). A default that changes in the defaults block
+   reaches nobody who has opened the app before: the first boot persists the WHOLE merged
+   settings object into vot-state (use-persisted-state.js, prev === null → immediate write), and
+   `...savedS` puts those bytes back over any new default on every boot after. So every existing
+   profile carries showSurpriseButton:false as a SAVED value whether or not the reader ever
+   touched it. The flip therefore runs as a round keyed on `defaultsRev`: a key still at its OLD
+   default that the reader never set (`touched`) takes the new one, once; an explicit choice is
+   never overwritten. Nothing recorded `touched` before tonight, so for older profiles "switched
+   off" and "never touched" are the same bytes and both flip — stated, not hidden. */
+describe('useSettings — the 2026-09-10 default flips reach every profile that never chose', () => {
+  const FLIPPED = { showSurpriseButton: true, showReadingDot: true, autoScrollNext: true };
+
+  it('a fresh profile reads the dice, the reading marker and Auto-Continue ON, stamped with the round', () => {
+    const s = mount().result.current.settings;
+    for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
+    expect(s.defaultsRev).toBe(1);
+    expect(s.touched).toEqual({});
+  });
+
+  it('a profile saved before tonight, still carrying the OLD defaults, is flipped once and stamped; nothing else moves', () => {
+    const s = mount({ savedSettings: { showSurpriseButton: false, showReadingDot: false, autoScrollNext: false, translation: 'kjv', autoScroll: false } }).result.current.settings;
+    for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
+    expect(s.defaultsRev).toBe(1);
+    expect(s.translation).toBe('kjv');
+    expect(s.autoScroll).toBe(false);
+  });
+
+  it('a key the old profile never wrote flips too — absence is the old default', () => {
+    const s = mount({ savedSettings: { translation: 'kjv' } }).result.current.settings;
+    expect(s.showSurpriseButton).toBe(true);
+    expect(s.showReadingDot).toBe(true);
+  });
+
+  it("an OFF the reader chose (touched) keeps OFF across the flip; the untouched sibling still flips", () => {
+    const s = mount({ savedSettings: { showSurpriseButton: false, showReadingDot: false, touched: { showSurpriseButton: true } } }).result.current.settings;
+    expect(s.showSurpriseButton).toBe(false);
+    expect(s.showReadingDot).toBe(true);
+    expect(s.touched).toEqual({ showSurpriseButton: true });
+  });
+
+  /* The next two are green on the code BEFORE the flip (nothing flips, so nothing over-flips);
+     they exist to go red if a round ever ignores the stamp or rewrites a value already at the
+     new default. Their teeth are the bite, not the RED. */
+  it('the round runs once: a stamped profile is never re-flipped, touched record or not', () => {
+    const s = mount({ savedSettings: { defaultsRev: 1, showSurpriseButton: false } }).result.current.settings;
+    expect(s.showSurpriseButton).toBe(false);
+    expect(s.defaultsRev).toBe(1);
+  });
+
+  it('a profile already at the NEW value is left exactly as it is', () => {
+    const s = mount({ savedSettings: { showSurpriseButton: true, showReadingDot: true, autoScrollNext: true } }).result.current.settings;
+    expect(s.showSurpriseButton).toBe(true);
+    expect(s.showReadingDot).toBe(true);
+    expect(s.autoScrollNext).toBe(true);
+  });
+
+  it("toggleSetting and updateSetting record the key as the reader's own choice", () => {
+    const { result } = mount();
+    act(() => result.current.toggleSetting('showSurpriseButton'));
+    act(() => result.current.updateSetting('arrowLayout', 'split'));
+    expect(result.current.settings.showSurpriseButton).toBe(false);
+    expect(result.current.settings.touched).toEqual({ showSurpriseButton: true, arrowLayout: true });
+  });
+
+  it('flipped, switched off by the reader, saved, booted again: still off, and the sibling still on', () => {
+    const first = mount();
+    act(() => first.result.current.toggleSetting('showSurpriseButton'));
+    // What vot-state carries between the two boots — a JSON round trip, as IDB's structured clone is.
+    const saved = JSON.parse(JSON.stringify(first.result.current.settings));
+    const s = mount({ savedSettings: saved }).result.current.settings;
+    expect(s.showSurpriseButton).toBe(false);
+    expect(s.showReadingDot).toBe(true);
+    expect(s.defaultsRev).toBe(1);
   });
 });

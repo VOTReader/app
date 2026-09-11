@@ -1,9 +1,10 @@
 /* tour-steps — the tour's stops as data, and the little logic around them.
    ────────────────────────────────────────────────────────────────────
    RED first (review-tutorial, 2026-09-04). What these lock down:
-     A) The shape: a welcome card, six numbered stops (the last one is the
-        closing card), each with a title, plain text and — for the five
+     A) The shape: a welcome card, then the numbered stops (the last one is
+        the closing card), each with a title, plain text and — for the
         teaching stops — a target on the real UI and a way to get there.
+        The count is hand-written in exactly one case here, on purpose.
      B) Bounds: next/prev never run off either end.
      C) The words: no jargon an older reader has to decode, and the
         phrases the trailer uses (Creative, 2026-09-04) appear verbatim.
@@ -17,31 +18,31 @@ import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarge
 afterEach(() => { document.body.innerHTML = ''; });
 
 describe('tour-steps — shape', () => {
-  it('is a welcome card plus seven numbered stops', () => {
-    expect(stepCount()).toBe(8);
+  it('is a welcome card plus eight numbered stops', () => {
+    expect(stepCount()).toBe(9);
     expect(TOUR_STEPS[0].id).toBe('welcome');
     expect(TOUR_STEPS[0].number).toBe(0);
-    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(TOUR_STEPS[7].id).toBe('done');
+    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(TOUR_STEPS[8].id).toBe('done');
   });
 
   it('every teaching stop points at a real control and knows how to get there', () => {
-    for (const s of TOUR_STEPS.slice(1, 7)) {
+    for (const s of TOUR_STEPS.slice(1, 8)) {
       expect(s.target && s.target.selector, s.id).toBeTruthy();
       expect(s.screen, s.id).toBeTruthy();
       expect(typeof s.enter, s.id).toBe('string');
     }
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'done']);
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'settings', 'done']);
   });
 
   /* THE NUMBER IS WRITTEN TWICE — once as `number`, once inside the eyebrow's words — and
      nothing but this case makes the two agree. Adding a stop moved every eyebrow after it,
      and an eyebrow reading "3 of 6" on the fourth of eight stops is the kind of wrong that
      no other assertion here can see. Derived from the array, never hand-listed. */
-  it('every eyebrow counts itself out of seven, and the welcome card says how many are coming', () => {
+  it('every eyebrow counts itself out of eight, and the welcome card says how many are coming', () => {
     const teaching = TOUR_STEPS.slice(1);
     for (const s of teaching) expect(s.eyebrow, s.id).toContain(`${s.number} of ${teaching.length}`);
-    expect(TOUR_STEPS[0].text).toContain('seven stops');
+    expect(TOUR_STEPS[0].text).toContain('eight stops');
   });
 
   /* THE COUNT IS WRITTEN ONCE (2026-09-10). Four sentences counted the stops by hand — every
@@ -49,7 +50,7 @@ describe('tour-steps — shape', () => {
      Home strip still said "six" after the highlight stop made it seven. The module now publishes
      the count as a word and every sentence reads it. The table here is the test's OWN reading of
      the array, so a module that published the wrong word cannot satisfy this by agreeing with
-     itself; the hand-written 'seven stops' above is the loud line that moves when a stop lands. */
+     itself; the hand-written count above is the loud line that moves when a stop lands. */
   it('publishes the stop count as a word, and the welcome card counts with it', () => {
     const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
     expect(TOUR_STOPS_WORD).toBe(words[TOUR_STEPS.length - 1]);
@@ -104,6 +105,33 @@ describe('tour-steps — shape', () => {
     expect(TOUR_WORDS).toContain('Note');
   });
 
+  /* Corbin, 2026-09-10: "add to the tutorial a stop showing users they can toggle certain features
+     on/off in settings." The stop rides the Settings screen the backup stop already opened (same
+     `screen`, same `enter`, no navigation added), opens the Reading group and rings the dice row, and
+     names three features by the words the reader sees on screen. It says nothing the closing card
+     says, so 'done' stays the closing card. */
+  it('the settings stop is the last teaching stop, on the screen the backup stop opened, and rings the dice row', () => {
+    const st = TOUR_STEPS.find((s) => s.id === 'settings');
+    const backup = TOUR_STEPS.find((s) => s.id === 'backup');
+    expect(TOUR_STEPS.indexOf(st)).toBe(TOUR_STEPS.length - 2);
+    expect(st.screen).toBe('settings');
+    expect(st.screen).toBe(backup.screen);
+    expect(st.enter).toBe(backup.enter);
+    expect(st.settingsGroup).toBe('reading');
+    expect(st.target.selector).toContain('[data-settings-group="reading"]');
+    expect(st.target.text).toBe('Surprise Me');
+    expect(st.act).toBeNull();
+    expect(st.primary).toBe('Next');
+  });
+
+  it('the settings stop says the features can be switched on or off in Settings, and names three by their on-screen names', () => {
+    const st = TOUR_STEPS.find((s) => s.id === 'settings');
+    expect(st.title).toBe('Make it yours');
+    expect(st.text).toMatch(/switched on or off/);
+    expect(st.text).toContain('Settings');
+    for (const name of ['Surprise Me', 'Reading Position Marker', 'Auto-Scroll']) expect(st.text, name).toContain(name);
+  });
+
   /* The closing card used to carry highlighting as a parting sentence. Now that it is a stop of
      its own, that sentence would teach it twice and the second time without showing anything.
      Asserted as ABSENCE plus a positive on the same string, so a card emptied by accident cannot
@@ -119,7 +147,7 @@ describe('tour-steps — shape', () => {
 describe('tour-steps — bounds', () => {
   it('nextIndex stops at the last stop, prevIndex at the first', () => {
     expect(nextIndex(0)).toBe(1);
-    expect(nextIndex(7)).toBe(7);
+    expect(nextIndex(8)).toBe(8);
     expect(prevIndex(0)).toBe(0);
     expect(prevIndex(3)).toBe(2);
   });
