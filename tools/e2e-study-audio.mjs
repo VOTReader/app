@@ -147,13 +147,19 @@ try {
   // ── 1. the study chapter carries the pill ──
   await openStudyChapter();
   const title1 = await heroTitle();
+  // AUDIO_MANIFEST rides bundle-a-vot, the LAZY letter corpus: on a fresh boot it is absent when the
+  // hero paints, and the study host has to kick it (the first outing of this walk, on 3f921a1c, found
+  // it absent and no pill). Wait for it and say how long the reader waited, rather than sample once.
+  const manifestAtHero = await page.evaluate(() => typeof AUDIO_MANIFEST !== 'undefined');
+  const tHero = Date.now();
+  const manifestCame = await page.waitForFunction((k) => typeof AUDIO_MANIFEST !== 'undefined' && !!AUDIO_MANIFEST[k], { timeout: 20000, polling: 25 }, CHAPTER_KEY).then(() => true).catch(() => false);
   const assetId = await page.evaluate((k) => (typeof AUDIO_MANIFEST !== 'undefined' && AUDIO_MANIFEST[k] && AUDIO_MANIFEST[k][0]) ? AUDIO_MANIFEST[k][0][0] : null, CHAPTER_KEY);
-  note(`study chapter open: ${JSON.stringify(title1)}; manifest ${CHAPTER_KEY} -> asset ${assetId}`);
-  if (!assetId) { fail(`precondition: AUDIO_MANIFEST has no ${CHAPTER_KEY} (the walk is about a recording that ships)`); exitCode = 2; throw new Error('precondition'); }
-  const pill = await page.$('.hero-play-row button');
+  note(`study chapter open: ${JSON.stringify(title1)}; AUDIO_MANIFEST at hero paint: ${manifestAtHero ? 'present' : 'ABSENT'}; ${CHAPTER_KEY} -> asset ${assetId} (${manifestCame ? (Date.now() - tHero) + ' ms after the hero' : 'never within 20 s'})`);
+  if (!assetId) { fail(`1: AUDIO_MANIFEST never carried ${CHAPTER_KEY} on the study chapter — the host did not load the corpus, or the manifest lost the row`); exitCode = manifestCame ? 2 : 1; throw new Error('no manifest row'); }
+  const pill = await page.waitForSelector('.hero-play-row button', { timeout: 10000 }).catch(() => null);
+  note(`1: Listen pill ${pill ? 'on the study chapter, ' + (Date.now() - tHero) + ' ms after the hero' : 'ABSENT 10 s after the manifest arrived'}`);
   await shot('1-study-chapter');
-  if (!pill) fail('1: no Listen pill on the study chapter (.hero-play-row button)');
-  else note('1: the Listen pill is on the study chapter');
+  if (!pill) fail('1: no Listen pill on the study chapter (.hero-play-row button) although the manifest carries the row');
 
   // ── 2. a real tap: the chapter's own asset is requested and plays ──
   if (pill) {
