@@ -424,11 +424,12 @@ function armChrome(tag, geo) {
   if (geo.noteGap === null) {
     notes.push(`${tag} 2e the portrait hint is not up at this frame, so its placement was NOT checked — not the same as passing`);
   } else {
-    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below the lowest chrome above it (intended 10, ceiling ${NOTE_GAP_MAX})`);
+    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below ${geo.noteAgainst} `
+      + `— the lowest chrome above it (intended 10, ceiling ${NOTE_GAP_MAX})`);
     if (geo.noteGap < 0) {
-      fail(`2e the portrait hint overlaps the chrome above it by ${-geo.noteGap} px — that card is what covered the Back button`);
+      fail(`2e the portrait hint overlaps ${geo.noteAgainst} by ${-geo.noteGap} px — that card is what covered the Back button`);
     } else if (geo.noteGap > NOTE_GAP_MAX) {
-      fail(`2e the portrait hint floats ${geo.noteGap} px below the chrome above it against an intended 10 — its placement measurement `
+      fail(`2e the portrait hint floats ${geo.noteGap} px below ${geo.noteAgainst} against an intended 10 — its placement measurement `
         + 'has gone stale, which is what a draft observing the topbar only on mount produced (299 px against a topbar ending at 72)');
     }
   }
@@ -549,14 +550,27 @@ const readGeometry = (chromeSel, optionalSel) => {
      clearing the topbar and landing on the location readout is the bug this arm
      caught, so an arm that only watched the topbar would have called that fix
      green. */
-  const aboveEls = ['.sw-topbar', '.sw-context'].map((s) => document.querySelector(s)).filter((e) => e && vis(e));
+  const aboveSel = ['.sw-topbar', '.sw-context'];
+  const aboveEls = aboveSel.map((s) => document.querySelector(s)).filter((e) => e && vis(e));
   const aboveBottom = aboveEls.length ? Math.max(...aboveEls.map((e) => e.getBoundingClientRect().bottom)) : null;
+  /* WHICH element the gap was measured against, printed beside the number. This
+     arm's region has already been redefined once -- it measured the topbar
+     alone, read 58 px, then measured the lowest chrome above the hint and read
+     145 px on the SAME TREE with the same defect. Nothing in the output said
+     the question had changed, so the two numbers are diffable only by someone
+     who happens to know. A number without its region is not comparable to
+     anything. */
+  let noteAgainst = null;
+  if (aboveBottom !== null) {
+    const lowest = aboveEls.reduce((m, e) => (e.getBoundingClientRect().bottom > m.getBoundingClientRect().bottom ? e : m));
+    noteAgainst = aboveSel[aboveEls.indexOf(lowest)] || lowest.className || lowest.tagName;
+  }
   const noteGap = (noteEl && vis(noteEl) && aboveBottom !== null)
     ? Math.round((noteEl.getBoundingClientRect().top - aboveBottom) * 10) / 10
     : null;
 
   return {
-    overlaps, covered, unhittable, offscreen, band: best, noteGap,
+    overlaps, covered, unhittable, offscreen, band: best, noteGap, noteAgainst,
     blocksFound: blocks.map((b) => b.sel), blocksMissing, blocksInvisible,
     pairs, hits: controls.length,
     innerWidth, innerHeight: rows.length,
