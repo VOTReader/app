@@ -3340,18 +3340,20 @@ describe('audio-player — resume across the update reload', () => {
     } finally { dropGlobals(); }
   });
 
-  /* THE DURABLE CLOCK (w-audio-kill-cadence). A kill fires no event, and localStorage does not
+  /* THE DURABLE SNAPSHOT (w-audio-kill-cadence). A kill fires no event, and localStorage does not
      survive one: measured 2026-09-11 (probe-kill-durability.mjs), under an abrupt kill of the whole
      browser process tree LS came back at its FIRST commit — Chromium commits it 5 s after the
      first write and then at most ~60 times an hour — while IndexedDB came back with the last
-     write, every time. So the clock the next boot trusts is an IDB record {url, time, at},
-     written every whole second while playing and at every snapshot write; the LS snapshot keeps
-     the queue's identity. IDBAdapter is bundle-b, reached through the globalThis bridge like the
-     positions store; absent, the writes are silent no-ops. */
+     write, every time. The walk's kill arm then lost the snapshot ENTIRELY (the bar came back
+     idle), so the durable record is the whole snapshot, not a clock beside it: the same object
+     _persist() writes to LS, put to IDB (meta/audio-snapshot) at every snapshot write and every
+     whole second while playing. LS keeps the synchronous first paint and older data; at boot the
+     IDB record wins unless the LS copy is newer. IDBAdapter is bundle-b, reached through the
+     globalThis bridge like the positions store; absent, the writes are silent no-ops. */
   const fakeIdb = (rec) => { const idb = { put: vi.fn(async () => {}), get: vi.fn(async () => rec), delete: vi.fn(async () => {}) }; globalThis.IDBAdapter = idb; return idb; };
-  const clockPuts = (idb) => idb.put.mock.calls.filter((c) => c[0] === 'meta' && c[1] === 'audio-clock').map((c) => c[2]);
+  const snapPuts = (idb) => idb.put.mock.calls.filter((c) => c[0] === 'meta' && c[1] === 'audio-snapshot').map((c) => c[2]);
 
-  it('every whole second while PLAYING the durable clock is written to IDB (meta/audio-clock) with the exact clock and the url; nothing while paused', async () => {
+  it('every whole second while PLAYING the durable snapshot is put to IDB (meta/audio-snapshot) with the exact clock and the identity; nothing while paused', async () => {
     const idb = fakeIdb(null);
     try {
       await load(); rebuildGlobals();
@@ -3361,49 +3363,61 @@ describe('audio-player — resume across the update reload', () => {
       const tick = (t) => { el().currentTime = t; el().dispatchEvent(new Event('timeupdate')); };
       idb.put.mockClear();
       tick(41.2); tick(41.45); tick(41.7);            // one whole second: one write
-      expect(clockPuts(idb).length, 'one write per whole second, not per timeupdate').toBe(1);
-      expect(clockPuts(idb)[0]).toMatchObject({ url: URL_OF('idC'), time: 41.2 });
-      expect(typeof clockPuts(idb)[0].at).toBe('number');
+      expect(snapPuts(idb).length, 'one write per whole second, not per timeupdate').toBe(1);
+      expect(snapPuts(idb)[0]).toMatchObject({ v: 2, mode: 'letter', volKey: 'vol1', key: 'vol1:letter-c', time: 41.2, track: { url: URL_OF('idC') } });
+      expect(typeof snapPuts(idb)[0].at, 'stamped, so the boot can tell which copy is newer').toBe('number');
       tick(42.05); tick(43.1); tick(44.02);
-      expect(clockPuts(idb).map((r) => r.time)).toEqual([41.2, 42.05, 43.1, 44.02]);
+      expect(snapPuts(idb).map((r) => r.time)).toEqual([41.2, 42.05, 43.1, 44.02]);
       AudioPlayer.toggle();                            // paused: the pause's own snapshot carries the clock once more…
-      const n = clockPuts(idb).length;
-      expect(clockPuts(idb)[n - 1].time).toBe(44.02);
+      const n = snapPuts(idb).length;
+      expect(snapPuts(idb)[n - 1].time).toBe(44.02);
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the LS copy is the same record').toBe(44.02);
       el().currentTime = 50; el().dispatchEvent(new Event('timeupdate'));   // …and nothing moves it while paused
-      expect(clockPuts(idb).length, 'no write while paused').toBe(n);
+      expect(snapPuts(idb).length, 'no write while paused').toBe(n);
     } finally { dropGlobals(); delete globalThis.IDBAdapter; }
   });
 
-  it('the boot adopts the durable clock over the snapshot\'s for the SAME recording — and ignores one for another', async () => {
-    localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAP, time: 40 }));   // the last LS commit that survived
-    fakeIdb({ url: URL_OF('idC'), time: 55.25, at: Date.now() });
+  it('the boot takes the durable snapshot over the LS copy: a newer clock for the same recording, and the whole identity when LS lost it', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAP, time: 40 }));   // the last LS commit that survived (no stamp: an older build's)
+    fakeIdb({ ...SNAP, time: 55.25, at: Date.now() });
     try {
       await load(); rebuildGlobals();
       await tick(); await tick();
       expect(AudioPlayer.getState().status).toBe('paused');
-      expect(AudioPlayer.getState().time, 'the bar shows the durable clock, not the stale snapshot').toBe(55.25);
+      expect(AudioPlayer.getState().time, 'the bar shows the durable clock, not the stale LS copy').toBe(55.25);
       expect(AudioPlayer.getPreciseTime()).toBe(55.25);
     } finally { dropGlobals(); delete globalThis.IDBAdapter; }
-    localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAP, time: 40 }));
-    fakeIdb({ url: URL_OF('idZ'), time: 55.25, at: Date.now() });                 // another recording's clock
+    localStorage.removeItem('vot-audio-pos');                                       // the kill took the LS copy with it (measured: arm D came back idle)
+    fakeIdb({ ...SNAP, key: 'vol1:letter-z', time: 12.5, at: Date.now(), track: { ...SNAP.track, key: 'vol1:letter-z', title: 'Letter Z', url: URL_OF('idZ') } });
+    try {
+      await load(); rebuildGlobals();
+      expect(AudioPlayer.getState().status, 'before the IDB read: nothing to show').toBe('idle');
+      await tick(); await tick();
+      expect(AudioPlayer.getState().status, 'the bar is back from IDB alone').toBe('paused');
+      expect(AudioPlayer.getState().queue[0] && AudioPlayer.getState().queue[0].url).toBe(URL_OF('idZ'));
+      expect(AudioPlayer.getState().time).toBe(12.5);
+    } finally { dropGlobals(); delete globalThis.IDBAdapter; }
+    localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAP, time: 40, at: Date.now() }));   // LS stamped NEWER than IDB: only an older build's data can do that
+    fakeIdb({ ...SNAP, time: 55.25, at: Date.now() - 600000 });
     try {
       await load(); rebuildGlobals();
       await tick(); await tick();
-      expect(AudioPlayer.getState().time, 'a clock for another url is not this bar\'s').toBe(40);
+      expect(AudioPlayer.getState().time, 'the newer copy stands, whichever channel holds it').toBe(40);
     } finally { dropGlobals(); delete globalThis.IDBAdapter; }
   });
 
-  it('the update reload\'s own record outranks the durable clock, and stop() clears the clock', async () => {
+  it('the update reload\'s own record outranks the durable snapshot, and stop() clears it with the LS copy', async () => {
     globalThis.Audio = Counting;
     localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
     sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
-    const idb = fakeIdb({ url: URL_OF('idC'), time: 39.5, at: Date.now() - 4000 });
+    const idb = fakeIdb({ ...SNAP, time: 39.5, at: Date.now() - 4000 });
     try {
       await load(); rebuildGlobals();
       await tick(); await tick(); await tick();
       expect(AudioPlayer.getState().time, 'the reload record is exact and newer by construction').toBe(41.37);
       AudioPlayer.stop();
-      expect(idb.delete.mock.calls.some((c) => c[0] === 'meta' && c[1] === 'audio-clock'), 'stop() forgets the clock with the snapshot').toBe(true);
+      expect(idb.delete.mock.calls.some((c) => c[0] === 'meta' && c[1] === 'audio-snapshot'), 'stop() forgets the durable copy with the LS one').toBe(true);
+      expect(localStorage.getItem('vot-audio-pos')).toBeNull();
     } finally { dropGlobals(); delete globalThis.IDBAdapter; }
   });
 
