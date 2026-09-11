@@ -1174,15 +1174,28 @@ if (harnessFault) {
    is broken. An incomplete arm only decides the exit when nothing failed —
    otherwise "incomplete" would hide a red. */
 if (!fails.length && armFourIncomplete && !nothingToCheck) nothingToCheck = armFourIncomplete;
+/* A NAMED DEFECT OUTRANKS "NOTHING TO CHECK", decided HERE and nowhere else.
+   `fails` accumulates across frames and `nothingToCheck` is set inside the frame
+   loop, so frame 1 can record real failures and frame 2 can then fail to draw.
+   Testing nothingToCheck first swallowed frame 1's rows and exited 2 -- I had
+   the rule written in a comment and applied it at one site of three (the
+   Verifier's finding). Guarding each setter is the same mistake waiting for a
+   fourth site; the exit is where every path routes through. The run is
+   incomplete either way; the difference is whether anyone learns what failed. */
+if (fails.length) {
+  if (nothingToCheck) {
+    console.error('[e2e-swweb] ALSO INCOMPLETE: ' + nothingToCheck);
+    console.error('[e2e-swweb] — the failures below are from frames that DID run; the frame above never did, '
+      + 'so this result is a FAIL and an incomplete run at once, and the fail is the one that counts');
+  }
+  console.error('[e2e-swweb] ' + fails.length + ' FAILED:\n  ' + fails.join('\n  '));
+  console.error('[e2e-swweb] RESULT FAIL (' + fails.length + ')' + (nothingToCheck ? ' + INCOMPLETE' : '') + ' PARAMS ' + PARAMS);
+  process.exit(EXIT_FAIL);
+}
 if (nothingToCheck) {
   console.error('[e2e-swweb] ' + nothingToCheck);
   console.error('[e2e-swweb] RESULT NOTHING-TO-CHECK — INCOMPLETE, not a pass and not a skip. PARAMS ' + PARAMS);
   process.exit(EXIT_NOTHING_TO_CHECK);
-}
-if (fails.length) {
-  console.error('[e2e-swweb] ' + fails.length + ' FAILED:\n  ' + fails.join('\n  '));
-  console.error('[e2e-swweb] RESULT FAIL (' + fails.length + ') PARAMS ' + PARAMS);
-  process.exit(EXIT_FAIL);
 }
 console.log('[e2e-swweb] RESULT PASS PARAMS ' + PARAMS);
 process.exit(EXIT_PASS);
