@@ -339,32 +339,33 @@ async function armR(page, tag, fname, c, r0) {
   const band = r0.bottom.find((b) => b.label === 'Matthew');
   if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
   const x0 = Math.max(0, band.x0 - 40), x1 = Math.min(c.w, band.x1 + 40);
-  const lum = (b64) => page.evaluate(async (b64, box) => {
+  // captures are clipped to the corridor box: a full 3840x2160 PNG encodes in
+  // ~1.3 s and could not resolve a 250 ms fade
+  const clip = { x: c.l + x0, y: c.t + r0.topY + 4, width: x1 - x0, height: r0.bottomY - r0.topY - 8 };
+  const lum = (b64) => page.evaluate(async (b64) => {
     const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
     const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
     const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
-    const s = img.width / box.w;   // device px per CSS px
-    const X0 = Math.floor(box.x0 * s), X1 = Math.floor(box.x1 * s), Y0 = Math.floor(box.y0 * s), Y1 = Math.floor(box.y1 * s);
-    const d = g.getImageData(X0, Y0, X1 - X0, Y1 - Y0).data;
+    const d = g.getImageData(0, 0, cv.width, cv.height).data;
     let sum = 0;
     for (let p = 0; p < d.length; p += 4) sum += d[p] + d[p + 1] + d[p + 2];
     return +(sum / 3 / (d.length / 4)).toFixed(2);
-  }, b64, { w: c.w, x0, x1, y0: r0.topY + 4, y1: r0.bottomY - 4 });
+  }, b64);
   await clickIfPresent(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
-  const rest0 = await lum(await page.screenshot({ encoding: 'base64' }));
+  const rest0 = await lum(await page.screenshot({ encoding: 'base64', clip }));
   await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12);
   await page.mouse.wheel({ deltaY: -120 });
   const t0 = Date.now();
   const shots = [];
   for (let i = 0; i < 14; i++) {
     const cf = await attr(page, 'data-cap-fraction');
-    const b64 = await page.screenshot({ encoding: 'base64' });
+    const b64 = await page.screenshot({ encoding: 'base64', clip });
     shots.push({ t: Date.now() - t0, cf: Number(cf), lum: await lum(b64) });
     if (OUT && (i === 0 || i === 3 || i === 6 || i === 13)) writeFileSync(resolve(OUT, `${fname}-R-${String(i).padStart(2, '0')}-t${shots[i].t}.png`), Buffer.from(b64, 'base64'));
   }
   await sleep(400);
-  const restEnd = await lum(await page.screenshot({ encoding: 'base64' }));
+  const restEnd = await lum(await page.screenshot({ encoding: 'base64', clip }));
   let maxStep = 0, at = -1;
   for (let i = 1; i < shots.length; i++) { const d = Math.abs(shots[i].lum - shots[i - 1].lum); if (d > maxStep) { maxStep = d; at = i; } }
   const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
