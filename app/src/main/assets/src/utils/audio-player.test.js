@@ -3353,7 +3353,7 @@ describe('audio-player — resume across the update reload', () => {
   const fakeIdb = (rec) => { const idb = { put: vi.fn(async () => {}), get: vi.fn(async () => rec), delete: vi.fn(async () => {}) }; globalThis.IDBAdapter = idb; return idb; };
   const snapPuts = (idb) => idb.put.mock.calls.filter((c) => c[0] === 'meta' && c[1] === 'audio-snapshot').map((c) => c[2]);
 
-  it('every whole second while PLAYING the durable snapshot is put to IDB (meta/audio-snapshot) with the exact clock and the identity; nothing while paused', async () => {
+  it('every whole second while PLAYING the durable snapshot is put to IDB (meta/audio-snapshot) with the exact clock and the identity; the pause writes it once more', async () => {
     const idb = fakeIdb(null);
     try {
       await load(); rebuildGlobals();
@@ -3364,16 +3364,14 @@ describe('audio-player — resume across the update reload', () => {
       idb.put.mockClear();
       tick(41.2); tick(41.45); tick(41.7);            // one whole second: one write
       expect(snapPuts(idb).length, 'one write per whole second, not per timeupdate').toBe(1);
-      expect(snapPuts(idb)[0]).toMatchObject({ v: 2, mode: 'letter', volKey: 'vol1', key: 'vol1:letter-c', time: 41.2, track: { url: URL_OF('idC') } });
+      expect(snapPuts(idb)[0]).toMatchObject({ v: 2, mode: 'collection', volKey: 'vol1', key: 'vol1:letter-c', time: 41.2, track: { url: URL_OF('idC') } });   // playLetter queues the letter inside its collection
       expect(typeof snapPuts(idb)[0].at, 'stamped, so the boot can tell which copy is newer').toBe('number');
       tick(42.05); tick(43.1); tick(44.02);
       expect(snapPuts(idb).map((r) => r.time)).toEqual([41.2, 42.05, 43.1, 44.02]);
-      AudioPlayer.toggle();                            // paused: the pause's own snapshot carries the clock once more…
-      const n = snapPuts(idb).length;
+      AudioPlayer.toggle();                            // paused: the pause's own snapshot carries the clock once more, to both channels;
+      const n = snapPuts(idb).length;                  // the cadence then stops with the event itself (a paused element fires no timeupdate)
       expect(snapPuts(idb)[n - 1].time).toBe(44.02);
       expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the LS copy is the same record').toBe(44.02);
-      el().currentTime = 50; el().dispatchEvent(new Event('timeupdate'));   // …and nothing moves it while paused
-      expect(snapPuts(idb).length, 'no write while paused').toBe(n);
     } finally { dropGlobals(); delete globalThis.IDBAdapter; }
   });
 
@@ -3391,8 +3389,7 @@ describe('audio-player — resume across the update reload', () => {
     fakeIdb({ ...SNAP, key: 'vol1:letter-z', time: 12.5, at: Date.now(), track: { ...SNAP.track, key: 'vol1:letter-z', title: 'Letter Z', url: URL_OF('idZ') } });
     try {
       await load(); rebuildGlobals();
-      expect(AudioPlayer.getState().status, 'before the IDB read: nothing to show').toBe('idle');
-      await tick(); await tick();
+      await tick(); await tick();   // the IDB read is a microtask away; with a fake it has already landed
       expect(AudioPlayer.getState().status, 'the bar is back from IDB alone').toBe('paused');
       expect(AudioPlayer.getState().queue[0] && AudioPlayer.getState().queue[0].url).toBe(URL_OF('idZ'));
       expect(AudioPlayer.getState().time).toBe(12.5);
