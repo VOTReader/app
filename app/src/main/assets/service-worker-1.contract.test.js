@@ -1,20 +1,25 @@
 // @ts-nocheck
 /* RED — service-worker-1 (Verifier reproduction, 2026-09-03)
    ─────────────────────────────────────────────────────────────────────────
-   A VISIBLE reader, past the 12 s boot grace, is deliberately NOT reloaded
-   when a new service worker activates (sw-register.js: toast, then reload on
-   the next backgrounding). The new worker has already claim()ed the page and
-   deleted vot-core-OLD. The page keeps running the OLD eager bundles it parsed
-   at boot — and its lazy loaders (index.html's __makeLazyLoader) will inject
-   whatever the NEW worker serves: bundle-e / bundle-f / a corpus bundle from
-   the NEW build, into a page whose bundle-a..d are the OLD build. Nothing in
-   the loader checks the build identity before appending the script tag.
+   As found (2026-09-03): a VISIBLE reader past the 12 s boot grace was
+   deliberately NOT reloaded when a new service worker activated (sw-register:
+   toast, then reload on the next backgrounding). The new worker had already
+   claim()ed the page and deleted vot-core-OLD, so the page kept running the OLD
+   eager bundles it parsed at boot while its lazy loaders (index.html's
+   __makeLazyLoader) would inject whatever the NEW worker served: bundle-e /
+   bundle-f / a corpus bundle from the NEW build into a page whose bundle-a..d
+   were the OLD build. The fix set window.__votSwTookOver at takeover and taught
+   the loader to reload rather than append.
 
-   Codex's unit (codex-repros 5f175b9e) asserted an immediate reload on
-   controllerchange while visible. That is the behaviour the 2026-08-11
-   UPDATE-READY change removed on purpose, and the finding's fix keeps the
-   toast; the test would stay RED after the recommended fix, so it is NOT
-   adopted. This one pins the contract the fix has to meet, mechanism-free:
+   Since 2026-09-10 (Corbin: "toast and update should happen no matter what
+   screen user happens to be on") a controlled page reloads AT ONCE on
+   controllerchange; the update-ready toast and the visible-page wait are gone,
+   and "VOTReader was just updated." is shown by the boot after the reload
+   (utils/update-toast.js). The mixed-build window shrank from "until the reader
+   backgrounds the app" to "between reload() and the unload", and it did not
+   close: a lazy load in that gap still fetches NEW bytes into the OLD page, so
+   the takeover flag is still set before the reload and the loader still refuses.
+   The case below pins that contract on the path that exists now:
 
    CONTRACT: once a new worker controls a page that was not reloaded onto it,
    a lazy load must not inject a script from the new build into the old page.
@@ -106,25 +111,24 @@ describe('service-worker-1 — a visible reader on old eager bundles after a new
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it('RED: after controllerchange (toast path, page kept), a lazy load must reload or refuse — never inject the NEW build into the OLD page', async () => {
+  it('RED: after controllerchange (a prior controller) the page reloads at once, and a lazy load racing that reload REFUSES — never inject the NEW build into the OLD page', async () => {
     installIndexLoaders();
     registerServiceWorker();
-    await vi.advanceTimersByTimeAsync(13000);         // past BOOT_GRACE_MS, page visible
+    await vi.advanceTimersByTimeAsync(13000);         // long past boot, page visible: no longer a reason to wait
 
     // The new worker installed, skipWaiting()ed, claim()ed this page and
-    // deleted vot-core-OLD. sw-register shows the toast and keeps the page.
+    // deleted vot-core-OLD. sw-register reloads wherever the reader is.
     sw.controller = fakeController('v1.02-NEW');
     for (const cb of listeners.controllerchange || []) cb();
     await vi.advanceTimersByTimeAsync(0);
-    expect(document.getElementById('vot-toast-update'), 'the update toast is the designed visible-path behaviour').not.toBeNull();
-    expect(reload).not.toHaveBeenCalled();
+    expect(reload, 'a controlled page reloads at once when a new worker takes over, visible or not').toHaveBeenCalledTimes(1);
 
-    // The reader taps Settings / Search / the Garden: bundle-e is lazy.
+    // The reader taps Settings / Search / the Garden in the gap between
+    // reload() and the unload: bundle-e is lazy, and every byte of it would
+    // now come from the NEW build. The loader must refuse to append it.
     window.__loadScreensE().catch(() => {});
     await vi.advanceTimersByTimeAsync(4000);          // longer than the GET_VERSION ask timeout
-
-    const injected = injectedLazyScripts();
-    const mixed = injected.includes('dist/bundle-e.js') && reload.mock.calls.length === 0;
-    expect(mixed, 'bundle-e from the NEW build was injected into a page still running the OLD bundle-a..d, with no reload').toBe(false);
+    expect(injectedLazyScripts(), 'bundle-e from the NEW build was injected into a page still running the OLD bundle-a..d: '
+      + 'the takeover flag (window.__votSwTookOver) is what makes the loader refuse in that gap').not.toContain('dist/bundle-e.js');
   });
 });
