@@ -41,6 +41,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     localStorage.clear();
     sessionStorage.clear();
     _resetUpdateToast();                 // one boot per case: an earlier case's announcement must not fold this one's offer early
+    delete /** @type {any} */ (window).__votSwTookOver;
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     APK_VERSION.value = null;
     BRIDGE.isAndroid = false;
@@ -118,6 +119,24 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     expect(el.classList.contains('vot-toast-action')).toBe(true);
     el.click();
     expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('a page that has already begun its update reload (the takeover flag) decides nothing and leaves the flag for the document that follows', async () => {
+    /* The early claim: registerServiceWorker() reloads through doReload() AT registration,
+       and announceUpdateIfAny() runs four lines later in the same tick (_entry-b.js, order
+       pinned by the wiring case below) — in the dying page. Reading the flag there would
+       spend it, and the key path would then ask the NEW worker, write the key and toast in
+       a page being torn down; the document that follows would read 'same'. This case SETS
+       the precondition (the takeover flag): that doReload() sets it before the announcer
+       runs is sw-register.test.js's early-claim case plus the wiring order. */
+    control();
+    /** @type {any} */ (window).__votSwTookOver = true;
+    markUpdateReload();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('reloading');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG), 'left for the next document').toBe('1');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY), 'not written').toBe(OLD);
   });
 
   it('a plain reload of the same build (no flag) shows nothing — the flag is set by doReload() alone', async () => {
