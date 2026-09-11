@@ -77,8 +77,8 @@ try {
   // Boot instruments, installed before any page script of every document.
   await page.evaluateOnNewDocument((tallerPx) => {
     const w = /** @type {any} */ (window);
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') return;   // about:blank has no storage to read
     w.__e2eArm = sessionStorage.getItem('e2e-arm') || '-';
-    if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
     // Arm C: a boot-only style — the hero is tallerPx taller until +3 s, like a header
     // whose settled height differs from its first-paint height.
     if (w.__e2eArm === 'C') {
