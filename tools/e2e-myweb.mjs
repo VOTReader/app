@@ -366,7 +366,10 @@ try {
   const own = await serveOwnTree();
   server = own.server;
   console.log(`[e2e-myweb] tree ${HEAD} serving ${own.url}`);
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], protocolTimeout: 240000 });
+  // MYWEB_CHROME_ARGS: extra Chrome flags, e.g. "--use-gl=angle --use-angle=swiftshader" for the
+  // software-raster proxy of a weak phone (its own renderer string, never compared across; information only)
+  const extra = process.env.MYWEB_CHROME_ARGS ? process.env.MYWEB_CHROME_ARGS.split(/\s+/).filter(Boolean) : [];
+  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', ...extra], protocolTimeout: 240000 });
   const probe = await browser.newPage();
   const renderer = await probe.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; });
   await probe.close();
