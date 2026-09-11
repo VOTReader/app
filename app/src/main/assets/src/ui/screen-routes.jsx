@@ -377,6 +377,14 @@ export function buildScreenRoutes({
   //   - a Bible edition (volKey 'bible-*') → that book's chapter in the
   //     reader (per-chapter editions label every part "Chapter N"; anything
   //     unlabeled lands on chapter 1);
+  //   - A study recording (study:<chapterId>, ruling (4) 2026-09-11) opens the
+  //     study chapter. bible-studies.js is lazy and 4.4 MB and the Library
+  //     can be a session's first screen, so the arm does NOT await it: the
+  //     destination is set at once through navigateToLink (the History
+  //     arm's door) and the bible-study-chapter route owns the corpus kick
+  //     and its Loading… surface. The study id therefore comes from the
+  //     key: every shipped chapter id is `<study.id>-ch<n>`, pinned over
+  //     the live corpus and manifest by screen-routes.studyaudio.test.jsx.
   //   - Hidden Manna (no index) and range compilations (key null) have no
   //     destination — hasTextDestination gates every tap on the same rule.
   // Pure navigation: the AudioPlayer singleton is never touched, so playback
@@ -395,6 +403,20 @@ export function buildScreenRoutes({
         { type: 'bible', bookId: id, chapter: m ? Number(m[1]) : 1 },
         { sourceLetterTitle: 'Listening Library' }
       );
+      return;
+    }
+    if (volKey === 'study') {
+      const stem = id.match(/^(.+)-ch\d+$/);
+      if (!stem) return;   // a key no shipped manifest produces (a saved row from another build): nothing, not a crash
+      const studyId = stem[1];
+      const study = getStudyById(studyId);
+      // Same tracking as selectStudyChapter (an index open) and the History
+      // arm — the reading dot must not tell a Library open apart. slug === id
+      // for every shipped study (pinned); the corpus-resident slug is preferred
+      // exactly as the History arm prefers it.
+      const slug = (study && study.slug) || studyId;
+      setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: id })));
+      navigateToLink({ type: 'study-letter', studyId, studyChapterId: id }, { sourceLetterTitle: 'Listening Library' });
       return;
     }
     const collection = COL_BY_KEY.get(volKey);

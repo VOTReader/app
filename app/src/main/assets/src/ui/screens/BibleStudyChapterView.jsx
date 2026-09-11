@@ -153,6 +153,7 @@ export function BibleStudyChapterView({
     <LetterView
       {...sharedViewProps}
       letter={letterShim}
+      volKey="study"
       studyMode={true}
       volumeLabel={study.title}
       onHome={() => { if (study.chapters.length > 1) { setStudyChapterId(null); setScreen('bible-study-index'); } else { goStudiesHome(); } }}

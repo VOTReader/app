@@ -112,8 +112,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // Listen tap is Bandcamp-instant (no-op while anything is playing, offline,
   // or in an inert peek). Store-side guards make repeats free.
   React.useEffect(() => {
-    if (!inert && !studyMode) AudioPlayer.prewarm(volKey, letter.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- letter.id is the identity; volKey/studyMode/inert are fixed per mount site
+    if (!inert) AudioPlayer.prewarm(volKey, letter.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- letter.id is the identity; volKey/inert are fixed per mount site
   }, [letter.id]);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
   // Dialog semantics for the inline scripture sheet (2026-08-03 cycle 4 —
@@ -301,12 +301,15 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           </div>
           {/* Streaming audio letter (2026-08-05). Presence + reader come from
               the AUDIO_MANIFEST lazy-corpus global (same bundle as the letter
-              corpus, so it's loaded whenever a letter renders); a study-shim
-              volKey simply misses the manifest and the pill self-hides. An
-              inert peek KEEPS the pill — the swipe preview must stay
-              pixel-identical to the committed page (it can't fire: the peek
-              is pointer-events:none + HTML inert). */}
-          {!studyMode && AudioPlayer.hasAudio(volKey, letter.id) && (
+              corpus, so it's loaded whenever a letter renders). A study chapter
+              is the same: BibleStudyChapterView mounts this view with volKey
+              'study' and the manifest keys its recordings study:<chapterId>
+              (ruling (4), 2026-09-11); a chapter without one misses the
+              manifest and the pill self-hides — the manifest is the gate,
+              never studyMode. An inert peek KEEPS the pill — the swipe
+              preview must stay pixel-identical to the committed page (it
+              can't fire: the peek is pointer-events:none + HTML inert). */}
+          {AudioPlayer.hasAudio(volKey, letter.id) && (
             <div className="hero-play-row">
               {/* C2-C [C2]: collectionLabel becomes the track's `sub` — the
                   second line of the mini-player, the listening desk, the
