@@ -1,6 +1,7 @@
 """batch-align — volume-scale read-along alignment + audio-sync.js shipper.
 
   python tools/batch-align.py --volkeys one [--force] [--no-ship]
+  python tools/batch-align.py --volkeys study --only study:purity-ch1   # one chapter, the rest carried
 
 Per manifest key in the volume: the dual-leg belt via hone-align.py's run_belt
 (resumable — a key whose belt JSON already carries the current settings_hash is
@@ -16,6 +17,11 @@ ships + REVIEW list, < 0.60 EXCLUDED (no read-along — never a wrong highlight)
 UNSPOKEN rows and interpolated REVIEW guesses are never in tuples (engine-side).
 Other volumes' existing sync rows are preserved verbatim. CORPUS_VERSION is NOT
 bumped here — the committer bumps once per ship (see flock-audio-sync.bump_corpus).
+
+Volume keys are whatever prefix AUDIO_MANIFEST carries -- `study` (the Bible/Letter
+Studies, study:<chapterId>, 2026-09-11) needed nothing here: the extractor emits the
+chapters as Format A, so fragments_for resolves and the study surface reads the rows
+under volKey 'study' exactly as LetterView reads a letter's.
 
 Report: tools/_align-work/reports/batch-<volkeys>.txt
 """
@@ -104,6 +110,10 @@ def main():
     ap.add_argument("--volkeys", required=True, help="comma-separated volume keys (e.g. one,two)")
     ap.add_argument("--force", action="store_true", help="re-run even when settings_hash matches")
     ap.add_argument("--no-ship", action="store_true", help="align only; do not touch audio-sync.js")
+    ap.add_argument("--only", default="",
+                    help="comma-separated manifest keys to align THIS run; the volume's other keys "
+                         "are not failures -- ship() carries their shipped timings forward -- so a "
+                         "volume can land one unit per commit")
     a = ap.parse_args()
     vols = set(a.volkeys.split(","))
     s = al.settings_for("letters-A")
@@ -114,6 +124,12 @@ def main():
     alternates = ha.js_object("AUDIO_ALTERNATES")
     keys = sorted(k for k in manifest if k.split(":", 1)[0] in vols)
     print(f"batch-align: {len(keys)} letters in volumes {sorted(vols)}  settings {want_hash}")
+    only = {u for u in a.only.split(",") if u}
+    if only - set(keys):
+        # A typo here would align nothing and exit 0 with every key "carried forward".
+        raise SystemExit(f"--only names keys not in volumes {sorted(vols)}: {sorted(only - set(keys))}")
+    if only:
+        print(f"batch-align: --only {len(only)} of {len(keys)} key(s); the rest keep their shipped timings")
 
     # Units tools/align-supervisor.py killed for memory. A relaunch must not
     # walk straight back into the letter that just took 13.4 GB, or the
@@ -126,6 +142,8 @@ def main():
 
     report, failures = [], []
     for n, key in enumerate(keys, 1):
+        if only and key not in only:
+            continue   # deliberately deferred: no report row, so ship() carries it forward
         if key in skip_units:
             failures.append((key, "SKIPPED — exceeded the supervisor's RSS ceiling"))
             print(f"  [{n}/{len(keys)}] {key}  SKIPPED (memory ceiling)")
