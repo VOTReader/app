@@ -46,8 +46,17 @@
  *         CC-BY fix rather than on a defect
  *     2b  every control AND the CC-BY line is HIT-TESTABLE at its own centre
  *         (elementFromPoint, because a bounding box cannot see what is painted
- *         on top of it, and "present but painted over" is a licence problem)
+ *         on top of it, and "present but painted over" is a licence problem).
+ *         A non-interactive element that is `pointer-events: none` is reported
+ *         as UNHITTABLE, not covered — the hit test has no answer for it, and
+ *         what comes back is whatever is behind. 2a's rect overlap is what
+ *         covers such an element.
  *     2c  nothing spills the viewport horizontally
+ *   and every frame prints what arm 2 RAN — the blocks it found, the pairs it
+ *   compared, the elements it hit-tested — because 0 failures and 0 checks are
+ *   the same output, and a renamed selector shrinks the check set silently.
+ *   Zero pairs or zero hits is a FAILURE: an arm that checked nothing has not
+ *   run, whatever colour it prints.
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
  *         reading-column question was really asking about, and no threshold
@@ -338,8 +347,14 @@ function armDensity(tag, rise, fall, pinned) {
 
 function armChrome(tag, geo) {
   const fail = (m) => fails.push(`${tag} ${m}`);
+  const before = fails.length;
   for (const o of geo.overlaps) {
     fail(`2a ${o.a} overlaps ${o.b} by ${o.w}x${o.h} px at (${o.x}, ${o.y})`);
+  }
+  for (const u of geo.unhittable) {
+    notes.push(`${tag} 2b ${JSON.stringify(u.label)} (${u.sel}) cannot be hit-tested — it is \`pointer-events: none\`, so `
+      + `elementFromPoint returned ${u.by}, which is what is BEHIND it. Its visibility is unproven here, not disproven; `
+      + '2a\'s rect overlap is what covers this element on this tree.');
   }
   for (const c of geo.covered) {
     fail(`2b ${JSON.stringify(c.label)} (${c.sel}) is covered at its own centre (${c.x}, ${c.y}) by ${c.by} — a bounding box cannot see this`);
@@ -349,14 +364,32 @@ function armChrome(tag, geo) {
     fail(`2c ${JSON.stringify(s.label)} (${s.sel}) sits outside the viewport: rect ${s.rect}`);
   }
   notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; chrome covers ${geo.coveredPct}%`);
+
+  /* WHAT ARM 2 RAN. 0 failures and 0 checks are the same output, so the counts
+     are printed and the empty case is a failure rather than a pass. */
+  if (geo.blocksMissing.length) {
+    fail(`2 the chrome selectors ${geo.blocksMissing.join(' ')} match nothing in the DOM — renamed, and every check that used them silently left the set`);
+  }
+  if (!geo.pairs) fail('2a compared ZERO block pairs — the overlap check did not run, which is not the same as passing');
+  if (!geo.hits) fail('2b hit-tested ZERO elements — the reachability check did not run, which is not the same as passing');
+  notes.push(`${tag} arm 2: ran, blocks=[${geo.blocksFound.join(' ')}]`
+    + (geo.blocksInvisible.length ? ` notPainted=[${geo.blocksInvisible.join(' ')}]` : '')
+    + (geo.blocksMissing.length ? ` MISSING=[${geo.blocksMissing.join(' ')}]` : '')
+    + `, pairs=${geo.pairs}, hits=${geo.hits}, unhittable=${geo.unhittable.length}, overflow=1, failures=${fails.length - before}`);
 }
 
 /** Chrome geometry, measured in viewport space — which is what the reader meets, rotation included. */
 const readGeometry = (chromeSel) => {
   const R = (el) => { const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
   const vis = (el) => { const b = el.getBoundingClientRect(); const cs = getComputedStyle(el); return b.width > 0 && b.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.01; };
-  const blocks = chromeSel.map((sel) => ({ sel, el: document.querySelector(sel) }))
-    .filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, el: o.el, rect: R(o.el) }));
+  const found = chromeSel.map((sel) => ({ sel, el: document.querySelector(sel) }));
+  /* ABSENT and NOT PAINTED are different answers and only one of them is a
+     defect: `.sw-legend` is legitimately `display: none` at a narrow frame,
+     while a selector that matches NOTHING is a rename, which is exactly how a
+     check set shrinks without anyone noticing. */
+  const blocksMissing = found.filter((o) => !o.el).map((o) => o.sel);
+  const blocksInvisible = found.filter((o) => o.el && !vis(o.el)).map((o) => o.sel);
+  const blocks = found.filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, el: o.el, rect: R(o.el) }));
 
   /* A PARENT CONTAINING ITS CHILD IS NOT ONE BLOCK COVERING ANOTHER, and the
      first draft of 2a could not tell them apart. When the CC-BY credit moved
@@ -366,9 +399,11 @@ const readGeometry = (chromeSel) => {
      on the shape of the fix is worse than no check: whether a nested line is
      readable is a HIT TEST, and it gets one below. */
   const overlaps = [];
+  let pairs = 0;
   for (let i = 0; i < blocks.length; i++) {
     for (let j = i + 1; j < blocks.length; j++) {
       if (blocks[i].el.contains(blocks[j].el) || blocks[j].el.contains(blocks[i].el)) continue;
+      pairs++;
       const a = blocks[i].rect; const b = blocks[j].rect;
       const w = Math.min(a.r, b.r) - Math.max(a.x, b.x);
       const h = Math.min(a.b, b.b) - Math.max(a.y, b.y);
@@ -384,6 +419,7 @@ const readGeometry = (chromeSel) => {
      problem and not a cosmetic one. */
   const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit')].filter(vis);
   const covered = [];
+  const unhittable = [];
   const offscreen = [];
   for (const el of controls) {
     const b = el.getBoundingClientRect();
@@ -397,7 +433,16 @@ const readGeometry = (chromeSel) => {
     const hit = document.elementFromPoint(x, y);
     if (!hit || !(hit === el || el.contains(hit))) {
       const by = hit ? (hit.className || hit.tagName) : 'nothing';
-      covered.push({ label, sel: String(sel).slice(0, 40), x, y, by: String(by).slice(0, 40) });
+      const row = { label, sel: String(sel).slice(0, 40), x, y, by: String(by).slice(0, 40) };
+      /* A miss has TWO causes and only one is a defect. `pointer-events: none`
+         makes the element transparent to the hit test, so what comes back is
+         whatever is behind it — which at a wide frame was the GL canvas, i.e.
+         something UNDERNEATH being reported as covering it. The instrument has
+         no answer there; say that, rather than a wrong one. A control with
+         pointer-events: none is a different matter — it cannot be tapped. */
+      const interactive = el.tagName === 'BUTTON' || el.tagName === 'SELECT' || el.tagName === 'A';
+      if (getComputedStyle(el).pointerEvents === 'none' && !interactive) unhittable.push(row);
+      else covered.push(row);
     }
   }
 
@@ -420,7 +465,9 @@ const readGeometry = (chromeSel) => {
   for (let y = 0; y < rows.length; y++) if (rows[y]) coveredRows++;
 
   return {
-    overlaps, covered, offscreen, band: best,
+    overlaps, covered, unhittable, offscreen, band: best,
+    blocksFound: blocks.map((b) => b.sel), blocksMissing, blocksInvisible,
+    pairs, hits: controls.length,
     innerWidth, innerHeight: rows.length,
     coveredPct: Math.round((coveredRows / rows.length) * 1000) / 10,
     scrollWidth: document.documentElement.scrollWidth,
