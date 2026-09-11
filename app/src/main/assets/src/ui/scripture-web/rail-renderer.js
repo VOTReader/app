@@ -191,8 +191,12 @@ export function distanceToPath(pts, px, py) {
 export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const { width, DPR, base, chrome, votRail, verseX } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  /* One palette. The Scripture Web is dark regardless of the app's theme
+     (owner call, 2026-09-10), so these were a branch that could not be taken --
+     dead code that reads as live, which is how the next reader concludes the
+     rail still has a light mode. */
+  const ink = '235,231,222';
+  const gold = '232,192,80';
 
   // ── the two rails ──
   ctx.lineWidth = DPR;

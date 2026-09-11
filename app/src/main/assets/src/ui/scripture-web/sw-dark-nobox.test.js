@@ -20,35 +20,48 @@ import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CSS = path.join(HERE, '../../../app.css');
 
-/** The `.sw-controls` rule body, isolated from the rest of the stylesheet. */
-function controlsRule() {
+/** A bare rule's body, isolated from the rest of the stylesheet. */
+function bareRule(sel) {
   const css = fs.readFileSync(CSS, 'utf8');
   /* The bare rule, not `.sw-root.sw-rotated .sw-controls` and not a media
-     override: anchor on a line whose selector is exactly `.sw-controls {`. */
-  const m = css.match(/\n\s*\.sw-controls\s*\{([^}]*)\}/);
-  if (!m) throw new Error('no bare `.sw-controls {` rule found in app.css — this test is about a '
+     override: anchor on a line whose selector is exactly `<sel> {`. */
+  const m = css.match(new RegExp('\\n\\s*\\' + sel + '\\s*\\{([^}]*)\\}'));
+  if (!m) throw new Error(`no bare \`${sel} {\` rule found in app.css — this test is about a `
     + 'selector that no longer exists, which is a finding about the test, not a pass');
   return m[1];
 }
 
+/* BOTH panels, because there are two and they are the same treatment: .sw-topbar
+   on the left, .sw-controls on the right. Testing one would have let the other
+   ship, which is precisely what the scope I was handed would have done. */
+const PANELS = ['.sw-topbar', '.sw-controls'];
+
 describe('the Scripture Web controls float over the canvas, with no panel behind them', () => {
-  it('the .sw-controls rule exists and is the one that lays the row out', () => {
+  it.each(PANELS)('%s exists and is the rule that lays its row out', (sel) => {
     /* THE HARNESS PRECONDITION, and it is also the anti-vacuity guard: if this
        goes red, every assertion below is about the wrong rule (or about no rule
        at all) whatever colour it shows. */
-    const body = controlsRule();
+    const body = bareRule(sel);
     expect(body).toMatch(/position:\s*absolute/);
     expect(body).toMatch(/display:\s*flex/);
   });
 
-  it('declares no background — the black box behind the buttons is the thing being removed', () => {
-    expect(controlsRule()).not.toMatch(/background/);
+  it.each(PANELS)('%s declares no background — the black box behind the buttons', (sel) => {
+    expect(bareRule(sel)).not.toMatch(/background/);
   });
 
-  it('declares no border and no radius — a rounded outline is the same box by another name', () => {
-    const body = controlsRule();
+  it.each(PANELS)('%s declares no border and no radius — a rounded outline is the same box', (sel) => {
+    const body = bareRule(sel);
     expect(body).not.toMatch(/border\s*:/);
     expect(body).not.toMatch(/border-radius/);
+  });
+
+  it('the attribution keeps a legibility treatment, and it is not a panel', () => {
+    /* An unreadable CC-BY line is a licence problem. It lost the box behind it,
+       so it must gain something — and that something must not be another box. */
+    const credit = bareRule('.sw-credit');
+    expect(credit).toMatch(/text-shadow/);
+    expect(credit).not.toMatch(/background/);
   });
 });
 

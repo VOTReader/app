@@ -6788,12 +6788,14 @@
       --sw-topbar-floor: calc(44px + 2 * var(--sw-topbar-pad) + 2px);
     }
 
+    /* NO PANEL. The top chrome floats over the canvas: the back button and the
+       controls carry their own pill borders, so the rectangles behind them were
+       drawing a box around a box (owner call, 2026-09-10). Layout is untouched
+       -- the padding stays, so nothing moves. */
     .sw-topbar {
       position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
       left: 14px; top: var(--sw-chrome-top);
       padding: var(--sw-topbar-pad) 10px var(--sw-topbar-pad) var(--sw-topbar-pad);
-      background: var(--bg3);
-      border: 1px solid var(--border); border-radius: var(--radius);
     }
     .sw-title h1 {
       margin: 0; font-family: var(--font-cinzel);
@@ -6805,11 +6807,11 @@
       color: var(--cream-muted); letter-spacing: 0.04em;
     }
 
+    /* .sw-topbar's twin, and it loses its panel for the same reason. */
     .sw-controls {
       position: absolute; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px;
       right: 14px; top: var(--sw-chrome-top);
       max-width: 62vw; justify-content: flex-end; padding: 7px;
-      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
     }
     .sw-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -6987,10 +6989,16 @@
        clear of the strip by hand, and the hand-measured 198px went stale when
        the strip grew a row — so the attribution sat behind the buttons on a
        320px phone, present and unreadable. A flex row cannot go stale. */
+    /* The CC-BY attribution sits inside .sw-controls and lost the panel behind
+       it. An attribution that cannot be read is a LICENCE problem, not a
+       cosmetic one, so it keeps its size, colour, opacity and position and gains
+       the only legibility treatment that is not a panel: a shadow dark enough to
+       separate 10 px text from a bright arc passing under it. */
     .sw-credit {
       flex-basis: 100%; margin: 2px 2px 0; text-align: right;
       font-size: var(--fsc-10); color: var(--cream-muted); opacity: 0.75;
       letter-spacing: 0.04em;
+      text-shadow: 0 1px 2px #000, 0 0 4px #000;
     }
     .sw-live {
       position: absolute; width: 1px; height: 1px; overflow: hidden;

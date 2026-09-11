@@ -186,25 +186,36 @@ describe('modes', () => {
   });
 });
 
-describe('chrome tokens follow the theme', () => {
-  it('resolves against <body>, where the light palette is declared', () => {
-    // The dark palette sits on :root; light is a full token swap on
-    // `body.light`. Resolving at <html> returns the DARK values in light mode,
-    // and because the GL surface paints that colour over the CSS background,
-    // the entire view would stay black on parchment.
-    document.documentElement.style.setProperty('--bg', '#000000');
+describe('chrome tokens are one palette, but the text size is still the reader\'s', () => {
+  it('ignores a live --bg, and still resolves --fsc-10 against <body>', () => {
+    /* This case used to assert the opposite -- that `--bg` was read live off
+       <body> so the canvas followed the app's theme. That mechanism is gone by
+       owner call, and the case is INVERTED rather than deleted, because the
+       second half below is the thing now worth guarding: the font sizes are
+       still read live, since they follow the reader's text-size setting and
+       were never a theme. Drop this case and a later "simplify" pass could make
+       them constants too without a single test going red. */
     document.body.style.setProperty('--bg', '#f7f2e8');
-    expect(readChromeTokens().bg.trim()).toBe('#f7f2e8');
-    document.documentElement.style.removeProperty('--bg');
+    document.body.style.setProperty('--fsc-10', '13px');
+    const chrome = readChromeTokens();
+    expect(chrome.bg).toBe('#000000');
+    expect(chrome.fsRuler).toBe(13);
     document.body.style.removeProperty('--bg');
+    document.body.style.removeProperty('--fsc-10');
   });
 
-  it('reports the light flag from the body class the app actually sets', () => {
+  it('IGNORES the body class the app sets — this screen has one palette', () => {
+    /* The inverse of what this case used to assert, and deliberately kept
+       rather than deleted: the old case pinned a feature the owner asked to be
+       removed, so the honest replacement is the property that is now true.
+       Deleting it would have left nothing watching the same line. */
     document.body.classList.remove('light');
-    expect(readChromeTokens().isLight).toBe(false);
+    const dark = readChromeTokens();
     document.body.classList.add('light');
-    expect(readChromeTokens().isLight).toBe(true);
+    const underLight = readChromeTokens();
     document.body.classList.remove('light');
+    expect(underLight.isLight).toBe(false);
+    expect(underLight).toEqual(dark);
   });
 
   it('parses both hex and rgb() into clearColor components', () => {
