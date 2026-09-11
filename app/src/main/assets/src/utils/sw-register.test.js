@@ -226,7 +226,7 @@ describe('registerServiceWorker — the update-reload flag and the early claim',
   });
 
   it('index.html captures the controller in its FIRST inline script, before dist/bundle-a.js — the compare above is silently off without it', () => {
-    const html = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../index.html'), 'utf8');
+    const html = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../index.html'), 'utf8');
     const capture = html.indexOf('window.__votController0 = (navigator.serviceWorker && navigator.serviceWorker.controller) || null;');
     const firstScript = html.indexOf('<script>');
     const bundleA = html.indexOf('dist/bundle-a.js');
