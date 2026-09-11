@@ -544,6 +544,18 @@ try {
   const B1 = await afterReload('B');
   await shot('B-after');
   note(`B after:  letter ${JSON.stringify(B1.title)} scrollTop=${B1.y} --font-scale=${B1.fs} ${B1.status} key ${B1.key} store=${B1.storeT} clock=${B1.t === null ? 'n/a' : B1.t.toFixed(1)} toast=${JSON.stringify(B1.toast)} shown=${B1.toastShown}`);
+  // The toast is decided when the worker answers, however late (w-toast-ask-open,
+  // 2026-09-11): a single read at a fixed moment after boot is the 3 s decision that
+  // was replaced. Wait for it, and say when it came.
+  if (!B1.toastShown) {
+    const tT = Date.now();
+    const late = await page.waitForFunction(() => { const e = document.querySelector('#vot-toast-updated'); return !!(e && e.classList.contains('show')); }, { timeout: 10000 }).then(() => true, () => false);
+    if (late) {
+      B1.toast = await page.evaluate(() => (document.querySelector('#vot-toast-updated') || { textContent: '' }).textContent.trim());
+      B1.toastShown = true;
+      note(`B the update toast came ${Date.now() - tT} ms after the first read — the worker answered late: ${JSON.stringify(B1.toast)}`);
+    }
+  }
   const bootB = bootReport('B', B1, B0.y);
   if (B1.title !== B0.title) fail(`B the reader came back on ${JSON.stringify(B1.title) || 'a different screen'}, not ${JSON.stringify(B0.title)}`);
   assertScroll('B', B0.y, B1);
