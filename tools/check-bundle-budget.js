@@ -47,7 +47,24 @@ const BUDGETS = [
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.
   // Deliberate — this is the feature's lazy bundle, not the cold boot path.
-  { file: 'bundle-f.js', measured: 65543, max: 66400 },
+  //
+  // 2026-09-10, landing 70: 66,400 -> 76,100, and `measured` to the size true at
+  // that landing. THE CEILING WAS RAISED BECAUSE IT HAD 265 BYTES LEFT, not
+  // because anything grew unexpectedly. Three Scripture Web landings walked the
+  // margin down 1,272 -> 857 -> 694 -> 265 — 79% of the original headroom — and
+  // 265 B is about three lines of minified JS, so the next ordinary change here
+  // trips a COLLAPSE detector over something that is not a collapse.
+  //   measured 66,135 x 1.15 = 76,055.25, rounded up to the hundred = 76,100.
+  // The percentage this file prints never left +0.7% through any of those three,
+  // because it is computed against `measured` and `measured` had drifted 7,933 B
+  // stale. That is fixed here for this row and in the next commit for the
+  // sentences; the OTHER rows' `measured` values are still stale and are left
+  // alone deliberately, because the headroom line landing next prints size and
+  // max directly and a stale baseline can no longer be the only number a reader
+  // gets. `measured` is in no comparison in this file — the only test is
+  // `size > b.max` — so nothing above can change a gate outcome except the
+  // ceiling itself.
+  { file: 'bundle-f.js', measured: 66135, max: 76100 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
