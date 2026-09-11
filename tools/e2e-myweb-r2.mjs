@@ -36,10 +36,16 @@
  *      Each notch's capture is taken while the gesture is still LIVE (inside
  *      the 150 ms hold, data-cap-fraction 0): what a moving finger sees.
  *   R  release: from the overview one wheel notch over the Bible rail at the
- *      Matthew corridor, then a burst of captures through the hold and the
- *      250 ms fade back to the full picture. Registered: the largest step in
- *      the corridor's mean luminance between consecutive captures (the "no
- *      pop" number), the capture cadence, and data-cap-fraction per capture.
+ *      Matthew corridor, then the ui canvas's corridor box sampled every
+ *      animation frame through the hold and the 250 ms fade back to the full
+ *      picture. Runs FIRST, on a fresh page: a full-page screenshot before it
+ *      (arm O) leaves the canvas where a sample costs ~430 ms on desktop and
+ *      the fade is invisible. Registered: the largest RAW step in the corridor's mean
+ *      luminance between consecutive samples (the "no pop" number, gate a
+ *      third of the live dip), the sample cadence beside it, and the count of
+ *      fading samples; fewer than three fading samples is UNRESOLVED and
+ *      FAILS (the Verifier's bite: with the fade removed the whole dip landed
+ *      in one sampler gap and a per-time normalisation waved it through).
  *   T  two-rail: wheel over the top rail until Rebuke fills >= 60 % of the
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
@@ -83,7 +89,7 @@ const NAV_MS = 60000;
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
 const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
 const NOTCHES = 22;
-const ARMS = arg('arms', 'O,S,T,C,R').split(',');
+const ARMS = arg('arms', 'R,O,S,T,C').split(',');
 const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
 for (const t of new Set([OWN, TREE])) {
@@ -366,35 +372,53 @@ async function armR(page, tag, fname, c, r0) {
   })`;
   const box = { x0, x1, y0: r0.topY + 4, y1: r0.bottomY - 4 };
   const sample = (ms) => page.evaluate((src, box, ms) => (new Function('return ' + src)())(box, ms), SAMPLER, box, ms);
-  const rest0 = (await sample(0))[0].lum;
-  await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12);
+  await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12); await sleep(150);
+  // the sampler starts BEFORE the notch: a slow puppeteer round trip after the
+  // wheel (132 ms seen on a loaded machine) would otherwise skip the 150 ms hold
+  const pending = sample(1000);
+  await sleep(80);
   await page.mouse.wheel({ deltaY: -120 });
-  const shots = await sample(700);
+  const all = await pending;
+  const firstLiveIdx = all.findIndex((x) => x.cf === 0);
+  const pre = firstLiveIdx > 0 ? all.slice(0, firstLiveIdx) : all.slice(0, 1);
+  const rest0 = +(pre.reduce((a, x) => a + x.lum, 0) / pre.length).toFixed(2);
+  const shots = firstLiveIdx >= 0 ? all.slice(firstLiveIdx) : all;
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const restEnd = (await sample(0))[0].lum;
-  // the sampler runs on the page's own frames and cannot promise a 120 Hz
-  // cadence under load (a busy machine gave 100 ms gaps on the phone frame,
-  // one sample per 450 ms on desktop), so every step is ALSO expressed per
-  // 16.7 ms of wall time, which is what a 60 Hz eye sees between two frames
-  let maxStep = 0, maxRate = 0, at = -1;
-  for (let i = 1; i < shots.length; i++) {
-    const d = Math.abs(shots[i].lum - shots[i - 1].lum), dt = Math.max(1, shots[i].t - shots[i - 1].t);
-    const rate = d * Math.min(1, 16.7 / dt);
-    if (d > maxStep) maxStep = d;
-    if (rate > maxRate) { maxRate = rate; at = i; }
-  }
-  const live = shots.filter((x) => x.cf === 0), fading = shots.filter((x) => x.cf > 0 && x.cf < 1), full = shots.filter((x) => x.cf === 1);
+  // the RAW step between consecutive samples is the gate; a per-time
+  // normalisation would assume the luminance eased across a sampler gap,
+  // which is the property under test (the Verifier's bite iii)
+  // the RELEASE is what is measured: from the last live sample on. The
+  // sampler's first frames can precede the app's first live draw, and the
+  // rest-to-live drop at the notch is the cap taking hold, not the fade.
+  const live = shots.filter((x) => x.cf === 0);
+  const lastLiveIdx = live.length ? shots.indexOf(live[live.length - 1]) : 0;
+  const after = shots.slice(lastLiveIdx);
+  const fading = after.filter((x) => x.cf > 0 && x.cf < 1), full = after.filter((x) => x.cf === 1);
   const first = shots[0], lastLive = live.length ? live[live.length - 1] : null, firstFull = full.length ? full[0] : null;
+  let maxStep = 0, at = -1, maxGap = 0;
+  for (let i = 1; i < after.length; i++) {
+    const d = Math.abs(after[i].lum - after[i - 1].lum), dt = after[i].t - after[i - 1].t;
+    if (d > maxStep) { maxStep = d; at = lastLiveIdx + i; }
+    if (dt > maxGap) maxGap = dt;
+  }
   const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
-  note(`${tag} R: Matthew corridor (ui canvas) mean luminance: rest ${rest0} -> ${shots.length} frames over ${shots[shots.length - 1].t} ms (mean cadence ${cadence} ms): first sample ${first.lum} at t+${first.t} (cap ${first.cf}), live ${live.length} frames${lastLive ? ` (.. ${lastLive.lum} at t+${lastLive.t})` : ''}, fading ${fading.length} frames, full from t+${firstFull ? firstFull.t : '-'} (${firstFull ? firstFull.lum : '-'}); largest step between samples ${maxStep.toFixed(2)}/255, largest per-16.7 ms step ${maxRate.toFixed(2)}/255 (sample ${at}, t+${shots[at] ? shots[at].t : '-'} ms, cap ${shots[at] ? shots[at].cf : '-'}); rest again ${restEnd}`);
+  note(`${tag} R: Matthew corridor (ui canvas) mean luminance: rest ${rest0} -> ${shots.length} samples over ${shots[shots.length - 1].t} ms (mean cadence ${cadence} ms, largest gap ${maxGap} ms): first sample ${first.lum} at t+${first.t} (cap ${first.cf}), live ${live.length}${lastLive ? ` (.. ${lastLive.lum} at t+${lastLive.t})` : ''}, fading ${fading.length}, full from t+${firstFull ? firstFull.t : '-'} (${firstFull ? firstFull.lum : '-'}); largest RAW step between consecutive samples ${maxStep.toFixed(2)}/255 (sample ${at}, t+${shots[at] ? shots[at].t : '-'} ms, cap ${shots[at] ? shots[at].cf : '-'}); rest again ${restEnd}`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R.json`), JSON.stringify({ rest0, restEnd, shots }, null, 1));
-  const dip = (firstFull ? firstFull.lum : rest0) - (live.length ? live[0].lum : first.lum);
+  const dip = (firstFull ? firstFull.lum : rest0) - (lastLive ? lastLive.lum : first.lum);
+  if (!live.length) fails.push(`${tag} R: no live frame was sampled after the notch (first sample cap ${first.cf} at t+${first.t} ms): the hold was not seen`);
   // the sampler's first frame can precede the app's first live draw (t+5 ms),
   // so the hold is judged by any live or fading frame seen, not the first
-  if (!live.length && !fading.length) fails.push(`${tag} R: no live or fading frame was sampled after the notch (first cap ${first.cf} at t+${first.t} ms, cadence ${cadence} ms): the hold and the fade were not seen`);
   if (!firstFull) fails.push(`${tag} R: the cap did not come back to full within 700 ms`);
-  if (!(maxRate <= Math.max(1.0, dip * 0.35))) fails.push(`${tag} R: a per-16.7 ms step of ${maxRate.toFixed(2)}/255 is more than a third of the live dip (${dip.toFixed(2)}): a pop`);
-  if (fading.length < 3) note(`${tag} R: the fade was not resolved by this run's cadence (${fading.length} fading samples); the ease is asserted per 16.7 ms above, not by count`);
+  // fewer than three fading samples: a POP when the sampler's gap around the
+  // largest step is shorter than a third of the 250 ms fade (it resolved the
+  // event fine and there WAS no fade: the defect), UNRESOLVED only when the
+  // gaps were too coarse to have seen a fade at all (the instrument's fault)
+  const gapAtStep = at > 0 ? shots[at].t - shots[at - 1].t : maxGap;
+  if (fading.length < 3) {
+    const pop = gapAtStep < 250 / 3;
+    fails.push(`${tag} R: ${pop ? 'POP' : 'UNRESOLVED'}: ${fading.length} fading samples; the largest step ${maxStep.toFixed(2)}/255 (dip ${dip.toFixed(2)}) sits in a ${gapAtStep} ms gap (cadence ${cadence} ms, largest gap ${maxGap} ms): ${pop ? 'the sampler saw the release and there was no fade' : 'the sampler could not have seen a 250 ms fade; fix the instrument, not the fade'}`);
+  } else if (!(maxStep <= dip * 0.35)) fails.push(`${tag} R: a raw step of ${maxStep.toFixed(2)}/255 between consecutive samples (${gapAtStep} ms gap) is more than a third of the live dip (${dip.toFixed(2)}): a pop`);
   await clickIfPresent(page, 'Reset the view'); await sleep(300);
 }
 
@@ -407,10 +431,12 @@ async function walk(page, url, fname) {
   const c = await canvasRect(page);
   const r0 = await rails(page);
   note(`${tag} rails ${r0 ? `topY ${r0.topY} bottomY ${r0.bottomY}, ${r0.top.length} collections, ${r0.bottom.length} books` : 'NOT PUBLISHED (data-rails absent)'}`);
+  // R first, on the fresh page: even the O screenshot before it leaves the
+  // canvas where a sample costs ~430 ms on desktop (see the arm's note)
+  if (ARMS.includes('R')) { if (r0) await armR(page, tag, fname, c, r0); else fails.push(`${tag} R: no data-rails`); }
   if (ARMS.includes('O')) { await page.mouse.move(c.l + 8, c.t + 8); await sleep(250); await shot(page, `${fname}-O-overview`); }
   if (ARMS.includes('S')) await armS(page, tag, fname, c, r0);
   if (ARMS.includes('C')) { if (r0) await armC(page, tag, fname, c, r0, f); else fails.push(`${tag} C: no data-rails`); }
-  if (ARMS.includes('R')) { if (r0) await armR(page, tag, fname, c, r0); else fails.push(`${tag} R: no data-rails`); }
   if (!ARMS.includes('T')) return;
   if (!r0) { fails.push(`${tag} T: the screen publishes no data-rails, so no rail can be zoomed to a book`); return; }
   const p1 = await pairing(page, tag, fname, c, r0, 'Rebuke', 'Isaiah', /Rebuke/i, /^Isaiah\b/, '1');

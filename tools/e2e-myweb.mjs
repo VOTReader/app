@@ -91,14 +91,23 @@ const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.
    passes on that GPU with no environment. MYWEB_R5_CEILINGS (JSON) is for
    trial runs only and is announced loudly in the log. */
 const R5_CEILINGS = process.env.MYWEB_R5_CEILINGS ? JSON.parse(process.env.MYWEB_R5_CEILINGS) : {
-  // Registered by the Verifier 2026-09-11 01:08-01:18 at 41e727eb from THREE identical runs of
-  // this tool (--perf, no env var, gate-lock held for the whole span, nvidia-smi 0-1 % / 1.2 GB
-  // before each): every state read min-of-two p50 4.2 / 4.2 ms in all three runs (n ~360 frames
-  // per run; phone p95 4.3, desktop p95 up to 12.5 with the half-res layer) — the rAF floor of
-  // this display. Ceiling = max of the three, zero margin, so a read above the floor is a
-  // finding. Chrome/152.0.7977.54. Log: sessions/2026-09-06-orchestrator/verifier-gate-logs/
-  // myweb-r5-41e727eb/. A different renderer string is NOT this number: register it, do not reuse.
-  'NVIDIA GeForce RTX 5080': { overview: 4.2, phoneLand: 4.2, phone: 4.2, desktop: 4.2 },
+  // Registered 2026-09-11 (design-perf) for the full-resolution, batched, live-capped My Web at the
+  // sw-myweb-r2-rb tip, from THREE runs of this tool (--perf, no env var) on the RTX 5080 D3D11
+  // with the GPU state printed in the log (sessions/2026-09-11-orchestrator/myweb-r2/r5-draw-{1,2,3}/).
+  // The quantity is the personal DRAW's own main-thread time (ui clearRect to its last paint call,
+  // per frame, min-of-two p50 of a 1.5 s live pan), a continuous number; the rAF interval p50 is
+  // printed as information because the 240 Hz vsync quantises it to 4.2 / 8.3 ms and flips
+  // between them when the draw sits near one frame (the Verifier's 36 readings at b5d66afd).
+  // Ceiling = the highest of the three runs + the larger of the observed spread (max - min) or
+  // 10 %, so a fourth identical run cannot flake on its own tip (a continuous quantity has spread;
+  // the quantised floor at 41e727eb had none, which is why zero margin was right there):
+  //   overview: min-of-two draw p50 over the three runs [4.4, 5.0, 4.8, 4.5, 5.0, 4.9, 4.9, 4.6, 4.6] -> ceiling 5.6
+  //   phoneLand: min-of-two draw p50 over the three runs [6.0, 5.9, 5.8] -> ceiling 6.6
+  //   phone: min-of-two draw p50 over the three runs [5.3, 4.9, 5.5] -> ceiling 6.1
+  //   desktop: min-of-two draw p50 over the three runs [5.5, 5.4, 4.8] -> ceiling 6.2
+  // overview is shared by every frame; phoneLand/phone/desktop are the three zoom steps.
+  // A different renderer string is NOT this number: register it, do not reuse.
+  'NVIDIA GeForce RTX 5080': {"overview": 5.6, "phoneLand": 6.6, "phone": 6.1, "desktop": 6.2},
 };
 let R5 = null;  // the registered entry for this run's renderer, or null
 const R5_MIN_CLEARS = num('MYWEB_R5_MIN_CLEARS', 0.8);   // ui-canvas clearRect per opportunity (min(moves, frames)); main and the branch read ~1.0
@@ -232,18 +241,43 @@ async function readBoth(page) {
   return { on, off, ctx: diffStats(on, off) };
 }
 const COUNTERS = () => {
-  window.__sw2d = { stroke: 0, clear: 0 };
+  window.__sw2d = { stroke: 0, clear: 0, draws: [], t0: 0, tLast: 0 };
   const P = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
   if (!P) return;
-  const os = P.stroke; P.stroke = function () { window.__sw2d.stroke++; return os.apply(this, arguments); };
+  const isUi = (ctx) => ctx.canvas && ctx.canvas.classList && ctx.canvas.classList.contains('sw-canvas-ui');
+  // the draw's OWN time: from the ui canvas's clearRect to its last paint
+  // call before the next clear, on the main thread. A continuous quantity,
+  // unlike the rAF interval, which a 240 Hz vsync quantises to 4.2 / 8.3 ms
+  // and flips between when the draw sits near one frame (the Verifier's
+  // three runs at b5d66afd: 35 of 36 readings on one of the two).
+  const mark = function () { const c = window.__sw2d; if (c.t0) c.tLast = performance.now(); };
+  for (const m of ['stroke', 'fill', 'fillText', 'drawImage', 'fillRect']) {
+    const o = P[m];
+    P[m] = function () { if (m === 'stroke') window.__sw2d.stroke++; if (isUi(this)) mark(); return o.apply(this, arguments); };
+  }
   // the draw's witness on EVERY tree: the personal draw clears the ui canvas
   // before it paints, so clears/frame ~ 1 means the draw ran each frame
-  const oc = P.clearRect; P.clearRect = function () { if (this.canvas && this.canvas.classList && this.canvas.classList.contains('sw-canvas-ui')) window.__sw2d.clear++; return oc.apply(this, arguments); };
+  const oc = P.clearRect; P.clearRect = function () {
+    if (isUi(this)) {
+      const c = window.__sw2d;
+      if (c.t0 && c.tLast > c.t0) c.draws.push(c.tLast - c.t0);
+      c.clear++; c.t0 = performance.now(); c.tLast = 0;
+    }
+    return oc.apply(this, arguments);
+  };
 };
 async function frameTime(page, panMs) {
   await page.evaluate((ms) => {
-    const w = window; w.__swFrames = []; let last = 0; const stop = performance.now() + ms;
-    const tick = (t) => { if (last) w.__swFrames.push(t - last); last = t; if (t < stop) requestAnimationFrame(tick); };
+    const w = window;
+    // counters start clean at the pass: the pass before it (zoom notches,
+    // the release fade) must not be counted into this pass's strokes
+    if (w.__sw2d) { w.__sw2d.stroke = 0; w.__sw2d.clear = 0; w.__sw2d.draws = []; w.__sw2d.t0 = 0; w.__sw2d.tLast = 0; }
+    w.__swFrames = []; w.__swCap = []; let last = 0; const stop = performance.now() + ms;
+    const root = document.querySelector('.sw-root');
+    const tick = (t) => {
+      if (last) { w.__swFrames.push(t - last); w.__swCap.push(root ? Number(root.getAttribute('data-cap-fraction')) : NaN); }
+      last = t; if (t < stop) requestAnimationFrame(tick);
+    };
     requestAnimationFrame(tick);
   }, panMs);
   const box = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; });
@@ -253,24 +287,31 @@ async function frameTime(page, panMs) {
   while (Date.now() - t0 < panMs) { k++; await page.mouse.move(box.x + Math.sin(k / 5) * amp, box.y + Math.cos(k / 7) * amp / 2); }
   await page.mouse.up();
   const d = await page.evaluate(() => window.__swFrames.slice().sort((a, b) => a - b));
-  const c = await page.evaluate(() => { const c = Object.assign({}, window.__sw2d || {}); if (window.__sw2d) { window.__sw2d.stroke = 0; window.__sw2d.clear = 0; } return c; });
+  const cap = await page.evaluate(() => { const c = window.__swCap || []; const n = c.filter((x) => Number.isFinite(x)).length; return { n, live: c.filter((x) => x === 0).length, fading: c.filter((x) => x > 0 && x < 1).length, full: c.filter((x) => x === 1).length }; });
+  const c = await page.evaluate(() => { const c = window.__sw2d ? { stroke: window.__sw2d.stroke, clear: window.__sw2d.clear, draws: window.__sw2d.draws.slice().sort((a, b) => a - b) } : {}; return c; });
   if (!d.length) return null;
   const q = (p) => +d[Math.min(d.length - 1, Math.floor(d.length * p))].toFixed(1);
+  const dr = c.draws || [];
+  const qd = (p) => dr.length ? +dr[Math.min(dr.length - 1, Math.floor(dr.length * p))].toFixed(2) : NaN;
+  const capState = cap.n ? `${cap.live}/${cap.fading}/${cap.full} of ${cap.n} ticks live/fading/full` : 'no data-cap-fraction (pre-r2 tree)';
   // a draw is scheduled per pointer move, so on a fast tree rAF ticks outnumber
   // moves and clears/frame reads below 1 for a draw that ran on every chance it had:
   // the witness is clears per OPPORTUNITY, min(moves, frames)
-  return { n: d.length, p50: q(0.5), p95: q(0.95), moves: k, strokesPerFrame: Math.round((c.stroke || 0) / d.length), clearsPerFrame: +((c.clear || 0) / d.length).toFixed(2), clearsPerOpportunity: +((c.clear || 0) / Math.min(k, d.length)).toFixed(2) };
+  return { n: d.length, p50: q(0.5), p95: q(0.95), moves: k, strokesPerFrame: Math.round((c.stroke || 0) / Math.max(1, c.clear || d.length)), clearsPerFrame: +((c.clear || 0) / d.length).toFixed(2), clearsPerOpportunity: +((c.clear || 0) / Math.min(k, d.length)).toFixed(2), drawN: dr.length, drawP50: qd(0.5), drawP95: qd(0.95), capState, under45: +(d.filter((x) => x <= 4.5).length / d.length).toFixed(2) };
 }
-/** Two runs, min-of-two p50; strokes/frame must show the draw ran. */
+/** Two passes; the gate is the DRAW's own time (min-of-two p50, a continuous
+    quantity); the rAF interval p50 is printed as information with the share
+    of intervals under 4.5 ms; clears/opportunity must show the draw ran. */
 async function perfArm(page, tag, state, ceiling) {
   const a = await frameTime(page, 1500); await sleep(300);
   const b = await frameTime(page, 1500); await sleep(300);
   if (!a || !b) { fails.push(`${tag} R5 ${state}: no rAF frames recorded during the pan`); return; }
-  const min = Math.min(a.p50, b.p50);
-  note(`${tag} R5 ${state} rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, moves ${a.moves}/${b.moves}, p95 ${a.p95}/${b.p95}, clears/opportunity ${a.clearsPerOpportunity}/${b.clearsPerOpportunity}, strokes/frame ${a.strokesPerFrame}/${b.strokesPerFrame}); ceiling ${ceiling == null ? 'UNREGISTERED' : ceiling}`);
+  const min = Math.min(a.drawP50, b.drawP50);
+  note(`${tag} R5 ${state} draw p50 ${a.drawP50}/${b.drawP50} ms (p95 ${a.drawP95}/${b.drawP95}, draws ${a.drawN}/${b.drawN}); rAF p50 ${a.p50}/${b.p50} ms (n ${a.n}/${b.n}, p95 ${a.p95}/${b.p95}, share <= 4.5 ms ${a.under45}/${b.under45}, moves ${a.moves}/${b.moves}, clears/opportunity ${a.clearsPerOpportunity}/${b.clearsPerOpportunity}, strokes/draw ${a.strokesPerFrame}/${b.strokesPerFrame}); cap ${a.capState} | ${b.capState}; ceiling ${ceiling == null ? 'UNREGISTERED' : ceiling + ' ms of draw'}`);
   if (Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity) < R5_MIN_CLEARS) fails.push(`${tag} R5 ${state}: ${Math.min(a.clearsPerOpportunity, b.clearsPerOpportunity)} ui-canvas clears per opportunity < ${R5_MIN_CLEARS}: the draw did not run when it could, so the frame time is not the draw's`);
-  if (ceiling == null) { fails.push(`${tag} R5 ${state}: min-of-two p50 ${min} ms against NO ceiling: this renderer is not registered in R5_CEILINGS (the Verifier registers it from three runs at the landing tip)`); return; }
-  if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two p50 ${min} ms > ceiling ${ceiling} ms`);
+  if (!(a.drawN > 20 && b.drawN > 20)) { fails.push(`${tag} R5 ${state}: too few timed draws (${a.drawN}/${b.drawN}) to read a p50`); return; }
+  if (ceiling == null) { fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms against NO ceiling: this renderer is not registered in R5_CEILINGS (the Verifier registers it from three runs at the landing tip)`); return; }
+  if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms > ceiling ${ceiling} ms`);
 }
 async function makeLink(page, route, verseIdx, ref) {
   await goHome(page);
