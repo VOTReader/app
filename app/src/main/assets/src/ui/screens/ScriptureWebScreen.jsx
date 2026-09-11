@@ -700,9 +700,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       if (!underlay || !edge || !node) return null;
       const source = refOfVerse(g, underlay.versePos[found.index]);
       const target = curatedEndpoint(edge, node);
+      // the card's third line names the Volume the passage sits in (what the
+      // reader zoomed the top rail to), never the edge's storage kind
+      const seg = p.votRail.segments.find((s) => s.volKey === node.volKey);
       return {
         kind: 'underlay', index: found.index, source, target,
-        joins: edge.kind || 'curated connection',
+        joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
         cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
       };
     }
