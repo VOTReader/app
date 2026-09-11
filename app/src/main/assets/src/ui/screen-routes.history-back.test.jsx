@@ -129,18 +129,21 @@ function makeRoutes(overrides = {}) {
   return { routes: buildScreenRoutes(props), props };
 }
 
-describe('Scripture Web is reached by drilling, not from the landing page', () => {
-  /* Corbin, 2026-09-05: "get rid of scripture web on the landing page, make
-     users drill for it, still under construction."
+describe('Scripture Web is offered from Home again, and still reached by drilling', () => {
+  /* Corbin, 2026-09-11: "add the scripture web button back to the home screen like it was
+     before, as seen in the trailer." This is the case b3e3625a replaced (2026-09-05, "make
+     users drill for it"), put back: Home opens it and captures its origin, so back from the
+     web returns to Home. The Library entry and the deep link were never touched and stay. */
+  it('the Home route opens Scripture Web from Home and back returns through the captured origin', () => {
+    const { routes, props } = makeRoutes();
+    routes.home().props.onScriptureWeb();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
+    expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
 
-     This case used to assert the opposite — that Home opened it — so it is
-     replaced rather than added to. What has NOT changed is everything past the
-     entry point: the route resolves, the Library entry opens it, and back
-     still returns through the captured origin. A deep link into
-     `scripture-web` is unaffected; the screen was never removed. */
-  it('the Home route offers no Scripture Web entry at all', () => {
-    const { routes } = makeRoutes();
-    expect(routes.home().props.onScriptureWeb).toBeUndefined();
+    const next = makeRoutes({ navOrigin: { screen: 'home', returnOrigin: null } });
+    next.routes['scripture-web']().props.onBack();
+    expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
+    expect(next.props.setScreen).not.toHaveBeenCalled();
   });
 
   it('the Library entry still opens it, and back returns through the origin', () => {
