@@ -36,6 +36,16 @@ describe('settleRead — a position is a reading only once the scroller is still
     expect(r.samples.map((s) => s.y)).toEqual([900, 887, 850, 780, 720, 698]);
   });
 
+  it('a scroller still moving past the first still window is read only when it stops (the window resets on every change)', async () => {
+    const c = clock();
+    const moving = Array.from({ length: 30 }, (_, i) => 900 - i * 7);   // 30 moves over 464 ms of fake clock, then still at 697
+    const r = await settleRead(series(moving), { stillMs: 250, maxMs: 4000, everyMs: 16, now: c.now, sleep: c.sleep });
+    expect(r.settled).toBe(true);
+    expect(r.y).toBe(697);                 // a window measured from the FIRST read would have returned 788 at +256 ms
+    expect(r.samples).toHaveLength(30);
+    expect(r.waitedMs).toBe(16 * 29 + 256);
+  });
+
   it('an already-still scroller settles after exactly the still window', async () => {
     const c = clock();
     const r = await settleRead(series([698]), { stillMs: 250, maxMs: 4000, everyMs: 16, now: c.now, sleep: c.sleep });
