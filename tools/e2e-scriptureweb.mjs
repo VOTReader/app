@@ -900,7 +900,31 @@ async function walk(page, url, frame, scale) {
   const first = await state(page);
   if (first.fallback && !first.root) {
     const why = await page.evaluate(() => (document.querySelector('.sw-fallback-body') || { textContent: '' }).textContent.trim());
-    nothingToCheck = `${tag} the web could not be drawn: ${JSON.stringify(why)}. No density control exists to measure, so no arm here means anything.`;
+    /* ARM 4b ON THE FALLBACK PATH. A shipped shader that does not compile
+       THROWS out of buildRenderer, the screen catches it into `loadError`, and
+       we arrive here -- which used to return NOTHING-TO-CHECK and never read
+       the recorder, leaving 4b's `ok === false` branch unreachable in the real
+       app. The recorder still holds the shader, because `shaderSource` runs
+       before `compileShader`. Read it, and let a named defect outrank "nothing
+       to check": `nothingToCheck` is tested FIRST at exit, so setting both
+       would hide the red. */
+    const dead = await page.evaluate(() => (window.__swwebShaders || []).map((r) => {
+      let ok = null;
+      try { ok = !!r.gl.getShaderParameter(r.sh, r.gl.COMPILE_STATUS); } catch (_e) { ok = null; }
+      let log = '';
+      try { log = (r.gl.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
+      return { ok, log, len: r.src.length, head: r.src.split('\n').slice(0, 3).join(' ').slice(0, 80) };
+    })).catch(() => []);
+    const broke = dead.filter((r) => r.ok === false);
+    if (broke.length) {
+      for (const r of broke) {
+        fails.push(`${tag} 4b a SHIPPED shader does not compile: ${JSON.stringify(r.log) || 'the driver gave no log'} `
+          + `(${r.len} chars, starts ${JSON.stringify(r.head)}). The screen fell back to ${JSON.stringify(why)}; `
+          + 'this is the arm that names WHICH shader and WHAT the driver said, where the fallback text is only a symptom');
+      }
+    } else {
+      nothingToCheck = `${tag} the web could not be drawn: ${JSON.stringify(why)}. No density control exists to measure, so no arm here means anything.`;
+    }
     return;
   }
 
@@ -953,7 +977,19 @@ async function walk(page, url, frame, scale) {
 
   /* ARM 4b — what the APP compiled, read off the recorder. Per frame, because
      it is free: no extra GL context, no extra page, just a read of what already
-     happened. */
+     happened.
+
+     WHICH BRANCH A BITE CAN DRIVE, measured rather than assumed. Getting here
+     means the screen SETTLED, and a shipped shader that fails to compile throws
+     out of buildRenderer long before that — so `ok === false` is essentially
+     unreachable at THIS read, and the fallback-path read above is what
+     witnesses it. (Not provably dead: a context-loss rebuild can leave a failed
+     shader in the recorder while an earlier program still paints. It stays, and
+     it is cheap.) What this read owns, and the fallback read cannot, is
+     `!shipped.length` — THE SCREEN COMPILED NOTHING AT ALL. Every other arm
+     here passes over a blank canvas: the chrome still lays out, the density
+     control still reads, the band is still measurable. This is the only arm
+     that looks at whether the renderer ran. */
   const shipped = await page.evaluate(() => {
     const recs = window.__swwebShaders || [];
     return recs.map((r) => {
