@@ -43,6 +43,19 @@ export function BibleStudyChapterView({
   // Common LetterView bundle (theme/search/history/settings/link/etc.)
   sharedViewProps,
 }) {
+  // The study's recordings are in AUDIO_MANIFEST, which rides bundle-a-vot — the
+  // LAZY letter corpus — so a study reached cold (Home > Studies > here) has no
+  // manifest and LetterView's hasAudio reads "no recording" for six that ship
+  // (ruling (4), 2026-09-11; caught by e2e-study-audio's first outing). Warm it
+  // the way the Listening Library does; App's useLazyBundles re-renders this
+  // route when it lands, so the pill appears without a subscription here. On an
+  // installed profile the bundle is precached (CORPUS_PRECACHE) — a cache read
+  // and a parse, no network. A study's letter links kick the same corpus anyway.
+  // First statement of the component: the early returns below must not skip it
+  // (rules-of-hooks), and a study still loading may as well warm the corpus too.
+  React.useEffect(() => {
+    if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
+  }, []);
   if (!studyId || !studyChapterId) return null;
   const study = getStudyById(studyId);
   const ch = getStudyChapter(study, studyChapterId);
