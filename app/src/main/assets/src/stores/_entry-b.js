@@ -135,6 +135,7 @@ import { measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSa
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
+import { announceUpdateIfAny } from '../utils/update-toast.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -277,6 +278,11 @@ Object.assign(window, HubScreen, ViewerScreen, EditorScreen);
 
 // ── Service worker (W3) — web-only, gated by PlatformBridge ────────────
 registerServiceWorker();
+// ── "VOTReader was just updated." — once per new build, on any screen ──
+// Unconditional and before any screen mounts: on the web this is the boot
+// after the controllerchange reload; on Android the next cold start with a
+// new APK. update-toast.test.js pins that nothing conditional sits here.
+announceUpdateIfAny();
 
 // ── Memory-pressure trim signal (Android onTrimMemory → JS) ─────────────
 // MainActivity.onTrimMemory calls window.__onTrimMemory on a moderate+ memory-
