@@ -22,14 +22,19 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { CORPUS_FILES, buildCollections, formatAFragments, formatBFragments, fragmentsFor } from './audio-fragments-lib.mjs';
+import { CORPUS_FILES, STUDY_FILE, buildCollections, formatAFragments, formatBFragments, fragmentsFor } from './audio-fragments-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
 const OUTDIR = resolve(HERE, '_align-work');
 
 const ctx = {};
-for (const f of CORPUS_FILES) {
+// STUDY_FILE too (2026-09-11): the Bible/Letter Studies render through
+// LetterView over `chapter.blocks`, so every chapter is a Format-A item keyed
+// study:<chapterId> — the key the manifest has carried since c48 and the one
+// batch-align.py --volkeys study looks up here. Emitted for every chapter that
+// renders blocks, audio or not, exactly as the letters are.
+for (const f of [...CORPUS_FILES, STUDY_FILE]) {
   runInNewContext(readFileSync(resolve(ASSETS, 'src', 'data', f), 'utf8'), ctx, { filename: f });
 }
 const { A: A_COLS, B: B_COLS, holyDays } = buildCollections(ctx);

@@ -35,9 +35,27 @@ export const CORPUS_FILES = Object.freeze([
 ]);
 
 /**
+ * The Bible/Letter Studies, evaluated into the same context when a caller
+ * wants the `study` collection below. Listed apart from CORPUS_FILES because it
+ * is 4.4 MB and lazy in the app, and because the studies are a different
+ * SURFACE (BibleStudyChapterView), not a fifteenth letter collection: the
+ * manifest generator's letter walk never sees them, and their audio keys are
+ * `study:<chapterId>` (c48). What they share with a letter is exactly the text
+ * domain — the study screen mounts LetterView over `chapter.blocks`, the same
+ * Segments path, collision-guard space included — so a chapter is a Format-A
+ * item here and nowhere else in the pipeline needs a study-shaped branch.
+ */
+export const STUDY_FILE = 'bible-studies.js';
+
+/**
  * Map an evaluated corpus context to the volKey -> items shape the aligner and
  * the app agree on. Holy Days is returned separately: its ghost entries carry
  * either shape and are classified per entry.
+ *
+ * `A.study` is present only when STUDY_FILE was evaluated into ctx: every study
+ * chapter that renders blocks, keyed by its own id (`purity-ch1`), which is
+ * unique across studies (72 chapters, 0 collisions, pinned by the test) and is
+ * the letterId the app hands ReadAlongHighlight for `study:<chapterId>`.
  * @param {any} ctx
  */
 export function buildCollections(ctx) {
@@ -50,6 +68,9 @@ export function buildCollections(ctx) {
     flock: [ctx.LETTERS_FLOCK_PREFACE, ...ctx.LETTERS_FLOCK],
     rebuke: [ctx.LETTERS_REBUKE_PREFACE, ...ctx.LETTERS_REBUKE],
   };
+  if (Array.isArray(ctx.BIBLE_STUDIES)) {
+    A.study = ctx.BIBLE_STUDIES.flatMap((s) => (s.chapters || []).filter((c) => c && Array.isArray(c.blocks)));
+  }
   const B = { wtlb1: ctx.WTLB_ONE, wtlb2: ctx.WTLB_TWO, blessed: ctx.THE_BLESSED };
   return { A, B, holyDays: (ctx.HOLY_DAYS || []).filter(Boolean) };
 }

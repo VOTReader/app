@@ -49,7 +49,7 @@ import { runInNewContext } from 'vm';
 import { execFileSync } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { CORPUS_FILES, buildCollections, blockDomainText, formatBSpoken } from './audio-fragments-lib.mjs';
+import { CORPUS_FILES, STUDY_FILE, buildCollections, blockDomainText, formatBSpoken } from './audio-fragments-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -92,7 +92,11 @@ const AUDIO_MANIFEST = manifestCtx.AUDIO_MANIFEST || {};
 const AUDIO_ALTERNATES = manifestCtx.AUDIO_ALTERNATES || {};
 
 const corpusCtx = {};
-for (const f of CORPUS_FILES) {
+// STUDY_FILE too: the Bible/Letter Studies are a Format-A collection keyed
+// study:<chapterId> (c48 manifest rows, BibleStudyChapterView over LetterView),
+// and until 2026-09-11 a study timeline read NO-SUCH-ITEM here because ITEMS
+// was built from the fourteen letter files alone.
+for (const f of [...CORPUS_FILES, STUDY_FILE]) {
   runInNewContext(readFileSync(resolve(DATA, f), 'utf8'), corpusCtx, { filename: f });
 }
 const { A: A_COLS, B: B_COLS, holyDays } = buildCollections(corpusCtx);
