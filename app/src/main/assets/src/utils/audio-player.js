@@ -519,7 +519,8 @@ function _ensureEl() {
       _syncMediaSessionPosition();
       _notify();
       // Durable resume: snapshot every ~5s of playback (and on the pause
-      // below). Cheap — ~300 bytes to localStorage.
+      // below, and on pagehide / hidden — _flushOnHide). Cheap — ~300 bytes
+      // to localStorage.
       if (sec - _lastPersistSec >= 5 || sec < _lastPersistSec) { _lastPersistSec = sec; _persist(); }
       _maybePrefetchNext();   // 1 Hz — re-arms the gentle warm after a hiccup
     }
@@ -1402,7 +1403,9 @@ function _persist() {
     const src = _pendingRestore || _source;
     let qi = _pendingRestore ? _pendingRestore.qi : _state.qi;
     let track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
-    let time = Math.floor(_state.time || 0);
+    // Exact to the millisecond (2026-09-11): it was floored, and a floor lost up
+    // to a second at the one moment the reader cannot tap through — the close.
+    let time = Math.round((_state.time || 0) * 1000) / 1000;
     /* THE SNAPSHOT MUST NOT NAME A RECORDING THE LISTENER HEARD TO ITS END, and
        until now only the OTHER writer refused to. `_rememberPosition` has this
        exact guard (`if (_finishedUrl && track.url === _finishedUrl) return;`) and
@@ -1498,7 +1501,7 @@ function _restoreFromSaved() {
       qi: Math.max(0, Math.floor(Number(s.qi) || 0)),
       key: typeof s.key === 'string' ? s.key : track.key,
       url: track.url,
-      time: Math.max(0, Math.floor(Number(s.time) || 0)),
+      time: Math.max(0, Number(s.time) || 0),
       queue: customQueue,
       startKey: typeof s.startKey === 'string' ? s.startKey : null,
       startIndex: Number.isInteger(s.startIndex) && s.startIndex >= 0 ? s.startIndex : null,
@@ -2457,7 +2460,43 @@ function _onBeforeUpdateReload() {
     sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, JSON.stringify({ url: track.url, time, at: Date.now() }));
   } catch (_e) { /* storage blocked — the periodic snapshot is what remains */ }
 }
-if (typeof window !== 'undefined') window.addEventListener('vot:before-update-reload', _onBeforeUpdateReload);
+
+/* ── the CLOSE with no reload event (2026-09-11, audio-clock-close-gap-1) ──
+   A closed tab is not an update: nothing fires vot:before-update-reload, and
+   what the next boot found was the periodic snapshot — up to ~5 s late (the
+   Verifier read the restored bar ~14 s behind after a browser close). pagehide
+   is the last event a document gets — tab close, navigation away, the Android
+   WebView's destroy — and the element is still live in it: write the snapshot
+   then, with the clock getPreciseTime() defines (the element from
+   HAVE_METADATA on, else the intent — never an unloaded element's 0).
+   visibilitychange → hidden is the phone's
+   background, where the audio keeps playing and the periodic writer keeps
+   running: one more point, so a kill soon after backgrounding loses less.
+   Only while PLAYING: a paused bar's clock is the pause's, already written;
+   re-reading a stopped element would let a stray value overwrite it. */
+function _flushOnHide() {
+  if (_state.status !== 'playing' || !_el) return;
+  _state.time = getPreciseTime();   // the one definition of the clock right now
+  _lastPersistSec = Math.floor(_state.time);
+  _persist();
+}
+/* One live player per window. A re-import (the test harness's vi.resetModules)
+   retires the previous instance's window listeners first, so a stale instance
+   cannot answer a later document's events — the same reason the play arbiter
+   is reachable as __votAudioArbiter. */
+if (typeof window !== 'undefined') {
+  const g = _g();
+  if (typeof g.__votAudioPlayerRetire === 'function') g.__votAudioPlayerRetire();
+  const onVisibility = () => { if (document.visibilityState === 'hidden') _flushOnHide(); };
+  window.addEventListener('vot:before-update-reload', _onBeforeUpdateReload);
+  window.addEventListener('pagehide', _flushOnHide);
+  document.addEventListener('visibilitychange', onVisibility);
+  g.__votAudioPlayerRetire = () => {
+    window.removeEventListener('vot:before-update-reload', _onBeforeUpdateReload);
+    window.removeEventListener('pagehide', _flushOnHide);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+}
 
 /** A play() the browser refused. NotAllowedError is the autoplay policy: the
  *  bar shows Play instead of a spinner, and if this was the update resume the
