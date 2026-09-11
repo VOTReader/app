@@ -49,6 +49,13 @@
  *                      the plain text is not also on the page;
  *   REFUSED, THEN TAP  one tap on that toast starts playback within 1/60 s of the flushed
  *                      clock and the toast goes.
+ *   REFUSED, RETRIED   (update-resume-activation-race-1, 2026-09-11) the boot play() is refused
+ *                      inside the activation race — the reloaded document's transient activation
+ *                      arrives ~90–175 ms after it starts — and the app's ONE retry ~300 ms later
+ *                      is allowed: PLAYING at the flushed clock, the plain toast, exactly one
+ *                      refusal and two play() attempts on the record (the Audio wrapper logs every
+ *                      play() with its answer). Playing with NO refusal on record under the phone
+ *                      policy is the policy flag not taking; a third attempt is a double start.
  * In both policies the restore's LANDING is exact and the same letter and text size come back.
  *
  * The recording is a 60 s WAV the harness synthesises and serves in place of every
@@ -240,6 +247,16 @@ try {
     const Wrapped = function (...args) {
       const el = new Orig(...args);
       for (const type of ['playing', 'seeked', 'pause']) el.addEventListener(type, () => { w.__e2eAudioEvents.push({ type, t: el.currentTime, at: Math.round(performance.now()) }); });
+      // Every play() the app asks for, with its answer: a refusal (NotAllowedError) is the
+      // activation race's signature, and "resumed by itself after ONE refusal" is a designed
+      // outcome that only this record can tell apart from "the policy flag did not take".
+      const origPlay = el.play;
+      el.play = function () {
+        const at = Math.round(performance.now()); const t = el.currentTime;
+        const p = origPlay.apply(this, arguments);
+        if (p && p.then) p.then(() => w.__e2eAudioEvents.push({ type: 'play-ok', t, at }), (e) => w.__e2eAudioEvents.push({ type: 'play-refused', t, at, err: e && e.name }));
+        return p;
+      };
       return el;
     };
     Wrapped.prototype = Orig.prototype;
@@ -567,12 +584,27 @@ try {
     if (recT === null) fail('B the clock record was not written on the reload event');
     else if (recT < B0.t - CLOCK_TOL_FRAME || recT > B0.t + elapsedMax) fail(`B the clock record carries ${recT} s, outside [${B0.t.toFixed(3)}, ${(B0.t + elapsedMax).toFixed(1)}] s — not the clock at the event`);
     let fp = firstPlaying(B1);
-    if (refused && (fp || B1.status === 'playing')) fail(`B playback started with no gesture under the user-gesture-required policy (${fmtEvents(B1.audioEvents)}) — the policy flag did not take`);
+    // Under the phone policy the boot play() is refused inside the activation race and the app
+    // retries ONCE ~300 ms later (update-resume-activation-race-1); playing after exactly one
+    // recorded refusal is "resumed by itself", a designed outcome. Playing with NO refusal on
+    // record is the policy flag not taking; more than two play() attempts is a double start.
+    const refusals = (B1.audioEvents || []).filter((e) => e.type === 'play-refused');
+    const attempts = (B1.audioEvents || []).filter((e) => e.type === 'play-ok' || e.type === 'play-refused');
+    if (refused && (fp || B1.status === 'playing')) {
+      if (!refusals.length) fail(`B playback started with no gesture and no refused play() under the user-gesture-required policy (${fmtEvents(B1.audioEvents)}) — the policy flag did not take`);
+      else if (refusals.length !== 1 || attempts.length !== 2) fail(`B ${refusals.length} refusal(s) and ${attempts.length} play() attempt(s) after the boot — want exactly one refusal and ONE retry (${fmtEvents(B1.audioEvents)})`);
+      else {
+        const ok = attempts.find((e) => e.type === 'play-ok');
+        const gap = ok ? ok.at - refusals[0].at : null;
+        if (gap !== null && gap < 250) fail(`B the retry was asked ${gap} ms after the refusal — inside the race it is meant to wait out (want >= ~300 ms)`);
+        else note(`B autoplay after the real update, phone policy: the boot play() was refused at +${refusals[0].at} ms (${refusals[0].err}) and the ONE retry was allowed at +${ok ? ok.at : '?'} ms — resumed by itself, ${gap} ms later (the activation race)`);
+      }
+    }
     if (!fp && B1.status !== 'playing') {
       // THE REFUSED SHAPE (the phone's): paused AT the flushed clock; the ONE toast reads
       // the listening offer, exactly; one tap resumes at that clock; the toast then goes.
       const LISTEN = 'VOTReader was just updated. Tap to continue listening.';
-      note(`B autoplay after the real update: refused (status ${B1.status}); toast ${JSON.stringify(B1.toast)}`);
+      note(`B autoplay after the real update: refused (status ${B1.status}; ${refusals.length} refused play() on record); toast ${JSON.stringify(B1.toast)}`);
       if (B1.storeT !== recT) fail(`B the player came back paused at ${B1.storeT} s, not at the ${recT} s the event wrote`);
       else note(`B the player came back paused at exactly the ${recT} s the event wrote`);
       if (B1.toast !== LISTEN) fail(`B the toast reads ${JSON.stringify(B1.toast)}, want exactly ${JSON.stringify(LISTEN)}`);
