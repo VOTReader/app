@@ -6826,8 +6826,15 @@
     .sw-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     .sw-btn.is-on, .sw-toggle.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); }
     .sw-btn-icon { padding: 0; }
-    .sw-zoom { display: inline-flex; gap: 4px; }
-    .sw-btn-zoom { width: 44px; padding: 0; font-family: var(--font-body); font-size: var(--fsc-18); letter-spacing: 0; }
+    /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back),
+       top-right beside the strip; the strip yields it 44 px + the 8 px gap. In
+       the hidden state it is a small quiet glyph — the border goes, the glyph
+       shrinks, the 44 px tap target does not. */
+    .sw-hide-all { position: absolute; z-index: 5; right: 14px; top: calc(var(--sw-chrome-top) + 7px); }
+    .sw-root:not(.sw-narrow) .sw-controls { right: calc(14px + 44px + 8px); }
+    .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-legend) { display: none; }
+    .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
+    .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
     .sw-seg { display: inline-flex; border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
     .sw-seg-btn {
       min-height: 44px; padding: 0 14px; background: transparent; border: 0;
@@ -6845,42 +6852,6 @@
       letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer;
     }
     .sw-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-
-    .sw-context {
-      position: absolute; z-index: 4; left: 14px;
-      top: calc(76px + max(env(safe-area-inset-top), var(--inset-top, 0px)));
-      display: grid; gap: 2px; min-width: 170px; max-width: min(300px, 40%);
-      padding: 9px 12px 10px; background: var(--bg3);
-      border-left: 2px solid var(--gold); border-top: 1px solid var(--border);
-      border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
-      border-radius: 0 var(--radius) var(--radius) 0; color: var(--cream-dim);
-      pointer-events: none;
-    }
-    .sw-context-eyebrow {
-      font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
-      letter-spacing: 0.16em; text-transform: uppercase;
-    }
-    .sw-context strong {
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-family: var(--font-cinzel); font-size: var(--fsc-18); font-weight: 600;
-      color: var(--gold-bright); letter-spacing: 0.02em;
-    }
-    .sw-context-range { min-height: 1em; font-size: var(--fsc-12); color: var(--cream-dim); }
-    .sw-context-zoom { font-size: var(--fsc-11); color: var(--cream-muted); letter-spacing: 0.05em; }
-
-    .sw-goto {
-      position: absolute; z-index: 8; right: 14px; top: 78px; width: min(360px, calc(100% - 28px));
-      padding: 12px; background: var(--bg3); border: 1px solid var(--gold-border);
-      border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0,0,0,0.28);
-    }
-    .sw-goto form { display: flex; gap: 7px; align-items: center; }
-    .sw-goto-input {
-      min-width: 0; flex: 1; min-height: 44px; padding: 0 12px; color: var(--cream-dim);
-      background: var(--bg); border: 1px solid var(--gold-border); border-radius: var(--radius);
-      font: var(--fs-15) var(--font-body);
-    }
-    .sw-goto-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-    .sw-goto-help { margin-top: 8px; color: var(--cream-muted); font-size: var(--fsc-11); }
 
     .sw-loading, .sw-fallback {
       position: absolute; inset: 0; z-index: 5;
@@ -6956,11 +6927,6 @@
     .sw-key-hist i:nth-child(1) { height: 4px; }
     .sw-key-hist i:nth-child(2) { height: 9px; }
     .sw-key-hist i:nth-child(3) { height: 6px; }
-    .sw-key-t0 { background: #d0a838; } .sw-key-t1 { background: #f48fb1; } .sw-key-t2 { background: #6cb4dc; }
-    .sw-key-g0 { background: #d0a838; } .sw-key-g1 { background: #da833c; } .sw-key-g2 { background: #e7c45c; }
-    .sw-key-g3 { background: #ef6d67; } .sw-key-g4 { background: #f48fb1; } .sw-key-g5 { background: #7bcba3; }
-    .sw-key-g6 { background: #66bfd8; } .sw-key-g7 { background: #6c98e0; } .sw-key-g8 { background: #a480e2; }
-    .sw-key-g9 { background: #cd67cf; }
 
     /* NO POSITION AND NO OFFSET: the CC-BY line is the control strip's last
        row. It used to be absolutely placed with a `bottom` that had to be kept
@@ -7068,7 +7034,6 @@
     .sw-root.sw-rotated .sw-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-select { padding-left: 10px; padding-right: 20px; }
-    .sw-root.sw-rotated .sw-context { max-width: 300px; }
     /* The rotated root is `width: 100vh; height: 100vw` (the CSS rotation
        swaps the axes), so a panel capped in vh against the PHYSICAL
        viewport overflows before touch-action ever gets a chance to help —
