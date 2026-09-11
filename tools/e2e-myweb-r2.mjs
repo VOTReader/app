@@ -388,8 +388,10 @@ async function armR(page, tag, fname, c, r0) {
   const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
   note(`${tag} R: Matthew corridor (ui canvas) mean luminance: rest ${rest0} -> ${shots.length} frames over ${shots[shots.length - 1].t} ms (mean cadence ${cadence} ms): first sample ${first.lum} at t+${first.t} (cap ${first.cf}), live ${live.length} frames${lastLive ? ` (.. ${lastLive.lum} at t+${lastLive.t})` : ''}, fading ${fading.length} frames, full from t+${firstFull ? firstFull.t : '-'} (${firstFull ? firstFull.lum : '-'}); largest step between samples ${maxStep.toFixed(2)}/255, largest per-16.7 ms step ${maxRate.toFixed(2)}/255 (sample ${at}, t+${shots[at] ? shots[at].t : '-'} ms, cap ${shots[at] ? shots[at].cf : '-'}); rest again ${restEnd}`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R.json`), JSON.stringify({ rest0, restEnd, shots }, null, 1));
-  const dip = (firstFull ? firstFull.lum : rest0) - first.lum;
-  if (!(first.cf < 1)) fails.push(`${tag} R: the first sample after the notch was already at the full cap (cap ${first.cf} at t+${first.t} ms): the hold was not seen`);
+  const dip = (firstFull ? firstFull.lum : rest0) - (live.length ? live[0].lum : first.lum);
+  // the sampler's first frame can precede the app's first live draw (t+5 ms),
+  // so the hold is judged by any live or fading frame seen, not the first
+  if (!live.length && !fading.length) fails.push(`${tag} R: no live or fading frame was sampled after the notch (first cap ${first.cf} at t+${first.t} ms, cadence ${cadence} ms): the hold and the fade were not seen`);
   if (!firstFull) fails.push(`${tag} R: the cap did not come back to full within 700 ms`);
   if (!(maxRate <= Math.max(1.0, dip * 0.35))) fails.push(`${tag} R: a per-16.7 ms step of ${maxRate.toFixed(2)}/255 is more than a third of the live dip (${dip.toFixed(2)}): a pop`);
   if (fading.length < 3) note(`${tag} R: the fade was not resolved by this run's cadence (${fading.length} fading samples); the ease is asserted per 16.7 ms above, not by count`);
