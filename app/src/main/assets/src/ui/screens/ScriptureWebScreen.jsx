@@ -132,69 +132,32 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [noWebGL, setNoWebGL] = React.useState(false);
   const [glRetry, setGlRetry] = React.useState(0);
   const [dataRetry, setDataRetry] = React.useState(0);
-  // A canon needs its width. On a phone held upright the screen is CSS-rotated
-  // into landscape — no Android orientation flip, the page just lays itself
-  // out sideways (owner call). Pointer coords are mapped back through loc().
+  // A canon needs its width. The Scripture Web presents in LANDSCAPE, always
+  // (owner call, 2026-09-10: "landscape by default, no rotate option"). Where
+  // the platform will flip the display, screen.orientation.lock('landscape')
+  // does it; where that is refused, absent, or resolves without flipping, the
+  // root is CSS-rotated 90° in ANY portrait viewport — chrome included — so
+  // the reader turns the phone and sees landscape either way. No hint, no
+  // control, no preference, no pointer-type gate. Pointer coords are mapped
+  // back through loc(). A real flip arrives as a resize, and the resize
+  // handler un-rotates by itself; there is nothing to settle.
   const [rotated, setRotated] = React.useState(
-    typeof window !== 'undefined' && window.innerHeight > window.innerWidth &&
-    window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  // Physical aspect ratio only — NOT gated on touch or on whether the CSS
-  // rotation applied. showPortraitFallback clears `rotated` in the same
-  // callback that raises the hint, so the hint's render gate must key off
-  // this instead or it can never show (scripture-web-6).
-  const [isPortrait, setIsPortrait] = React.useState(
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
   React.useEffect(() => {
-    const onResize = () => {
-      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      setRotated(window.innerHeight > window.innerWidth && coarse);
-      setIsPortrait(window.innerHeight > window.innerWidth);
-    };
+    const onResize = () => setRotated(window.innerHeight > window.innerWidth);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const rotatedRef = React.useRef(rotated);
-  const [orientationHint, setOrientationHint] = React.useState(false);
-  const showPortraitFallback = React.useCallback(() => {
-    setRotated(false);
-    setOrientationHint(true);
-  }, []);
-  const settleLandscapeRequest = React.useCallback(() => {
-    // Some desktop WebViews resolve orientation.lock() without changing the
-    // viewport. Do not leave the instrument sideways in that case.
-    window.setTimeout(() => {
-      if (window.innerHeight > window.innerWidth) showPortraitFallback();
-      else setOrientationHint(false);
-    }, 300);
-  }, [showPortraitFallback]);
-  const requestLandscape = React.useCallback(() => {
-    const orientation = typeof screen !== 'undefined' && screen.orientation;
-    if (!orientation || typeof orientation.lock !== 'function') {
-      showPortraitFallback();
-      return;
-    }
-    Promise.resolve(orientation.lock('landscape')).then(() => {
-      settleLandscapeRequest();
-    }).catch(showPortraitFallback);
-  }, [settleLandscapeRequest, showPortraitFallback]);
   React.useEffect(() => {
-    if (!rotated) {
-      if (!(typeof window !== 'undefined' && window.innerHeight > window.innerWidth)) {
-        setOrientationHint(false);
-      }
-      return undefined;
-    }
-    const coarse = typeof window !== 'undefined' && window.matchMedia &&
-      window.matchMedia('(pointer: coarse)').matches;
-    if (!coarse) return undefined;
+    if (!rotated) return undefined;
     const orientation = typeof screen !== 'undefined' && screen.orientation;
-    if (orientation && typeof orientation.lock === 'function') {
-      Promise.resolve(orientation.lock('landscape')).then(() => {
-        settleLandscapeRequest();
-      }).catch(showPortraitFallback);
-    } else showPortraitFallback();
+    if (!orientation || typeof orientation.lock !== 'function') return undefined;
+    // A refusal is not an error here: the CSS rotation already covers it.
+    // lock() can reject OR throw synchronously depending on the browser.
+    try { Promise.resolve(orientation.lock('landscape')).catch(() => {}); } catch (_e) { /* covered */ }
     return undefined;
-  }, [rotated, settleLandscapeRequest, showPortraitFallback]);
+  }, [rotated]);
 
   /** Viewport coords -> the rotated screen's own CSS space. */
   const loc = React.useCallback((e) => (rotatedRef.current
@@ -250,41 +213,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
   const ctxBoxRef = React.useRef(null);
-  /* The orientation note's top, measured off the topbar's own box. Null until
-     the first measurement, which is exactly when the CSS floor applies — and
-     the floor is the SMALLEST box the topbar can have, so the note is already
-     clear of it in that window. The observer exists for the case the floor
-     cannot cover: a topbar that has GROWN, from a wrapped title or a hint line
-     (measured: 62 px tall becomes 89 px once flashHint() adds its line).
-
-     `rotated` IS IN THE DEPS BECAUSE A RESIZE OBSERVER WATCHES SIZE AND THIS
-     IS A POSITION. Measured on the first draft, which observed only on mount:
-     at 426x952 the screen is still CSS-rotated when this effect first runs, the
-     topbar's VIEWPORT box is then the rotated one, and the note was placed at
-     299 px instead of 82 — while `.sw-narrow` at 320x640, which never rotates,
-     read 82. An ancestor's transform changes no element's content box, so the
-     observer never fired again and the wrong value stuck, differing between two
-     text scales on the same frame: a flaky instrument, which is worse than a
-     constant. Re-measuring when the rotation clears closes it, and the stale
-     direction was safe anyway — a rotated bar's box is TALLER, so the note was
-     too low rather than over the Back button. */
-  const [noteTop, setNoteTop] = React.useState(/** @type {string|null} */ (null));
-  React.useEffect(() => {
-    /* EVERYTHING ABOVE IT, not only the topbar. Placing the note at the
-       topbar's bottom + 10 put it at y 82, squarely on `.sw-context` at
-       y 76..159 — the first version of this fix traded a card over the Back
-       button for a card over the location readout. Caught by the gate on its
-       own fix, in one run, which is the only reason it is not shipping. */
-    const above = [topbarRef.current, ctxBoxRef.current].filter(Boolean);
-    if (!above.length || typeof ResizeObserver !== 'function') return undefined;
-    const measure = () => setNoteTop(
-      Math.round(above.reduce((m, el) => Math.max(m, el.getBoundingClientRect().bottom), 0) + 10) + 'px'
-    );
-    measure();
-    const ro = new ResizeObserver(measure);
-    above.forEach((el) => ro.observe(el));
-    return () => ro.disconnect();
-  }, [rotated, orientationHint]);
   const contextRef = React.useRef(null);
   const rangeRef = React.useRef(null);
   const zoomRef = React.useRef(null);
@@ -324,7 +252,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(true);
     return () => {
       if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(false);
-      // The mount effect above may have locked landscape (requestLandscape);
+      // The rotation effect above may have locked landscape;
       // leaving without unlocking strands every OTHER screen rotated (F27).
       // No orientation API, and unlock() rejecting/throwing when nothing was
       // locked, are both normal — swallow either.
@@ -1121,14 +1049,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         Select a line to see its references; Nearby opens a keyboard-friendly list.
       </div>
     </div>
-    {orientationHint && isPortrait && (
-      <div className="sw-orientation-note" role="status"
-        style={noteTop ? { top: noteTop } : undefined}>
-        <strong>Best in landscape</strong>
-        <span>Turn your device sideways to read the full canon clearly.</span>
-        <button type="button" className="sw-btn" onClick={requestLandscape}>Try landscape</button>
-      </div>
-    )}
     </React.Fragment>
   );
 }

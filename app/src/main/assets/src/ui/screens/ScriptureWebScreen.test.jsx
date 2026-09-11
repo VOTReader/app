@@ -379,22 +379,49 @@ describe('scripture-web-5 — Try again re-decodes the graph', () => {
   });
 });
 
-describe('scripture-web-6 — the landscape hint gates on portrait-ness, not on `rotated`', () => {
-  it('shows "Best in landscape" after a rejected lock, even though rotated is cleared', async () => {
-    // Portrait + a coarse (touch) pointer: rotated starts true, the mount
-    // effect attempts screen.orientation.lock('landscape').
+describe('landscape, always — a portrait viewport is rotated, and nothing asks the reader to turn', () => {
+  /* This block used to be scripture-web-6, which asserted that a rejected
+     lock produced a "Best in landscape" note and an UN-rotated root. That is
+     the behaviour the owner asked to be removed (2026-09-10: "landscape by
+     default, no rotate option"), so the case is inverted rather than deleted:
+     the two assertions below are the unit form of the RED for this change --
+     the root stays rotated, and no note exists to paint. */
+  it('stays rotated after a rejected lock, and renders no orientation note', async () => {
     setViewport(400, 800);
     vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
-    // The Android WebView rejects lock() (locking requires fullscreen) —
-    // the exact scenario the finding names.
+    // The Android WebView rejects lock() outside fullscreen. That refusal used
+    // to un-rotate the screen and raise a hint; now it changes nothing.
     window.screen.orientation = { lock: () => Promise.reject(new Error('locking requires fullscreen')) };
 
-    render(<ScriptureWebScreen {...baseProps()} />);
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-    // showPortraitFallback ran: orientationHint is true, but it also cleared
-    // rotated — the render gate `orientationHint && rotated` can never pass.
-    expect(screen.getByText('Best in landscape')).toBeTruthy();
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeTruthy();
+    expect(screen.queryByText('Best in landscape')).toBeNull();
+    expect(document.querySelector('.sw-orientation-note')).toBeNull();
+  });
+
+  it('rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone', async () => {
+    /* The old code rotated only when `(pointer: coarse)` matched, so a
+       portrait viewport on a mouse-driven device showed the note instead. The
+       owner's rule has no pointer clause: any portrait viewport rotates. */
+    setViewport(400, 800);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })));
+    window.screen.orientation = { lock: () => Promise.reject(new Error('not supported')) };
+
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeTruthy();
+  });
+
+  it('does NOT rotate a landscape viewport — the control for the two above', async () => {
+    setViewport(800, 400);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(container.querySelector('.sw-root')).toBeTruthy();
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeNull();
   });
 });
 
