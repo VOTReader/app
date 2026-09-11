@@ -15,6 +15,12 @@ import { dirname, resolve } from 'node:path';
 
 const SW_VERSION = { value: null };
 const APK_VERSION = { value: null };
+/* The bridge is a MODULE export (utils/platform-bridge.js), never a global: the
+   app has no window.PlatformBridge, so a module that read one would take the web
+   arm on every Android boot and never show the toast there. The getter reads the
+   holder at call time, the same lazy shape as SW_VERSION above (vi.mock hoists). */
+const BRIDGE = { isAndroid: false };
+vi.mock('./platform-bridge.js', () => ({ PlatformBridge: { get isAndroid() { return BRIDGE.isAndroid; } } }));
 vi.mock('./build-version.js', () => ({
   getBuildVersion: vi.fn(async () => SW_VERSION.value),
   fetchServerBuildVersion: vi.fn(async () => APK_VERSION.value),
@@ -35,12 +41,12 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     localStorage.clear();
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     APK_VERSION.value = null;
-    vi.stubGlobal('PlatformBridge', { isAndroid: false });
+    BRIDGE.isAndroid = false;
     vi.mocked(showToast).mockClear();
     const stale = document.getElementById(UPDATED_TOAST_ID);
     if (stale) stale.remove();
   });
-  afterEach(() => { vi.unstubAllGlobals(); });
+  afterEach(() => { BRIDGE.isAndroid = false; });
 
   it('a stored OLDER build shows the toast once and stores the new build', async () => {
     localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
@@ -77,7 +83,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
   });
 
   it('Android: no service worker, so the APK\'s own service-worker.js is the build', async () => {
-    vi.stubGlobal('PlatformBridge', { isAndroid: true });
+    BRIDGE.isAndroid = true;
     SW_VERSION.value = null;
     APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
