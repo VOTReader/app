@@ -50,9 +50,14 @@ class ShipCarriesForwardUnrunUnits(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         d = self.dir.name
-        self._saved = (bam.SYNC_JS, bam.HONE)
+        # EVERY path ship() writes is redirected, or the test rewrites the repo:
+        # the first cut of the provenance sidecar left PROVENANCE pointing at
+        # tools/audio-sync-provenance.json, and pre-commit's run of this suite
+        # replaced the committed 729-key sidecar with these four keys.
+        self._saved = (bam.SYNC_JS, bam.HONE, bam.PROVENANCE)
         bam.SYNC_JS = os.path.join(d, "audio-sync.js")
         bam.HONE = os.path.join(d, "hone")
+        bam.PROVENANCE = os.path.join(d, "audio-sync-provenance.json")
         os.makedirs(bam.HONE)
         self.addCleanup(self.dir.cleanup)
         self.addCleanup(self._restore)
@@ -72,7 +77,7 @@ class ShipCarriesForwardUnrunUnits(unittest.TestCase):
         self._write_belt("two:excluded", [[3.5, 1, 0, 5, 0]])
 
     def _restore(self):
-        bam.SYNC_JS, bam.HONE = self._saved
+        bam.SYNC_JS, bam.HONE, bam.PROVENANCE = self._saved
 
     def _write_sync(self, sync):
         lines = ",\n".join(json.dumps(k) + ":" + json.dumps(v) for k, v in sorted(sync.items()))
@@ -115,6 +120,71 @@ class ShipCarriesForwardUnrunUnits(unittest.TestCase):
     def test_other_volumes_are_untouched(self):
         after = self._ship()
         self.assertEqual(after["one:untouched"], self.before["one:untouched"])
+
+
+class ShipRecordsWhichRecordingEachTimelineBelongsTo(unittest.TestCase):
+    """The provenance sidecar (tools/audio-sync-provenance.json).
+
+    AUDIO_SYNC is keyed by LETTER and aligned against one RECORDING; the
+    manifest can swap a letter's primary recording without touching
+    audio-sync.js (it did: one:and-he-shall-be-called-i-am played Benjamin's
+    voice under text-to-speech timings). The belts know which asset each part
+    was aligned against and are gitignored, so ship() writes that down where
+    check-audio-sync.js can compare it to the manifest on every commit.
+
+      belt present        -> its parts' asset ids, in part order
+      belt gone, seen     -> the previous sidecar's entry (carried forward)
+      belt gone, unseen   -> null, which the gate fails rather than guesses
+      key no longer shipped -> not in the sidecar at all              (control)
+    """
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        d = self.dir.name
+        self._saved = (bam.SYNC_JS, bam.HONE, bam.PROVENANCE)
+        bam.SYNC_JS = os.path.join(d, "audio-sync.js")
+        bam.HONE = os.path.join(d, "hone")
+        bam.PROVENANCE = os.path.join(d, "audio-sync-provenance.json")
+        os.makedirs(bam.HONE)
+        self.addCleanup(self.dir.cleanup)
+        self.addCleanup(self._restore)
+        with open(bam.SYNC_JS, "w", encoding="utf-8", newline="\n") as f:
+            f.write("var AUDIO_SYNC = {\n"
+                    + ",\n".join(json.dumps(k) + ":" + json.dumps([[1.0, 0, 0, 4, 0]]) for k in
+                                 ["one:belted", "one:two-parts", "one:carried", "one:unknown", "one:retired"])
+                    + "\n};\nvar AUDIO_SYNC_ALT = {\n\n};\n")
+        with open(bam.belt_path("one:belted"), "w", encoding="utf-8") as f:
+            json.dump({"tuples": [[1.0, 0, 0, 4, 0]], "parts": [{"part": 0, "asset": "A1"}]}, f)
+        with open(bam.belt_path("one:two-parts"), "w", encoding="utf-8") as f:
+            json.dump({"tuples": [[1.0, 0, 0, 4, 0], [2.0, 0, 0, 4, 1]],
+                       "parts": [{"part": 0, "asset": "P0"}, {"part": 1, "asset": "P1"}]}, f)
+        # A previous sidecar vouches for one belt-less key and not the other.
+        with open(bam.PROVENANCE, "w", encoding="utf-8") as f:
+            json.dump({"primary": {"one:carried": ["OLD"], "one:retired": ["GONE"]}}, f)
+
+    def _restore(self):
+        bam.SYNC_JS, bam.HONE, bam.PROVENANCE = self._saved
+
+    def _ship(self):
+        bam.ship({"one"}, [row("one:belted"), row("one:two-parts")], WANT,
+                 keys={"one:belted", "one:two-parts", "one:carried", "one:unknown"})
+        with open(bam.PROVENANCE, encoding="utf-8") as f:
+            return json.load(f)["primary"]
+
+    def test_a_belt_names_its_recording_per_part(self):
+        prov = self._ship()
+        self.assertEqual(prov["one:belted"], ["A1"])
+        self.assertEqual(prov["one:two-parts"], ["P0", "P1"])
+
+    def test_a_carried_forward_key_keeps_its_previous_entry(self):
+        self.assertEqual(self._ship()["one:carried"], ["OLD"])
+
+    def test_a_key_nothing_vouches_for_is_null_not_guessed(self):
+        prov = self._ship()
+        self.assertIn("one:unknown", prov)
+        self.assertIsNone(prov["one:unknown"])
+
+    def test_a_key_no_longer_shipped_leaves_the_sidecar(self):
+        self.assertNotIn("one:retired", self._ship())
 
 
 if __name__ == "__main__":
