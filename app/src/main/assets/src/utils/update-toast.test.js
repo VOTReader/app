@@ -31,7 +31,7 @@ vi.mock('./toast.js', async (importOriginal) => {
 });
 
 import { showToast } from './toast.js';
-import { announceUpdateIfAny, offerListeningResume, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
+import { announceUpdateIfAny, offerListeningResume, markUpdateReload, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATE_RELOAD_FLAG, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
 const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb', NEWER = 'v1.0.2-cccccccccc';
@@ -39,6 +39,7 @@ const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb', NEWER = 'v1.0.2-cccc
 describe('announceUpdateIfAny — one toast per new build, on any screen', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     APK_VERSION.value = null;
     BRIDGE.isAndroid = false;
@@ -66,6 +67,63 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     // Once: a second boot on the same build is silent.
     expect(await announceUpdateIfAny()).toBe('same');
     expect(showToast).toHaveBeenCalledTimes(1);
+  });
+
+  /* THE RELOAD FLAG (w-toast-reload-flag, 2026-09-11). The live 90 → 91 crossing: the reloaded
+     document read the OLD build in the key before any of its scripts ran and the NEW build
+     540 ms later with no write of its own — a sibling document of the origin had crossed first
+     and advanced the key — so it took 'same' and stayed silent. The key is a PROFILE fact; the
+     reload is a DOCUMENT fact: sw-register's doReload() sets a sessionStorage flag before
+     location.reload(), and the document that follows toasts on it, whatever the key says. */
+  it('a document reloaded for an update toasts on the flag even when a sibling already advanced the key', async () => {
+    control();
+    markUpdateReload();                                        // what doReload() does before location.reload()
+    expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG), 'the flag is written').not.toBeNull();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, NEW);           // the sibling got there first
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(document.getElementById(UPDATED_TOAST_ID).textContent).toBe(UPDATED_TOAST_TEXT);
+    expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG), 'consumed: the next document in this tab decides for itself').toBeNull();
+    expect(await announceUpdateIfAny(), 'control: the same document asked again has no flag and the key agrees').toBe('same');
+  });
+
+  it('reloaded for an update: the key follows when the build is known', async () => {
+    control();
+    markUpdateReload();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('reloaded for an update but the worker is silent: the toast still shows and the key is left alone — a null is not a value', async () => {
+    control();
+    SW_VERSION.value = null;
+    markUpdateReload();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(OLD);
+  });
+
+  it('the listening offer rides the flag path: one toast, carrying the tap', async () => {
+    control();
+    markUpdateReload();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, NEW);
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
+    expect(el.classList.contains('vot-toast-action')).toBe(true);
+    el.click();
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('a plain reload of the same build (no flag) shows nothing — the flag is set by doReload() alone', async () => {
+    control();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, NEW);
+    expect(await announceUpdateIfAny()).toBe('same');
+    expect(showToast).not.toHaveBeenCalled();
   });
 
   it('a stored EQUAL build shows nothing', async () => {
@@ -207,6 +265,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
 describe('offerListeningResume — the update toast carries the tap', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     vi.mocked(showToast).mockClear();
     _resetUpdateToast();

@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerServiceWorker } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { _resetToasts } from './toast.js';
+import { UPDATE_RELOAD_FLAG } from './update-toast.js';
 
 describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
   let controllerChangeHandler;
@@ -147,6 +148,84 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     setVisibility('visible');
     registerServiceWorker();
     expect(spy).toHaveBeenCalledWith('./service-worker.js', { updateViaCache: 'none' });
+  });
+});
+
+/* THE RELOAD FLAG AND THE EARLY CLAIM (w-toast-reload-flag, 2026-09-11). doReload() writes a
+   sessionStorage flag before location.reload() so the document that follows knows it was
+   reloaded for an update (update-toast.js toasts on it). And a takeover that happened BEFORE
+   this listener existed — the controller at registration is not the one captured inline at
+   document start (index.html) — reloads through the same door: that page runs the OLD build
+   under the NEW worker, and the controllerchange that announced it had nobody to hear it. */
+describe('registerServiceWorker — the update-reload flag and the early claim', () => {
+  let controllerChangeHandler, reloadSpy, flagAtReload;
+  let origSW, origLocation;
+  const A = { scriptURL: 'sw.js#A' }, B = { scriptURL: 'sw.js#B' };
+  const stub = (controller) => {
+    const swMock = {
+      controller,
+      addEventListener: (type, cb) => { if (type === 'controllerchange') controllerChangeHandler = cb; },
+      register: () => Promise.resolve({ waiting: null, installing: null, addEventListener: () => {}, update: () => {} }),
+    };
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: swMock });
+  };
+  beforeEach(() => {
+    controllerChangeHandler = null; flagAtReload = 'unread';
+    reloadSpy = vi.fn(() => { flagAtReload = sessionStorage.getItem(UPDATE_RELOAD_FLAG); });
+    delete window.__votSwTookOver; delete window.__votController0;
+    sessionStorage.clear();
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: reloadSpy } });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW); else delete navigator.serviceWorker;
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+    delete window.__votSwTookOver; delete window.__votController0;
+    sessionStorage.clear();
+  });
+
+  it('doReload() writes the flag BEFORE location.reload(), beside the restore record', () => {
+    stub(A); window.__votController0 = A;
+    let flagAtRecord = 'unread';
+    window.addEventListener('vot:before-update-reload', () => { flagAtRecord = sessionStorage.getItem(UPDATE_RELOAD_FLAG); }, { once: true });
+    registerServiceWorker();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    controllerChangeHandler();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    expect(flagAtReload, 'set when reload() is called').toBe('1');
+    expect(flagAtRecord, 'already set when the restore record is written').toBe('1');
+  });
+
+  it('EARLY CLAIM: the controller at registration is not the one captured at document start → reload through doReload(), once, with the flag', () => {
+    window.__votController0 = A;                       // index.html, before any bundle
+    stub(B);                                           // B claimed while the bundles were still parsing
+    registerServiceWorker();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    expect(flagAtReload).toBe('1');
+    expect(window.__votSwTookOver).toBe(true);
+    if (controllerChangeHandler) controllerChangeHandler();   // a later event must not reload twice
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('the same worker since document start: no reload (the anti-loop control — every plain boot reads EQUAL)', () => {
+    window.__votController0 = A; stub(A);
+    registerServiceWorker();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG)).toBeNull();
+  });
+
+  it('no worker at document start, one at registration (a first visit whose install claimed before registration): no reload', () => {
+    window.__votController0 = null; stub(A);
+    registerServiceWorker();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('no capture at all (a document without the inline script): no reload', () => {
+    stub(A);
+    registerServiceWorker();
+    expect(reloadSpy).not.toHaveBeenCalled();
   });
 });
 
