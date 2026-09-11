@@ -461,7 +461,7 @@
       if (!root) return false;
       const canvases = document.querySelectorAll('.sw-canvas').length === 2;
       const body = document.body.textContent || '';
-      const counted = /(^|\s)[\d,]+\sconnections/.test(body) || /links you have made/.test(body);
+      const counted = /[\d,]+\sconnections/.test(body) || /links you have made/.test(body);
       const fellBack = !!document.querySelector('.sw-fallback');
       return canvases && (counted || fellBack);
     });

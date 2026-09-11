@@ -329,7 +329,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     ];
     three.chapters = [[0, 1, START, SPAN], [1, 1, START + SPAN, SPAN], [2, 1, START + 2 * SPAN, SPAN]];
     three.total = CANON;
-    vi.mocked(decodeGraph).mockReturnValueOnce(three);
+    vi.mocked(decodeGraph).mockReturnValueOnce(/** @type {any} */ (three));
     await mount();
     for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'LEV'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
