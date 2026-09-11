@@ -67,17 +67,22 @@ describe('My Web r2 — G1 full resolution', () => {
     expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(5);
     expect(/** @type {any} */ (RR).CONTEXT_SCALE).toBeUndefined();
   });
-  it('batches threads by colour bin and corridor layer: a corridor keeps a stroke per thread, a fan shares one', () => {
+  it('batches threads by colour bin and layer: near-coincident threads keep a stroke each, a fan shares one', () => {
     // The 5080 read 8.3 ms a frame with a stroke per thread and 4.2 with one
     // path. Ink must still accumulate where threads run along each other
-    // (near-adjacent verses to the same passage), so those get their own
-    // layers; threads from those verses to different passages share a path.
+    // (both ends within a few stroke widths on screen: adjacent verses to
+    // the same passage, or to passages that sit together at this zoom), so
+    // those get their own layers; a fan from those verses shares a path.
     const base = { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) };
     const ctx0 = fakeCtx(); drawPersonalWeb(ctx0, null, base, opts);
-    const corridor = { count: 3, versePos: new Float32Array([50, 50.2, 50.4]), votPos: new Float32Array([20, 20, 20]) };
+    // verseX is 10 px a verse here, the stroke 0.8 px: verses 0.1 apart are one line
+    const corridor = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([20, 20, 20]) };
     const c1 = fakeCtx(); drawPersonalWeb(c1, null, corridor, opts);
     expect(c1.calls.stroke - ctx0.calls.stroke).toBe(3);
-    const fan = { count: 3, versePos: new Float32Array([50, 50.2, 50.4]), votPos: new Float32Array([10, 20, 40]) };
+    const neighbours = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([20, 20.02, 20.04]) };
+    const c3 = fakeCtx(); drawPersonalWeb(c3, null, neighbours, opts);
+    expect(c3.calls.stroke - ctx0.calls.stroke).toBe(3);
+    const fan = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([10, 20, 40]) };
     const c2 = fakeCtx(); drawPersonalWeb(c2, null, fan, opts);
     expect(c2.calls.stroke - ctx0.calls.stroke).toBe(1);
   });
