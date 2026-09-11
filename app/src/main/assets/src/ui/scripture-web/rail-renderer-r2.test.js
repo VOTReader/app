@@ -82,7 +82,9 @@ describe('My Web r2 — G1 full resolution', () => {
     const neighbours = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([20, 20.02, 20.04]) };
     const c3 = fakeCtx(); drawPersonalWeb(c3, null, neighbours, opts);
     expect(c3.calls.stroke - ctx0.calls.stroke).toBe(3);
-    const fan = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([10, 20, 40]) };
+    // a fan from the same verses shares a root, so it layers too; threads of one
+    // bin apart at BOTH ends (4 px here, the stroke 0.8) share a path
+    const fan = { count: 3, versePos: new Float32Array([50, 50.4, 50.8]), votPos: new Float32Array([10, 20, 40]) };
     const c2 = fakeCtx(); drawPersonalWeb(c2, null, fan, opts);
     expect(c2.calls.stroke - ctx0.calls.stroke).toBe(1);
   });

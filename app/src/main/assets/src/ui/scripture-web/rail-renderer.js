@@ -262,12 +262,13 @@ export function threadPath(a, b, crossRail, o) {
  * overlap (a corridor of forty citations reads darker than one; R1), and
  * overlapping segments of ONE path are painted once, so a thread cannot share
  * a path with a thread it runs along. Two threads run along each other when
- * BOTH their endpoints sit within a few stroke widths on screen (at 1x, forty
- * Matthew notes to the letters of one Volume are one line); so within a
- * colour bin the threads are sorted by their Bible end and each takes the
- * lowest layer no near-coincident thread (both ends within `near` device px)
- * already holds. Corridor members get their own layers; threads that merely
- * cross share one, and lose accumulation only where they cross. The 5080
+ * EITHER end sits within a few stroke widths of the other's on screen: at 1x
+ * forty Matthew notes to one letter converge on it and overlap for half their
+ * length whatever verses they leave from. So within a colour bin the threads
+ * are sorted by their Bible end and each takes the lowest layer no such
+ * neighbour (either end within `near` device px) already holds. Corridor
+ * members get their own layers; threads that merely cross share one, and
+ * lose accumulation only at the crossing. The 5080
  * read 8.3 ms a frame with a stroke per thread (2,100 strokeStyle changes
  * and stroke() calls) and 4.2 with one path: the batches bring the count to
  * the number of (bin, layer) pairs in view.
@@ -312,10 +313,14 @@ class ContextBatches {
     // 10x needs 21, 0.45 needs 9; past the cap threads share and nothing shows.
     const cap = Math.max(1, Math.ceil(Math.log(1 / 255) / Math.log(1 - Math.min(0.99, Math.max(0.001, alpha)))));
     const held = new Int32Array(cap + 1);   // stamp = i + 1 when a neighbour holds that layer
+    let binStart = 0;
     for (let i = 0; i < th.length; i++) {
       const e = th[i];
-      for (let j = i - 1; j >= 0 && th[j].bin === e.bin && e.bx - th[j].bx <= near; j--) {
-        if (Math.abs(th[j].tx - e.tx) <= near) held[th[j].layer] = i + 1;
+      if (i > 0 && th[i - 1].bin !== e.bin) binStart = i;
+      // neighbours by the Bible end are adjacent in the sort; by the Volumes
+      // end they can be anywhere in the bin
+      for (let j = i - 1; j >= binStart; j--) {
+        if (e.bx - th[j].bx <= near || Math.abs(th[j].tx - e.tx) <= near) held[th[j].layer] = i + 1;
       }
       let layer = 0;
       while (layer < cap && held[layer] === i + 1) layer++;
