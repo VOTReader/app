@@ -41,6 +41,22 @@ describe('AudioPositionsStore — per-recording resume points', () => {
     expect(AudioPositionsStore.get().positions[url(1)].at).toBe(Date.now());
   });
 
+  it('a write with an UNKNOWN duration (0) keeps the remembered one — a 0 must not impersonate a length', () => {
+    /* The player writes a position before the element has metadata: since the refused update
+       resume records the seek's intent as the clock (audio-player _seekOnMetadata), a
+       _persist() in that window arrives here as (t = 41.37, d = 0). Storing that 0 over a known
+       3600 blanks the library row's "59:18 left" until the next real tick — and for good, if the
+       app is closed before the tap. 0 means "never known" (the typedef says so); it is not a
+       length, so it cannot replace one. A first write with no duration still stores 0. */
+    AudioPositionsStore.setPosition(track(1), 300, 3600);
+    AudioPositionsStore.setPosition(track(1), 41.37, 0);
+    expect(AudioPositionsStore.getPosition(url(1)), 'the clock moves, the length stays').toEqual({ t: 41.4, d: 3600 });
+    AudioPositionsStore.setPosition(track(2), 90, 0);
+    expect(AudioPositionsStore.getPosition(url(2)), 'nothing known before: 0 is the honest length').toEqual({ t: 90, d: 0 });
+    AudioPositionsStore.setPosition(track(1), 50, 3601);
+    expect(AudioPositionsStore.getPosition(url(1)), 'a known length still replaces the old one').toEqual({ t: 50, d: 3601 });
+  });
+
   it('never accepts a URL outside the release-asset boundary', () => {
     AudioPositionsStore.setPosition({ url: 'https://example.test/untrusted.mp3' }, 90, 600);
     AudioPositionsStore.setPosition('javascript:alert(1)', 90, 600);
