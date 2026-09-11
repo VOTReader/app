@@ -330,6 +330,48 @@ describe('useScrollMemory — content anchor (reflow-proof restore)', () => {
     expect(saved.anchorKey).toBe('v2');     // nearest verse, not the note at the exact top
     expect(saved.anchorOff).toBe(-30);      // v2 starts 30px below the viewport top
   });
+
+  /* restore-anchor-top-of-letter-1 (2026-09-11). A record captured at the TOP of a letter
+     still carries an anchor: the FIRST paragraph, with a large NEGATIVE offset that bakes
+     in everything above it (hero, meta). The header's height at boot is not its height
+     at capture (the title's web font swaps in; a pill row mounts), and anchorTop(boot) +
+     anchorOff(saved) then lands the reader that difference DOWN a page they left at the
+     top — 99 px in a Verifier rehearsal arm. Above the first content element the pixel y
+     describes the place exactly; the anchor is for positions INSIDE the content. */
+  it('a record saved at the TOP (first paragraph, negative offset) comes back at 0 when the header is taller at boot', () => {
+    stubContainerRect(0);
+    addAnchor('p1', 699);   // the first paragraph sits 99 px lower than when the record was saved
+    tab.scrollPositions['letter-beta'] = { y: 0, pct: 0, anchorKey: 'p1', anchorOff: -600 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(0);   // pre-fix: 699 - 600 = 99
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(0);   // and the one-frame re-apply agrees
+  });
+
+  it('a record saved a few px into the header keeps its pixel y, not the anchor arithmetic', () => {
+    stubContainerRect(0);
+    addAnchor('p1', 699);
+    tab.scrollPositions['letter-beta'] = { y: 10, pct: 0, anchorKey: 'p1', anchorOff: -590 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(10);   // pre-fix: 699 - 590 = 109
+  });
+
+  it('control: a negative offset on a LATER element is a gap between paragraphs — the anchor still wins', () => {
+    // Green before and after: it bounds the fix. A rule of "any negative offset → pixel y"
+    // would restore the stale 1988 here instead of following the reflowed paragraph.
+    stubContainerRect(0);
+    addAnchor('p1', 100);
+    addAnchor('p5', 2300);   // reflowed: it sat at 2000 when the record was saved
+    tab.scrollPositions['letter-beta'] = { y: 1988, pct: 0.9, anchorKey: 'p5', anchorOff: -12 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(2288);
+  });
 });
 
 describe('useScrollMemory — journal viewer/editor keys are PER-ENTRY', () => {
