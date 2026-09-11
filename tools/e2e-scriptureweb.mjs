@@ -40,9 +40,13 @@
  *   root and every word on it is chrome. Replaced, not skipped, by the two
  *   properties that carry the same meaning here, both reported with their
  *   numbers whichever way they land:
- *     2a  no two persistent chrome blocks overlap each other
- *     2b  every control is HIT-TESTABLE at its own centre (elementFromPoint,
- *         because a bounding box cannot see what is painted on top of it)
+ *     2a  no two persistent chrome blocks overlap each other, EXCEPT where one
+ *         contains the other — a parent holding its child is not a block
+ *         covering a block, and treating it as one fires on the shape of the
+ *         CC-BY fix rather than on a defect
+ *     2b  every control AND the CC-BY line is HIT-TESTABLE at its own centre
+ *         (elementFromPoint, because a bounding box cannot see what is painted
+ *         on top of it, and "present but painted over" is a licence problem)
  *     2c  nothing spills the viewport horizontally
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
@@ -338,7 +342,7 @@ function armChrome(tag, geo) {
     fail(`2a ${o.a} overlaps ${o.b} by ${o.w}x${o.h} px at (${o.x}, ${o.y})`);
   }
   for (const c of geo.covered) {
-    fail(`2b the control ${JSON.stringify(c.label)} (${c.sel}) is covered at its own centre (${c.x}, ${c.y}) by ${c.by} — a bounding box cannot see this`);
+    fail(`2b ${JSON.stringify(c.label)} (${c.sel}) is covered at its own centre (${c.x}, ${c.y}) by ${c.by} — a bounding box cannot see this`);
   }
   if (geo.overflowX > 1) fail(`2c the page scrolls ${geo.overflowX} px horizontally (scrollWidth ${geo.scrollWidth} > innerWidth ${geo.innerWidth})`);
   for (const s of geo.offscreen) {
@@ -352,11 +356,19 @@ const readGeometry = (chromeSel) => {
   const R = (el) => { const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
   const vis = (el) => { const b = el.getBoundingClientRect(); const cs = getComputedStyle(el); return b.width > 0 && b.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.01; };
   const blocks = chromeSel.map((sel) => ({ sel, el: document.querySelector(sel) }))
-    .filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, rect: R(o.el) }));
+    .filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, el: o.el, rect: R(o.el) }));
 
+  /* A PARENT CONTAINING ITS CHILD IS NOT ONE BLOCK COVERING ANOTHER, and the
+     first draft of 2a could not tell them apart. When the CC-BY credit moved
+     INTO the control strip — which is the fix for it being behind the strip —
+     the credit's rect became a subset of the strip's by construction, and 2a
+     reported a 286x11 "overlap" at every frame, permanently. A check that fires
+     on the shape of the fix is worse than no check: whether a nested line is
+     readable is a HIT TEST, and it gets one below. */
   const overlaps = [];
   for (let i = 0; i < blocks.length; i++) {
     for (let j = i + 1; j < blocks.length; j++) {
+      if (blocks[i].el.contains(blocks[j].el) || blocks[j].el.contains(blocks[i].el)) continue;
       const a = blocks[i].rect; const b = blocks[j].rect;
       const w = Math.min(a.r, b.r) - Math.max(a.x, b.x);
       const h = Math.min(a.b, b.b) - Math.max(a.y, b.y);
@@ -366,7 +378,11 @@ const readGeometry = (chromeSel) => {
     }
   }
 
-  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select')].filter(vis);
+  /* `.sw-credit` is in here with the buttons because the property is the same
+     one: can the reader actually SEE this, which a rectangle cannot answer. It
+     is the CC-BY attribution, so "present but painted over" is a licence
+     problem and not a cosmetic one. */
+  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit')].filter(vis);
   const covered = [];
   const offscreen = [];
   for (const el of controls) {
