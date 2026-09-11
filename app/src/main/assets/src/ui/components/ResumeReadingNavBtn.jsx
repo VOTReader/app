@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ResumeReadingNavBtn — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   The pulsing "resume reading" gold dot, rendered INSIDE the top nav bar
+   The pulsing "continue reading" gold bookmark ribbon (a bare dot until
+   2026-09-10 — Corbin: "Change the icon for the reading resume dot to
+   something that makes more sense"), rendered INSIDE the top nav bar
    (ScreenLayout mounts it just left of the Tabs button). It used to be an
    App-level position:fixed button floating over the top-right of index
    screens — that drew over content AND had to be visibility-hidden on the
@@ -48,10 +50,15 @@ export function ResumeReadingNavBtn() {
     <button
       className="reading-dot-nav"
       onClick={onGo}
-      title="Resume reading"
-      aria-label="Resume reading"
+      title="Continue reading"
+      aria-label="Continue reading"
     >
-      <span className="rdg-inner" />
+      {/* A bookmark ribbon: the shape of a place kept. Inline, so it takes the
+          gold token through currentColor and needs no asset. */}
+      <svg className="rdg-glyph" viewBox="0 0 24 24" width="14" height="16" aria-hidden="true"
+        fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round">
+        <path d="M6 3h12v18l-6-4.5L6 21z" />
+      </svg>
     </button>
   );
 }
