@@ -83,12 +83,21 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
       setVisibility('visible');
       registerServiceWorker();
       vi.advanceTimersByTime(60_000);         // well past the old boot window
-      let flagAtReload;
-      reloadSpy.mockImplementationOnce(() => { flagAtReload = window.__votSwTookOver; });
+      let flagAtReload, eventsAtReload = -1, events = 0;
+      const onBefore = () => { events += 1; };
+      window.addEventListener('vot:before-update-reload', onBefore);
+      reloadSpy.mockImplementationOnce(() => { flagAtReload = window.__votSwTookOver; eventsAtReload = events; });
       controllerChangeHandler();
+      window.removeEventListener('vot:before-update-reload', onBefore);
       expect(reloadSpy).toHaveBeenCalledTimes(1);
       expect(window.__votSwTookOver).toBe(true);
       expect(flagAtReload, 'the flag must be visible to a loader that runs before the reload lands').toBe(true);
+      // The reload is ours, so the restore record is written synchronously first:
+      // one window event, dispatched before reload(), that the scroll memory and
+      // the audio player answer inline (Corbin: "land reader back exactly where
+      // they were" — exactly, not "as of the last debounce").
+      expect(events, 'vot:before-update-reload fires exactly once').toBe(1);
+      expect(eventsAtReload, 'and it fires BEFORE location.reload()').toBe(1);
       expect(document.getElementById('vot-toast-update')).toBeNull();
     } finally {
       vi.useRealTimers();

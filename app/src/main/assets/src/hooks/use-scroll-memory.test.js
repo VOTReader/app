@@ -443,3 +443,45 @@ describe('useScrollMemory — scrollPositions LRU bound (Wave 0)', () => {
     expect(el.scrollTop).toBe(1234); // exact restore, unchanged by the LRU layer
   });
 });
+
+/* ── the update reload (2026-09-10): the LIVE position, written before reload() ──
+   The debounced path lands 120 ms + 250 ms after the last scroll event; a reader
+   scrolling at the instant a new worker claims the page would come back that much
+   short. sw-register dispatches `vot:before-update-reload` right before reload(); the
+   hook answers by reading __scrollEl NOW and handing the record to
+   window.__flushPersistState as a patch on the active tab — no render, no timer. */
+describe('useScrollMemory — vot:before-update-reload', () => {
+  it('writes the live scroller position into the active tab synchronously, through the persist flush', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const flush = vi.fn();
+    /** @type {any} */ (window).__flushPersistState = flush;
+    try {
+      scrollTo(900);                                   // no idle wait: the debounce has NOT fired
+      expect(tab.scrollPositions['letter-alpha']).toBeUndefined();
+      act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
+      expect(flush).toHaveBeenCalledTimes(1);
+      const patch = flush.mock.calls[0][0];
+      expect(typeof patch).toBe('function');
+      const union = { tabs: [{ id: 'a', scrollPositions: { other: { y: 5 } } }, { id: 'b', scrollPositions: {} }], activeTabIdx: 0, theme: 'dark' };
+      const out = patch(union);
+      expect(out.theme).toBe('dark');
+      expect(out.tabs[1]).toBe(union.tabs[1]);          // the other tab untouched
+      expect(out.tabs[0].scrollPositions.other).toEqual({ y: 5 });
+      const rec = out.tabs[0].scrollPositions['letter-alpha'];
+      expect(rec && rec.y, 'the record is the scroller as it stands at the event, not the last debounced value').toBe(900);
+      expect(typeof rec.pct).toBe('number');
+    } finally {
+      delete /** @type {any} */ (window).__flushPersistState;
+    }
+  });
+
+  it('without a persist flush published it still commits through updateActiveTab (nothing is silently dropped)', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    delete /** @type {any} */ (window).__flushPersistState;
+    scrollTo(640);
+    act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
+    expect(tab.scrollPositions['letter-alpha'] && tab.scrollPositions['letter-alpha'].y).toBe(640);
+  });
+});
