@@ -50,8 +50,8 @@ export function ResumeReadingNavBtn() {
     <button
       className="reading-dot-nav"
       onClick={onGo}
-      title="Continue reading"
-      aria-label="Continue reading"
+      title="Reading Position Marker"
+      aria-label="Reading Position Marker"
     >
       {/* A bookmark ribbon: the shape of a place kept. Inline, so it takes the
           gold token through currentColor and needs no asset. */}
