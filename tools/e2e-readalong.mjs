@@ -6,6 +6,7 @@
  *   node tools/e2e-readalong.mjs --keys five:mindful,one:christmas
  *   node tools/e2e-readalong.mjs --all                # every locally cached key
  *   node tools/e2e-readalong.mjs --bible john:1       # a Bible chapter
+ *   node tools/e2e-readalong.mjs --keys study:purity-ch1   # a Bible/Letter Study chapter
  *   node tools/e2e-readalong.mjs --pixel-proof        # also prove it RENDERS
  *
  * THE HEADLINE ASSERTION is not the one you would guess. `rangeIn` walks the
@@ -341,6 +342,62 @@ async function openLetter(page, volKey, letterId) {
 }
 
 /**
+ * Open a Bible/Letter Study chapter with its recording playing. The study
+ * surface (w-study-audio-surface-r2, 2026-09-11) mounts LetterView with
+ * volKey 'study' over `chapter.blocks`, so from here on the chapter IS a
+ * Format A letter to this harness: hl-keys `letter:<chapterId>:<bi>`, the
+ * same Segments domain, the same `__votE2ELetter` the assertions read.
+ * Two corpora have to be resident first: the lazy VOT corpus (AUDIO_MANIFEST
+ * rides bundle-a-vot) and bible-studies.js, which the app loads by script
+ * tag on the first Studies screen — injected the same way here, since the
+ * harness never walks there. The chapter id is unique across every shipped
+ * study (pinned by audio-fragments-lib.test.js), so no study scope is needed.
+ */
+async function openStudyChapter(page, chapterId) {
+  await page.evaluate(() => { window.__loadVotCorpus(); });
+  await page.waitForFunction('window.__votCorpus && window.__votCorpus.loaded', { timeout: 30000 });
+  await page.evaluate(() => new Promise((done) => {
+    if (typeof window.BIBLE_STUDIES !== 'undefined') { done(true); return; }
+    const s = document.createElement('script');
+    s.src = 'src/data/bible-studies.js';
+    s.onload = () => done(true);
+    s.onerror = () => done(false);
+    document.head.appendChild(s);
+  }));
+  const found = await page.evaluate((id) => {
+    for (const st of (window.BIBLE_STUDIES || [])) {
+      for (const c of (st.chapters || [])) {
+        if (c && c.id === id && Array.isArray(c.blocks)) { window.__votE2ELetter = c; return true; }
+      }
+    }
+    return false;
+  }, chapterId);
+  if (!found) return { ok: false, reason: 'chapter not in BIBLE_STUDIES (or renders no blocks)' };
+  const queued = await page.evaluate(() => {
+    AudioPlayer.playLetter({ volKey: 'study', letter: window.__votE2ELetter, collectionLabel: 'e2e' });
+    const st = AudioPlayer.getState();
+    return !!st.queue[st.qi];
+  });
+  if (!queued) return { ok: false, reason: 'no track queued (study:' + chapterId + ' not in AUDIO_MANIFEST?)' };
+  const opened = await page.evaluate(() => {
+    if (typeof window.__openAudioText !== 'function') return false;
+    const st = AudioPlayer.getState();
+    window.__openAudioText(st.queue[st.qi]);
+    return true;
+  });
+  if (!opened) return { ok: false, reason: '__openAudioText missing' };
+  // A tree without the study routing arm ignores a study track silently (no
+  // screen change, no error), and the domain check below would then pass for
+  // want of any block to compare. Demand the chapter actually rendered.
+  try {
+    await page.waitForFunction((id) => !!document.querySelector('[data-hl-key^="letter:' + id + ':"]'), { timeout: 30000 }, chapterId);
+  } catch (_e) {
+    return { ok: false, reason: 'study chapter never rendered — is the study audio surface on this tree?' };
+  }
+  return { ok: true, reason: '' };
+}
+
+/**
  * Open a Bible chapter with its audio playing. Same bridge as the letters, so
  * the harness and a real listener take the same route to the screen.
  */
@@ -623,7 +680,9 @@ async function run() {
     for (const key of (bibleSpec && !opt('keys', '') ? [] : keys)) {
       const [volKey, letterId] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
       const isB = FORMAT_B_VOLS.has(volKey);
-      const opened = isB ? await openEntry(page, volKey, letterId) : await openLetter(page, volKey, letterId);
+      const opened = isB ? await openEntry(page, volKey, letterId)
+        : volKey === 'study' ? await openStudyChapter(page, letterId)
+          : await openLetter(page, volKey, letterId);
       if (!opened.ok) { failures.push({ key, kind: 'NAV', detail: opened.reason }); continue; }
       await sleep(700);
 
