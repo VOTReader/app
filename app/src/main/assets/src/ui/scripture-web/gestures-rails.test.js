@@ -84,6 +84,28 @@ describe('rail-aware gestures', () => {
     expect(camV.ppv / fitPPV(camV, W)).toBeCloseTo(2, 3);
     expect(camB.ppv / b0).toBeCloseTo(Math.exp(280 * 0.0021), 6);
   });
+  it('a wheel over a rail-reset pill zooms the rail beneath it; a wheel over other chrome is left alone', () => {
+    // The walk found it: "Reset Volumes" appears at the gap's left end after
+    // the first notch over Vol I, and every notch after landed on the pill and
+    // was eaten as chrome (desktop: Vol I stuck at 4 % of the width).
+    const pill = document.createElement('button');
+    pill.className = 'sw-btn sw-rail-reset sw-rail-reset-top';
+    pill.setAttribute('data-wheel-through', '1');
+    root.appendChild(pill);
+    const other = document.createElement('button');
+    other.className = 'sw-btn';
+    root.appendChild(other);
+    const v0 = camV.ppv, b0 = camB.ppv;
+    const e1 = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 40, clientY: 120, deltaY: -280 });
+    pill.dispatchEvent(e1);
+    expect(e1.defaultPrevented).toBe(true);
+    expect(camV.ppv / v0).toBeCloseTo(Math.exp(280 * 0.0021), 6);
+    expect(camB.ppv).toBe(b0);
+    const e2 = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 40, clientY: 480, deltaY: -280 });
+    other.dispatchEvent(e2);
+    expect(e2.defaultPrevented).toBe(false);
+    expect(camB.ppv).toBe(b0);
+  });
   it('a surface with no camFor (the canon web) still zooms the one camera as before', () => {
     detach();
     detach = attachWebGestures(root, {

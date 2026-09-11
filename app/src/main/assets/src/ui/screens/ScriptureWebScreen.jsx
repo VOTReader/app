@@ -1053,11 +1053,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
-          onClick={() => resetRail('top')}>Reset Volumes</button>
+          data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>
       ) : null}
       {mode === 'personal' && railZoom.bottom ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-bottom" aria-label="Reset the Bible rail"
-          onClick={() => resetRail('bottom')}>Reset Bible</button>
+          data-wheel-through="1" onClick={() => resetRail('bottom')}>Reset Bible</button>
       ) : null}
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
       <div id="sw-a11y-help" className="sw-sr-only">

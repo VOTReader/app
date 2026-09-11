@@ -143,7 +143,7 @@ async function zoomBandTo(page, c, r0, which, label, frac) {
     if (!r) return { ok: false, why: 'data-rails not published' };
     const bands = which === 'top' ? r.top : r.bottom;
     const band = bands.find((b) => b.label.toLowerCase().startsWith(label.toLowerCase()));
-    if (!band) return { ok: false, why: `band ${label} not visible; visible: ` + bands.map((b) => b.label).join('|') };
+    if (!band) return { ok: false, why: `band ${label} not visible after ${i} notches; visible ${bands.length}: ${bands[0] && bands[0].label}..${bands[bands.length - 1] && bands[bands.length - 1].label}; cam ${JSON.stringify(r.cam)} camV ${JSON.stringify(r.camV)}` };
     if ((band.x1 - band.x0) / c.w >= frac) return { ok: true, band, steps: i };
     const cx = c.l + Math.max(20, Math.min(c.w - 20, (band.x0 + band.x1) / 2));
     await page.mouse.move(cx, which === 'top' ? c.t + r0.topY + 12 : c.t + r0.bottomY - 12);
@@ -195,7 +195,7 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   if (!(Math.abs(mid.b - before.b) <= before.b * 0.01)) fails.push(`${tag} T${suffix}: wheeling over the TOP rail moved the Bible camera (ppv-css ${before.b} -> ${mid.b}): the zoom is not independent`);
   const b = await zoomBandTo(page, c, r0, 'bottom', bottomLabel, BAND_FILL);
   const after = await ppv(page);
-  if (!b.ok) { fails.push(`${tag} T${suffix}: bottom rail to ${bottomLabel}: ${b.why}`); return null; }
+  if (!b.ok) { await shot(page, `${fname}-T${suffix}-FAIL`); fails.push(`${tag} T${suffix}: bottom rail to ${bottomLabel}: ${b.why}`); return null; }
   if (!(after.b > mid.b * 1.5)) fails.push(`${tag} T${suffix}: the Bible camera did not zoom (ppv-css ${mid.b} -> ${after.b})`);
   if (!(Math.abs(after.v - mid.v) <= mid.v * 0.01)) fails.push(`${tag} T${suffix}: wheeling over the BOTTOM rail moved the Volumes camera (ppv-vot ${mid.v} -> ${after.v}): the zoom is not independent`);
   await sleep(400);
