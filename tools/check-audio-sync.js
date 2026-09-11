@@ -329,6 +329,43 @@ for (const [assetId, rows] of Object.entries(AUDIO_SYNC_ALT)) {
   checkTimeline('alt:' + assetId, owner, rows);
 }
 
+// ------------------------------------------------------- provenance --
+/**
+ * A primary timeline is keyed by LETTER, but it was aligned against one
+ * RECORDING — and the manifest can change which recording is primary without
+ * touching audio-sync.js at all. It did: one:and-he-shall-be-called-i-am was
+ * aligned against the text-to-speech asset in August; a later manifest run
+ * made Benjamin's reading the primary (rank B > V), so the app played his
+ * voice under TTS pacing for a month. Every offset was word-clean, so every
+ * check above stayed green; batch-align's resume (settings + fragments hash)
+ * called the belt current, so a re-run would not have touched it either.
+ *
+ * Alternates cannot drift this way: AUDIO_SYNC_ALT is keyed by asset id.
+ *
+ * The belts that know the answer are gitignored, so batch-align.py's shipper
+ * writes what they say into tools/audio-sync-provenance.json — per key, the
+ * asset ids of the parts the rows were aligned against — and this leg compares
+ * that to what AUDIO_MANIFEST plays today. A key the sidecar cannot vouch for
+ * fails too: unknown provenance is the state the bug hid in.
+ */
+const PROV_PATH = resolve(HERE, 'audio-sync-provenance.json');
+let provenanceChecked = 0;
+if (!existsSync(PROV_PATH)) {
+  note(failures, 'provenance', 'NO-PROVENANCE-SIDECAR', { detail: 'tools/audio-sync-provenance.json is missing; batch-align.py ship() writes it' });
+} else {
+  const prov = JSON.parse(readFileSync(PROV_PATH, 'utf8')).primary || {};
+  for (const key of Object.keys(AUDIO_SYNC)) {
+    const manifest = (AUDIO_MANIFEST[key] || []).map((r) => r[0]);
+    const belt = prov[key];
+    provenanceChecked++;
+    if (!Array.isArray(belt) || !belt.length) {
+      note(failures, key, 'UNKNOWN-PROVENANCE', { detail: 'no belt names the recording these rows were aligned against', manifest });
+    } else if (belt.length !== manifest.length || belt.some((a, i) => a !== manifest[i])) {
+      note(failures, key, 'PROVENANCE-MISMATCH', { belt, manifest, detail: 'the rows were aligned against a recording the manifest no longer plays as primary; re-align (batch-align.py, with the stale belt removed or --force)' });
+    }
+  }
+}
+
 // -------------------------------------------------- the coverage floor --
 /**
  * Read-along coverage only goes UP.
@@ -376,7 +413,12 @@ const byKind = new Map();
 for (const f of failures) byKind.set(f.kind, (byKind.get(f.kind) || 0) + 1);
 
 const staleKeys = [...perKey.values()].filter((k) => k.kinds.has('STALE-DOMAIN')).map((k) => k.key).sort();
-const otherKeys = [...perKey.values()].filter((k) => k.fail > 0 && !k.kinds.has('STALE-DOMAIN')).map((k) => k.key).sort();
+// Provenance findings are about WHICH recording, not about the prose domain,
+// so they never join the "re-align these stale offsets" lists below.
+const PROVENANCE_KINDS = new Set(['NO-PROVENANCE-SIDECAR', 'UNKNOWN-PROVENANCE', 'PROVENANCE-MISMATCH']);
+const otherKeys = [...perKey.values()]
+  .filter((k) => k.fail > 0 && !k.kinds.has('STALE-DOMAIN') && [...k.kinds].some((kind) => !PROVENANCE_KINDS.has(kind)))
+  .map((k) => k.key).sort();
 
 if (emitProbeText) {
   mkdirSync(WORK, { recursive: true });
@@ -393,6 +435,7 @@ if (asJson) {
     staleKeys,
     otherKeys,
     coverage: touchedChars ? +(timedChars / touchedChars).toFixed(4) : null,
+    provenanceChecked,
     lost,
     detail: failures.slice(0, 200),
   }, null, 2));
@@ -437,7 +480,8 @@ if (!blocking.length) {
     process.exit(1);
   }
   console.log('[audio-sync] OK — every shipped span starts and ends on a word boundary'
-    + (waived ? `, except ${waived} row(s) across ${ALLOWED.size} key(s) queued for re-alignment (tools/audio-sync-stale.allow).` : '.'));
+    + (waived ? `, except ${waived} row(s) across ${ALLOWED.size} key(s) queued for re-alignment (tools/audio-sync-stale.allow).` : '.')
+    + ` ${provenanceChecked} primary timelines name the recording the manifest plays.`);
   process.exit(0);
 }
 
@@ -445,6 +489,17 @@ console.error('\n[audio-sync] FAIL — ' + blocking.length + ' bad row(s):');
 const blockingKinds = new Map();
 for (const f of blocking) blockingKinds.set(f.kind, (blockingKinds.get(f.kind) || 0) + 1);
 for (const [kind, n] of [...blockingKinds].sort((a, b) => b[1] - a[1])) console.error(`    ${kind.padEnd(20)} ${n}`);
+
+const provFails = blocking.filter((f) => f.kind === 'PROVENANCE-MISMATCH' || f.kind === 'UNKNOWN-PROVENANCE');
+if (provFails.length) {
+  console.error(`\n  ${provFails.length} primary timeline(s) do not name the recording the manifest plays (tools/audio-sync-provenance.json):`);
+  for (const f of provFails.slice(0, 20)) {
+    console.error(`    ${f.key}  belt=${JSON.stringify(f.belt || null)}  manifest=${JSON.stringify(f.manifest)}`);
+  }
+  if (provFails.length > 20) console.error(`    ... and ${provFails.length - 20} more`);
+  console.error('  Re-align the letter (batch-align.py skips a belt whose settings and fragments match,');
+  console.error('  so remove the stale belt from tools/_align-work/hone or pass --force); never edit the sidecar by hand.');
+}
 
 const sample = blocking.filter((f) => f.painted).slice(0, 6);
 if (sample.length) {
