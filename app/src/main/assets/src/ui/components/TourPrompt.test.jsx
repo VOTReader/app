@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { TourPrompt } from './TourPrompt.jsx';
 import { TourController } from '../../utils/tour-controller.js';
+import { TOUR_STOPS_WORD } from '../../utils/tour-steps.js';
 import { AboutSeenFlagStore, TourDoneFlagStore } from '../../stores/app-flag-stores.js';
 
 beforeEach(() => {
@@ -47,5 +48,15 @@ describe('TourPrompt — the strip declares the room it takes', () => {
     render(<TourPrompt screen="settings" />);
     expect(document.querySelector('.tour-prompt')).toBeNull();
     expect(document.body.classList.contains('tour-prompt-open')).toBe(false);
+  });
+
+  /* RED 2026-09-10: the strip said "six short stops" after the highlight stop made the tour
+     seven. The count was hand-written here, a bundle away from the array it counts. It now
+     reads the word the steps module publishes (through the controller, the only thing this
+     bundle-d component can reach); tour-steps.test pins that word against the array itself. */
+  it('counts the stops the tour actually has', () => {
+    render(<TourPrompt screen="home" />);
+    const text = document.querySelector('.tour-prompt-text').textContent;
+    expect(text).toContain(`${TOUR_STOPS_WORD} short stops`);
   });
 });
