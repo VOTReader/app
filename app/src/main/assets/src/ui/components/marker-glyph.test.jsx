@@ -139,7 +139,7 @@ describe('the Reading Position Marker does not wear the Bookmark glyph', () => {
   it('CONTROL — the instrument reads sameness: the bookmark path on its two sites overlaps 1.0, and every mask carries ink', () => {
     const a = silhouette(navBookmarkSvg()), b = silhouette(inlineBookmarkSvg()), m = silhouette(markerSvg());
     expect(iou(a, b), 'nav bookmark vs inline bookmark (same path)').toBe(1);
-    for (const [name, mask] of [['nav bookmark', a], ['inline bookmark', b], ['marker', m]]) {
+    for (const [name, mask] of /** @type {[string, Set<string>][]} */ ([['nav bookmark', a], ['inline bookmark', b], ['marker', m]])) {
       expect(mask.size, name + ' ink cells of ' + GRID * GRID).toBeGreaterThanOrEqual(0.08 * GRID * GRID);
     }
   });
