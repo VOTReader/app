@@ -42,6 +42,7 @@ beforeEach(() => {
     view: () => ({ W, H, DPR }),
     handlers: () => ({ hover() {}, tap() {}, doubleTap() {} }),
     schedule: () => log.push('draw'),
+    live: () => log.push('live'),
     maxZoom: () => 1000, clampCamera, zoomAbout, xToVerse,
   });
 });
@@ -105,6 +106,15 @@ describe('rail-aware gestures', () => {
     other.dispatchEvent(e2);
     expect(e2.defaultPrevented).toBe(false);
     expect(camB.ppv).toBe(b0);
+  });
+  it('a wheel notch, a drag move and a pinch move each say the gesture is live', () => {
+    wheel(500, 120, -280);
+    expect(log.filter((x) => x === 'live').length).toBe(1);
+    ptr('pointerdown', 500, 480); ptr('pointermove', 540, 480); ptr('pointerup', 540, 480);
+    expect(log.filter((x) => x === 'live').length).toBe(2);
+    ptr('pointerdown', 300, 480, 1); ptr('pointerdown', 700, 480, 2); ptr('pointermove', 260, 480, 1);
+    expect(log.filter((x) => x === 'live').length).toBe(3);
+    ptr('pointerup', 260, 480, 1); ptr('pointerup', 700, 480, 2);
   });
   it('a surface with no camFor (the canon web) still zooms the one camera as before', () => {
     detach();
