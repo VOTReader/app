@@ -362,21 +362,25 @@ export function useScrollMemory({
        carries it. Write the live record straight into the persisted union
        through usePersistedState's patched flush instead. The state update is
        still made (it is what the export path and a same-document survivor
-       read); when no flush is published the state update is all there is. */
+       read); when no flush is published the state update is all there is.
+       `{ reload: true }` makes that flush write the union to sessionStorage as
+       well — the IDB put alone may never land before the reload (see the
+       usePersistedState header, item 6) — so it is asked for WHATEVER is on
+       screen; with the tabs overview open only the merge is skipped, because
+       the overview's own scroll is not the screen's position. */
     const onBeforeReload = () => {
       flushScrollToActiveTab();
-      if (tabsOverviewOpenRef.current) return;
-      const key = scrollKeyRef.current;
-      const rec = liveScrollRecord();
       const flush = /** @type {any} */ (window).__flushPersistState;
-      if (!key || !rec || typeof flush !== 'function') return;
+      if (typeof flush !== 'function') return;
+      const key = scrollKeyRef.current;
+      const rec = tabsOverviewOpenRef.current ? null : liveScrollRecord();
       flush((u) => {
-        if (!u || !Array.isArray(u.tabs)) return u;
+        if (!key || !rec || !u || !Array.isArray(u.tabs)) return u;
         const i = typeof u.activeTabIdx === 'number' ? u.activeTabIdx : 0;
         return { ...u, tabs: u.tabs.map((t, j) => (j === i && t
           ? { ...t, scrollPositions: mergeScrollPosition(t.scrollPositions, key, rec) }
           : t)) };
-      });
+      }, { reload: true });
     };
     window.addEventListener('vot:before-update-reload', onBeforeReload);
     return () => {
