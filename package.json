@@ -32,6 +32,7 @@
     "check:audio-sync": "node tools/check-audio-sync.js",
     "check:audio-manifest": "node tools/check-audio-manifest.js",
     "check:corpus": "node tools/check-corpus-version.js",
+    "check:half-recipe": "node tools/check-half-recipe.mjs",
     "check:apk-assets": "node tools/check-apk-assets.js",
     "check:type-scale": "node tools/check-type-scale.js",
     "check:css-tokens": "node tools/check-css-tokens.js",
