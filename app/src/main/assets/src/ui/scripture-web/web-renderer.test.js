@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, FLYOVER_FLOOR, flyOverGLSL,
+  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
 } from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -171,7 +171,9 @@ describe('deep-zoom declutter', () => {
        design-perf's to tune. */
     expect(flyOverDim(0, 1)).toBeGreaterThan(0);
     expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
-    expect(flyOverGLSL).toContain('float flyFloor = ' + FLYOVER_FLOOR + ';');
+    // The FORMATTED literal, never the raw value: at FLYOVER_FLOOR = 1 the raw
+    // form is `float flyFloor = 1;`, which the compiler rejects (glsl-float.test.js).
+    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
     expect(flyOverGLSL).not.toContain('smoothstep(.55, 1., localize)');
   });
 });

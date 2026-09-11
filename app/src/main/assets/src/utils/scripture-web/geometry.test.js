@@ -12,7 +12,7 @@ import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
   localizeFactor, squashFactor, arcDistance,
   arcShape, arcShapeGLSL, arcHeight, spanLogOf, APEX_LIFT, FAN_FLOOR,
-  arcAnchored, flyOverDim, flyOverGLSL,
+  arcAnchored, flyOverDim, flyOverGLSL, glslFloat,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
   autoDensity, DENSITY_ENTER_PPV_CSS, DENSITY_EXIT_PPV_CSS, PPV_MAX_CSS,
@@ -154,9 +154,10 @@ describe('the curve law', () => {
   });
 
   it('publishes the same constants to the GLSL the shader inlines', () => {
-    expect(arcShapeGLSL).toContain(String(CEIL_SOFTNESS));
-    expect(arcShapeGLSL).toContain(String(APEX_LIFT));
-    expect(arcShapeGLSL).toContain(String(FAN_FLOOR));
+    // glslFloat, not String: String(1.0) is '1', an int literal GLSL rejects.
+    expect(arcShapeGLSL).toContain(glslFloat(CEIL_SOFTNESS));
+    expect(arcShapeGLSL).toContain(glslFloat(APEX_LIFT));
+    expect(arcShapeGLSL).toContain(glslFloat(FAN_FLOOR));
     expect(arcShapeGLSL).toContain('tanh');
     expect(arcShapeGLSL).toContain('mix(r, deepR, localize)');
     expect(arcShapeGLSL).toContain('mix(r*squash, deepA, localize)');
@@ -436,8 +437,10 @@ describe('visibility law', () => {
   });
 
   it('publishes the margin and the floor to the GLSL the shader inlines', () => {
-    expect(flyOverGLSL).toContain('float m = ' + FLYOVER_MARGIN + '.;');
-    expect(flyOverGLSL).toContain('float flyFloor = ' + FLYOVER_FLOOR + ';');
+    // glslFloat spells both: `24.` was right only while the margin stayed whole,
+    // and the raw floor is an int literal the moment it is tuned to 1 (glsl-float.test.js).
+    expect(flyOverGLSL).toContain('float m = ' + glslFloat(FLYOVER_MARGIN) + ';');
+    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
     expect(flyOverGLSL).toContain('mix(1., mix(flyFloor, 1., anchored), localize)');
   });
 });
