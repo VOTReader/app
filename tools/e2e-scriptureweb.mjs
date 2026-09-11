@@ -957,7 +957,10 @@ async function walk(page, url, frame, scale) {
 
   const first = await state(page);
   if (first.fallback && !first.root) {
-    const why = await page.evaluate(() => (document.querySelector('.sw-fallback-body') || { textContent: '' }).textContent.trim());
+    /* The same NUL `getShaderInfoLog` needs stripping for arrives here too:
+       the screen quotes the driver verbatim into its own message. */
+    const why = await page.evaluate(() => (document.querySelector('.sw-fallback-body') || { textContent: '' })
+      .textContent.split(String.fromCharCode(0)).join('').trim());
     /* ARM 4b ON THE FALLBACK PATH. A shipped shader that does not compile
        THROWS out of buildRenderer, the screen catches it into `loadError`, and
        we arrive here -- which used to return NOTHING-TO-CHECK and never read
