@@ -107,7 +107,9 @@ export function relativePlayedAt(stamp) {
  * any Bible-edition track — those open the playing book's chapter in the
  * reader. Hidden Manna's absent index and range compilations (key null)
  * still have none — without this test the Text icon / desk title renders a
- * tap that silently does nothing.
+ * tap that silently does nothing. A study recording (study:<chapterId>) is
+ * the study chapter LetterView renders in studyMode — screen-routes'
+ * _openAudioText has the arm; the two must agree (ruling (4), 2026-09-11).
  *
  * @param {any} track
  * @returns {boolean}
@@ -117,6 +119,7 @@ export function hasTextDestination(track) {
   const divider = key.indexOf(':');
   if (divider < 1 || divider >= key.length - 1) return false;
   if (key.indexOf('bible-') === 0) return true;
+  if (key.indexOf('study:') === 0) return true;
   if (typeof COL_BY_KEY === 'undefined') return false;
   const collection = COL_BY_KEY.get(key.slice(0, divider));
   return !!(collection && collection.letterScreen);
