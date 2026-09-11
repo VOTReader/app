@@ -33,6 +33,13 @@
  *      published cameras. Registered: the largest per-notch endpoint
  *      displacement in CSS px, and that the thread is never null and never
  *      changes stroke class (rise-only vs rise+run) between adjacent notches.
+ *      Each notch's capture is taken while the gesture is still LIVE (inside
+ *      the 150 ms hold, data-cap-fraction 0): what a moving finger sees.
+ *   R  release: from the overview one wheel notch over the Bible rail at the
+ *      Matthew corridor, then a burst of captures through the hold and the
+ *      250 ms fade back to the full picture. Registered: the largest step in
+ *      the corridor's mean luminance between consecutive captures (the "no
+ *      pop" number), the capture cadence, and data-cap-fraction per capture.
  *   T  two-rail: wheel over the top rail until Rebuke fills >= 60 % of the
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
@@ -76,7 +83,7 @@ const NAV_MS = 60000;
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
 const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
 const NOTCHES = 22;
-const ARMS = arg('arms', 'O,S,T,C').split(',');
+const ARMS = arg('arms', 'O,S,T,C,R').split(',');
 const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
 for (const t of new Set([OWN, TREE])) {
@@ -299,9 +306,12 @@ async function armC(page, tag, fname, c, r0, f) {
       if (!band) { fails.push(`${tag} C ${which}: band ${label} left the screen at notch ${i}`); break; }
       const cx = c.l + Math.max(4, Math.min(c.w - 4, (band.x0 + band.x1) / 2));
       await page.mouse.move(cx, which === 'top' ? c.t + r0.topY + 12 : c.t + r0.bottomY - 12);
-      await page.mouse.wheel({ deltaY: -120 }); await sleep(160);
-      await page.mouse.move(c.l + 8, c.t + 8); await sleep(120);
+      await page.mouse.wheel({ deltaY: -120 }); await sleep(30);
+      // captured LIVE: inside the hold after the notch, the capped frame a moving finger sees
+      const cf = await attr(page, 'data-cap-fraction');
       if (OUT) await page.screenshot({ path: resolve(OUT, `${fname}-C-${which}-${String(i).padStart(2, '0')}.png`) });
+      if (i === 1) note(`${tag} C ${which}: notch captures are taken at data-cap-fraction ${cf} (0 = live cap)`);
+      await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
       const cur = await read();
       const disp = Math.max(Math.abs(cur.ax - prev.ax), Math.abs(cur.bx - prev.bx));
       if (disp > maxDisp) { maxDisp = disp; at = i; }
@@ -322,6 +332,51 @@ async function armC(page, tag, fname, c, r0, f) {
   await clickIfPresent(page, 'Reset the view'); await sleep(400);
 }
 
+/** Arm R: the release fade, measured in the Matthew corridor. */
+async function armR(page, tag, fname, c, r0) {
+  // the corridor: the band between the rails over the Matthew stretch of the
+  // bottom rail (the Study Bible notes), the densest ink on the overview
+  const band = r0.bottom.find((b) => b.label === 'Matthew');
+  if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
+  const x0 = Math.max(0, band.x0 - 40), x1 = Math.min(c.w, band.x1 + 40);
+  const lum = (b64) => page.evaluate(async (b64, box) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+    const s = img.width / box.w;   // device px per CSS px
+    const X0 = Math.floor(box.x0 * s), X1 = Math.floor(box.x1 * s), Y0 = Math.floor(box.y0 * s), Y1 = Math.floor(box.y1 * s);
+    const d = g.getImageData(X0, Y0, X1 - X0, Y1 - Y0).data;
+    let sum = 0;
+    for (let p = 0; p < d.length; p += 4) sum += d[p] + d[p + 1] + d[p + 2];
+    return +(sum / 3 / (d.length / 4)).toFixed(2);
+  }, b64, { w: c.w, x0, x1, y0: r0.topY + 4, y1: r0.bottomY - 4 });
+  await clickIfPresent(page, 'Reset the view'); await sleep(500);
+  await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
+  const rest0 = await lum(await page.screenshot({ encoding: 'base64' }));
+  await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12);
+  await page.mouse.wheel({ deltaY: -120 });
+  const t0 = Date.now();
+  const shots = [];
+  for (let i = 0; i < 14; i++) {
+    const cf = await attr(page, 'data-cap-fraction');
+    const b64 = await page.screenshot({ encoding: 'base64' });
+    shots.push({ t: Date.now() - t0, cf: Number(cf), lum: await lum(b64) });
+    if (OUT && (i === 0 || i === 3 || i === 6 || i === 13)) writeFileSync(resolve(OUT, `${fname}-R-${String(i).padStart(2, '0')}-t${shots[i].t}.png`), Buffer.from(b64, 'base64'));
+  }
+  await sleep(400);
+  const restEnd = await lum(await page.screenshot({ encoding: 'base64' }));
+  let maxStep = 0, at = -1;
+  for (let i = 1; i < shots.length; i++) { const d = Math.abs(shots[i].lum - shots[i - 1].lum); if (d > maxStep) { maxStep = d; at = i; } }
+  const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
+  note(`${tag} R: Matthew corridor mean luminance at rest ${rest0} -> live ${shots[0].lum} (cap ${shots[0].cf}, t+${shots[0].t} ms) -> rest again ${restEnd}; largest step between consecutive captures ${maxStep.toFixed(2)}/255 (capture ${at}, t+${shots[at] ? shots[at].t : '-'} ms), capture cadence ~${cadence} ms; trace ${shots.map((s) => `${s.t}:${s.cf}:${s.lum}`).join(' ')}`);
+  if (OUT) writeFileSync(resolve(OUT, `${fname}-R.json`), JSON.stringify({ rest0, restEnd, shots }, null, 1));
+  const dip = rest0 - shots[0].lum;
+  if (!(shots[0].cf === 0)) fails.push(`${tag} R: the first capture after the notch was not live (data-cap-fraction ${shots[0].cf})`);
+  if (!(Math.abs(restEnd - rest0) <= 1.5)) fails.push(`${tag} R: the picture did not come back to rest (${rest0} -> ${restEnd})`);
+  if (!(maxStep <= Math.max(2, dip * 0.5))) fails.push(`${tag} R: a step of ${maxStep.toFixed(2)}/255 between consecutive captures is more than half the live dip (${dip.toFixed(2)}): a pop`);
+  await clickIfPresent(page, 'Reset the view'); await sleep(300);
+}
+
 async function walk(page, url, fname) {
   const f = FRAMES[fname];
   const tag = `[${fname} ${f.w}x${f.h}]`;
@@ -334,6 +389,7 @@ async function walk(page, url, fname) {
   if (ARMS.includes('O')) { await page.mouse.move(c.l + 8, c.t + 8); await sleep(250); await shot(page, `${fname}-O-overview`); }
   if (ARMS.includes('S')) await armS(page, tag, fname, c, r0);
   if (ARMS.includes('C')) { if (r0) await armC(page, tag, fname, c, r0, f); else fails.push(`${tag} C: no data-rails`); }
+  if (ARMS.includes('R')) { if (r0) await armR(page, tag, fname, c, r0); else fails.push(`${tag} R: no data-rails`); }
   if (!ARMS.includes('T')) return;
   if (!r0) { fails.push(`${tag} T: the screen publishes no data-rails, so no rail can be zoomed to a book`); return; }
   const p1 = await pairing(page, tag, fname, c, r0, 'Rebuke', 'Isaiah', /Rebuke/i, /^Isaiah\b/, '1');
