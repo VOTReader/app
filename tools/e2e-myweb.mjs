@@ -86,7 +86,10 @@ const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.
    Radeon 890M readings that chose the layer are in the note, not here.
    Key: a substring of UNMASKED_RENDERER_WEBGL. Value: { overview, phoneLand,
    phone, desktop } in ms (overview shared by every frame; the rest at three
-   zoom steps). MYWEB_R5_CEILINGS='{"NVIDIA GeForce RTX 5080":{...}}' overrides. */
+   zoom steps). THE TREE CARRIES ITS OWN REGISTRATION: the Verifier's values go
+   into this object as a tools-only commit, so a checkout at the landing SHA
+   passes on that GPU with no environment. MYWEB_R5_CEILINGS (JSON) is for
+   trial runs only and is announced loudly in the log. */
 const R5_CEILINGS = process.env.MYWEB_R5_CEILINGS ? JSON.parse(process.env.MYWEB_R5_CEILINGS) : {
   // none registered yet: the Verifier fills this from three runs at the landing tip
 };
@@ -364,6 +367,7 @@ try {
   const r5key = Object.keys(R5_CEILINGS).find((k) => renderer && String(renderer).includes(k));
   R5 = r5key ? R5_CEILINGS[r5key] : null;
   if (PERF) console.log('[e2e-myweb] R5 ceilings: ' + (R5 ? 'registered for ' + JSON.stringify(r5key) + ' ' + JSON.stringify(R5) : 'NONE registered for this renderer; every R5 arm FAILS until the Verifier registers it'));
+  if (PERF && process.env.MYWEB_R5_CEILINGS) console.log('[e2e-myweb] !!! R5 OVERRIDE IN FORCE: MYWEB_R5_CEILINGS came from the environment, not the tree. A PASS in this log is a TRIAL, not the landing proof; the registered values must be committed into R5_CEILINGS.');
   for (const fname of WANT) {
     const ctx = await browser.createBrowserContext();
     const page = await ctx.newPage();
