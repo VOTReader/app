@@ -163,7 +163,10 @@ async function brightestGround(page, boxes, dpr) {
     const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
     const d = g.getImageData(0, 0, c.width, c.height).data;
     const lum = (r, gg, b) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
-    return boxes.map((r) => {
+    // a witness that the web moved: a checksum of the centre 120x120 device px
+    let sum = 0; const cx = (c.width / 2) | 0, cy = (c.height / 2) | 0;
+    for (let y = cy - 60; y < cy + 60; y++) for (let x = cx - 60; x < cx + 60; x++) { const i = (y * c.width + x) * 4; sum = (sum * 31 + d[i] + d[i + 1] + d[i + 2]) | 0; }
+    const grounds = boxes.map((r) => {
       let best = null, bl = -1;
       for (let x = Math.ceil((r.l + 3) * dpr); x < (r.l + 8) * dpr; x++) for (let y = Math.ceil((r.t + 3) * dpr); y < (r.b - 3) * dpr; y++) {
         const i = (y * c.width + x) * 4; const l = lum(d[i], d[i + 1], d[i + 2]);
@@ -171,10 +174,11 @@ async function brightestGround(page, boxes, dpr) {
       }
       return best;
     });
+    return { grounds, sum };
   }, b64, boxes, dpr);
 }
 
-const readPpv = (page) => page.evaluate(() => { const w = document.querySelector('.sw-wrap'); return w ? Number(w.getAttribute('data-ppv-css')) : NaN; });
+const readPpv = (page) => page.evaluate(() => { const w = document.querySelector('.sw-root'); return w ? Number(w.getAttribute('data-ppv-css')) : NaN; });
 async function zoom3(page, tag) {
   const p0 = await readPpv(page);
   if (!(p0 > 0)) { note(`${tag} F3w: the screen publishes no data-ppv-css; the zoomed arm is skipped`); return false; }
@@ -198,7 +202,9 @@ async function worstGround(page, pills, dpr, worst, state) {
       for (let s = 1; s <= 8; s++) await page.mouse.move(c.x + Math.cos(ang) * amp * s / 8, c.y + Math.sin(ang) * amp * s / 8);
       await page.mouse.up(); await sleep(350);
     }
-    const g = await brightestGround(page, pills.map((p) => p.box), dpr);
+    const { grounds: g, sum } = await brightestGround(page, pills.map((p) => p.box), dpr);
+    if (k > 0 && sum === worst.lastSum) worst.stillPans = (worst.stillPans || 0) + 1;
+    worst.lastSum = sum;
     pills.forEach((p, i) => {
       if (!g[i]) return;
       const cr = contrastOn(p.color, g[i]);
@@ -233,6 +239,7 @@ async function walk(page, url, fname) {
   const resting = r.pills.filter((p) => !p.on);
   await worstGround(page, resting, f.dpr, worst, 'overview');
   if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps');
+  if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS * 2} drags left the web's centre pixels unchanged: the pan did not take, the grounds are not the worst`);
   for (const p of resting) {
     const w = worst.get(p.name);
     if (!w) { note(`${tag} F3w ${p.name}: no ground read`); continue; }
