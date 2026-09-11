@@ -98,6 +98,10 @@ const kb = (n) => (n / 1000).toFixed(1) + ' KB';
 
 const over = [];
 const missing = [];
+// Every row the loop did NOT `continue` past — i.e. every file it actually
+// stat'ed. This is the set the success line may speak for, and it is the set
+// the headroom line searches. BUDGETS.length is the set it USED to claim.
+const seen = [];
 for (const b of BUDGETS) {
   // A path with a separator is relative to the assets root (a raw src/data
   // file the app fetches directly); a bare name is a dist/ bundle.
@@ -110,6 +114,7 @@ for (const b of BUDGETS) {
     if (!b.optional) missing.push(b.file);
     continue;
   }
+  seen.push({ ...b, size });
   if (size > b.max) over.push({ ...b, size });
 }
 
@@ -123,7 +128,11 @@ if (over.length) {
   console.error('[bundle-budget] a bundle grew past its byte ceiling:');
   for (const o of over) {
     const growth = ((o.size / o.measured - 1) * 100).toFixed(1);
-    console.error(`  ${o.file}  ${kb(o.size)}  >  ceiling ${kb(o.max)}   (+${growth}% vs the ${kb(o.measured)} baseline)`);
+    // The absolute overrun FIRST, because it is the number a reader uses to
+    // decide whether this RED is real. The percentage is computed against
+    // `measured`, which is in no comparison in this file and goes stale
+    // silently; a bundle 256 bytes past its ceiling once reported "+1.7%".
+    console.error(`  ${o.file}  ${kb(o.size)}  >  ceiling ${kb(o.max)}   over by ${o.size - o.max} bytes   (+${growth}% vs the ${kb(o.measured)} baseline)`);
   }
   console.error('');
   console.error('  This is a collapse detector, not a diet: the ceilings sit ~15% over the');
@@ -137,4 +146,19 @@ if (over.length) {
   process.exit(1);
 }
 
-console.log(`[bundle-budget] OK — all ${BUDGETS.length} bundles inside their byte ceilings.`);
+// `all ${BUDGETS.length}` was a CONSTANT, so it could only be right by coincidence
+// — on a tree where every optional row's file happens to exist. Today 13 of 15 are
+// present and it printed "all 15" on every green. A count that cannot be wrong
+// because it cannot be right is the same defect as a stale `measured`: a number
+// beside a verdict, describing nothing the verdict depended on.
+const absent = BUDGETS.length - seen.length;
+console.log(`[bundle-budget] OK — all ${seen.length} of ${BUDGETS.length} declared (${absent} optional absent) inside their byte ceilings.`);
+// The tightest headroom in BYTES, over every row that was stat'ed — not a
+// naming-convention subset. A `tightest:` line computed over the bare-filename
+// bundles alone describes less than the gate measured while reading as though it
+// describes all of it, and on the day a src/data row is genuinely tightest it
+// cannot name it and names the runner-up instead.
+if (seen.length) {
+  const t = seen.reduce((a, b) => (b.max - b.size < a.max - a.size ? b : a));
+  console.log(`  tightest: ${t.file} ${t.size} / ${t.max}, ${t.max - t.size} left`);
+}
