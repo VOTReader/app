@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, flyOverGLSL,
+  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, FLYOVER_FLOOR, flyOverGLSL,
 } from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -148,24 +148,31 @@ describe('deep-zoom declutter', () => {
     // The threshold is a LITERAL zero, not an epsilon standing in for one...
     const thresholds = [...SHADER_SOURCE.vertex.matchAll(/if \(dim <= ([^)]*)\)/g)].map((m) => m[1].trim());
     expect(thresholds).toEqual(['0.']);
-    // ...and that zero is the law's own, the one pick.js:87 refuses taps on
-    // (`if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue`).
-    // Asserted through the shared function rather than by reading pick.js's
-    // text: this tree is browser-scoped for tsc, so `node:fs` is not available
-    // here, and a behaviour check is the better pin anyway.
-    expect(flyOverDim(0, 1)).toBe(0);
-    // The band above it stays paintable AND tappable — that is the half the
-    // literal protects. A cull at any epsilon would blank these.
-    expect(flyOverDim(0, 0.8)).toBeGreaterThan(0);
-    expect(flyOverDim(0, 0.99)).toBeGreaterThan(0);
+    // ...and it is the same literal zero pick.js:87 refuses taps on
+    // (`if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue`),
+    // so draw and pick can never disagree about an arc at zero. BUT THE
+    // FLY-OVER LAW NO LONGER PRODUCES ONE: by owner rule (2026-09-10, "what
+    // you're trying to zoom into and tap disappears as you get closer") a
+    // fly-over settles at FLYOVER_FLOOR and stops. This used to assert
+    // flyOverDim(0, 1) === 0; it now asserts the opposite, at every depth,
+    // through the shared function rather than pick.js's text.
+    for (const loc of [0, 0.55, 0.8, 0.99, 1]) expect(flyOverDim(0, loc)).toBeGreaterThan(0);
+    expect(flyOverDim(0, 1)).toBe(FLYOVER_FLOOR);
   });
 
-  it('fades fly-over arcs to NOTHING at full depth, not to a residual band', () => {
-    // The tanh ceiling flattens every large arc apex to the same height, so
-    // at depth hundreds of fly-overs stacked into horizontal smears across
-    // the screen (the on-device report). The floor must reach zero.
-    expect(flyOverDim(0, 1)).toBe(0);
-    expect(flyOverGLSL).toContain('mix(.10, 0., smoothstep(.55, 1., localize))');
+  it('settles fly-over arcs at a VISIBLE floor at full depth — dimmer than an anchored arc, never nothing', () => {
+    /* This case used to demand the floor reach zero, because the tanh ceiling
+       flattens every large apex to one height and at depth hundreds of
+       fly-overs stacked into horizontal smears (the on-device report). The
+       owner then met the other face of that law: the line he was zooming
+       toward vanished as he arrived. Both reports are real. The trade is
+       stated here as a property: the smear is DIMMED (below an anchored arc)
+       and the chased line is NEVER GONE (above zero). The number itself is
+       design-perf's to tune. */
+    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
+    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
+    expect(flyOverGLSL).toContain('float flyFloor = ' + FLYOVER_FLOOR + ';');
+    expect(flyOverGLSL).not.toContain('smoothstep(.55, 1., localize)');
   });
 });
 

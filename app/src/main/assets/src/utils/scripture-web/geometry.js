@@ -461,6 +461,27 @@ export function arcHeight(d, R, A) {
 export const FLYOVER_MARGIN = 24;
 
 /**
+ * The alpha a fly-over settles at once the reader has localized. NEVER ZERO.
+ *
+ * It used to fall from 0.10 to exactly 0 at full depth, so that hundreds of
+ * long arcs' flattened apexes stopped smearing the view -- and the owner met
+ * the other face of that law: "what you're trying to zoom into and tap
+ * disappears as you get closer" (2026-09-10). Zooming into a line's middle is
+ * exactly what carries both its feet out of the frame, so the line being
+ * chased became a fly-over and vanished on arrival. The owner's rule: a line
+ * crossing the viewport must not vanish as zoom increases.
+ *
+ * 0.35 is a first setting, not a measured optimum: visibly present and
+ * tappable on a thin line over black, still clearly below an anchored arc so
+ * the clutter case survives in a weaker form. design-perf tunes it with the
+ * S-metrics they already hold. The literal rule ("never decrease with zoom")
+ * is satisfiable only by deleting fly-over dimming altogether, because zoom is
+ * what turns an anchored arc into a fly-over; this keeps the dimming and bans
+ * the disappearance.
+ */
+export const FLYOVER_FLOOR = 0.35;
+
+/**
  * 1 when either foot of an arc is within `margin` of the viewport, else 0.
  * An exact JS mirror of the shader's `step()` pair — GLSL's step(e, x) is
  * `x >= e ? 1 : 0`, so both edges are inclusive here too.
@@ -478,10 +499,10 @@ export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
 
 /**
  * The alpha multiplier the shader applies to a fly-over: 1 while the reader
- * is at overview, falling to the fly-over floor as they localize, and to
- * EXACTLY 0 at full depth so hundreds of flattened apexes stop smearing
- * across the view. Anything this returns 0 for is not painted, and therefore
- * must not be pickable.
+ * is at overview, falling to FLYOVER_FLOOR as they localize, and NO FURTHER.
+ * It no longer reaches 0 -- see FLYOVER_FLOOR for why -- so the shader's
+ * `dim <= 0` cull is never fed by this law, and every fly-over stays
+ * pickable at its on-screen midpoint.
  *
  * MUST stay identical to flyOverGLSL below and to the shader that inlines it.
  *
@@ -489,9 +510,7 @@ export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
  * @param {number} localize — localizeFactor()
  */
 export function flyOverDim(anchored, localize) {
-  const t = smoothstep(0.55, 1, localize);
-  const flyFloor = 0.1 + (0 - 0.1) * t;
-  const floored = flyFloor + (1 - flyFloor) * anchored;
+  const floored = FLYOVER_FLOOR + (1 - FLYOVER_FLOOR) * anchored;
   return 1 + (floored - 1) * localize;
 }
 
@@ -513,7 +532,7 @@ float arcAnchored(float x0, float x1, float width){
              step(-m, x1)*step(x1, width + m));
 }
 float flyOverDim(float anchored, float localize){
-  float flyFloor = mix(.10, 0., smoothstep(.55, 1., localize));
+  float flyFloor = ${FLYOVER_FLOOR};
   return mix(1., mix(flyFloor, 1., anchored), localize);
 }`;
 
