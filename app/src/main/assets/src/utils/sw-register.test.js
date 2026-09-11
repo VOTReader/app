@@ -11,6 +11,9 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { registerServiceWorker } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { _resetToasts } from './toast.js';
@@ -220,6 +223,18 @@ describe('registerServiceWorker — the update-reload flag and the early claim',
     window.__votController0 = null; stub(A);
     registerServiceWorker();
     expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('index.html captures the controller in its FIRST inline script, before dist/bundle-a.js — the compare above is silently off without it', () => {
+    const html = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../index.html'), 'utf8');
+    const capture = html.indexOf('window.__votController0 = (navigator.serviceWorker && navigator.serviceWorker.controller) || null;');
+    const firstScript = html.indexOf('<script>');
+    const bundleA = html.indexOf('dist/bundle-a.js');
+    expect(capture, 'the capture line is present').toBeGreaterThan(-1);
+    expect(firstScript, 'precondition: an inline script exists').toBeGreaterThan(-1);
+    expect(capture, 'inside the first inline script').toBeGreaterThan(firstScript);
+    expect(html.indexOf('</script>', firstScript), 'that script closes after the capture').toBeGreaterThan(capture);
+    expect(bundleA, 'before the first bundle').toBeGreaterThan(capture);
   });
 
   it('no capture at all (a document without the inline script): no reload', () => {
