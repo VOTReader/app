@@ -18,6 +18,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
+import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 
 /** Clearance below the top chrome before the VOT rail is drawn, in CSS px. */
 const TOP_INSET = 96;
@@ -247,7 +248,15 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   if (votRail && votRail.segments && votRail.total > 0) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.font = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
-    let row = 0;
+    // Measure before drawing: collection names are long ("Words To Live By:
+    // Part One"), and a name wider than twice its band is not printed at all.
+    // The rows are then given by the one placement law both rails share
+    // (rail-labels.js): the top row first, the second when the top's last
+    // name would be nearer than 5 px, and NO row when neither has room — the
+    // old alternation (row = 1 - row) tracked nothing about where a row's last
+    // name ended, and HOLY DAYS met MTAM 3 px apart at 1920 wide. Every band
+    // keeps its tick either way.
+    const names = [];
     for (const seg of votRail.segments) {
       if (!seg.count) continue;
       const span = segmentSpan(seg, opts);
@@ -256,21 +265,17 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       ctx.beginPath();
       ctx.moveTo(span.x0, rails.topY - 7 * DPR); ctx.lineTo(span.x0, rails.topY);
       ctx.stroke();
-      // Measure before drawing: collection names are long ("Words To Live By:
-      // Part One"), and printing one that doesn't fit just overlaps its
-      // neighbour into mush. Alternate rows buy width for the tighter ones.
       const label = (seg.short || seg.label).toUpperCase();
       const w = ctx.measureText(label).width;
-      const room = span.room;
-      if (w <= room - 6 * DPR) {
-        ctx.fillStyle = 'rgba(' + ink + ',0.8)';
-        ctx.fillText(label, span.labelX, rails.topY - 11 * DPR);
-      } else if (w <= room * 2) {
-        row = 1 - row;
-        ctx.fillStyle = 'rgba(' + ink + ',0.62)';
-        ctx.fillText(label, span.labelX, rails.topY - (row ? 27 : 11) * DPR);
-      }
+      if (w > span.room * 2) continue;
+      names.push({ label, x: span.labelX, left: span.labelX - w / 2, right: span.labelX + w / 2, fits: w <= span.room - 6 * DPR });
     }
+    const rows = placeRailLabels(names, 5 * DPR);
+    names.forEach((n, i) => {
+      if (rows[i] < 0) return;
+      ctx.fillStyle = 'rgba(' + ink + ',' + (n.fits && rows[i] === 0 ? 0.8 : 0.62) + ')';
+      ctx.fillText(n.label, n.x, rails.topY - (rows[i] ? 27 : 11) * DPR);
+    });
   }
 
   // ── the corpus's own curated edges, as a quiet underlay ──

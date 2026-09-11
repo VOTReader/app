@@ -450,9 +450,10 @@
     await step('Scripture Web', async function () {
       // Reached from the Library like every other personal-study surface. The
       // canvases are WebGL/2D, so assert the SHELL (headless CI may have no
-      // GPU): the screen mounted, both canvases exist, the graph asset landed
-      // and reported its size, and the CC-BY attribution is on screen — that
-      // last one is a licence obligation, not decoration.
+      // GPU): the screen mounted, both canvases exist, and the graph asset
+      // landed and reported its size ("15,402 connections"; the "of 63,418"
+      // left with sw-chrome-r3). The CC-BY attribution moved to About with
+      // that branch — the 'About' step below keeps the licence obligation gated.
       await goHome();
       clickByText(/Personal Study/); await sleep(320);
       clickByText(/Scripture Web/); await sleep(2200);
@@ -460,10 +461,21 @@
       if (!root) return false;
       const canvases = document.querySelectorAll('.sw-canvas').length === 2;
       const body = document.body.textContent || '';
-      const credited = /OpenBible\.info \(CC-BY\)/.test(body);
-      const counted = /of\s[\d,]+\sconnections/.test(body) || /links you have made/.test(body);
+      const counted = /(^|\s)[\d,]+\sconnections/.test(body) || /links you have made/.test(body);
       const fellBack = !!document.querySelector('.sw-fallback');
-      return canvases && credited && (counted || fellBack);
+      return canvases && (counted || fellBack);
+    });
+    await step('About', async function () {
+      // The one visible CC-BY attribution for the Scripture Web's dataset — a
+      // licence obligation, not decoration. It lived on the web canvas until
+      // sw-chrome-r3 (it printed over the book labels in landscape); do not let
+      // this step go with it without equivalent credit somewhere the reader sees.
+      await goHome();
+      if (!clickByText(/About VOTReader/)) return false;
+      await sleep(400);
+      const credit = document.querySelector('.about-credit');
+      const text = (credit && credit.textContent) || '';
+      return /OpenBible\.info/.test(text) && /CC-BY/.test(text);
     });
     await step('Library → Notes', async function () { return lib(/My Notes/, /My Notes/); });
     await step('Library → Bookmarks', async function () { return lib(/My Bookmarks/, /My Bookmarks/); });

@@ -236,7 +236,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
     DRAWN.length = 0; CALLS.length = 0;
     vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })));
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (kind) { return kind === '2d' ? fake2d() : null; });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(/** @type {any} */ (function (kind) { return kind === '2d' ? fake2d() : null; }));
     try { sessionStorage.clear(); } catch (_e) { /* private mode */ }
   });
   afterEach(() => {

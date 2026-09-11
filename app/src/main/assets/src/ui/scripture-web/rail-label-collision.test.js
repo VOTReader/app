@@ -28,6 +28,7 @@ if (typeof globalThis.Path2D === 'undefined') {
 }
 
 // READING_CHAIN order, then BIBLE_STUDIES order; counts as the corpus ships them (2026-09-11).
+/** @type {[string, string, number][]} */
 const CHAIN = [
   ['one', 'Vol I', 30], ['two', 'Vol II', 29], ['three', 'Vol III', 30], ['four', 'Vol IV', 29],
   ['five', 'Vol V', 29], ['six', 'Vol VI', 31], ['seven', 'Vol VII', 67], ['rebuke', 'Rebuke', 31],

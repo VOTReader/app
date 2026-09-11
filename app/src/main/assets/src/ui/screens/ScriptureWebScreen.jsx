@@ -34,6 +34,7 @@ import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js'
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, LINK_KIND_NAMES, LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
+import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -1065,75 +1066,28 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
   }
 
   // book names + separators
-  const span = [];
-  for (const c of g.chapters) {
-    if (!span[c[0]]) span[c[0]] = [c[2], c[2] + c[3]];
-    span[c[0]][1] = c[2] + c[3];
-  }
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  // Right edge already claimed on each of the two label rows, so a book can
-  // only print where it will not touch whatever printed before it.
-  const rowEnd = [-Infinity, -Infinity];
-  for (let bi = 0; bi < span.length; bi++) {
-    const s = span[bi][0], e = span[bi][1];
-    const x0 = X(s), x1 = X(e);
-    if (x1 < -90 || x0 > W + 90) continue;
-    ctx.strokeStyle = 'rgba(' + gold + ',0.22)';
-    ctx.beginPath(); ctx.moveTo(x0, base + 2 * DPR); ctx.lineTo(x0, base + 9 * DPR); ctx.stroke();
-    const width = x1 - x0;
-    // MEASURE before printing. A label wider than its book's own span (or its
-    // share of a staggered row) collides with its neighbour into mush — very
-    // visible on a phone, where Matthew/Luke/Acts sit within a few px of each
-    // other. Full name if it fits, else the abbreviation, else nothing.
-    const full = g.books[bi].title.toUpperCase();
-    const abbr = g.books[bi].abbr.toUpperCase();
-    const fullFont = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
-    const abbrFont = (chrome.fsRuler * DPR) + 'px Cinzel,Georgia,serif';
-    ctx.font = fullFont;
-    let label = null;
-    if (ctx.measureText(full).width <= width - 8 * DPR) {
-      label = full;
-    } else {
-      ctx.font = abbrFont;
-      const w = ctx.measureText(abbr).width;
-      // Staggering onto a second row buys a book roughly twice its own width
-      // before it can touch the neighbour printed on the same row.
-      if (w <= width * 2) label = abbr;
-    }
-    if (!label) continue;
-    ctx.font = label === full ? fullFont : abbrFont;
-    const w = ctx.measureText(label).width;
-    const cx = Math.max(Math.min((x0 + x1) / 2, W - 30 * DPR), 30 * DPR);
-    const left = cx - w / 2, right = cx + w / 2;
-    const pad = 5 * DPR;
-    // Prefer the top row; fall to the second only if the top is taken. If
-    // both are claimed, the book goes unlabelled rather than overprinting.
-    let row = -1;
-    if (left >= rowEnd[0] + pad) row = 0;
-    else if (left >= rowEnd[1] + pad) row = 1;
-    if (row < 0) continue;
-    rowEnd[row] = right;
-    ctx.fillStyle = 'rgba(' + ink + ',' + (row ? 0.62 : 0.86) + ')';
-    ctx.fillText(label, cx, base + (row ? 48 : 34) * DPR);
-  }
+  drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
 }
 
 /**
- * The scripture rail's ruler, reused under the personal web so the bottom
- * axis reads identically in both modes.
+ * The books along the scripture rail — the tick, then the name where it can
+ * be read: the full title when it fits the book's span, else the abbreviation
+ * when that is under twice the span, else nothing. Rows come from the ONE
+ * placement law both rails share (rail-labels.js): the top row first, the
+ * second when the top's last name would be nearer than 5 px, no row when
+ * neither has room. Shared by drawRuler (the canon) and drawRulerOnly (My
+ * Web), which each carried a copy of this before.
  */
-function drawRulerOnly(ctx, g, cam, view, v, chrome) {
-  const W = v.W, DPR = v.DPR, base = view.base;
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
-  const X = (verse) => verseToX(cam, W, verse);
+function drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold) {
   const span = [];
   for (const c of g.chapters) {
     if (!span[c[0]]) span[c[0]] = [c[2], c[2] + c[3]];
     span[c[0]][1] = c[2] + c[3];
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  const rowEnd = [-Infinity, -Infinity];
+  const fullFont = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
+  const abbrFont = (chrome.fsRuler * DPR) + 'px Cinzel,Georgia,serif';
+  const names = [];
   for (let bi = 0; bi < span.length; bi++) {
     const x0 = X(span[bi][0]), x1 = X(span[bi][1]);
     if (x1 < -90 || x0 > W + 90) continue;
@@ -1146,35 +1100,41 @@ function drawRulerOnly(ctx, g, cam, view, v, chrome) {
     // other. Full name if it fits, else the abbreviation, else nothing.
     const full = g.books[bi].title.toUpperCase();
     const abbr = g.books[bi].abbr.toUpperCase();
-    const fullFont = '600 ' + (chrome.fsLabel * DPR) + 'px Cinzel,Georgia,serif';
-    const abbrFont = (chrome.fsRuler * DPR) + 'px Cinzel,Georgia,serif';
     ctx.font = fullFont;
     let label = null;
     if (ctx.measureText(full).width <= width - 8 * DPR) {
       label = full;
     } else {
       ctx.font = abbrFont;
-      const w = ctx.measureText(abbr).width;
       // Staggering onto a second row buys a book roughly twice its own width
       // before it can touch the neighbour printed on the same row.
-      if (w <= width * 2) label = abbr;
+      if (ctx.measureText(abbr).width <= width * 2) label = abbr;
     }
     if (!label) continue;
     ctx.font = label === full ? fullFont : abbrFont;
     const w = ctx.measureText(label).width;
     const cx = Math.max(Math.min((x0 + x1) / 2, W - 30 * DPR), 30 * DPR);
-    const left = cx - w / 2, right = cx + w / 2;
-    const pad = 5 * DPR;
-    // Prefer the top row; fall to the second only if the top is taken. If
-    // both are claimed, the book goes unlabelled rather than overprinting.
-    let row = -1;
-    if (left >= rowEnd[0] + pad) row = 0;
-    else if (left >= rowEnd[1] + pad) row = 1;
-    if (row < 0) continue;
-    rowEnd[row] = right;
-    ctx.fillStyle = 'rgba(' + ink + ',' + (row ? 0.62 : 0.86) + ')';
-    ctx.fillText(label, cx, base + (row ? 48 : 34) * DPR);
+    names.push({ label, font: ctx.font, cx, left: cx - w / 2, right: cx + w / 2 });
   }
+  const rows = placeRailLabels(names, 5 * DPR);
+  names.forEach((n, i) => {
+    if (rows[i] < 0) return;
+    ctx.font = n.font;
+    ctx.fillStyle = 'rgba(' + ink + ',' + (rows[i] ? 0.62 : 0.86) + ')';
+    ctx.fillText(n.label, n.cx, base + (rows[i] ? 48 : 34) * DPR);
+  });
+}
+
+/**
+ * The scripture rail's ruler, reused under the personal web so the bottom
+ * axis reads identically in both modes.
+ */
+function drawRulerOnly(ctx, g, cam, view, v, chrome) {
+  const W = v.W, DPR = v.DPR, base = view.base;
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const X = (verse) => verseToX(cam, W, verse);
+  drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
 }
 
 /* ── chrome pieces ─────────────────────────────────────────────────────── */
