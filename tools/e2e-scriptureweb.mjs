@@ -85,7 +85,10 @@
  *         chosen, with no tolerance band. Chrome that stops overlapping itself
  *         has not necessarily got out of the reader's way: landing 70 cut this
  *         band 39%% at 320x640 with every other arm green. A frame with no
- *         registered floor FAILS rather than passing — the tallest run of viewport height no chrome
+ *         registered floor FAILS rather than passing — and so does an
+ *         unregistered PLATFORM, because the band's top is chrome height, which
+ *         is text layout, and this walk runs on a developer's win32 and on
+ *         ubuntu-latest in ci.yml — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
  *         reading-column question was really asking about, and no threshold
  *         for it has been agreed.
@@ -229,9 +232,22 @@ const NOTE_GAP_MAX = num('SWWEB_NOTE_GAP_MAX', 30);
 let BROWSER_BUILD = null;
 
 const BAND_FLOOR = {
-  '320x640': 154,   // y 237..391, chrome 70.6% -- same in all three runs
-  '426x952': 518,   // y 237..755, chrome 42% -- same in all three runs
+  /* KEYED BY PLATFORM AS WELL AS FRAME, because the band's top is chrome
+     height, which is TEXT LAYOUT, and this walk runs on two platforms: a
+     developer's win32 and `ubuntu-latest` in ci.yml. At zero margin one pixel
+     of font-metric difference reddens it by construction, and a floor that
+     reddens for a reason nobody can act on is a floor that gets lowered. */
+  win32: {
+    '320x640': 154,   // y 237..391, chrome 70.6% — identical in all three runs
+    '426x952': 518,   // y 237..755, chrome 42.0% — identical in all three runs
+  },
+  /* linux: DELIBERATELY UNREGISTERED. Registering a guess would be worse than
+     the gap — an unregistered platform says "this has never been measured
+     here", which is true and actionable, while a guessed number says "the band
+     shrank" about a machine nobody has measured. It fails exactly the way an
+     unregistered FRAME does, and for the same reason. */
 };
+const BAND_FLOOR_PLATFORM = BAND_FLOOR[process.platform];
 
 const PARAMS = [
   'frames=' + FRAMES.map((f) => f.w + 'x' + f.h).join(','),
@@ -249,7 +265,10 @@ const PARAMS = [
   'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
   'requiredPainted=' + REQUIRED_PAINTED.map((r) => r.sel).join('|'),
   'noteGapMax=' + NOTE_GAP_MAX,
-  'bandFloor=' + Object.entries(BAND_FLOOR).map(([k, v]) => k + ':' + v).join('|'),
+  'platform=' + process.platform,
+  'bandFloor=' + (BAND_FLOOR_PLATFORM
+    ? Object.entries(BAND_FLOOR_PLATFORM).map(([k, v]) => k + ':' + v).join('|')
+    : 'NONE REGISTERED FOR ' + process.platform),
 ].join(' ');
 
 console.log('[e2e-swweb] PARAMS ' + PARAMS);
@@ -602,18 +621,24 @@ function armChrome(tag, geo) {
   /* Built from the fields the object ALREADY carries. A second copy of the
      viewport size would be two definitions that must agree. */
   const frameKey = `${Math.round(geo.innerWidth)}x${geo.innerHeight}`;
-  const floor = BAND_FLOOR[frameKey];
-  if (floor === undefined) {
-    fail(`2d ${frameKey} has NO REGISTERED FLOOR for the open reading band (${geo.band.h} px measured). `
-      + 'A new frame needs a measured floor, not a default — a default that passes is indistinguishable '
-      + 'from a gate that is not watching this frame at all');
+  const floor = BAND_FLOOR_PLATFORM && BAND_FLOOR_PLATFORM[frameKey];
+  if (!BAND_FLOOR_PLATFORM) {
+    fail(`2d NO FLOOR IS REGISTERED FOR PLATFORM ${JSON.stringify(process.platform)} (${geo.band.h} px measured at `
+      + `${frameKey}). The band's top is chrome height, which is text layout, so a floor measured on another `
+      + 'platform is a number about another machine — and at zero margin one pixel of font-metric difference '
+      + 'reddens it by construction. Measure this platform three consecutive times and register what it reads; '
+      + 'do NOT reuse another platform\'s number and do NOT add a tolerance to make one fit');
+  } else if (floor === undefined) {
+    fail(`2d ${frameKey} has NO REGISTERED FLOOR for the open reading band (${geo.band.h} px measured) on `
+      + `${process.platform}. A new frame needs a measured floor, not a default — a default that passes is `
+      + 'indistinguishable from a gate that is not watching this frame at all');
   } else if (geo.band.h < floor) {
     fail(`2d the open reading band is ${geo.band.h} px at ${frameKey}, BELOW the registered floor of ${floor} px `
       + `— the chrome took ${floor - geo.band.h} px from the reader. Chrome that stops overlapping itself has not `
       + 'necessarily got out of the reader\'s way, and this is the only arm that can tell the difference');
   }
   notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; `
-    + `chrome covers ${geo.coveredPct}%; floor ${floor === undefined ? 'NONE REGISTERED' : floor + ' px'}; `
+    + `chrome covers ${geo.coveredPct}%; floor ${floor === undefined ? 'NONE REGISTERED for ' + process.platform : floor + ' px (' + process.platform + ')'}; `
     + `browser ${BROWSER_BUILD || 'UNDETERMINED — browser.version() gave nothing, so a red here cannot be told from an instrument change'}`);
 
   /* WHAT ARM 2 RAN. 0 failures and 0 checks are the same output, so the counts
