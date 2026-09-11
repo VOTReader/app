@@ -14,6 +14,10 @@
 import { TOUR_LETTER } from '../hooks/use-tour.js';
 import { describe, it, expect, afterEach } from 'vitest';
 import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
+import { SCRIPTURE_WEB_FAMOUS_COUNT } from './scripture-web/famous-count.js';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 afterEach(() => { document.body.innerHTML = ''; });
 
@@ -125,9 +129,9 @@ describe('tour-steps — shape', () => {
 
   it("the scripture-web stop says the trailer slide's three sentences and names both halves", () => {
     const sw = TOUR_STEPS.find((s) => s.id === 'scripture-web');
-    expect(sw.title).toBe('See the Scriptures as a web');
-    expect(sw.text).toBe('Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible\'s threads. My Web holds the links you make yourself.');
-    expect(sw.tip).toBe('Tap a thread to read both ends.');
+    expect(sw.title).toBe('The Bible as a web');
+    expect(sw.text).toBe('Every place one verse points to another is drawn as a thread: ' + SCRIPTURE_WEB_FAMOUS_COUNT.toLocaleString() + ' of them across the Bible. Tap a thread and both verses come up. My Web is the same web, made of the links you make yourself.');
+    expect(sw.tip).toBe('Explore the Bible like never before.');
     expect(TOUR_WORDS).toContain('Scripture Web');
     expect(TOUR_WORDS).toContain('My Web');
   });
@@ -154,8 +158,8 @@ describe('tour-steps — shape', () => {
   it('the settings stop says the features can be switched on or off in Settings, and names three by their on-screen names', () => {
     const st = TOUR_STEPS.find((s) => s.id === 'settings');
     expect(st.title).toBe('Make it yours');
-    expect(st.text).toMatch(/switched on or off/);
-    expect(st.text).toContain('Settings');
+    // "switched off here" since the 09-11 copy sheet — the stop IS Settings, the word is the screen's.
+    expect(st.text).toMatch(/switched off here/);
     for (const name of ['Surprise Me', 'Reading Position Marker', 'Auto-Scroll']) expect(st.text, name).toContain(name);
   });
 
@@ -236,3 +240,107 @@ describe('the Listen stop seeks into the recording the tour actually opens', () 
   });
 });
 
+/* THE 09-11 COPY SHEET (Creative & Media, tour-copy-sheet.md, 17:25; Corbin's beats of 17:0x). Every
+   line the sheet changes is pinned VERBATIM here, so a stray edit reddens the row that carries it, and
+   the rows the sheet leaves alone are pinned too, marked as controls: they are green before and after
+   and prove the table is reading the stops it names. The count on the Scripture Web stop is never a
+   literal: it comes from the generated module the data generator writes beside the data, formatted
+   the way the screen formats its own counter (toLocaleString), and two cases below hold it to the
+   committed data and to the absence of typed digits in the source. */
+describe('tour-steps — the 09-11 copy sheet', () => {
+  const stop = (id) => TOUR_STEPS.find((s) => s.id === id);
+  const COUNT = SCRIPTURE_WEB_FAMOUS_COUNT.toLocaleString();
+  /** @type {[string, 'title'|'text'|'tip'|'after', string, boolean][]} id, field, the sheet's line, changed-by-the-sheet */
+  const SHEET = [
+    ['welcome', 'text', 'A short tour: ' + TOUR_STOPS_WORD + ' stops, about two minutes. Skip any time. Find it again under Settings › Help.', true],
+    ['letters', 'text', 'Every letter of The Volumes of Truth lives here. Tap a Volume, then a letter, or press Next and I will open one.', true],
+    ['listen', 'text', 'Press Listen. The words light up as they are read, and the page follows along.', false],
+    ['listen', 'tip', 'Tap it now, or press Next and I will do it for you.', false],
+    ['listen', 'after', 'Hear it? The words light up as they are read, and the page follows along. Tap any line and the reading jumps to it. Press Next when you are ready.', true],
+    ['highlight', 'text', 'Hold any line for a moment. A small bar appears: Highlight, Note, or Link. Everything you mark collects in the Library.', true],
+    ['highlight', 'after', 'See the colour? Hold any line to do this yourself, any time. Link ties a line to any other passage. Press Next when you are ready.', true],
+    ['bible', 'text', 'This is John 3: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen. The verses light up one by one as they are read.', true],
+    ['bible', 'after', 'Hear it? Each verse lights up as it is read. Press Next when you are ready.', false],
+    ['scripture-web', 'title', 'The Bible as a web', true],
+    ['scripture-web', 'text', 'Every place one verse points to another is drawn as a thread: ' + COUNT + ' of them across the Bible. Tap a thread and both verses come up. My Web is the same web, made of the links you make yourself.', true],
+    ['scripture-web', 'tip', 'Explore the Bible like never before.', true],
+    ['journal', 'text', 'Your Journal lives in the Library. Tap New Entry and write. It saves by itself.', true],
+    ['backup', 'text', 'Your notes stay on your device. One tap on Export saves a backup file. Import brings it back.', false],
+    ['settings', 'title', 'Make it yours', false],
+    ['settings', 'text', 'Most of what you have seen can be switched off here: Surprise Me, the Reading Position Marker, Auto-Scroll, and the parts of the screen you do not need, like Search, History and the icons in the top bar. Keep what you use.', true],
+    ['done', 'text', 'Find it again under Settings › Help. Enjoy your reading.', true],
+  ];
+
+  it('every line the sheet changes is the sheet\'s line, verbatim (thirteen rows red before the copy landed)', () => {
+    for (const [id, field, line, changed] of SHEET) {
+      if (!changed) continue;
+      expect(stop(id)[field], id + '.' + field).toBe(line);
+    }
+    expect(SHEET.filter((r) => r[3]).length).toBe(13);
+  });
+
+  it('CONTROL — the rows the sheet leaves alone still read as they did (green before and after; proves the table reads the stops it names)', () => {
+    for (const [id, field, line, changed] of SHEET) {
+      if (changed) continue;
+      expect(stop(id)[field], id + '.' + field).toBe(line);
+    }
+    expect(SHEET.filter((r) => !r[3]).length).toBe(5);
+  });
+
+  it('the Listen stop\'s after-line invites the tap-to-seek, in the reading\'s words, not the audio\'s (Corbin, 17:0x)', () => {
+    expect(stop('listen').after).toContain('Tap any line and the reading jumps to it.');
+    expect(stop('listen').text).not.toMatch(/jumps/);   // the text line stays the trailer's
+    expect(stop('listen').after).not.toMatch(/audio|player|seek/i);
+  });
+
+  it('the highlight stop names Link, the third button on the real bar, and TOUR_WORDS carries it', () => {
+    expect(stop('highlight').text).toMatch(/Highlight, Note, or Link/);
+    expect(stop('highlight').after).toMatch(/Link ties a line/);
+    expect(TOUR_WORDS).toContain('Link');
+    expect(TOUR_WORDS).toContain('Highlight');
+    expect(TOUR_WORDS).toContain('Note');
+  });
+
+  /* THE COUNT IS READ, NEVER TYPED. Three legs: (a) the stop's sentence carries the generated
+     count formatted the way the screen formats its own counter; (b) the generated count IS the
+     committed data's Famous count by the screen's own law (graphStats: the sum of every bucket's
+     off10) — read from src/data/scripture-web-data.js on disk, not from a second copy of the law's
+     answer; (c) the digits appear nowhere in tour-steps.js's source, raw or formatted. */
+  const here = dirname(fileURLToPath(import.meta.url));
+  it('the Scripture Web stop says the generated count, formatted like the screen', () => {
+    expect(SCRIPTURE_WEB_FAMOUS_COUNT).toBeGreaterThan(1000);
+    expect(stop('scripture-web').text).toContain(': ' + COUNT + ' of them across the Bible.');
+  });
+  it('the generated count is the committed data\'s Famous count under the screen\'s law (sum of off10)', () => {
+    const src = readFileSync(resolve(here, '../data/scripture-web-data.js'), 'utf8');
+    const at = src.indexOf('var SCRIPTURE_WEB_DATA = ');
+    expect(at, 'the data file declares SCRIPTURE_WEB_DATA').toBeGreaterThan(0);
+    const data = JSON.parse(src.slice(at + 'var SCRIPTURE_WEB_DATA = '.length).replace(/;\s*$/, ''));
+    expect(data.buckets.length, 'buckets').toBeGreaterThan(0);
+    const famous = data.buckets.reduce((n, b) => n + b.off10, 0);
+    expect(famous).toBe(SCRIPTURE_WEB_FAMOUS_COUNT);
+    expect(famous).toBe(data.count);   // today every shipped thread is Famous; if that ever changes, the law above still rules
+  });
+  it('the count\'s digits are not typed anywhere in tour-steps.js (raw or formatted)', () => {
+    const src = readFileSync(resolve(here, 'tour-steps.js'), 'utf8');
+    expect(src, 'raw digits').not.toContain(String(SCRIPTURE_WEB_FAMOUS_COUNT));
+    expect(src, 'formatted').not.toContain(COUNT);
+    expect(src, 'the placeholder is what the source carries').toContain('{COUNT}');
+    // and the positive on the same file: the module that supplies it is imported
+    expect(src).toMatch(/from '\.\/scripture-web\/famous-count\.js'/);
+  });
+
+  it('still a welcome card plus nine numbered stops — the sheet adds none', () => {
+    expect(stepCount()).toBe(10);
+    expect(TOUR_STOPS_WORD).toBe('nine');
+    expect(stop('welcome').text).toContain('nine stops');
+  });
+
+  it('no banned word in any title, text, tip or after-line (the older gate read title + text only)', () => {
+    for (const s of TOUR_STEPS) {
+      for (const f of ['title', 'text', 'tip', 'after']) {
+        if (s[f]) expect(bannedWord(s[f]), s.id + '.' + f).toBeNull();
+      }
+    }
+  });
+});
