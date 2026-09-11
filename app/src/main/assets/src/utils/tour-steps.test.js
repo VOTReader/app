@@ -159,6 +159,18 @@ describe('tour-steps — shape', () => {
     for (const name of ['Surprise Me', 'Reading Position Marker', 'Auto-Scroll']) expect(st.text, name).toContain(name);
   });
 
+  /* Corbin, 2026-09-11: the stop should also say the reader can "control many UI features (like
+     disabling search, history, other icons, etc) in settings". Named by the words Settings shows:
+     the Search and History rows (Search, Tabs & History) and the icons of the top bar
+     (Top-Nav Buttons — "Icons in the reading bar"). "UI" itself is on the banned list. */
+  it('the settings stop also names Search, History and the top-bar icons as things that can be switched off', () => {
+    const st = TOUR_STEPS.find((s) => s.id === 'settings');
+    for (const name of ['Search', 'History']) expect(st.text, name).toMatch(new RegExp('(^|[^A-Za-z])' + name + '([^A-Za-z]|$)'));
+    expect(st.text).toMatch(/icons/i);
+    expect(bannedWord(st.text)).toBeNull();
+    expect(st.text.split(/\s+/).length).toBeLessThan(60);
+  });
+
   /* The closing card used to carry highlighting as a parting sentence. Now that it is a stop of
      its own, that sentence would teach it twice and the second time without showing anything.
      Asserted as ABSENCE plus a positive on the same string, so a card emptied by accident cannot

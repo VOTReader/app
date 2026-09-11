@@ -57,12 +57,26 @@ describe('the Scripture Web controls float over the canvas, with no panel behind
     expect(body).not.toMatch(/border-radius/);
   });
 
-  it('the attribution keeps a legibility treatment, and it is not a panel', () => {
-    /* An unreadable CC-BY line is a licence problem. It lost the box behind it,
-       so it must gain something — and that something must not be another box. */
-    const credit = bareRule('.sw-credit');
-    expect(credit).toMatch(/text-shadow/);
-    expect(credit).not.toMatch(/background/);
+  /* Round 3 (Corbin, 2026-09-11): the credit left the canvas — it printed over the book labels
+     in landscape — and About carries the CC-BY line. Its rule goes with it: a rule for an
+     element nothing renders is the dead CSS the css-tokens gate exists to keep out. */
+  it('the canvas credit has no rule left in app.css (the attribution is About\'s)', () => {
+    const css = fs.readFileSync(CSS, 'utf8');
+    expect(css).not.toMatch(/\.sw-credit\b/);
+  });
+
+  /* The hide button hides the interactive chrome and KEEPS the legend: the one rule that hides
+     under .sw-chrome-hidden names the topbar and the strip and must not name the colour key.
+     Anchored on the rule itself, with a positive on the same rule, so a stylesheet that lost
+     the rule cannot satisfy the absence. */
+  it('the hidden state hides the topbar and the strip, not the legend', () => {
+    const css = fs.readFileSync(CSS, 'utf8');
+    const m = css.match(/\.sw-root\.sw-chrome-hidden\s*:is\(([^)]*)\)\s*\{\s*display:\s*none;?\s*\}/);
+    expect(m, 'the .sw-root.sw-chrome-hidden :is(...) { display: none } rule').toBeTruthy();
+    const hidden = m[1];
+    expect(hidden).toMatch(/\.sw-topbar/);
+    expect(hidden).toMatch(/\.sw-controls/);
+    expect(hidden).not.toMatch(/\.sw-legend/);
   });
 });
 

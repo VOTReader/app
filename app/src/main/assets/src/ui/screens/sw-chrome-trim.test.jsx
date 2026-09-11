@@ -197,3 +197,106 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(screen.getByLabelText(HIDE_ALL)).toBeTruthy();
   });
 });
+
+/* ROUND 3 (Corbin, 2026-09-11, from a landscape screenshot with the credit printed over the
+ * book labels): "Get rid of the 'cross reference open bible' shpeel, it's colliding with other
+ * text." — the credit leaves the canvas (About carries the CC-BY line). The hide button
+ * "should still keep the web legend (the books at the bottom, etc) but just hide the
+ * interactable UI for small screens" — so hidden means the pills, Reset and the counter go and
+ * the book rail (drawn on the UI canvas) and the colour key stay. The header count "just keep
+ * x connections".
+ *
+ * The rail is canvas ink, not DOM, so the harness hands the UI canvas a RECORDING 2D context
+ * (the setup shim returns null for every context, which is exactly what let the old
+ * "hidden clears the rail" branch pass unobserved). The precondition case proves a label is
+ * painted at all before the hidden case asks whether it survives. */
+describe('the Scripture Web chrome, round 3 — the credit goes, the hide button keeps the legend and the rail', () => {
+  const CALLS = [];
+  const fake2d = () => new Proxy({}, {
+    get(_t, prop) {
+      if (prop === 'measureText') return (s) => { CALLS.push(['measureText', s]); return { width: 20 }; };
+      if (prop === 'canvas') return null;
+      return (...a) => { CALLS.push([String(prop), ...a]); };
+    },
+    set() { return true; },
+  });
+  const labelsPainted = () => CALLS.filter((c) => c[0] === 'fillText').map((c) => String(c[1]));
+  const waitForLabel = async () => {
+    for (let i = 0; i < 60 && !labelsPainted().some((s) => /^gen/i.test(s)); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    return labelsPainted();
+  };
+
+  beforeEach(() => {
+    setViewport(900, 600);
+    for (const [prop, value] of SIZES) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return value; } });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
+    DRAWN.length = 0; CALLS.length = 0;
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })));
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (kind) { return kind === '2d' ? fake2d() : null; });
+    try { sessionStorage.clear(); } catch (_e) { /* private mode */ }
+  });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    for (const [prop] of SIZES) delete HTMLCanvasElement.prototype[prop];
+    delete window.SCRIPTURE_WEB_DATA;
+  });
+
+  it('precondition: with the chrome showing, the rail paints a book label on the UI canvas (the recorder sees it)', async () => {
+    await mount();
+    const labels = await waitForLabel();
+    /* If this is empty the recorder is not reaching drawRuler and the hidden case below
+       would be red for the wrong reason (or green for none). */
+    expect(labels.some((s) => /^gen/i.test(s)), 'a Genesis label: ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
+  });
+
+  it('renders NO credit line on the canvas — the attribution lives on About', async () => {
+    const { container } = await mount();
+    expect(container.querySelector('.sw-credit')).toBeNull();
+    expect(screen.queryByText(/OpenBible/i)).toBeNull();
+  });
+
+  it('hidden keeps the book rail: a draw after the hide still paints the book labels', async () => {
+    await mount();
+    await waitForLabel();
+    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    CALLS.length = 0;
+    const labels = await waitForLabel();
+    expect(labels.some((s) => /^gen/i.test(s)), 'labels after the hide: ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
+  });
+
+  it('hidden keeps the book rail in My Web too — one screen, two modes', async () => {
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+    await tick();
+    await waitForLabel();
+    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    CALLS.length = 0;
+    const labels = await waitForLabel();
+    expect(labels.some((s) => /^gen/i.test(s)), 'labels after the hide (My Web): ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
+  });
+
+  it('hidden keeps the colour key in the DOM and hides the strip and the topbar', async () => {
+    const { container } = await mount();
+    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    const root = container.querySelector('.sw-root.sw-chrome-hidden');
+    expect(root).toBeTruthy();
+    /* The elements stay mounted either way (the hiding is CSS); the CSS gate lives in
+       sw-dark-nobox.test.js. Here: the key is still rendered with its entries. */
+    expect(root.querySelector('.sw-legend .sw-key')).toBeTruthy();
+    expect(root.querySelector('.sw-controls')).toBeTruthy();
+  });
+
+  it('the header count reads "N connections", not "N of M connections"', async () => {
+    const { container } = await mount();
+    const sub = container.querySelector('.sw-title p');
+    expect(sub).toBeTruthy();
+    expect(sub.textContent).toMatch(/^\d[\d,]* connections$/);
+    expect(sub.textContent).not.toMatch(/ of /);
+  });
+});
