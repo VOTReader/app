@@ -137,3 +137,46 @@ describe('detach', () => {
     expect(schedule).not.toHaveBeenCalled();
   });
 });
+
+/* Corbin, 2026-09-11: "fully zoomed into bible web, you can't grab the screen (pc or android)
+   and move around". Measured in the walk browser (probe-sw-pan.mjs, 245a15c0): the drag ALONG
+   the canon pans at the ceiling on both frames; what does not is a swipe ACROSS it — `moved`
+   was read from x alone, so a 100 px perpendicular swipe ended as a TAP, opened the thread
+   chooser over the canvas, and every drag after it started on the sheet and moved nothing.
+   On a phone held sideways that is exactly "I dragged, nothing moved, a card was in the way". */
+describe('a swipe across the canon is not a tap (w-sw-zoom-pan, item 1)', () => {
+  it('RED today: a 100 px perpendicular swipe opens nothing, and the next drag along the canon pans', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { cam, handlers } = attach(root);
+    const x0 = cam.x;
+    // the swipe: down at (300, 200), straight down the glass to (300, 300), up
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    for (let i = 1; i <= 8; i++) root.dispatchEvent(pointerEvent('pointermove', { clientX: 300, clientY: 200 + i * 12.5 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 300 }));
+    expect(handlers.tap, 'a 100 px swipe must not read as a tap (it opens the chooser over the canvas)').not.toHaveBeenCalled();
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+    expect(cam.x, 'a perpendicular swipe pans nothing').toBe(x0);
+    // the next drag, along the canon, pans by the dragged distance
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 200, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 200, clientY: 300 }));
+    expect(cam.x - x0, 'the drag after the swipe pans 100 px = 10 verses at ppv 10').toBeCloseTo(10, 6);
+    expect(handlers.tap).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL — a real tap (no motion) still taps, and a 2 px tremor is still a tap', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
+    expect(handlers.tap).toHaveBeenCalledTimes(1);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 301, clientY: 202 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 301, clientY: 202 }));
+    /* 400 ms apart would be two taps; the harness fires them within a tick, so the second lands
+       as a double-tap — either way the tremor did not become a drag, which is what this pins. */
+    expect(handlers.tap.mock.calls.length + handlers.doubleTap.mock.calls.length).toBe(2);
+  });
+});
