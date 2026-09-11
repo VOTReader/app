@@ -2629,7 +2629,9 @@ _restoreFromSaved();
    The boot after the reload consumes the record, seeks the restored bar to
    that clock and tries play() without a gesture. Android's WebView allows it
    (mediaPlaybackRequiresUserGesture=false); a browser that refuses answers
-   NotAllowedError, and the update toast then carries the tap
+   NotAllowedError — tried ONCE more 300 ms later when the reader's sticky
+   activation says the tap already happened (the activation race, below) —
+   and the update toast then carries the tap
    (utils/update-toast.js, reached through window.__votUpdateToastResume —
    bundle-d cannot import bundle-b). Paused or idle at the reload: no record. */
 const RESUME_AFTER_UPDATE_KEY = 'vot-audio-resume-after-update';
@@ -2686,13 +2688,47 @@ if (typeof window !== 'undefined') {
   };
 }
 
+/* ── the activation race (update-resume-activation-race-1, 2026-09-11) ────
+   The document reloaded for an update has the reader's STICKY activation from
+   its first instant (navigator.userActivation.hasBeenActive — the tap that
+   started the recording, kept across the reload) but its TRANSIENT activation
+   arrives ~90–175 ms after document start, and a boot play() that lands before
+   it is refused on the same boot that allows it 300 ms later (the Verifier's
+   probe on 95's tree: play() held to +166 ms REFUSED, to +443 ms ALLOWED; 11 of
+   11 local arms refused, 3 of 4 live arms resumed by themselves). So a refused
+   resume with the sticky bit set is retried ONCE, RESUME_RETRY_MS later; a
+   second refusal takes the toast path. An absent API is not "true" (older
+   WebViews, jsdom): no retry. The retry is the same element at the same
+   intended seek — no clock moves — and it stands down if anything else asked
+   the element to play meanwhile, so audio is never asked to start twice. */
+const RESUME_RETRY_MS = 300;
+let _resumeRetried = false;
+
+function _stickyActivation() {
+  try { const u = navigator.userActivation; return !!u && u.hasBeenActive === true; } catch (_e) { return false; }
+}
+
+function _retryResumePlay() {
+  if (!_resumeAfterUpdateArmed || !_el) return;                 // the toast path already ran, or the bar is gone
+  if (!_el.paused) { _resumeAfterUpdateArmed = false; return; } // the reader's own tap asked for sound: nothing to add
+  const p = _el.play();
+  if (p && typeof p.then === 'function') p.then(() => { _resumeAfterUpdateArmed = false; }, (err) => { _playRefused(err); });
+}
+
 /** A play() the browser refused. NotAllowedError is the autoplay policy: the
  *  bar shows Play instead of a spinner, and if this was the update resume the
- *  update toast offers the tap. Anything else is the element's 'error' path. */
+ *  update toast offers the tap — after the one retry above, when the reader's
+ *  sticky activation says the tap already happened. Anything else is the
+ *  element's 'error' path. */
 function _playRefused(err) {
   if (!err || err.name !== 'NotAllowedError') return;
   _markPaused();
   if (!_resumeAfterUpdateArmed) return;
+  if (!_resumeRetried && _stickyActivation()) {
+    _resumeRetried = true;
+    setTimeout(_retryResumePlay, RESUME_RETRY_MS);
+    return;
+  }
   _resumeAfterUpdateArmed = false;
   const offer = _g().__votUpdateToastResume;
   if (typeof offer === 'function') offer(() => { toggle(); });
