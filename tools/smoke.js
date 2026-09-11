@@ -914,7 +914,8 @@
       ' | ' + Math.round(now() - t0) + 'ms';
     return report;
   };
-  root.votSmoke._waitUntil = waitUntil;   // the read helper, for tools/smoke.test.js
+  root.votSmoke._waitUntil = waitUntil;       // the read helpers, for tools/smoke.test.js
+  root.votSmoke._waitForMarks = waitForMarks;
 
   if (typeof console !== 'undefined') {
     console.log('[votSmoke] loaded — run: votSmoke().then(r=>console.log(JSON.stringify(r,null,2)))');
