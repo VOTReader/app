@@ -51,7 +51,11 @@
  *         as UNHITTABLE, not covered — the hit test has no answer for it, and
  *         what comes back is whatever is behind. 2a's rect overlap is what
  *         covers such an element.
- *     2c  nothing spills the viewport horizontally
+ *     2c  nothing spills the viewport horizontally, and NOTHING IN THE SET IS
+ *         UNJUDGEABLE: an element that is `pointer-events: none` gets no answer
+ *         from elementFromPoint, and 2a cannot cover for it once the element is
+ *         nested inside another chrome block, so the pair of them go quiet
+ *         together. Measured 0 here; a legitimate case gets a named allowance
  *     2f  the chrome whose ABSENCE is a defect — the topbar (the only way off
  *         this screen) and the CC-BY line (a licence obligation) — is PAINTED,
  *         not merely present. Nothing else in arm 2 can see that: 2a skips the
@@ -392,10 +396,23 @@ function armChrome(tag, geo) {
   for (const o of geo.overlaps) {
     fail(`2a ${o.a} overlaps ${o.b} by ${o.w}x${o.h} px at (${o.x}, ${o.y})`);
   }
+  /* AN UNJUDGEABLE ELEMENT FAILS. Recording the blindness is right and is not
+     enough: a blindness that is acceptable today and unacceptable tomorrow
+     reads identically in a green log, and `unhittable=1` passing silently is
+     the whole problem. The chrome fix removes `pointer-events: none` from
+     `.sw-credit`, and that removal is what makes the credit judgeable at all —
+     with the property, 2b files it here as a note and 2a skips its pair because
+     the fix nests it inside `.sw-controls`, so both arms go quiet and nothing
+     looks. Re-adding the property for a plausible reason would return the
+     credit to unjudgeable through a one-line change that no arm opposed.
+     Measured on this tree: unhittable = 0 at all four frames, so this is a live
+     assertion and not an aspiration. A future element that legitimately cannot
+     be hit-tested gets a NAMED allowance here, not silence. */
   for (const u of geo.unhittable) {
-    notes.push(`${tag} 2b ${JSON.stringify(u.label)} (${u.sel}) cannot be hit-tested — it is \`pointer-events: none\`, so `
-      + `elementFromPoint returned ${u.by}, which is what is BEHIND it. Its visibility is unproven here, not disproven; `
-      + '2a\'s rect overlap is what covers this element on this tree.');
+    fail(`2b ${JSON.stringify(u.label)} (${u.sel}) CANNOT BE JUDGED — it is \`pointer-events: none\`, so `
+      + `elementFromPoint returned ${u.by}, which is what is BEHIND it. Its visibility is unproven here, not `
+      + 'disproven, and 2a cannot cover for it when the element is nested inside another chrome block. '
+      + 'Either make it hit-testable or add a named allowance saying why being unjudgeable is acceptable.');
   }
   for (const c of geo.covered) {
     fail(`2b ${JSON.stringify(c.label)} (${c.sel}) is covered at its own centre (${c.x}, ${c.y}) by ${c.by} — a bounding box cannot see this`);
