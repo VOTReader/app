@@ -170,7 +170,7 @@ describe('deep-zoom declutter', () => {
 });
 
 describe('modes', () => {
-  it('exposes the three colour modes in cycle order', () => {
+  it('maps its three colour laws to uColorMode 0/1/2 — the screen offers only distance (sw-chrome-trim.test.jsx)', () => {
     expect(COLOR_MODES).toEqual(['distance', 'testament', 'genre']);
   });
   it('exposes the three densities from sparsest to fullest', () => {

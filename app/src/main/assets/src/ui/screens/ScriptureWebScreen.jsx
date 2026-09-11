@@ -28,12 +28,12 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, findWebReference,
+  arcsTouching,
 } from '../../utils/scripture-web/pick.js';
-import { createRenderer, COLOR_MODES, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
-import { readChromeTokens, GENRE_NAMES, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
+import { readChromeTokens, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -104,16 +104,20 @@ const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
    describe a UI this version does not have. */
 const DENSITY_AUTO_ON = 'Essential density, strongest connections only';
 const DENSITY_AUTO_OFF = 'Famous density, all connections';
-const COLOR_LABEL = { distance: 'Distance', testament: 'Testament', genre: 'Genre' };
 const DENSITY_HINT = {
   essential: 'only the strongest connections',
   famous: 'the famous view — about 64,000 connections',
 };
-const COLOR_HINT = {
-  distance: 'how far apart in scripture the two ends sit',
-  testament: 'Old to Old, New to New, or a bridge between them',
-  genre: 'the kind of book each thread leaves from',
-};
+/* HIDE ALL. One session-scoped flag, not a profile setting: the reader hides
+   the chrome to look at the web, and the next visit should open with the
+   controls back. Absence is the signal — the key is removed, never set to
+   '0' — so a default can never impersonate a choice. sessionStorage is not
+   swept by the vot-* localStorage migration and is per-tab, which is the
+   scope the flag means. */
+const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
+function readChromeHidden() {
+  try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
+}
 
 /**
  * @param {object} props
@@ -185,12 +189,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // auto-switch off forever after one tap on a control the reader was only
   // looking at.
   const [densityPinned, setDensityPinned] = React.useState(false);
-  const [colorMode, setColorMode] = React.useState('distance');
   const [detail, setDetail] = React.useState(null);      // the open sheet
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
-  const [goToOpen, setGoToOpen] = React.useState(false);
-  const [goToValue, setGoToValue] = React.useState('');
+  const [chromeHidden, setChromeHidden] = React.useState(readChromeHidden);
   const [tip, setTip] = React.useState(null);            // hover chip
   const [announce, setAnnounce] = React.useState('');
   // A transient explanation under the title — set on control cycles so the
@@ -212,11 +214,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
-  const ctxBoxRef = React.useRef(null);
-  const contextRef = React.useRef(null);
-  const rangeRef = React.useRef(null);
-  const zoomRef = React.useRef(null);
-  const zoomInRef = React.useRef(null);
   const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
@@ -404,19 +401,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const zoom = cam.ppv / fitPPV(cam, v.W);
     const chrome = chromeRef.current;
     const base = viewFor();
-    const location = webLocation(g, cam, v.W, zoom);
-    if (contextRef.current) contextRef.current.textContent = location.title;
-    if (rangeRef.current) rangeRef.current.textContent = location.range;
-    if (zoomRef.current) {
-      const zoomLabel = zoom < 1.1 ? 'Overview' : (zoom < 10 ? Math.round(zoom * 10) / 10 : Math.round(zoom) + 'x');
-      zoomRef.current.textContent = zoomLabel;
-    }
-    if (zoomInRef.current) {
-      // aria-disabled, not disabled: the control keeps its name and stays
-      // focusable, so a reader who lands on it is told why it does nothing.
-      zoomInRef.current.setAttribute('aria-disabled',
-        zoom >= maxZoomOf(g, v) - 1e-9 ? 'true' : 'false');
-    }
     /* THE ESSENTIAL AUTO-SWITCH, evaluated here rather than in a zoom handler
        because EVERY route to a new ppv passes through a frame - pinch, fling
        settle, keyboard, Go to, the zoom buttons - and a handler would have to
@@ -453,7 +437,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // shader. The GL pass still runs to paint the ground colour.
       r.draw(Object.assign({}, base, {
         camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
-        colorMode, density: 'essential', light: chrome.isLight, bg: chrome.bg,
+        colorMode: 'distance', density: 'essential', light: chrome.isLight, bg: chrome.bg,
         focusRange: null, focusArc: -1, hoverArc: -1,
       }));
       const uic = uiRef.current;
@@ -464,7 +448,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(railOpts(), {
           hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc,
         }));
-        drawRulerOnly(ctx, g, cam, base, v, chrome);
+        if (!chromeHidden) drawRulerOnly(ctx, g, cam, base, v, chrome);
       }
       return;
     }
@@ -480,14 +464,22 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       alpha: style.alpha,
       voteMix: style.voteMix,
       dpr: v.DPR,
-      colorMode, density, light: chrome.isLight, bg: chrome.bg,
+      colorMode: 'distance', density, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
+    if (chromeHidden) {
+      // The book rail is chrome too. drawRuler clears the UI canvas before it
+      // paints, so skipping it would leave the last rail standing.
+      const uic = uiRef.current;
+      const ctx = uic && uic.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, v.W, uic.height);
+      return;
+    }
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-  }, [graph, colorMode, density, densityPinned, baseDensity, viewFor, mode, railOpts]);
+  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts, chromeHidden]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -717,29 +709,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return found.map(describe).filter(Boolean);
   }, [describe, density, graph, listOpen, mode, showUnderlay]);
 
-  const submitGoTo = React.useCallback((event) => {
-    if (event && event.preventDefault) event.preventDefault();
-    const result = graph && findWebReference(graph, goToValue);
-    const cam = camRef.current, v = viewRef.current;
-    if (!result || !cam || !v.W) {
-      flashHint('Try a reference such as Jeremiah 6:16 or John 3.');
-      return;
-    }
-    cam.x = result.hasVerse ? result.verse : (result.lo + result.hi) / 2;
-    const chapterVerses = result.hi - result.lo + 1;
-    const targetZoom = result.hasVerse
-      ? Math.min(800, Math.max(160, graph.total / Math.max(chapterVerses * 2.5, 1)))
-      : Math.min(800, Math.max(16, graph.total / Math.max(chapterVerses * 4, 1)));
-    cam.ppv = fitPPV(cam, v.W) * targetZoom;
-    clampCamera(cam, v.W, maxZoomOf(graph, v));
-    focusRef.current = { arc: -1, range: [result.lo, result.hi] };
-    setGoToOpen(false);
-    setGoToValue('');
-    setDetail(null); setChoices(null); setListOpen(false); setTip(null);
-    setAnnounce(result.label);
-    schedule();
-  }, [flashHint, goToValue, graph, schedule]);
-
   const commitFound = React.useCallback((found) => {
     if (!found) return;
     focusRef.current = found.kind === 'arc' || found.kind === 'link'
@@ -808,15 +777,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     schedule();
   }, [graph, schedule]);
 
-  const changeZoom = React.useCallback((factor) => {
-    const cam = camRef.current, v = viewRef.current;
-    if (!cam || !v.W) return;
-    const before = cam.ppv;
-    zoomAbout(cam, v.W, v.W / 2, factor, maxZoomOf(graph, v));
-    if (factor > 1 && cam.ppv === before) setAnnounce(ZOOM_MAX_MESSAGE);
-    schedule();
-  }, [graph, schedule]);
-
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
 
@@ -828,8 +788,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     clampCamera(cam, v.W, maxZoomOf(graph, v));
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
-    setDetail(null); setChoices(null); setListOpen(false); setTip(null); setGoToOpen(false); schedule();
+    setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
   }, [graph, schedule]);
+
+  const toggleChrome = React.useCallback(() => {
+    const next = !chromeHidden;
+    try {
+      if (next) sessionStorage.setItem(CHROME_HIDDEN_KEY, '1');
+      else sessionStorage.removeItem(CHROME_HIDDEN_KEY);
+    } catch (_e) { /* private mode: the toggle still works for this mount */ }
+    setChromeHidden(next);
+  }, [chromeHidden]);
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
@@ -855,8 +824,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // through to onBack(), so one press both dismissed the tip and threw the
       // reader out to the Library.
       if (emptyShown) { dismissEmpty(); }
-      else if (goToOpen || listOpen || choices || detail || tip) {
-        setGoToOpen(false); setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+      else if (listOpen || choices || detail || tip) {
+        setListOpen(false); setChoices(null); setDetail(null); setTip(null);
         focusRef.current = { arc: -1, range: null }; schedule();
       }
       else if (onBack) onBack();
@@ -868,7 +837,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [choices, detail, goToOpen, listOpen, tip, graph, onBack, resetView, schedule,
+  }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
       emptyShown, dismissEmpty]);
 
   const openEndpoint = React.useCallback((endpoint) => {
@@ -911,11 +880,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   return (
     <React.Fragment>
-    <div className={'sw-root' + (rotated ? ' sw-rotated' : '')} ref={wrapRef}
+    <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')} ref={wrapRef}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
       aria-label="The Scripture Web — an interactive map of cross-references"
-      aria-describedby="sw-context-copy sw-a11y-help">
+      aria-describedby="sw-a11y-help">
       <canvas className="sw-canvas sw-canvas-gl" ref={glRef} aria-hidden="true" />
       <canvas className="sw-canvas sw-canvas-ui" ref={uiRef} aria-hidden="true" />
 
@@ -941,14 +910,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
             aria-pressed={mode === 'personal'} onClick={() => { setMode('personal'); setDetail(null); setChoices(null); setListOpen(false); }}>My web</button>
         </div>
-        <button type="button" className={'sw-btn' + (goToOpen ? ' is-on' : '')}
-          onClick={() => { setGoToOpen(!goToOpen); setListOpen(false); }}
-          aria-expanded={goToOpen} aria-haspopup="dialog">Go to</button>
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
-          onClick={() => { setListOpen(!listOpen); setGoToOpen(false); setChoices(null); }}
+          onClick={() => { setListOpen(!listOpen); setChoices(null); }}
           aria-expanded={listOpen} aria-haspopup="dialog">Nearby</button>
         {mode === 'canonical' ? (
-          <React.Fragment>
             <label className="sw-select-wrap">
               <span className="sw-sr-only">Connection density</span>
               <select className="sw-select" value={density} aria-label="Connection density"
@@ -966,17 +931,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                 <option value="famous">Famous</option>
               </select>
             </label>
-            <label className="sw-select-wrap">
-              <span className="sw-sr-only">Colour mode</span>
-              <select className="sw-select" value={colorMode} aria-label="Colour mode"
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setColorMode(next); flashHint('Colour shows ' + COLOR_HINT[next]);
-                }}>
-                {COLOR_MODES.map((value) => <option key={value} value={value}>{COLOR_LABEL[value]}</option>)}
-              </select>
-            </label>
-          </React.Fragment>
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
@@ -985,10 +939,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
               ? personalRef.current.underlay.count.toLocaleString() : '…'}
           </button>
         )}
-        <div className="sw-zoom" role="group" aria-label="Zoom">
-          <button type="button" className="sw-btn sw-btn-zoom" onClick={() => changeZoom(1 / 1.8)} aria-label="Zoom out">−</button>
-          <button type="button" className="sw-btn sw-btn-zoom" ref={zoomInRef} onClick={() => changeZoom(1.8)} aria-label="Zoom in">+</button>
-        </div>
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
         {/* IN THE STRIP'S FLOW, NOT UNDER IT. `flex-basis: 100%` in a wrapping
             flex row makes this its own last line, so the strip's height carries
@@ -996,28 +946,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       </div>
 
-      <div className="sw-context" ref={ctxBoxRef} aria-label="Current Scripture Web location">
-        <span className="sw-context-eyebrow">Viewing</span>
-        <strong ref={contextRef}>The whole canon</strong>
-        <span id="sw-context-copy" className="sw-context-range" ref={rangeRef} />
-        <span className="sw-context-zoom" ref={zoomRef}>Overview</span>
-      </div>
-
-      {goToOpen && (
-        <div className="sw-goto" role="dialog" aria-label="Go to a Bible reference">
-          <form onSubmit={submitGoTo}>
-            <label className="sw-sr-only" htmlFor="sw-goto-input">Bible reference</label>
-            <input id="sw-goto-input" className="sw-goto-input" autoFocus
-              value={goToValue} onChange={(e) => setGoToValue(e.target.value)}
-              placeholder="Jeremiah 6:16" list="sw-book-list" />
-            <button type="submit" className="sw-btn">Go</button>
-          </form>
-          <datalist id="sw-book-list">
-            {graph && graph.books.map((book) => <option key={book.id} value={book.title + ' '} />)}
-          </datalist>
-          <div className="sw-goto-help">Book, chapter, or verse — for example “Jer 6:16”.</div>
-        </div>
-      )}
+      {/* HIDE ALL — outside everything it hides, because it is the way back.
+          The label stays constant and aria-pressed carries the state, the same
+          convention as the Scripture / My web seg. */}
+      <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
+        aria-label="Hide controls" aria-pressed={chromeHidden} onClick={toggleChrome}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        </svg>
+      </button>
 
       {emptyShown && (
         <div className="sw-empty">
@@ -1042,10 +979,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} />
       )}
 
-      <div className="sw-legend" aria-hidden="true">{legendFor(colorMode)}</div>
+      <div className="sw-legend" aria-hidden="true">{legendFor()}</div>
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
       <div id="sw-a11y-help" className="sw-sr-only">
-        Drag to move through scripture. Use the zoom controls or plus and minus keys.
+        Drag to move through scripture. Pinch or scroll to zoom, or use the plus and minus keys.
         Select a line to see its references; Nearby opens a keyboard-friendly list.
       </div>
     </div>
@@ -1447,7 +1384,7 @@ function endpointCard(eyebrow, ep) {
   };
 }
 
-function legendFor(colorMode) {
+function legendFor() {
   // Every variant ends with the histogram key — the bars hanging under the
   // baseline (Psalm 119 reaching deepest) are chapter LENGTH, and nothing on
   // screen said so until a reader asked what the deep column was.
@@ -1457,18 +1394,9 @@ function legendFor(colorMode) {
       bars below — chapter length
     </span>
   );
-  if (colorMode === 'testament') {
-    return ['Within the Old', 'Old ↔ New', 'Within the New'].map((label, i) => (
-      <span className="sw-key" key={label}>
-        <i className={'sw-key-dot sw-key-t' + i} />{label}
-      </span>
-    )).concat([histKey]);
-  }
-  if (colorMode === 'genre') {
-    return GENRE_NAMES.map((label, i) => (
-      <span className="sw-key" key={label}><i className={'sw-key-dot sw-key-g' + i} />{label}</span>
-    )).concat([histKey]);
-  }
+  // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
+  // "leave distance as only option, it looks best anyway"). The renderer
+  // still knows testament and genre by uColorMode; nothing here selects them.
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" /><span>across the canon</span>
@@ -1528,21 +1456,6 @@ function curatedEndpoint(edge, node) {
     };
   }
   return null;
-}
-
-function webLocation(g, cam, width, zoom) {
-  if (!(zoom >= 1.15)) return { title: 'The whole canon', range: '' };
-  const left = Math.max(0, Math.min(g.total - 1, Math.floor(xToVerse(cam, width, 0))));
-  const right = Math.max(0, Math.min(g.total - 1, Math.ceil(xToVerse(cam, width, width))));
-  const a = refOfVerse(g, left), b = refOfVerse(g, right);
-  if (a.chapterIndex === b.chapterIndex) {
-    return {
-      title: a.bookTitle + ' ' + a.chapter,
-      range: 'Verses ' + a.verse + (a.verse === b.verse ? '' : '–' + b.verse),
-    };
-  }
-  const center = refOfVerse(g, Math.max(0, Math.min(g.total - 1, Math.round(cam.x))));
-  return { title: center.bookTitle + ' ' + center.chapter, range: 'Visible ' + a.label + ' – ' + b.label };
 }
 
 function summaryOf(found) {
