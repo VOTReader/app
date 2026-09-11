@@ -82,9 +82,19 @@ try {
     // Arm C: a boot-only style — the hero is tallerPx taller until +3 s, like a header
     // whose settled height differs from its first-paint height.
     if (w.__e2eArm === 'C') {
-      const s = document.createElement('style'); s.id = 'e2e-tall'; s.textContent = `.hero-title{padding-top:${tallerPx}px}`;
-      (document.head || document.documentElement).appendChild(s);
-      setTimeout(() => { const el = document.getElementById('e2e-tall'); if (el) el.remove(); w.__e2eTallRemovedAt = Math.round(performance.now()); }, 3000);
+      // At document start there is no <html> yet (the first run of this arm appended to null and
+      // took every instrument below down with it): poll for the root, then inject. The style is
+      // in place long before the app's first layout (bundles take ~50 ms to arrive).
+      const inject = () => {
+        try {
+          const root = document.head || document.documentElement;
+          if (!root) { setTimeout(inject, 0); return; }
+          const s = document.createElement('style'); s.id = 'e2e-tall'; s.textContent = `.hero-title{padding-top:${tallerPx}px}`;
+          root.appendChild(s); w.__e2eTallInjectedAt = Math.round(performance.now());
+          setTimeout(() => { const el = document.getElementById('e2e-tall'); if (el) el.remove(); w.__e2eTallRemovedAt = Math.round(performance.now()); }, 3000);
+        } catch (e) { w.__e2eTallErr = String(e && e.message || e); }
+      };
+      inject();
     }
     // The saved record as the boot FINDS it (a readonly get at document start, before the
     // app's first readwrite) — never CREATE the database from here.
@@ -233,10 +243,21 @@ try {
     for (const n of names) { const c = await caches.open(n); for (const req of await c.keys()) if (/cinzel-decorative-.*\.woff2$/.test(req.url) && await c.delete(req)) removed += 1; }
     return removed;
   });
+  const cdp = await page.createCDPSession();
+  await cdp.send('Network.enable');
   for (const arm of onlyArms) {
     note(`--- arm ${arm}: ${arm === 'A' ? 'natural boot' : arm === 'B' ? `hero fonts evicted from the worker's cache and delayed 3 s on the network` : `the hero ${TALLER_PX} px taller for the first 3 s`}`);
     fontDelayMs = arm === 'B' ? 3000 : 0;
-    if (arm === 'B') note(`B evicted ${await evictHeroFonts()} font entries from Cache Storage`);
+    if (arm === 'B') {
+      // Evict the woff2 from the worker's Cache Storage AND bypass the renderer's memory/HTTP cache,
+      // or the reload paints Cinzel Decorative from memory and there is no fallback phase at all
+      // (the first run of this arm: font loaded at the first sample).
+      note(`B evicted ${await evictHeroFonts()} font entries from Cache Storage`);
+      await cdp.send('Network.clearBrowserCache');
+      await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+    } else {
+      await cdp.send('Network.setCacheDisabled', { cacheDisabled: false });
+    }
     await page.evaluate((a) => sessionStorage.setItem('e2e-arm', a), arm);
     // Every arm starts from the same saved record: the reload must not re-flush a moved position.
     const before = await scrollTopNow();
@@ -245,7 +266,8 @@ try {
     await booted();
     await page.waitForFunction(() => window.__e2eBootIdb && window.__e2eBootIdb.done, { timeout: 15000 }).catch(() => null);
     await sleep(6500);
-    const r = await page.evaluate(() => ({ arm: window.__e2eArm, boot: window.__e2eBootIdb, landed: window.__e2eRestoreLanded, edges: window.__e2eRestoreEdges, series: window.__e2eSeries, tallRemovedAt: window.__e2eTallRemovedAt || null, obsErr: window.__e2eObsErr || null }));
+    const r = await page.evaluate(() => ({ arm: window.__e2eArm, boot: window.__e2eBootIdb, landed: window.__e2eRestoreLanded, edges: window.__e2eRestoreEdges || [], series: window.__e2eSeries || [], tallInjectedAt: window.__e2eTallInjectedAt || null, tallRemovedAt: window.__e2eTallRemovedAt || null, tallErr: window.__e2eTallErr || null, obsErr: window.__e2eObsErr || null }));
+    if (!r.series.length) note(`${arm}: NO per-frame samples (instrument missing or the paragraph never rendered); tallErr=${r.tallErr} obsErr=${r.obsErr}`);
     const bootRec = recordFor(r.boot && r.boot.scrollPositions);
     const final = await scrollTopNow();
     const fontsNow = await page.evaluate(() => document.fonts.check('16px "Cinzel Decorative"'));
@@ -254,7 +276,7 @@ try {
     const bootTop = r.series.length ? r.series[0].top : null;
     note(`${arm} boot found record ${JSON.stringify(bootRec)}`);
     note(`${arm} header series: ${runs(r.series) || '(no samples: the paragraph never rendered inside 6 s)'}`);
-    note(`${arm} first-paragraph top at first sample ${bootTop}, at +6 s ${settledTop} (distinct values ${JSON.stringify(tops)}); hero-font loaded now=${fontsNow}${r.tallRemovedAt ? '; C style removed at ' + r.tallRemovedAt + ' ms' : ''}`);
+    note(`${arm} first-paragraph top at first sample ${bootTop}, at +6 s ${settledTop} (distinct values ${JSON.stringify(tops)}); hero-font loaded now=${fontsNow}${r.tallInjectedAt != null ? '; C style injected at ' + r.tallInjectedAt + ' ms, removed at ' + r.tallRemovedAt + ' ms' : ''}`);
     note(`${arm} restore edges ${JSON.stringify(r.edges)}; landed ${JSON.stringify(r.landed)}; scrollTop at +6.5 s = ${final}`);
     await shot(`arm-${arm}`);
     if (!bootRec || bootRec.y !== 0) { fail(`${arm}: precondition — the boot did not find the y = 0 record (${JSON.stringify(bootRec)})`); continue; }
