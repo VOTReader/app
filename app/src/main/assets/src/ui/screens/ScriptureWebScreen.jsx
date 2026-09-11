@@ -33,7 +33,7 @@ import {
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
-import { readChromeTokens, LINK_KIND_NAMES, LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
+import { readChromeTokens, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -67,9 +67,6 @@ const SHORT_STUDY = {
  * 247 CSS px per verse on a 1920 px desktop, 5.6x into a void, and about
  * right on a 375 px phone only by accident.
  */
-/** My Web's colour scheme for the capture set (canon | amber | kind); one
- * value per session, read once, so a capture tool can set it before boot. */
-const MYWEB_SCHEME = (() => { try { return sessionStorage.getItem('vot-sw-myweb-scheme') || 'canon'; } catch (_e) { return 'canon'; } })();
 
 const maxZoomOf = (graph, v) => (graph
   ? maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1))
@@ -403,7 +400,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       verseX: (verse) => verseToX(cam, v.W, verse),
       // r2: the Volumes rail through ITS camera when one exists
       votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
-      scheme: MYWEB_SCHEME,
       showUnderlay,
     };
   }, [frame, showUnderlay]);
@@ -1512,34 +1508,17 @@ function legendFor(mode) {
       bars below — chapter length
     </span>
   );
-  // My Web draws no distance colour at all: its ink is the reader's three link
-  // kinds over the Volumes' own citations in cream (rail-renderer's ink law).
-  // The distance ramp under that canvas was the Scripture Web's legend lying
-  // about a screen it does not describe (design-perf, 2026-09-10).
-  if (mode === 'personal' && MYWEB_SCHEME !== 'kind') {
-    // r2: the Volumes' citations wear the canon's ramp by where they land in
-    // scripture (Genesis magenta, Revelation green: the same colour names the
-    // same book on both screens); the reader's own links are gold.
-    const ramp = MYWEB_SCHEME === 'amber'
-      ? { background: 'linear-gradient(to right, #9e4d1a, #cc8029, #e8bf4f, #f5e6b8)' }
-      : undefined;
+  // My Web (r2): the Volumes' citations wear the canon's ramp by where they
+  // land in scripture (Genesis magenta, Revelation green: the same colour
+  // names the same book on both screens); the reader's own links are gold.
+  // The legend names that axis, never the distance law this screen has no
+  // say in (design-perf, 2026-09-11; Corbin picked canon over amber/kind).
+  if (mode === 'personal') {
     return [
       <span className="sw-key" key="links"><i className="sw-key-dot" style={{ background: 'rgb(232,192,80)' }} />your links</span>,
-      <span className="sw-key" key="ramp"><span>Genesis</span><i className="sw-key-gradient" style={ramp} /><span>Revelation</span> &mdash; the Volumes&rsquo; citations</span>,
+      <span className="sw-key" key="ramp"><span>Genesis</span><i className="sw-key-gradient" /><span>Revelation</span> &mdash; the Volumes&rsquo; citations</span>,
       histKey,
     ];
-  }
-  if (mode === 'personal') {
-    return LINK_KIND_NAMES.map((label, i) => (
-      <span className="sw-key" key={label}>
-        <i className="sw-key-dot" style={{ background: 'rgb(' + LINK_KIND_COLORS[i].map((n) => Math.round(n * 255)).join(',') + ')' }} />{label}
-      </span>
-    )).concat([
-      <span className="sw-key" key="context">
-        <i className="sw-key-dot sw-key-context" />the Volumes&rsquo; own citations
-      </span>,
-      histKey,
-    ]);
   }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
   // "leave distance as only option, it looks best anyway"). The renderer

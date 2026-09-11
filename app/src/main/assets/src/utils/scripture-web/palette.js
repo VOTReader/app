@@ -73,13 +73,6 @@ export function genreOfBook(bookIndex) {
   return GENRE_BOOK_ENDS.length - 1;
 }
 
-/** Personal-web link colours, by what the link joins. */
-export const LINK_KIND_COLORS = [
-  [0.906, 0.769, 0.361],  // 0 — within scripture
-  [0.643, 0.502, 0.886],  // 1 — within the Volumes
-  [0.957, 0.561, 0.694],  // 2 — a bridge between them
-];
-
 /**
  * The distance ramp on the CPU, the same eight stops the shader mixes
  * (rampGLSL below), so a Canvas2D surface speaks the canon's colour language.
@@ -95,27 +88,20 @@ export function distanceRampRGB(t) {
 /** The reader's own links: gold, the app's one saturated ink. */
 export const MY_WEB_LINK_RGB = '232,192,80';
 
-/** A warm ramp, amber into gold into cream (the second capture for Corbin). */
-const AMBER_RAMP = [[0.62, 0.30, 0.10], [0.80, 0.50, 0.16], [0.91, 0.75, 0.31], [0.96, 0.90, 0.72]];
-
 /**
  * My Web's colour law. A bridge (a Volumes citation of scripture) is
  * coloured by WHERE in the canon it lands, on the same ramp the Scripture
  * Web uses for distance, so Genesis reads magenta and Revelation green on
  * both screens; the legend under My Web names the axis. The reader's own
- * links are gold with their pins.
+ * links are gold with their pins. Corbin picked this over an amber depth
+ * ramp and a per-kind palette (2026-09-11: "Canon is my favorite").
  *
- * @param {string} scheme 'canon' (default) | 'amber' | 'kind'
- * @param {{verse?:number, verseTotal?:number, bridge?:boolean, link?:boolean, kind?:number}} o
+ * @param {{verse?:number, verseTotal?:number, link?:boolean}} o
  * @returns {string} 'r,g,b'
  */
-export function myWebColor(scheme, o) {
+export function myWebColor(o) {
   if (o.link) return MY_WEB_LINK_RGB;
   const t = o.verseTotal > 0 ? Math.min(1, Math.max(0, (o.verse || 0) / o.verseTotal)) : 0;
-  if (scheme === 'amber') {
-    const s = t * (AMBER_RAMP.length - 1), i = Math.floor(s), j = Math.min(i + 1, AMBER_RAMP.length - 1), f = s - i;
-    return AMBER_RAMP[i].map((v, k) => Math.round((v + (AMBER_RAMP[j][k] - v) * f) * 255)).join(',');
-  }
   return distanceRampRGB(t);
 }
 

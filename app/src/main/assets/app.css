@@ -6951,7 +6951,6 @@
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
     .sw-key-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
-    .sw-key-context { background: rgba(204, 196, 180, 0.6); }
     .sw-key-gradient {
       width: 84px; height: 6px; border-radius: 3px; display: inline-block; margin: 0 6px;
       background: linear-gradient(to right, #c252b8, #8f5cd9, #4f70d4, #5c9ec9, #b54750, #c9a06b, #99a84f, #54c25e);
