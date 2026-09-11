@@ -1008,28 +1008,10 @@ async function walk(page, url, frame, scale) {
   }
   notes.push(`${tag} 2 --font-scale ${geo.fontScale || '1'} root ${geo.rootFontPx} viewport ${geo.innerWidth}x${geo.innerHeight}`);
   armChrome(tag, geo);
-
-  const start = await state(page);
-  if (start.ppvRaw === null) {
-    fails.push(`${tag} 1a the screen does not publish data-ppv-css on .sw-root. The auto-switch's own input is then `
-      + 'unobservable and its law is unmeasurable from a browser — that is a defect in the instrument\'s contract, not a skip.');
-    notes.push(`${tag} arms 1 and 3 did not run (no ppv publisher, so the zoom ladder has nothing to step on); arm 2 above DID run`);
-    return;
-  }
-  if (start.density === null) {
-    fails.push(`${tag} 1a the canvas is up but there is no density control (select[aria-label="Connection density"])`);
-    return;
-  }
-  if (!Number.isFinite(start.ppv)) {
-    fails.push(`${tag} 1a data-ppv-css reads ${JSON.stringify(start.ppvRaw)}, not a number`);
-    return;
-  }
-  notes.push(`${tag} entry ppv ${start.ppv} density ${start.density} zoom ${JSON.stringify(start.zoomLabel)}`);
-
-  const rise = await zoomArc(page, +1, (s) => s.ppv >= DENSITY_ENTER_PPV_CSS);
-  const atCeiling = await zoomArc(page, +1, () => false);          // run to the stop for arm 3
-  const top = atCeiling[atCeiling.length - 1];
-
+  /* 4b SITS ABOVE ARM 1'S RETURN, ON PURPOSE. It owes arm 1 nothing -- the
+     recorder was filled at boot -- and on a tree without the ppv publisher the
+     frame returns right after the 1a rows. Measured on two branches: with the
+     read below that return, 4b never ran and nothing said so. */
   /* ARM 4b — what the APP compiled, read off the recorder. Per frame, because
      it is free: no extra GL context, no extra page, just a read of what already
      happened.
@@ -1069,6 +1051,28 @@ async function walk(page, url, frame, scale) {
       + `${shipped.filter((r) => r.ok === true).length} compiled, ${bad.length} failed, ${unknown.length} unreadable `
       + `(${shipped.map((r) => r.len).join('+')} chars) — the SHIPPED shader, where 4a reads the source module`);
   }
+
+
+  const start = await state(page);
+  if (start.ppvRaw === null) {
+    fails.push(`${tag} 1a the screen does not publish data-ppv-css on .sw-root. The auto-switch's own input is then `
+      + 'unobservable and its law is unmeasurable from a browser — that is a defect in the instrument\'s contract, not a skip.');
+    notes.push(`${tag} arms 1 and 3 did not run (no ppv publisher, so the zoom ladder has nothing to step on); arms 2 and 4b above DID run`);
+    return;
+  }
+  if (start.density === null) {
+    fails.push(`${tag} 1a the canvas is up but there is no density control (select[aria-label="Connection density"])`);
+    return;
+  }
+  if (!Number.isFinite(start.ppv)) {
+    fails.push(`${tag} 1a data-ppv-css reads ${JSON.stringify(start.ppvRaw)}, not a number`);
+    return;
+  }
+  notes.push(`${tag} entry ppv ${start.ppv} density ${start.density} zoom ${JSON.stringify(start.zoomLabel)}`);
+
+  const rise = await zoomArc(page, +1, (s) => s.ppv >= DENSITY_ENTER_PPV_CSS);
+  const atCeiling = await zoomArc(page, +1, () => false);          // run to the stop for arm 3
+  const top = atCeiling[atCeiling.length - 1];
 
   const ft = await frameTime(page, PAN_MS).catch((e) => ({ err: e.message }));
   if (ft && ft.err) notes.push(`${tag} 3 frame time UNMEASURED (${ft.err})`);
