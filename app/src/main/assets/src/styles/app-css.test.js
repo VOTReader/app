@@ -401,9 +401,9 @@ describe('app.css — one pill grammar in the Scripture Web strip', () => {
     // The phone showed FAMOUS in solid --bg3 beside see-through pills. One
     // resting fill for .sw-btn, .sw-seg and .sw-select; the active fill is
     // .is-on's alone.
-    const btn = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-btn') || '');
-    const sel = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-select') || '');
-    const seg = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-seg') || '');
+    const btn = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-btn {') || '');
+    const sel = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-select {') || '');
+    const seg = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-seg {') || '');
     expect(btn && sel && seg, 'a pill rule has no background').toBeTruthy();
     expect(sel[1].trim()).toBe(btn[1].trim());
     expect(seg[1].trim()).toBe(btn[1].trim());
