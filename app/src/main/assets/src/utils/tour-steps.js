@@ -32,6 +32,8 @@ export const TOUR_WORDS = Object.freeze([
   'a backup', 'Export', 'Import', 'Your Data',
   // The two words the real selection bar shows, so the reader recognises them under their finger.
   'Highlight', 'Note',
+  // The two halves of the web, as the Home button and the screen's own control name them.
+  'Scripture Web', 'My Web',
 ]);
 
 /** Words an older reader should never have to decode. Matched whole, case-insensitive. */
@@ -118,6 +120,22 @@ const STOPS = [
     title: 'The Bible too, verse by verse',
     text: 'I opened John 3 for you: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen and the verses light up one by one as they are read.',
     after: 'Hear it? Each verse lights up as it is read. Press Next when you are ready.',
+    primary: 'Next',
+  },
+  /* THE WEB GETS A STOP (Corbin, 2026-09-11: "add a stop about it to the tutorial … both the
+     trailer and the tutorial should mention both halves of the scripture web"). It follows the
+     Bible stop — the reader has just watched verses light up; the next thing is every place one
+     verse points to another — and it rings the Home button the same ask put back, so `enter` is
+     goHome (the Bible stop leaves the tour on bible-ch; one navigation, as the journal and backup
+     stops pay). The three sentences are the trailer slide's own (Creative's cut 8), so the app and
+     the trailer agree, and they name both halves by their on-screen names. */
+  {
+    id: 'scripture-web', screen: 'home', enter: 'goHome',
+    target: { selector: '.home-shortcuts button', text: 'Scripture Web' }, act: null,
+    label: 'The Scripture Web',
+    title: 'See the Scriptures as a web',
+    text: 'Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible\'s threads. My Web holds the links you make yourself.',
+    tip: 'Tap a thread to read both ends.',
     primary: 'Next',
   },
   {

@@ -155,11 +155,9 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     'scripture-web': {
       id: 'scripture-web', eyebrow: 'The Whole Counsel', title: 'Scripture Web',
       detail: '63,418 cross-references',
-      // Unlike the other guides this one is not an empty-state hint — the tile
-      // is never empty. It is the reason Scripture Web left the landing page
-      // (Corbin, 2026-09-05) and it uses the same one-line caption span so it
-      // reads as part of the tile rather than as a banner bolted onto it.
-      guide: 'Still under construction.',
+      // No guide: the "Still under construction." caption of 2026-09-05 left with the
+      // Home shortcut's return (2026-09-11) — the tour teaches the web now, and a tile
+      // one screen away saying it is not ready would contradict it.
       onClick: onOpenScriptureWeb,
       icon: (
         // Three nested arcs over a baseline — the visualization in miniature.
