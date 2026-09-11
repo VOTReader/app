@@ -33,7 +33,7 @@ import {
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
-import { readChromeTokens, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
+import { readChromeTokens, LINK_KIND_NAMES, LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -897,7 +897,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-title">
           <h1>{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
           {mode === 'personal'
-            ? <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>
+            ? (personalCount === 0
+              /* An invitation, not a count of zero: "0 links you have made" under
+                 a fog was Corbin's screenshot of a dead screen (design-perf,
+                 2026-09-10). The number returns with the first link. */
+              ? <p>No links yet — select any text and tap Link.</p>
+              : <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>)
             : (stats && <p>{stats.shown.toLocaleString()} of {stats.total.toLocaleString()} connections</p>)}
           {hint && <p className="sw-hint" role="status">{hint}</p>}
         </div>
@@ -960,12 +965,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {emptyShown && (
         <div className="sw-empty">
           <div className="sw-empty-title">Your web is still being woven.</div>
+          {/* One sentence, so the panel covers under half the band on the
+              800x360 frame (the walk's R3); the silver threads behind it are
+              the corpus's own citations, and the panel must not hide them. */}
           <div className="sw-empty-body">
-            Select text anywhere in the app, tap <strong>Link</strong>, and pick a
-            destination. Every link you make draws a thread here — between two
-            passages of scripture, between a letter and a verse, or across the
-            Volumes. The faint gold threads below are the connections the
-            Volumes already make.
+            Select text anywhere in the app, tap <strong>Link</strong>, and pick
+            where it goes. The silver threads are the Volumes&rsquo; own citations.
           </div>
           <button type="button" className="sw-empty-close" aria-label="Dismiss"
             onClick={dismissEmpty}>×</button>
@@ -980,7 +985,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} />
       )}
 
-      <div className="sw-legend" aria-hidden="true">{legendFor()}</div>
+      <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
       <div id="sw-a11y-help" className="sw-sr-only">
         Drag to move through scripture. Pinch or scroll to zoom, or use the plus and minus keys.
@@ -1385,7 +1390,7 @@ function endpointCard(eyebrow, ep) {
   };
 }
 
-function legendFor() {
+function legendFor(mode) {
   // Every variant ends with the histogram key — the bars hanging under the
   // baseline (Psalm 119 reaching deepest) are chapter LENGTH, and nothing on
   // screen said so until a reader asked what the deep column was.
@@ -1395,6 +1400,22 @@ function legendFor() {
       bars below — chapter length
     </span>
   );
+  // My Web draws no distance colour at all: its ink is the reader's three link
+  // kinds over the Volumes' own citations in cream (rail-renderer's ink law).
+  // The distance ramp under that canvas was the Scripture Web's legend lying
+  // about a screen it does not describe (design-perf, 2026-09-10).
+  if (mode === 'personal') {
+    return LINK_KIND_NAMES.map((label, i) => (
+      <span className="sw-key" key={label}>
+        <i className="sw-key-dot" style={{ background: 'rgb(' + LINK_KIND_COLORS[i].map((n) => Math.round(n * 255)).join(',') + ')' }} />{label}
+      </span>
+    )).concat([
+      <span className="sw-key" key="context">
+        <i className="sw-key-dot sw-key-context" />the Volumes&rsquo; own citations
+      </span>,
+      histKey,
+    ]);
+  }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
   // "leave distance as only option, it looks best anyway"). The renderer
   // still knows testament and genre by uColorMode; nothing here selects them.

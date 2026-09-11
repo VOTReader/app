@@ -23,6 +23,18 @@ import { LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
 const TOP_INSET = 96;
 /** Curve tension for inter-rail ribbons: how far control points push out. */
 const RIBBON_BOW = 0.42;
+/** The corpus-context layer's resolution relative to the canvas (see drawPersonalWeb). */
+export const CONTEXT_SCALE = 0.5;
+let contextCanvas = null;
+/** One reusable offscreen canvas for the context; null where 2D is unavailable (tests). */
+function contextLayer(w, h) {
+  if (typeof document === 'undefined') return null;
+  if (!contextCanvas) contextCanvas = document.createElement('canvas');
+  if (contextCanvas.width !== w || contextCanvas.height !== h) { contextCanvas.width = w; contextCanvas.height = h; }
+  let lc = null;
+  try { lc = contextCanvas.getContext('2d'); } catch (_e) { lc = null; }
+  return lc ? { canvas: contextCanvas, ctx: lc } : null;
+}
 
 /**
  * Where the two rails sit.
@@ -188,6 +200,31 @@ export function distanceToPath(pts, px, py) {
  *   DPR:number, base:number, chrome:any, showUnderlay?:boolean,
  *   hoverIndex?:number, focusIndex?:number}} opts
  */
+/**
+ * The My Web ink law (design-perf, 2026-09-10; the note is
+ * sessions/2026-09-10-orchestrator/myweb-visual-design.md, every number in it
+ * measured). z = the corpus's on-screen width / the screen width: 1 at
+ * overview, 1.8^n after n zoom steps.
+ *
+ * Context (the Volumes' own citations) is cream, faint per edge at overview
+ * so corridors glow where citations pile and a lone thread whispers, rising
+ * with zoom so a thread reads on its own at depth (0.15 at 5.8x, 0.45 at
+ * 40x). The reader's links are the only saturated ink: their kind colour,
+ * wider (2.0 -> 2.6 with depth, like a canon ribbon), haloed, pinned at both
+ * ends. The unit test reads this export; the walk reads the pixels it makes.
+ */
+export function personalInk(z) {
+  const zz = Math.max(1, z || 1);
+  const t = Math.min(1, Math.log(zz) / Math.log(40));
+  return {
+    context: { rgb: '204,196,180', alpha: Math.min(0.45, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
+    // the link thickens with depth like a canon ribbon (2.0 -> 2.6 at 40x), so it
+    // stays 6x a context thread with its halo even where the thread is 0.45 · 1.3
+    link: { alpha: 0.95, width: 2.0 + 0.6 * t, halo: 7, haloAlpha: 0.16, dot: 3, ring: 5.5,
+      hoverWidth: 3 + 0.6 * t, hoverHalo: 11, hoverHaloAlpha: 0.3 },
+  };
+}
+
 export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const { width, DPR, base, chrome, votRail, verseX } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
@@ -240,47 +277,90 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   if (underlay && opts.showUnderlay && underlay.count) {
     // 2,000+ curated edges: at any real weight they become a brown wash that
     // buries the reader's own handful of links. This is context, not content.
-    ctx.strokeStyle = 'rgba(' + gold + ',0.045)';
-    ctx.lineWidth = 0.7 * DPR;
-    ctx.beginPath();
+    const z = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
+    const cx = personalInk(z).context;
+    // The context is stroked into a HALF-RESOLUTION layer and blitted up: the
+    // cost of 2,095 antialiased strokes is fill-bound on a 2x canvas (measured
+    // 175-320 ms a frame at full resolution), and a quarter of the pixels is
+    // a quarter of the fill. The blur it buys is the point as much as the
+    // speed: context reads as soft silk, the reader's links stay crisp.
+    const L = contextLayer(Math.ceil(width * CONTEXT_SCALE), Math.ceil(opts.height * CONTEXT_SCALE));
+    const c2 = L ? L.ctx : ctx;
+    if (L) {
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, L.canvas.width, L.canvas.height);
+      c2.setTransform(CONTEXT_SCALE, 0, 0, CONTEXT_SCALE, 0, 0);
+    }
+    c2.strokeStyle = 'rgba(' + cx.rgb + ',' + cx.alpha + ')';
+    c2.lineWidth = L ? Math.max(cx.width * DPR, 1 / CONTEXT_SCALE) : cx.width * DPR;
+    // ONE STROKE PER EDGE. A single path stroked once composites every edge at
+    // the same flat value whatever piles up (measured: a uniform 10/255 over
+    // half the band). Per-edge strokes let corridors accumulate, which is the
+    // structure the reader's eye follows.
     for (let i = 0; i < underlay.count; i++) {
       const a = [verseX(underlay.versePos[i]), rails.bottomY];
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       if ((a[0] < -50 && b[0] < -50) || (a[0] > width + 50 && b[0] > width + 50)) continue;
       const pts = linkPath(a[0], a[1], b[0], b[1], true, 12);
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+      c2.beginPath();
+      c2.moveTo(pts[0][0], pts[0][1]);
+      for (let k = 1; k < pts.length; k++) c2.lineTo(pts[k][0], pts[k][1]);
+      c2.stroke();
     }
-    ctx.stroke();
+    if (L) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(L.canvas, 0, 0, width, opts.height);
+    }
   }
 
   if (!personal || !personal.count) return rails;
 
-  // ── the reader's links ──
+  // ── the reader's links: halo pass first so no halo covers a neighbour's core ──
+  const L = personalInk(opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1).link;
+  const paths = [];
   for (let i = 0; i < personal.count; i++) {
     const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
     const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const cross = personal.aRail[i] !== personal.bRail[i];
     const gap = Math.abs(rails.bottomY - rails.topY);
-    const pts = linkPath(a[0], a[1], b[0], b[1], cross,
-      { n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 });
+    paths.push({ a, b, pts: linkPath(a[0], a[1], b[0], b[1], cross,
+      { n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }) });
+  }
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = 0; i < personal.count; i++) {
+    const c = LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0];
+    const rgb = c.map((n) => Math.round(n * 255)).join(',');
+    const hot = i === opts.hoverIndex || i === opts.focusIndex;
+    const dim = (opts.focusIndex >= 0 && i !== opts.focusIndex) ? 0.18 : 1;
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + ((hot ? L.hoverHaloAlpha : L.haloAlpha) * dim) + ')';
+    ctx.lineWidth = (hot ? L.hoverHalo : L.halo) * DPR;
+    const pts = paths[i].pts;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.stroke();
+  }
+  for (let i = 0; i < personal.count; i++) {
+    const { a, b, pts } = paths[i];
     const c = LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0];
     const rgb = c.map((n) => Math.round(n * 255)).join(',');
     const isHover = i === opts.hoverIndex;
     const isFocus = i === opts.focusIndex;
     const dim = (opts.focusIndex >= 0 && !isFocus) ? 0.18 : 1;
-    ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.85 * dim) + ')';
-    ctx.lineWidth = (isHover || isFocus ? 2.6 : 1.4) * DPR;
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + (L.alpha * dim) + ')';
+    ctx.lineWidth = (isHover || isFocus ? L.hoverWidth : L.width) * DPR;
     ctx.beginPath();
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.stroke();
-    // endpoint dots
+    // endpoint pins: a ring on the rail with a filled dot, so both ends read
+    // as places, not as where a line happened to stop
     ctx.fillStyle = 'rgba(' + rgb + ',' + dim + ')';
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.9 * dim) + ')';
+    ctx.lineWidth = 1 * DPR;
     for (const p of [a, b]) {
-      ctx.beginPath();
-      ctx.arc(p[0], p[1], (isHover || isFocus ? 4 : 2.6) * DPR, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(p[0], p[1], L.ring * DPR, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(p[0], p[1], L.dot * DPR, 0, Math.PI * 2); ctx.fill();
     }
   }
   return rails;
