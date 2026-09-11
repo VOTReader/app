@@ -289,39 +289,32 @@ describe('releaseTranslationsExcept (boot-performance-4)', () => {
   });
 });
 
-/* THE CALLER, WHICH NOTHING ABOVE CAN REACH.
-   ----------------------------------------------------------------------
-   The sweep's BEHAVIOUR is pinned behaviourally above and those cases have
-   teeth. What no case here can reach is app.jsx's effect - the code that
-   decides to CALL it - and mounting App in jsdom to find out is not on offer.
-   A bite on that effect (arm I of bite_boot4.py) reddened NOTHING before this
-   block existed, which is the honest reason it is here.
-
-   So this is a text gate and it witnesses exactly one thing: the effect routes
-   through the helper on BOTH arms, including the nkjv arm it used to return
-   early on. It says nothing about whether the effect runs, or when. */
-describe('the translation effect reaches the sweep (boot-performance-4, source gate)', () => {
+/* THE CALLER. The effect that decides to CALL the sweep lived in App() and nothing here could
+   reach it - mounting App in jsdom is not on offer - so a text gate on app.jsx stood in for it
+   (boot-performance-4). It also put app.jsx at 809/800 on check:app-size. The effect is now
+   hooks/use-translation-loader.js (w-evict-hook, 2026-09-11), where use-translation-loader.test.js
+   DRIVES both arms with spies on the two helpers: the nkjv arm sweeps instead of returning early,
+   and the loaded arm sweeps only after the load resolves. What no behavioural case can see is the
+   wiring - that App() still calls the hook with the reader's translation - so THAT is what the
+   text gate witnesses now, and only that. */
+describe('App() calls the translation loader (boot-performance-4 / w-evict-hook, source gate)', () => {
   const SRC = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../app.jsx'), 'utf8');
   /* A comment satisfies a text matcher in both directions, so strip first - and
      the stripper gets its own control below, on this very file's hazard. */
   const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
   it('PRECONDITION: the stripper is alive and did not eat the program', () => {
-    expect(SRC).toContain('it used to be the one that freed nothing');       // lives in a comment
-    expect(stripped).not.toContain('it used to be the one that freed nothing');
-    expect(stripped).toContain('loadTranslation(code)');                 // still the program
+    expect(SRC).toContain('only the setter side effect matters');           // lives in a comment
+    expect(stripped).not.toContain('only the setter side effect matters');
+    expect(stripped).toContain('useState(0)');                                // still the program
   });
 
-  it('the nkjv arm SWEEPS instead of returning early', () => {
-    expect(stripped).toContain("releaseTranslationsExcept('nkjv')");
+  it('the composition root hands the reader\'s translation and the tick setter to the hook', () => {
+    expect(stripped).toContain('useTranslationLoader(settings.translation, setTranslationTick)');
   });
 
-  it('the loaded arm sweeps AFTER the load resolves, never before', () => {
-    /* Order matters to the reader, not just to correctness: sweeping first
-       would leave them on NKJV for the length of the next download. */
-    const i = stripped.indexOf('loadTranslation(code).then(');
-    const j = stripped.indexOf('releaseTranslationsExcept(code)', i);
-    expect(i).toBeGreaterThan(-1);
-    expect(j).toBeGreaterThan(i);
+  it('the effect itself has left App() - the sweep is called from the hook, never inline', () => {
+    expect(stripped).not.toContain('releaseTranslationsExcept(');
+    expect(stripped).not.toContain('loadTranslation(code)');
   });
 });
