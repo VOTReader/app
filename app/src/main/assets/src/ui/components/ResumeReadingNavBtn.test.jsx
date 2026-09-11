@@ -40,13 +40,15 @@ describe('ResumeReadingNavBtn — nav-bar resume dot', () => {
     expect(container.querySelector('.reading-dot-nav')).toBe(null);
   });
 
-  it('renders a bookmark-ribbon glyph named "Reading Position Marker" on an eligible screen (home) — not a bare dot', () => {
+  it('renders its own glyph named "Reading Position Marker" on an eligible screen (home) — not a bare dot', () => {
     const { container } = renderDot({ screen: 'home', enabled: true, onGo: vi.fn() });
     const btn = container.querySelector('.reading-dot-nav');
     expect(btn).not.toBe(null);
     // Corbin (2026-09-10): "Change the icon for the reading resume dot to
-    // something that makes more sense, instead of just a dot". A ribbon
-    // says "your place is kept"; a dot said nothing. The name is the one the
+    // something that makes more sense, instead of just a dot". Lines of text
+    // with a pointer at one say "your place in the reading"; a dot said nothing
+    // (and the ribbon that followed it was the Bookmark button's icon —
+    // marker-glyph.test.jsx keeps the two apart). The name is the one the
     // Settings row and the tour use for the same control (Orchestrator,
     // 2026-09-10): one control, one name in every place it is spoken of.
     expect(btn.getAttribute('aria-label')).toBe('Reading Position Marker');
