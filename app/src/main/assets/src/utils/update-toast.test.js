@@ -40,6 +40,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    _resetUpdateToast();                 // one boot per case: an earlier case's announcement must not fold this one's offer early
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     APK_VERSION.value = null;
     BRIDGE.isAndroid = false;

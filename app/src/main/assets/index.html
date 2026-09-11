@@ -46,7 +46,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-TSCHUeYHT4U2HKXpT/OlGXsF+3bPNdp0A3WeuXNs7u0=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-TSCHUeYHT4U2HKXpT/OlGXsF+3bPNdp0A3WeuXNs7u0=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -102,6 +102,12 @@
        early load failures too. Zero overhead in production: just one
        event listener that pushes onto an array. */
     window.__votResourceErrs = [];
+    /* The worker serving THIS document, captured before any bundle runs.
+       sw-register compares it with the controller at registration: a
+       different worker means a takeover already happened while these
+       scripts were parsing, and the page reloads onto it (the early claim,
+       w-toast-reload-flag 2026-09-11). Identity, not URL: A and B share one. */
+    try { window.__votController0 = (navigator.serviceWorker && navigator.serviceWorker.controller) || null; } catch (e) { window.__votController0 = null; }
     window.addEventListener('error', function(e){
       try {
         if (e.target && e.target !== window && (e.target.src || e.target.href)) {
