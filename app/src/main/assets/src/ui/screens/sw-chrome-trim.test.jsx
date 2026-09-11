@@ -45,6 +45,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 });
 
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { decodeGraph } from '../../utils/scripture-web/decode.js';
 
 const CANON = 31102;
 function graph() {
@@ -306,5 +307,41 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(sub).toBeTruthy();
     expect(sub.textContent).toMatch(/^\d[\d,]* connections$/);
     expect(sub.textContent).not.toMatch(/ of /);
+  });
+
+  /* Item 5's bottom half. drawRuler and drawRulerOnly each carried a copy of
+     the book-name block; both now call drawBookNames(), which places names
+     through placeRailLabels — the law the top rail adopted in the same batch.
+     This case witnesses that the bottom rail actually routes through the law
+     (a bite that pins every name to the top row reddens it); the law's own
+     shape is pinned in rail-label-collision.test.js. Geometry: three 600-verse
+     books at W = 800 are 15.4 px wide each, so with the recorder's fixed 20 px
+     measureText only the abbreviations qualify and neighbours overlap by ~5 px
+     — GEN takes the top row, EXO the second, and LEV clears GEN by 10.9 px and
+     returns to the top row. */
+  it('the bottom rail places colliding book names on two rows through the shared law', async () => {
+    const CANON = 31102, START = 15000, SPAN = 600;
+    const three = graph();
+    three.books = [
+      { id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' },
+      { id: 'exodus-plain', title: 'Exodus', abbr: 'Exo' },
+      { id: 'leviticus-plain', title: 'Leviticus', abbr: 'Lev' },
+    ];
+    three.chapters = [[0, 1, START, SPAN], [1, 1, START + SPAN, SPAN], [2, 1, START + 2 * SPAN, SPAN]];
+    three.total = CANON;
+    vi.mocked(decodeGraph).mockReturnValueOnce(three);
+    await mount();
+    for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'LEV'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    const yOf = (label) => {
+      const hits = CALLS.filter((c) => c[0] === 'fillText' && c[1] === label);
+      expect(hits.length, label + ' was painted').toBeGreaterThan(0);
+      return hits[hits.length - 1][3];
+    };
+    const yGen = yOf('GEN'), yExo = yOf('EXO'), yLev = yOf('LEV');
+    const DPR = Math.min(window.devicePixelRatio || 1, 3);
+    expect(yExo - yGen, 'EXO one row below GEN').toBe(14 * DPR);
+    expect(yLev, 'LEV back on the top row').toBe(yGen);
   });
 });
