@@ -38,7 +38,10 @@ export const DENSITY_STEPS = ['essential', 'famous'];
 
 // The zero-alpha cull in VERT's main(), on the line marked `zero-alpha cull`.
 //
-// Once flyOverDim has faded an arc to zero, STOP DRAWING IT. Alpha 0 still costs a full
+// A zero dim is not drawn. flyOverDim can no longer produce one (FLYOVER_FLOOR
+// is never 0, by owner rule), so this cull is kept for any OTHER zero the law
+// is ever handed, and is not the fly-over law's exit any more.
+// (Original rationale follows.) Once flyOverDim has faded an arc to zero, STOP DRAWING IT. Alpha 0 still costs a full
 // rasterise and blend of every pixel of the ribbon. Measured with
 // EXT_disjoint_timer_query_webgl2 on the real asset (Design & Performance,
 // scripture-web-3-fill-measure.md): phone 375@3 at zoom 400x, 3.05 -> 1.09 ms on a
