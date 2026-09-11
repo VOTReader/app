@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 /* build-version — the announcer's ask is held OPEN (w-toast-ask-open, 2026-09-11).
    A decision taken at a fixed 3 s before the worker speaks was the defect: on a
-   cold start of the live origin the reply lost the race to the page's own boot
-   (or the worker it was posted to retired mid-ask), and 'unknown' or 'first' was
-   decided in its place — a null decided into a value. Settings keeps its 3 s
-   getBuildVersion() for its render; the announcer waits.
+   cold start of the live origin the reply lost the race to the page's own boot,
+   and 'unknown' or 'first' was decided in its place — a null decided into a
+   value. Settings keeps its 3 s getBuildVersion() for its render; the announcer
+   waits.
    The answer that decides comes from the worker that served THIS document. A
    takeover mid-ask settles null and the new worker is NOT asked: sw-register
    reloads onto it synchronously inside the same controllerchange (its handler is
@@ -38,8 +38,8 @@ describe('awaitBuildVersion — the ask the announcer waits for', () => {
     fakeContainer(a);
     const settings = getBuildVersion();
     const announcer = awaitBuildVersion();
-    let settingsSaw = 'pending'; settings.then((v) => { settingsSaw = v; });
-    let announcerSaw = 'pending'; announcer.then((v) => { announcerSaw = v; });
+    let settingsSaw = /** @type {any} */ ('pending'); settings.then((v) => { settingsSaw = v; });
+    let announcerSaw = /** @type {any} */ ('pending'); announcer.then((v) => { announcerSaw = v; });
     await vi.advanceTimersByTimeAsync(3000);
     expect(settingsSaw, 'control: the render ask gave up at 3 s').toBeNull();
     expect(announcerSaw, 'the announcer is still waiting').toBe('pending');

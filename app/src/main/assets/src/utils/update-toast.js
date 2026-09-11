@@ -18,8 +18,21 @@
    server may be ahead of the cache that page runs from. One localStorage key
    remembers the last build this profile saw.
 
+   THE ASK IS HELD OPEN (2026-09-11, w-toast-ask-open). The live 89 → 90
+   crossing showed no toast on four profiles: the reloaded document's ask was
+   decided at a fixed 3 s before the worker spoke (a cold boot's own work), and
+   'unknown' or 'first' was written in its place. awaitBuildVersion() has no
+   timeout for the DECISION and this decides when the answer arrives, however
+   late; a worker that never answers leaves today's outcome (nothing shown,
+   nothing written). A takeover mid-ask settles null → 'unknown' here, on
+   purpose: sw-register reloads onto the new worker inside the same
+   controllerchange and the reloaded document decides — an answer taken from
+   the new worker in THIS one would write the key and toast in a page being
+   torn down, and the next would read 'same'. Settings keeps its 3 s render ask.
+
    THE THREE ANSWERS, and only one of them is a toast:
-     unknown  — the version could not be read. NOTHING is written and nothing
+     unknown  — the version could not be read (no worker to wait for and no
+                deployed file readable). NOTHING is written and nothing
                 is shown: a null must never impersonate a value, and writing
                 it would turn the next real read into a false "updated".
      first    — nothing stored AND nothing of the app's in storage: a fresh
@@ -56,7 +69,7 @@
    and the offer shows nothing: the bar's own Play button is the way then.
    ═════════════════════════════════════════════════ */
 import { PlatformBridge } from './platform-bridge.js';
-import { getBuildVersion, fetchServerBuildVersion } from './build-version.js';
+import { awaitBuildVersion, fetchServerBuildVersion } from './build-version.js';
 import { showToast, hideToast } from './toast.js';
 
 /** localStorage key. Listed in cached-store.js's LS_SKIP_LIST so the one-time
@@ -115,7 +128,7 @@ if (typeof window !== 'undefined') /** @type {any} */ (window).__votUpdateToastR
  *  makes, in the same order. A controlled page whose worker is silent stays
  *  null: it runs from a cache the server may be ahead of. */
 async function runningBuild() {
-  const sw = await getBuildVersion();
+  const sw = await awaitBuildVersion();   // held open: decided when the worker answers, however late
   if (sw && sw.cacheVersion) return sw.cacheVersion;
   if (!PlatformBridge.isAndroid && controlled()) return null;
   const file = await fetchServerBuildVersion();

@@ -69,6 +69,52 @@ export function getBuildVersion() {
 }
 
 /**
+ * The build of the worker serving THIS document, waited for however long it
+ * takes — the announcer's ask (2026-09-11, w-toast-ask-open). A decision taken
+ * at a fixed 3 s before the worker spoke was the defect: on a cold start of the
+ * live origin the reply lost the race to the page's own boot, and 'unknown' or
+ * 'first' was decided in its place — a null decided into a value. So there is
+ * no timeout for the decision. Resolves null AT ONCE when no worker serves the
+ * page (no serviceWorker at all, or uncontrolled — a first visit: the caller
+ * reads the deployed file instead). A TAKEOVER MID-ASK (controllerchange)
+ * settles null too, and the new worker is NOT asked: the message queued on the
+ * retired worker is gone, and the new worker serves the NEXT document —
+ * sw-register reloads onto it synchronously inside its own controllerchange
+ * handler, registered before this one (_entry-b.js) — and that document asks
+ * for itself. An answer taken from the new worker HERE would arrive in a few
+ * ms, before the reload commits, and the caller would write the last-seen key
+ * and toast in a page being torn down; the page that follows would then read
+ * 'same' and stay silent, the very defect. Never resolves when the serving
+ * worker never answers, which leaves that caller exactly where a timeout would
+ * — silent — without a wrong value written. Settings keeps getBuildVersion()
+ * above: a render cannot wait.
+ *
+ * @returns {Promise<BuildVersion|null>}
+ */
+export function awaitBuildVersion() {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return resolve(null);
+    const container = navigator.serviceWorker;
+    let settled = false;
+    function done(v) {
+      if (settled) return;
+      settled = true;
+      container.removeEventListener('controllerchange', retired);
+      resolve(v);
+    }
+    function retired() { done(null); }   // the worker asked is gone; the next document asks for itself
+    container.addEventListener('controllerchange', retired);
+    let channel;
+    try { channel = new MessageChannel(); } catch (_e) { return done(null); }
+    channel.port1.onmessage = (event) => {
+      const d = event && event.data;
+      if (d && d.type === 'VERSION' && typeof d.cacheVersion === 'string') done({ cacheVersion: d.cacheVersion, corpusVersion: String(d.corpusVersion || '') });
+    };
+    try { container.controller.postMessage({ type: 'GET_VERSION' }, [channel.port2]); } catch (_e) { done(null); }
+  });
+}
+
+/**
  * Ask the SERVER what the newest build is, without disturbing any cache.
  *
  * Reads the deployed service-worker.js as plain text with cache:'no-store' and
