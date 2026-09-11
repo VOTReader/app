@@ -539,6 +539,28 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     return r;
   };
 
+  // ── My Web visual (design-perf, 2026-09-10; note: myweb-visual-design.md) ──
+  // Appended inside the describe that owns openMyWeb(). Both cases are RED on
+  // main: the subtitle there is "0 links you have made" and the legend is the
+  // Scripture Web's distance ramp, which My Web never draws.
+
+  it('R3 with no links the subtitle invites, it does not count to zero', async () => {
+    await openMyWeb();
+    const sub = document.querySelector('.sw-title p');
+    expect(sub).toBeTruthy();
+    expect(sub.textContent).not.toMatch(/\d/);
+    expect(sub.textContent).toMatch(/\bLink\b/);
+  });
+
+  it('R4 in My Web the legend names the link kinds and the context, never the distance ramp', async () => {
+    await openMyWeb();
+    const legend = document.querySelector('.sw-legend');
+    expect(legend).toBeTruthy();
+    expect(legend.textContent).toMatch(/Within scripture/);
+    expect(legend.textContent).toMatch(/Volumes/);
+    expect(legend.textContent).not.toMatch(/across the canon|nearby/);
+  });
+
   it('offers a Dismiss control on the notice', async () => {
     await openMyWeb();
     expect(screen.getByText('Your web is still being woven.')).toBeTruthy();
