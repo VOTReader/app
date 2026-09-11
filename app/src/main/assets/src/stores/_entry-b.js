@@ -118,6 +118,7 @@ import { useTapThrough } from '../hooks/use-tap-through.js';
 import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
 import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
+import { useTranslationLoader } from '../hooks/use-translation-loader.js';
 import { useJournalMediaSweep } from '../hooks/use-journal-media-sweep.js';
 import { useRestoreGuard } from '../hooks/use-restore-guard.js';
 import { useReadTracker } from '../hooks/use-read-tracker.js';
@@ -235,6 +236,7 @@ Object.assign(window, {
   useReadingPositionNav,
   useReadingChainNav,
   useSurprise,
+  useTranslationLoader,
   useJournalMediaSweep,
   useRestoreGuard,
   useReadTracker,

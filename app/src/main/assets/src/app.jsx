@@ -245,25 +245,9 @@ function App() {
     if (!settings.tabsEnabled && tabsOverviewOpen) setTabsOverviewOpen(false);
   }, [settings.tabsEnabled, tabsOverviewOpen]);
 
-  // Lazy-load the active translation. NKJV is always available (baked into
-  // BOOKS.chapters[].sections[].verses[].text); all others are ~4.5MB JS
-  // files loaded on demand.
-  useEffect(() => {
-    const code = settings.translation || 'nkjv';
-    /* Free the editions this reader has left behind: each is a ~32 MB global and
-       nothing else ever releases one. AFTER the new edition loads, never before,
-       so a reader switching between two of them is not left staring at NKJV while
-       the second download runs.
-
-       Switching all the way back to NKJV frees every alt edition, which is why
-       this effect no longer returns early on it — that is the one switch with the
-       most to free, and it used to be the one that freed nothing. */
-    if (code === 'nkjv') { releaseTranslationsExcept('nkjv'); return; }
-    loadTranslation(code).then(() => {
-      releaseTranslationsExcept(code);
-      setTranslationTick((v) => v + 1);
-    });
-  }, [settings.translation]);
+  // Lazy-load the active translation and sweep the editions left behind
+  // (hooks/use-translation-loader.js — the effect and its reasons live there).
+  useTranslationLoader(settings.translation, setTranslationTick);
 
   // One-time reclaim of the RETIRED Classic engine's index cache at boot.
   // The FlexSearch engine is gone (MiniSearch is the only engine now), so
