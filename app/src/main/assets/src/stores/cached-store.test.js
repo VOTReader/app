@@ -1029,8 +1029,9 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
     expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
     expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
+    expect(LS_SKIP_LIST).toContain('vot-last-seen-build');      // utils/update-toast.js
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(7);
+    expect(LS_SKIP_LIST.length).toBe(8);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
