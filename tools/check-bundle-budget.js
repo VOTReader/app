@@ -42,7 +42,10 @@ const BUDGETS = [
   { file: 'bundle-d.js', measured: 522971, max: 602000 },   // most screens/sheets/utils
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
-  { file: 'bundle-e.js', measured: 114137, max: 132000 },   // Settings/Search/Garden
+  // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
+  // Settings/Search work since the last baseline had eaten the margin down to 973 bytes,
+  // and a ceiling that fails the next honest change is a gate nobody can land under.
+  { file: 'bundle-e.js', measured: 131027, max: 150700 },   // Settings/Search/Garden
   // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.
