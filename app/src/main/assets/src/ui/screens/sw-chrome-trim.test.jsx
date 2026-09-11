@@ -261,11 +261,18 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(screen.queryByText(/OpenBible/i)).toBeNull();
   });
 
-  it('hidden keeps the book rail: a draw after the hide still paints the book labels', async () => {
+  /* The hide itself repaints nothing (the canvas is not cleared by a CSS class), so the
+     draw that matters is the NEXT one — the phone turning in the reader's hand. jsdom has no
+     ResizeObserver, so the screen listens to window resize, which is what a rotation raises;
+     that is the redraw driven here. Under the old code that redraw CLEARED the rail. */
+  const rotate = () => act(async () => { window.dispatchEvent(new Event('resize')); await new Promise((r) => setTimeout(r, 0)); });
+
+  it('hidden keeps the book rail: the redraw after the hide (a rotation) still paints the book labels', async () => {
     await mount();
     await waitForLabel();
     fireEvent.click(screen.getByLabelText(HIDE_ALL));
     CALLS.length = 0;
+    await rotate();
     const labels = await waitForLabel();
     expect(labels.some((s) => /^gen/i.test(s)), 'labels after the hide: ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
   });
@@ -277,6 +284,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     await waitForLabel();
     fireEvent.click(screen.getByLabelText(HIDE_ALL));
     CALLS.length = 0;
+    await rotate();
     const labels = await waitForLabel();
     expect(labels.some((s) => /^gen/i.test(s)), 'labels after the hide (My Web): ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
   });

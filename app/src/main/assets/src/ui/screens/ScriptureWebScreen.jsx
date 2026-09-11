@@ -452,7 +452,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(railOpts(), {
           hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc,
         }));
-        if (!chromeHidden) drawRulerOnly(ctx, g, cam, base, v, chrome);
+        // The rail stays under the hidden chrome: it is the legend of the web,
+        // not a control (Corbin, 2026-09-11).
+        drawRulerOnly(ctx, g, cam, base, v, chrome);
       }
       return;
     }
@@ -472,18 +474,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
-    if (chromeHidden) {
-      // The book rail is chrome too. drawRuler clears the UI canvas before it
-      // paints, so skipping it would leave the last rail standing.
-      const uic = uiRef.current;
-      const ctx = uic && uic.getContext('2d');
-      if (ctx) ctx.clearRect(0, 0, v.W, uic.height);
-      return;
-    }
+    // The book rail is drawn whether or not the chrome is hidden: the hide
+    // button takes the pills and the counter, and the books along the bottom
+    // are how the reader knows where in scripture the web is (Corbin,
+    // 2026-09-11: "keep the web legend (the books at the bottom, etc)"). It
+    // used to be cleared here as "chrome too".
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts, chromeHidden]);
+  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -907,7 +906,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                  2026-09-10). The number returns with the first link. */
               ? <p>No links yet — select any text and tap Link.</p>
               : <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>)
-            : (stats && <p>{stats.shown.toLocaleString()} of {stats.total.toLocaleString()} connections</p>)}
+            /* The count shown, alone: "15,402 of 63,418" read as a fraction of
+               something the reader had not asked about (Corbin, 2026-09-11:
+               "just keep x connections"); the density hint that flashes on a
+               switch is where the two densities are explained. */
+            : (stats && <p>{stats.shown.toLocaleString()} connections</p>)}
           {hint && <p className="sw-hint" role="status">{hint}</p>}
         </div>
       </div>
@@ -949,16 +952,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           </button>
         )}
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
-        {/* IN THE STRIP'S FLOW, NOT UNDER IT. `flex-basis: 100%` in a wrapping
-            flex row makes this its own last line, so the strip's height carries
-            the attribution instead of a second element having to guess it. */}
-        <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
+        {/* NO CREDIT LINE HERE. The CC-BY attribution for the OpenBible.info
+            dataset lives on About ("Cross-reference data from OpenBible.info,
+            used under CC-BY."); the copy this strip carried printed over the
+            book labels in landscape (Corbin, 2026-09-11). */}
       </div>
 
-      {/* HIDE ALL — outside everything it hides, because it is the way back;
-          bottom-right, the one free corner on the smallest frame (app.css says
-          why). The label stays constant and aria-pressed carries the state, the
-          same convention as the Scripture / My web seg. */}
+      {/* HIDE THE CONTROLS — outside everything it hides, because it is the way
+          back; bottom-right, the one free corner on the smallest frame (app.css
+          says why). Hidden means the topbar and the strip (the pills, Reset, the
+          counter); the book rail on the UI canvas and the colour key stay, because
+          they are how the web is read, not how it is driven (Corbin, 2026-09-11:
+          "keep the web legend (the books at the bottom, etc) but just hide the
+          interactable UI"). The label stays constant and aria-pressed carries
+          the state, the same convention as the Scripture / My web seg. */}
       <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
         aria-label="Hide controls" aria-pressed={chromeHidden} onClick={toggleChrome}>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">

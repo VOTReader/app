@@ -61,8 +61,14 @@ describe('the Scripture Web controls float over the canvas, with no panel behind
      in landscape — and About carries the CC-BY line. Its rule goes with it: a rule for an
      element nothing renders is the dead CSS the css-tokens gate exists to keep out. */
   it('the canvas credit has no rule left in app.css (the attribution is About\'s)', () => {
-    const css = fs.readFileSync(CSS, 'utf8');
-    expect(css).not.toMatch(/\.sw-credit\b/);
+    const raw = fs.readFileSync(CSS, 'utf8');
+    const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+    /* The stripper proven on the file that carries the hazard: a history comment still
+       names `.sw-credit`, so raw must contain it and stripped must not — and stripped must
+       still be the stylesheet (a stripper that ate the file would satisfy the absence). */
+    expect(raw).toMatch(/\.sw-credit\b/);
+    expect(stripped).toMatch(/\.sw-live\s*\{/);
+    expect(stripped).not.toMatch(/\.sw-credit\b/);
   });
 
   /* The hide button hides the interactive chrome and KEEPS the legend: the one rule that hides

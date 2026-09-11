@@ -165,7 +165,10 @@ const STOPS = [
     target: { selector: '[data-settings-group="reading"] .settings-row', text: 'Surprise Me' }, act: null,
     label: 'Settings',
     title: 'Make it yours',
-    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, and more. Turn off what you do not use.',
+    /* Corbin, 2026-09-11: say too that whole features go quiet here — "control many UI
+       features (like disabling search, history, other icons, etc)". Search and History are the
+       rows' own names; "the icons in the top bar" is the Top-Nav Buttons group's own subtitle. */
+    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use.',
     primary: 'Next',
   },
   {

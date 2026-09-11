@@ -6859,7 +6859,10 @@
     }
     /* A narrow root parks the strip bottom-left at full width; it yields the corner. */
     .sw-root.sw-narrow .sw-controls { max-width: calc(100% - 76px); }
-    .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-legend) { display: none; }
+    /* Hidden = the controls, not the legend: the colour key stays with the book
+       rail on the canvas (Corbin, 2026-09-11: "keep the web legend … just hide
+       the interactable UI"). */
+    .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls) { display: none; }
     .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
     .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
     .sw-seg { display: inline-flex; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
@@ -6957,22 +6960,8 @@
     .sw-key-hist i:nth-child(2) { height: 9px; }
     .sw-key-hist i:nth-child(3) { height: 6px; }
 
-    /* NO POSITION AND NO OFFSET: the CC-BY line is the control strip's last
-       row. It used to be absolutely placed with a `bottom` that had to be kept
-       clear of the strip by hand, and the hand-measured 198px went stale when
-       the strip grew a row — so the attribution sat behind the buttons on a
-       320px phone, present and unreadable. A flex row cannot go stale. */
-    /* The CC-BY attribution sits inside .sw-controls and lost the panel behind
-       it. An attribution that cannot be read is a LICENCE problem, not a
-       cosmetic one, so it keeps its size, colour, opacity and position and gains
-       the only legibility treatment that is not a panel: a shadow dark enough to
-       separate 10 px text from a bright arc passing under it. */
-    .sw-credit {
-      flex-basis: 100%; margin: 2px 2px 0; text-align: right;
-      font-size: var(--fsc-10); color: var(--cream-muted); opacity: 0.75;
-      letter-spacing: 0.04em;
-      text-shadow: 0 1px 2px #000, 0 0 4px #000;
-    }
+    /* The canvas carried a CC-BY credit line here until 2026-09-11; it printed
+       over the book labels in landscape and About carries the attribution. */
     .sw-live {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip-path: inset(50%); white-space: nowrap;
