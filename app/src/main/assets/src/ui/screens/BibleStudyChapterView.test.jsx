@@ -9,7 +9,7 @@
    useScrollMemory saves the live screen under. LetterView is the natural
    test boundary here — it's stubbed to capture its props. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { BibleStudyChapterView } from './BibleStudyChapterView.jsx';
 
@@ -20,10 +20,12 @@ beforeEach(() => {
   globalThis.LetterView = (props) => { captured = props; return <div data-testid="lv" />; };
   globalThis.COL_BY_LETTER_SC = new Map();
   globalThis.studyShortTitle = (t) => t;
+  window.__loadVotCorpus = vi.fn(() => Promise.resolve());
 });
 afterEach(() => {
   cleanup();
   for (const k of ['LetterView', 'COL_BY_LETTER_SC', 'studyShortTitle']) delete globalThis[k];
+  delete window.__loadVotCorpus;
 });
 
 const STUDY = {
@@ -64,6 +66,16 @@ describe('BibleStudyChapterView → LetterView audio identity (ruling (4), 2026-
     expect(captured.volKey).toBe('study');
     expect(captured.studyMode).toBe(true);
     expect(captured.volumeLabel).toBe('The Study');   // becomes the track's `sub`
+  });
+
+  it('kicks the lazy VOT corpus on mount — AUDIO_MANIFEST rides bundle-a-vot, and a study reached cold never loaded it', () => {
+    /* Found by tools/e2e-study-audio.mjs on the first built tree (3f921a1c): Home > Studies >
+       Purity > ch 1 on a fresh boot showed no pill, because hasAudio answers false for
+       "manifest not loaded" exactly as for "no recording". The Listening Library warms the
+       same corpus for the same reason (AudioLibraryScreen); App's useLazyBundles re-renders
+       the route when it lands, so the kick alone is the fix. */
+    renderView();
+    expect(window.__loadVotCorpus).toHaveBeenCalledTimes(1);
   });
 });
 
