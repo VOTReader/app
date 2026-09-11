@@ -1144,6 +1144,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-journal-draft',            // JournalEditorScreen
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
+  'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
