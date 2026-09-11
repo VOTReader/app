@@ -297,7 +297,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while fading. */
   const capFractionNow = React.useCallback(() => {
     const now = performance.now();
-    if (now < liveUntilRef.current) return 0;
+    // a frame is kept pending through the hold, so the fade starts the moment
+    // it ends even when the last gesture event drew the last frame
+    if (now < liveUntilRef.current) { schedule(); return 0; }
     if (!liveUntilRef.current) return 1;
     if (!releaseAtRef.current) releaseAtRef.current = now;
     const f = Math.min(1, (now - releaseAtRef.current) / FADE_MS);
