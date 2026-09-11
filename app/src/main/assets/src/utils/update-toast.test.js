@@ -140,21 +140,22 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
   });
 
-  it('a USED profile with no stored build has just crossed from a build older than this key: the plain toast, once', async () => {
-    /* The first update INTO the build that introduced the key. The old page never
-       wrote vot-last-seen-build (it had no announcer), so "nothing stored" is not
-       "nothing to compare": the profile has a history and a build it was on. The
-       one thing every used profile carries in localStorage is the vot-state shim
-       (index.html reads theme + fontStyle + fontScale from it before React mounts),
-       written by usePersistedState on every state flush. The old page also never
-       fired vot:before-update-reload, so the exact clock cannot ride this crossing:
-       the PLAIN toast, never the listening offer. */
+  it('a USED profile with no stored build stores silently: absence is not a crossing (91\'s history rule retired, 2026-09-11)', async () => {
+    /* 91 read "used profile, no key" as the first update into the build that
+       introduced the key, and toasted. It was cut against a misread of the 89 → 90
+       crossing — the key had not been lost, a sibling document had written it — and
+       with the reload flag carrying every web crossing the rule is only a
+       spurious-toast risk: Chromium commits localStorage 5 s after the first write,
+       so a kill in that window leaves a used profile with no key on the SAME build,
+       and the rule would have told that reader they were updated. Absence is
+       ambiguous (never written / lost); a default must not decide it into a value.
+       Android loses one transitional toast (a profile from before the key crosses
+       silently once); the key carries every crossing after. */
     localStorage.setItem('vot-state', JSON.stringify({ theme: 'dark', settings: { fontStyle: 'classic' } }));
-    expect(await announceUpdateIfAny()).toBe('shown');
-    expect(showToast).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(showToast).mock.calls[0][0].text).toBe(UPDATED_TOAST_TEXT);
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(showToast).not.toHaveBeenCalled();
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
-    // the second update on the same profile: the key path, exactly as before
+    // the next update on the same profile: the key path
     _resetUpdateToast(); vi.mocked(showToast).mockClear();
     SW_VERSION.value = { cacheVersion: NEWER, corpusVersion: 'c45' };
     expect(await announceUpdateIfAny()).toBe('shown');
@@ -166,8 +167,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
   });
 
   it('a used profile with no stored build and an UNKNOWN version: still nothing written, nothing shown', async () => {
-    // The history rule sits BEHIND the unknown arm: with no build to compare against,
-    // a history is not an update either.
+    // With no build to compare against nothing is written, used profile or not.
     localStorage.setItem('vot-state', '{"theme":"dark"}');
     control(); SW_VERSION.value = null;
     expect(await announceUpdateIfAny()).toBe('unknown');
