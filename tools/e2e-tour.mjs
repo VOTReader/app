@@ -27,6 +27,7 @@ import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
+import { TOUR_STEPS } from '../app/src/main/assets/src/utils/tour-steps.js';
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -60,8 +61,14 @@ const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
 const ok = (m) => console.log('  ok  ' + m);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const STOPS = ['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'done'];
-const EXPECT_SCREEN = { letters: 'home', listen: 'vot-one-letter', highlight: 'vot-one-letter', bible: 'bible-ch', journal: 'journal-home', backup: 'settings' };
+/* The stops come from the tour itself (tour-steps.js is pure, so node can import it): a stop
+   added to the app is a stop this walk drives, with no list here to forget. The walk went red
+   on 2026-09-10 the first time a stop was added without it — "expected stop done, the tour is
+   at settings" — and then hung on a label behind the still-open card. The COUNT is pinned by
+   tour-steps.test; this instrument's job is each stop on the real screen. */
+const STOPS = TOUR_STEPS.map((s) => s.id);
+const RINGED = TOUR_STEPS.filter((s) => s.target).map((s) => s.id);            // every stop that rings a control
+const EXPECT_SCREEN = Object.fromEntries(TOUR_STEPS.filter((s) => s.target).map((s) => [s.id, s.screen]));
 
 async function run(browser, { width, height, label, light }) {
   console.log(`\n== ${label} ${width}x${height} ${light ? 'light' : 'dark'}`);
@@ -202,7 +209,7 @@ async function run(browser, { width, height, label, light }) {
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
     const want = EXPECT_SCREEN[id];
     if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
-    if (['letters', 'listen', 'highlight', 'bible', 'journal', 'backup'].includes(id)) {
+    if (RINGED.includes(id)) {
       /* Wait for the ring to EXIST and then to STOP MOVING, and the second half is not a
          nicety. The overlay re-scrolls an off-screen target for up to RESCROLL_WINDOW_MS,
          so a small control is settled on the frame its ring appears and a TALL one is not:
@@ -332,7 +339,7 @@ async function run(browser, { width, height, label, light }) {
       if (!(await facts()).focusInside) fail('listen: Tab left the card');
     }
     await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
-    await sleep(id === 'letters' || id === 'listen' || id === 'highlight' || id === 'bible' || id === 'journal' || id === 'backup' || id === 'welcome' ? 1400 : 400);
+    await sleep(id === 'done' ? 400 : 1400);   // every stop but the closing card navigates or rings
     if (id === 'highlight') {
       // The colour goes with the stop. Asserted on the way out rather than at the end of the
       // walk, because by then the letter screen is gone and its absence would prove nothing.
