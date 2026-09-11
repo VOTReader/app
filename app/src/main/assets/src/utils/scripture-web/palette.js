@@ -101,8 +101,21 @@ export const MY_WEB_LINK_RGB = '232,192,80';
  */
 export function myWebColor(o) {
   if (o.link) return MY_WEB_LINK_RGB;
-  const t = o.verseTotal > 0 ? Math.min(1, Math.max(0, (o.verse || 0) / o.verseTotal)) : 0;
-  return distanceRampRGB(t);
+  return distanceRampRGB(myWebCanonT(o));
+}
+
+/** Where a citation lands in the canon, 0..1. */
+export function myWebCanonT(o) {
+  return o.verseTotal > 0 ? Math.min(1, Math.max(0, (o.verse || 0) / o.verseTotal)) : 0;
+}
+
+/** The context is stroked in this many colour bins along the canon (one
+ * path per bin and corridor layer, see rail-renderer): 96 bins over eight
+ * ramp stops is at most ~19/255 per channel between neighbours, under one
+ * unit in a pixel once the context's alpha (0.04 at 1x) is applied. */
+export const CONTEXT_BINS = 96;
+export function myWebBinColor(bin) {
+  return distanceRampRGB((bin + 0.5) / CONTEXT_BINS);
 }
 
 export const LINK_KIND_NAMES = ['Within scripture', 'Within the Volumes', 'Scripture ↔ Volumes'];

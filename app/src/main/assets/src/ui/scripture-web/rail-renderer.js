@@ -17,7 +17,7 @@
    links, which is years away and would be a good problem to have.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { myWebColor } from '../../utils/scripture-web/palette.js';
+import { myWebColor, myWebCanonT, myWebBinColor, CONTEXT_BINS } from '../../utils/scripture-web/palette.js';
 
 /** Clearance below the top chrome before the VOT rail is drawn, in CSS px. */
 const TOP_INSET = 96;
@@ -258,34 +258,72 @@ export function threadPath(a, b, crossRail, o) {
 }
 
 /**
- * Stroke a thread: the rise at the context's alpha, the level run along the
- * far rail (when there is one) at RUN_ALPHA of it, so a thread to an
- * off-screen book reads as a line diving into its rail, not a streak.
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array<[number, number]>} pts
- * @param {string} rgb
- * @param {number} alpha
+ * The context's stroke batches. A thread's ink must ACCUMULATE where threads
+ * overlap (a corridor of forty citations reads darker than one; R1), and
+ * overlapping segments of ONE path are painted once, so a thread cannot share
+ * a path with a thread it runs along. Two threads run along each other when
+ * they join near-adjacent verses to the same Volumes passage; so a thread's
+ * path is keyed by its colour bin and its RANK among the threads of that bin
+ * that end on the same passage: corridor members get their own layers,
+ * threads to different passages share one. The 5080 read 8.3 ms a frame with
+ * a stroke per thread (2,100 strokeStyle changes and stroke() calls) and 4.2
+ * with one path: the batches bring the count to about the number of
+ * (bin, layer) pairs in view.
+ *
+ * The rise of a thread is stroked at the context's alpha; the level run along
+ * the far rail (when there is one) at RUN_ALPHA of it, in its own batch, so a
+ * thread to an off-screen book reads as a line diving into its rail.
  */
-function strokeThread(ctx, pts, rgb, alpha) {
-  const rise = /** @type {any} */ (pts).rise;
-  const fromA = /** @type {any} */ (pts).fromA;
-  if (rise < 0) {
-    ctx.strokeStyle = 'rgba(' + rgb + ',' + alpha + ')';
-    ctx.beginPath();
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-    ctx.stroke();
-    return;
+class ContextBatches {
+  constructor() {
+    /** @type {Map<number, Array<{pts:Array<[number, number]>, i0:number, i1:number}>>} */
+    this.paths = new Map();
+    /** @type {Map<number, number>} */
+    this.ranks = new Map();
   }
-  // the rise is [0..rise] when the visible end is a, [rise..end] when it is b
-  const segs = fromA ? [[0, rise, alpha], [rise, pts.length - 1, alpha * RUN_ALPHA]]
-    : [[0, rise, alpha * RUN_ALPHA], [rise, pts.length - 1, alpha]];
-  for (const [i0, i1, al] of segs) {
-    ctx.strokeStyle = 'rgba(' + rgb + ',' + al + ')';
-    ctx.beginPath();
-    ctx.moveTo(pts[i0][0], pts[i0][1]);
-    for (let k = i0 + 1; k <= i1; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-    ctx.stroke();
+  /**
+   * @param {number} t canon position 0..1
+   * @param {number} passage the Volumes node the thread ends on
+   * @param {Array<[number, number]>} pts
+   */
+  add(t, passage, pts) {
+    const bin = Math.min(CONTEXT_BINS - 1, Math.floor(t * CONTEXT_BINS));
+    const rk = bin * 1000000 + Math.round(passage);
+    const layer = Math.min(255, this.ranks.get(rk) || 0);
+    this.ranks.set(rk, layer + 1);
+    const rise = /** @type {any} */ (pts).rise;
+    const fromA = /** @type {any} */ (pts).fromA;
+    if (rise < 0) { this.push(bin, layer, 0, pts, 0, pts.length - 1); return; }
+    // the rise is [0..rise] when the visible end is a, [rise..end] when it is b
+    if (fromA) { this.push(bin, layer, 0, pts, 0, rise); this.push(bin, layer, 1, pts, rise, pts.length - 1); }
+    else { this.push(bin, layer, 1, pts, 0, rise); this.push(bin, layer, 0, pts, rise, pts.length - 1); }
+  }
+  /** @param {number} bin @param {number} layer @param {number} run @param {Array<[number, number]>} pts @param {number} i0 @param {number} i1 */
+  push(bin, layer, run, pts, i0, i1) {
+    const key = (bin * 256 + layer) * 2 + run;
+    let list = this.paths.get(key);
+    if (!list) { list = []; this.paths.set(key, list); }
+    list.push({ pts, i0, i1 });
+  }
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} alpha
+   * @returns {number} strokes made
+   */
+  stroke(ctx, alpha) {
+    let n = 0;
+    for (const [key, list] of this.paths) {
+      const run = key & 1, bin = Math.floor(key / 512);
+      ctx.strokeStyle = 'rgba(' + myWebBinColor(bin) + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
+      ctx.beginPath();
+      for (const seg of list) {
+        ctx.moveTo(seg.pts[seg.i0][0], seg.pts[seg.i0][1]);
+        for (let k = seg.i0 + 1; k <= seg.i1; k++) ctx.lineTo(seg.pts[k][0], seg.pts[k][1]);
+      }
+      ctx.stroke();
+      n++;
+    }
+    return n;
   }
 }
 
@@ -410,14 +448,15 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     // drawn at all (threadPath), which is what keeps depth clean.
     ctx.lineWidth = cx.width * DPR;
     ctx.lineCap = 'round';
+    const batches = new ContextBatches();
     for (let i = 0; i < underlay.count; i++) {
       const a = /** @type {[number, number]} */ ([verseX(underlay.versePos[i]), rails.bottomY]);
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
       if (!pts) continue;
-      const rgb = myWebColor({ verse: underlay.versePos[i], verseTotal: opts.verseTotal });
-      strokeThread(ctx, pts, rgb, cx.alpha);
+      batches.add(myWebCanonT({ verse: underlay.versePos[i], verseTotal: opts.verseTotal }), underlay.votPos[i], pts);
     }
+    batches.stroke(ctx, cx.alpha);
   }
 
   if (!personal || !personal.count) return rails;
