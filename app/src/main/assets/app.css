@@ -6865,6 +6865,12 @@
     .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls) { display: none; }
     .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
     .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
+    /* r2: one pill per zoomed rail, sitting just inside its rail (the rail's
+       y is published by the personal draw as --sw-rail-top / --sw-rail-bottom) */
+    .sw-rail-reset { position: absolute; left: 16px; z-index: 4; min-height: 36px; padding: 0 12px; }
+    .sw-rail-reset-top { top: calc(var(--sw-rail-top, 96px) + 8px); }
+    .sw-rail-reset-bottom { top: calc(var(--sw-rail-bottom, 60vh) - 44px); }
+    .sw-root.sw-chrome-hidden .sw-rail-reset { display: none; }
     .sw-seg { display: inline-flex; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
     .sw-seg-btn {
       min-height: 44px; padding: 0 14px; background: transparent; border: 0;

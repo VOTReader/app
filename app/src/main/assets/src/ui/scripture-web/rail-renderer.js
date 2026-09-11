@@ -17,25 +17,19 @@
    links, which is years away and would be a good problem to have.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
+import { LINK_KIND_COLORS, myWebColor } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 
 /** Clearance below the top chrome before the VOT rail is drawn, in CSS px. */
 const TOP_INSET = 96;
 /** Curve tension for inter-rail ribbons: how far control points push out. */
 const RIBBON_BOW = 0.42;
-/** The corpus-context layer's resolution relative to the canvas (see drawPersonalWeb). */
-export const CONTEXT_SCALE = 0.5;
-let contextCanvas = null;
-/** One reusable offscreen canvas for the context; null where 2D is unavailable (tests). */
-function contextLayer(w, h) {
-  if (typeof document === 'undefined') return null;
-  if (!contextCanvas) contextCanvas = document.createElement('canvas');
-  if (contextCanvas.width !== w || contextCanvas.height !== h) { contextCanvas.width = w; contextCanvas.height = h; }
-  let lc = null;
-  try { lc = contextCanvas.getContext('2d'); } catch (_e) { lc = null; }
-  return lc ? { canvas: contextCanvas, ctx: lc } : null;
-}
+/** An endpoint this far past the screen edge still counts as on screen (device px). */
+export const EDGE_MARGIN = 24;
+/** How far past the screen edge a thread to an off-screen book completes its
+ * rise, as a fraction of the width; grows with the log of the distance so a
+ * thread to a far book exits shallower than one to the next book over. */
+const REACH_MARGIN = 0.12;
 
 /**
  * Where the two rails sit.
@@ -73,7 +67,7 @@ export function railFrame(v, base) {
  * every reading was wrong and they at least AGREED.
  *
  * @param {number} pos — rail position, 0..votRail.total
- * @param {{verseX:(v:number)=>number, votRail:{total:number}, verseTotal:number}} opts
+ * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:{total:number}, verseTotal:number}} opts
  * @returns {number}
  */
 export function votRailX(pos, opts) {
@@ -84,6 +78,10 @@ export function votRailX(pos, opts) {
   if (!(total > 0)) {
     throw new TypeError('rail-renderer: opts.verseTotal (the camera verse count) is required');
   }
+  // r2: the Volumes rail carries its OWN camera when the screen gives one
+  // (opts.votX), so the two rails zoom and pan independently; a caller with
+  // one camera keeps the shared-span mapping.
+  if (opts.votX) return opts.votX(pos);
   return opts.verseX((pos / Math.max(opts.votRail.total, 1)) * total);
 }
 
@@ -170,6 +168,80 @@ export function linkPath(ax, ay, bx, by, crossRail, steps) {
 }
 
 /**
+ * The r2 thread: a link is a LINE WITH ENDPOINTS ON ITS BOOKS at every zoom.
+ *
+ * linkPath() above is the overview shape. At depth an endpoint can sit
+ * thousands of px off screen, and the cubic's control points hang straight
+ * under each endpoint, so every such thread crossed the screen flat at mid
+ * gap: 2,095 of them made Corbin's cream band (measured 0.45-0.48 of the
+ * band's rows lit edge to edge at 10.5x). Here:
+ *   - neither endpoint on screen -> null. Nothing visible to attach to, so
+ *     nothing is drawn (context) and nothing is pickable.
+ *   - one endpoint on screen -> the thread completes its rise within a REACH
+ *     of that endpoint (the distance to the screen edge plus a margin that
+ *     grows with the log of the distance to the far book), so on screen it is
+ *     a line leaving its book toward the far one, and the level run to the
+ *     far endpoint lies off screen. Continuous with the both-visible shape:
+ *     while the far end is within reach the two are the same curve.
+ *   - both on screen -> the overview shape (ribbon cubic, half-ellipse).
+ *
+ * @param {[number, number]} a
+ * @param {[number, number]} b
+ * @param {boolean} crossRail
+ * @param {{width:number, gap:number, up?:boolean, maxRy?:number, n?:number}} o
+ * @returns {Array<[number, number]>|null}
+ */
+export function threadPath(a, b, crossRail, o) {
+  const W = o.width;
+  const on = (p) => p[0] >= -EDGE_MARGIN && p[0] <= W + EDGE_MARGIN;
+  const onA = on(a), onB = on(b);
+  if (!onA && !onB) return null;
+  const adx = Math.abs(b[0] - a[0]);
+  const n = o.n || 24;
+  // the reach from the visible end toward the far one
+  const vis = onA ? a : b, far = onA ? b : a;
+  const sign = far[0] >= vis[0] ? 1 : -1;
+  const distToEdge = sign > 0 ? (W + EDGE_MARGIN) - vis[0] : vis[0] + EDGE_MARGIN;
+  const reach = (onA && onB) ? adx
+    : Math.min(adx, distToEdge + W * REACH_MARGIN * (1 + Math.log10(1 + adx / W)));
+  let pts;
+  if (crossRail) {
+    // a cubic from the visible end to where the rise completes, then level to the far end
+    const ex = vis[0] + sign * reach, ey = far[1];
+    const dy = ey - vis[1];
+    const c1 = [vis[0], vis[1] + dy * RIBBON_BOW], c2 = [ex, ey - dy * RIBBON_BOW];
+    pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      pts.push([u * u * u * vis[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * ex,
+        u * u * u * vis[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * ey]);
+    }
+    if (reach < adx) pts.push([far[0], far[1]]);
+  } else {
+    // a quarter-ellipse rising over `reach` (never more than the half span),
+    // a level run at the apex, a quarter down to the far end
+    const rxFull = adx / 2;
+    const rx = Math.min(rxFull, reach);
+    const dir = o.up === false ? 1 : -1;
+    const ry = Math.min(rxFull, o.maxRy || rxFull);
+    const half = Math.ceil(n / 2);
+    pts = [];
+    for (let i = 0; i <= half; i++) {
+      const th = (Math.PI / 2) * (i / half);
+      pts.push([vis[0] + sign * rx * (1 - Math.cos(th)), vis[1] + dir * ry * Math.sin(th)]);
+    }
+    if (rx < rxFull) pts.push([far[0] - sign * rx, vis[1] + dir * ry]);
+    for (let i = 1; i <= half; i++) {
+      const th = (Math.PI / 2) * (1 - i / half);
+      pts.push([far[0] - sign * rx * (1 - Math.cos(th)), vis[1] + dir * ry * Math.sin(th)]);
+    }
+  }
+  if (!onA) pts.reverse();
+  pts[0] = [a[0], a[1]]; pts[pts.length - 1] = [b[0], b[1]];
+  return pts;
+}
+
+/**
  * Distance from a point to a polyline, for hit testing.
  * @param {Array<[number, number]>} pts
  * @param {number} px
@@ -197,8 +269,8 @@ export function distanceToPath(pts, px, py) {
  * @param {{count:number, aRail:Uint8Array, bRail:Uint8Array, aPos:Float32Array,
  *   bPos:Float32Array, kind:Uint8Array}|null} personal
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array}|null} underlay
- * @param {{verseX:(v:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
- *   DPR:number, base:number, chrome:any, showUnderlay?:boolean,
+ * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
+ *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, scheme?:string,
  *   hoverIndex?:number, focusIndex?:number}} opts
  */
 /**
@@ -218,6 +290,8 @@ export function personalInk(z) {
   const zz = Math.max(1, z || 1);
   const t = Math.min(1, Math.log(zz) / Math.log(40));
   return {
+    // rgb is the 'kind' scheme's cream; the canon scheme colours each thread
+    // by myWebColor() and takes only the alpha and width from here
     context: { rgb: '204,196,180', alpha: Math.min(0.45, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
     // the link thickens with depth like a canon ribbon (2.0 -> 2.6 at 40x), so it
     // stays 6x a context thread with its halo even where the thread is 0.45 · 1.3
@@ -278,77 +352,66 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     });
   }
 
-  // ── the corpus's own curated edges, as a quiet underlay ──
+  // ── the corpus's own curated edges, as context ──
+  const zB = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
+  const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
+  const z = Math.max(zB, zV);
+  const gap = Math.abs(rails.bottomY - rails.topY);
+  const scheme = opts.scheme || 'canon';
+  const geo = { width, gap };
   if (underlay && opts.showUnderlay && underlay.count) {
-    // 2,000+ curated edges: at any real weight they become a brown wash that
-    // buries the reader's own handful of links. This is context, not content.
-    const z = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
     const cx = personalInk(z).context;
-    // The context is stroked into a HALF-RESOLUTION layer and blitted up: the
-    // cost of 2,095 antialiased strokes is fill-bound on a 2x canvas (measured
-    // 175-320 ms a frame at full resolution), and a quarter of the pixels is
-    // a quarter of the fill. The blur it buys is the point as much as the
-    // speed: context reads as soft silk, the reader's links stay crisp.
-    const L = contextLayer(Math.ceil(width * CONTEXT_SCALE), Math.ceil(opts.height * CONTEXT_SCALE));
-    const c2 = L ? L.ctx : ctx;
-    if (L) {
-      c2.setTransform(1, 0, 0, 1, 0, 0);
-      c2.clearRect(0, 0, L.canvas.width, L.canvas.height);
-      c2.setTransform(CONTEXT_SCALE, 0, 0, CONTEXT_SCALE, 0, 0);
-    }
-    c2.strokeStyle = 'rgba(' + cx.rgb + ',' + cx.alpha + ')';
-    c2.lineWidth = L ? Math.max(cx.width * DPR, 1 / CONTEXT_SCALE) : cx.width * DPR;
-    // ONE STROKE PER EDGE. A single path stroked once composites every edge at
-    // the same flat value whatever piles up (measured: a uniform 10/255 over
-    // half the band). Per-edge strokes let corridors accumulate, which is the
-    // structure the reader's eye follows.
+    // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
+    // the half-resolution layer read as "low resolution"). One stroke per
+    // edge so corridors accumulate; a thread with no visible endpoint is not
+    // drawn at all (threadPath), which is what keeps depth clean.
+    ctx.lineWidth = cx.width * DPR;
+    ctx.lineCap = 'round';
     for (let i = 0; i < underlay.count; i++) {
-      const a = [verseX(underlay.versePos[i]), rails.bottomY];
+      const a = /** @type {[number, number]} */ ([verseX(underlay.versePos[i]), rails.bottomY]);
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
-      if ((a[0] < -50 && b[0] < -50) || (a[0] > width + 50 && b[0] > width + 50)) continue;
-      const pts = linkPath(a[0], a[1], b[0], b[1], true, 12);
-      c2.beginPath();
-      c2.moveTo(pts[0][0], pts[0][1]);
-      for (let k = 1; k < pts.length; k++) c2.lineTo(pts[k][0], pts[k][1]);
-      c2.stroke();
-    }
-    if (L) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(L.canvas, 0, 0, width, opts.height);
+      const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
+      if (!pts) continue;
+      const rgb = scheme === 'kind' ? cx.rgb : myWebColor(scheme, { verse: underlay.versePos[i], verseTotal: opts.verseTotal, bridge: true });
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + cx.alpha + ')';
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+      ctx.stroke();
     }
   }
 
   if (!personal || !personal.count) return rails;
 
   // ── the reader's links: halo pass first so no halo covers a neighbour's core ──
-  const L = personalInk(opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1).link;
+  const L = personalInk(z).link;
   const paths = [];
   for (let i = 0; i < personal.count; i++) {
     const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
     const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const cross = personal.aRail[i] !== personal.bRail[i];
-    const gap = Math.abs(rails.bottomY - rails.topY);
-    paths.push({ a, b, pts: linkPath(a[0], a[1], b[0], b[1], cross,
-      { n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }) });
+    const pts = threadPath(a, b, cross, Object.assign({ n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }, geo));
+    const rgb = scheme === 'kind'
+      ? (LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0]).map((n) => Math.round(n * 255)).join(',')
+      : myWebColor(scheme, { link: true, kind: personal.kind[i] });
+    paths.push({ a, b, pts, rgb });
   }
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (let i = 0; i < personal.count; i++) {
-    const c = LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0];
-    const rgb = c.map((n) => Math.round(n * 255)).join(',');
+    const { pts, rgb } = paths[i];
+    if (!pts) continue;
     const hot = i === opts.hoverIndex || i === opts.focusIndex;
     const dim = (opts.focusIndex >= 0 && i !== opts.focusIndex) ? 0.18 : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + ((hot ? L.hoverHaloAlpha : L.haloAlpha) * dim) + ')';
     ctx.lineWidth = (hot ? L.hoverHalo : L.halo) * DPR;
-    const pts = paths[i].pts;
     ctx.beginPath();
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.stroke();
   }
   for (let i = 0; i < personal.count; i++) {
-    const { a, b, pts } = paths[i];
-    const c = LINK_KIND_COLORS[personal.kind[i]] || LINK_KIND_COLORS[0];
-    const rgb = c.map((n) => Math.round(n * 255)).join(',');
+    const { a, b, pts, rgb } = paths[i];
+    if (!pts) continue;
     const isHover = i === opts.hoverIndex;
     const isFocus = i === opts.focusIndex;
     const dim = (opts.focusIndex >= 0 && !isFocus) ? 0.18 : 1;
@@ -359,11 +422,12 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.stroke();
     // endpoint pins: a ring on the rail with a filled dot, so both ends read
-    // as places, not as where a line happened to stop
+    // as places, not as where a line happened to stop; only on screen
     ctx.fillStyle = 'rgba(' + rgb + ',' + dim + ')';
     ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.9 * dim) + ')';
     ctx.lineWidth = 1 * DPR;
     for (const p of [a, b]) {
+      if (p[0] < -EDGE_MARGIN || p[0] > width + EDGE_MARGIN) continue;
       ctx.beginPath(); ctx.arc(p[0], p[1], L.ring * DPR, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(p[0], p[1], L.dot * DPR, 0, Math.PI * 2); ctx.fill();
     }
@@ -404,8 +468,9 @@ export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
     if (px < minX || px > maxX) continue;
     const cross = personal.aRail[i] !== personal.bRail[i];
     const gap = Math.abs(rails.bottomY - rails.topY);
-    const d = distanceToPath(linkPath(a[0], a[1], b[0], b[1], cross,
-      { n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }), px, py);
+    const pts = threadPath(a, b, cross, { width: opts.width, gap, n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 });
+    if (!pts) continue;
+    const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, { index: i, distance: d }, cap);
   }
   return best;
@@ -442,7 +507,9 @@ export function pickUnderlayLinks(underlay, opts, px, py, tol, limit) {
     const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
     const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
     if (px < minX || px > maxX) continue;
-    const d = distanceToPath(linkPath(a[0], a[1], b[0], b[1], true, 12), px, py);
+    const pts = threadPath(/** @type {[number, number]} */ (a), b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 12 });
+    if (!pts) continue;
+    const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, {
       index: i, distance: d, verse: underlay.versePos[i], votPos: underlay.votPos[i],
       record: underlay.records && underlay.records[i],
