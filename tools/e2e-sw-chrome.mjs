@@ -33,8 +33,9 @@
  *   F3w the same text over the WORST ground the phone gives it: the web pans
  *       under the fixed strip, so each resting pill's ground is read from
  *       screenshotted pixels (the pill's inner edge strip, 3..8 CSS px inside
- *       the border, where no glyph is drawn) at every pan position, overview
- *       and at three zoom steps, and the ink must clear 3:1 (label grade)
+ *       the border, where no glyph is drawn) at the boot camera and, after
+ *       three asserted zoom steps, at every pan position (a drag at overview
+ *       is a tap on a clamped camera), and the ink must clear 3:1 (label grade)
  *       over the brightest pixel found. A pill under which nothing bright
  *       ever passed says so; that pill is not proven either way.
  *       the fill carries a scrim), computed from the same computed styles
@@ -193,15 +194,19 @@ async function zoom3(page, tag) {
 
 /** F3w: pan the web under the strip PAN_STEPS times (a slow circle of drags),
  * reading every pill's brightest ground after each; keep the worst per pill. */
-async function worstGround(page, pills, dpr, worst, state) {
+async function worstGround(page, pills, dpr, worst, state, tag, steps) {
   const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; });
-  for (let k = 0; k <= PAN_STEPS; k++) {
+  for (let k = 0; k <= steps; k++) {
     if (k > 0) {
       const ang = (k / PAN_STEPS) * Math.PI * 2, amp = Math.min(c.w, c.h) * 0.3;
       await page.mouse.move(c.x, c.y); await page.mouse.down();
       for (let s = 1; s <= 8; s++) await page.mouse.move(c.x + Math.cos(ang) * amp * s / 8, c.y + Math.sin(ang) * amp * s / 8);
       await page.mouse.up(); await sleep(350);
     }
+    // the ground is only the web's if the web is what sits under the pointer: a
+    // sheet or chooser over the canvas (a clamped drag reads as a tap) is a fault
+    const under = await page.evaluate((c) => { const e = document.elementFromPoint(c.x, c.y); return e ? e.tagName + '.' + e.className : 'nothing'; }, c);
+    if (!/sw-canvas/.test(under)) { fails.push(`${tag} F3w ${state} step ${k}: ${under} covers the canvas centre; the ground under the pills is not the web's`); return; }
     const { grounds: g, sum } = await brightestGround(page, pills.map((p) => p.box), dpr);
     if (k > 0 && sum === worst.lastSum) worst.stillPans = (worst.stillPans || 0) + 1;
     worst.lastSum = sum;
@@ -237,9 +242,11 @@ async function walk(page, url, fname) {
   // F3w: the worst ground the phone gives each resting pill, from pixels
   const worst = new Map();
   const resting = r.pills.filter((p) => !p.on);
-  await worstGround(page, resting, f.dpr, worst, 'overview');
-  if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps');
-  if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS * 2} drags left the web's centre pixels unchanged: the pan did not take, the grounds are not the worst`);
+  // at overview the camera is clamped (the canon fits the screen), so a drag
+  // would read as a tap: the boot ground is the overview ground, no drags
+  await worstGround(page, resting, f.dpr, worst, 'overview', tag, 0);
+  if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps', tag, PAN_STEPS);
+  if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS} drags left the web's centre pixels unchanged: the pan did not take, the grounds are not the worst`);
   for (const p of resting) {
     const w = worst.get(p.name);
     if (!w) { note(`${tag} F3w ${p.name}: no ground read`); continue; }
