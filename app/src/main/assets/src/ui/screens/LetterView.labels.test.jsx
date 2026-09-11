@@ -169,3 +169,54 @@ describe('LetterView — the Videos card appears only when there are videos [C5]
     expect(titles).toEqual(['Audio']);   // Audio present, Videos absent
   });
 });
+
+/* Ruling (4), 2026-09-11: a study chapter with a recording gets the same pill.
+   BibleStudyChapterView renders LetterView in studyMode with volKey 'study';
+   the six Purity chapters ship in AUDIO_MANIFEST as study:purity-chN. Pre-fix
+   the pill and the prewarm were gated on !studyMode, so a real recording was
+   invisible on the one screen that shows its text. The gate is hasAudio and
+   nothing else: a study chapter WITHOUT a recording still shows nothing. */
+describe('LetterView — a study chapter\'s recording gets the Listen pill (ruling (4))', () => {
+  const STUDY_CH = { ...LETTER, id: 'purity-ch1', title: 'Chapter 1', num: 1 };
+  const STUDY_PROPS = { volKey: 'study', studyMode: true, volumeLabel: 'Purity - Bible/Letter Study' };
+
+  it('asks hasAudio about study:<chapterId> and shows the pill when the manifest has it', () => {
+    const asked = [];
+    AudioPlayer.hasAudio = (v, id) => { asked.push([v, id]); return true; };
+    renderLetter(STUDY_PROPS, STUDY_CH);
+    // The mock records its arguments: a mock that ignores them would pass a
+    // pill keyed on the wrong volKey (2026-09-05 Doctrine).
+    expect(asked).toContainEqual(['study', 'purity-ch1']);
+    expect(document.querySelector('.hero-play-row button')).toBeTruthy();
+  });
+
+  it('plays it as { volKey: "study", letter, collectionLabel: study title } — the track key the Library routes back through', () => {
+    hadAudio = true;
+    renderLetter(STUDY_PROPS, STUDY_CH);
+    fireEvent.click(document.querySelector('.hero-play-row button'));
+    expect(playCalls).toHaveLength(1);
+    expect(playCalls[0].volKey).toBe('study');
+    expect(playCalls[0].letter.id).toBe('purity-ch1');
+    expect(playCalls[0].collectionLabel).toBe('Purity - Bible/Letter Study');
+  });
+
+  it('prewarms the study recording like any letter (studyMode is not a reason to skip it)', () => {
+    const warmed = [];
+    AudioPlayer.prewarm = (v, id) => { warmed.push([v, id]); };
+    renderLetter(STUDY_PROPS, STUDY_CH);
+    expect(warmed).toEqual([['study', 'purity-ch1']]);
+  });
+
+  it('control: a study chapter with NO recording shows no pill — the gate is hasAudio, not studyMode', () => {
+    hadAudio = false;
+    renderLetter(STUDY_PROPS, STUDY_CH);
+    expect(document.querySelector('.hero-play-row')).toBeNull();
+  });
+
+  it('control: an inert study peek does not prewarm', () => {
+    const warmed = [];
+    AudioPlayer.prewarm = (v, id) => { warmed.push([v, id]); };
+    renderLetter({ ...STUDY_PROPS, inert: true }, STUDY_CH);
+    expect(warmed).toEqual([]);
+  });
+});

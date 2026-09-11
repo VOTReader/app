@@ -55,6 +55,18 @@ const renderView = () => render(
   />,
 );
 
+describe('BibleStudyChapterView → LetterView audio identity (ruling (4), 2026-09-11)', () => {
+  it('mounts LetterView with volKey "study" — the manifest prefix of study:<chapterId> recordings', () => {
+    renderView();
+    // Pre-fix volKey was omitted: hasAudio/prewarm/playLetter were asked about
+    // 'undefined:ch2' (and short-circuited on studyMode anyway), so the six
+    // Purity recordings shipped in AUDIO_MANIFEST had no Listen pill.
+    expect(captured.volKey).toBe('study');
+    expect(captured.studyMode).toBe(true);
+    expect(captured.volumeLabel).toBe('The Study');   // becomes the track's `sub`
+  });
+});
+
 describe('BibleStudyChapterView → LetterView resolvePeek', () => {
   it('builds the current chapter shim with its neighbors (unchanged contract)', () => {
     renderView();

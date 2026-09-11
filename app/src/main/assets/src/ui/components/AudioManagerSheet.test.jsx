@@ -787,6 +787,10 @@ describe('AudioManagerSheet — title jump to text (owner request 2026-08-09)', 
     expect(hasTextDestination({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' })).toBe(true);
     expect(hasTextDestination({ key: null })).toBe(false);
     expect(hasTextDestination({ key: 'vol1:letter-a' })).toBe(false);   // no COL_BY_KEY here
+    // A study recording (ruling (4), 2026-09-11): its text is the study chapter LetterView
+    // renders in studyMode, reached through _openAudioText's study arm — not a collection.
+    expect(hasTextDestination({ key: 'study:purity-ch1' })).toBe(true);
+    expect(hasTextDestination({ key: 'study:' })).toBe(false);
   });
 });
 
