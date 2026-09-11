@@ -48,6 +48,9 @@
  * each reload the walk polls scrollTop until it has not moved for 500 ms (at most 6 s) and prints
  * the moves before it classifies — one sample read 887 against 900 while the read-along follow
  * was still carrying the page to 698 and was called "moved for no reason" (e2e-walk-lib.mjs).
+ * And the update toast is witnessed by the same 4 s boot trace, never by that later read: the
+ * plain toast lasts 4 s (UPDATED_TOAST_MS) and the settle wait's first outing read its text with
+ * the show class already gone — a witness that reads a 4 s window at one moment is a coin toss.
  *
  * Before either arm, the FRESH profile's two boots must show no update toast at all: boot 1
  * is uncontrolled (the worker is installing) and boot 2 is the first controlled boot of a
@@ -453,7 +456,7 @@ try {
     await booted();
     // Where the scroller sits over the first seconds after boot: the restore lands, and
     // then anything else that writes scrollTop shows as a later move in this trace.
-    await page.evaluate(() => { const w = /** @type {any} */ (window); w.__e2eScrollTrace = []; const t0 = performance.now(); const iv = setInterval(() => { const el = document.querySelector(".screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll"); w.__e2eScrollTrace.push({ at: Math.round(performance.now() - t0), y: el ? Math.round(el.scrollTop) : null, max: el ? el.scrollHeight - el.clientHeight : null, restoring: document.body.classList.contains("scroll-restoring") }); if (performance.now() - t0 > 4000) clearInterval(iv); }, 100); });
+    await page.evaluate(() => { const w = /** @type {any} */ (window); w.__e2eScrollTrace = []; const t0 = performance.now(); const iv = setInterval(() => { const el = document.querySelector(".screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll"); w.__e2eScrollTrace.push({ at: Math.round(performance.now() - t0), y: el ? Math.round(el.scrollTop) : null, max: el ? el.scrollHeight - el.clientHeight : null, restoring: document.body.classList.contains("scroll-restoring"), toast: (() => { const t = document.querySelector("#vot-toast-updated"); return t && t.classList.contains("show") ? t.textContent.trim() : null; })() }); if (performance.now() - t0 > 4000) clearInterval(iv); }, 100); });
     await sleep(1500);
     note(`${arm} after the reload: tour offer ${await declineTour() ? 'SHOWN (declined)' : 'not shown'}`);
     await page.waitForFunction(() => window.AudioPlayer && window.AudioPlayer.getState().queue.length > 0, { timeout: 10000 }).catch(() => {});
@@ -471,7 +474,15 @@ try {
     // hand the record to assertScroll so a verdict names what the scroller was doing.
     const settle = await settleRead(() => page.evaluate(() => { const el = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll'); return el ? Math.round(el.scrollTop) : null; }), { stillMs: 500, maxMs: 6000, everyMs: 50 });
     note(`${arm} scroller before the read: ${settleLine(settle)}`);
-    return Object.assign(await readPage(), { settle });
+    // The update toast is witnessed by the same 4 s trace, not by the read below: the plain
+    // "just updated" toast lasts 4 s (UPDATED_TOAST_MS) and the read now lands after the settle
+    // wait — the first run of that wait read the toast's text with its show class already gone.
+    const seen = trace.filter((s) => s.toast);
+    // text = the LAST text shown (the listening offer re-uses the plain toast's element, so a refused
+    // resume rewrites it); texts = every distinct text in order, for the report.
+    const toastSeen = seen.length ? { text: seen[seen.length - 1].toast, texts: [...new Set(seen.map((s) => s.toast))], firstAt: seen[0].at, lastAt: seen[seen.length - 1].at } : null;
+    note(`${arm} update toast in the boot trace: ${toastSeen ? `${toastSeen.texts.map((t) => JSON.stringify(t)).join(' then ')} shown from +${toastSeen.firstAt} ms through +${toastSeen.lastAt} ms of the trace` : 'none shown'}`);
+    return Object.assign(await readPage(), { settle, toastSeen });
   };
   // What the boot FOUND, before the app touched anything: the two sessionStorage records
   // written on the reload event, and the IDB record — which says whether the put issued
@@ -597,7 +608,10 @@ try {
   if (B1.title !== B0.title) fail(`B the reader came back on ${JSON.stringify(B1.title) || 'a different screen'}, not ${JSON.stringify(B0.title)}`);
   assertScroll('B', B0.y, B1);
   if (B1.fs !== fs0) fail(`B text size came back as --font-scale=${B1.fs}, was ${fs0}`);
-  if (!B1.toastShown || !/just updated/i.test(B1.toast)) fail(`B no "just updated" toast after a real new build (toast ${JSON.stringify(B1.toast)}, shown=${B1.toastShown})`);
+  // Witnessed by the boot trace (shown at any moment in the first 4 s), or live at the read.
+  const toastText = B1.toastSeen ? B1.toastSeen.text : (B1.toastShown ? B1.toast : '');
+  if (!/just updated/i.test(toastText)) fail(`B no "just updated" toast after a real new build (boot trace: ${B1.toastSeen ? JSON.stringify(B1.toastSeen.text) : 'none shown'}; live at the read: ${JSON.stringify(B1.toast)}, shown=${B1.toastShown})`);
+  else note(`B the update toast showed after the real new build: ${JSON.stringify(toastText)}${B1.toastSeen ? ` (+${B1.toastSeen.firstAt} ms to +${B1.toastSeen.lastAt} ms after boot)` : ' (still up at the read)'}`);
   // Exactly ONE update toast on the page, whichever text it carries: the listening offer
   // re-uses the plain toast's element (one element per id), so the plain one is never ALSO shown.
   const toastCount = await page.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.children.length === 0 && /just updated/i.test(e.textContent || '')).length);
