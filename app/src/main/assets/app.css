@@ -6761,7 +6761,17 @@
        to the rotated box, and a transformed ancestor is the containing block
        for the fixed/absolute chrome inside, so every overlay rides along. */
     .sw-root.sw-rotated {
-      top: 0; left: 0; width: 100vh; height: 100vw;
+      /* THE DYNAMIC VIEWPORT, WITH THE OLD UNIT AS ITS FALLBACK. On mobile
+         Chrome 100vh is the LARGE viewport (URL bar hidden), taller than the
+         visible one by the bar while it shows, so a root sized 100vh runs
+         off the glass and everything anchored to its far edge (the pill
+         cluster, the credit, the hide-all button) is cut: Corbin's Pixel,
+         2026-09-10 22:56, one minute after the trim went live. 100dvh follows
+         the bar. The 100vh line stays FIRST so an engine without dvh keeps
+         the old size rather than none. */
+      top: 0; left: 0;
+      width: 100vh; width: 100dvh;
+      height: 100vw; height: 100dvw;
       transform: rotate(90deg) translateY(-100%);
       transform-origin: top left;
     }
@@ -6813,10 +6823,17 @@
       right: 14px; top: var(--sw-chrome-top);
       max-width: 62vw; justify-content: flex-end; padding: 7px;
     }
+    /* ONE PILL GRAMMAR (Corbin, 2026-09-10: "some buttons are full black and
+       some are see through, unify"): every resting pill is the same
+       half-black scrim behind a gold hairline, so the web shows through and
+       cream text still reads over the brightest arc (a 50 % scrim under
+       --cream-dim on the green corridor's ~0.35 luminance gives ~4.1:1, where
+       bare glass gave ~2.3:1); the active pill alone takes the gold tint. No
+       solid box anywhere: the box is what the nobox landing killed. */
     .sw-btn {
       display: inline-flex; align-items: center; justify-content: center;
       min-height: 44px; min-width: 44px; padding: 0 14px;
-      background: transparent; color: var(--cream-dim);
+      background: rgba(0, 0, 0, 0.5); color: var(--cream-dim);
       border: 1px solid var(--gold-border); border-radius: 999px;
       font-family: var(--font-cinzel); font-size: var(--fsc-11);
       letter-spacing: 0.09em; text-transform: uppercase; cursor: pointer;
@@ -6843,7 +6860,7 @@
     .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-legend) { display: none; }
     .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
     .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
-    .sw-seg { display: inline-flex; border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
+    .sw-seg { display: inline-flex; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
     .sw-seg-btn {
       min-height: 44px; padding: 0 14px; background: transparent; border: 0;
       color: var(--cream-muted); font-family: var(--font-cinzel);
@@ -6855,7 +6872,7 @@
     .sw-select-wrap { display: inline-flex; align-items: center; }
     .sw-select {
       min-height: 44px; padding: 0 28px 0 13px; appearance: auto;
-      background: var(--bg3); color: var(--cream-dim); border: 1px solid var(--gold-border);
+      background: rgba(0, 0, 0, 0.5); color: var(--cream-dim); border: 1px solid var(--gold-border);
       border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fsc-11);
       letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer;
     }
