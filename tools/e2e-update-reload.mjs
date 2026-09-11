@@ -27,6 +27,11 @@
  *      either PLAYING at its clock or the toast reading "… Tap to continue listening."
  *      whose one tap resumes it there. No "Reload" button is ever rendered.
  *
+ * Before either arm, the FRESH profile's two boots must show no update toast at all: boot 1
+ * is uncontrolled (the worker is installing) and boot 2 is the first controlled boot of a
+ * profile that now has data — the shape a naive "a used profile with no stored build has been
+ * updated" rule mistakes for an update. A brand-new reader is never told they were updated.
+ *
  * Autoplay is measured twice: under Chrome's DEFAULT policy (desktop; this machine allows the
  * resume after a real gesture before the reload) and, with --autoplay-refused, under
  * user-gesture-required — the phone's path (mobile Chrome refuses play() with no gesture after
@@ -280,12 +285,21 @@ try {
   await click('Continue'); await click('Begin Reading');
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, { timeout: 90000 });
   note('worker controls the page after boot 1');
+  // A fresh profile is never told it was updated. The toast stays up 4 s; both reads happen
+  // well over a second after the announcer could have decided.
+  const updateToastNow = () => page.evaluate(() => { const e = document.querySelector('#vot-toast-updated'); return e && e.classList.contains('show') ? (e.textContent || '').trim() : null; });
+  const t1 = await updateToastNow();
+  if (t1 !== null) fail(`boot 1 (fresh profile, uncontrolled) shows an update toast ${JSON.stringify(t1)} — nothing was updated`);
   // ── boot 2: a CONTROLLED page, the state every later update finds ──
   await page.reload({ waitUntil: 'load' });
   await booted(); await sleep(700);
   const controlledAtBoot = await page.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller));
   if (!controlledAtBoot) fail('precondition: the page is not controlled at boot 2 — the update path cannot be driven');
   note(`boot 2: tour offer ${await declineTour() ? 'declined' : 'not shown'}`);
+  await sleep(800);
+  const t2 = await updateToastNow();
+  if (t2 !== null) fail(`boot 2 (fresh profile, first controlled boot) shows an update toast ${JSON.stringify(t2)} — a brand-new reader was told they were updated`);
+  else note('boots 1 and 2: no update toast on the fresh profile');
   note('renderer: ' + await page.evaluate(() => {
     try { const c = document.createElement('canvas'); const gl = c.getContext('webgl2') || c.getContext('webgl'); if (!gl) return 'no WebGL';
       const x = gl.getExtension('WEBGL_debug_renderer_info'); return x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) { return 'error: ' + e.message; }

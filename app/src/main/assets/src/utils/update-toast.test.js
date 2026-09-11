@@ -34,7 +34,7 @@ import { showToast } from './toast.js';
 import { announceUpdateIfAny, offerListeningResume, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
-const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb';
+const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb', NEWER = 'v1.0.2-cccccccccc';
 
 describe('announceUpdateIfAny — one toast per new build, on any screen', () => {
   beforeEach(() => {
@@ -46,7 +46,13 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     const stale = document.getElementById(UPDATED_TOAST_ID);
     if (stale) stale.remove();
   });
-  afterEach(() => { BRIDGE.isAndroid = false; });
+  afterEach(() => { BRIDGE.isAndroid = false; uncontrol(); });
+
+  /* jsdom has no navigator.serviceWorker at all, which IS the uncontrolled web page
+     (a first visit). A CONTROLLED page is stubbed on: the announcer reads only
+     `.controller`, and the SW's answer itself comes through the mocked getBuildVersion. */
+  const control = () => Object.defineProperty(navigator, 'serviceWorker', { value: { controller: {} }, configurable: true });
+  const uncontrol = () => { try { delete /** @type {any} */ (navigator).serviceWorker; } catch (_e) { /* not stubbed */ } };
 
   it('a stored OLDER build shows the toast once and stores the new build', async () => {
     localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
@@ -69,14 +75,50 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
   });
 
   it('the first ever boot stores silently — nothing to compare, nothing to announce', async () => {
+    expect(localStorage.length, 'precondition: a FRESH profile — nothing of the app\'s in storage').toBe(0);
     expect(await announceUpdateIfAny()).toBe('first');
     expect(showToast).not.toHaveBeenCalled();
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
   });
 
+  it('a USED profile with no stored build has just crossed from a build older than this key: the plain toast, once', async () => {
+    /* The first update INTO the build that introduced the key. The old page never
+       wrote vot-last-seen-build (it had no announcer), so "nothing stored" is not
+       "nothing to compare": the profile has a history and a build it was on. The
+       one thing every used profile carries in localStorage is the vot-state shim
+       (index.html reads theme + fontStyle + fontScale from it before React mounts),
+       written by usePersistedState on every state flush. The old page also never
+       fired vot:before-update-reload, so the exact clock cannot ride this crossing:
+       the PLAIN toast, never the listening offer. */
+    localStorage.setItem('vot-state', JSON.stringify({ theme: 'dark', settings: { fontStyle: 'classic' } }));
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(showToast).mock.calls[0][0].text).toBe(UPDATED_TOAST_TEXT);
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+    // the second update on the same profile: the key path, exactly as before
+    _resetUpdateToast(); vi.mocked(showToast).mockClear();
+    SW_VERSION.value = { cacheVersion: NEWER, corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEWER);
+    vi.mocked(showToast).mockClear();
+    expect(await announceUpdateIfAny(), 'the same build again: nothing').toBe('same');
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('a used profile with no stored build and an UNKNOWN version: still nothing written, nothing shown', async () => {
+    // The history rule sits BEHIND the unknown arm: with no build to compare against,
+    // a history is not an update either.
+    localStorage.setItem('vot-state', '{"theme":"dark"}');
+    control(); SW_VERSION.value = null;
+    expect(await announceUpdateIfAny()).toBe('unknown');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBeNull();
+  });
+
   it('an UNKNOWN version writes nothing and shows nothing — a null must never impersonate a value', async () => {
     localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
-    SW_VERSION.value = null;              // web, uncontrolled or an old SW that never answers
+    control(); SW_VERSION.value = null;   // web, controlled by an old SW that never answers
     expect(await announceUpdateIfAny()).toBe('unknown');
     expect(showToast).not.toHaveBeenCalled();
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(OLD);   // untouched
@@ -92,13 +134,34 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
   });
 
-  it('web with no service worker answer does NOT read the deployed file as its own build', async () => {
-    // Off Android an uncontrolled page is a first visit; the server's
-    // service-worker.js says what is PUBLISHED, not what this page runs.
-    SW_VERSION.value = null;
+  it('web, CONTROLLED but the worker is silent: the deployed file is NOT this page\'s build', async () => {
+    // A controlled page runs whatever its worker cached; the server's
+    // service-worker.js says what is PUBLISHED, which may be ahead of that.
+    control(); SW_VERSION.value = null;
     APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
     expect(await announceUpdateIfAny()).toBe('unknown');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(OLD);
+  });
+
+  it('web, UNCONTROLLED (a first visit fetched every byte from the network): the deployed file IS this page\'s build', async () => {
+    /* Boot 1 of a fresh profile has no controller yet — the worker is installing — so
+       the SW cannot answer, and the page came from the network moments ago, so the
+       server's service-worker.js is its own build. It must be REMEMBERED here: a fresh
+       profile that recorded nothing at boot 1 would arrive at boot 2 (controlled, the
+       SW answering) as "a used profile with no stored build" and toast a brand-new
+       reader about an update that never happened. */
+    expect(navigator.serviceWorker, 'precondition: uncontrolled').toBeUndefined();
+    SW_VERSION.value = null;
+    APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+    // boot 2: controlled, the worker answers the same build; the profile is used by now
+    localStorage.setItem('vot-state', '{"theme":"dark"}');
+    control(); SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' }; APK_VERSION.value = null;
+    expect(await announceUpdateIfAny()).toBe('same');
     expect(showToast).not.toHaveBeenCalled();
   });
 
