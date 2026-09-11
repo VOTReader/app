@@ -3438,3 +3438,130 @@ describe('audio-player — resume across the update reload', () => {
     } finally { dropGlobals(); }
   });
 });
+
+describe('audio-player — the boot resume retries ONCE past the activation race (update-resume-activation-race-1)', () => {
+  /* Measured by the Verifier on 95's tree (verifier-launch-gates/autoplay-after-reload.mjs, 2026-09-11):
+     after an update reload that followed a trusted tap, the reloaded document inherits the reader's
+     STICKY activation at once (navigator.userActivation.hasBeenActive) but its TRANSIENT activation
+     arrives ~90–175 ms after document start, and the restore's play() lands before it on a fast boot
+     (NotAllowedError — 11 of 11 local arms parked with the LISTEN toast) and after it on a heavier one
+     (3 of 4 live arms resumed by themselves). play() held to +166 ms: REFUSED; to +443 ms: ALLOWED.
+     So: when the boot play() is refused and hasBeenActive is true — the reader DID tap this origin
+     and the reload kept the bit — retry exactly once ~300 ms later; a second refusal takes today's
+     path (paused at the exact clock, "Tap to continue listening.", one tap resumes). An absent
+     userActivation API is not "true": no retry. Nothing starts audio twice; the clock never moves. */
+  const REC_KEY = 'vot-audio-resume-after-update';
+  const RETRY_MS = 300;
+  const rebuildGlobals = () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+  };
+  const dropGlobals = () => { delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr; };
+  const SNAP = { v: 2, mode: 'letter', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:letter-c', time: 40,
+    track: { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', url: URL_OF('idC'), readerCode: 'T', partLabel: null } };
+  const refusal = () => Object.assign(new Error('blocked'), { name: 'NotAllowedError' });
+  /** Refuses the first `refuse` play() calls, allows the rest; counts every call. */
+  class RefusingN extends FakeAudio {
+    constructor() { super(); this.playCalls = 0; }
+    play() {
+      this.playCalls += 1;
+      if (this.playCalls <= RefusingN.refuse) { this.paused = true; return Promise.reject(refusal()); }
+      this.played = true; this.paused = false; return Promise.resolve();
+    }
+  }
+  RefusingN.refuse = 1;
+  const activation = (hasBeenActive) => Object.defineProperty(window.navigator, 'userActivation', { configurable: true, get: () => ({ hasBeenActive, isActive: false }) });
+  const advance = (ms) => vi.advanceTimersByTimeAsync(ms);
+  let offer;
+  /** Boot the module with the record armed, under fake timers (the retry is a timer). */
+  const bootWithRecord = async () => {
+    globalThis.Audio = RefusingN;
+    offer = vi.fn(); window.__votUpdateToastResume = offer;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
+    vi.useFakeTimers();
+    await load(); rebuildGlobals();
+    await advance(5);                                   // the restored queue rebuilds and _start() runs play()
+  };
+  afterEach(() => {
+    vi.useRealTimers();
+    dropGlobals();
+    sessionStorage.removeItem(REC_KEY);
+    delete window.__votUpdateToastResume;
+    delete /** @type {any} */ (window.navigator).userActivation;
+    RefusingN.refuse = 1;
+  });
+
+  it('refused with hasBeenActive true: ONE retry about 300 ms later plays; no toast offer', async () => {
+    activation(true);
+    RefusingN.refuse = 1;
+    await bootWithRecord();
+    expect(el().playCalls, 'the boot play() was tried').toBe(1);
+    expect(AudioPlayer.getState().status, 'refused: the bar shows Play meanwhile').toBe('paused');
+    expect(offer, 'no offer yet — the retry is owed first').not.toHaveBeenCalled();
+    await advance(RETRY_MS - 20);
+    expect(el().playCalls, 'not before ~300 ms').toBe(1);
+    await advance(40);
+    expect(el().playCalls, 'exactly one retry').toBe(2);
+    el().dispatchEvent(new Event('playing'));
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(offer, 'the retry was allowed: no toast offer').not.toHaveBeenCalled();
+    await advance(10000);
+    expect(el().playCalls, 'nothing starts audio a third time').toBe(2);
+  });
+
+  it('refused with hasBeenActive false: no retry; today\'s path (the offer, one play() only)', async () => {
+    activation(false);
+    RefusingN.refuse = 99;
+    await bootWithRecord();
+    expect(el().playCalls).toBe(1);
+    expect(offer).toHaveBeenCalledTimes(1);
+    await advance(10000);
+    expect(el().playCalls, 'no retry without the sticky bit').toBe(1);
+    expect(offer).toHaveBeenCalledTimes(1);
+  });
+
+  it('no userActivation API at all (jsdom, older WebViews): absent is not true — no retry', async () => {
+    delete /** @type {any} */ (window.navigator).userActivation;
+    RefusingN.refuse = 99;
+    await bootWithRecord();
+    expect(el().playCalls).toBe(1);
+    expect(offer).toHaveBeenCalledTimes(1);
+    await advance(10000);
+    expect(el().playCalls).toBe(1);
+  });
+
+  it('refused twice: the toast offer after the second refusal, no third try, the clock untouched', async () => {
+    activation(true);
+    RefusingN.refuse = 99;
+    await bootWithRecord();
+    expect(el().playCalls).toBe(1);
+    expect(offer).not.toHaveBeenCalled();
+    await advance(RETRY_MS + 20);
+    expect(el().playCalls, 'the one retry').toBe(2);
+    expect(offer, 'refused again: the offer, once').toHaveBeenCalledTimes(1);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().time, 'the bar still shows the resume clock').toBe(41.37);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the snapshot still holds it — a second refusal must not persist 0 over it either').toBe(41.37);
+    await advance(10000);
+    expect(el().playCalls, 'no third try').toBe(2);
+    expect(offer).toHaveBeenCalledTimes(1);
+    offer.mock.calls[0][0]();                           // the reader taps the toast
+    await advance(5);
+    expect(el().playCalls, 'the tap is the next play command').toBe(3);
+  });
+
+  it('the reader taps Play inside the retry window: the retry stands down — audio is never asked to start twice', async () => {
+    activation(true);
+    RefusingN.refuse = 1;
+    await bootWithRecord();
+    expect(el().playCalls).toBe(1);
+    await advance(100);
+    AudioPlayer.toggle();                               // the reader's own tap on the bar, 100 ms in
+    expect(el().playCalls).toBe(2);
+    await advance(RETRY_MS + 100);
+    expect(el().playCalls, 'the timer fired and did nothing: the element was already asked to play').toBe(2);
+    expect(offer).not.toHaveBeenCalled();
+  });
+});
