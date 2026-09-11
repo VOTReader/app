@@ -11,10 +11,15 @@
  *                     dense field of REAL threads on a 144 px gap, printed as
  *                     information)
  *        aniso        of lit pixels, the share lit at x±8 on their own row and
- *                     dark at y±8 in their own column: a near-horizontal run
- *                     with dark above and below, the streak signature (v2, the
- *                     gate). A diagonal or a dense crossing field reads low.
- *      PASS: aniso <= STREAK_ANISO on both frames (main reads the BEFORE).
+ *                     dark at y±8 in their own column (v2, information: a stack
+ *                     of streaks 2-3 px apart defeats it, main read 0.04-0.07)
+ *        horiz        of EDGE pixels (Sobel |g| > 40 on the summed RGB), the
+ *                     share whose gradient is within ~18 deg of vertical, i.e.
+ *                     the line under them runs within ~18 deg of horizontal.
+ *                     A stack of streaks reads high whatever its density; a fan
+ *                     of diagonals reads low; a saturated blob has no edges and
+ *                     drops out. (v3, the gate)
+ *      PASS: horiz <= STREAK_HORIZ on both frames (main reads the BEFORE).
  *   T  two-rail: wheel over the top rail until Rebuke fills >= 60 % of the
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
@@ -30,7 +35,7 @@
  *      at its first assertion, which is the RED.
  *
  * USAGE
- *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--out DIR] [--before TREE]
+ *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--arms S,T] [--out DIR] [--before TREE]
  *   --before TREE serves THAT tree (its own tools/e2e-read-serve.mjs, its own
  *   git status) and measures it with this file's instruments: the BEFORE
  *   number comes from the same exported code as the AFTER. Both trees must be
@@ -51,7 +56,8 @@ const TREE = resolve(arg('before', OWN));
 const OUT = arg('out', '');
 const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
 const NAV_MS = 60000;
-const STREAK_ANISO = 0.30;   // v2 gate; main read 0.5x on both frames, the tip below (numbers in the log)
+const STREAK_HORIZ = 0.35;   // v3 gate: main (ce710380) and the tip read in the log; set between them with the number
+const ARMS = arg('arms', 'S,T').split(',');
 const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
 for (const t of new Set([OWN, TREE])) {
@@ -117,11 +123,21 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
   const lit = new Uint8Array(W * H);
   for (let i = 0, p = 0; i < lit.length; i++, p += 4) lit[i] = (d[p] + d[p + 1] + d[p + 2] > 60) ? 1 : 0;
   const y0 = Math.floor(H * y0f), y1 = Math.floor(H * y1f);
+  const lum = new Float32Array(W * H);
+  for (let i = 0, p = 0; i < lum.length; i++, p += 4) lum[i] = d[p] + d[p + 1] + d[p + 2];
   const R = 8;
-  let streakRows = 0, nLit = 0, nAniso = 0;
+  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0;
   for (let y = y0; y < y1; y++) {
     let row = 0;
     for (let x = 0; x < W; x++) {
+      if (x >= 1 && x < W - 1 && y >= 1 && y < H - 1) {
+        // Sobel on the summed RGB
+        const i = y * W + x;
+        const gx = (lum[i - W + 1] + 2 * lum[i + 1] + lum[i + W + 1]) - (lum[i - W - 1] + 2 * lum[i - 1] + lum[i + W - 1]);
+        const gy = (lum[i + W - 1] + 2 * lum[i + W] + lum[i + W + 1]) - (lum[i - W - 1] + 2 * lum[i - W] + lum[i - W + 1]);
+        const ax = Math.abs(gx), ay = Math.abs(gy);
+        if (ax + ay > 40 * 4) { nEdge++; if (ay >= 3 * ax) nHoriz++; }
+      }
       if (!lit[y * W + x]) continue;
       row++; nLit++;
       if (x < R || x >= W - R || y < R || y >= H - R) continue;
@@ -131,7 +147,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
     }
     if (row / W >= 0.6) streakRows++;
   }
-  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3) };
+  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3) };
 }, b64, 0.22, 0.80);
 
 async function shot(page, name) { if (OUT) await page.screenshot({ path: resolve(OUT, name + '.png') }); }
@@ -182,8 +198,8 @@ async function armS(page, tag, fname, c, r0) {
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);   // park: no hover card in the frame
   await shot(page, `${fname}-S-psalms-10x`);
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px, gate <= ${STREAK_ANISO})`);
-  if (!(s.aniso <= STREAK_ANISO)) fails.push(`${tag} S: aniso ${s.aniso} > ${STREAK_ANISO}: the zoomed context reads as a horizontal streak field`);
+  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${STREAK_HORIZ}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px)`);
+  if (!(s.horiz <= STREAK_HORIZ)) fails.push(`${tag} S: horiz ${s.horiz} > ${STREAK_HORIZ}: the zoomed context reads as a horizontal streak field`);
   await clickIfPresent(page, 'Reset the view'); await sleep(600);
   return s;
 }
@@ -212,8 +228,8 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
   await shot(page, `${fname}-T${suffix}-${topLabel}-${bottomLabel}`.replace(/\s+/g, '_'));
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} T${suffix}: streak rowFraction ${s.rowFraction}, aniso ${s.aniso}`);
-  if (!(s.aniso <= STREAK_ANISO)) fails.push(`${tag} T${suffix}: aniso ${s.aniso} > ${STREAK_ANISO} with both rails zoomed`);
+  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}`);
+  if (!(s.horiz <= STREAK_HORIZ)) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ} with both rails zoomed`);
   return { t, b, after, before };
 }
 
@@ -226,7 +242,8 @@ async function walk(page, url, fname) {
   const c = await canvasRect(page);
   const r0 = await rails(page);
   note(`${tag} rails ${r0 ? `topY ${r0.topY} bottomY ${r0.bottomY}, ${r0.top.length} collections, ${r0.bottom.length} books` : 'NOT PUBLISHED (data-rails absent)'}`);
-  await armS(page, tag, fname, c, r0);
+  if (ARMS.includes('S')) await armS(page, tag, fname, c, r0);
+  if (!ARMS.includes('T')) return;
   if (!r0) { fails.push(`${tag} T: the screen publishes no data-rails, so no rail can be zoomed to a book`); return; }
   const p1 = await pairing(page, tag, fname, c, r0, 'Rebuke', 'Isaiah', /Rebuke/i, /^Isaiah\b/, '1');
   if (p1) {
