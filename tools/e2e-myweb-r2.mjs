@@ -21,7 +21,8 @@
  *      not move. Endpoints THROUGH THE REAL UI: the pointer scans the Isaiah
  *      band 6 px above the bottom rail until the hover card reads "Corpus
  *      connection" with an Isaiah verse; then the Rebuke band 6 px below the
- *      top rail until the card's Volumes end names Rebuke. Then the pills:
+ *      top rail until the card's third line (the Volume the passage sits in)
+ *      reads Rebuke. Then the pills:
  *      "Reset the Volumes rail" returns only the top camera to fit; "Reset the
  *      view" returns both. Then the reverse pairing: top to the leftmost
  *      collection (Vol I), bottom to Revelation, the same card assertions.
@@ -103,7 +104,7 @@ const canvasRect = (page) => page.evaluate(() => { const b = document.querySelec
 const tipText = (page) => page.evaluate(() => {
   const t = document.querySelector('.sw-tip'); if (!t) return null;
   const q = (c) => { const e = t.querySelector(c); return e ? e.textContent.trim() : ''; };
-  return { eyebrow: q('.sw-tip-eyebrow'), ref: q('.sw-tip-ref'), alt: q('.sw-tip-ref-alt') };
+  return { eyebrow: q('.sw-tip-eyebrow'), ref: q('.sw-tip-ref'), alt: q('.sw-tip-ref-alt'), meta: q('.sw-tip-meta') };
 });
 
 /** Both instruments over a fresh-decoded screenshot (never getImageData on the app canvas). */
@@ -163,7 +164,7 @@ async function hoverEndpoint(page, c, r, which, band, want) {
     const t = await tipText(page);
     last = t;
     if (t && /Corpus connection/i.test(t.eyebrow)) {
-      const text = which === 'top' ? t.alt : t.ref;
+      const text = which === 'top' ? t.meta : t.ref;
       if (want.test(text)) return { ok: true, x: Math.round(x - c.l), card: t, tries: i + 1 };
     }
   }
@@ -202,7 +203,8 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   note(`${tag} T${suffix}: top ${topLabel} ${t.steps} notches -> ${((t.band.x1 - t.band.x0) / c.w * 100).toFixed(0)} % of the width, Volumes ${(after.v / before.v).toFixed(1)}x; bottom ${bottomLabel} ${b.steps} notches -> ${((b.band.x1 - b.band.x0) / c.w * 100).toFixed(0)} %, Bible ${(after.b / before.b).toFixed(1)}x; visible top ${r.top.map((x) => x.label).join('|')} bottom ${r.bottom.map((x) => x.label).join('|')}`);
   const eb = await hoverEndpoint(page, c, r, 'bottom', b.band, bottomWant);
   const et = await hoverEndpoint(page, c, r, 'top', t.band, topWant);
-  note(`${tag} T${suffix}: bottom endpoint ${eb.ok ? `hit at x ${eb.x} after ${eb.tries}: "${eb.card.ref}" ↕ "${eb.card.alt}"` : `MISS after ${eb.tries} (last card ${JSON.stringify(eb.last)})`}; top endpoint ${et.ok ? `hit at x ${et.x} after ${et.tries}: "${et.card.ref}" ↕ "${et.card.alt}"` : `MISS after ${et.tries} (last card ${JSON.stringify(et.last)})`}`);
+  const card = (h) => `"${h.card.ref}" ↕ "${h.card.alt}" (${h.card.meta})`;
+  note(`${tag} T${suffix}: bottom endpoint ${eb.ok ? `hit at x ${eb.x} after ${eb.tries}: ${card(eb)}` : `MISS after ${eb.tries} (last card ${JSON.stringify(eb.last)})`}; top endpoint ${et.ok ? `hit at x ${et.x} after ${et.tries}: ${card(et)}` : `MISS after ${et.tries} (last card ${JSON.stringify(et.last)})`}`);
   if (!eb.ok) fails.push(`${tag} T${suffix}: no thread within 14 px of the bottom rail inside ${bottomLabel} names a ${bottomLabel} verse`);
   if (!et.ok) fails.push(`${tag} T${suffix}: no thread within 14 px of the top rail inside ${topLabel} names ${topLabel}`);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
@@ -238,7 +240,7 @@ async function walk(page, url, fname) {
     if (!(Math.abs(z.b - p1.before.b) <= p1.before.b * 0.01 && Math.abs(z.v - p1.before.v) <= p1.before.v * 0.01)) fails.push(`${tag} T1: "Reset the view" did not return both cameras to fit (${JSON.stringify(z)} vs ${JSON.stringify(p1.before)})`);
   }
   await clickIfPresent(page, 'Reset the view'); await sleep(500);
-  await pairing(page, tag, fname, c, r0, 'Vol I', 'Revelation', /Vol(ume)?\s*I\b|Volume One/i, /^Revelation\b/, '2');
+  await pairing(page, tag, fname, c, r0, 'Vol I', 'Revelation', /^Vol I$/, /^Revelation\b/, '2');
   await clickIfPresent(page, 'Reset the view'); await sleep(300);
 }
 
@@ -246,15 +248,18 @@ let browser, own;
 try {
   own = await serveOwnTree();
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], protocolTimeout: 240000 });
-  const page = await (await browser.createBrowserContext()).newPage();
+  let page = await (await browser.createBrowserContext()).newPage();
   const renderer = await (async () => { await page.goto('about:blank'); return page.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; }); })();
   note(`tree ${TREE} @ ${sha(TREE)}${TREE !== OWN ? ` (instrument from ${sha(OWN)})` : ''}; renderer ${renderer}`);
   for (const fname of FRAME_LIST) {
     if (!FRAMES[fname]) { fails.push(`unknown frame ${fname}`); continue; }
+    // a fresh context per frame: the first walk's onboarding answers live in its storage
+    page = await (await browser.createBrowserContext()).newPage();
     await walk(page, own.url, fname);
   }
 } catch (e) {
   console.error('[e2e-myweb-r2] harness: ' + (e && e.stack || e));
+  if (fails.length) console.error('[e2e-myweb-r2] fails so far:\n  ' + fails.join('\n  '));
   process.exitCode = 3;
 } finally {
   if (browser) await browser.close();
