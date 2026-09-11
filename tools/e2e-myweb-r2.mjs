@@ -19,7 +19,20 @@
  *                     A stack of streaks reads high whatever its density; a fan
  *                     of diagonals reads low; a saturated blob has no edges and
  *                     drops out. (v3, the gate)
- *      PASS: horiz <= STREAK_HORIZ on both frames (main reads the BEFORE).
+ *      PASS: horiz <= STREAK_HORIZ[frame] (registered per frame at measured
+ *      plus margin, the way R5 ceilings are keyed; main reads the BEFORE).
+ *   O  overview shot at rest, for the byte-wise comparison between tips.
+ *   C  continuity notch strip, Corbin's exact ask ("one tiny little increment
+ *      of zoom later ... the green lines have merged"): from T1's frame the
+ *      pointer finds ONE thread near the centre of the Isaiah band (its card
+ *      publishes data-verse / data-vot); the view is reset; then 22 notches
+ *      over the top rail at the centre of that thread's collection, one
+ *      capture per notch, then 22 over the bottom rail at the centre of its
+ *      book. At every notch the thread's endpoints and stroke class come from
+ *      the tree's own exported geometry (verseToX, threadPath) fed the
+ *      published cameras. Registered: the largest per-notch endpoint
+ *      displacement in CSS px, and that the thread is never null and never
+ *      changes stroke class (rise-only vs rise+run) between adjacent notches.
  *   T  two-rail: wheel over the top rail until Rebuke fills >= 60 % of the
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
@@ -35,7 +48,7 @@
  *      at its first assertion, which is the RED.
  *
  * USAGE
- *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--arms S,T] [--out DIR] [--before TREE]
+ *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--arms O,S,T,C] [--out DIR] [--before TREE]
  *   --before TREE serves THAT tree (its own tools/e2e-read-serve.mjs, its own
  *   git status) and measures it with this file's instruments: the BEFORE
  *   number comes from the same exported code as the AFTER. Both trees must be
@@ -61,8 +74,9 @@ const NAV_MS = 60000;
    0.365 / 0.219. The gate sits at the midpoint so a regression halfway back to
    the streak field fails. The phone frame's 0.365 is its geometry, not a
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
-const STREAK_HORIZ = 0.5;
-const ARMS = arg('arms', 'S,T').split(',');
+const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+const NOTCHES = 22;
+const ARMS = arg('arms', 'O,S,T,C').split(',');
 const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
 for (const t of new Set([OWN, TREE])) {
@@ -72,6 +86,11 @@ for (const t of new Set([OWN, TREE])) {
 const sha = (t) => execSync('git rev-parse --short HEAD', { cwd: t }).toString().trim();
 const puppeteer = createRequire(pathToFileURL(resolve(OWN, 'package.json')))('puppeteer');
 const { serveOwnTree } = await import(pathToFileURL(resolve(TREE, 'tools/e2e-read-serve.mjs')).href);
+// the tree's own law, for arm C (main has no threadPath: the arm reports that and stops)
+const law = {
+  ...(await import(pathToFileURL(resolve(TREE, 'app/src/main/assets/src/utils/scripture-web/geometry.js')).href)),
+  ...(await import(pathToFileURL(resolve(TREE, 'app/src/main/assets/src/ui/scripture-web/rail-renderer.js')).href).catch(() => ({}))),
+};
 if (OUT) mkdirSync(OUT, { recursive: true });
 
 const FRAMES = {
@@ -115,7 +134,7 @@ const canvasRect = (page) => page.evaluate(() => { const b = document.querySelec
 const tipText = (page) => page.evaluate(() => {
   const t = document.querySelector('.sw-tip'); if (!t) return null;
   const q = (c) => { const e = t.querySelector(c); return e ? e.textContent.trim() : ''; };
-  return { eyebrow: q('.sw-tip-eyebrow'), ref: q('.sw-tip-ref'), alt: q('.sw-tip-ref-alt'), meta: q('.sw-tip-meta') };
+  return { eyebrow: q('.sw-tip-eyebrow'), ref: q('.sw-tip-ref'), alt: q('.sw-tip-ref-alt'), meta: q('.sw-tip-meta'), verse: Number(t.getAttribute('data-verse')), vot: Number(t.getAttribute('data-vot')) };
 });
 
 /** Both instruments over a fresh-decoded screenshot (never getImageData on the app canvas). */
@@ -203,8 +222,9 @@ async function armS(page, tag, fname, c, r0) {
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);   // park: no hover card in the frame
   await shot(page, `${fname}-S-psalms-10x`);
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${STREAK_HORIZ}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px)`);
-  if (!(s.horiz <= STREAK_HORIZ)) fails.push(`${tag} S: horiz ${s.horiz} > ${STREAK_HORIZ}: the zoomed context reads as a horizontal streak field`);
+  const gate = STREAK_HORIZ[fname];
+  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px)`);
+  if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
   await clickIfPresent(page, 'Reset the view'); await sleep(600);
   return s;
 }
@@ -234,8 +254,72 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   await shot(page, `${fname}-T${suffix}-${topLabel}-${bottomLabel}`.replace(/\s+/g, '_'));
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
   note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}`);
-  if (!(s.horiz <= STREAK_HORIZ)) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ} with both rails zoomed`);
+  if (!(s.horiz <= STREAK_HORIZ[fname])) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ[fname]} with both rails zoomed`);
   return { t, b, after, before };
+}
+
+/** Arm C: the notch strip. */
+async function armC(page, tag, fname, c, r0, f) {
+  if (!law.threadPath || !law.verseToX) { note(`${tag} C: this tree exports no threadPath; no strip`); fails.push(`${tag} C: no thread geometry to follow`); return; }
+  // (1) find one thread near the centre of Isaiah in T1's frame
+  const t = await zoomBandTo(page, c, r0, 'top', 'Rebuke', BAND_FILL);
+  const b = await zoomBandTo(page, c, r0, 'bottom', 'Isaiah', BAND_FILL);
+  if (!t.ok || !b.ok) { fails.push(`${tag} C: could not reach T1's frame (${t.why || b.why})`); return; }
+  const r1 = await rails(page);
+  const mid = (b.band.x0 + b.band.x1) / 2, half = (b.band.x1 - b.band.x0) * 0.1;
+  let found = null;
+  for (let i = 0; i < 40 && !found; i++) {
+    const x = c.l + mid + half * (((i * 0.618) % 1) * 2 - 1);
+    await page.mouse.move(x, c.t + r1.bottomY - 6); await sleep(120);
+    const tip = await tipText(page);
+    if (tip && /Corpus connection/i.test(tip.eyebrow) && Number.isFinite(tip.verse) && Number.isFinite(tip.vot)) found = tip;
+  }
+  await page.mouse.move(c.l + 8, c.t + 8); await sleep(200);
+  if (!found) { fails.push(`${tag} C: no corpus thread within 14 px of the bottom rail near the centre of Isaiah`); return; }
+  const book = found.ref.replace(/\s+\d+:\d+.*$/, '');
+  note(`${tag} C: following "${found.ref}" ↕ "${found.alt}" (${found.meta}); verse ${found.verse}, vot ${found.vot}`);
+  await clickLabel(page, 'Reset the view'); await sleep(600);
+  const W = c.w * f.dpr;
+  const read = async () => {
+    const r = await rails(page);
+    const topY = r.topY * f.dpr, bottomY = r.bottomY * f.dpr;
+    const a = /** @type {[number, number]} */ ([law.verseToX(r.cam, W, found.verse), bottomY]);
+    const bb = /** @type {[number, number]} */ ([law.verseToX(r.camV, W, found.vot), topY]);
+    const pts = law.threadPath(a, bb, true, { width: W, gap: bottomY - topY, n: 12 });
+    return { ax: +(a[0] / f.dpr).toFixed(1), bx: +(bb[0] / f.dpr).toFixed(1), drawn: !!pts, cls: pts ? (pts.rise >= 0 ? 'rise+run' : 'rise') : 'none', r };
+  };
+  const strip = async (which, label) => {
+    let prev = await read();
+    let maxDisp = 0, nulls = 0, classChanges = 0, at = -1;
+    const rows = [{ notch: 0, ...prev }];
+    for (let i = 1; i <= NOTCHES; i++) {
+      const r = prev.r;
+      const bands = which === 'top' ? r.top : r.bottom;
+      const band = bands.find((x) => x.label.toLowerCase() === label.toLowerCase()) || bands.find((x) => x.label.toLowerCase().startsWith(label.toLowerCase()));
+      if (!band) { fails.push(`${tag} C ${which}: band ${label} left the screen at notch ${i}`); break; }
+      const cx = c.l + Math.max(4, Math.min(c.w - 4, (band.x0 + band.x1) / 2));
+      await page.mouse.move(cx, which === 'top' ? c.t + r0.topY + 12 : c.t + r0.bottomY - 12);
+      await page.mouse.wheel({ deltaY: -120 }); await sleep(160);
+      await page.mouse.move(c.l + 8, c.t + 8); await sleep(120);
+      if (OUT) await page.screenshot({ path: resolve(OUT, `${fname}-C-${which}-${String(i).padStart(2, '0')}.png`) });
+      const cur = await read();
+      const disp = Math.max(Math.abs(cur.ax - prev.ax), Math.abs(cur.bx - prev.bx));
+      if (disp > maxDisp) { maxDisp = disp; at = i; }
+      if (!cur.drawn) nulls++;
+      if (cur.cls !== prev.cls) classChanges++;
+      rows.push({ notch: i, ...cur, disp: +disp.toFixed(1) });
+      prev = cur;
+    }
+    const p = await ppv(page);
+    note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; stroke class changes: ${classChanges}; endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
+    if (nulls) fails.push(`${tag} C ${which}: the thread vanished at ${nulls} notches`);
+    if (classChanges) fails.push(`${tag} C ${which}: the thread changed stroke class ${classChanges} times between adjacent notches`);
+    if (OUT) writeFileSync(resolve(OUT, `${fname}-C-${which}.json`), JSON.stringify(rows.map(({ r, ...rest }) => rest), null, 1));
+    return maxDisp;
+  };
+  await strip('top', found.meta);
+  await strip('bottom', book);
+  await clickIfPresent(page, 'Reset the view'); await sleep(400);
 }
 
 async function walk(page, url, fname) {
@@ -247,7 +331,9 @@ async function walk(page, url, fname) {
   const c = await canvasRect(page);
   const r0 = await rails(page);
   note(`${tag} rails ${r0 ? `topY ${r0.topY} bottomY ${r0.bottomY}, ${r0.top.length} collections, ${r0.bottom.length} books` : 'NOT PUBLISHED (data-rails absent)'}`);
+  if (ARMS.includes('O')) { await page.mouse.move(c.l + 8, c.t + 8); await sleep(250); await shot(page, `${fname}-O-overview`); }
   if (ARMS.includes('S')) await armS(page, tag, fname, c, r0);
+  if (ARMS.includes('C')) { if (r0) await armC(page, tag, fname, c, r0, f); else fails.push(`${tag} C: no data-rails`); }
   if (!ARMS.includes('T')) return;
   if (!r0) { fails.push(`${tag} T: the screen publishes no data-rails, so no rail can be zoomed to a book`); return; }
   const p1 = await pairing(page, tag, fname, c, r0, 'Rebuke', 'Isaiah', /Rebuke/i, /^Isaiah\b/, '1');

@@ -705,6 +705,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       const seg = p.votRail.segments.find((s) => s.volKey === node.volKey);
       return {
         kind: 'underlay', index: found.index, source, target,
+        // rail positions, published on the card (data-verse / data-vot) so a
+        // walk can follow this one thread through the exported geometry
+        verse: underlay.versePos[found.index], vot: underlay.votPos[found.index],
         joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
         cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
       };
@@ -1288,7 +1291,8 @@ function TipChip({ info, viewport }) {
     top: Math.max(8, Math.min(info.y + 16, height - 138)) + 'px',
   };
   return (
-    <div className="sw-tip" style={style} aria-hidden="true">
+    <div className="sw-tip" style={style} aria-hidden="true"
+      data-verse={s.kind === 'underlay' ? s.verse : undefined} data-vot={s.kind === 'underlay' ? s.vot : undefined}>
       {s.kind === 'arc' && (
         <React.Fragment>
           <div className="sw-tip-eyebrow">Connection</div>
