@@ -1,0 +1,166 @@
+/**
+ * My Web r2 — the REDs (design-perf, 2026-09-11; Corbin's three findings on
+ * the live My Web: low-resolution grey lines, a horizontal streak field at
+ * zoom, one unified zoom that helps nobody).
+ *
+ * G1  FULL RESOLUTION: the corpus context is stroked on the canvas it is
+ *     given, one stroke per edge, never through a half-resolution layer
+ *     blitted up (main: CONTEXT_SCALE 0.5 + drawImage, the "low resolution"
+ *     Corbin saw).
+ * G2  A THREAD IS A LINE WITH ENDPOINTS ON ITS BOOKS: threadPath() returns
+ *     null when neither endpoint is on screen (nothing to attach to), and
+ *     when one is, the visible polyline never runs near-horizontal across
+ *     the screen (main's cubic puts every off-screen thread on one
+ *     mid-gap streak); both endpoints stay exactly where endpointPoint
+ *     puts them; a thread whose far end has JUST left the screen is
+ *     continuous with the one whose far end is still on it.
+ * G3  TWO TRANSFORMS: the Volumes rail has its own camera. endpointPoint
+ *     maps a VOT position through opts.votX and a verse through opts.verseX,
+ *     and a cross-rail thread takes one endpoint from each.
+ */
+import { describe, it, expect } from 'vitest';
+import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
+import { createCamera, fitPPV, verseToX, zoomAbout } from '../../utils/scripture-web/geometry.js';
+import * as RR from './rail-renderer.js';
+
+const { drawPersonalWeb, endpointPoint, railFrame } = RR;
+const threadPath = /** @type {any} */ (RR).threadPath;
+
+const rail = buildVotRail([
+  { volKey: 'one', label: 'Volume One', items: Array.from({ length: 30 }, (_, i) => ({ id: 'l' + i, title: 'Letter ' + i })) },
+  { volKey: 'rebuke', label: "The Lord's Rebuke", short: 'Rebuke', items: Array.from({ length: 31 }, (_, i) => ({ id: 'r' + i, title: 'Rebuke ' + i })) },
+]);
+const W = 1000, H = 600, DPR = 1, BASE = 500;
+const opts = {
+  width: W, height: H, DPR, base: BASE, votRail: rail,
+  verseTotal: 100, verseX: (verse) => verse * 10,
+  chrome: { isLight: false, fsLabel: 11 },
+  showUnderlay: true, hoverIndex: -1, focusIndex: -1,
+};
+const rails = railFrame({ H, DPR }, BASE);
+
+/** A 2D context that only counts; drawImage is deliberately ABSENT so a
+ * layer blit throws instead of passing quietly.
+ * @returns {any} */
+function fakeCtx() {
+  const calls = { stroke: 0, fill: 0, beginPath: 0 };
+  const noop = () => {};
+  return {
+    calls, canvas: { classList: { contains: () => true } },
+    lineWidth: 0, strokeStyle: '', fillStyle: '', font: '', textAlign: '', textBaseline: '',
+    lineCap: '', lineJoin: '', globalAlpha: 1,
+    beginPath() { calls.beginPath++; }, moveTo: noop, lineTo: noop, arc: noop, bezierCurveTo: noop,
+    stroke() { calls.stroke++; }, fill() { calls.fill++; },
+    fillText: noop, measureText: () => ({ width: 40 }), clearRect: noop, save: noop, restore: noop,
+    setTransform: noop,
+  };
+}
+
+describe('My Web r2 — G1 full resolution', () => {
+  it('strokes every context edge on the canvas it is given, never through a half-resolution layer', () => {
+    // jsdom has a document, so main takes its offscreen-layer branch here and
+    // calls ctx.drawImage, which this context does not have: main throws.
+    const underlay = { count: 5, versePos: new Float32Array([5, 20, 50, 70, 95]), votPos: new Float32Array([0, 10, 20, 40, 60]) };
+    const ctx = fakeCtx(), ctx0 = fakeCtx();
+    drawPersonalWeb(ctx, null, underlay, opts);
+    drawPersonalWeb(ctx0, null, { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) }, opts);
+    expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(5);
+    expect(/** @type {any} */ (RR).CONTEXT_SCALE).toBeUndefined();
+  });
+});
+
+/** Longest run of consecutive samples that stays within `flat` px of one y
+ * while spanning at least `span` px of x, measured over the on-screen part.
+ * A streak is a run wider than a third of the screen. */
+function widestFlatRun(pts, flat, width) {
+  let best = 0;
+  for (let i = 0; i < pts.length; i++) {
+    let j = i;
+    while (j + 1 < pts.length && Math.abs(pts[j + 1][1] - pts[i][1]) <= flat) j++;
+    const on = pts.slice(i, j + 1).filter((p) => p[0] >= 0 && p[0] <= width);
+    if (on.length > 1) best = Math.max(best, Math.abs(on[on.length - 1][0] - on[0][0]));
+  }
+  return best;
+}
+
+describe('My Web r2 — G2 a thread is a line with endpoints on its books', () => {
+  const gap = rails.bottomY - rails.topY;
+  it('is null when neither endpoint is on screen', () => {
+    expect(threadPath([-4000, rails.bottomY], [6000, rails.topY], true, { width: W, gap })).toBeNull();
+    expect(threadPath([-4000, rails.bottomY], [-200, rails.bottomY], false, { width: W, gap })).toBeNull();
+  });
+  it('leaves a visible endpoint toward its far book without a horizontal run across the screen', () => {
+    // Corbin's screenshot: at 10x every context thread had its Volumes end
+    // thousands of px off screen; main's cubic runs each one flat across the
+    // gap at mid height. The visible part must be a LINE that exits.
+    for (const far of [-3000, -20000, 4000, 60000]) {
+      const pts = threadPath([500, rails.bottomY], [far, rails.topY], true, { width: W, gap });
+      expect(pts).not.toBeNull();
+      expect(pts[0]).toEqual([500, rails.bottomY]);
+      expect(pts[pts.length - 1]).toEqual([far, rails.topY]);
+      // no flat run wider than a third of the screen inside the screen
+      expect(widestFlatRun(pts, gap * 0.02, W), 'far ' + far).toBeLessThan(W / 3);
+    }
+  });
+  it('keeps both endpoints exactly on their rails when both are visible', () => {
+    const pts = threadPath([200, rails.bottomY], [700, rails.topY], true, { width: W, gap });
+    expect(pts[0]).toEqual([200, rails.bottomY]);
+    expect(pts[pts.length - 1]).toEqual([700, rails.topY]);
+    expect(Math.min(...pts.map((p) => p[1]))).toBeGreaterThanOrEqual(rails.topY - 0.01);
+    expect(Math.max(...pts.map((p) => p[1]))).toBeLessThanOrEqual(rails.bottomY + 0.01);
+  });
+  it('is continuous as the far endpoint crosses the screen edge', () => {
+    // the point where the thread meets x = 900 must move smoothly as the far
+    // end walks from on-screen (980) to just off (1020): no jump > 3 px
+    const yAt = (far) => {
+      const pts = threadPath([300, rails.bottomY], [far, rails.topY], true, { width: W, gap });
+      let best = null;
+      for (let i = 1; i < pts.length; i++) {
+        const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
+        if ((x1 - 900) * (x2 - 900) <= 0 && x2 !== x1) { best = y1 + (y2 - y1) * (900 - x1) / (x2 - x1); break; }
+      }
+      return best;
+    };
+    let prev = yAt(980);
+    for (const far of [990, 1000, 1010, 1020, 1040]) {
+      const y = yAt(far);
+      expect(y).not.toBeNull();
+      expect(Math.abs(y - prev), 'far ' + far).toBeLessThan(3);
+      prev = y;
+    }
+  });
+  it('an intra-rail arc with one end off screen rises and exits, it does not run flat along the apex', () => {
+    const pts = threadPath([500, rails.bottomY], [-9000, rails.bottomY], false, { width: W, gap, up: true, maxRy: gap * 0.78 });
+    expect(pts).not.toBeNull();
+    expect(pts[0]).toEqual([500, rails.bottomY]);
+    expect(widestFlatRun(pts, gap * 0.02, W)).toBeLessThan(W / 3);
+  });
+});
+
+describe('My Web r2 — G3 two transforms, one for each rail', () => {
+  it('a VOT endpoint follows the Volumes camera and a verse follows the Bible camera', () => {
+    const camB = createCamera(100); camB.ppv = fitPPV(camB, W); camB.x = 50;
+    const camV = createCamera(rail.total); camV.ppv = fitPPV(camV, W); camV.x = rail.total / 2;
+    // zoom the Volumes rail 10x about the Rebuke band's centre; leave the Bible at fit
+    const rebuke = rail.segments.find((s) => s.volKey === 'rebuke');
+    const anchor = verseToX(camV, W, rebuke.start + rebuke.count / 2);
+    zoomAbout(camV, W, anchor, 10, 1000);
+    const two = Object.assign({}, opts, {
+      verseX: (verse) => verseToX(camB, W, verse),
+      votX: (pos) => verseToX(camV, W, pos),
+    });
+    const top = endpointPoint({ rail: 1, pos: rebuke.start }, two, rails);
+    const bottom = endpointPoint({ rail: 0, pos: 50 }, two, rails);
+    // the Bible end sits where fit puts verse 50; the Volumes end where the
+    // 10x camera puts the first Rebuke letter: NOT (start/total)*100 verses
+    expect(bottom[0]).toBeCloseTo(W / 2, 6);
+    expect(top[0]).toBeCloseTo(verseToX(camV, W, rebuke.start + 0.5), 6);
+    expect(Math.abs(top[0] - verseToX(camB, W, ((rebuke.start + 0.5) / rail.total) * 100))).toBeGreaterThan(50);
+    expect(top[1]).toBe(rails.topY);
+    expect(bottom[1]).toBe(rails.bottomY);
+  });
+  it('without votX the top rail still rides the Bible camera (the pre-r2 contract holds for callers that give one camera)', () => {
+    const p = endpointPoint({ rail: 1, pos: 10 }, opts, rails);
+    expect(p[0]).toBeCloseTo(opts.verseX(((10 + 0.5) / rail.total) * 100), 6);
+  });
+});
