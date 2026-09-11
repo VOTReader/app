@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { LINK_KIND_COLORS } from '../../utils/scripture-web/palette.js';
+import { myWebColor, MY_WEB_LINK_RGB } from '../../utils/scripture-web/palette.js';
 import * as RR from './rail-renderer.js';
 
 // Read off the namespace, not a named import: on the tree this RED was written
@@ -83,10 +83,10 @@ describe('My Web ink law', () => {
       const core = link.alpha * link.width;
       if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(8);
       expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(6);
-      for (const kind of LINK_KIND_COLORS) {
-        const rgb = kind.map((n) => Math.round(n * 255)).join(',');
-        expect(context.rgb).not.toBe(rgb);
-      }
+      // the link is gold; no stop of the canon ramp a context thread wears is
+      expect(myWebColor({ link: true })).toBe(MY_WEB_LINK_RGB);
+      for (let t = 0; t <= 1; t += 0.05) expect(myWebColor({ verse: t * 100, verseTotal: 100 })).not.toBe(MY_WEB_LINK_RGB);
+      expect(context.rgb).not.toBe(MY_WEB_LINK_RGB);
     }
   });
 
