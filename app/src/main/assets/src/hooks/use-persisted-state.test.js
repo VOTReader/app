@@ -37,7 +37,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { usePersistedState } from './use-persisted-state.js';
+import { usePersistedState, RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS, takeResumeState } from './use-persisted-state.js';
 import { StateStore } from '../stores/state-store.js';
 
 /** Build a full 8-value union with overridable fields. */
@@ -348,5 +348,75 @@ describe('usePersistedState — window.__flushPersistState(patch)', () => {
     setSpy.mockClear();
     act(() => { /** @type {any} */ (window).__flushPersistState(); });
     expect(setSpy).not.toHaveBeenCalled();
+  });
+});
+
+/* ── the reload record (2026-09-11): the union survives the update's reload in
+   sessionStorage. StateStore.set is asynchronous by construction (a Web Lock, an IDB
+   read, the 3-way merge, then the put) and a document one call from location.reload()
+   may never finish it — the walk measured the reader coming back at 612 px against 900
+   with the patched IDB write in place. So the reload's flush ALSO writes the union to
+   sessionStorage, synchronously, and the next boot takes that record first
+   (useSavedState → takeResumeState), applies it, and clears it. IDB stays the durable
+   path for every other write; the record is a same-tab, two-minute bridge. */
+describe('usePersistedState — the reload record (sessionStorage)', () => {
+  beforeEach(() => { sessionStorage.clear(); });
+
+  it('flush(patch, { reload: true }) writes the patched union to sessionStorage the moment it returns, and still to the store', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    const flush = /** @type {any} */ (window).__flushPersistState;
+    act(() => { flush((u) => ({ ...u, tabs: [{ ...u.tabs[0], scrollPositions: { k: { y: 900 } } }] }), { reload: true }); });
+    const raw = sessionStorage.getItem(RESUME_STATE_KEY);
+    expect(raw, 'no await, no timer: the record is there when flush returns').toBeTruthy();
+    const rec = JSON.parse(/** @type {string} */ (raw));
+    expect(typeof rec.at).toBe('number');
+    expect(rec.state.tabs[0].scrollPositions).toEqual({ k: { y: 900 } });
+    expect(rec.state.theme).toBe('dark');
+    expect(setSpy, 'IDB is still written — the record is a bridge, not a replacement').toHaveBeenCalledTimes(1);
+    expect(setSpy.mock.calls[0][0].tabs[0].scrollPositions).toEqual({ k: { y: 900 } });
+  });
+
+  it('CONTROL: a patched flush WITHOUT the reload option writes no record', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { /** @type {any} */ (window).__flushPersistState((u) => ({ ...u, activeReadKey: 'x' })); });
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+  });
+
+  it('takeResumeState() hands the state back once and clears the record', () => {
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: { tabs: [{ id: 'z' }], activeTabIdx: 0 } }));
+    const s = takeResumeState();
+    expect(s && s.tabs[0].id).toBe('z');
+    expect(sessionStorage.getItem(RESUME_STATE_KEY), 'consumed: a second boot never replays it').toBeNull();
+    expect(takeResumeState()).toBeNull();
+  });
+
+  it('a record older than the max age is dropped, not applied', () => {
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now() - RESUME_STATE_MAX_AGE_MS - 1, state: { tabs: [] } }));
+    expect(takeResumeState()).toBeNull();
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+  });
+
+  it('a malformed record, or one whose state is not an object, is dropped — null never impersonates a state', () => {
+    sessionStorage.setItem(RESUME_STATE_KEY, '{not json');
+    expect(takeResumeState()).toBeNull();
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: null }));
+    expect(takeResumeState()).toBeNull();
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: 'tabs' }));
+    expect(takeResumeState()).toBeNull();
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ state: { tabs: [] } }));   // no timestamp: age unknown → not applied
+    expect(takeResumeState()).toBeNull();
+    expect(takeResumeState(), 'nothing stored → null (JSON.parse(null) is null too; the guard is explicit, not incidental)').toBeNull();
+  });
+
+  it('a sessionStorage that throws does not stop the store write — the reload must still happen', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+    try {
+      act(() => { /** @type {any} */ (window).__flushPersistState((u) => u, { reload: true }); });
+    } finally { spy.mockRestore(); }
+    expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });
