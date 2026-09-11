@@ -57,6 +57,7 @@ import { execFileSync } from 'node:child_process';
 const A = 'app/src/main/assets';
 const DIST_FLOOR = 8;      // dist/ holds 10 today; below 8 the glob is broken, not the tree
 const SRC_FLOOR = 100;     // hundreds of .js/.jsx under src/; below this the ls-tree is broken
+const ROOT_FLOOR = 3;      // app.css + the root .js files build.py folds (4 today); below 3 the derivation is broken
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const lines = (s) => s.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -88,7 +89,26 @@ if (dist.length < DIST_FLOOR) {
 const generated = [...dist, `${A}/service-worker.js`, `${A}/index.html`];
 
 // ── condition 1: non-test source in the delta ──────────────────────────────────────────────────
-const srcDelta = lines(git('diff', '--name-only', base, head, '--', `${A}/src`))
+// A GUARD'S SCOPE IS THE BUILD'S INPUT SET, NOT A DIRECTORY (2026-09-10, sw-chrome-fit). This
+// used to read `${A}/src` alone, and app.css lives at the assets ROOT — build:css minifies it into
+// dist/app.min.css and build.py folds it into bundle-a — so a stylesheet change with no build
+// behind it read "no non-test source in the delta ... a tooling-only branch looks exactly like
+// this and must pass". The half recipe, wearing the tooling-only label. The root inputs are
+// DERIVED, never hand-listed: app.css (package.json's build:css input) plus every root .js file
+// whose name build.py quotes, read from the base tree so a stale list cannot narrow silently.
+const buildPy = git('show', `${base}:tools/build.py`);
+const rootInputs = [`${A}/app.css`].concat(
+  lines(git('ls-tree', '--name-only', base, `${A}/`))
+    .filter((f) => /\.js$/.test(f) && !/\.test\.js$/.test(f) && !/service-worker\.js$/.test(f))
+    .filter((f) => buildPy.includes(`'${f.slice(A.length + 1)}'`)),
+);
+if (rootInputs.length < ROOT_FLOOR) {
+  console.error(`[half-recipe] DEAD INSTRUMENT — only ${rootInputs.length} root build inputs derived (floor ${ROOT_FLOOR}).`);
+  console.error("  app.css plus the root .js files build.py names should be 4; a derivation reading fewer is");
+  console.error('  broken, and a narrower input set is the failure direction that clears a half recipe.');
+  process.exit(2);
+}
+const srcDelta = lines(git('diff', '--name-only', base, head, '--', `${A}/src`, ...rootInputs))
   .filter((f) => !/\.test\.[a-z]+$/.test(f));
 
 // live control on the source extractor: the tree must contain source at all
@@ -107,6 +127,7 @@ const moved = generated.filter((g) => blob(base, g) !== blob(head, g));
 const short = (r) => r.slice(0, 8);
 console.log(`[half-recipe] base ${short(base)} → head ${short(head)}`);
 console.log(`  generated paths derived from the base tree : ${generated.length}  (moved ${moved.length})`);
+console.log(`  root build inputs derived from the base    : ${rootInputs.length}`);
 console.log(`  non-test source files in the delta          : ${srcDelta.length}`);
 if (moved.length) for (const m of moved) console.log(`    moved  ${m}`);
 
