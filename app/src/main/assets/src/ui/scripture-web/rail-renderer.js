@@ -308,15 +308,18 @@ class ContextBatches {
       if (!list) { list = []; paths.set(key, list); }
       list.push({ pts, i0, i1 });
     };
-    let used = 0;   // bitmask of layers held by near-coincident neighbours (32 is plenty; beyond it, share)
+    // Layers beyond which one more thread moves a pixel by under 1/255 at this
+    // alpha: (1 - alpha)^n * 255 < 1. 0.04 at 1x needs 136 of them, 0.23 at
+    // 10x needs 21, 0.45 needs 9; past the cap threads share and nothing shows.
+    const cap = Math.max(1, Math.ceil(Math.log(1 / 255) / Math.log(1 - Math.min(0.99, Math.max(0.001, alpha)))));
+    const held = new Int32Array(cap + 1);   // stamp = i + 1 when a neighbour holds that layer
     for (let i = 0; i < th.length; i++) {
       const e = th[i];
-      used = 0;
       for (let j = i - 1; j >= 0 && th[j].bin === e.bin && e.bx - th[j].bx <= near; j--) {
-        if (Math.abs(th[j].tx - e.tx) <= near && th[j].layer < 32) used |= (1 << th[j].layer);
+        if (Math.abs(th[j].tx - e.tx) <= near) held[th[j].layer] = i + 1;
       }
       let layer = 0;
-      while (layer < 32 && (used & (1 << layer))) layer++;
+      while (layer < cap && held[layer] === i + 1) layer++;
       e.layer = layer;
       const rise = /** @type {any} */ (e.pts).rise;
       const fromA = /** @type {any} */ (e.pts).fromA;
