@@ -4,7 +4,13 @@
    cold start of the live origin the reply lost the race to the page's own boot
    (or the worker it was posted to retired mid-ask), and 'unknown' or 'first' was
    decided in its place — a null decided into a value. Settings keeps its 3 s
-   getBuildVersion() for its render; the announcer waits. */
+   getBuildVersion() for its render; the announcer waits.
+   The answer that decides comes from the worker that served THIS document. A
+   takeover mid-ask settles null and the new worker is NOT asked: sw-register
+   reloads onto it synchronously inside the same controllerchange (its handler is
+   registered first, _entry-b.js), so an answer taken from it here would arrive
+   before the reload commits, write the last-seen key and toast in a page being
+   torn down, and the reloaded page would read 'same' and stay silent. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getBuildVersion, awaitBuildVersion } from './build-version.js';
 
@@ -21,7 +27,7 @@ function fakeContainer(controller) {
   Object.defineProperty(navigator, 'serviceWorker', { value: sw, configurable: true });
   return sw;
 }
-const flush = () => new Promise((r) => setTimeout(r, 0));
+const flush = () => vi.advanceTimersByTimeAsync(0);   // fake timers are on: a real setTimeout would never fire
 
 describe('awaitBuildVersion — the ask the announcer waits for', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
@@ -43,26 +49,31 @@ describe('awaitBuildVersion — the ask the announcer waits for', () => {
     expect(await announcer).toEqual({ cacheVersion: 'v1.0.2-cccccccccc', corpusVersion: 'c45' });
   });
 
-  it('a worker retired before it answered is not waited on: the ask is re-posted to the new controller on controllerchange', async () => {
+  it('a takeover mid-ask settles null and the new worker is NOT asked: it serves the next document, which asks for itself', async () => {
     const a = fakeWorker('A'), b = fakeWorker('B');
     const sw = fakeContainer(a);
     const announcer = awaitBuildVersion();
-    await flush();
-    expect(a.asks.length, 'asked once of the old worker').toBe(1);
-    sw.controller = b;                                 // skipWaiting + claim: A is redundant, its queue gone
+    expect(a.asks.length, 'asked once of the worker serving this document').toBe(1);
+    sw.controller = b;                                 // skipWaiting + claim: A is redundant, its queue gone; sw-register is reloading onto B
     sw.dispatchEvent(new Event('controllerchange'));
+    expect(b.asks.length, 'never asked — its answer would land in a page being torn down, write the key, and silence the page that follows').toBe(0);
+    expect(await announcer, 'nothing decided here: the reloaded document decides').toBeNull();
+    a.answer('v1.0.2-aaaaaaaaaa');                     // the retired worker's late word changes nothing
     await flush();
-    expect(b.asks.length, 'asked again of the new one').toBe(1);
-    b.answer('v1.0.2-dddddddddd');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(await announcer).toEqual({ cacheVersion: 'v1.0.2-dddddddddd', corpusVersion: 'c45' });
-    sw.dispatchEvent(new Event('controllerchange'));   // settled: no further asks
+    expect(await announcer).toBeNull();
+    sw.dispatchEvent(new Event('controllerchange'));   // settled: nothing listens
     await flush();
-    expect(a.asks.length + b.asks.length).toBe(2);
+    expect(a.asks.length + b.asks.length).toBe(1);
   });
 
   it('uncontrolled (a first visit): null at once, so the caller can read the deployed file instead', async () => {
     fakeContainer(null);
+    expect(await awaitBuildVersion()).toBeNull();
+  });
+
+  it('no serviceWorker at all (a WebView without it): null at once, no throw', async () => {
+    delete /** @type {any} */ (navigator).serviceWorker;
+    expect('serviceWorker' in navigator, 'precondition').toBe(false);
     expect(await awaitBuildVersion()).toBeNull();
   });
 });
