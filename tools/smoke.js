@@ -133,8 +133,32 @@
     ]
   };
 
-  function now() { return (root.performance && performance.now()) || Date.now(); }
+  // 0 is a reading (a fake clock starts there): fall back only when there is no performance.now at all.
+  function now() { return (root.performance && typeof performance.now === 'function') ? performance.now() : Date.now(); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // A thing that PAINTS over a window is read once it is there, never at one moment: on the
+  // live origin in WebKit the WTLB Introduction's marks paint 600–800 ms after the click
+  // (the Verifier's hunt, 2026-09-11: 600 ms in 5 runs of 8, 800 in 3) and this file's single
+  // read at sleep(600) lost 3 of 8. Polls `pred` every `step` ms (100) up to `maxMs` (4000);
+  // resolves with the elapsed ms once it held, or -1 at the cap — the caller then reads what
+  // is there and fails honestly. A crashed page ends the wait early: a later read of it says
+  // nothing new. Exposed as votSmoke._waitUntil for the unit case.
+  function waitUntil(pred, maxMs, step) {
+    var t0 = now(); step = step || 100; maxMs = maxMs || 4000;
+    return new Promise(function (resolve) {
+      (function tick() {
+        var ok = false;
+        try { ok = !!pred(); } catch (_e) { ok = false; }
+        var elapsed = now() - t0;
+        if (ok) return resolve(Math.round(elapsed));
+        if (elapsed >= maxMs || isCrashed()) return resolve(-1);
+        setTimeout(tick, step);
+      })();
+    });
+  }
+  function waitForMarks(maxMs) {
+    return waitUntil(function () { return document.querySelectorAll('mark.hl-mark').length > 0; }, maxMs);
+  }
 
   // Resolve a symbol by `window[name]` only. Three categories of globals
   // are reachable this way:
@@ -575,12 +599,14 @@
       await goHome(); await sleep(280);
       clickByText(/Prophetic Letters/); await sleep(320);
       clickByText(/^Volume One/); await sleep(320);
-      clickByText(/A Word of Warning/); await sleep(600);
+      clickByText(/A Word of Warning/);
+      var paintedAfterMs = await waitForMarks(4000);   // the seeded marks paint over a window; read them once they are there
 
       var afterOpen = {
         crashed: isCrashed(),
         marks: document.querySelectorAll('mark.hl-mark').length,
-        noteIcons: document.querySelectorAll('.hl-note-icon').length
+        noteIcons: document.querySelectorAll('.hl-note-icon').length,
+        paintedAfterMs: paintedAfterMs
       };
       // next → prev (the historical crash/corruption path)
       function arrow(dir) {
@@ -593,10 +619,12 @@
         if (bb) bb.click();
       }
       arrow('next'); await sleep(550);
-      arrow('prev'); await sleep(650);
+      arrow('prev');
+      var repaintedAfterMs = await waitForMarks(4000);   // the same read, the same rule, after the round trip
       var afterNav = {
         crashed: isCrashed(),
-        marks: document.querySelectorAll('mark.hl-mark').length
+        marks: document.querySelectorAll('mark.hl-mark').length,
+        paintedAfterMs: repaintedAfterMs
       };
       restore();
       return {
@@ -663,12 +691,14 @@
       // FULL word only: the index header's audio section chips (2026-08-05)
       // carry labels like "Part 1 · Intro–19" that a bare /Intro\b/ matched
       // first — clicking a chip starts playback instead of opening the entry.
-      clickByText(/Introduction/i); await sleep(600);
+      clickByText(/Introduction/i);
+      var paintedAfterMs = await waitForMarks(4000);   // 600–800 ms on the live origin in WebKit; one read at 600 lost 3 of 8
 
       var afterOpen = {
         crashed: isCrashed(),
         marks: document.querySelectorAll('mark.hl-mark').length,
-        noteIcons: document.querySelectorAll('.hl-note-icon').length
+        noteIcons: document.querySelectorAll('.hl-note-icon').length,
+        paintedAfterMs: paintedAfterMs
       };
       restore();
       return {
@@ -745,7 +775,7 @@
       var newBtnX = document.querySelector('button.tab-card-new');
       if (!newBtnX) return fail('New Tab button not found (tab X)');
       newBtnX.click();             // openNewTab appends + activates → tab X
-      await sleep(600);
+      await waitUntil(onHome, 4000);   // a fresh tab starts on Home; read it once the grid is there
       var xIdx = realCardsBefore;  // the appended tab is the new last index
       clickByText(/Prophetic Letters/); await sleep(500);
       var xLanded = /Volume One/.test(document.body.textContent || '') && !isCrashed();
@@ -755,8 +785,7 @@
       var newBtnY = document.querySelector('button.tab-card-new');
       if (!newBtnY) return fail('New Tab button not found (tab Y)');
       newBtnY.click();
-      await sleep(600);
-      var yOnHome = onHome();
+      var yOnHome = (await waitUntil(onHome, 4000)) >= 0;   // same rule: the grid, once it is there
 
       // 4. Run the full 13-screen walk inside tab Y.
       var walk = await walkScreens();
@@ -869,6 +898,7 @@
       ' | ' + Math.round(now() - t0) + 'ms';
     return report;
   };
+  root.votSmoke._waitUntil = waitUntil;   // the read helper, for tools/smoke.test.js
 
   if (typeof console !== 'undefined') {
     console.log('[votSmoke] loaded — run: votSmoke().then(r=>console.log(JSON.stringify(r,null,2)))');
