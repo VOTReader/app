@@ -54,11 +54,19 @@ export function registerServiceWorker() {
   // unload the page in the same tick, and a lazy load in that gap would fetch
   // NEW bytes into the OLD page (service-worker-1); index.html's loader reads
   // the flag and refuses to append. Set before the reload, never after.
+  //
+  // THE RELOAD IS OURS, so the restore record is written before it rather than
+  // left to the debounces that serve crashes and tab kills. One window event,
+  // dispatched synchronously: useScrollMemory answers with the live scroller's
+  // position through the persist flush, the audio player with the element's
+  // exact clock. Corbin: "land reader back exactly where they were" — exactly,
+  // not as of the last 120 ms + 250 ms debounce or the last 5 s snapshot.
   let refreshing = false;
   const doReload = () => {
     if (refreshing) return;
     refreshing = true;
     window.__votSwTookOver = true;
+    try { window.dispatchEvent(new Event('vot:before-update-reload')); } catch (_e) { /* a listener's throw must not stop the reload */ }
     window.location.reload();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
