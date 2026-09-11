@@ -210,6 +210,15 @@ const NOTE_GAP_MAX = num('SWWEB_NOTE_GAP_MAX', 30);
 
    A FRAME WITH NO REGISTERED FLOOR FAILS rather than passing: a default that
    passes is indistinguishable from a gate that is not watching that frame. */
+/* The browser build the walk actually drove, printed beside the band. A floor
+   at zero margin has exactly one innocent way to go red on an unrelated
+   landing: a browser or font update moving layout. The first thing a reader
+   needs then is whether the INSTRUMENT changed under the number — same build
+   and a smaller band is a regression, a different build is an instrument event
+   and the floor moves by a commit naming that cause. Undetermined is printed as
+   undetermined; a plausible default here would be the reader's whole answer. */
+let BROWSER_BUILD = null;
+
 const BAND_FLOOR = {
   '320x640': 154,   // y 237..391, chrome 70.6% -- same in all three runs
   '426x952': 518,   // y 237..755, chrome 42% -- same in all three runs
@@ -483,7 +492,9 @@ function armChrome(tag, geo) {
       + `— the chrome took ${floor - geo.band.h} px from the reader. Chrome that stops overlapping itself has not `
       + 'necessarily got out of the reader\'s way, and this is the only arm that can tell the difference');
   }
-  notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; chrome covers ${geo.coveredPct}%`);
+  notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; `
+    + `chrome covers ${geo.coveredPct}%; floor ${floor === undefined ? 'NONE REGISTERED' : floor + ' px'}; `
+    + `browser ${BROWSER_BUILD || 'UNDETERMINED — browser.version() gave nothing, so a red here cannot be told from an instrument change'}`);
 
   /* WHAT ARM 2 RAN. 0 failures and 0 checks are the same output, so the counts
      are printed and the empty case is a failure rather than a pass. */
@@ -824,6 +835,7 @@ try {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', ...swArgs],
     protocolTimeout: 240000,
   });
+  BROWSER_BUILD = await browser.version().catch(() => null);
   const probe = await browser.newPage();
   const renderer = await probe.evaluate(() => {
     const c = document.createElement('canvas');
