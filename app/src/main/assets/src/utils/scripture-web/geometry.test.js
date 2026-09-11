@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN,
+  CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
   localizeFactor, squashFactor, arcDistance,
   arcShape, arcShapeGLSL, arcHeight, spanLogOf, APEX_LIFT, FAN_FLOOR,
   arcAnchored, flyOverDim, flyOverGLSL,
@@ -413,17 +413,31 @@ describe('visibility law', () => {
     for (const loc of [0, 0.55, 0.8, 1]) expect(flyOverDim(1, loc)).toBe(1);
   });
 
-  it('fades a fly-over through the floor and reaches EXACTLY zero at depth', () => {
-    // Only the full zero makes an arc unpickable, so it has to be exact
-    // rather than a rounding-close approximation.
-    expect(flyOverDim(0, 0.55)).toBeCloseTo(0.505, 10);
-    expect(flyOverDim(0, 0.8)).toBeCloseTo(0.23336, 5);
-    expect(flyOverDim(0, 1)).toBe(0);
+  /* THE OLD CASE HERE ASSERTED THE DEFECT: "fades a fly-over through the floor
+     and reaches EXACTLY zero at depth". That zero is what the owner met --
+     "what you're trying to zoom into and tap disappears as you get closer" --
+     because zooming into a line's middle is exactly what carries both its feet
+     out of the frame. Inverted, not deleted. */
+  it("NEVER fades a fly-over to nothing — the line the reader is zooming toward must not vanish as they arrive", () => {
+    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
+  });
+
+  it('holds every fly-over at or above the named, tappable floor at every depth', () => {
+    for (const loc of [0, 0.3, 0.55, 0.8, 1]) {
+      expect(flyOverDim(0, loc)).toBeGreaterThanOrEqual(FLYOVER_FLOOR);
+    }
+    /* And the floor itself is a value a reader can see and tap, not a token
+       0.10 that reads as "trimmed away" on a thin line over black. */
+    expect(FLYOVER_FLOOR).toBeGreaterThanOrEqual(0.3);
+  });
+
+  it('still dims a fly-over below an anchored arc at depth — the clutter case is kept, weaker', () => {
+    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
   });
 
   it('publishes the margin and the floor to the GLSL the shader inlines', () => {
     expect(flyOverGLSL).toContain('float m = ' + FLYOVER_MARGIN + '.;');
-    expect(flyOverGLSL).toContain('mix(.10, 0., smoothstep(.55, 1., localize))');
+    expect(flyOverGLSL).toContain('float flyFloor = ' + FLYOVER_FLOOR + ';');
     expect(flyOverGLSL).toContain('mix(1., mix(flyFloor, 1., anchored), localize)');
   });
 });
@@ -445,12 +459,17 @@ describe('the fly-over cull is a hit-test law, not only a draw law', () => {
   cam.ppv = 115;
   clampCamera(cam, 400, 5000);
 
-  it('will not pick a fly-over the shader has faded to nothing', () => {
+  it("PICKS the fly-over at its own midpoint at full depth — Corbin's chase, in one arc", () => {
+    /* This case used to assert toBeNull() here: the fly-over faded to nothing,
+       so the picker refused it. That is the owner's defect stated as a
+       property. Zoomed onto the middle of [18,22] until both feet (-30, 430)
+       are outside a 400 px frame, the line is still drawn and still tappable
+       at the point on screen the reader is looking at. */
     const view = FLY({ localize: 1 });
     const [px, py] = pointOnArc(g, cam, view, 0, 0.5);
     expect(px).toBeGreaterThan(0);
     expect(px).toBeLessThan(view.width);
-    expect(pickArc(g, cam, view, px, py, 6)).toBeNull();
+    expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 0 });
   });
 
   it('still picks that same arc at overview, where it is painted', () => {
