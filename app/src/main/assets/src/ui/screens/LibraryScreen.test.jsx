@@ -88,18 +88,14 @@ const renderLibrary = (props = {}) => render(
 const tileEl = (title) => [...document.querySelectorAll('.library-tile')]
   .find((t) => { const h = t.querySelector('.library-tile-title'); return h && h.textContent.trim() === title; });
 
-/* Scripture Web is reachable only by drilling now (Corbin, 2026-09-05): the
-   Home shortcut is gone and this is the way in. It carries an "under
-   construction" caption in the app's own `library-tile-guide` style — the same
-   one-line span the empty Notes / Links / Bookmarks tiles use — rather than a
-   banner or a rectangle of its own. */
-describe('Scripture Web is reachable from the Library, and says it is unfinished', () => {
-  it('renders the tile with an under-construction caption in the tile-guide style', () => {
-    // No bespoke order any more: the shared stub now derives from
-    // DEFAULT_LIBRARY_ORDER, so this case renders the tile the app renders.
-    // It also asserts that, rather than trusting it — a stub that silently
-    // stopped carrying the id would otherwise make this case vacuous instead
-    // of red, which is the failure it was written to prevent.
+/* The "Still under construction." caption went on this tile on 2026-09-05, the day the Home
+   shortcut left ("make users drill for it, still under construction"). On 2026-09-11 the shortcut
+   is back on Home and the tour teaches the web, so a caption one screen away saying it is not
+   ready contradicts both (the Orchestrator's call, for Corbin's morning veto). The tile keeps its
+   count and stays the way in from the Library. Asserted as ABSENCE with a control on the same
+   render: the empty Notes tile still carries ITS guide, so the guide span itself is alive. */
+describe('Scripture Web is reachable from the Library, and no longer says it is unfinished', () => {
+  it('renders the tile with its count and no caption; the empty Notes tile still has its guide', () => {
     expect(DEFAULT_LIBRARY_ORDER).toContain('scripture-web');
     setupGlobals();
     const onOpenScriptureWeb = vi.fn();
@@ -107,10 +103,12 @@ describe('Scripture Web is reachable from the Library, and says it is unfinished
 
     const tile = screen.getByText('Scripture Web').closest('button');
     expect(tile).toBeTruthy();
+    expect(tile.querySelector('.library-tile-guide')).toBeNull();
+    expect(tile.textContent).not.toMatch(/under construction/i);
+    expect(tile.textContent).toMatch(/cross-references/);
 
-    const guide = tile.querySelector('.library-tile-guide');
-    expect(guide).toBeTruthy();
-    expect(guide.textContent).toMatch(/under construction/i);
+    // The control: the guide span still exists on a tile that has something to say.
+    expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeTruthy();
 
     // Still the way in.
     fireEvent.click(tile);
