@@ -3191,7 +3191,7 @@ describe('audio-player — resume across the update reload', () => {
     expect(rec && rec.url).toBe(URL_OF('idC'));
     expect(rec.time, 'the element clock, not the whole-second store value').toBe(41.37);
     expect(typeof rec.at).toBe('number');
-    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the durable snapshot is refreshed at the same instant (its own whole-second format)').toBe(41);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the durable snapshot is refreshed at the same instant, exact — it stopped flooring on 2026-09-11 (a floor lost up to a second at the one moment the reader cannot tap: the close)').toBe(41.37);
   });
 
   it('the reload event while idle or paused leaves NO record — a stale flag must not impersonate the reader\'s choice', () => {
@@ -3256,7 +3256,7 @@ describe('audio-player — resume across the update reload', () => {
       await tick(); await tick(); await tick();
       expect(AudioPlayer.getState().status).toBe('paused');
       expect(AudioPlayer.getState().time, 'the bar shows the clock the reader was at, not 0:00').toBe(41.37);
-      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the boot snapshot keeps the place (its whole-second format) — the refusal must not persist 0 over it').toBe(41);
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the boot snapshot keeps the place, exact — the refusal must not persist 0 over it').toBe(41.37);
       // The tap then lands the seek at that clock: the deferred seek is still armed for this element.
       offer.mock.calls[0][0]();
       await tick();
@@ -3291,6 +3291,43 @@ describe('audio-player — resume across the update reload', () => {
       expect(AudioPlayer.getPreciseTime(), 'after metadata the element\'s live clock, never the store').toBe(43.2);
       expect(AudioPlayer.getState().time, 'control: the store has not moved — the two differ, so the read above chose').toBe(41.37);
     } finally { dropGlobals(); }
+  });
+
+  it('a pagehide while PLAYING (the tab closed, the app destroyed — no reload event) writes the EXACT clock to the snapshot', () => {
+    /* audio-clock-close-gap-1: the Verifier read the restored bar ~14 s behind after a browser
+       close. A closed tab is not an update — nothing fires vot:before-update-reload — and the
+       periodic snapshot is up to ~5 s late. pagehide is the last event a document gets (tab
+       close, navigation away, the WebView's destroy), with the element still live; the phone's
+       background (visibilitychange → hidden) is one more point, not the last: audio keeps
+       playing there and the periodic writer keeps running. */
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().readyState = 4; el().duration = 60;
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 41.37;
+    window.dispatchEvent(new Event('pagehide'));
+    const s = JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
+    expect(s && s.key).toBe('vol1:letter-c');
+    expect(s.time, 'the element clock, exact — the reader cannot tap through a close').toBe(41.37);
+    expect(sessionStorage.getItem(REC_KEY), 'a close is not an update: no resume record, so the next boot attempts no play()').toBeNull();
+    el().currentTime = 44.02;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    try { document.dispatchEvent(new Event('visibilitychange')); } finally { delete /** @type {any} */ (document).visibilityState; }
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'hidden while playing: the clock at that moment').toBe(44.02);
+  });
+
+  it('a pagehide while PAUSED or idle leaves the snapshot as the pause wrote it — a stopped clock is not re-read from a live element', () => {
+    window.dispatchEvent(new Event('pagehide'));
+    expect(localStorage.getItem('vot-audio-pos'), 'idle: nothing to write').toBeNull();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().readyState = 4; el().duration = 60;
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 41.37;
+    el().dispatchEvent(new Event('timeupdate'));           // the store saw 41.37
+    AudioPlayer.toggle();                                  // paused by the reader: the pause wrote 41.37
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(41.37);
+    el().currentTime = 50;                                 // a stray element value while paused
+    window.dispatchEvent(new Event('pagehide'));
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'paused: the pause\'s clock stands').toBe(41.37);
   });
 
   it('a record for ANOTHER recording, or older than two minutes, is dropped without a play attempt', async () => {
