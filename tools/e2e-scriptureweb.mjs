@@ -56,6 +56,15 @@
  *         from elementFromPoint, and 2a cannot cover for it once the element is
  *         nested inside another chrome block, so the pair of them go quiet
  *         together. Measured 0 here; a legitimate case gets a named allowance
+ * ARM 4 — the shaders COMPILE AND LINK in the browser the walk drives. Landing
+ *   69 shipped with `web-renderer.test.js` asserting the shader's TEXT in
+ *   twenty places and vitest holding no GL context, so a GLSL syntax error
+ *   would blank the screen with every gate green. Runs ONCE; scope is total
+ *   (the app source declares one shader pair). A deliberately broken shader
+ *   must be REJECTED by the same pipeline or the arm reports itself DEAD rather
+ *   than passing. It reads the SOURCE module, not the bundle — see the note on
+ *   `armShaders`.
+ *
  *     2f  the chrome whose ABSENCE is a defect — the topbar (the only way off
  *         this screen) and the CC-BY line (a licence obligation) — is PAINTED,
  *         not merely present. Nothing else in arm 2 can see that: 2a skips the
@@ -276,6 +285,14 @@ if (!(ZOOM_STEP < BAND_RATIO)) {
 const fails = [];
 const notes = [];
 let nothingToCheck = null;
+/* ARM 4's OWN incompleteness, deliberately NOT the walk's global
+   `nothingToCheck`: that one short-circuits the frame loop, and an early draft
+   of this file already made the mistake of letting one arm's precondition
+   switch off an independent one. A shader probe that cannot arm says nothing
+   about the density law or the chrome, so arms 1-3 still run. It does make the
+   RUN incomplete, which is a distinct answer from passing and gets the distinct
+   exit. */
+let armFourIncomplete = null;
 
 /* e2e-tour.mjs's idiom, written out the same way it is there rather than
    shared: the width test is the load-bearing half, because a tile can be in
@@ -434,6 +451,109 @@ function armDensity(tag, rise, fall, pinned) {
       fail(`1g the density was ${pinned.beforeTap} before the tap, not essential — there was nothing to tap back FROM`);
     }
   }
+}
+
+/* ARM 4 — the shaders compile and link in the browser the walk drives.
+ *
+ * SCOPE, stated with the count because a count without its scope means nothing:
+ * the app source declares exactly ONE shader pair (`web-renderer.js`, the only
+ * `createShader` call site in `app/src/main/assets/src`), so 2 shaders and 1
+ * program is total coverage of what exists, not a sample.
+ *
+ * WHAT IT DOES NOT CLOSE, said here because a green will be quoted: a
+ * successful compile does not prove the cull is CORRECT, and GLSL does not
+ * error on a varying left unwritten on some path — that is undefined behaviour,
+ * not a diagnostic. This answers "does it build", never "does it draw the right
+ * thing".
+ *
+ * AND THE LIMIT THAT MATTERS INSIDE THIS WALK: arm 4 imports the SOURCE module
+ * over the origin, so it proves the shader the source declares compiles — not
+ * the one in the bundle. Every other arm here drives the BUILT app. A stale or
+ * broken bundle leaves arm 4 green; that is arm 2's and 2d's territory, and
+ * `check:asset-integrity`'s. The source is imported rather than regex-read
+ * because VERT and FRAG are template literals carrying `${...}` interpolations,
+ * and reading those as text would measure a different string than the one the
+ * driver sees.
+ */
+async function armShaders(browser, baseUrl, pageUrl) {
+  const ctx = await browser.createBrowserContext();
+  const page = await ctx.newPage();
+  let out;
+  try {
+    await page.goto(pageUrl, { waitUntil: 'load', timeout: NAV_MS });
+    out = await page.evaluate(async (base) => {
+      const mod = await import(base + '/src/ui/scripture-web/web-renderer.js');
+      const S = mod.SHADER_SOURCE;
+      if (!S || typeof S.vertex !== 'string' || typeof S.fragment !== 'string') {
+        return { armed: false, why: 'web-renderer.js exports no SHADER_SOURCE with vertex and fragment strings' };
+      }
+      const cv = document.createElement('canvas');
+      const gl = cv.getContext('webgl2');
+      if (!gl) return { armed: false, why: 'no webgl2 context in this browser' };
+
+      const build = (type, src) => {
+        const sh = gl.createShader(type);
+        gl.shaderSource(sh, src);
+        gl.compileShader(sh);
+        /* NUL-STRIP (the Verifier's, paid for once): a driver infoLog can carry
+           a NUL, which makes every downstream grep treat the whole output as
+           BINARY and hide the FAIL row — leaving only an exit code, which is
+           also what a crash produces. The row is the evidence. */
+        const log = (gl.getShaderInfoLog(sh) || '').replace(/\0/g, '').trim();
+        return { ok: !!gl.getShaderParameter(sh, gl.COMPILE_STATUS), log, sh };
+      };
+
+      const v = build(gl.VERTEX_SHADER, S.vertex);
+      const f = build(gl.FRAGMENT_SHADER, S.fragment);
+      let link = { ok: false, log: 'not attempted — a shader failed to compile' };
+      if (v.ok && f.ok) {
+        const pr = gl.createProgram();
+        gl.attachShader(pr, v.sh); gl.attachShader(pr, f.sh); gl.linkProgram(pr);
+        link = { ok: !!gl.getProgramParameter(pr, gl.LINK_STATUS), log: (gl.getProgramInfoLog(pr) || '').replace(/\0/g, '').trim() };
+      }
+      /* POSITIVE CONTROL: the same pipeline must REJECT a deliberate break.
+         Without it, "compiled" cannot be told from a pipeline that approves
+         anything — and a driver that approves anything is exactly how this arm
+         would go green forever. */
+      const broken = build(gl.VERTEX_SHADER, S.vertex.replace('void main()', 'void main(@@@)'));
+      return {
+        armed: true,
+        glVersion: String(gl.getParameter(gl.VERSION)),
+        vertLen: S.vertex.length, fragLen: S.fragment.length,
+        v: { ok: v.ok, log: v.log }, f: { ok: f.ok, log: f.log }, link,
+        controlRejected: !broken.ok, controlLog: broken.log,
+      };
+    }, baseUrl);
+  } catch (e) {
+    out = { armed: false, why: 'the probe page threw: ' + (e && e.message ? e.message : String(e)) };
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+
+  if (!out.armed) {
+    armFourIncomplete = `4 the shader probe COULD NOT ARM (${out.why}). Nothing was compiled, which is not the same `
+      + 'as compiling: a missing context is not a passing shader';
+    notes.push('arm 4: NOT ARMED — ' + out.why);
+    return;
+  }
+  if (!out.controlRejected) {
+    armFourIncomplete = '4 the GL compiler ACCEPTED a deliberately broken vertex shader, so an OK from it means '
+      + `nothing (control log ${JSON.stringify(out.controlLog)}). The instrument is dead, and nothing was measured`;
+    notes.push('arm 4: INSTRUMENT DEAD — the control was not rejected');
+    return;
+  }
+  for (const [name, r] of [['vertex', out.v], ['fragment', out.f]]) {
+    if (!r.ok) fails.push(`4 the ${name} shader DOES NOT COMPILE — ${JSON.stringify(r.log) || 'the driver gave no log'}. `
+      + 'web-renderer.test.js asserts this shader\'s TEXT and vitest has no GL context, so this would blank the '
+      + 'whole screen with every other gate green');
+  }
+  if (out.v.ok && out.f.ok && !out.link.ok) {
+    fails.push(`4 the shaders compile but the program DOES NOT LINK — ${JSON.stringify(out.link.log) || 'the driver gave no log'}`);
+  }
+  notes.push(`arm 4: ran ONCE (the shader does not depend on viewport, so four runs would be four extra GL contexts `
+    + `for one answer), shaders=2 of 2 in the app source, programs=1, control=rejected, `
+    + `vertex ${out.vertLen} chars, fragment ${out.fragLen} chars, gl ${JSON.stringify(out.glVersion)}, `
+    + `compile v=${out.v.ok ? 'OK' : 'FAIL'} f=${out.f.ok ? 'OK' : 'FAIL'} link=${out.link.ok ? 'OK' : 'FAIL'}`);
 }
 
 function armChrome(tag, geo) {
@@ -847,6 +967,8 @@ try {
   await probe.close();
   console.log('[e2e-swweb] renderer ' + JSON.stringify(renderer));
 
+  await armShaders(browser, own.base, own.url);
+
   for (const frame of FRAMES) {
     for (const scale of TEXT_SCALES) {
       const ctx = await browser.createBrowserContext();     // isolated storage per run
@@ -874,6 +996,10 @@ if (harnessFault) {
   console.error('[e2e-swweb] RESULT HARNESS-FAULT — nothing was measured; this says nothing about the tree. PARAMS ' + PARAMS);
   process.exit(EXIT_HARNESS);
 }
+/* A real FAILURE outranks an incomplete arm: if something is broken, say what
+   is broken. An incomplete arm only decides the exit when nothing failed —
+   otherwise "incomplete" would hide a red. */
+if (!fails.length && armFourIncomplete && !nothingToCheck) nothingToCheck = armFourIncomplete;
 if (nothingToCheck) {
   console.error('[e2e-swweb] ' + nothingToCheck);
   console.error('[e2e-swweb] RESULT NOTHING-TO-CHECK — INCOMPLETE, not a pass and not a skip. PARAMS ' + PARAMS);
