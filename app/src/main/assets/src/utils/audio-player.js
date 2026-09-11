@@ -1517,17 +1517,19 @@ function _persistDurableOnly() {
   try { s = _snapshot(); } catch (_e) { return; }
   if (s && s !== 'clear') _persistDurable(s);
 }
-/** Boot: the durable copy outranks the LS one unless LS is stamped newer. The
- *  update reload's own record (sessionStorage, exact) outranks both — it is
- *  newer by construction; and a bar already rebuilt (the reader tapped Play in
- *  the milliseconds this read takes) keeps what it started from. */
+/** Boot: the durable copy outranks the LS one unless LS is stamped newer. A
+ *  bar already rebuilt (the reader tapped Play in the milliseconds this read
+ *  takes) keeps what it started from. The update reload's own record needs no
+ *  guard here: its rebuild clears the pending restore before this resolves, and
+ *  offline — where it stays pending — the IDB copy IS the reload's flush (same
+ *  _persist() call, same clock, same stamp); a guard on it was bitten and no
+ *  case could tell. */
 async function _adoptDurableSnapshot() {
   const idb = _idb();
   if (!idb) return;
   let rec = null;
   try { rec = await idb.get(SNAPSHOT_STORE, SNAPSHOT_KEY); } catch (_e) { return; }
   if (!rec || typeof rec !== 'object' || typeof rec.at !== 'number') return;
-  if (_resumeAfterUpdateArmed) return;
   if (_state.status !== 'idle' && !_pendingRestore) return;   // live already: the reader pressed Play
   if (_pendingRestore && rec.at < _restoredAt) return;         // the LS copy is newer
   if (_applySnapshot(rec)) _notify();
