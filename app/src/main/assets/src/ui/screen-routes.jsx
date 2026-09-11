@@ -90,7 +90,6 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} theme
  * @property {*} setTheme
  * @property {*} settings
- * @property {*} setSettings
  * @property {*} toggleSetting
  * @property {*} updateSetting
  * @property {*} titleFocusHidden
@@ -209,7 +208,7 @@ export function buildScreenRoutes({
   audioColKey, setAudioColKey,
   // ── Theme + settings + display ──
   theme, setTheme,
-  settings, setSettings, toggleSetting, updateSetting,
+  settings, toggleSetting, updateSetting,
   titleFocusHidden, setTitleFocusHidden,
   headingsFocusHidden, setHeadingsFocusHidden,
   // ── Read progress + history ──
@@ -630,7 +629,7 @@ export function buildScreenRoutes({
         query={searchQuery}
         onQueryChange={setSearchQuery}
         settings={settings}
-        onSettingsChange={(key, val) => setSettings((prev) => ({ ...prev, [key]: val }))}
+        onSettingsChange={updateSetting}
         onSelect={handleSearchSelect}
         onCommand={handleSearchCommand}
         onBack={goSearchOrigin}

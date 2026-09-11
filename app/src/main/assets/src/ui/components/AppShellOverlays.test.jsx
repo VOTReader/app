@@ -55,7 +55,7 @@ function renderOverlay() {
       lastTabCloseStrikesRef={{ current: 0 }}
       disableTabsPromptOpen={false} setDisableTabsPromptOpen={noop}
       gardenWarningOpen={false} setGardenWarningOpen={noop}
-      setSettings={noop} setScreen={noop}
+      setScreen={noop}
     />,
   );
 }
