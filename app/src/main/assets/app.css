@@ -6863,7 +6863,7 @@
     .sw-seg { display: inline-flex; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
     .sw-seg-btn {
       min-height: 44px; padding: 0 14px; background: transparent; border: 0;
-      color: var(--cream-muted); font-family: var(--font-cinzel);
+      color: var(--cream-dim); font-family: var(--font-cinzel);
       font-size: var(--fsc-11); letter-spacing: 0.09em; text-transform: uppercase;
       cursor: pointer; transition: var(--transition);
     }
