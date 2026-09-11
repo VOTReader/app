@@ -12,7 +12,7 @@
 */
 import { TOUR_LETTER } from '../hooks/use-tour.js';
 import { describe, it, expect, afterEach } from 'vitest';
-import { TOUR_STEPS, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
+import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
 
 afterEach(() => { document.body.innerHTML = ''; });
 
@@ -42,6 +42,18 @@ describe('tour-steps — shape', () => {
     const teaching = TOUR_STEPS.slice(1);
     for (const s of teaching) expect(s.eyebrow, s.id).toContain(`${s.number} of ${teaching.length}`);
     expect(TOUR_STEPS[0].text).toContain('seven stops');
+  });
+
+  /* THE COUNT IS WRITTEN ONCE (2026-09-10). Four sentences counted the stops by hand — every
+     eyebrow, the welcome card, the Home strip (TourPrompt) and the Settings Help note — and the
+     Home strip still said "six" after the highlight stop made it seven. The module now publishes
+     the count as a word and every sentence reads it. The table here is the test's OWN reading of
+     the array, so a module that published the wrong word cannot satisfy this by agreeing with
+     itself; the hand-written 'seven stops' above is the loud line that moves when a stop lands. */
+  it('publishes the stop count as a word, and the welcome card counts with it', () => {
+    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    expect(TOUR_STOPS_WORD).toBe(words[TOUR_STEPS.length - 1]);
+    expect(TOUR_STEPS[0].text).toContain(`${TOUR_STOPS_WORD} stops`);
   });
 
   it('every stop has a title and plain text under 60 words', () => {
