@@ -460,8 +460,10 @@ describe('useScrollMemory — vot:before-update-reload', () => {
       scrollTo(900);                                   // no idle wait: the debounce has NOT fired
       expect(tab.scrollPositions['letter-alpha']).toBeUndefined();
       act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
-      expect(flush).toHaveBeenCalledTimes(1);
-      const patch = flush.mock.calls[0][0];
+      // Hooks mounted by earlier cases in this file are still listening (no RTL
+      // auto-cleanup here); the one under test registered last and answers last.
+      expect(flush).toHaveBeenCalled();
+      const patch = flush.mock.calls[flush.mock.calls.length - 1][0];
       expect(typeof patch).toBe('function');
       const union = { tabs: [{ id: 'a', scrollPositions: { other: { y: 5 } } }, { id: 'b', scrollPositions: {} }], activeTabIdx: 0, theme: 'dark' };
       const out = patch(union);
