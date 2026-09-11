@@ -188,9 +188,15 @@ export const AudioPositionsStore = extendStore(
       if (seconds <= 0) { this.clearPosition(url); return; }
       if (this._shouldDefer('setPosition', track, t, d)) return;
       const data = _writeableData(this);
+      // A duration of 0 is "never known" (the typedef), not a length: it cannot replace one
+      // the row already carries. The player writes before metadata now that a deferred seek
+      // records its intent as the clock (audio-player _seekOnMetadata), and that write must
+      // move the clock without blanking the library row's "N left".
+      const prev = data.positions[url];
+      const length = _seconds(d) || (prev && typeof prev === 'object' ? _seconds(prev.d) : 0);
       // Delete before re-inserting: that is what makes key order LRU order.
       delete data.positions[url];
-      data.positions[url] = { t: seconds, d: _seconds(d), at: Date.now() };
+      data.positions[url] = { t: seconds, d: length, at: Date.now() };
       _prune(data);
       this._cache = data;
       this._save();
