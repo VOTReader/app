@@ -482,6 +482,44 @@ function armDensity(tag, rise, fall, pinned) {
   }
 }
 
+/* Read arm 4b's recorder. Runs in the PAGE, so it is a plain function of its
+   own and closes over nothing here.
+
+   `deleted` is load-bearing and not a detail: web-renderer.js compile() calls
+   gl.deleteShader() BEFORE it throws, so on the fallback path the shader is
+   already gone and getShaderInfoLog returns ''. An empty log from a live
+   shader ("the driver said nothing") and an empty log from a deleted one ("the
+   log existed and was thrown away before I looked") are completely different
+   facts, and gl.isShader tells them apart exactly. */
+const READ_RECORDER = () => (window.__swwebShaders || []).map((r) => {
+  const g = r.gl;
+  let ok = null;
+  try { ok = !!g.getShaderParameter(r.sh, g.COMPILE_STATUS); } catch (_e) { ok = null; }
+  let log = '';
+  try { log = (g.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
+  let deleted = false;
+  try { deleted = !g.isShader(r.sh); } catch (_e) { deleted = false; }
+  let name = 'a shader of UNKNOWN stage';
+  try {
+    const t = g.getShaderParameter(r.sh, g.SHADER_TYPE);
+    if (t === g.VERTEX_SHADER) name = 'the VERTEX shader';
+    else if (t === g.FRAGMENT_SHADER) name = 'the FRAGMENT shader';
+  } catch (_e) { /* stays unknown, and says so */ }
+  return { ok, log, deleted, name, len: r.src.length, head: r.src.split('\n').slice(0, 3).join(' ').slice(0, 80) };
+});
+
+/* NEVER render an empty log as the driver's words. `JSON.stringify('')` is
+   '""' -- truthy -- so the obvious `stringify(log) || fallback` is dead on
+   arrival, which is exactly how four red rows came back reading `: ""`. */
+function glLog(r, carriedBy) {
+  if (r.log) return JSON.stringify(r.log);
+  if (r.deleted) {
+    return 'UNREADABLE HERE -- the renderer deleted the shader before throwing (web-renderer.js compile()), so the '
+      + 'driver\'s words survive only in ' + (carriedBy ? JSON.stringify(carriedBy) : "the screen's own message");
+  }
+  return 'EMPTY -- the shader is still live and the driver gave no log at all, which is itself odd';
+}
+
 /* ARM 4 — the shaders compile and link in the browser the walk drives.
  *
  * SCOPE, stated with the count because a count without its scope means nothing:
@@ -908,17 +946,11 @@ async function walk(page, url, frame, scale) {
        before `compileShader`. Read it, and let a named defect outrank "nothing
        to check": `nothingToCheck` is tested FIRST at exit, so setting both
        would hide the red. */
-    const dead = await page.evaluate(() => (window.__swwebShaders || []).map((r) => {
-      let ok = null;
-      try { ok = !!r.gl.getShaderParameter(r.sh, r.gl.COMPILE_STATUS); } catch (_e) { ok = null; }
-      let log = '';
-      try { log = (r.gl.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
-      return { ok, log, len: r.src.length, head: r.src.split('\n').slice(0, 3).join(' ').slice(0, 80) };
-    })).catch(() => []);
+    const dead = await page.evaluate(READ_RECORDER).catch(() => []);
     const broke = dead.filter((r) => r.ok === false);
     if (broke.length) {
       for (const r of broke) {
-        fails.push(`${tag} 4b a SHIPPED shader does not compile: ${JSON.stringify(r.log) || 'the driver gave no log'} `
+        fails.push(`${tag} 4b ${r.name} THE APP SHIPPED does not compile: ${glLog(r, why)} `
           + `(${r.len} chars, starts ${JSON.stringify(r.head)}). The screen fell back to ${JSON.stringify(why)}; `
           + 'this is the arm that names WHICH shader and WHAT the driver said, where the fallback text is only a symptom');
       }
@@ -990,17 +1022,7 @@ async function walk(page, url, frame, scale) {
      here passes over a blank canvas: the chrome still lays out, the density
      control still reads, the band is still measurable. This is the only arm
      that looks at whether the renderer ran. */
-  const shipped = await page.evaluate(() => {
-    const recs = window.__swwebShaders || [];
-    return recs.map((r) => {
-      let ok = null;
-      try { ok = !!r.gl.getShaderParameter(r.sh, r.gl.COMPILE_STATUS); } catch (_e) { ok = null; }
-      let log = '';
-      try { log = (r.gl.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
-      const first = r.src.split('\n').slice(0, 3).join(' ').slice(0, 80);
-      return { ok, log, len: r.src.length, head: first };
-    });
-  }).catch((e) => ({ err: e.message }));
+  const shipped = await page.evaluate(READ_RECORDER).catch((e) => ({ err: e.message }));
 
   if (shipped && shipped.err) {
     fails.push(`${tag} 4b the shader recorder could not be read (${shipped.err}) — nothing was measured about what `
@@ -1013,11 +1035,11 @@ async function walk(page, url, frame, scale) {
     const bad = shipped.filter((r) => r.ok === false);
     const unknown = shipped.filter((r) => r.ok === null);
     for (const r of bad) {
-      fails.push(`${tag} 4b a shader THE APP COMPILED failed: ${JSON.stringify(r.log) || 'the driver gave no log'} `
+      fails.push(`${tag} 4b ${r.name} THE APP COMPILED failed: ${glLog(r, null)} `
         + `(${r.len} chars, starts ${JSON.stringify(r.head)}). This is the SHIPPED shader, not the source module`);
     }
     for (const r of unknown) {
-      fails.push(`${tag} 4b a recorded shader's COMPILE_STATUS could not be read (${r.len} chars, starts `
+      fails.push(`${tag} 4b ${r.name}'s COMPILE_STATUS could not be read (${r.len} chars, starts `
         + `${JSON.stringify(r.head)}) — unknown is reported as unknown, never as compiled`);
     }
     notes.push(`${tag} 4b the app handed the driver ${shipped.length} shader${shipped.length === 1 ? '' : 's'}, `
