@@ -171,7 +171,10 @@ const CHROME_WHEN_SHOWN = ['.sw-orientation-note'];
    chrome whose absence is a defect rather than a layout choice: the topbar,
    which is the only way off this screen, and the credit, which is a licence
    obligation. */
-const REQUIRED_PAINTED = ['.sw-topbar', '.sw-credit'];
+const REQUIRED_PAINTED = [
+  { sel: '.sw-topbar', why: 'it is the only way off this screen' },
+  { sel: '.sw-credit', why: 'it is a licence obligation, and an absent attribution is worse than an unreadable one' },
+];
 /* The portrait hint is placed 10 px below the topbar. The ceiling is not a pin
    on the 10 — it catches a MEASUREMENT THAT HAS GONE STALE, which is not a
    hypothetical: a draft that observed the topbar only on mount read its
@@ -193,7 +196,7 @@ const PARAMS = [
   'panMs=' + PAN_MS,
   'chrome=' + CHROME.join('|'),
   'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
-  'requiredPainted=' + REQUIRED_PAINTED.join('|'),
+  'requiredPainted=' + REQUIRED_PAINTED.map((r) => r.sel).join('|'),
   'noteGapMax=' + NOTE_GAP_MAX,
 ].join(' ');
 
@@ -440,12 +443,16 @@ function armChrome(tag, geo) {
   if (geo.blocksMissing.length) {
     fail(`2 the chrome selectors ${geo.blocksMissing.join(' ')} match nothing in the DOM — renamed, and every check that used them silently left the set`);
   }
-  const goneDark = geo.blocksInvisible.filter((sel) => REQUIRED_PAINTED.includes(sel));
-  if (goneDark.length) {
-    fail(`2f ${goneDark.join(' ')} is present in the DOM but NOT PAINTED — every other arm is silent about this, `
-      + 'because 2a skips a nested pair, 2b drops an unpainted element from the hit list, and a required '
-      + 'selector that matches but does not paint is only a note. An absent CC-BY line is worse than an '
-      + 'unreadable one, and this is the only arm that can see it');
+  /* EACH ENTRY CARRIES ITS OWN REASON, so there is no catch-all arm guessing on
+     behalf of a selector it was not written for. The first version of this line
+     was written for the credit and printed "an absent CC-BY line is worse than
+     an unreadable one" about `.sw-legend` when the arm was proved live — and
+     would say it about the topbar. A gate's sentence is part of the gate. */
+  for (const req of REQUIRED_PAINTED) {
+    if (!geo.blocksInvisible.includes(req.sel)) continue;
+    fail(`2f ${req.sel} is present in the DOM but NOT PAINTED, and ${req.why}. Every other arm is silent `
+      + 'about this: 2a skips a nested pair, 2b drops an unpainted element from the hit list, and a required '
+      + 'selector that matches but does not paint is only a note. This is the only arm that can see it');
   }
   if (!geo.pairs) fail('2a compared ZERO block pairs — the overlap check did not run, which is not the same as passing');
   if (!geo.hits) fail('2b hit-tested ZERO elements — the reachability check did not run, which is not the same as passing');
