@@ -78,31 +78,32 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(screen.queryByRole('button', { name: 'Recent reading' })).toBeNull();
   });
 
-  /* Corbin, 2026-09-05: "get rid of scripture web on the landing page, make
-     users drill for it, still under construction." Home is the landing page,
-     so the shortcut goes; the Library entry stays and carries the caption. The
-     routes and deep links are untouched — this is about what Home OFFERS, not
-     about what the app can reach.
-
-     Asserted by absence, and absence is the weak kind of assertion, so the
-     second half of this case is the control: the OTHER shortcuts must still be
-     there. A Home that rendered no shortcut row at all would satisfy the first
-     expectation and fail the reader. */
-  it('Home offers no Scripture Web shortcut, and still offers the others', () => {
+  /* Corbin, 2026-09-11: "add the scripture web button back to the home screen like it was
+     before, as seen in the trailer." Before is b3e3625a's parent — the quick-access button in
+     the shortcut row that trailer cut 7 (recorded at d49de8c2, 21:22, an hour before the
+     removal) shows. It is the control the tour's 'scripture-web' stop rings. The 2026-09-05
+     removal ("still under construction, make users drill for it") is reversed for Home only;
+     the Library entry keeps its own route. The row's other three are the control, as before:
+     a Home with no shortcut row at all satisfies nothing here. */
+  it('Home offers the Scripture Web shortcut again, beside the others, and it opens the web', () => {
     setupGlobals();
-    renderHome({ onNotes: () => {}, onBookmarks: () => {} });
+    const onScriptureWeb = vi.fn();
+    renderHome({ onNotes: () => {}, onBookmarks: () => {}, onScriptureWeb });
 
-    expect(screen.queryByRole('button', { name: /Scripture Web/i })).toBeNull();
-    expect(document.body.textContent).not.toMatch(/Scripture Web/i);
-
-    // The control: the row itself is alive.
     const shortcuts = document.querySelector('.home-shortcuts');
     expect(shortcuts).toBeTruthy();
     const labels = [...shortcuts.querySelectorAll('button')].map((x) => x.textContent.trim());
-    expect(labels).toContain('Notes');
-    expect(labels).toContain('Bookmarks');
-    expect(labels).toContain('Recent reading');
-    expect(labels).not.toContain('Scripture Web');
+    expect(labels).toEqual(['Search library', 'Recent reading', 'Notes', 'Bookmarks', 'Scripture Web']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
+    expect(onScriptureWeb).toHaveBeenCalledTimes(1);
+  });
+
+  it('with no onScriptureWeb the row still has no Scripture Web button (a route decides, not Home)', () => {
+    setupGlobals();
+    renderHome({ onNotes: () => {}, onBookmarks: () => {} });
+    expect(screen.queryByRole('button', { name: /Scripture Web/i })).toBeNull();
+    expect(document.querySelector('.home-shortcuts')).toBeTruthy();
   });
 
   it('reorders by keyboard while preserving hidden History and focus', () => {
