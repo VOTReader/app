@@ -72,16 +72,20 @@ describe('the Scripture Web controls float over the canvas, with no panel behind
   });
 
   /* The hide button hides the interactive chrome and KEEPS the legend: the one rule that hides
-     under .sw-chrome-hidden names the topbar and the strip and must not name the colour key.
-     Anchored on the rule itself, with a positive on the same rule, so a stylesheet that lost
-     the rule cannot satisfy the absence. */
-  it('the hidden state hides the topbar and the strip, not the legend', () => {
+     under .sw-chrome-hidden names the topbar, the strip AND the context card (.sw-tip — the
+     chapter/verse card floating over the canvas; Orchestrator on Corbin's "just hide the
+     interactable UI for small screens", 2026-09-11: a card over the canvas is neither the web nor
+     the legend, and on a phone it is exactly the space he wants back), and must not name the
+     colour key. Anchored on the rule itself, with positives on the same rule, so a stylesheet
+     that lost the rule cannot satisfy the absence. */
+  it('the hidden state hides the topbar, the strip and the context card, not the legend', () => {
     const css = fs.readFileSync(CSS, 'utf8');
     const m = css.match(/\.sw-root\.sw-chrome-hidden\s*:is\(([^)]*)\)\s*\{\s*display:\s*none;?\s*\}/);
     expect(m, 'the .sw-root.sw-chrome-hidden :is(...) { display: none } rule').toBeTruthy();
     const hidden = m[1];
     expect(hidden).toMatch(/\.sw-topbar/);
     expect(hidden).toMatch(/\.sw-controls/);
+    expect(hidden, 'the context card hides with the chrome (w-marker-icon extra)').toMatch(/\.sw-tip\b/);
     expect(hidden).not.toMatch(/\.sw-legend/);
   });
 });
