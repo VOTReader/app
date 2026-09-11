@@ -129,27 +129,28 @@ export function readChromeTokens(el) {
     const v = cs.getPropertyValue(name);
     return (v && v.trim()) || fallback;
   };
-  const isLight = typeof document !== 'undefined' &&
-    document.body && document.body.classList.contains('light');
+  /* ONLY THE FONT SIZES ARE READ LIVE. They follow the reader's text-size
+     setting, which is not a theme; every colour below is a constant, because
+     this screen has one palette and the app's shared tokens flip under
+     `body.light`. Reading them would put parchment on the canvas no matter what
+     `isLight` claimed -- the two are separate mechanisms and deleting only the
+     flag would have produced a screen reporting dark while painting light. */
   return {
-    isLight,
-    bg: get('--bg', isLight ? '#f7f2e8' : '#000000'),
-    ink: get('--cream-dim', isLight ? '#150a04' : '#f2ede5'),
-    muted: get('--cream-muted', isLight ? '#3a2510' : '#ccc4b4'),
-    gold: get('--gold', isLight ? '#7a5c10' : '#e8c050'),
-    goldDim: get('--gold-dim', isLight ? '#a8832a' : '#d0a838'),
-    goldBright: get('--gold-bright', isLight ? '#9b7418' : '#f5d86a'),
-    border: get('--border', 'rgba(200,164,86,0.16)'),
+    ...SW_PALETTE,
     fsRuler: parseFloat(get('--fsc-10', '10')) || 10,
     fsLabel: parseFloat(get('--fsc-11', '11')) || 11,
   };
 }
 
-const FALLBACK_CHROME = {
+/* THE Scripture Web palette. One copy: the fallback below is this object, so a
+   retune cannot move the live palette and leave the fallback behind. */
+const SW_PALETTE = {
   isLight: false, bg: '#000000', ink: '#f2ede5', muted: '#ccc4b4',
   gold: '#e8c050', goldDim: '#d0a838', goldBright: '#f5d86a',
-  border: 'rgba(200,164,86,0.16)', fsRuler: 10, fsLabel: 11,
+  border: 'rgba(200,164,86,0.16)',
 };
+
+const FALLBACK_CHROME = { ...SW_PALETTE, fsRuler: 10, fsLabel: 11 };
 
 /** '#rrggbb' or 'rgb(...)' → [r,g,b] in 0..1, for clearColor. */
 export function cssColorToRGB(css) {
