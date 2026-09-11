@@ -1312,6 +1312,19 @@ function _resumeAt(track) {
  */
 function _seekOnMetadata(at) {
   if (!(at > 0) || !_el) return;
+  /* THE INTENT OF THE SEEK IS THE CLOCK, from this line on — not from whenever
+     metadata lands. _start() has just set _state.time = 0, and everything that
+     reads the clock before the first timeupdate (the bar, the media-session
+     position, and _persist()) would otherwise read that 0 as the reader's
+     place. The case that made it a loss: the update resume's play() refused
+     by the autoplay policy (_playRefused -> _markPaused -> _persist) wrote 0
+     into the boot snapshot over a 41 s position, with the seek still waiting
+     for metadata a refused play() never loads (measured by
+     tools/e2e-update-reload.mjs --autoplay-refused, r5). seek() already keeps
+     the same rule for an unseekable element: "state still reflects intent". */
+  _state.time = at;
+  _lastTick = Math.floor(at);
+  _notify();
   // HAVE_METADATA (1) or better — duration and the seekable ranges are known,
   // which is the whole precondition the event was standing in for.
   if (_el.readyState >= 1) {
