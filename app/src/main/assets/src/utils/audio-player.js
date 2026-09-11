@@ -2406,11 +2406,17 @@ function getState() { return _state; }
  * that has to land on a syllable — read-along's rAF driver reads this instead.
  * Deliberately notifies nothing and allocates nothing: it is a pull, called up
  * to once per animation frame. Falls back to the store's value before the
- * element exists (boot-restore placeholder) so the caller never sees NaN.
+ * element exists (boot-restore placeholder) so the caller never sees NaN —
+ * AND before the element has metadata: with nothing loaded its currentTime
+ * reads 0, which is not a position but the absence of one, while the seek's
+ * intent is already the store's clock (_seekOnMetadata). A null must not
+ * impersonate a value; the frame loop would paint sentence one for the
+ * length of the metadata gap. HAVE_METADATA (1) is the same line
+ * _seekOnMetadata draws for the seek itself.
  *
  * @returns {number}
  */
-function getPreciseTime() { return _el ? (_el.currentTime || 0) : _state.time; }
+function getPreciseTime() { return _el && _el.readyState >= 1 ? (_el.currentTime || 0) : _state.time; }
 
 // Boot-time durable-resume: if a prior session left a position snapshot, put
 // the bar up PAUSED at that spot (display-only state; no network, no corpus).

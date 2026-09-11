@@ -44,14 +44,19 @@ class FakeAudio extends EventTarget {
     this.currentTime = 0;
     this.duration = 0;
     this.paused = true;
+    // HAVE_NOTHING until a load; getPreciseTime() reads the element only from
+    // HAVE_METADATA on, and a fake that played with readyState undefined was
+    // asserting about an element no browser produces.
+    this.readyState = 0;
     this.preload = '';
     this.error = null;
     this.defaultPlaybackRate = 1;
     this.playbackRate = 1;
   }
   get src() { return this._src; }
-  set src(v) { this._src = v; this.currentTime = 0; this.playbackRate = this.defaultPlaybackRate; }
-  play() { this.paused = false; return Promise.resolve(); }
+  set src(v) { this._src = v; this.currentTime = 0; this.readyState = 0; this.playbackRate = this.defaultPlaybackRate; }
+  // A playing element has data, so it has metadata (HAVE_ENOUGH_DATA = 4).
+  play() { this.paused = false; this.readyState = 4; return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() {}
   removeAttribute(name) { if (name === 'src') this._src = ''; }
