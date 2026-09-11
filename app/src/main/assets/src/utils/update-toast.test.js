@@ -191,6 +191,10 @@ describe('offerListeningResume — the update toast carries the tap', () => {
   });
 
   it('is published for bundle-d as window.__votUpdateToastResume (the player cannot import bundle-b)', () => {
+    // Both sides typed first: `undefined toBe undefined` would pass with the export deleted
+    // AND the publication gone — the bite that removes both must redden this case.
+    expect(typeof offerListeningResume).toBe('function');
+    expect(typeof window.__votUpdateToastResume).toBe('function');
     expect(window.__votUpdateToastResume).toBe(offerListeningResume);
   });
 });

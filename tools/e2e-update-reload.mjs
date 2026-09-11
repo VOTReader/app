@@ -27,10 +27,20 @@
  *      either PLAYING at its clock or the toast reading "… Tap to continue listening."
  *      whose one tap resumes it there. No "Reload" button is ever rendered.
  *
- * Autoplay is measured under Chrome's DEFAULT policy — no --autoplay-policy flag — with a
- * real gesture on the page before the reload, exactly the reader's situation. Whether the
- * browser allows the resume or refuses it is printed as a fact, and arm 2 passes either
- * way as long as the tap path works when it must.
+ * Autoplay is measured twice: under Chrome's DEFAULT policy (desktop; this machine allows the
+ * resume after a real gesture before the reload) and, with --autoplay-refused, under
+ * user-gesture-required — the phone's path (mobile Chrome refuses play() with no gesture after
+ * a reload; every live returning-profile sample reads RESUMED ON TAP). The three outcomes,
+ * pre-registered for the live AFTER sample (2026-09-11):
+ *   ALLOWED            the recording is PLAYING at the flushed clock (first 'playing' within
+ *                      1/60 s of the record) and the one toast reads exactly
+ *                      "VOTReader was just updated.";
+ *   REFUSED            the player is PAUSED at exactly the flushed clock, the ONE toast reads
+ *                      exactly "VOTReader was just updated. Tap to continue listening." and
+ *                      the plain text is not also on the page;
+ *   REFUSED, THEN TAP  one tap on that toast starts playback within 1/60 s of the flushed
+ *                      clock and the toast goes.
+ * In both policies the restore's LANDING is exact and the same letter and text size come back.
  *
  * The recording is a 60 s WAV the harness synthesises and serves in place of every
  * release mp3 (with Range answers, or Chrome treats it as unseekable and a seek restarts
@@ -76,6 +86,10 @@ import puppeteer from 'puppeteer';
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
 const withAudio = !argv.includes('--no-audio');
+// --autoplay-refused: Chrome's user-gesture-required policy — the phone's real path (mobile
+// Chrome refuses play() with no gesture after a reload; the Verifier's live returning-profile
+// samples all read RESUMED ON TAP). Same walk, and arm B then asserts the REFUSED shape.
+const refused = argv.includes('--autoplay-refused');
 const CLOCK_TOL_FRAME = 1 / 60; // one frame at 60 Hz: the bar for the clock coming back, both arms (Corbin: "exactly")
 const RESUME_AT = 40;
 
@@ -131,8 +145,8 @@ const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
 const note = (m) => console.log('  ' + m);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=d3d11'] });
-console.log(`browser ${await browser.version()}  audio=${withAudio ? 'on' : 'off'}`);
+const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=d3d11', ...(refused ? ['--autoplay-policy=user-gesture-required'] : [])] });
+console.log(`browser ${await browser.version()}  audio=${withAudio ? 'on' : 'off'}  autoplay policy: ${refused ? 'user-gesture-required (the phone)' : 'Chrome default'}`);
 try {
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
@@ -476,7 +490,11 @@ try {
     // … and sound must come back AT that clock: the first 'playing' after the boot,
     // whether the browser allowed the resume or the reader tapped the toast for it.
     let fp = firstPlaying(A1);
+    if (refused && (fp || A1.status === 'playing')) fail(`A playback started with no gesture under the user-gesture-required policy (${fmtEvents(A1.audioEvents)}) — the policy flag did not take, nothing below is about the phone's path`);
     if (!fp && A1.status !== 'playing') {
+      // Paused AT the flushed clock, not at the periodic snapshot's whole second.
+      if (A1.storeT !== recT) fail(`A the player came back paused at ${A1.storeT} s, not at the ${recT} s the event wrote`);
+      else note(`A the player came back paused at exactly the ${recT} s the event wrote`);
       // No new build in this arm, so the toast that carries the tap is arm B's; here a
       // refusal is answered with the bar's own Play, which resumes from the same record.
       note(`A autoplay after the reload: refused (status ${A1.status}); resuming from the bar's Play (the toast's tap is arm B's)`);
@@ -517,6 +535,10 @@ try {
   assertScroll('B', B0.y, B1);
   if (B1.fs !== fs0) fail(`B text size came back as --font-scale=${B1.fs}, was ${fs0}`);
   if (!B1.toastShown || !/just updated/i.test(B1.toast)) fail(`B no "just updated" toast after a real new build (toast ${JSON.stringify(B1.toast)}, shown=${B1.toastShown})`);
+  // Exactly ONE update toast on the page, whichever text it carries: the listening offer
+  // re-uses the plain toast's element (one element per id), so the plain one is never ALSO shown.
+  const toastCount = await page.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.children.length === 0 && /just updated/i.test(e.textContent || '')).length);
+  if (toastCount !== 1) fail(`B ${toastCount} elements read "just updated" — want exactly one toast`);
   if (withAudio && B0.key) {
     if (B1.key !== B0.key) fail(`B the player holds ${JSON.stringify(B1.key)}, the reader was listening to ${JSON.stringify(B0.key)}`);
     // The pre-reload read here is seconds before the event (the worker decides when),
@@ -527,10 +549,16 @@ try {
     if (recT === null) fail('B the clock record was not written on the reload event');
     else if (recT < B0.t - CLOCK_TOL_FRAME || recT > B0.t + elapsedMax) fail(`B the clock record carries ${recT} s, outside [${B0.t.toFixed(3)}, ${(B0.t + elapsedMax).toFixed(1)}] s — not the clock at the event`);
     let fp = firstPlaying(B1);
+    if (refused && (fp || B1.status === 'playing')) fail(`B playback started with no gesture under the user-gesture-required policy (${fmtEvents(B1.audioEvents)}) — the policy flag did not take`);
     if (!fp && B1.status !== 'playing') {
-      const tapOffered = /tap to continue listening/i.test(B1.toast);
-      note(`B autoplay after the real update: refused (status ${B1.status}); toast offers the tap: ${tapOffered}`);
-      if (!tapOffered) fail(`B the reader came back silent with no way to continue from the toast (toast ${JSON.stringify(B1.toast)})`);
+      // THE REFUSED SHAPE (the phone's): paused AT the flushed clock; the ONE toast reads
+      // the listening offer, exactly; one tap resumes at that clock; the toast then goes.
+      const LISTEN = 'VOTReader was just updated. Tap to continue listening.';
+      note(`B autoplay after the real update: refused (status ${B1.status}); toast ${JSON.stringify(B1.toast)}`);
+      if (B1.storeT !== recT) fail(`B the player came back paused at ${B1.storeT} s, not at the ${recT} s the event wrote`);
+      else note(`B the player came back paused at exactly the ${recT} s the event wrote`);
+      if (B1.toast !== LISTEN) fail(`B the toast reads ${JSON.stringify(B1.toast)}, want exactly ${JSON.stringify(LISTEN)}`);
+      if (!/tap to continue listening/i.test(B1.toast)) fail(`B the reader came back silent with no way to continue from the toast (toast ${JSON.stringify(B1.toast)})`);
       else {
         await page.click('#vot-toast-updated');
         await page.waitForFunction(() => (window.__e2eAudioEvents || []).some((e) => e.type === 'playing'), { timeout: 15000 }).catch(() => {});
@@ -538,8 +566,13 @@ try {
         fp = firstPlaying(after);
         if (after.status !== 'playing') fail('B tapping the toast did not resume playback');
         else note('B one tap on the toast resumed playback');
+        if (after.toastShown) fail(`B the toast is still showing after the tap (${JSON.stringify(after.toast)})`);
+        else note('B the toast went with the tap');
       }
-    } else note('B autoplay after the real update: ALLOWED by this browser (plain "just updated" toast)');
+    } else {
+      note('B autoplay after the real update: ALLOWED by this browser (plain "just updated" toast)');
+      if (B1.toast !== 'VOTReader was just updated.') fail(`B with playback allowed the toast reads ${JSON.stringify(B1.toast)}, want exactly "VOTReader was just updated."`);
+    }
     note(`B audio events since the boot: ${fmtEvents((await readPage()).audioEvents)}`);
     if (!fp) fail('B sound never came back (no \'playing\' event after the boot)');
     else if (recT !== null && Math.abs(fp.t - recT) > CLOCK_TOL_FRAME) fail(`B sound came back at ${fp.t.toFixed(3)} s against the ${recT} s the event wrote (tolerance ${CLOCK_TOL_FRAME} s, one frame; the reader was at ${B0.t.toFixed(3)} s when last read)`);
