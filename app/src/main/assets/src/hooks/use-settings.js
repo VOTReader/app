@@ -9,8 +9,10 @@
                         the hardcoded defaults)
      - setSettings     (raw React setState — returned so App() can compose
                         settings writes from other subsystems if needed)
-     - toggleSetting   (plain arrow fn: flips settings[key] boolean)
-     - updateSetting   (plain arrow fn: sets settings[key] = val)
+     - toggleSetting   (plain arrow fn: flips settings[key] boolean, records touched[key])
+     - updateSetting   (plain arrow fn: sets settings[key] = val, records touched[key])
+     - DEFAULT_FLIPS   (the rounds of default changes applied to profiles that never chose;
+                        `defaultsRev` and `touched` ride inside settings — see the block above it)
      - body-class + platform-bridge effect (deps [theme, settings])
                         Mirrors theme + every settings flag that has a CSS
                         body-class or a platform-bridge call onto
@@ -58,6 +60,24 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
  * @typedef {Record<string, any>} Settings
  */
 
+/* A DEFAULT THAT CHANGES AFTER A READER'S FIRST BOOT REACHES NOBODY BY ITSELF. The first
+   boot persists the WHOLE merged settings object into vot-state (usePersistedState writes
+   it immediately, prev === null) and `...savedS` below puts those bytes back over any new
+   default on every boot after — so every profile from before 2026-09-10 carries
+   showSurpriseButton:false as a SAVED value whether or not the reader ever opened Settings.
+   A flip is therefore a ROUND: one entry per change, append-only, keyed on `defaultsRev`
+   (the last round a profile has been through, stamped into settings). A key flips only if
+   it still reads the OLD default AND the reader never set it (`touched`, written by the
+   two mutators). Nothing recorded `touched` before round 1, so for older profiles "switched
+   off" and "never touched" are the same bytes and both flip — stated, not hidden; the reader
+   switches off again in one tap and that choice is recorded. Round 1: Corbin, 2026-09-10,
+   "make surprise me dice button and reading dot on by default"; Auto-Continue with them
+   (only reachable once Auto-Scroll is on, i.e. once the reader asked for hands-free).
+   @type {ReadonlyArray<Readonly<Record<string, [any, any]>>>}  key → [old default, new default] */
+export const DEFAULT_FLIPS = Object.freeze([
+  Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
+]);
+
 /**
  * Settings state container hook. Owns settings + 3 mutators plus the
  * body-class + AndroidBridge mirroring effect. Persistence lives in
@@ -87,8 +107,18 @@ export function useSettings({ savedSettings, theme }) {
     if ('showChapterSummary' in savedS && savedS.showChapterSummary === false) {
       migrated.showChapterTitle = false;
     }
+    // Default flips (DEFAULT_FLIPS above): every round this profile has not been through.
+    const touched = (savedS.touched && typeof savedS.touched === 'object') ? savedS.touched : {};
+    for (let i = Number(savedS.defaultsRev) || 0; i < DEFAULT_FLIPS.length; i++) {
+      for (const [key, [from, to]] of Object.entries(DEFAULT_FLIPS[i])) {
+        if (!touched[key] && (!(key in savedS) || savedS[key] === from)) migrated[key] = to;
+      }
+    }
+    migrated.defaultsRev = DEFAULT_FLIPS.length;
     return {
-      showReadingDot: false, showSurpriseButton: false, markAsRead: true,
+      showReadingDot: true, showSurpriseButton: true, markAsRead: true,
+      // The keys the reader set through the two mutators — a flip never overwrites one of these.
+      touched: {},
       // Search defaults — only the values that are actually wired to
       // VotSearch.search() at the call site. Previously this block also
       // declared 12 searchInclude* flags (Notes, Verses, Headings,
@@ -138,9 +168,12 @@ export function useSettings({ savedSettings, theme }) {
       // reading pace by up to 2× when the reader resizes text. The controller
       // derives px from a measured line height, so this value is scale-
       // invariant. Off by default — the pill is chrome on every reading screen.
+      // Auto-Continue is ON (round 1): it means nothing until the reader has
+      // switched Auto-Scroll on, and hands-free reading that stops at every
+      // chapter end is not hands-free.
       autoScroll: false,
       autoScrollLpm: "16",
-      autoScrollNext: false,
+      autoScrollNext: true,
       autoScrollEndMs: "2500",
       // Read-along (ui/components/ReadAlongHighlight.jsx). TWO keys, both ON
       // by default, because they are two different kinds of thing: the wash
@@ -157,8 +190,11 @@ export function useSettings({ savedSettings, theme }) {
   });
 
   // ── Plain arrow functions ──────────────────────────────────────────────
-  const toggleSetting = (key) => setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
-  const updateSetting = (key, val) => setSettings((prev) => ({ ...prev, [key]: val }));
+  // Both record the key in `touched`: from here on a default flip (DEFAULT_FLIPS) can tell
+  // the reader's choice from a default they never looked at.
+  const touch = (prev, key) => ({ ...(prev.touched || {}), [key]: true });
+  const toggleSetting = (key) => setSettings((prev) => ({ ...prev, [key]: !prev[key], touched: touch(prev, key) }));
+  const updateSetting = (key, val) => setSettings((prev) => ({ ...prev, [key]: val, touched: touch(prev, key) }));
 
   // ── Body-class + AndroidBridge effect ─────────────────────────────────
   // Mirrors theme + every settings flag that has a CSS body-class or a

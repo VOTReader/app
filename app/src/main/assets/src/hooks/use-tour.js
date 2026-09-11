@@ -11,8 +11,9 @@
      openLetter        Volume One › "Chosen by God" (short, has a recording)
      openBible         John 3, in whatever translation the reader chose
      goJournalHub      App's goJournalHub (Library › Journal)
-     openSettingsData  App's goSettings; SettingsScreen opens the Your Data
-                       group itself when the tour's stop asks for it
+     openSettingsData  App's goSettings; SettingsScreen opens whichever group
+                       the stop's `settingsGroup` asks for (Your Data for the
+                       backup stop, Reading for the settings stop)
 
    App is at its 800-line canary: this hook exists so the tour costs App()
    two lines (this call, and `screen` on AppShellOverlays).

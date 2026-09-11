@@ -136,6 +136,20 @@ const STOPS = [
     text: 'Your notes stay on your device. One tap on Export saves a backup file. Import brings it back.',
     primary: 'Next',
   },
+  /* SETTINGS GETS A STOP (Corbin, 2026-09-10: "a stop showing users they can toggle certain
+     features on/off in settings"). It rides the Settings screen the backup stop already opened
+     (same `screen`, same `enter`, so no navigation is added), opens the Reading group and rings
+     the dice row — the same feature the reader met on Home — and names three features by the
+     words the reader sees on screen. "toggle" is on the banned list; "switched on or off" is
+     what the card says. The closing card stays the closing card. */
+  {
+    id: 'settings', screen: 'settings', enter: 'openSettingsData', settingsGroup: 'reading',
+    target: { selector: '[data-settings-group="reading"] .settings-row', text: 'Surprise Me' }, act: null,
+    label: 'Settings',
+    title: 'Make it yours',
+    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, and more. Turn off what you do not use.',
+    primary: 'Next',
+  },
   {
     id: 'done', screen: 'home', enter: 'goHome', target: null, act: null,
     title: "That's the tour",

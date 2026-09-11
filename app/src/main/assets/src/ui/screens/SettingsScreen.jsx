@@ -523,7 +523,7 @@ function _platformLabel(platform) {
 // dependencies. A match opens its group; dependent rows still obey their toggles.
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
-  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker position dot streak dwell time random letter button surprise keep screen on double tap click fullscreen',
+  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
   topnav: 'top nav buttons icons settings gear history theme bookmark',
@@ -1945,9 +1945,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={!!settings.showScrollNotch}
               onToggle={() => onToggle("showScrollNotch")}
             />
+            {/* Named for what it does, not its shape (2026-09-10): the marker was a pulsing dot
+                and becomes a bookmark ribbon on the resume-icon branch; the row, the control's
+                accessible name and the tour's settings stop all say "Reading Position Marker". */}
             <SettingsRow
-              label="Reading Position Dot"
-              desc="A pulsing gold dot in the top navigation bar that takes you back to where you were last reading. It follows you the moment you open any chapter or letter."
+              label="Reading Position Marker"
+              desc="Shows where you left off reading, in the top bar; tap it to go back. It follows you the moment you open any chapter or letter."
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />
@@ -1969,9 +1972,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               ]}
               onChange={(v) => onSetting("dwellMs", v)}
             />
+            {/* The Home button says "Surprise Me"; the row says the same, so a reader sent here
+                by the tour finds it (it was "Random Letter Button" until 2026-09-10). */}
             <SettingsRow
-              label="Random Letter Button"
-              desc="A breathing dice icon on the home screen that opens a random chapter or letter when tapped."
+              label="Surprise Me Button"
+              desc="A breathing dice on the Home screen that opens a random chapter or letter when tapped."
               checked={settings.showSurpriseButton}
               onToggle={() => onToggle("showSurpriseButton")}
             />
