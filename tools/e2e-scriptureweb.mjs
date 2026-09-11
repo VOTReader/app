@@ -57,8 +57,8 @@
  *   the same output, and a renamed selector shrinks the check set silently.
  *   Zero pairs or zero hits is a FAILURE: an arm that checked nothing has not
  *   run, whatever colour it prints.
- *     2e  the portrait hint, WHEN IT IS UP, sits below the topbar and not far
- *         below it — the gap is printed either way, and "the hint is not up at
+ *     2e  the portrait hint, WHEN IT IS UP, sits below the LOWEST chrome above
+ *         it — topbar and location readout both — and not far below it — the gap is printed either way, and "the hint is not up at
  *         this frame" is reported as its own answer rather than as a pass
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
@@ -383,11 +383,11 @@ function armChrome(tag, geo) {
   if (geo.noteGap === null) {
     notes.push(`${tag} 2e the portrait hint is not up at this frame, so its placement was NOT checked — not the same as passing`);
   } else {
-    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below the topbar (intended 10, ceiling ${NOTE_GAP_MAX})`);
+    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below the lowest chrome above it (intended 10, ceiling ${NOTE_GAP_MAX})`);
     if (geo.noteGap < 0) {
-      fail(`2e the portrait hint overlaps the topbar by ${-geo.noteGap} px — that card is what covered the Back button`);
+      fail(`2e the portrait hint overlaps the chrome above it by ${-geo.noteGap} px — that card is what covered the Back button`);
     } else if (geo.noteGap > NOTE_GAP_MAX) {
-      fail(`2e the portrait hint floats ${geo.noteGap} px below the topbar against an intended 10 — its placement measurement `
+      fail(`2e the portrait hint floats ${geo.noteGap} px below the chrome above it against an intended 10 — its placement measurement `
         + 'has gone stale, which is what a draft observing the topbar only on mount produced (299 px against a topbar ending at 72)');
     }
   }
@@ -497,9 +497,14 @@ const readGeometry = (chromeSel, optionalSel) => {
      null when the hint is not up — which is a different answer from 0 and is
      reported as one. */
   const noteEl = document.querySelector('.sw-orientation-note');
-  const barEl = document.querySelector('.sw-topbar');
-  const noteGap = (noteEl && barEl && vis(noteEl) && vis(barEl))
-    ? Math.round((noteEl.getBoundingClientRect().top - barEl.getBoundingClientRect().bottom) * 10) / 10
+  /* Measured against the LOWEST chrome above it, not against the topbar alone:
+     clearing the topbar and landing on the location readout is the bug this arm
+     caught, so an arm that only watched the topbar would have called that fix
+     green. */
+  const aboveEls = ['.sw-topbar', '.sw-context'].map((s) => document.querySelector(s)).filter((e) => e && vis(e));
+  const aboveBottom = aboveEls.length ? Math.max(...aboveEls.map((e) => e.getBoundingClientRect().bottom)) : null;
+  const noteGap = (noteEl && vis(noteEl) && aboveBottom !== null)
+    ? Math.round((noteEl.getBoundingClientRect().top - aboveBottom) * 10) / 10
     : null;
 
   return {
