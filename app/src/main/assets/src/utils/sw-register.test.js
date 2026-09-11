@@ -180,7 +180,7 @@ describe('registerServiceWorker — the update-reload flag and the early claim',
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
   });
   afterEach(() => {
-    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW); else delete navigator.serviceWorker;
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW); else delete /** @type {any} */ (navigator).serviceWorker;
     if (origLocation) Object.defineProperty(window, 'location', origLocation);
     delete window.__votSwTookOver; delete window.__votController0;
     sessionStorage.clear();

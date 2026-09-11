@@ -30,6 +30,7 @@
 import { PlatformBridge } from './platform-bridge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { showToast } from './toast.js';
+import { markUpdateReload } from './update-toast.js';
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -45,7 +46,8 @@ export function registerServiceWorker() {
   // destroyed the smoke harness's execution context mid-walk (smoke:ci failed
   // all 3 attempts with "Execution context was destroyed"). Captured BEFORE
   // register() so claim() can't flip it first.
-  const hadController = !!navigator.serviceWorker.controller;
+  const controllerAtRegistration = navigator.serviceWorker.controller;
+  const hadController = !!controllerAtRegistration;
 
   // RELOAD WHEREVER THE READER IS (Corbin, 2026-09-10). This used to defer a
   // visible mid-session reload until the app was backgrounded, or offer a
@@ -66,6 +68,9 @@ export function registerServiceWorker() {
     if (refreshing) return;
     refreshing = true;
     window.__votSwTookOver = true;
+    // The document that follows toasts on this, not on the profile's last-seen key
+    // (update-toast.js): the reload is the evidence, and it is this tab's own.
+    markUpdateReload();
     try { window.dispatchEvent(new Event('vot:before-update-reload')); } catch (_e) { /* a listener's throw must not stop the reload */ }
     window.location.reload();
   };
@@ -73,6 +78,19 @@ export function registerServiceWorker() {
     if (!hadController) return;   // first controller — nothing stale to reload onto
     doReload();
   });
+  // THE EARLY CLAIM (w-toast-reload-flag, 2026-09-11). index.html captures the
+  // controller at document start, before any bundle runs. If it is not the one
+  // controlling the page now, a new worker claimed this document while its own
+  // scripts were still parsing: the controllerchange that announced it fired with
+  // nobody listening, and this page is running the OLD build under the NEW worker.
+  // Reload onto it now, through the same door, so the flag and the restore go along.
+  // Only a worker-to-worker change counts: none-to-worker is the first visit's claim
+  // (SW-CLAIM above), and a document without the capture is left alone. The compare
+  // is by identity — the container hands out one ServiceWorker object per worker per
+  // document — and every plain boot reads EQUAL here, or every boot would reload
+  // (the sibling bench's anti-loop control, tools/e2e-update-siblings.mjs).
+  const controllerAtStart = /** @type {any} */ (window).__votController0;
+  if (controllerAtStart && controllerAtRegistration && controllerAtStart !== controllerAtRegistration) doReload();
 
   // service-worker-4 (2026-09-04): the install's corpus precache is
   // best-effort (a miss must not fail the install), but a miss used to leave

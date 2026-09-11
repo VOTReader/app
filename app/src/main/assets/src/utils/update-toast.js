@@ -43,6 +43,14 @@
    after sw-register's controllerchange reload; on Android it is the next cold
    start with a new APK, whatever screen it restores to.
 
+   THE RELOAD FLAG (w-toast-reload-flag, 2026-09-11). On the web the decision is
+   the document's, not the profile's: sw-register's doReload() sets a
+   sessionStorage flag before location.reload(), and the document that follows
+   toasts on it whatever the key says (a sibling document of the origin that
+   crossed first has already advanced the key; a silent worker cannot withhold
+   it). The key stays as bookkeeping for Android's cold start and for the 'same'
+   read of a plain boot.
+
    "TAP TO CONTINUE LISTENING." (Corbin, 2026-09-10). After the web's self-reload
    the audio player tries to resume the recording it was playing; when the
    browser refuses (autoplay policy — a fresh document has no gesture), the
@@ -62,6 +70,26 @@ import { showToast, hideToast } from './toast.js';
 /** localStorage key. Listed in cached-store.js's LS_SKIP_LIST so the one-time
  *  vot-* sweep leaves it alone. */
 export const LAST_SEEN_BUILD_KEY = 'vot-last-seen-build';
+/** sessionStorage flag: "this document was reloaded for an update". Set by
+ *  sw-register's doReload() one call before location.reload() (markUpdateReload),
+ *  read and cleared by the announcer below (takeUpdateReload). Per document:
+ *  sessionStorage is the tab's own and survives its reload, so a sibling document
+ *  of the origin cannot spend it and a process kill cannot lose it the way it
+ *  loses a localStorage commit. */
+export const UPDATE_RELOAD_FLAG = 'vot-update-reload';
+
+/** The reload is ours: say so to the document that follows. */
+export function markUpdateReload() {
+  try { sessionStorage.setItem(UPDATE_RELOAD_FLAG, '1'); } catch (_e) { /* no sessionStorage: the key path below still decides */ }
+}
+/** Whether this document was reloaded for an update — consumed on the read. */
+function takeUpdateReload() {
+  try {
+    const v = sessionStorage.getItem(UPDATE_RELOAD_FLAG);
+    if (v !== null) sessionStorage.removeItem(UPDATE_RELOAD_FLAG);
+    return v !== null;
+  } catch (_e) { return false; }
+}
 export const UPDATED_TOAST_ID = 'vot-toast-updated';
 export const UPDATED_TOAST_TEXT = 'VOTReader was just updated.';
 export const UPDATED_TOAST_LISTEN_TEXT = 'VOTReader was just updated. Tap to continue listening.';
@@ -149,6 +177,20 @@ function profileUsed() {
  */
 export async function announceUpdateIfAny() {
   const used = profileUsed();           // before the first await: nothing of this boot has written yet
+  if (takeUpdateReload()) {
+    // THE RELOAD IS THE EVIDENCE (w-toast-reload-flag, 2026-09-11). sw-register reloaded
+    // THIS document onto a new worker and said so in the tab's own sessionStorage before
+    // calling reload(). Toast on that, now, whatever the key says: the key is a PROFILE
+    // fact, and on the live 90 → 91 crossing a sibling document of the origin crossed
+    // first and advanced it, so the document the reader was looking at read 'same' and
+    // stayed silent. A silent worker cannot withhold the toast either. The key is then
+    // bookkeeping — Android's cold start and the 'same' read below — written when the
+    // build is known and left alone when it is not (a null is not a value).
+    const out = announce();
+    const running = await runningBuild();
+    if (running) { try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode */ } }
+    return out;
+  }
   const running = await runningBuild();
   if (!running) return 'unknown';
   let seen = null;
@@ -156,10 +198,16 @@ export async function announceUpdateIfAny() {
   if (seen === running) return 'same';
   try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode: announce anyway, next boot repeats */ }
   if (seen == null && !used) return 'first';
+  return announce();
+}
+
+/** Show the one announcement of this boot: the listening offer if the player already
+ *  asked for the tap, the plain toast otherwise. */
+function announce() {
   announced = true;
   const resume = pendingResume;
   pendingResume = null;
   if (resume) showListeningToast(resume);
   else showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_TEXT, durationMs: UPDATED_TOAST_MS });
-  return 'shown';
+  return /** @type {'shown'} */ ('shown');
 }
