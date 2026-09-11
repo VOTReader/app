@@ -24,7 +24,7 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
 // The hook reads GARDEN_DEFAULT_TIER as a bare window global (bundle-d).
 /** @type {any} */ (globalThis).GARDEN_DEFAULT_TIER = 2;
 
-import { useSettings } from './use-settings.js';
+import { useSettings, defaultFlipsFor } from './use-settings.js';
 
 /** Render the hook with props, defaulting to a fresh first launch. */
 function mount({ savedSettings = null, theme = 'dark' } = {}) {
@@ -273,6 +273,20 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
     act(() => result.current.updateSetting('arrowLayout', 'split'));
     expect(result.current.settings.showSurpriseButton).toBe(false);
     expect(result.current.settings.touched).toEqual({ showSurpriseButton: true, arrowLayout: true });
+  });
+
+  /* Round 1 is all booleans, and for a boolean "still at its old default" and "not already at
+     the new one" are the same test — a bite that drops the old-default clause survives every
+     case above (B7, 2026-09-10). The clause is for the round that flips a SELECT: a profile
+     from before the touched record that chose a third value must keep it. Witnessed here on the
+     pure rule with a synthetic round, since no shipped round can show it. */
+  it('a pre-round choice that is neither the old nor the new default is never touched (a select round)', () => {
+    const round = [{ arrowLayout: ['off', 'nav'] }];
+    expect(defaultFlipsFor({ arrowLayout: 'split' }, round)).toEqual({ defaultsRev: 1 });
+    expect(defaultFlipsFor({ arrowLayout: 'off' }, round)).toEqual({ arrowLayout: 'nav', defaultsRev: 1 });
+    expect(defaultFlipsFor({}, round)).toEqual({ arrowLayout: 'nav', defaultsRev: 1 });
+    expect(defaultFlipsFor({ arrowLayout: 'off', touched: { arrowLayout: true } }, round)).toEqual({ defaultsRev: 1 });
+    expect(defaultFlipsFor({ arrowLayout: 'off', defaultsRev: 1 }, round)).toEqual({ defaultsRev: 1 });
   });
 
   it('flipped, switched off by the reader, saved, booted again: still off, and the sibling still on', () => {

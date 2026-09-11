@@ -79,6 +79,27 @@ export const DEFAULT_FLIPS = Object.freeze([
 ]);
 
 /**
+ * What a saved profile still owes from the rounds it has not been through: `{ key: newDefault }`
+ * for every key still at its OLD default that the reader never set, plus the stamp. Pure, so the
+ * rule is tested on its own — the "still at its old default" clause is what keeps a pre-round
+ * choice that is neither default (a select value) untouched, and no boolean round can show it.
+ * @param {Record<string, any>} savedS
+ * @param {ReadonlyArray<Readonly<Record<string, [any, any]>>>} [flips]
+ * @returns {Record<string, any>}
+ */
+export function defaultFlipsFor(savedS, flips = DEFAULT_FLIPS) {
+  const touched = (savedS.touched && typeof savedS.touched === 'object') ? savedS.touched : {};
+  const out = {};
+  for (let i = Number(savedS.defaultsRev) || 0; i < flips.length; i++) {
+    for (const [key, [from, to]] of Object.entries(flips[i])) {
+      if (!touched[key] && (!(key in savedS) || savedS[key] === from)) out[key] = to;
+    }
+  }
+  out.defaultsRev = flips.length;
+  return out;
+}
+
+/**
  * Settings state container hook. Owns settings + 3 mutators plus the
  * body-class + AndroidBridge mirroring effect. Persistence lives in
  * usePersistedState (P6k+1).
@@ -108,13 +129,7 @@ export function useSettings({ savedSettings, theme }) {
       migrated.showChapterTitle = false;
     }
     // Default flips (DEFAULT_FLIPS above): every round this profile has not been through.
-    const touched = (savedS.touched && typeof savedS.touched === 'object') ? savedS.touched : {};
-    for (let i = Number(savedS.defaultsRev) || 0; i < DEFAULT_FLIPS.length; i++) {
-      for (const [key, [from, to]] of Object.entries(DEFAULT_FLIPS[i])) {
-        if (!touched[key] && (!(key in savedS) || savedS[key] === from)) migrated[key] = to;
-      }
-    }
-    migrated.defaultsRev = DEFAULT_FLIPS.length;
+    Object.assign(migrated, defaultFlipsFor(savedS));
     return {
       showReadingDot: true, showSurpriseButton: true, markAsRead: true,
       // The keys the reader set through the two mutators — a flip never overwrites one of these.
