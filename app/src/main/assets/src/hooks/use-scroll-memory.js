@@ -188,6 +188,13 @@ function anchorContentTop(el, anchorKey) {
   return (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
 }
 
+// Is `anchorKey` the FIRST data-hl-key element of the scroller (nothing but the
+// header above it)? Document order is vertical order for reading content.
+function isFirstContent(el, anchorKey) {
+  var first = el ? el.querySelector('[data-hl-key]') : null;
+  return !!first && first.getAttribute('data-hl-key') === anchorKey;
+}
+
 // Land a saved position on the current __scrollEl. Returns a cleanup fn.
 // Accepts the full saved record { y, pct, anchorKey, anchorOff }, a legacy plain
 // number, or null. PREFERS the content anchor; falls back to the saved pixel y.
@@ -225,7 +232,19 @@ function startRestore(saved) {
   // the DOM (precise), else the saved pixel y.
   function best() {
     var aTop = anchorContentTop(__scrollEl, anchorKey);
-    if (aTop != null) return { y: Math.max(0, Math.round(aTop + anchorOff)), anchored: true };
+    if (aTop != null) {
+      // A NEGATIVE offset on the FIRST content element means the viewport top sat
+      // above all content — in the header (hero, meta) — whose height at boot is
+      // not its height at capture (the title's web font swaps in, a pill row
+      // mounts), so aTop + anchorOff would land the reader that difference DOWN a
+      // page they left at the top (99 px in a Verifier rehearsal arm,
+      // restore-anchor-top-of-letter-1). The pixel y describes the header region
+      // exactly, so it wins there. A negative offset on any LATER element is a gap
+      // between two content elements, stable across boots: the anchor keeps
+      // winning. (Restore-side on purpose: saved records already carry the anchor.)
+      if (anchorOff < 0 && isFirstContent(__scrollEl, anchorKey)) return { y: legacyY, anchored: true };
+      return { y: Math.max(0, Math.round(aTop + anchorOff)), anchored: true };
+    }
     return { y: legacyY, anchored: false };
   }
   function settle() {
