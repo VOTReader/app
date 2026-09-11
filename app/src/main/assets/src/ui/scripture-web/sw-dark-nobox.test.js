@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* RED for the Scripture Web's chrome: no panel behind the controls, and no
  * light palette can reach this screen.
  * ═══════════════════════════════════════════════════════════════════════
