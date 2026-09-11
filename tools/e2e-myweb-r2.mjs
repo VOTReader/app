@@ -354,27 +354,43 @@ async function armR(page, tag, fname, c, r0) {
   await clickIfPresent(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const rest0 = await lum(await page.screenshot({ encoding: 'base64', clip }));
+  // the burst samples the ui canvas itself every animation frame for 700 ms
+  // (a screenshot takes 40-400 ms and cannot see a 250 ms fade): the corridor
+  // box is copied into a scratch canvas (no read-back on the app canvas) and
+  // its mean luminance read with data-cap-fraction as drawn that frame
   await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12);
   await page.mouse.wheel({ deltaY: -120 });
-  const t0 = Date.now();
-  const shots = [];
-  for (let i = 0; i < 14; i++) {
-    const cf = await attr(page, 'data-cap-fraction');
-    const b64 = await page.screenshot({ encoding: 'base64', clip });
-    shots.push({ t: Date.now() - t0, cf: Number(cf), lum: await lum(b64) });
-    if (OUT && (i === 0 || i === 3 || i === 6 || i === 13)) writeFileSync(resolve(OUT, `${fname}-R-${String(i).padStart(2, '0')}-t${shots[i].t}.png`), Buffer.from(b64, 'base64'));
-  }
-  await sleep(400);
+  const shots = await page.evaluate((box, ms) => new Promise((done) => {
+    const ui = document.querySelector('.sw-canvas-ui');
+    const root = document.querySelector('.sw-root');
+    const s = ui.width / ui.getBoundingClientRect().width;
+    const X0 = Math.floor(box.x0 * s), Y0 = Math.floor(box.y0 * s), W = Math.floor((box.x1 - box.x0) * s), H = Math.floor((box.y1 - box.y0) * s);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    const out = []; const t0 = performance.now();
+    const tick = () => {
+      g.clearRect(0, 0, W, H); g.drawImage(ui, X0, Y0, W, H, 0, 0, W, H);
+      const d = g.getImageData(0, 0, W, H).data;
+      let sum = 0;
+      for (let p = 0; p < d.length; p += 4) sum += (d[p] + d[p + 1] + d[p + 2]) * d[p + 3] / 255;
+      out.push({ t: +(performance.now() - t0).toFixed(0), cf: Number(root.getAttribute('data-cap-fraction')), lum: +(sum / 3 / (W * H)).toFixed(2) });
+      if (performance.now() - t0 < ms) requestAnimationFrame(tick); else done(out);
+    };
+    requestAnimationFrame(tick);
+  }), { x0, x1, y0: r0.topY + 4, y1: r0.bottomY - 4 }, 700);
+  await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const restEnd = await lum(await page.screenshot({ encoding: 'base64', clip }));
   let maxStep = 0, at = -1;
   for (let i = 1; i < shots.length; i++) { const d = Math.abs(shots[i].lum - shots[i - 1].lum); if (d > maxStep) { maxStep = d; at = i; } }
-  const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
-  note(`${tag} R: Matthew corridor mean luminance at rest ${rest0} -> live ${shots[0].lum} (cap ${shots[0].cf}, t+${shots[0].t} ms) -> rest again ${restEnd}; largest step between consecutive captures ${maxStep.toFixed(2)}/255 (capture ${at}, t+${shots[at] ? shots[at].t : '-'} ms), capture cadence ~${cadence} ms; trace ${shots.map((s) => `${s.t}:${s.cf}:${s.lum}`).join(' ')}`);
+  const live = shots.filter((x) => x.cf === 0), fading = shots.filter((x) => x.cf > 0 && x.cf < 1), full = shots.filter((x) => x.cf === 1);
+  const first = shots[0], lastLive = live.length ? live[live.length - 1] : null, firstFull = full.length ? full[0] : null;
+  note(`${tag} R: Matthew corridor (ui canvas) mean luminance: rest ${rest0} (screenshot) -> ${shots.length} frames over ${shots[shots.length - 1].t} ms: live ${live.length} frames (${first.lum} at t+${first.t}${lastLive ? ` .. ${lastLive.lum} at t+${lastLive.t}` : ''}), fading ${fading.length} frames, full from t+${firstFull ? firstFull.t : '-'} (${firstFull ? firstFull.lum : '-'}); largest per-frame step ${maxStep.toFixed(2)}/255 at frame ${at} (t+${shots[at] ? shots[at].t : '-'} ms, cap ${shots[at] ? shots[at].cf : '-'}); rest again ${restEnd} (screenshot)`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R.json`), JSON.stringify({ rest0, restEnd, shots }, null, 1));
-  const dip = rest0 - shots[0].lum;
-  if (!(shots[0].cf === 0)) fails.push(`${tag} R: the first capture after the notch was not live (data-cap-fraction ${shots[0].cf})`);
-  if (!(Math.abs(restEnd - rest0) <= 1.5)) fails.push(`${tag} R: the picture did not come back to rest (${rest0} -> ${restEnd})`);
-  if (!(maxStep <= Math.max(2, dip * 0.5))) fails.push(`${tag} R: a step of ${maxStep.toFixed(2)}/255 between consecutive captures is more than half the live dip (${dip.toFixed(2)}): a pop`);
+  const dip = (firstFull ? firstFull.lum : rest0) - (live.length ? live[0].lum : rest0);
+  if (!live.length) fails.push(`${tag} R: no live frame was sampled after the notch`);
+  if (!firstFull) fails.push(`${tag} R: the cap did not come back to full within 700 ms`);
+  if (!(fading.length >= 3)) fails.push(`${tag} R: only ${fading.length} fading frames sampled between live and full: the ease is not visible as a span`);
+  if (!(maxStep <= Math.max(1.5, dip * 0.35))) fails.push(`${tag} R: a per-frame step of ${maxStep.toFixed(2)}/255 is more than a third of the live dip (${dip.toFixed(2)}): a pop`);
   await clickIfPresent(page, 'Reset the view'); await sleep(300);
 }
 
