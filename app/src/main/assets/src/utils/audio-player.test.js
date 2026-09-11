@@ -3265,6 +3265,34 @@ describe('audio-player — resume across the update reload', () => {
     } finally { dropGlobals(); }
   });
 
+  it('getPreciseTime() reads the intended clock BEFORE metadata, and the element\'s live clock after it', async () => {
+    /* The read-along's frame loop pulls getPreciseTime() up to once per frame, and the
+       loop is live from `loading` on. Between a restored start and `loadedmetadata`
+       the element has no position — its currentTime reads 0 — while the seek's intent
+       is already the clock (_seekOnMetadata records it). An element with nothing
+       loaded is a null wearing a number: the frame loop would paint the first
+       sentence and could follow it to the top of the letter for the length of the
+       metadata gap. Six 4 s traces did not catch it (walk r5-r7); a class is closed
+       here, not a measurement answered. After metadata the ELEMENT is the clock again:
+       the store only moves on whole seconds and the wash lands on syllables. */
+    globalThis.Audio = Counting;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick();
+      expect(el() && el().readyState, 'precondition: the element exists and has no metadata yet').toBe(0);
+      expect(el().currentTime, 'precondition: the element has no position yet').toBe(0);
+      expect(AudioPlayer.getState().time, 'the store carries the intent').toBe(41.37);
+      expect(AudioPlayer.getPreciseTime(), 'before metadata the intended clock, not the empty element\'s 0').toBe(41.37);
+      el().readyState = 1; el().duration = 60; el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(41.37);
+      el().readyState = 4; el().currentTime = 43.2;             // playing on: the element is ahead of the store's whole seconds
+      expect(AudioPlayer.getPreciseTime(), 'after metadata the element\'s live clock, never the store').toBe(43.2);
+      expect(AudioPlayer.getState().time, 'control: the store has not moved — the two differ, so the read above chose').toBe(41.37);
+    } finally { dropGlobals(); }
+  });
+
   it('a record for ANOTHER recording, or older than two minutes, is dropped without a play attempt', async () => {
     globalThis.Audio = Counting;
     localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
