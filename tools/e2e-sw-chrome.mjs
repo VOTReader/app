@@ -171,7 +171,10 @@ async function brightestGround(page, boxes, dpr) {
     const grounds = boxes.map((r) => {
       // a pill is a stadium: the strip hugs one LONG side, 3..8 px in, and
       // stays clear of both rounded ends by the pill's half-thickness + 2
-      const w = r.r - r.l, h = r.b - r.t, tall = h > w, end = Math.min(w, h) / 2 + 2;
+      const w = r.r - r.l, h = r.b - r.t, tall = h > w;
+      // a circle (the hide-all button) has no straight side: read an 8 px
+      // band at the apex of its top arc, where the arc drops under half a px
+      const end = Math.abs(w - h) < 4 ? Math.min(w, h) / 2 - 4 : Math.min(w, h) / 2 + 2;
       const x0 = tall ? r.l + 3 : r.l + end, x1 = tall ? r.l + 8 : r.r - end;
       const y0 = tall ? r.t + end : r.t + 3, y1 = tall ? r.b - end : r.t + 8;
       let best = null, bl = -1;
