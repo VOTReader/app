@@ -87,7 +87,7 @@ const note = (m) => console.log('  ' + m);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-console.log(`browser ${await browser.version()}`);
+console.log(`browser ${await browser.version()}  targets at launch: ${(await browser.targets()).filter((t) => t.type() === 'page').length} page(s) (the default context's blank tab; the bench uses its own context)`);
 try {
   const ctx = await browser.createBrowserContext();
   const errors = [];
@@ -175,6 +175,13 @@ try {
 
   // ── RED 1: deploy B; both documents reload; BOTH must toast ──
   console.log('RED 1 — siblings: two controlled documents, one deploy');
+  // EXACTLY TWO documents of the origin, both opened here: a fresh browser context, never a
+  // persistent profile — Chrome restores a persistent profile's previous app tab at launch
+  // (the Verifier's harness carried one all night, 2026-09-11), and a third document would
+  // make "both toast" unreadable. Counted from the context, not assumed.
+  const open = (await ctx.pages()).map((p) => p.url());
+  note(`documents open in the context before the deploy: ${open.length} — ${open.map((u) => u.split('/').pop()).join(', ')}`);
+  if (open.length !== 2) fail(`the bench must hold exactly two documents before the deploy, found ${open.length}`);
   swBump = 'sib' + Date.now().toString(36);
   const l1 = P1.loads, l2 = P2.loads;
   const nav1 = P1.waitForNavigation({ waitUntil: 'load', timeout: 60000 }).then(() => true, () => false);
