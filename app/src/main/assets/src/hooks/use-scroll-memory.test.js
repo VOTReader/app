@@ -463,8 +463,12 @@ describe('useScrollMemory — vot:before-update-reload', () => {
       // Hooks mounted by earlier cases in this file are still listening (no RTL
       // auto-cleanup here); the one under test registered last and answers last.
       expect(flush).toHaveBeenCalled();
-      const patch = flush.mock.calls[flush.mock.calls.length - 1][0];
+      const call = flush.mock.calls[flush.mock.calls.length - 1];
+      const patch = call[0];
       expect(typeof patch).toBe('function');
+      // The reload option is what makes usePersistedState write the union to
+      // sessionStorage as well as IDB — the IDB put alone may never land (its header).
+      expect(call[1], 'the flush is asked to survive the reload').toEqual({ reload: true });
       const union = { tabs: [{ id: 'a', scrollPositions: { other: { y: 5 } } }, { id: 'b', scrollPositions: {} }], activeTabIdx: 0, theme: 'dark' };
       const out = patch(union);
       expect(out.theme).toBe('dark');
@@ -485,5 +489,25 @@ describe('useScrollMemory — vot:before-update-reload', () => {
     scrollTo(640);
     act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
     expect(tab.scrollPositions['letter-alpha'] && tab.scrollPositions['letter-alpha'].y).toBe(640);
+  });
+
+  it('with the tabs overview open the union is still written for the reload — the overview scroll is just not folded in', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ tabsOverviewOpen: true }) });
+    settleRestoreRaf();
+    const flush = vi.fn();
+    /** @type {any} */ (window).__flushPersistState = flush;
+    try {
+      scrollTo(777);                                   // the overview's own scroller moving
+      act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
+      const call = flush.mock.calls[flush.mock.calls.length - 1];
+      expect(call, 'the reload record must be written whatever is on screen').toBeTruthy();
+      expect(call[1]).toEqual({ reload: true });
+      const union = { tabs: [{ id: 'a', scrollPositions: { other: { y: 5 } } }], activeTabIdx: 0 };
+      const out = call[0](union);
+      expect(out.tabs[0].scrollPositions['letter-alpha'], "the overview's scroll never masquerades as the screen position").toBeUndefined();
+      expect(out.tabs[0].scrollPositions.other).toEqual({ y: 5 });
+    } finally {
+      delete /** @type {any} */ (window).__flushPersistState;
+    }
   });
 });

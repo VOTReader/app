@@ -24,6 +24,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { _validateTabState, useSavedState } from './use-saved-state.js';
 import { StateStore } from '../stores/state-store.js';
+import { RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS } from './use-persisted-state.js';
 
 /** Run _validateTabState on a fresh copy of the input and return the result. */
 function validate(/** @type {Record<string, any>} */ input) {
@@ -536,5 +537,51 @@ describe('_validateTabState — 13 coercion rules', () => {
         expect(result.current.tabs[0].scrollPositions).toEqual({ 'wtlb-a': { y: 715 } });
       });
     });
+  });
+});
+
+/* ── the update reload record (2026-09-11) ──
+   usePersistedState writes the union to sessionStorage on the update's reload event
+   (see its header: an IDB put issued one call before location.reload() may never land).
+   This is the READ side of that record: a fresh one wins over the store, is applied
+   through the same validation as any persisted state, and is cleared so a second boot
+   never replays it. The mount write in usePersistedState then makes it durable. */
+describe('useSavedState — the update reload record is read first, applied, and cleared', () => {
+  beforeEach(() => { sessionStorage.clear(); });
+
+  it('a fresh record wins over the store and is consumed', () => {
+    StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'home' }], activeTabIdx: 0, theme: 'dark' });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: {
+      tabs: [{ screen: 'bible-ch', chapterNum: 5, bookId: 'genesis', scrollPositions: { 'genesis-5': { y: 900, pct: 0.3, anchorKey: 'genesis:5:7', anchorOff: 12 } } }],
+      activeTabIdx: 0, theme: 'light',
+    } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen).toBe('bible-ch');
+    expect(result.current.tabs[0].scrollPositions['genesis-5']).toEqual({ y: 900, pct: 0.3, anchorKey: 'genesis:5:7', anchorOff: 12 });
+    expect(result.current.theme).toBe('light');
+    expect(sessionStorage.getItem(RESUME_STATE_KEY), 'consumed on read').toBeNull();
+  });
+
+  it('a record older than the max age is ignored and cleared — the store is the truth again', () => {
+    StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'home' }], activeTabIdx: 0 });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now() - RESUME_STATE_MAX_AGE_MS - 1, state: { tabs: [{ screen: 'bible-ch', chapterNum: 5, bookId: 'genesis' }] } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen).toBe('home');
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+  });
+
+  it('the record goes through the same validation as the store (a chapter tab with no chapterNum is coerced home)', () => {
+    StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'home' }], activeTabIdx: 0 });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: { tabs: [{ screen: 'bible-ch', bookId: 'genesis' }, { screen: 'matthew-ch', chapterNum: 3 }], activeTabIdx: 1 } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen, 'Rule 1 applies to the record too').toBe('home');
+    expect(result.current.tabs[1].screen).toBe('matthew-ch');
+    expect(result.current.activeTabIdx).toBe(1);
+  });
+
+  it('CONTROL: with no record, the store is what comes back', () => {
+    StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'matthew-ch', chapterNum: 3 }], activeTabIdx: 0 });
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen).toBe('matthew-ch');
   });
 });
