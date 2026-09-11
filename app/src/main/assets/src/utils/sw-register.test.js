@@ -67,21 +67,20 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
   /* INVISIBLE-RELOAD: past the boot window with the app in the foreground, the
      user is mid-letter — reloading there yanks them out. Wait for the next
      background instead; they come back to the new build. */
-  it('defers a mid-session VISIBLE reload until the app is backgrounded', () => {
+  it('reloads a mid-session VISIBLE page immediately — wherever the reader is (Corbin, 2026-09-10)', () => {
+    // "toast and update should happen no matter what screen user happens to be
+    // on." The visible-mid-session deferral (wait for backgrounding, or offer a
+    // Reload toast) is gone; the app's own state restore across the reload is
+    // the safety. No toast is offered and no flag is left for the lazy loader.
     vi.useFakeTimers();
     try {
       setVisibility('visible');
       registerServiceWorker();
-      vi.advanceTimersByTime(60_000);         // well past BOOT_GRACE_MS
+      vi.advanceTimersByTime(60_000);         // well past the old boot window
       controllerChangeHandler();
-      expect(reloadSpy).not.toHaveBeenCalled();
-      // still visible → still no reload
-      document.dispatchEvent(new Event('visibilitychange'));
-      expect(reloadSpy).not.toHaveBeenCalled();
-      // user leaves the app → reload now, unseen
-      setVisibility('hidden');
-      document.dispatchEvent(new Event('visibilitychange'));
       expect(reloadSpy).toHaveBeenCalledTimes(1);
+      expect(window.__votSwTookOver).toBeUndefined();
+      expect(document.getElementById('vot-toast-update')).toBeNull();
     } finally {
       vi.useRealTimers();
     }
