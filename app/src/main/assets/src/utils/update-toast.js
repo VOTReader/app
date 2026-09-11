@@ -67,6 +67,12 @@ function showListeningToast(onTap) {
   showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_LISTEN_TEXT, durationMs: UPDATED_TOAST_LISTEN_MS });
   const el = document.getElementById(UPDATED_TOAST_ID);
   if (!el) return;
+  // .vot-toast is pointer-events:none (app.css): a toast is not a target. This one
+  // is, so it opts in with .vot-toast-action — added HERE, because showToast sets
+  // className only when it creates the element and the announcer may have
+  // created this one already. Without it the tap falls through to whatever is
+  // under the toast (the walk's click did, under the phone's autoplay policy).
+  el.classList.add('vot-toast-action');
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
   const tap = () => { hideToast(UPDATED_TOAST_ID); onTap(); };
