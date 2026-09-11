@@ -6982,11 +6982,15 @@
     .sw-key-g6 { background: #66bfd8; } .sw-key-g7 { background: #6c98e0; } .sw-key-g8 { background: #a480e2; }
     .sw-key-g9 { background: #cd67cf; }
 
+    /* NO POSITION AND NO OFFSET: the CC-BY line is the control strip's last
+       row. It used to be absolutely placed with a `bottom` that had to be kept
+       clear of the strip by hand, and the hand-measured 198px went stale when
+       the strip grew a row — so the attribution sat behind the buttons on a
+       320px phone, present and unreadable. A flex row cannot go stale. */
     .sw-credit {
-      position: absolute; z-index: 4; right: 14px;
-      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      flex-basis: 100%; margin: 2px 2px 0; text-align: right;
       font-size: var(--fsc-10); color: var(--cream-muted); opacity: 0.75;
-      letter-spacing: 0.04em; pointer-events: none;
+      letter-spacing: 0.04em;
     }
     .sw-live {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -7000,7 +7004,6 @@
     .sw-root.sw-narrow .sw-controls { max-width: 100%; left: 14px; right: auto; justify-content: flex-start;
       top: auto; bottom: calc(30px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
     .sw-root.sw-narrow .sw-legend { display: none; }
-    .sw-root.sw-narrow .sw-credit { left: 14px; right: auto; }
     @media (prefers-reduced-motion: reduce) {
       .sw-btn, .sw-seg-btn { transition: none; }
     }
@@ -7069,11 +7072,6 @@
     .sw-empty-close:active { background: var(--bg2); }
 
     .sw-root.sw-narrow .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
-    .sw-root.sw-narrow .sw-credit { bottom: calc(4px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-10); }
-
-    /* Above the control strip, not behind it — CC-BY attribution has to stay
-       legible, not merely present. */
-    .sw-root.sw-narrow .sw-credit { bottom: calc(198px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
 
     /* A rotated phone still has a landscape-sized root, but the physical
        viewport is tight enough that the last control otherwise falls onto a
