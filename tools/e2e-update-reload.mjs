@@ -12,7 +12,7 @@
  * and a recording playing after a real click, and fires `controllerchange` on
  * navigator.serviceWorker — the event the new worker's claim() fires — so the REAL
  * doReload path runs: takeover flag, the `vot:before-update-reload` write, location.reload().
- * Two arms, in one browser context:
+ * Three arms, in one browser context:
  *
  *   A  SAME FRAME. The scroll and the takeover happen in one tick with no idle wait, so
  *      nothing debounced can have landed: what comes back is what the synchronous write
@@ -26,6 +26,10 @@
  *      letter and scroll, "VOTReader was just updated." on screen, and the recording
  *      either PLAYING at its clock or the toast reading "… Tap to continue listening."
  *      whose one tap resumes it there. No "Reload" button is ever rendered.
+ *   C  A CLOSE WITH NO RELOAD EVENT (audio-clock-close-gap-1). The tab is closed mid-listen at
+ *      a moment the periodic snapshot is provably >= 2.5 s stale, and a new tab in the same
+ *      profile boots: the bar comes back on the same recording within 1 s of the clock read
+ *      just before the close, PAUSED (a close is not an update; no play() is attempted).
  *
  * Before either arm, the FRESH profile's two boots must show no update toast at all: boot 1
  * is uncontrolled (the worker is installing) and boot 2 is the first controlled boot of a
@@ -595,6 +599,40 @@ try {
       const p1 = await readPage(); await sleep(1500); const p2 = await readPage();
       if (p2.t <= p1.t) fail('B the clock is not advancing after the resume');
       else note(`B advancing: ${p1.t.toFixed(1)} s → ${p2.t.toFixed(1)} s`);
+    }
+  }
+  // ════════ ARM C — a CLOSE with no reload event ════════
+  // The tab closed mid-listen (or the WebView destroyed): nothing fires vot:before-update-reload,
+  // so the next boot finds whatever the durable snapshot held. The close is taken at a moment the
+  // periodic snapshot is provably STALE (>= 2.5 s behind the live clock — it recurs every 5 s of
+  // playback), so a tree without a flush on pagehide cannot pass by closing right after a snapshot.
+  // Same browser context: the profile's localStorage survives a tab close; the reopened page's
+  // restored bar is read paused, before any tap, and must not have started on its own.
+  if (withAudio) {
+    const Cpre = await readPage();
+    if (Cpre.status !== 'playing') fail(`C precondition: the reader is not playing before the close (${Cpre.status})`);
+    else {
+      const stale = await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
+        return !!s && window.AudioPlayer.getPreciseTime() - Number(s.time) >= 2.5;
+      }, { timeout: 15000 }).then(() => true, () => false);
+      const C0 = await readPage();
+      const snapBefore = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('vot-audio-pos') || 'null'); return s ? Number(s.time) : null; });
+      note(`C before: playing key ${C0.key} at ${C0.t.toFixed(3)} s; the periodic snapshot holds ${snapBefore} s`);
+      if (!stale) fail('C precondition: the periodic snapshot never read >= 2.5 s stale within 15 s — the cadence changed, or the clock is not advancing');
+      const closedAt = Date.now();
+      await page.close();
+      const page2 = await ctx.newPage();
+      await page2.goto(BASE, { waitUntil: 'load' });
+      await page2.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
+      await sleep(1500);
+      const C1 = await page2.evaluate(() => { const P = window.AudioPlayer; const s = P && P.getState(); const tr = s && s.queue[s.qi] || {}; return { key: tr.key || null, status: s ? s.status : null, storeT: s ? s.time : null }; });
+      note(`C after the close + reopen: ${C1.status} key ${C1.key} store=${C1.storeT} (reopened ${Date.now() - closedAt} ms after the close)`);
+      if (C1.key !== C0.key) fail(`C the bar came back with ${JSON.stringify(C1.key)}, the reader was listening to ${JSON.stringify(C0.key)}`);
+      else if (C1.storeT === null || Math.abs(C1.storeT - C0.t) > 1) fail(`C the bar came back at ${C1.storeT} s, ${(C0.t - (C1.storeT || 0)).toFixed(1)} s behind the ${C0.t.toFixed(3)} s read just before the close (tolerance 1 s; the periodic snapshot held ${snapBefore} s)`);
+      else note(`C clock: the bar came back at ${C1.storeT} s against ${C0.t.toFixed(3)} s read just before the close — ${((C1.storeT - C0.t) * 1000).toFixed(0)} ms, within 1 s`);
+      if (C1.status === 'playing') fail('C the bar came back PLAYING after a plain reopen — a close is not an update; nothing asked for sound');
+      await page2.close().catch(() => {});
     }
   }
   if (errors.length) fail(`page errors: ${errors.slice(0, 3).join(' | ')}`);
