@@ -121,8 +121,11 @@ describe('My Web r2 — G2 a thread is a line with endpoints on its books', () =
       }
       return best;
     };
-    let prev = yAt(980);
-    for (const far of [990, 1000, 1010, 1020, 1040]) {
+    // 2 px steps from on screen (960) past the edge (1024) and past the point
+    // where the reach caps (~1170 for this thread): every step moves the
+    // crossing by less than 3 px (the plain cubic's own slope is 0.62 px/px)
+    let prev = yAt(960);
+    for (let far = 962; far <= 1400; far += 2) {
       const y = yAt(far);
       expect(y).not.toBeNull();
       expect(Math.abs(y - prev), 'far ' + far).toBeLessThan(3);

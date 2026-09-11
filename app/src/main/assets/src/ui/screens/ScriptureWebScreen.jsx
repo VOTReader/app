@@ -39,7 +39,7 @@ import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
 import {
-  drawPersonalWeb, pickPersonalLinks, pickUnderlayLinks,
+  drawPersonalWeb, pickPersonalLinks, pickUnderlayLinks, railFrame, segmentSpan,
 } from '../scripture-web/rail-renderer.js';
 
 /**
@@ -68,6 +68,10 @@ const SHORT_STUDY = {
  * 247 CSS px per verse on a 1920 px desktop, 5.6x into a void, and about
  * right on a 375 px phone only by accident.
  */
+/** My Web's colour scheme for the capture set (canon | amber | kind); one
+ * value per session, read once, so a capture tool can set it before boot. */
+const MYWEB_SCHEME = (() => { try { return sessionStorage.getItem('vot-sw-myweb-scheme') || 'canon'; } catch (_e) { return 'canon'; } })();
+
 const maxZoomOf = (graph, v) => (graph
   ? maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1))
   : 4000);
@@ -211,6 +215,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── everything below here is per-frame state; deliberately NOT React ──
   const camRef = React.useRef(null);
+  /* r2: the Volumes rail has a camera of its own, so the top and bottom halves
+     zoom and pan independently (Corbin: "zoom into Rebuke [top] and on the
+     bottom half zoom into Isaiah, both at once"). Seeded when the personal
+     graph is built; clamped on every personal frame. */
+  const camVRef = React.useRef(null);
+  const lastRailRef = React.useRef('bottom');
+  const [railZoom, setRailZoom] = React.useState({ top: false, bottom: false });
+  const railZoomRef = React.useRef(railZoom);
   const rendererRef = React.useRef(null);
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
@@ -390,9 +402,33 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // votRailX). Without verseTotal every top-rail x is NaN, by design.
       verseTotal: cam.total,
       verseX: (verse) => verseToX(cam, v.W, verse),
+      // r2: the Volumes rail through ITS camera when one exists
+      votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
+      scheme: MYWEB_SCHEME,
       showUnderlay,
     };
   }, [frame, showUnderlay]);
+
+  /** The ceiling for whichever camera is asked about: the Bible's is a
+   * relation on the canon (44 CSS px a verse); the Volumes' the same
+   * relation on its own rail. */
+  const zoomCapFor = React.useCallback((c) => {
+    const v = viewRef.current;
+    if (c && c === camVRef.current) return maxZoomFor(c.total, (v.W || 1) / (v.DPR || 1));
+    return maxZoomOf(graph, v);
+  }, [graph]);
+
+  /** The camera under a device-px y: above the gap's midline the Volumes
+   * rail, below it the Bible rail; the canon web has one camera for all. */
+  const camFor = React.useCallback((yDevice) => {
+    const cv = camVRef.current;
+    if (modeRef.current !== 'personal' || !cv) return camRef.current;
+    const v = viewRef.current;
+    const rails = railFrame({ H: v.H, DPR: v.DPR }, frame().base);
+    const top = yDevice < (rails.topY + rails.bottomY) / 2;
+    lastRailRef.current = top ? 'top' : 'bottom';
+    return top ? cv : camRef.current;
+  }, [frame]);
 
   // ── render ──────────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -404,6 +440,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
        scripture-web walk branch carries, so the two merge as one): a walk that
        reads pixels after "three zoom steps" must first know the steps took. */
     if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+    const camV = mode === 'personal' ? camVRef.current : null;
+    if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
+    if (wrapRef.current && camV) wrapRef.current.setAttribute('data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
     const chrome = chromeRef.current;
     const base = viewFor();
     /* THE ESSENTIAL AUTO-SWITCH, evaluated here rather than in a zoom handler
@@ -450,9 +489,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       if (ctx) {
         ctx.clearRect(0, 0, v.W, v.H);
         const p = personalRef.current;
-        drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(railOpts(), {
+        const ro = railOpts();
+        drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(ro, {
           hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc,
         }));
+        publishRails(ro, p, g, cam, camV, v);
+        // the per-rail reset pills show only while that rail is zoomed;
+        // setState from the frame loop runs only when the answer changes
+        const rz = { top: !!camV && camV.ppv > fitPPV(camV, v.W) * 1.02, bottom: cam.ppv > fitPPV(cam, v.W) * 1.02 };
+        if (rz.top !== railZoomRef.current.top || rz.bottom !== railZoomRef.current.bottom) { railZoomRef.current = rz; setRailZoom(rz); }
         // The rail stays under the hidden chrome: it is the legend of the web,
         // not a control (Corbin, 2026-09-11).
         drawRulerOnly(ctx, g, cam, base, v, chrome);
@@ -483,7 +528,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts]);
+  }, [graph, density, densityPinned, baseDensity, viewFor, mode, railOpts, zoomCapFor]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -573,6 +618,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!graph || mode !== 'personal') return;
     const built = buildPersonal(graph);
     personalRef.current = built;
+    camVRef.current = built && built.votRail && built.votRail.total > 0 ? createCamera(built.votRail.total) : null;
     setPersonalCount(built && built.graph ? built.graph.count : 0);
     schedule();
     // The studies corpus is lazy; when it lands after the first build, the
@@ -590,11 +636,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const el = wrapRef.current;
     if (!el || !graph) return;
     return attachWebGestures(el, {
-      loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current,
+      loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
-      schedule, maxZoom: () => maxZoomOf(graph, viewRef.current), clampCamera, zoomAbout, xToVerse,
+      schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
     });
-  }, [graph, schedule, loc]);
+  }, [graph, schedule, loc, camFor, zoomCapFor]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
@@ -784,16 +830,28 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
 
+  /** Reset one rail's camera to fit (r2: each rail has its own). */
+  const resetRail = React.useCallback((which) => {
+    const v = viewRef.current;
+    const c = which === 'top' ? camVRef.current : camRef.current;
+    if (!c) return;
+    c.ppv = fitPPV(c, v.W);
+    c.x = c.total / 2;
+    clampCamera(c, v.W, zoomCapFor(c));
+    schedule();
+  }, [schedule, zoomCapFor]);
+
   const resetView = React.useCallback(() => {
     const cam = camRef.current, v = viewRef.current;
     if (!cam) return;
     cam.ppv = fitPPV(cam, v.W);
     cam.x = cam.total / 2;
     clampCamera(cam, v.W, maxZoomOf(graph, v));
+    if (camVRef.current) resetRail('top');
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [graph, schedule]);
+  }, [graph, schedule, resetRail]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -806,10 +864,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
-    const cam = camRef.current, v = viewRef.current;
+    const v = viewRef.current;
+    // r2: the keys drive the rail the pointer last touched (the Bible rail
+    // until a gesture says otherwise); Reset (0) resets both
+    const onTop = modeRef.current === 'personal' && lastRailRef.current === 'top' && camVRef.current;
+    const cam = onTop ? camVRef.current : camRef.current;
     if (!cam || !v.W) return;
     const step = (v.W / cam.ppv) * 0.12;
-    const ceiling = maxZoomOf(graph, v);
+    const ceiling = zoomCapFor(cam);
     let atCeiling = false;
     if (e.key === 'ArrowLeft') { cam.x -= step; }
     else if (e.key === 'ArrowRight') { cam.x += step; }
@@ -842,7 +904,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
-      emptyShown, dismissEmpty]);
+      emptyShown, dismissEmpty, zoomCapFor]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
@@ -998,6 +1060,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
+      {mode === 'personal' && railZoom.top ? (
+        <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
+          onClick={() => resetRail('top')}>Reset Volumes</button>
+      ) : null}
+      {mode === 'personal' && railZoom.bottom ? (
+        <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-bottom" aria-label="Reset the Bible rail"
+          onClick={() => resetRail('bottom')}>Reset Bible</button>
+      ) : null}
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
       <div id="sw-a11y-help" className="sw-sr-only">
         Drag to move through scripture. Pinch or scroll to zoom, or use the plus and minus keys.
@@ -1067,6 +1137,44 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
 
   // book names + separators
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
+}
+
+/**
+ * r2: what the rails show, published for the browser walk (data-rails on the
+ * root): every visible Volumes band and every visible Bible book with its
+ * on-screen span in CSS px, and where the two rails sit. A walk that zooms
+ * the top rail to Rebuke and the bottom to Isaiah reads this to know the
+ * zoom took before it reads a pixel.
+ */
+function publishRails(ro, p, g, cam, camV, v) {
+  const el = /** @type {HTMLElement|null} */ (ro && ro.width ? document.querySelector('.sw-root') : null);
+  if (!el || !g) return;
+  const rails = railFrame({ H: v.H, DPR: v.DPR }, ro.base);
+  const top = [];
+  if (p && p.votRail && p.votRail.segments) {
+    for (const seg of p.votRail.segments) {
+      if (!seg.count) continue;
+      const span = segmentSpan(seg, ro);
+      if (span) top.push({ label: (seg.short || seg.label), x0: +(span.x0 / v.DPR).toFixed(1), x1: +(span.x1 / v.DPR).toFixed(1) });
+    }
+  }
+  const bottom = [];
+  const span = [];
+  for (const c of g.chapters) {
+    if (!span[c[0]]) span[c[0]] = [c[2], c[2] + c[3]];
+    span[c[0]][1] = c[2] + c[3];
+  }
+  for (let bi = 0; bi < span.length; bi++) {
+    const x0 = verseToX(cam, v.W, span[bi][0]), x1 = verseToX(cam, v.W, span[bi][1]);
+    if (x1 < 0 || x0 > v.W) continue;
+    bottom.push({ label: g.books[bi].title, x0: +(x0 / v.DPR).toFixed(1), x1: +(x1 / v.DPR).toFixed(1) });
+  }
+  el.setAttribute('data-rails', JSON.stringify({
+    topY: +(rails.topY / v.DPR).toFixed(1), bottomY: +(rails.bottomY / v.DPR).toFixed(1),
+    top, bottom, camV: camV ? { x: camV.x, ppv: camV.ppv, total: camV.total } : null, cam: { x: cam.x, ppv: cam.ppv, total: cam.total },
+  }));
+  el.style.setProperty('--sw-rail-top', (rails.topY / v.DPR).toFixed(0) + 'px');
+  el.style.setProperty('--sw-rail-bottom', (rails.bottomY / v.DPR).toFixed(0) + 'px');
 }
 
 /**
@@ -1375,6 +1483,19 @@ function legendFor(mode) {
   // kinds over the Volumes' own citations in cream (rail-renderer's ink law).
   // The distance ramp under that canvas was the Scripture Web's legend lying
   // about a screen it does not describe (design-perf, 2026-09-10).
+  if (mode === 'personal' && MYWEB_SCHEME !== 'kind') {
+    // r2: the Volumes' citations wear the canon's ramp by where they land in
+    // scripture (Genesis magenta, Revelation green: the same colour names the
+    // same book on both screens); the reader's own links are gold.
+    const ramp = MYWEB_SCHEME === 'amber'
+      ? { background: 'linear-gradient(to right, #9e4d1a, #cc8029, #e8bf4f, #f5e6b8)' }
+      : undefined;
+    return [
+      <span className="sw-key" key="links"><i className="sw-key-dot" style={{ background: 'rgb(232,192,80)' }} />your links</span>,
+      <span className="sw-key" key="ramp"><span>Genesis</span><i className="sw-key-gradient" style={ramp} /><span>Revelation</span> &mdash; the Volumes&rsquo; citations</span>,
+      histKey,
+    ];
+  }
   if (mode === 'personal') {
     return LINK_KIND_NAMES.map((label, i) => (
       <span className="sw-key" key={label}>
