@@ -91,7 +91,14 @@ const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.
    passes on that GPU with no environment. MYWEB_R5_CEILINGS (JSON) is for
    trial runs only and is announced loudly in the log. */
 const R5_CEILINGS = process.env.MYWEB_R5_CEILINGS ? JSON.parse(process.env.MYWEB_R5_CEILINGS) : {
-  // none registered yet: the Verifier fills this from three runs at the landing tip
+  // Registered by the Verifier 2026-09-11 01:08-01:18 at 41e727eb from THREE identical runs of
+  // this tool (--perf, no env var, gate-lock held for the whole span, nvidia-smi 0-1 % / 1.2 GB
+  // before each): every state read min-of-two p50 4.2 / 4.2 ms in all three runs (n ~360 frames
+  // per run; phone p95 4.3, desktop p95 up to 12.5 with the half-res layer) — the rAF floor of
+  // this display. Ceiling = max of the three, zero margin, so a read above the floor is a
+  // finding. Chrome/152.0.7977.54. Log: sessions/2026-09-06-orchestrator/verifier-gate-logs/
+  // myweb-r5-41e727eb/. A different renderer string is NOT this number: register it, do not reuse.
+  'NVIDIA GeForce RTX 5080': { overview: 4.2, phoneLand: 4.2, phone: 4.2, desktop: 4.2 },
 };
 let R5 = null;  // the registered entry for this run's renderer, or null
 const R5_MIN_CLEARS = num('MYWEB_R5_MIN_CLEARS', 0.8);   // ui-canvas clearRect per opportunity (min(moves, frames)); main and the branch read ~1.0
