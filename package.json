@@ -35,6 +35,7 @@
     "check:half-recipe": "node tools/check-half-recipe.mjs",
     "check:apk-assets": "node tools/check-apk-assets.js",
     "check:type-scale": "node tools/check-type-scale.js",
+    "check:bridge-crosslist": "node tools/check-bridge-crosslist.js",
     "check:css-tokens": "node tools/check-css-tokens.js",
     "check:bundle-budget": "node tools/check-bundle-budget.js",
     "check:runtime-assets": "node tools/list-runtime-src-assets.js --check",
