@@ -23,7 +23,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 import {
-  CORPUS_FILES, buildCollections, blockDomainText, sentenceSpans,
+  CORPUS_FILES, STUDY_FILE, buildCollections, blockDomainText, sentenceSpans,
   clauseSplit, formatAFragments, CLAUSE_SPLIT_TOKENS,
 } from './audio-fragments-lib.mjs';
 
@@ -186,5 +186,42 @@ describe('THE INVARIANT — every corpus fragment is one check-audio-sync would 
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('the Bible/Letter Studies are a Format-A collection, keyed study:<chapterId>', () => {
+  // Written RED (2026-09-11): on the tree before this landed, buildCollections
+  // had no study shape, so a study timeline read NO-SUCH-ITEM in
+  // check-audio-sync and the extractor never emitted a study: key — the six
+  // Purity recordings shipped in AUDIO_MANIFEST (c48) with nowhere to land.
+  const load = (files) => {
+    const ctx = {};
+    for (const f of files) runInNewContext(readFileSync(resolve(DATA, f), 'utf8'), ctx, { filename: f });
+    return buildCollections(ctx);
+  };
+
+  it('is absent unless STUDY_FILE was evaluated (a caller sees no phantom collection)', () => {
+    expect(load(CORPUS_FILES).A.study).toBeUndefined();
+  });
+
+  it('holds every study chapter that renders blocks, by an id unique across studies', () => {
+    const { A } = load([...CORPUS_FILES, STUDY_FILE]);
+    expect(Array.isArray(A.study)).toBe(true);
+    const ids = A.study.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (let n = 1; n <= 6; n++) expect(ids).toContain(`purity-ch${n}`);
+    // Every study chapter is a Format-A item: blocks, never paragraphs.
+    expect(A.study.every((c) => Array.isArray(c.blocks) && !c.paragraphs)).toBe(true);
+  });
+
+  it('extracts clause fragments from a Purity chapter that the gate would accept', () => {
+    const { A } = load([...CORPUS_FILES, STUDY_FILE]);
+    const ch1 = A.study.find((c) => c.id === 'purity-ch1');
+    const frags = formatAFragments(ch1);
+    expect(frags.length).toBeGreaterThan(20);
+    for (const f of frags) {
+      const dom = blockDomainText(ch1.blocks[f.bi]);
+      expect(dom && dom.text.slice(f.cs, f.ce)).toBe(f.text);
+    }
   });
 });
