@@ -136,7 +136,11 @@ export function attachWebGestures(el, deps) {
     // dialog's padding, or a chooser row (scripture-web-2/8). Returning
     // WITHOUT preventDefault is the point: it lets the browser's own
     // scroll/selection run instead of substituting our own.
-    if (isChromeTarget(e.target)) return;
+    // A per-rail reset pill sits INSIDE the gap at the rail's left end,
+    // exactly where a reader wheels to zoom the leftmost book (Vol I, Genesis):
+    // it has no scroll of its own, so it declares the wheel passes through it
+    // (data-wheel-through) and the rail beneath zooms. Its taps stay its own.
+    if (isChromeTarget(e.target) && !(e.target.closest && e.target.closest('[data-wheel-through]'))) return;
     e.preventDefault();
     const pt = loc(e), W = view().W;
     const c = camAt(pt.y);
