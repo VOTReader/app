@@ -6881,28 +6881,6 @@
     }
     .sw-goto-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
     .sw-goto-help { margin-top: 8px; color: var(--cream-muted); font-size: var(--fsc-11); }
-    /* BELOW THE TOPBAR AND UNDER IT, because it was over the one control that
-       gets a reader off this screen. At z-index 20 and top:14px the note is
-       ~292px wide on a 320px frame and covered the Back button outright: a
-       sweep of the button's own 44x44 box found 4 reachable points out of 121,
-       all in its leftmost column. The note is a SIBLING of .sw-root, which has
-       no z-index of its own, so 3 really does paint under the topbar's 4 — and
-       the rotated case cannot arise, because `orientationHint` is only ever set
-       by showPortraitFallback(), which clears `rotated` in the same breath.
-
-       `top` is the note's own measured position when the ResizeObserver has
-       reported the topbar's box, and the topbar's FLOOR before that — never a
-       constant, because a constant is what went stale in .sw-credit. */
-    .sw-orientation-note {
-      position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
-      top: calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 10px);
-      display: flex; align-items: center; gap: 10px; max-width: calc(100% - 28px);
-      padding: 9px 12px; background: var(--bg3); border: 1px solid var(--gold-border);
-      border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-      color: var(--cream-dim); font-size: var(--fsc-11);
-    }
-    .sw-orientation-note strong { color: var(--gold-bright); font-family: var(--font-cinzel); letter-spacing: 0.08em; text-transform: uppercase; }
-    .sw-orientation-note span { color: var(--cream-muted); }
 
     .sw-loading, .sw-fallback {
       position: absolute; inset: 0; z-index: 5;
