@@ -249,6 +249,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
+  const ctxBoxRef = React.useRef(null);
   /* The orientation note's top, measured off the topbar's own box. Null until
      the first measurement, which is exactly when the CSS floor applies — and
      the floor is the SMALLEST box the topbar can have, so the note is already
@@ -269,12 +270,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
      too low rather than over the Back button. */
   const [noteTop, setNoteTop] = React.useState(/** @type {string|null} */ (null));
   React.useEffect(() => {
-    const el = topbarRef.current;
-    if (!el || typeof ResizeObserver !== 'function') return undefined;
-    const measure = () => setNoteTop(Math.round(el.getBoundingClientRect().bottom + 10) + 'px');
+    /* EVERYTHING ABOVE IT, not only the topbar. Placing the note at the
+       topbar's bottom + 10 put it at y 82, squarely on `.sw-context` at
+       y 76..159 — the first version of this fix traded a card over the Back
+       button for a card over the location readout. Caught by the gate on its
+       own fix, in one run, which is the only reason it is not shipping. */
+    const above = [topbarRef.current, ctxBoxRef.current].filter(Boolean);
+    if (!above.length || typeof ResizeObserver !== 'function') return undefined;
+    const measure = () => setNoteTop(
+      Math.round(above.reduce((m, el) => Math.max(m, el.getBoundingClientRect().bottom), 0) + 10) + 'px'
+    );
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    above.forEach((el) => ro.observe(el));
     return () => ro.disconnect();
   }, [rotated, orientationHint]);
   const contextRef = React.useRef(null);
@@ -1060,7 +1068,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       </div>
 
-      <div className="sw-context" aria-label="Current Scripture Web location">
+      <div className="sw-context" ref={ctxBoxRef} aria-label="Current Scripture Web location">
         <span className="sw-context-eyebrow">Viewing</span>
         <strong ref={contextRef}>The whole canon</strong>
         <span id="sw-context-copy" className="sw-context-range" ref={rangeRef} />
