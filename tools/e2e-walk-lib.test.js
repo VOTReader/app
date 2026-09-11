@@ -10,7 +10,7 @@
    Pure helpers, fake clock; the walk itself imports them. */
 
 import { describe, it, expect } from 'vitest';
-import { settleRead, classifyRestoredPages } from './e2e-walk-lib.mjs';
+import { settleRead, classifyRestoredPages, settleLine } from './e2e-walk-lib.mjs';
 
 /** A fake clock: `sleep` advances it; `now` reads it. */
 function clock() {
@@ -85,5 +85,16 @@ describe('classifyRestoredPages — what a persistent profile brought back at re
     expect(r.appTabs).toBe(1);
     expect(r.appUrls).toEqual(['http://127.0.0.1:4321/?tab=2']);
     expect(r.others).toEqual(['http://127.0.0.1:9999/index.html', 'not a url']);
+  });
+});
+
+describe('settleLine — the report sentence carries the moves, not only the verdict', () => {
+  it('names the settled position, the still window and every move', () => {
+    const line = settleLine({ y: 698, settled: true, waitedMs: 336, stillMs: 256, samples: [{ t: 0, y: 900 }, { t: 16, y: 887 }, { t: 80, y: 698 }] });
+    expect(line).toBe('still at 698 for 256 ms, read at +336 ms after moving 2x (900 -> 887 -> 698)');
+  });
+  it('says NOT still when the deadline won', () => {
+    const line = settleLine({ y: 41, settled: false, waitedMs: 1008, stillMs: 0, samples: [{ t: 0, y: 1 }, { t: 16, y: 2 }] });
+    expect(line.startsWith('NOT still: 41 at +1008 ms')).toBe(true);
   });
 });
