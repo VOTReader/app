@@ -369,3 +369,43 @@ describe('app.css — the My Web notice clears the control strip', () => {
     expect(close).toContain('height: 44px');
   });
 });
+
+/* ── sw-chrome-fit (design-perf, 2026-09-10) ──────────────────────────────
+   Corbin's Pixel, one minute after the trim went live: the right-anchored pill
+   cluster, the CC-BY credit and the hide-all button cut off by the glass in the
+   CSS-rotated landscape. `.sw-root.sw-rotated { width: 100vh }` sizes the
+   rotated root's long side from the LARGE viewport on mobile Chrome (URL bar
+   hidden), taller than the visible one while the bar shows. Headless Chrome
+   has no browser controls, so the cut cannot be produced by a walk here
+   (tools/e2e-sw-chrome.mjs says why); what is pinned is the LAW: the dynamic
+   unit sizes the root, with the old unit on the line before it as the
+   fallback for engines without it. */
+describe('app.css — the rotated Scripture Web root is sized by the dynamic viewport', () => {
+  const block = () => ruleBlock(CSS, '.sw-root.sw-rotated');
+  it('the long side is 100dvh, declared after a 100vh fallback', () => {
+    const b = block();
+    expect(b, 'no .sw-root.sw-rotated rule').toBeTruthy();
+    const widths = [...b.matchAll(/width\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(widths, 'the rotated root has no 100dvh width; the URL bar cuts the cluster off the glass').toContain('100dvh');
+    expect(widths.indexOf('100vh'), 'the 100vh fallback must come BEFORE 100dvh or it overrides it').toBeLessThan(widths.indexOf('100dvh'));
+  });
+  it('the short side is 100dvw, declared after a 100vw fallback', () => {
+    const heights = [...block().matchAll(/height\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(heights).toContain('100dvw');
+    expect(heights.indexOf('100vw')).toBeLessThan(heights.indexOf('100dvw'));
+  });
+});
+
+describe('app.css — one pill grammar in the Scripture Web strip', () => {
+  it('the density select paints like every other pill, not a solid box', () => {
+    // The phone showed FAMOUS in solid --bg3 beside see-through pills. One
+    // resting fill for .sw-btn, .sw-seg and .sw-select; the active fill is
+    // .is-on's alone.
+    const btn = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-btn') || '');
+    const sel = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-select') || '');
+    const seg = /background\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-seg') || '');
+    expect(btn && sel && seg, 'a pill rule has no background').toBeTruthy();
+    expect(sel[1].trim()).toBe(btn[1].trim());
+    expect(seg[1].trim()).toBe(btn[1].trim());
+  });
+});
