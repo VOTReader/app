@@ -87,9 +87,10 @@
  *   the same output, and a renamed selector shrinks the check set silently.
  *   Zero pairs or zero hits is a FAILURE: an arm that checked nothing has not
  *   run, whatever colour it prints.
- *     2e  the portrait hint, WHEN IT IS UP, sits below the LOWEST chrome above
- *         it — topbar and location readout both — and not far below it — the gap is printed either way, and "the hint is not up at
- *         this frame" is reported as its own answer rather than as a pass
+ *     2e  RETIRED 2026-09-10: it placed the portrait hint, and nobox deleted the
+ *         hint (the screen rotates itself; nothing asks the reader to turn)
+ *     2g  the hide-all button hides the topbar, the strip and the legend, stays
+ *         hittable itself, and shows them again — checked once per frame
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — against a REGISTERED PER-FRAME FLOOR, measured rather than
  *         chosen, with no tolerance band. Chrome that stops overlapping itself
@@ -171,18 +172,23 @@ const num = (name, dflt) => {
 const FRAMES = [{ w: 320, h: 640 }, { w: 426, h: 952 }];
 const TEXT_SCALES = [1, 1.8];
 const DPR = num('SWWEB_DPR', 2);
-const ZOOM_STEP = num('SWWEB_ZOOM_STEP', 1.8);        // must match changeZoom()'s factor
+/* 1.6 is the +/- KEY's factor (ScriptureWebScreen onKeyDown -> zoomAbout(..., 1.6, ...)).
+   The ladder clicked the zoom buttons at 1.8 until Corbin's trim deleted them
+   (2026-09-10); pinch, wheel and the keys are the routes that remain, and the
+   keys are the one a driver can step exactly. */
+const ZOOM_STEP = num('SWWEB_ZOOM_STEP', 1.6);        // must match onKeyDown's +/- factor
 const MAX_ZOOM_STEPS = num('SWWEB_MAX_ZOOM_STEPS', 24);
 const SETTLE_MS = num('SWWEB_SETTLE_MS', 6000);
 const NAV_MS = num('SWWEB_NAV_MS', 30000);
 const PAN_MS = num('SWWEB_PAN_MS', 1800);
-const CHROME = ['.sw-topbar', '.sw-controls', '.sw-context', '.sw-legend', '.sw-credit'];
-/* CONDITIONAL chrome: checked when it is up, never failed for being absent. The
-   portrait hint only renders after `screen.orientation.lock('landscape')` is
-   refused, so "missing" is its ordinary state and the required list's
-   rename-detection would fire on it every run. It belongs in the overlap set
-   because it is the card that covered the Back button. */
-const CHROME_WHEN_SHOWN = ['.sw-orientation-note'];
+/* `.sw-context` (the location card) and `.sw-orientation-note` (the portrait
+   hint) left this list with Corbin's trim and nobox (2026-09-10); `.sw-hide-all`
+   joined with the trim — it is the one control that must never be under
+   anything, because it is the way back once the rest is hidden. */
+const CHROME = ['.sw-topbar', '.sw-controls', '.sw-legend', '.sw-credit', '.sw-hide-all'];
+/* Chrome the hide-all button must make disappear. `.sw-credit` rides inside
+   `.sw-controls`; `.sw-legend` is display:none on a narrow root anyway. */
+const CHROME_HIDDEN_BY_BUTTON = ['.sw-topbar', '.sw-controls', '.sw-legend'];
 /* REQUIRED TO BE PAINTED, not merely present. Without this the walk has no
    positive control on the CC-BY line at all: 2a skips its pair because the fix
    puts it INSIDE `.sw-controls` (a child's rect is a subset of its parent's),
@@ -202,12 +208,6 @@ const REQUIRED_PAINTED = [
   { sel: '.sw-topbar', why: 'it is the only way off this screen' },
   { sel: '.sw-credit', why: 'it is a licence obligation, and an absent attribution is worse than an unreadable one' },
 ];
-/* The portrait hint is placed 10 px below the topbar. The ceiling is not a pin
-   on the 10 — it catches a MEASUREMENT THAT HAS GONE STALE, which is not a
-   hypothetical: a draft that observed the topbar only on mount read its
-   CSS-rotated box and placed the note 227 px out, at 299 px against a topbar
-   ending at 72. */
-const NOTE_GAP_MAX = num('SWWEB_NOTE_GAP_MAX', 30);
 /* 2d's FLOOR, PER FRAME — the READER'S reading area, which until now nothing
    gated. 2d was the only arm on this screen with no `fail()` at all, and a
    measurement with no threshold is a note, which is what a reader skims. The
@@ -272,9 +272,7 @@ const PARAMS = [
   'navMs=' + NAV_MS,
   'panMs=' + PAN_MS,
   'chrome=' + CHROME.join('|'),
-  'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
   'requiredPainted=' + REQUIRED_PAINTED.map((r) => r.sel).join('|'),
-  'noteGapMax=' + NOTE_GAP_MAX,
   'platform=' + process.platform,
   'bandFloor=' + (BAND_FLOOR_PLATFORM
     ? Object.entries(BAND_FLOOR_PLATFORM).map(([k, v]) => k + ':' + v).join('|')
@@ -362,7 +360,6 @@ const readState = () => {
     ppv: raw === null ? null : Number(raw),
     density: sel ? sel.value : null,
     live: live ? live.textContent.trim() : '',
-    zoomLabel: (document.querySelector('.sw-context-zoom') || { textContent: '' }).textContent.trim(),
   };
 };
 
@@ -375,11 +372,15 @@ const state = (page) => page.evaluate(readState);
  */
 async function stepZoom(page, dir) {
   const before = await state(page);
-  await page.evaluate((label) => {
-    const b = document.querySelector('button[aria-label="' + label + '"]');
-    if (!b) throw new Error('no ' + label + ' button');
-    /** @type {HTMLButtonElement} */ (b).click();
-  }, dir > 0 ? 'Zoom in' : 'Zoom out');
+  /* The +/- key on the focused root. React's onKeyDown hears a bubbling
+     KeyboardEvent dispatched on the element, and the handler zooms about the
+     centre by exactly ZOOM_STEP. No button is involved: trim deleted them. */
+  await page.evaluate((key) => {
+    const root = /** @type {HTMLElement|null} */ (document.querySelector('.sw-root'));
+    if (!root) throw new Error('no .sw-root to send ' + key + ' to');
+    root.focus();
+    root.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  }, dir > 0 ? '+' : '-');
   try {
     await page.waitForFunction(
       (was) => {
@@ -657,18 +658,6 @@ function armChrome(tag, geo) {
   for (const s of geo.offscreen) {
     fail(`2c ${JSON.stringify(s.label)} (${s.sel}) sits outside the viewport: rect ${s.rect}`);
   }
-  if (geo.noteGap === null) {
-    notes.push(`${tag} 2e the portrait hint is not up at this frame, so its placement was NOT checked — not the same as passing`);
-  } else {
-    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below ${geo.noteAgainst} `
-      + `— the lowest chrome above it (intended 10, ceiling ${NOTE_GAP_MAX})`);
-    if (geo.noteGap < 0) {
-      fail(`2e the portrait hint overlaps ${geo.noteAgainst} by ${-geo.noteGap} px — that card is what covered the Back button`);
-    } else if (geo.noteGap > NOTE_GAP_MAX) {
-      fail(`2e the portrait hint floats ${geo.noteGap} px below ${geo.noteAgainst} against an intended 10 — its placement measurement `
-        + 'has gone stale, which is what a draft observing the topbar only on mount produced (299 px against a topbar ending at 72)');
-    }
-  }
   /* Built from the fields the object ALREADY carries. A second copy of the
      viewport size would be two definitions that must agree. */
   const frameKey = `${Math.round(geo.innerWidth)}x${geo.innerHeight}`;
@@ -756,7 +745,7 @@ const readGeometry = (chromeSel, optionalSel) => {
      one: can the reader actually SEE this, which a rectangle cannot answer. It
      is the CC-BY attribution, so "present but painted over" is a licence
      problem and not a cosmetic one. */
-  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit, .sw-orientation-note button')].filter(vis);
+  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit, .sw-hide-all')].filter(vis);
   const covered = [];
   const unhittable = [];
   const offscreen = [];
@@ -785,13 +774,20 @@ const readGeometry = (chromeSel, optionalSel) => {
     }
   }
 
-  /* 2d: the tallest run of viewport height no chrome block covers. Chrome here
-     is banded top and bottom, so a 1-D sweep is the honest measure — it is
-     reported, never asserted, precisely because no target for it exists. */
-  const rows = new Uint8Array(Math.max(1, Math.round(innerHeight)));
+  /* 2d: the tallest run of the ROOT'S HEIGHT no chrome block covers. Chrome is
+     banded top and bottom of the instrument, so a 1-D sweep along the root's
+     vertical is the honest measure. On a portrait phone the root is CSS-rotated
+     90 deg (nobox, 2026-09-10) and its vertical is the VIEWPORT'S X AXIS: a sweep
+     down viewport y there reads the topbar edge-on as covering 91% of the frame
+     (28 px at 320x640 with nothing wrong on screen). The axis follows the root. */
+  const rotated = !!document.querySelector('.sw-root.sw-rotated');
+  const extent = rotated ? innerWidth : innerHeight;
+  const rows = new Uint8Array(Math.max(1, Math.round(extent)));
   for (const bl of blocks) {
-    const from = Math.max(0, Math.floor(bl.rect.y));
-    const to = Math.min(rows.length, Math.ceil(bl.rect.b));
+    const lo = rotated ? bl.rect.x : bl.rect.y;
+    const hi = rotated ? bl.rect.r : bl.rect.b;
+    const from = Math.max(0, Math.floor(lo));
+    const to = Math.min(rows.length, Math.ceil(hi));
     for (let y = from; y < to; y++) rows[y] = 1;
   }
   let best = { top: 0, bottom: 0, h: 0 }; let run = -1;
@@ -803,35 +799,8 @@ const readGeometry = (chromeSel, optionalSel) => {
   let coveredRows = 0;
   for (let y = 0; y < rows.length; y++) if (rows[y]) coveredRows++;
 
-  /* 2e: where the portrait hint sits relative to the topbar it used to cover.
-     null when the hint is not up — which is a different answer from 0 and is
-     reported as one. */
-  const noteEl = document.querySelector('.sw-orientation-note');
-  /* Measured against the LOWEST chrome above it, not against the topbar alone:
-     clearing the topbar and landing on the location readout is the bug this arm
-     caught, so an arm that only watched the topbar would have called that fix
-     green. */
-  const aboveSel = ['.sw-topbar', '.sw-context'];
-  const aboveEls = aboveSel.map((s) => document.querySelector(s)).filter((e) => e && vis(e));
-  const aboveBottom = aboveEls.length ? Math.max(...aboveEls.map((e) => e.getBoundingClientRect().bottom)) : null;
-  /* WHICH element the gap was measured against, printed beside the number. This
-     arm's region has already been redefined once -- it measured the topbar
-     alone, read 58 px, then measured the lowest chrome above the hint and read
-     145 px on the SAME TREE with the same defect. Nothing in the output said
-     the question had changed, so the two numbers are diffable only by someone
-     who happens to know. A number without its region is not comparable to
-     anything. */
-  let noteAgainst = null;
-  if (aboveBottom !== null) {
-    const lowest = aboveEls.reduce((m, e) => (e.getBoundingClientRect().bottom > m.getBoundingClientRect().bottom ? e : m));
-    noteAgainst = aboveSel[aboveEls.indexOf(lowest)] || lowest.className || lowest.tagName;
-  }
-  const noteGap = (noteEl && vis(noteEl) && aboveBottom !== null)
-    ? Math.round((noteEl.getBoundingClientRect().top - aboveBottom) * 10) / 10
-    : null;
-
   return {
-    overlaps, covered, unhittable, offscreen, band: best, noteGap, noteAgainst,
+    overlaps, covered, unhittable, offscreen, band: best, rotated,
     blocksFound: blocks.map((b) => b.sel), blocksMissing, blocksInvisible,
     pairs, hits: controls.length,
     innerWidth, innerHeight: rows.length,
@@ -1002,7 +971,7 @@ async function walk(page, url, frame, scale) {
 
   /* ARM 2 FIRST, and before any gesture: a drag that ends in a tap would open a
      sheet, and arm 2 is about the chrome a reader meets on arrival. */
-  const geo = await page.evaluate(readGeometry, CHROME, CHROME_WHEN_SHOWN);
+  const geo = await page.evaluate(readGeometry, CHROME, []);   // no conditional chrome since nobox
   if (String(geo.fontScale || '1') !== String(scale)) {
     fails.push(`${tag} the text scale did not take: --font-scale reads ${JSON.stringify(geo.fontScale)} and root font-size ${geo.rootFontPx}, wanted ${scale}. Arm 2 would be measuring the wrong frame.`);
   }
@@ -1068,7 +1037,7 @@ async function walk(page, url, frame, scale) {
     fails.push(`${tag} 1a data-ppv-css reads ${JSON.stringify(start.ppvRaw)}, not a number`);
     return;
   }
-  notes.push(`${tag} entry ppv ${start.ppv} density ${start.density} zoom ${JSON.stringify(start.zoomLabel)}`);
+  notes.push(`${tag} entry ppv ${start.ppv} density ${start.density}`);
 
   const rise = await zoomArc(page, +1, (s) => s.ppv >= DENSITY_ENTER_PPV_CSS);
   const atCeiling = await zoomArc(page, +1, () => false);          // run to the stop for arm 3
