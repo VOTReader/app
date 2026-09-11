@@ -499,12 +499,15 @@ const READ_RECORDER = () => (window.__swwebShaders || []).map((r) => {
   try { log = (g.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
   let deleted = false;
   try { deleted = !g.isShader(r.sh); } catch (_e) { deleted = false; }
+  let t = (r.type === 0 || r.type) ? r.type : null;   // remembered at createShader
+  if (t === null) {
+    /* Only for a shader created before the hook installed. Returns null on a
+       DELETED shader, which is why it cannot be the primary source. */
+    try { t = g.getShaderParameter(r.sh, g.SHADER_TYPE); } catch (_e) { t = null; }
+  }
   let name = 'a shader of UNKNOWN stage';
-  try {
-    const t = g.getShaderParameter(r.sh, g.SHADER_TYPE);
-    if (t === g.VERTEX_SHADER) name = 'the VERTEX shader';
-    else if (t === g.FRAGMENT_SHADER) name = 'the FRAGMENT shader';
-  } catch (_e) { /* stays unknown, and says so */ }
+  if (t === g.VERTEX_SHADER) name = 'the VERTEX shader';
+  else if (t === g.FRAGMENT_SHADER) name = 'the FRAGMENT shader';
   return { ok, log, deleted, name, len: r.src.length, head: r.src.split('\n').slice(0, 3).join(' ').slice(0, 80) };
 });
 
@@ -899,11 +902,28 @@ async function walk(page, url, frame, scale) {
      different defect and must not be impersonated. */
   await page.evaluateOnNewDocument(() => {
     window.__swwebShaders = [];
+    /* THE STAGE IS REMEMBERED AT CREATION, not queried later. A shader that
+       fails to compile is deleted by web-renderer.js before it throws, and
+       `getShaderParameter(sh, SHADER_TYPE)` on a deleted shader returns null --
+       so a post-hoc read knows the stage on every path EXCEPT the failure path,
+       which is the only one that needs it. `createShader(type)` is handed the
+       answer; keep it. */
+    window.__swwebStages = new WeakMap();
     for (const C of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) {
       if (!C || !C.prototype || !C.prototype.shaderSource) continue;
+      const origCreate = C.prototype.createShader;
+      C.prototype.createShader = function createShader(type) {
+        const sh = origCreate.call(this, type);
+        try { if (sh) window.__swwebStages.set(sh, type); } catch (_e) { /* never break the app */ }
+        return sh;
+      };
       const orig = C.prototype.shaderSource;
       C.prototype.shaderSource = function shaderSource(sh, src) {
-        try { window.__swwebShaders.push({ gl: this, sh, src: String(src) }); } catch (_e) { /* never break the app */ }
+        try {
+          let type = null;
+          try { type = window.__swwebStages.get(sh); } catch (_e) { type = null; }
+          window.__swwebShaders.push({ gl: this, sh, src: String(src), type });
+        } catch (_e) { /* never break the app */ }
         return orig.call(this, sh, src);
       };
     }
