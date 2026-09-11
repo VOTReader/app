@@ -67,6 +67,23 @@
         own copy of any module-scope registration, exactly the gap
         nav-handoff.js documents. No-op when nothing is pending; clears
         the pending timer so no duplicate trailing write follows.
+     6. THE UPDATE RELOAD (2026-09-11): sw-register fires
+        `vot:before-update-reload` one call before location.reload(), and
+        useScrollMemory answers with __flushPersistState(patch, { reload:
+        true }) — the live scroll record folded into the latest union.
+        StateStore.set is asynchronous by construction (a Web Lock, an IDB
+        read, the 3-way merge, then the put) and a document that is one
+        call from reload() may never finish it: the browser walk measured
+        the reader coming back at 612 px against 900 with that write in
+        place. So the reload flush ALSO writes the union to sessionStorage
+        (RESUME_STATE_KEY, synchronous, same tab only) and the next boot
+        takes that record FIRST — useSavedState → takeResumeState() —
+        applies it through the same validation as the store, and clears
+        it, so a second boot never replays it; the mount write (item 4)
+        then makes it durable. IDB stays the path for every other write;
+        the record is a two-minute bridge across one self-reload. A flush
+        that must survive a reload uses a synchronous store; IDB is never
+        that store.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -118,6 +135,38 @@ import { StateStore } from '../stores/state-store.js';
  * pause instead of 1 per character.
  */
 const PERSIST_DEBOUNCE_MS = 250;
+
+/**
+ * The update reload's record (header item 6): `{ at, state }` in sessionStorage,
+ * written by flush(patch, { reload: true }) and consumed once by takeResumeState().
+ * Same tab only, by sessionStorage's nature — which is the tab that reloads.
+ */
+export const RESUME_STATE_KEY = 'vot-state-resume-after-update';
+/** Older than this and the record is not from the reload that just happened. */
+export const RESUME_STATE_MAX_AGE_MS = 120000;
+
+/**
+ * Take the update reload's record: the state it carries, or null when there is
+ * none, it is malformed, undated, stale, or not an object. Whatever the answer,
+ * the key is cleared — a record is read by exactly one boot. `getItem` returning
+ * null is tested for explicitly: JSON.parse(null) is null too, and a null must
+ * never be able to impersonate a state.
+ * @returns {Record<string, any> | null}
+ */
+export function takeResumeState() {
+  let raw = null;
+  try {
+    raw = sessionStorage.getItem(RESUME_STATE_KEY);
+    if (raw != null) sessionStorage.removeItem(RESUME_STATE_KEY);
+  } catch (_e) { return null; }                   // sessionStorage unavailable
+  if (raw == null) return null;
+  let rec;
+  try { rec = JSON.parse(raw); } catch (_e) { return null; }
+  if (!rec || typeof rec !== 'object' || typeof rec.at !== 'number') return null;
+  if (Date.now() - rec.at > RESUME_STATE_MAX_AGE_MS) return null;
+  const s = rec.state;
+  return s && typeof s === 'object' ? s : null;
+}
 
 /**
  * Extract the fields the boot script (index.html:73) reads synchronously
@@ -180,8 +229,14 @@ export function usePersistedState({
        written at once. useScrollMemory folds the live scroller position in this
        way, because a state update at that instant would need a render the
        document will never get before reload(). Without a patch the old contract
-       holds: nothing pending, nothing written. */
-    const flush = (patch) => {
+       holds: nothing pending, nothing written.
+       `opts.reload` (header item 6) is the caller saying "this document is about
+       to reload": the union ALSO goes to sessionStorage, synchronously, because the
+       StateStore.set below is asynchronous and may never land. Explicit, not
+       inferred from the patch — a default must not be able to impersonate a
+       choice. A sessionStorage that throws (quota, unavailable) must not stop the
+       store write or the reload behind it. */
+    const flush = (patch, opts) => {
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       const pending = pendingRef.current;
       const base = pending != null ? pending : (typeof patch === 'function' ? latestRef.current : null);
@@ -190,6 +245,10 @@ export function usePersistedState({
       pendingRef.current = null;
       writtenRef.current = union;
       latestRef.current = union;
+      if (opts && opts.reload === true) {
+        try { sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: union })); }
+        catch (_e) { /* the IDB write below is still made; the reload still happens */ }
+      }
       // W2.3b: persistence routes through StateStore (IDB-backed). The
       // store's lsShim hook continues to write the reduced theme +
       // fontStyle + fontScale copy to localStorage for the boot-script
