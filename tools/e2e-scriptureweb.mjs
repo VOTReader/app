@@ -56,7 +56,17 @@
  *         from elementFromPoint, and 2a cannot cover for it once the element is
  *         nested inside another chrome block, so the pair of them go quiet
  *         together. Measured 0 here; a legitimate case gets a named allowance
- * ARM 4 — the shaders COMPILE AND LINK in the browser the walk drives. Landing
+ * ARM 4 — the shaders COMPILE, in two different senses, because one of them
+ *   is about the source and the other is about what ships.
+ *     4a  the SOURCE module's shaders compile and link, once, in a real driver
+ *     4b  every shader THE APP ACTUALLY HANDED THE DRIVER compiled — recorded
+ *         by hooking `shaderSource` before boot, so it reads the SHIPPED
+ *         shader whatever the build did to it. And if the recorder holds
+ *         NOTHING, the screen compiled nothing at all: a blank canvas that
+ *         every other arm here would pass over. A disagreement between 4a and
+ *         4b is itself information — the build rewrote the shader.
+ *
+ *   The old single-arm description follows; it is 4a's. Landing
  *   69 shipped with `web-renderer.test.js` asserting the shader's TEXT in
  *   twenty places and vitest holding no GL context, so a GLSL syntax error
  *   would blank the screen with every gate green. Runs ONCE; scope is total
@@ -550,26 +560,26 @@ async function armShaders(browser, baseUrl, pageUrl) {
   }
 
   if (!out.armed) {
-    armFourIncomplete = `4 the shader probe COULD NOT ARM (${out.why}). Nothing was compiled, which is not the same `
+    armFourIncomplete = `4a the shader probe COULD NOT ARM (${out.why}). Nothing was compiled, which is not the same `
       + 'as compiling: a missing context is not a passing shader';
-    notes.push('arm 4: NOT ARMED — ' + out.why);
+    notes.push('arm 4a: NOT ARMED — ' + out.why);
     return;
   }
   if (!out.controlRejected) {
-    armFourIncomplete = '4 the GL compiler ACCEPTED a deliberately broken vertex shader, so an OK from it means '
+    armFourIncomplete = '4a the GL compiler ACCEPTED a deliberately broken vertex shader, so an OK from it means '
       + `nothing (control log ${JSON.stringify(out.controlLog)}). The instrument is dead, and nothing was measured`;
-    notes.push('arm 4: INSTRUMENT DEAD — the control was not rejected');
+    notes.push('arm 4a: INSTRUMENT DEAD — the control was not rejected');
     return;
   }
   for (const [name, r] of [['vertex', out.v], ['fragment', out.f]]) {
-    if (!r.ok) fails.push(`4 the ${name} shader DOES NOT COMPILE — ${JSON.stringify(r.log) || 'the driver gave no log'}. `
+    if (!r.ok) fails.push(`4a the ${name} shader DOES NOT COMPILE — ${JSON.stringify(r.log) || 'the driver gave no log'}. `
       + 'web-renderer.test.js asserts this shader\'s TEXT and vitest has no GL context, so this would blank the '
       + 'whole screen with every other gate green');
   }
   if (out.v.ok && out.f.ok && !out.link.ok) {
-    fails.push(`4 the shaders compile but the program DOES NOT LINK — ${JSON.stringify(out.link.log) || 'the driver gave no log'}`);
+    fails.push(`4a the shaders compile but the program DOES NOT LINK — ${JSON.stringify(out.link.log) || 'the driver gave no log'}`);
   }
-  notes.push(`arm 4: ran ONCE (the shader does not depend on viewport, so four runs would be four extra GL contexts `
+  notes.push(`arm 4a: ran ONCE (the shader does not depend on viewport, so four runs would be four extra GL contexts `
     + `for one answer), shaders=2 of 2 in the app source, programs=1, control=rejected, `
     + `vertex ${out.vertLen} chars, fragment ${out.fragLen} chars, gl ${JSON.stringify(out.glVersion)}, `
     + `compile v=${out.v.ok ? 'OK' : 'FAIL'} f=${out.f.ok ? 'OK' : 'FAIL'} link=${out.link.ok ? 'OK' : 'FAIL'}`);
@@ -841,6 +851,26 @@ async function walk(page, url, frame, scale) {
     try { localStorage.setItem('vot-state', JSON.stringify({ settings: { fontScale: String(s) } })); } catch (_e) { /* private mode */ }
   }, scale);
 
+  /* ARM 4b's RECORDER, installed before the app boots. Hooks `shaderSource` on
+     the context prototype and keeps every string the app hands the driver,
+     together with the context that received it, so COMPILE_STATUS can be read
+     off the real shader object afterwards. This reaches the SHIPPED shader —
+     whatever the build did to it — where 4a reaches only the source module.
+     BOTH prototypes are hooked: recording webgl2 alone would make a webgl1
+     fallback look like "the screen never compiled anything", which is a
+     different defect and must not be impersonated. */
+  await page.evaluateOnNewDocument(() => {
+    window.__swwebShaders = [];
+    for (const C of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) {
+      if (!C || !C.prototype || !C.prototype.shaderSource) continue;
+      const orig = C.prototype.shaderSource;
+      C.prototype.shaderSource = function shaderSource(sh, src) {
+        try { window.__swwebShaders.push({ gl: this, sh, src: String(src) }); } catch (_e) { /* never break the app */ }
+        return orig.call(this, sh, src);
+      };
+    }
+  });
+
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const r = document.getElementById('root');
@@ -920,6 +950,44 @@ async function walk(page, url, frame, scale) {
   const rise = await zoomArc(page, +1, (s) => s.ppv >= DENSITY_ENTER_PPV_CSS);
   const atCeiling = await zoomArc(page, +1, () => false);          // run to the stop for arm 3
   const top = atCeiling[atCeiling.length - 1];
+
+  /* ARM 4b — what the APP compiled, read off the recorder. Per frame, because
+     it is free: no extra GL context, no extra page, just a read of what already
+     happened. */
+  const shipped = await page.evaluate(() => {
+    const recs = window.__swwebShaders || [];
+    return recs.map((r) => {
+      let ok = null;
+      try { ok = !!r.gl.getShaderParameter(r.sh, r.gl.COMPILE_STATUS); } catch (_e) { ok = null; }
+      let log = '';
+      try { log = (r.gl.getShaderInfoLog(r.sh) || '').split(String.fromCharCode(0)).join('').trim(); } catch (_e) { log = ''; }
+      const first = r.src.split('\n').slice(0, 3).join(' ').slice(0, 80);
+      return { ok, log, len: r.src.length, head: first };
+    });
+  }).catch((e) => ({ err: e.message }));
+
+  if (shipped && shipped.err) {
+    fails.push(`${tag} 4b the shader recorder could not be read (${shipped.err}) — nothing was measured about what `
+      + 'the app compiled, which is not the same as its compiling');
+  } else if (!shipped.length) {
+    fails.push(`${tag} 4b THE SCREEN COMPILED NO SHADERS AT ALL — \`shaderSource\` was never called, so the canvas `
+      + 'cannot have drawn anything. Every other arm here can pass over a blank canvas; this is the only one that '
+      + 'looks at whether the renderer ran');
+  } else {
+    const bad = shipped.filter((r) => r.ok === false);
+    const unknown = shipped.filter((r) => r.ok === null);
+    for (const r of bad) {
+      fails.push(`${tag} 4b a shader THE APP COMPILED failed: ${JSON.stringify(r.log) || 'the driver gave no log'} `
+        + `(${r.len} chars, starts ${JSON.stringify(r.head)}). This is the SHIPPED shader, not the source module`);
+    }
+    for (const r of unknown) {
+      fails.push(`${tag} 4b a recorded shader's COMPILE_STATUS could not be read (${r.len} chars, starts `
+        + `${JSON.stringify(r.head)}) — unknown is reported as unknown, never as compiled`);
+    }
+    notes.push(`${tag} 4b the app handed the driver ${shipped.length} shader${shipped.length === 1 ? '' : 's'}, `
+      + `${shipped.filter((r) => r.ok === true).length} compiled, ${bad.length} failed, ${unknown.length} unreadable `
+      + `(${shipped.map((r) => r.len).join('+')} chars) — the SHIPPED shader, where 4a reads the source module`);
+  }
 
   const ft = await frameTime(page, PAN_MS).catch((e) => ({ err: e.message }));
   if (ft && ft.err) notes.push(`${tag} 3 frame time UNMEASURED (${ft.err})`);
