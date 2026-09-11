@@ -3330,6 +3330,16 @@ describe('audio-player — resume across the update reload', () => {
     expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'paused: the pause\'s clock stands').toBe(41.37);
   });
 
+  it('the boot restore keeps the snapshot\'s EXACT clock — the reader floored too, and a floor on read undoes the flush', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAP, time: 41.37 }));
+    await load(); rebuildGlobals();
+    try {
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(AudioPlayer.getState().time, 'the bar shows the clock the close wrote, not its floor').toBe(41.37);
+      expect(AudioPlayer.getPreciseTime(), 'the read-along reads the same clock before any element exists').toBe(41.37);
+    } finally { dropGlobals(); }
+  });
+
   it('a record for ANOTHER recording, or older than two minutes, is dropped without a play attempt', async () => {
     globalThis.Audio = Counting;
     localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
