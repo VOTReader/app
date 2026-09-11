@@ -21,8 +21,12 @@ const APK_VERSION = { value: null };
    holder at call time, the same lazy shape as SW_VERSION above (vi.mock hoists). */
 const BRIDGE = { isAndroid: false };
 vi.mock('./platform-bridge.js', () => ({ PlatformBridge: { get isAndroid() { return BRIDGE.isAndroid; } } }));
+/* The announcer's own ask (awaitBuildVersion) is held open; getBuildVersion is Settings' 3 s
+   render ask. LATE.value, when set, is what the worker says after the 3 s ask has given up. */
+const LATE = { value: /** @type {any} */ (undefined) };
 vi.mock('./build-version.js', () => ({
   getBuildVersion: vi.fn(async () => SW_VERSION.value),
+  awaitBuildVersion: vi.fn(() => LATE.value !== undefined ? new Promise((r) => setTimeout(() => r(LATE.value), 20)) : Promise.resolve(SW_VERSION.value)),
   fetchServerBuildVersion: vi.fn(async () => APK_VERSION.value),
 }));
 vi.mock('./toast.js', async (importOriginal) => {
@@ -41,6 +45,7 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     localStorage.clear();
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
     APK_VERSION.value = null;
+    LATE.value = undefined;
     BRIDGE.isAndroid = false;
     vi.mocked(showToast).mockClear();
     const stale = document.getElementById(UPDATED_TOAST_ID);
@@ -66,6 +71,19 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     // Once: a second boot on the same build is silent.
     expect(await announceUpdateIfAny()).toBe('same');
     expect(showToast).toHaveBeenCalledTimes(1);
+  });
+
+  it('an answer that arrives AFTER the 3 s render ask gave up still decides — and toasts', async () => {
+    /* The live 89 → 90 crossing: the reloaded document's ask lost the race to its own cold boot
+       and the announcer decided 'unknown' (nothing written) or 'first' (silent) in its place.
+       The announcer waits for the worker, however late. */
+    control();
+    SW_VERSION.value = null;                                   // Settings' 3 s ask: gave up
+    LATE.value = { cacheVersion: NEW, corpusVersion: 'c45' };  // the worker, later
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
   });
 
   it('a stored EQUAL build shows nothing', async () => {
