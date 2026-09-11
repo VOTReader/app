@@ -73,7 +73,7 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
    switches off again in one tap and that choice is recorded. Round 1: Corbin, 2026-09-10,
    "make surprise me dice button and reading dot on by default"; Auto-Continue with them
    (only reachable once Auto-Scroll is on, i.e. once the reader asked for hands-free).
-   @type {ReadonlyArray<Readonly<Record<string, [any, any]>>>}  key → [old default, new default] */
+   @type {ReadonlyArray<Readonly<Record<string, any[]>>>}  key → [old default, new default] */
 export const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
 ]);
@@ -84,7 +84,7 @@ export const DEFAULT_FLIPS = Object.freeze([
  * rule is tested on its own — the "still at its old default" clause is what keeps a pre-round
  * choice that is neither default (a select value) untouched, and no boolean round can show it.
  * @param {Record<string, any>} savedS
- * @param {ReadonlyArray<Readonly<Record<string, [any, any]>>>} [flips]
+ * @param {ReadonlyArray<Readonly<Record<string, any[]>>>} [flips]  key → [old default, new default]
  * @returns {Record<string, any>}
  */
 export function defaultFlipsFor(savedS, flips = DEFAULT_FLIPS) {
