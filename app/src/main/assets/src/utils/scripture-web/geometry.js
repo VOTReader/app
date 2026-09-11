@@ -402,6 +402,26 @@ export function arcPointAt(tau, left, right, R, A, P) {
   return { x: left + R + (tau - HALF) * R, h: A, tx: -R, ty: 0 };
 }
 /**
+ * A JS number as a GLSL float literal -- the ONE door every constant passes
+ * through on its way into a shader template below.
+ *
+ * GLSL ES 3.00 has no int->float conversion, so `${X}` with X = 1 emits
+ * `float f = 1;` and the shader fails to compile. Measured by the Verifier
+ * through the real compiler (ANGLE): FLYOVER_FLOOR = 0.35 links; = 1 fails
+ * with "cannot convert from 'const int' to 'highp float'"; and = 1.0 fails
+ * IDENTICALLY, because String(1.0) is '1'. The value's own spelling cannot
+ * be trusted, so the literal is formatted here. A `${X}.` suffix is the same
+ * trap from the other side: right only while X stays whole (0.35. is not
+ * GLSL). glsl-float.test.js keeps every interpolation routed through this.
+ */
+export function glslFloat(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) {
+    throw new Error('glslFloat: not a finite number: ' + String(n));
+  }
+  return Number.isInteger(n) ? n.toFixed(1) : String(n);
+}
+
+/**
  * The same two laws as GLSL ES 3.00, for the vertex shader to inline. Kept
  * beside their JS originals so the pair can never drift apart unnoticed;
  * web-renderer.test.js asserts the shader contains this text verbatim.
@@ -414,9 +434,9 @@ const float ARC_HALF = 1.5707963;
 vec2 arcShape(float rx, float ceil, float squash, float localize, float spanLog){
   float r = max(rx, 0.);
   float c = max(ceil, 1.);
-  float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*clamp(spanLog, 0., 1.);
+  float k = ${glslFloat(FAN_FLOOR)} + ${glslFloat(1 - FAN_FLOOR)}*clamp(spanLog, 0., 1.);
   float deepR = min(r, c*k);
-  float deepA = ${APEX_LIFT}*c*tanh(r/(c*${CEIL_SOFTNESS}));
+  float deepA = ${glslFloat(APEX_LIFT)}*c*tanh(r/(c*${glslFloat(CEIL_SOFTNESS)}));
   return vec2(mix(r, deepR, localize), mix(r*squash, deepA, localize));
 }
 float arcTau(float x, float left, float right, float R, float P){
@@ -527,12 +547,12 @@ function smoothstep(e0, e1, x) {
  */
 export const flyOverGLSL = `
 float arcAnchored(float x0, float x1, float width){
-  float m = ${FLYOVER_MARGIN}.;
+  float m = ${glslFloat(FLYOVER_MARGIN)};
   return max(step(-m, x0)*step(x0, width + m),
              step(-m, x1)*step(x1, width + m));
 }
 float flyOverDim(float anchored, float localize){
-  float flyFloor = ${FLYOVER_FLOOR};
+  float flyFloor = ${glslFloat(FLYOVER_FLOOR)};
   return mix(1., mix(flyFloor, 1., anchored), localize);
 }`;
 
