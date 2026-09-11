@@ -48,10 +48,11 @@ export function isChromeTarget(target) {
  *   loc: (e: PointerEvent) => {x:number, y:number},
  *   dpr: () => number,
  *   cam: () => {x:number, ppv:number, total:number},
+ *   camFor?: (yDevice:number) => {x:number, ppv:number, total:number},
  *   view: () => {W:number, H:number, DPR:number},
  *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
  *   schedule: () => void,
- *   maxZoom: () => number,
+ *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number) => void,
  *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
@@ -60,6 +61,11 @@ export function isChromeTarget(target) {
  */
 export function attachWebGestures(el, deps) {
   const { loc, dpr, cam, view, handlers, schedule, maxZoom, clampCamera, zoomAbout, xToVerse } = deps;
+  // r2: two rails, two cameras. deps.camFor(yDevice) names the camera under
+  // the pointer (the Volumes rail above the gap's midline, the Bible rail
+  // below); a surface without it (the canon web) has one camera for all.
+  const camAt = (yCss) => (deps.camFor ? deps.camFor(yCss * dpr()) : cam());
+  const zoomCap = (c) => maxZoom(c);
   const pointers = new Map();
   let drag = null, pinch = null, moved = false, lastTap = 0;
 
@@ -80,29 +86,33 @@ export function attachWebGestures(el, deps) {
     if (pointers.size === 2) {
       const [p, q] = Array.from(pointers.values());
       const mid = (p.x + q.x) / 2;
-      pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: cam().ppv,
-                mid, verse: xToVerse(cam(), view().W, mid * dpr()) };
+      const pc = camAt((p.y + q.y) / 2);
+      pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, cam: pc,
+                mid, verse: xToVerse(pc, view().W, mid * dpr()) };
       drag = null;
     } else {
-      drag = { x: pt.x, camx: cam().x };
+      const dc = camAt(pt.y);
+      drag = { x: pt.x, camx: dc.x, cam: dc };
     }
   };
   const move = (e) => {
     const pt = loc(e);
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pt);
-    const c = cam(), W = view().W;
+    const W = view().W;
     if (pinch && pointers.size === 2) {
+      const c = pinch.cam;
       const [p, q] = Array.from(pointers.values());
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
-      clampCamera(c, W, maxZoom());
+      clampCamera(c, W, zoomCap(c));
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
-      clampCamera(c, W, maxZoom());
+      clampCamera(c, W, zoomCap(c));
       moved = true; schedule(); return;
     }
     if (drag) {
+      const c = drag.cam;
       if (Math.abs(pt.x - drag.x) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
-      clampCamera(c, W, maxZoom());
+      clampCamera(c, W, zoomCap(c));
       schedule(); return;
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
@@ -128,8 +138,9 @@ export function attachWebGestures(el, deps) {
     // scroll/selection run instead of substituting our own.
     if (isChromeTarget(e.target)) return;
     e.preventDefault();
-    const c = cam(), W = view().W;
-    zoomAbout(c, W, loc(e).x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), maxZoom());
+    const pt = loc(e), W = view().W;
+    const c = camAt(pt.y);
+    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c));
     schedule();
   };
   el.addEventListener('pointerdown', down);

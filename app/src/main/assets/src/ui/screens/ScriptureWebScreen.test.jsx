@@ -552,11 +552,16 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(sub.textContent).toMatch(/\bLink\b/);
   });
 
-  it('R4 in My Web the legend names the link kinds and the context, never the distance ramp', async () => {
+  it('R4 in My Web the legend names the reader\'s links and the canon axis its citations wear, never the distance ramp', async () => {
+    // r2: the Volumes' citations wear the canon's ramp by where they land in
+    // scripture, so the legend names that axis (Genesis to Revelation) and
+    // the reader's own gold links; it never claims the distance law.
     await openMyWeb();
     const legend = document.querySelector('.sw-legend');
     expect(legend).toBeTruthy();
-    expect(legend.textContent).toMatch(/Within scripture/);
+    expect(legend.textContent).toMatch(/your links/);
+    expect(legend.textContent).toMatch(/Genesis/);
+    expect(legend.textContent).toMatch(/Revelation/);
     expect(legend.textContent).toMatch(/Volumes/);
     expect(legend.textContent).not.toMatch(/across the canon|nearby/);
   });
