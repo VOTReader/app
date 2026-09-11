@@ -31,7 +31,7 @@ vi.mock('./toast.js', async (importOriginal) => {
 });
 
 import { showToast } from './toast.js';
-import { announceUpdateIfAny, offerListeningResume, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
+import { announceUpdateIfAny, offerListeningResume, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
 const OLD = 'v1.0.2-aaaaaaaaaa', NEW = 'v1.0.2-bbbbbbbbbb';
@@ -145,6 +145,8 @@ describe('offerListeningResume — the update toast carries the tap', () => {
   beforeEach(() => {
     localStorage.clear();
     SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    vi.mocked(showToast).mockClear();
+    _resetUpdateToast();
     const stale = document.getElementById(UPDATED_TOAST_ID);
     if (stale) stale.remove();
   });
@@ -163,7 +165,8 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     expect(onTap).toHaveBeenCalledTimes(1);
     el.click();
     expect(onTap, 'one offer, one tap').toHaveBeenCalledTimes(1);
-    expect(document.getElementById(UPDATED_TOAST_ID), 'the toast closes on the tap').toBeNull();
+    // toast.js keeps one element per id and hides it by class (hideToast); "closed" is that.
+    expect(el.classList.contains('show'), 'the toast closes on the tap').toBe(false);
   });
 
   it('offered BEFORE the announcer decides: the toast appears once, already carrying the tap', async () => {

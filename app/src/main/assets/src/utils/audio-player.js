@@ -821,8 +821,10 @@ function _start() {
   _pauseOtherDomAudio(null);
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
-  // the user-visible message, so this just stops an unhandled rejection.
-  if (p && typeof p.catch === 'function') p.catch(() => {});
+  // the load-failure message. A policy refusal fires no 'error' at all, so it
+  // is handled here: the bar must not sit in 'loading' forever, and the update
+  // resume (below) turns it into a tap on the update toast.
+  if (p && typeof p.then === 'function') p.then(() => { _resumeAfterUpdateArmed = false; }, (err) => { _playRefused(err); });
   // Cold-start stall watchdog (observed on-device 2026-08-06): the very first
   // request of a session can hang inside the WebView network stack — no
   // 'error', no progress, 'loading' forever — while an immediate retry
@@ -2401,6 +2403,72 @@ function getPreciseTime() { return _el ? (_el.currentTime || 0) : _state.time; }
 // the bar up PAUSED at that spot (display-only state; no network, no corpus).
 // Runs at module eval — deliberately touches only localStorage + _state.
 _restoreFromSaved();
+
+/* ── resume across the update's self-reload (Corbin, 2026-09-10) ──────────
+   "reload should be seamless, instant, with a toast indicating what happened,
+   and should otherwise land reader back exactly where they were before the
+   update." For a listener that is the same recording at the EXACT clock,
+   playing again.
+
+   The periodic snapshot above is whole-second and up to ~5 s late, and the
+   boot restore it feeds is a PAUSED bar. So: sw-register fires
+   `vot:before-update-reload` right before reload(); while playing we refresh
+   the snapshot and write a small sessionStorage record with the element's own
+   currentTime (sessionStorage: this tab, this reload, gone with the tab — a
+   flag that outlived its reload would resume a recording nobody asked for).
+   The boot after the reload consumes the record, seeks the restored bar to
+   that clock and tries play() without a gesture. Android's WebView allows it
+   (mediaPlaybackRequiresUserGesture=false); a browser that refuses answers
+   NotAllowedError, and the update toast then carries the tap
+   (utils/update-toast.js, reached through window.__votUpdateToastResume —
+   bundle-d cannot import bundle-b). Paused or idle at the reload: no record. */
+const RESUME_AFTER_UPDATE_KEY = 'vot-audio-resume-after-update';
+const RESUME_AFTER_UPDATE_MAX_AGE_MS = 2 * 60 * 1000;
+let _resumeAfterUpdateArmed = false;
+
+function _onBeforeUpdateReload() {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const track = _state.queue[_state.qi];
+    if (_state.status !== 'playing' || !_el || !track) { sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY); return; }
+    const time = _el.currentTime || 0;
+    _state.time = time;
+    _lastPersistSec = Math.floor(time);
+    _persist();
+    sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, JSON.stringify({ url: track.url, time, at: Date.now() }));
+  } catch (_e) { /* storage blocked — the periodic snapshot is what remains */ }
+}
+if (typeof window !== 'undefined') window.addEventListener('vot:before-update-reload', _onBeforeUpdateReload);
+
+/** A play() the browser refused. NotAllowedError is the autoplay policy: the
+ *  bar shows Play instead of a spinner, and if this was the update resume the
+ *  update toast offers the tap. Anything else is the element's 'error' path. */
+function _playRefused(err) {
+  if (!err || err.name !== 'NotAllowedError') return;
+  _markPaused();
+  if (!_resumeAfterUpdateArmed) return;
+  _resumeAfterUpdateArmed = false;
+  const offer = _g().__votUpdateToastResume;
+  if (typeof offer === 'function') offer(() => { toggle(); });
+}
+
+function _resumeAfterUpdate() {
+  let rec = null;
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const raw = sessionStorage.getItem(RESUME_AFTER_UPDATE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);         // consumed: never replayed
+    rec = JSON.parse(raw);
+  } catch (_e) { return; }
+  if (!rec || !_pendingRestore || rec.url !== _pendingRestore.url) return;
+  if (!(typeof rec.at === 'number' && Date.now() - rec.at < RESUME_AFTER_UPDATE_MAX_AGE_MS)) return;
+  const time = Number(rec.time);
+  if (Number.isFinite(time) && time >= 0) { _pendingRestore.time = time; _state.time = time; }
+  _resumeAfterUpdateArmed = true;
+  void _rebuildRestoredQueue();
+}
+_resumeAfterUpdate();
 
 /** The singleton audio player store. */
 export const AudioPlayer = {

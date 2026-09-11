@@ -169,20 +169,32 @@ export function usePersistedState({
   // Indirection so the debounce effect's timer and the mount effect's
   // listeners share ONE flush implementation without a stale closure.
   const flushRef = React.useRef(null);
+  // The last union rendered, written or still pending — the base a patched
+  // flush (the update reload) applies to.
+  const latestRef = React.useRef(null);
 
   // ── Mount-only: install the guaranteed-flush listeners + unmount flush.
   React.useEffect(() => {
-    const flush = () => {
+    /* `patch` is the update reload's door (sw-register's `vot:before-update-reload`):
+       a function applied to the LATEST union — pending or already written — and
+       written at once. useScrollMemory folds the live scroller position in this
+       way, because a state update at that instant would need a render the
+       document will never get before reload(). Without a patch the old contract
+       holds: nothing pending, nothing written. */
+    const flush = (patch) => {
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       const pending = pendingRef.current;
-      if (pending == null) return;               // nothing coalesced → no-op
+      const base = pending != null ? pending : (typeof patch === 'function' ? latestRef.current : null);
+      if (base == null) return;                  // nothing coalesced → no-op
+      const union = typeof patch === 'function' ? patch(base) : base;
       pendingRef.current = null;
-      writtenRef.current = pending;
+      writtenRef.current = union;
+      latestRef.current = union;
       // W2.3b: persistence routes through StateStore (IDB-backed). The
       // store's lsShim hook continues to write the reduced theme +
       // fontStyle + fontScale copy to localStorage for the boot-script
       // sync read at index.html:73 — no boot FOUC.
-      StateStore.set(pending);
+      StateStore.set(union);
     };
     flushRef.current = flush;
     // Contract 5: publish the SAME flush for the export path (see header).
@@ -219,6 +231,7 @@ export function usePersistedState({
       theme, lastReadChapters, lastReadLetterMap,
       activeReadKey, settings, readItems,
     };
+    latestRef.current = union;
     const prev = writtenRef.current;
     const boot = _bootFields(union);
     const prevBoot = _bootFields(prev);
