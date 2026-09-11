@@ -57,6 +57,9 @@
  *   the same output, and a renamed selector shrinks the check set silently.
  *   Zero pairs or zero hits is a FAILURE: an arm that checked nothing has not
  *   run, whatever colour it prints.
+ *     2e  the portrait hint, WHEN IT IS UP, sits below the topbar and not far
+ *         below it — the gap is printed either way, and "the hint is not up at
+ *         this frame" is reported as its own answer rather than as a pass
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — PRINTED, because "how much map is left" is the property the
  *         reading-column question was really asking about, and no threshold
@@ -136,6 +139,18 @@ const SETTLE_MS = num('SWWEB_SETTLE_MS', 6000);
 const NAV_MS = num('SWWEB_NAV_MS', 30000);
 const PAN_MS = num('SWWEB_PAN_MS', 1800);
 const CHROME = ['.sw-topbar', '.sw-controls', '.sw-context', '.sw-legend', '.sw-credit'];
+/* CONDITIONAL chrome: checked when it is up, never failed for being absent. The
+   portrait hint only renders after `screen.orientation.lock('landscape')` is
+   refused, so "missing" is its ordinary state and the required list's
+   rename-detection would fire on it every run. It belongs in the overlap set
+   because it is the card that covered the Back button. */
+const CHROME_WHEN_SHOWN = ['.sw-orientation-note'];
+/* The portrait hint is placed 10 px below the topbar. The ceiling is not a pin
+   on the 10 — it catches a MEASUREMENT THAT HAS GONE STALE, which is not a
+   hypothetical: a draft that observed the topbar only on mount read its
+   CSS-rotated box and placed the note 227 px out, at 299 px against a topbar
+   ending at 72. */
+const NOTE_GAP_MAX = num('SWWEB_NOTE_GAP_MAX', 30);
 
 const PARAMS = [
   'frames=' + FRAMES.map((f) => f.w + 'x' + f.h).join(','),
@@ -150,6 +165,8 @@ const PARAMS = [
   'navMs=' + NAV_MS,
   'panMs=' + PAN_MS,
   'chrome=' + CHROME.join('|'),
+  'chromeWhenShown=' + CHROME_WHEN_SHOWN.join('|'),
+  'noteGapMax=' + NOTE_GAP_MAX,
 ].join(' ');
 
 console.log('[e2e-swweb] PARAMS ' + PARAMS);
@@ -363,6 +380,17 @@ function armChrome(tag, geo) {
   for (const s of geo.offscreen) {
     fail(`2c ${JSON.stringify(s.label)} (${s.sel}) sits outside the viewport: rect ${s.rect}`);
   }
+  if (geo.noteGap === null) {
+    notes.push(`${tag} 2e the portrait hint is not up at this frame, so its placement was NOT checked — not the same as passing`);
+  } else {
+    notes.push(`${tag} 2e the portrait hint sits ${geo.noteGap} px below the topbar (intended 10, ceiling ${NOTE_GAP_MAX})`);
+    if (geo.noteGap < 0) {
+      fail(`2e the portrait hint overlaps the topbar by ${-geo.noteGap} px — that card is what covered the Back button`);
+    } else if (geo.noteGap > NOTE_GAP_MAX) {
+      fail(`2e the portrait hint floats ${geo.noteGap} px below the topbar against an intended 10 — its placement measurement `
+        + 'has gone stale, which is what a draft observing the topbar only on mount produced (299 px against a topbar ending at 72)');
+    }
+  }
   notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; chrome covers ${geo.coveredPct}%`);
 
   /* WHAT ARM 2 RAN. 0 failures and 0 checks are the same output, so the counts
@@ -379,17 +407,18 @@ function armChrome(tag, geo) {
 }
 
 /** Chrome geometry, measured in viewport space — which is what the reader meets, rotation included. */
-const readGeometry = (chromeSel) => {
+const readGeometry = (chromeSel, optionalSel) => {
   const R = (el) => { const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
   const vis = (el) => { const b = el.getBoundingClientRect(); const cs = getComputedStyle(el); return b.width > 0 && b.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.01; };
   const found = chromeSel.map((sel) => ({ sel, el: document.querySelector(sel) }));
+  const optional = optionalSel.map((sel) => ({ sel, el: document.querySelector(sel) })).filter((o) => o.el);
   /* ABSENT and NOT PAINTED are different answers and only one of them is a
      defect: `.sw-legend` is legitimately `display: none` at a narrow frame,
      while a selector that matches NOTHING is a rename, which is exactly how a
      check set shrinks without anyone noticing. */
   const blocksMissing = found.filter((o) => !o.el).map((o) => o.sel);
   const blocksInvisible = found.filter((o) => o.el && !vis(o.el)).map((o) => o.sel);
-  const blocks = found.filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, el: o.el, rect: R(o.el) }));
+  const blocks = found.concat(optional).filter((o) => o.el && vis(o.el)).map((o) => ({ sel: o.sel, el: o.el, rect: R(o.el) }));
 
   /* A PARENT CONTAINING ITS CHILD IS NOT ONE BLOCK COVERING ANOTHER, and the
      first draft of 2a could not tell them apart. When the CC-BY credit moved
@@ -417,7 +446,7 @@ const readGeometry = (chromeSel) => {
      one: can the reader actually SEE this, which a rectangle cannot answer. It
      is the CC-BY attribution, so "present but painted over" is a licence
      problem and not a cosmetic one. */
-  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit')].filter(vis);
+  const controls = [...document.querySelectorAll('.sw-topbar button, .sw-controls button, .sw-controls select, .sw-credit, .sw-orientation-note button')].filter(vis);
   const covered = [];
   const unhittable = [];
   const offscreen = [];
@@ -464,8 +493,17 @@ const readGeometry = (chromeSel) => {
   let coveredRows = 0;
   for (let y = 0; y < rows.length; y++) if (rows[y]) coveredRows++;
 
+  /* 2e: where the portrait hint sits relative to the topbar it used to cover.
+     null when the hint is not up — which is a different answer from 0 and is
+     reported as one. */
+  const noteEl = document.querySelector('.sw-orientation-note');
+  const barEl = document.querySelector('.sw-topbar');
+  const noteGap = (noteEl && barEl && vis(noteEl) && vis(barEl))
+    ? Math.round((noteEl.getBoundingClientRect().top - barEl.getBoundingClientRect().bottom) * 10) / 10
+    : null;
+
   return {
-    overlaps, covered, unhittable, offscreen, band: best,
+    overlaps, covered, unhittable, offscreen, band: best, noteGap,
     blocksFound: blocks.map((b) => b.sel), blocksMissing, blocksInvisible,
     pairs, hits: controls.length,
     innerWidth, innerHeight: rows.length,
@@ -578,7 +616,7 @@ async function walk(page, url, frame, scale) {
 
   /* ARM 2 FIRST, and before any gesture: a drag that ends in a tap would open a
      sheet, and arm 2 is about the chrome a reader meets on arrival. */
-  const geo = await page.evaluate(readGeometry, CHROME);
+  const geo = await page.evaluate(readGeometry, CHROME, CHROME_WHEN_SHOWN);
   if (String(geo.fontScale || '1') !== String(scale)) {
     fails.push(`${tag} the text scale did not take: --font-scale reads ${JSON.stringify(geo.fontScale)} and root font-size ${geo.rootFontPx}, wanted ${scale}. Arm 2 would be measuring the wrong frame.`);
   }
