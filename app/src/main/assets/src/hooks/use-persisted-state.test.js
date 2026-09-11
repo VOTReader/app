@@ -354,8 +354,9 @@ describe('usePersistedState — window.__flushPersistState(patch)', () => {
 /* ── the reload record (2026-09-11): the union survives the update's reload in
    sessionStorage. StateStore.set is asynchronous by construction (a Web Lock, an IDB
    read, the 3-way merge, then the put) and a document one call from location.reload()
-   may never finish it — the walk measured the reader coming back at 612 px against 900
-   with the patched IDB write in place. So the reload's flush ALSO writes the union to
+   is not owed its completion — a self-initiated reload may abort the transaction, and a
+   restore that depends on the browser finishing it during unload is a manufactured
+   survivor (Orchestrator's ruling, 2026-09-11). So the reload's flush ALSO writes the union to
    sessionStorage, synchronously, and the next boot takes that record first
    (useSavedState → takeResumeState), applies it, and clears it. IDB stays the durable
    path for every other write; the record is a same-tab, two-minute bridge. */
