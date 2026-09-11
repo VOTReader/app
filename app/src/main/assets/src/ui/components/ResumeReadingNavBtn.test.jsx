@@ -40,12 +40,19 @@ describe('ResumeReadingNavBtn — nav-bar resume dot', () => {
     expect(container.querySelector('.reading-dot-nav')).toBe(null);
   });
 
-  it('renders the pulsing dot on an eligible screen (home)', () => {
+  it('renders a bookmark-ribbon glyph labelled "Continue reading" on an eligible screen (home) — not a bare dot', () => {
     const { container } = renderDot({ screen: 'home', enabled: true, onGo: vi.fn() });
     const btn = container.querySelector('.reading-dot-nav');
     expect(btn).not.toBe(null);
-    expect(btn.getAttribute('aria-label')).toBe('Resume reading');
-    expect(btn.querySelector('.rdg-inner')).not.toBe(null);
+    // Corbin (2026-09-10): "Change the icon for the reading resume dot to
+    // something that makes more sense, instead of just a dot". A ribbon
+    // says "your place is kept"; a dot said nothing.
+    expect(btn.getAttribute('aria-label')).toBe('Continue reading');
+    const glyph = btn.querySelector('svg.rdg-glyph');
+    expect(glyph).not.toBe(null);
+    expect(glyph.getAttribute('aria-hidden')).toBe('true');
+    expect(glyph.querySelector('path')).not.toBe(null);
+    expect(btn.querySelector('.rdg-inner')).toBe(null);
   });
 
   it('hides on reading screens (you are already reading there)', () => {
@@ -64,7 +71,7 @@ describe('ResumeReadingNavBtn — nav-bar resume dot', () => {
     }
   });
 
-  it('tapping the dot calls onGo (resume reading)', () => {
+  it('tapping the marker calls onGo (continue reading)', () => {
     const onGo = vi.fn();
     const { container } = renderDot({ screen: 'volumes-home', enabled: true, onGo });
     fireEvent.click(container.querySelector('.reading-dot-nav'));
