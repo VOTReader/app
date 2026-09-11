@@ -30,6 +30,7 @@
    after sw-register's controllerchange reload; on Android it is the next cold
    start with a new APK, whatever screen it restores to.
    ═════════════════════════════════════════════════ */
+import { PlatformBridge } from './platform-bridge.js';
 import { getBuildVersion, fetchServerBuildVersion } from './build-version.js';
 import { showToast } from './toast.js';
 
@@ -46,8 +47,7 @@ export const UPDATED_TOAST_MS = 4000;
 async function runningBuild() {
   const sw = await getBuildVersion();
   if (sw && sw.cacheVersion) return sw.cacheVersion;
-  const android = typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid;
-  if (!android) return null;
+  if (!PlatformBridge.isAndroid) return null;
   const apk = await fetchServerBuildVersion();
   return apk && apk.cacheVersion ? apk.cacheVersion : null;
 }

@@ -49,15 +49,16 @@ export function registerServiceWorker() {
 
   // RELOAD WHEREVER THE READER IS (Corbin, 2026-09-10). This used to defer a
   // visible mid-session reload until the app was backgrounded, or offer a
-  // "Reload" toast, and set window.__votSwTookOver so index.html's lazy loader
-  // would reload rather than mix builds. All three are gone: the reload is
-  // immediate, the app's own state restore is the safety, and the mixed-build
-  // window that flag guarded no longer exists because the page never stays on
-  // the old build. (index.html still reads the flag; nothing sets it now.)
+  // "Reload" toast. Both are gone: the reload is immediate and the app's own
+  // state restore is the safety. The takeover flag STAYS: reload() does not
+  // unload the page in the same tick, and a lazy load in that gap would fetch
+  // NEW bytes into the OLD page (service-worker-1); index.html's loader reads
+  // the flag and refuses to append. Set before the reload, never after.
   let refreshing = false;
   const doReload = () => {
     if (refreshing) return;
     refreshing = true;
+    window.__votSwTookOver = true;
     window.location.reload();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
