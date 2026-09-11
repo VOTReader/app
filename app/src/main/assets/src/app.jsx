@@ -215,7 +215,7 @@ function App() {
   const [gardenWarningOpen, setGardenWarningOpen] = useState(false);
   /* useSettings — settings object + mutators + body-class/AndroidBridge
      effect. Extracted to src/hooks/use-settings.js (P6g). */
-  const { settings, setSettings, toggleSetting, updateSetting } = useSettings({
+  const { settings, toggleSetting, updateSetting } = useSettings({
     savedSettings: saved.settings,
     theme,
   });
@@ -665,7 +665,7 @@ function App() {
     genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
     audioColKey, setAudioColKey,
     theme, setTheme,
-    settings, setSettings, toggleSetting, updateSetting,
+    settings, toggleSetting, updateSetting,
     titleFocusHidden, setTitleFocusHidden,
     headingsFocusHidden, setHeadingsFocusHidden,
     activeReadKey, setActiveReadKey,
@@ -727,7 +727,7 @@ function App() {
         lastTabCloseStrikesRef={lastTabCloseStrikes}
         disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
         gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}
-        setSettings={setSettings} setScreen={setScreen}
+        setScreen={setScreen}
         screen={screen}
       />
 

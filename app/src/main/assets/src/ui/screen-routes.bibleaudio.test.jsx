@@ -72,7 +72,7 @@ function makeRoutes(bookId, bibleAudio = 'web-ebible') {
     isRead: vi.fn(() => false),
     setFromWtlb: vi.fn(),
     gardenPage: 1, setGardenPage: vi.fn(),
-    toggleSetting: vi.fn(), updateSetting: vi.fn(), setSettings: vi.fn(),
+    toggleSetting: vi.fn(), updateSetting: vi.fn(),
     titleFocusHidden: false, setTitleFocusHidden: vi.fn(),
     headingsFocusHidden: false, setHeadingsFocusHidden: vi.fn(),
     mode: 'read', setMode: vi.fn(), showStudy: false, setShowStudy: vi.fn(),

@@ -101,7 +101,10 @@ describe('settings writers outside the hook record touched', () => {
 
   it('the hook keeps its raw setter to itself, so a writer that skips touched cannot be written', () => {
     const { result } = renderHook(() => useSettings({ savedSettings: null, theme: 'dark' }));
-    expect(result.current.setSettings).toBeUndefined();
+    // Read through `any`: the hook's return TYPE no longer carries the setter either, so tsc is
+    // the second witness (TS2551 on a direct read once the setter left the type). The runtime check stays because
+    // a JS caller never sees the type.
+    expect(/** @type {any} */ (result.current).setSettings).toBeUndefined();
     // The control on the same instance: the sanctioned way still writes, and records.
     act(() => { result.current.updateSetting('gardenTier', 'mobile'); });
     expect(result.current.settings.gardenTier).toBe('mobile');

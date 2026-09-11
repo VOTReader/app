@@ -35,7 +35,7 @@ export function AppShellOverlays({
   disableTabsPromptOpen, setDisableTabsPromptOpen,
   // Garden warning
   gardenWarningOpen, setGardenWarningOpen,
-  setSettings, setScreen,
+  setScreen,
   // "Show me around" (review-tutorial): the Home strip needs the screen; the overlay needs nothing.
   screen,
 }) {
@@ -176,7 +176,7 @@ export function AppShellOverlays({
                   <button
                     key={t.id}
                     className={`garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`}
-                    onClick={() => setSettings((s) => ({ ...s, gardenTier: t.id }))}>
+                    onClick={() => updateSetting("gardenTier", t.id)}>
                     <div className="garden-tier-option-main">
                       <span className="garden-tier-option-name">{t.label}</span>
                       <span className="garden-tier-option-size">{t.size}</span>

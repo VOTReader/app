@@ -7,8 +7,11 @@
      - settings state  (React.useState with migration initializer; initial
                         value merges saved settings + migration fixes over
                         the hardcoded defaults)
-     - setSettings     (raw React setState — returned so App() can compose
-                        settings writes from other subsystems if needed)
+     - (the raw React setState stays INSIDE this hook, 2026-09-11: every writer outside it
+                        went through the two mutators below except two that composed the object by
+                        hand and so never recorded `touched` — the Garden tier and the Search corpus.
+                        Handing the setter out is what let them exist; a writer that skips `touched`
+                        makes a future default round overwrite the reader's choice.)
      - toggleSetting   (plain arrow fn: flips settings[key] boolean, records touched[key])
      - updateSetting   (plain arrow fn: sets settings[key] = val, records touched[key])
      - DEFAULT_FLIPS   (the rounds of default changes applied to profiles that never chose;
@@ -37,7 +40,7 @@
                        useState. Required as a dep of the body-class effect
                        so the "light" body class toggles on theme changes.
 
-   RETURNS: { settings, setSettings, toggleSetting, updateSetting }
+   RETURNS: { settings, toggleSetting, updateSetting }
 
    STORAGE:
      None directly. settings rides along in the vot-state JSON written by
@@ -107,7 +110,6 @@ export function defaultFlipsFor(savedS, flips = DEFAULT_FLIPS) {
  * @param {{ savedSettings: Settings | null | undefined, theme: string }} args
  * @returns {{
  *   settings: Settings,
- *   setSettings: (updater: Settings | ((prev: Settings) => Settings)) => void,
  *   toggleSetting: (key: string) => void,
  *   updateSetting: (key: string, val: any) => void
  * }}
@@ -276,5 +278,5 @@ export function useSettings({ savedSettings, theme }) {
   }, [theme, settings]);
 
   // ── Return ─────────────────────────────────────────────────────────────
-  return { settings, setSettings, toggleSetting, updateSetting };
+  return { settings, toggleSetting, updateSetting };
 }
