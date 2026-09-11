@@ -93,7 +93,7 @@ export function attachWebGestures(el, deps) {
       drag = null;
     } else {
       const dc = camAt(pt.y);
-      drag = { x: pt.x, camx: dc.x, cam: dc };
+      drag = { x: pt.x, y: pt.y, camx: dc.x, cam: dc };
     }
   };
   const move = (e) => {
@@ -111,7 +111,16 @@ export function attachWebGestures(el, deps) {
     }
     if (drag) {
       const c = drag.cam;
-      if (Math.abs(pt.x - drag.x) > 3) moved = true;
+      // Motion on EITHER axis is a gesture, not a tap. The web pans along x
+      // only, but a finger that travelled 100 px across the canon did not
+      // tap: read from x alone, that swipe ended in handlers().tap, opened
+      // the thread chooser over the canvas, and every drag after it began on
+      // the sheet and moved nothing (Corbin, 2026-09-11: "you can't grab the
+      // screen … and move around"; measured on the rotated phone frame).
+      // The camera is the one under the finger when it went down (drag.cam,
+      // the two-rail My Web's per-rail camera); a swipe across the gap
+      // between the rails is likewise a gesture and not a tap.
+      if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
       clampCamera(c, W, zoomCap(c));
       if (deps.live) deps.live(); schedule(); return;
