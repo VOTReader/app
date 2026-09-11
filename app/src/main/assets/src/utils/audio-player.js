@@ -522,6 +522,7 @@ function _ensureEl() {
       // below, and on pagehide / hidden — _flushOnHide). Cheap — ~300 bytes
       // to localStorage.
       if (sec - _lastPersistSec >= 5 || sec < _lastPersistSec) { _lastPersistSec = sec; _persist(); }
+      else _persistDurableOnly();   // every other second: the durable copy alone (a kill fires nothing)
       _maybePrefetchNext();   // 1 Hz — re-arms the gentle warm after a hiccup
     }
   });
@@ -1396,80 +1397,140 @@ function _slicePartHorizon(queue, startKey, startPartIndex) {
 
 function _persist() {
   // Durable per-recording memory rides the same call sites as the boot
-  // snapshot, and ahead of its localStorage guard: the two are independent.
+  // snapshot, and ahead of its storage guards: the two are independent.
   _rememberCurrentPosition(false);
-  try {
-    if (typeof localStorage === 'undefined') return;
-    const src = _pendingRestore || _source;
-    let qi = _pendingRestore ? _pendingRestore.qi : _state.qi;
-    let track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
-    // Exact to the millisecond (2026-09-11): it was floored, and a floor lost up
-    // to a second at the one moment the reader cannot tap through — the close.
-    let time = Math.round((_state.time || 0) * 1000) / 1000;
-    /* THE SNAPSHOT MUST NOT NAME A RECORDING THE LISTENER HEARD TO ITS END, and
-       until now only the OTHER writer refused to. `_rememberPosition` has this
-       exact guard (`if (_finishedUrl && track.url === _finishedUrl) return;`) and
-       the per-recording record is also dropped outright by `_forgetPosition`;
-       the boot snapshot had neither.
+  let s;
+  try { s = _snapshot(); } catch (_e) { return; }
+  if (!s) return;
+  if (s === 'clear') { _clearPersist(); return; }
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(PERSIST_KEY, JSON.stringify(s)); } catch (_e) { /* storage full/blocked — resume is best-effort */ }
+  _persistDurable(s);
+}
 
-       On the normal path the omission is invisible: next() moves qi and starts
-       the new track BEFORE it persists, so the url no longer matches. The
-       sleep-at-track-end path does not advance at all, so `_markPaused()` wrote
-       the finished recording at its ending clock — and the next session resumed
-       AT the end of something already heard. Pressing play fired `ended` again at
-       once, which ran `_notifyListened` a SECOND time and counted the completion
-       twice, then skipped a track the listener was not expecting to lose.
+/** The one record both channels write. Null when there is nothing to remember;
+ *  'clear' when the recording the listener heard to its end was the last one
+ *  (see below). */
+function _snapshot() {
+  const src = _pendingRestore || _source;
+  let qi = _pendingRestore ? _pendingRestore.qi : _state.qi;
+  let track = _pendingRestore ? _state.queue[0] : _state.queue[_state.qi];
+  // Exact to the millisecond (2026-09-11): it was floored, and a floor lost up
+  // to a second at the one moment the reader cannot tap through — the close.
+  let time = Math.round((_state.time || 0) * 1000) / 1000;
+  /* THE SNAPSHOT MUST NOT NAME A RECORDING THE LISTENER HEARD TO ITS END, and
+     until now only the OTHER writer refused to. `_rememberPosition` has this
+     exact guard (`if (_finishedUrl && track.url === _finishedUrl) return;`) and
+     the per-recording record is also dropped outright by `_forgetPosition`;
+     the boot snapshot had neither.
 
-       ADVANCING rather than rewinding, because the recording is over: rewinding to
-       0 would offer it again, which is the opposite of what finishing it means.
-       And when it was the LAST one, the snapshot is cleared — the same answer
-       next() reaches through stop(), whose own comment is "the boot snapshot is
-       the part that must not resurrect the bar".
+     On the normal path the omission is invisible: next() moves qi and starts
+     the new track BEFORE it persists, so the url no longer matches. The
+     sleep-at-track-end path does not advance at all, so `_markPaused()` wrote
+     the finished recording at its ending clock — and the next session resumed
+     AT the end of something already heard. Pressing play fired `ended` again at
+     once, which ran `_notifyListened` a SECOND time and counted the completion
+     twice, then skipped a track the listener was not expecting to lose.
 
-       THE LIVE BAR IS DELIBERATELY NOT TOUCHED. A reader who set a sleep timer
-       wakes to the recording they finished, paused at its end: that is "this is
-       where you got to", and it is the snapshot, not the bar, that the next
-       session reads. */
-    /* `!_pendingRestore` is a guard whose bad input cannot currently occur, and it
-       is kept rather than deleted for what it would cost if it did. `_finishedUrl`
-       is set only inside the `ended` handler, which needs a live media element,
-       and `_pendingRestore` means there is not one yet — so a bite on this clause
-       reddens nothing, correctly. But the restore placeholder is a ONE-track
-       queue, so were it ever to fire, `qi + 1 >= length` would hold and the arm
-       below would `_clearPersist()` — wiping the reader's resume point rather
-       than advancing it. A destructive misfire is worth one clause. */
-    if (!_pendingRestore && _finishedUrl && track && track.url === _finishedUrl) {
-      if (qi + 1 >= _state.queue.length) { _clearPersist(); return; }
-      qi += 1;
-      track = _state.queue[qi];
-      time = 0;
-    }
-    const savedTrack = normalizeAudioTrack(track);
-    if (!src || !savedTrack) return;
-    const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
-      ? _pendingRestore.queue
-      : _state.queue;
-    const customQueue = src.mode === 'custom'
-      ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
-      : undefined;
-    localStorage.setItem(PERSIST_KEY, JSON.stringify({
-      v: 2,
-      mode: src.mode, volKey: src.volKey, label: src.label,
-      qi,
-      key: savedTrack.key,
-      time,
-      track: savedTrack,
-      customQueue,
-      startKey: src.startKey || undefined,
-      startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
-      startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
-      startReader: src.startReader || undefined,
-    }));
-  } catch (_e) { /* storage full/blocked — resume is best-effort */ }
+     ADVANCING rather than rewinding, because the recording is over: rewinding to
+     0 would offer it again, which is the opposite of what finishing it means.
+     And when it was the LAST one, the snapshot is cleared — the same answer
+     next() reaches through stop(), whose own comment is "the boot snapshot is
+     the part that must not resurrect the bar".
+
+     THE LIVE BAR IS DELIBERATELY NOT TOUCHED. A reader who set a sleep timer
+     wakes to the recording they finished, paused at its end: that is "this is
+     where you got to", and it is the snapshot, not the bar, that the next
+     session reads. */
+  /* `!_pendingRestore` is a guard whose bad input cannot currently occur, and it
+     is kept rather than deleted for what it would cost if it did. `_finishedUrl`
+     is set only inside the `ended` handler, which needs a live media element,
+     and `_pendingRestore` means there is not one yet — so a bite on this clause
+     reddens nothing, correctly. But the restore placeholder is a ONE-track
+     queue, so were it ever to fire, `qi + 1 >= length` would hold and the arm
+     below would `_clearPersist()` — wiping the reader's resume point rather
+     than advancing it. A destructive misfire is worth one clause. */
+  if (!_pendingRestore && _finishedUrl && track && track.url === _finishedUrl) {
+    if (qi + 1 >= _state.queue.length) return 'clear';
+    qi += 1;
+    track = _state.queue[qi];
+    time = 0;
+  }
+  const savedTrack = normalizeAudioTrack(track);
+  if (!src || !savedTrack) return null;
+  const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
+    ? _pendingRestore.queue
+    : _state.queue;
+  const customQueue = src.mode === 'custom'
+    ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
+    : undefined;
+  return {
+    v: 2,
+    mode: src.mode, volKey: src.volKey, label: src.label,
+    qi,
+    key: savedTrack.key,
+    time,
+    track: savedTrack,
+    customQueue,
+    startKey: src.startKey || undefined,
+    startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
+    startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
+    startReader: src.startReader || undefined,
+    at: Date.now(),   // which copy is newer, when the two channels disagree at boot
+  };
 }
 
 function _clearPersist() {
   try { if (typeof localStorage !== 'undefined') localStorage.removeItem(PERSIST_KEY); } catch (_e) { /* ditto */ }
+  const idb = _idb();
+  if (idb) { try { Promise.resolve(idb.delete(SNAPSHOT_STORE, SNAPSHOT_KEY)).catch(() => {}); } catch (_e) { /* ditto */ } }
+}
+
+/* ── THE DURABLE SNAPSHOT — the kill (2026-09-11, w-audio-kill-cadence) ──
+   A kill fires no event, and localStorage does not survive one. Measured on
+   this machine (probe-kill-durability.mjs): after an abrupt kill of the whole
+   browser process tree — the phone's shape — LS came back at its FIRST commit
+   and nothing after (5.0 s on a 12 s run, 5.0 s on a 33 s run: Chromium
+   commits LS 5 s after the first write and then rate-limits commits to about
+   60 an hour, so a value written every second reaches disk about once a
+   minute), while IndexedDB came back with the LAST write, every time. The
+   walk's kill arm then lost the snapshot ENTIRELY — the bar came back idle —
+   so the durable record is the whole snapshot, not a clock beside it: the
+   same object, put to IDB at every snapshot write and every whole second
+   while playing (nothing when paused: timeupdate stops). LS keeps the
+   synchronous first paint of the bar and older data; at boot the IDB copy
+   wins unless the LS copy is stamped newer, which only an older build's data
+   can be. IDBAdapter is bundle-b, reached through the globalThis bridge like
+   the positions store; absent, all of this is a no-op. */
+const SNAPSHOT_STORE = 'meta';
+const SNAPSHOT_KEY = 'audio-snapshot';
+const _idb = () => _g().IDBAdapter || null;
+/** Epoch ms stamped on the copy the bar was restored from (0: none, or unstamped). */
+let _restoredAt = 0;
+function _persistDurable(s) {
+  const idb = _idb();
+  if (!idb) return;
+  try { Promise.resolve(idb.put(SNAPSHOT_STORE, SNAPSHOT_KEY, s)).catch(() => {}); }
+  catch (_e) { /* best-effort: the LS copy still has the last 5 s */ }
+}
+function _persistDurableOnly() {
+  let s;
+  try { s = _snapshot(); } catch (_e) { return; }
+  if (s && s !== 'clear') _persistDurable(s);
+}
+/** Boot: the durable copy outranks the LS one unless LS is stamped newer. The
+ *  update reload's own record (sessionStorage, exact) outranks both — it is
+ *  newer by construction; and a bar already rebuilt (the reader tapped Play in
+ *  the milliseconds this read takes) keeps what it started from. */
+async function _adoptDurableSnapshot() {
+  const idb = _idb();
+  if (!idb) return;
+  let rec = null;
+  try { rec = await idb.get(SNAPSHOT_STORE, SNAPSHOT_KEY); } catch (_e) { return; }
+  if (!rec || typeof rec !== 'object' || typeof rec.at !== 'number') return;
+  if (_resumeAfterUpdateArmed) return;
+  if (_state.status !== 'idle' && !_pendingRestore) return;   // live already: the reader pressed Play
+  if (_pendingRestore && rec.at < _restoredAt) return;         // the LS copy is newer
+  if (_applySnapshot(rec)) _notify();
 }
 
 /**
@@ -1483,17 +1544,27 @@ function _restoreFromSaved() {
     if (typeof localStorage === 'undefined') return;
     const raw = localStorage.getItem(PERSIST_KEY);
     if (!raw) return;
-    const s = JSON.parse(raw);
-    if (!s || (s.v !== 1 && s.v !== 2)) return;
+    _applySnapshot(JSON.parse(raw));
+  } catch (_e) { _setPendingRestore(null); }
+}
+
+/**
+ * Hand a snapshot record (either channel) to the bar as a pending restore.
+ * @param {any} s
+ * @returns {boolean} whether the record was usable
+ */
+function _applySnapshot(s) {
+  try {
+    if (!s || (s.v !== 1 && s.v !== 2)) return false;
     const track = normalizeAudioTrack(s.track);
     const mode = s.mode === 'letter' || s.mode === 'collection' || s.mode === 'section' || s.mode === 'custom'
       ? s.mode
       : null;
-    if (!track || !mode) return;
+    if (!track || !mode) return false;
     const customQueue = mode === 'custom' && Array.isArray(s.customQueue)
       ? s.customQueue.map(normalizeAudioTrack).filter(Boolean)
       : [];
-    if (mode === 'custom' && !customQueue.length) return;
+    if (mode === 'custom' && !customQueue.length) return false;
     _setPendingRestore({
       mode,
       volKey: typeof s.volKey === 'string' ? s.volKey : '',
@@ -1511,13 +1582,15 @@ function _restoreFromSaved() {
       startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
     });
+    _restoredAt = typeof s.at === 'number' ? s.at : 0;
     _state.queue = [track];
     _state.qi = 0;
     _state.time = _pendingRestore.time;
     _state.duration = 0;
     _state.status = 'paused';
     _notify();
-  } catch (_e) { _setPendingRestore(null); }
+    return true;
+  } catch (_e) { _setPendingRestore(null); return false; }
 }
 
 /**
@@ -2527,6 +2600,7 @@ function _resumeAfterUpdate() {
   void _rebuildRestoredQueue();
 }
 _resumeAfterUpdate();
+_adoptDurableSnapshot();
 
 /** The singleton audio player store. */
 export const AudioPlayer = {
