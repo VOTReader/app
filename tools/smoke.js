@@ -156,8 +156,23 @@
       })();
     });
   }
-  function waitForMarks(maxMs) {
-    return waitUntil(function () { return document.querySelectorAll('mark.hl-mark').length > 0; }, maxMs);
+  // The LIVE page only. Reading screens pre-mount both neighbour pages as inert peeks
+  // (ScreenLayout → PagerPeek), painted by the same annotation pass — so a document-wide
+  // `mark.hl-mark` count is satisfied by the page the reader just LEFT: after next → prev the
+  // first outing read "marks > 0" at +0 ms off the prev peek and then counted 0 on the live
+  // page. Count inside the live scroller, and after a navigation also require the live page
+  // to be the destination (`titleRe`), or a neighbour's marks answer for it.
+  function liveScroll() {
+    return document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll');
+  }
+  function liveCount(sel) { var s = liveScroll(); return s ? s.querySelectorAll(sel).length : 0; }
+  function waitForMarks(maxMs, titleRe) {
+    return waitUntil(function () {
+      var s = liveScroll();
+      if (!s) return false;
+      if (titleRe && !titleRe.test((s.querySelector('h1,.letter-title') || {}).textContent || '')) return false;
+      return s.querySelectorAll('mark.hl-mark').length > 0;
+    }, maxMs);
   }
 
   // Resolve a symbol by `window[name]` only. Three categories of globals
@@ -600,12 +615,12 @@
       clickByText(/Prophetic Letters/); await sleep(320);
       clickByText(/^Volume One/); await sleep(320);
       clickByText(/A Word of Warning/);
-      var paintedAfterMs = await waitForMarks(4000);   // the seeded marks paint over a window; read them once they are there
+      var paintedAfterMs = await waitForMarks(4000, /A Word of Warning/);   // the seeded marks paint over a window; read them once they are there
 
       var afterOpen = {
         crashed: isCrashed(),
-        marks: document.querySelectorAll('mark.hl-mark').length,
-        noteIcons: document.querySelectorAll('.hl-note-icon').length,
+        marks: liveCount('mark.hl-mark'),
+        noteIcons: liveCount('.hl-note-icon'),
         paintedAfterMs: paintedAfterMs
       };
       // next → prev (the historical crash/corruption path)
@@ -620,10 +635,11 @@
       }
       arrow('next'); await sleep(550);
       arrow('prev');
-      var repaintedAfterMs = await waitForMarks(4000);   // the same read, the same rule, after the round trip
+      // The same read after the round trip — on the live page, once it is this letter again.
+      var repaintedAfterMs = await waitForMarks(4000, /A Word of Warning/);
       var afterNav = {
         crashed: isCrashed(),
-        marks: document.querySelectorAll('mark.hl-mark').length,
+        marks: liveCount('mark.hl-mark'),
         paintedAfterMs: repaintedAfterMs
       };
       restore();
@@ -692,12 +708,12 @@
       // carry labels like "Part 1 · Intro–19" that a bare /Intro\b/ matched
       // first — clicking a chip starts playback instead of opening the entry.
       clickByText(/Introduction/i);
-      var paintedAfterMs = await waitForMarks(4000);   // 600–800 ms on the live origin in WebKit; one read at 600 lost 3 of 8
+      var paintedAfterMs = await waitForMarks(4000, /Introduction/i);   // 600–800 ms on the live origin in WebKit; one read at 600 lost 3 of 8
 
       var afterOpen = {
         crashed: isCrashed(),
-        marks: document.querySelectorAll('mark.hl-mark').length,
-        noteIcons: document.querySelectorAll('.hl-note-icon').length,
+        marks: liveCount('mark.hl-mark'),
+        noteIcons: liveCount('.hl-note-icon'),
         paintedAfterMs: paintedAfterMs
       };
       restore();
