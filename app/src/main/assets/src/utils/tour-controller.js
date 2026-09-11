@@ -7,8 +7,8 @@
    getVersion / getState, read by React with useSyncExternalStore.
 
    WHO CALLS WHAT
-     TourPrompt (Home strip)  start('prompt') · dismissPrompt('later'|'never')
-     SettingsScreen (Help)    start('settings') · reads step.settingsGroup
+     TourPrompt (Home strip)  start('prompt') · dismissPrompt('later'|'never') · stopsWord()
+     SettingsScreen (Help)    start('settings') · reads step.settingsGroup · stopsWord()
      TourOverlay              next() · back() · skip() · targetPressed() ·
                               clearHighlightDemo()
      App (hooks/use-tour.js)  attachNav({ goHome, openLetter, openBible,
@@ -31,7 +31,7 @@
    session-only by design: "Maybe later" means later.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { TOUR_STEPS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
+import { TOUR_STEPS, TOUR_STOPS_WORD, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 const listeners = new Set();
@@ -156,6 +156,10 @@ export const TourController = {
 
   /** True only while next() is pressing the ringed control itself. */
   isPressing() { return pressing; },
+
+  /** The stop count as a word ("seven"), for the sentences in bundles d and e that count the stops
+      and can reach the steps only through here. tour-steps.js owns the number; nobody types it. */
+  stopsWord() { return TOUR_STOPS_WORD; },
 
   /** The control a stop rings, if it is on screen (bundle-e's overlay reaches findTarget through here). */
   findTarget(step) { return findTarget(step); },
