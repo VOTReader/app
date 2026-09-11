@@ -12,7 +12,7 @@
  * and a recording playing after a real click, and fires `controllerchange` on
  * navigator.serviceWorker — the event the new worker's claim() fires — so the REAL
  * doReload path runs: takeover flag, the `vot:before-update-reload` write, location.reload().
- * Three arms, in one browser context:
+ * Four arms, one persistent profile (a temp user-data-dir, so arm D's kill can be survived):
  *
  *   A  SAME FRAME. The scroll and the takeover happen in one tick with no idle wait, so
  *      nothing debounced can have landed: what comes back is what the synchronous write
@@ -30,6 +30,14 @@
  *      a moment the periodic snapshot is provably >= 2.5 s stale, and a new tab in the same
  *      profile boots: the bar comes back on the same recording within 1 s of the clock read
  *      just before the close, PAUSED (a close is not an update; no play() is attempted).
+ *   D  A KILL: no pagehide, no event at all — the phone's shape (apps get killed). The restored
+ *      bar is played again from its own Play button, the whole browser process TREE is killed
+ *      abruptly at a moment the localStorage snapshot is provably >= 2.5 s stale, and a fresh
+ *      browser on the same profile boots: the bar comes back on the same recording within 1 s of
+ *      the clock read just before the kill, PAUSED. Measured before this arm existed
+ *      (probe-kill-durability.mjs, 2026-09-11): under a tree kill localStorage comes back at its
+ *      FIRST commit and nothing after — Chromium commits it 5 s after the first write and then at
+ *      most ~60 times an hour — while IndexedDB comes back with the last write, every time.
  *
  * Before either arm, the FRESH profile's two boots must show no update toast at all: boot 1
  * is uncontrolled (the worker is installing) and boot 2 is the first controlled boot of a
@@ -87,9 +95,11 @@
  *   - never indexedDB.open() a name that may not exist yet from a probe: it would create
  *     the database at version 1 under the app's feet. Ask indexedDB.databases() first. */
 import http from 'node:http';
-import { resolve, dirname, normalize, extname } from 'node:path';
+import { resolve, dirname, normalize, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import puppeteer from 'puppeteer';
 
 const argv = process.argv.slice(2);
@@ -154,11 +164,42 @@ const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
 const note = (m) => console.log('  ' + m);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=d3d11', ...(refused ? ['--autoplay-policy=user-gesture-required'] : [])] });
+// One persistent profile for the whole walk (arms A–C could live in an incognito context; arm D's
+// kill takes the browser with it, and only a profile on disk can be reopened afterwards).
+const profileDir = mkdtempSync(join(tmpdir(), 'vot-upd-'));
+const LAUNCH = { headless: true, userDataDir: profileDir, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=d3d11', ...(refused ? ['--autoplay-policy=user-gesture-required'] : [])] };
+let browser = await puppeteer.launch(LAUNCH);
 console.log(`browser ${await browser.version()}  audio=${withAudio ? 'on' : 'off'}  autoplay policy: ${refused ? 'user-gesture-required (the phone)' : 'Chrome default'}`);
+// The recording is served in place of every release URL — installed on every page that may play.
+const stubAudio = async (p) => {
+  await p.setRequestInterception(true);
+  p.on('request', (r) => {
+    if (/github\.com\/VOTReader\/votreader-assets|\.mp3(\?|$)/.test(r.url())) {
+      // Honour Range requests: without 206 answers Chrome treats the recording as
+      // unseekable and a seek restarts it from 0, which is not the reader's situation.
+      const m = /bytes=(\d+)-(\d*)/.exec(r.headers().range || '');
+      if (m) {
+        const from = Number(m[1]), to = m[2] ? Math.min(Number(m[2]), WAV.length - 1) : WAV.length - 1;
+        r.respond({ status: 206, contentType: 'audio/wav', body: WAV.subarray(from, to + 1),
+          headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${from}-${to}/${WAV.length}`, 'Cache-Control': 'no-store' } });
+      } else {
+        r.respond({ status: 200, contentType: 'audio/wav', headers: { 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' }, body: WAV });
+      }
+    } else r.continue();
+  });
+};
+// Kill the whole browser process TREE, abruptly: the storage service must die with its
+// uncommitted batches, as it does when Android kills the app. Killing only the main process
+// lets the children shut down and flush (measured: localStorage then survives to the last tick).
+const killBrowserTree = async () => {
+  const proc = browser.process();
+  const exited = new Promise((r) => { proc.once('exit', r); setTimeout(r, 5000); });
+  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+  else { try { process.kill(-proc.pid, 'SIGKILL'); } catch (_e) { proc.kill('SIGKILL'); } }
+  await exited;
+};
 try {
-  const ctx = await browser.createBrowserContext();
-  const page = await ctx.newPage();
+  const page = await browser.newPage();
   const errors = [];
   // Stamped with the clock and the document, so an error can be placed in an arm; a
   // thrown PRIMITIVE (an unhandled rejection with no reason) arrives as the value itself.
@@ -246,21 +287,7 @@ try {
     w.Audio = Wrapped;
   });
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-  await page.setRequestInterception(true);
-  page.on('request', (r) => {
-    if (/github\.com\/VOTReader\/votreader-assets|\.mp3(\?|$)/.test(r.url())) {
-      // Honour Range requests: without 206 answers Chrome treats the recording as
-      // unseekable and a seek restarts it from 0, which is not the reader's situation.
-      const m = /bytes=(\d+)-(\d*)/.exec(r.headers().range || '');
-      if (m) {
-        const from = Number(m[1]), to = m[2] ? Math.min(Number(m[2]), WAV.length - 1) : WAV.length - 1;
-        r.respond({ status: 206, contentType: 'audio/wav', body: WAV.subarray(from, to + 1),
-          headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${from}-${to}/${WAV.length}`, 'Cache-Control': 'no-store' } });
-      } else {
-        r.respond({ status: 200, contentType: 'audio/wav', headers: { 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' }, body: WAV });
-      }
-    } else r.continue();
-  });
+  await stubAudio(page);
   const booted = () => page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
   const click = async (label) => {
     const ok = await page.evaluate((label) => {
@@ -608,6 +635,7 @@ try {
   // playback), so a tree without a flush on pagehide cannot pass by closing right after a snapshot.
   // Same browser context: the profile's localStorage survives a tab close; the reopened page's
   // restored bar is read paused, before any tap, and must not have started on its own.
+  let page2 = null;   // arm C's reopened page; arm D plays it again and kills the browser under it
   if (withAudio) {
     const Cpre = await readPage();
     if (Cpre.status !== 'playing') fail(`C precondition: the reader is not playing before the close (${Cpre.status})`);
@@ -622,7 +650,7 @@ try {
       if (!stale) fail('C precondition: the periodic snapshot never read >= 2.5 s stale within 15 s — the cadence changed, or the clock is not advancing');
       const closedAt = Date.now();
       await page.close();
-      const page2 = await ctx.newPage();
+      page2 = await browser.newPage();
       await page2.goto(BASE, { waitUntil: 'load' });
       await page2.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
       await sleep(1500);
@@ -632,14 +660,49 @@ try {
       else if (C1.storeT === null || Math.abs(C1.storeT - C0.t) > 1) fail(`C the bar came back at ${C1.storeT} s, ${(C0.t - (C1.storeT || 0)).toFixed(1)} s behind the ${C0.t.toFixed(3)} s read just before the close (tolerance 1 s; the periodic snapshot held ${snapBefore} s)`);
       else note(`C clock: the bar came back at ${C1.storeT} s against ${C0.t.toFixed(3)} s read just before the close — ${((C1.storeT - C0.t) * 1000).toFixed(0)} ms, within 1 s`);
       if (C1.status === 'playing') fail('C the bar came back PLAYING after a plain reopen — a close is not an update; nothing asked for sound');
-      await page2.close().catch(() => {});
+    }
+  }
+  // ════════ ARM D — a KILL: no pagehide, no event at all ════════
+  // The phone's shape: the app is killed mid-listen. The restored bar is played again from its own
+  // Play button (a real gesture, so the refused policy allows it), the browser process tree is
+  // killed abruptly at a moment the localStorage snapshot is provably >= 2.5 s stale, and a fresh
+  // browser on the same profile boots. What comes back is what the DURABLE channel held: under a
+  // tree kill localStorage reads its first commit (Chromium commits it 5 s after the first write,
+  // then at most ~60 times an hour), IndexedDB reads its last write (probe-kill-durability.mjs).
+  if (withAudio && page2) {
+    await stubAudio(page2);
+    await page2.click('.audio-bar-play');
+    const playing = await page2.waitForFunction(() => { const s = window.AudioPlayer.getState(); return s.status === 'playing' && window.AudioPlayer.getPreciseTime() > 0; }, { timeout: 20000 }).then(() => true, () => false);
+    if (!playing) fail('D precondition: the restored bar did not start playing from its Play button');
+    else {
+      const stale = await page2.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
+        return !!s && window.AudioPlayer.getPreciseTime() - Number(s.time) >= 2.5;
+      }, { timeout: 15000 }).then(() => true, () => false);
+      const D0 = await page2.evaluate(() => { const P = window.AudioPlayer; const s = P.getState(); const tr = s.queue[s.qi] || {}; let snap = null; try { snap = Number(JSON.parse(localStorage.getItem('vot-audio-pos')).time); } catch (e) { snap = null; } return { key: tr.key || null, t: P.getPreciseTime(), snap }; });
+      note(`D before: playing key ${D0.key} at ${D0.t.toFixed(3)} s; the localStorage snapshot holds ${D0.snap} s`);
+      if (!stale) fail('D precondition: the snapshot never read >= 2.5 s stale within 15 s — the cadence changed, or the clock is not advancing');
+      const killedAt = Date.now();
+      await killBrowserTree();
+      browser = await puppeteer.launch(LAUNCH);
+      const page3 = await browser.newPage();
+      await stubAudio(page3);
+      await page3.goto(BASE, { waitUntil: 'load' });
+      await page3.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
+      await sleep(1500);
+      const D1 = await page3.evaluate(() => { const P = window.AudioPlayer; const s = P && P.getState(); const tr = s && s.queue[s.qi] || {}; return { key: tr.key || null, status: s ? s.status : null, storeT: s ? s.time : null }; });
+      note(`D after the kill + relaunch: ${D1.status} key ${D1.key} store=${D1.storeT} (relaunched ${Date.now() - killedAt} ms after the kill)`);
+      if (D1.key !== D0.key) fail(`D the bar came back with ${JSON.stringify(D1.key)}, the reader was listening to ${JSON.stringify(D0.key)}`);
+      else if (D1.storeT === null || Math.abs(D1.storeT - D0.t) > 1) fail(`D the bar came back at ${D1.storeT} s, ${(D0.t - (D1.storeT || 0)).toFixed(1)} s behind the ${D0.t.toFixed(3)} s read just before the kill (tolerance 1 s; the localStorage snapshot held ${D0.snap} s)`);
+      else note(`D clock: the bar came back at ${D1.storeT} s against ${D0.t.toFixed(3)} s read just before the kill — ${((D1.storeT - D0.t) * 1000).toFixed(0)} ms, within 1 s`);
+      if (D1.status === 'playing') fail('D the bar came back PLAYING after a kill — nothing asked for sound');
     }
   }
   if (errors.length) fail(`page errors: ${errors.slice(0, 3).join(' | ')}`);
-  await ctx.close();
 } finally {
-  await browser.close();
+  await browser.close().catch(() => {});
   server.close();
+  try { rmSync(profileDir, { recursive: true, force: true }); } catch (_e) { /* Chrome may still hold a file for a moment */ }
 }
 console.log(failures.length ? `\n${failures.length} FAILED` : '\nPASS — the reader came back where they were');
 process.exit(failures.length ? 1 : 0);
