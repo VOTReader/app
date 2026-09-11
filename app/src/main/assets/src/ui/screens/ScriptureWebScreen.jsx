@@ -1054,6 +1054,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <button type="button" className="sw-btn sw-btn-zoom" ref={zoomInRef} onClick={() => changeZoom(1.8)} aria-label="Zoom in">+</button>
         </div>
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
+        {/* IN THE STRIP'S FLOW, NOT UNDER IT. `flex-basis: 100%` in a wrapping
+            flex row makes this its own last line, so the strip's height carries
+            the attribution instead of a second element having to guess it. */}
+        <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       </div>
 
       <div className="sw-context" aria-label="Current Scripture Web location">
@@ -1103,7 +1107,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(colorMode)}</div>
-      <div className="sw-credit">Cross-references: OpenBible.info (CC-BY)</div>
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
       <div id="sw-a11y-help" className="sw-sr-only">
         Drag to move through scripture. Use the zoom controls or plus and minus keys.
