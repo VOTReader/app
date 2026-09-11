@@ -3240,6 +3240,31 @@ describe('audio-player — resume across the update reload', () => {
     } finally { dropGlobals(); }
   });
 
+  it('a refused play() parks the bar at the RESUME clock, not at zero: the bar shows it and the snapshot keeps it', async () => {
+    /* Measured under --autoplay-policy=user-gesture-required (tools/e2e-update-reload.mjs, r5):
+       "the player came back paused at 0 s, not at the 41.009193 s the event wrote". _start() zeroes
+       the clock, the seek waits for metadata a refused play() never loads, and the refusal's own
+       _persist() wrote that 0 into vot-audio-pos over the reader's place. Close the app before the
+       tap and the place is gone. The intent of the seek IS the clock (seek() already says so:
+       "state still reflects intent"), so the deferred seek records it the moment it is armed. */
+    globalThis.Audio = Refusing;
+    const offer = vi.fn(); window.__votUpdateToastResume = offer;
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
+    sessionStorage.setItem(REC_KEY, JSON.stringify({ url: URL_OF('idC'), time: 41.37, at: Date.now() }));
+    await load(); rebuildGlobals();
+    try {
+      await tick(); await tick(); await tick();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(AudioPlayer.getState().time, 'the bar shows the clock the reader was at, not 0:00').toBe(41.37);
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time, 'the boot snapshot keeps the place (its whole-second format) — the refusal must not persist 0 over it').toBe(41);
+      // The tap then lands the seek at that clock: the deferred seek is still armed for this element.
+      offer.mock.calls[0][0]();
+      await tick();
+      el().readyState = 1; el().duration = 60; el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBe(41.37);
+    } finally { dropGlobals(); }
+  });
+
   it('a record for ANOTHER recording, or older than two minutes, is dropped without a play attempt', async () => {
     globalThis.Audio = Counting;
     localStorage.setItem('vot-audio-pos', JSON.stringify(SNAP));
