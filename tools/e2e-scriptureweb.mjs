@@ -261,8 +261,15 @@ const BAND_FLOOR = {
      of font-metric difference reddens it by construction, and a floor that
      reddens for a reason nobody can act on is a floor that gets lowered. */
   win32: {
-    '320x640': 154,   // y 237..391, chrome 70.6% — identical in all three runs
-    '426x952': 518,   // y 237..755, chrome 42.0% — identical in all three runs
+    /* RE-REGISTERED 2026-09-11 (6cb64297, three consecutive runs identical, RTX 5080 /
+       Chrome 152). The REGION moved, not the chrome: nobox rotates the root on a
+       portrait frame, so the band is the root's vertical, which is viewport X, and
+       the old rows (154 = y 237..391 of 640; 518 = y 237..755 of 952) were sweeps
+       down viewport y on the pre-rotation tree — a number about a region that no
+       longer exists. A floor measured against a stale definition of the region
+       fails whichever way the region moved; the axis is printed on 2d's line now. */
+    '320x640': 135,   // x 52..187 of 320 along the rotated root, chrome 52.2% — identical in all three runs
+    '426x952': 290,   // x 52..342 of 426 along the rotated root, chrome 27.7% — identical in all three runs
   },
   /* linux: DELIBERATELY UNREGISTERED. Registering a guess would be worse than
      the gap — an unregistered platform says "this has never been measured
