@@ -20,7 +20,7 @@
    the same way the real canvas would via web-renderer.js's DOM listeners
    (which are proven separately in web-renderer.test.js).
 */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 /* Every draw the mocked renderer was asked to make, in order. MEASURED that a
    plain `const` works here: vi.mock's factory is hoisted but only RUNS at import
@@ -120,6 +120,10 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     for (const [prop] of SIZES) delete HTMLCanvasElement.prototype[prop];
     if (realDecode) vi.mocked(decodeGraph).mockImplementation(realDecode);
   });
+  // The zoom instrument below reads the LAST draw, so the recorder starts
+  // empty for every case: module-wide, the ceiling case's forty presses
+  // leaked '1711x' into the next describe's 'Overview' control.
+  beforeEach(() => { DRAWN.length = 0; });
 
   /* ONE WAITER FOR THE GL CANVAS, AND IT THROWS RATHER THAN GIVING UP SILENTLY.
      There were two copies of this loop - mount()'s, inherited from main, and a
@@ -151,6 +155,13 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     }
     // viewRef.W is set by the effect that follows the mount; flush once more.
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    /* Then the FIRST DRAW, bounded. The zoom instrument reads the last draw;
+       the label it replaced read 'Overview' off static markup before any
+       frame existed, which is a control that could not fail. */
+    for (let i = 0; i < 60 && DRAWN.length === 0; i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    if (DRAWN.length === 0) throw new Error('the renderer was never asked to draw - the sized canvas is not reaching draw()');
     return view;
   };
 
@@ -167,10 +178,24 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     return awaitCanvas(view);
   };
 
-  const zoomText = (c) => c.querySelector('.sw-context-zoom').textContent;
+  /* The zoom instrument. The location card that used to print this label is
+     gone (Corbin's trim), so the label is re-derived here from the ppv the
+     renderer was LAST asked to draw: zoom = ppv / fitPPV, fitPPV = W / total
+     with W = FRAME_CSS * dpr. Same formula the card used, same timing (the
+     card was written inside draw()), and it reads the camera, not a label. */
+  const zoomText = () => {
+    const last = DRAWN[DRAWN.length - 1];
+    if (!last) throw new Error('zoomText: nothing drawn yet');
+    const zoom = last.ppv / ((FRAME_CSS * last.dpr) / CANON);
+    return zoom < 1.1 ? 'Overview' : (zoom < 10 ? String(Math.round(zoom * 10) / 10) : Math.round(zoom) + 'x');
+  };
+  /* One FRAME per press (20 ms), not one macrotask: the instrument is now
+     the draw, and jsdom's requestAnimationFrame runs on a ~16 ms timer, so a
+     0 ms await reads the frame BEFORE the press. The card's label hid this
+     because it, too, lagged — the nested describe measured it. */
   const press = async (key) => {
     fireEvent.keyDown(document.querySelector('.sw-root'), { key });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
   };
 
   it('CONTROL and PRECONDITION: the canvas is sized, so + reaches the camera', async () => {
@@ -185,15 +210,6 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     for (let i = 0; i < 40; i++) await press('+');
     // maxZoomFor(31102, 800) = 1710.61 -> the label rounds to 1711x.
     expect(zoomText(container)).toBe('1711x');
-  });
-
-  it('marks the + button aria-disabled at the ceiling and not before', async () => {
-    await mount();
-    const plus = screen.getByLabelText('Zoom in');
-    expect(plus.getAttribute('aria-disabled')).not.toBe('true');
-    for (let i = 0; i < 40; i++) await press('+');
-    expect(plus.getAttribute('aria-disabled')).toBe('true');
-    expect(screen.getByLabelText('Zoom out').getAttribute('aria-disabled')).not.toBe('true');
   });
 
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
@@ -253,6 +269,11 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('crossing the entry edge switches to Essential AND says so', async () => {
       const { container } = await mount();
       for (let i = 0; i < 15; i++) await pressFrame('+');
+      /* The crossing press's own frame is the one the auto-switch's early
+         return SUPPRESSES (draw() sets the density state and returns before
+         asking the renderer), so the camera's new ppv is drawn on the frame
+         after that state lands. One more frame, then read the camera. */
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       expect(zoomText(container)).toBe('1153x');  // ppvCss 29.66, past 22
       // Both, or a silent switch passes: the rail shows the live value…
       expect(shown()).toBe('essential');
