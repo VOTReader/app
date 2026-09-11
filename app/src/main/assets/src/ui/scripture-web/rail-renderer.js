@@ -333,9 +333,15 @@ class ContextBatches {
       else { push(e.bin, layer, 1, e.pts, 0, rise); push(e.bin, layer, 0, e.pts, rise, e.pts.length - 1); }
     }
     let n = 0;
-    for (const [key, list] of paths) {
+    // keys sort by bin, then layer, then run: consecutive paths mostly share a
+    // style, and a strokeStyle set is a colour parse the canvas need not repeat
+    const keys = [...paths.keys()].sort((p, q) => p - q);
+    let last = '';
+    for (const key of keys) {
+      const list = paths.get(key);
       const run = key & 1, bin = Math.floor(key / 8192);
-      ctx.strokeStyle = 'rgba(' + myWebBinColor(bin) + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
+      const style = 'rgba(' + myWebBinColor(bin) + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
+      if (style !== last) { ctx.strokeStyle = style; last = style; }
       ctx.beginPath();
       for (const seg of list) {
         ctx.moveTo(seg.pts[seg.i0][0], seg.pts[seg.i0][1]);
