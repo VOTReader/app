@@ -89,8 +89,15 @@
  *   run, whatever colour it prints.
  *     2e  RETIRED 2026-09-10: it placed the portrait hint, and nobox deleted the
  *         hint (the screen rotates itself; nothing asks the reader to turn)
- *     2g  the hide-all button hides the topbar, the strip and the legend, stays
- *         hittable itself, and shows them again — checked once per frame
+ *     2g  the hide-all button, pressed both ways, once per frame: after one press
+ *         the root carries .sw-chrome-hidden, every block in CHROME_HIDDEN_BY_BUTTON
+ *         is display:none, aria-pressed reads true and the button itself is still
+ *         hit-testable at its centre (it is the way back); after a second press
+ *         every block that was painted on arrival is painted again and the
+ *         sessionStorage key is gone. Restored in a finally, so a red 2g cannot
+ *         hand arm 1 a chromeless screen. Whether the strip and the button sit
+ *         INSIDE the root's box is chrome-fit's F1 (tools/e2e-sw-chrome.mjs, its
+ *         own gate); 2b/2c do not re-measure it
  *     2d  the open canvas band — the tallest run of viewport height no chrome
  *         covers — against a REGISTERED PER-FRAME FLOOR, measured rather than
  *         chosen, with no tolerance band. Chrome that stops overlapping itself
@@ -240,6 +247,12 @@ const REQUIRED_PAINTED = [
    and the floor moves by a commit naming that cause. Undetermined is printed as
    undetermined; a plausible default here would be the reader's whole answer. */
 let BROWSER_BUILD = null;
+/* The GL renderer string (UNMASKED_RENDERER_WEBGL), printed beside every number a
+   GPU could move and beside the band's floor line, so a red line names the whole
+   instrument (Charter 2026-09-10: GPU named or not a number). The band is TEXT
+   LAYOUT, so its floor stays keyed by frame x platform; the renderer only rides
+   along there. Undetermined prints as undetermined. */
+let GL_RENDERER = null;
 
 const BAND_FLOOR = {
   /* KEYED BY PLATFORM AS WELL AS FRAME, because the band's top is chrome
@@ -677,9 +690,15 @@ function armChrome(tag, geo) {
       + `— the chrome took ${floor - geo.band.h} px from the reader. Chrome that stops overlapping itself has not `
       + 'necessarily got out of the reader\'s way, and this is the only arm that can tell the difference');
   }
-  notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (y ${geo.band.top}..${geo.band.bottom}) of ${geo.innerHeight} px; `
+  /* THE AXIS IS PART OF THE NUMBER. On a rotated root the band runs along viewport
+     x and its extent is innerWidth; "y .. of innerHeight" there reads a band as a
+     share of the wrong edge. readGeometry sweeps the root's axis and says which. */
+  const axis = geo.rotated ? 'x' : 'y';
+  notes.push(`${tag} 2d open canvas band ${geo.band.h} px tall (${axis} ${geo.band.top}..${geo.band.bottom}) of ${geo.extent} px`
+    + `${geo.rotated ? ' along the rotated root' : ''}; `
     + `chrome covers ${geo.coveredPct}%; floor ${floor === undefined ? 'NONE REGISTERED for ' + process.platform : floor + ' px (' + process.platform + ')'}; `
-    + `browser ${BROWSER_BUILD || 'UNDETERMINED — browser.version() gave nothing, so a red here cannot be told from an instrument change'}`);
+    + `browser ${BROWSER_BUILD || 'UNDETERMINED — browser.version() gave nothing, so a red here cannot be told from an instrument change'}; `
+    + `renderer ${GL_RENDERER || 'UNDETERMINED — the probe page gave no WebGL2 context'}`);
 
   /* WHAT ARM 2 RAN. 0 failures and 0 checks are the same output, so the counts
      are printed and the empty case is a failure rather than a pass. */
@@ -703,6 +722,75 @@ function armChrome(tag, geo) {
     + (geo.blocksInvisible.length ? ` notPainted=[${geo.blocksInvisible.join(' ')}]` : '')
     + (geo.blocksMissing.length ? ` MISSING=[${geo.blocksMissing.join(' ')}]` : '')
     + `, pairs=${geo.pairs}, hits=${geo.hits}, unhittable=${geo.unhittable.length}, overflow=1, failures=${fails.length - before}`);
+}
+
+/* ARM 2g — the hide-all button, pressed both ways. The reader's way back once
+   the rest is hidden, so the one property that matters most is that the button
+   is still HIT-TESTABLE in the hidden state (a bounding box cannot see a card
+   painted over it; elementFromPoint can). Each press is a real click through
+   puppeteer (a pointer at the element's centre, transforms included — the root
+   is CSS-rotated on the portrait frames), never `el.click()`. The probe reads
+   everything in one round trip so the two states are compared like for like.
+   RESTORED IN A FINALLY: the toggle persists in sessionStorage, and a red 2g
+   that left the chrome hidden would hand arm 1 a screen with no strip to read
+   the density from — one arm's failure silently becoming another's. */
+const HIDE_ALL_PROBE = (hiddenSel) => {
+  const root = document.querySelector('.sw-root');
+  const btn = document.querySelector('.sw-hide-all');
+  if (!root || !btn) return { missing: !root ? '.sw-root' : '.sw-hide-all' };
+  const b = btn.getBoundingClientRect();
+  const cx = Math.round(b.left + b.width / 2); const cy = Math.round(b.top + b.height / 2);
+  const hit = document.elementFromPoint(cx, cy);
+  const painted = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0.01; };
+  let key = null; try { key = sessionStorage.getItem('vot-sw-chrome-hidden'); } catch (_e) { key = 'UNREADABLE'; }
+  return {
+    hidden: root.classList.contains('sw-chrome-hidden'),
+    pressed: btn.getAttribute('aria-pressed'),
+    hittable: !!hit && (hit === btn || btn.contains(hit)),
+    hitBy: hit ? (hit.className && String(hit.className).slice(0, 40)) || hit.tagName : null,
+    x: cx, y: cy, w: Math.round(b.width), h: Math.round(b.height),
+    blocks: hiddenSel.map((sel) => { const el = document.querySelector(sel); return { sel, state: !el ? 'MISSING' : painted(el) ? 'painted' : 'hidden' }; }),
+    key,
+  };
+};
+
+async function armHideAll(page, tag) {
+  const fail = (m) => fails.push(`${tag} 2g ${m}`);
+  const before = fails.length;
+  const probe = () => page.evaluate(HIDE_ALL_PROBE, CHROME_HIDDEN_BY_BUTTON);
+  const press = async (wantHidden) => {
+    await page.click('.sw-hide-all');
+    await page.waitForFunction((want) => !!document.querySelector('.sw-root') && document.querySelector('.sw-root').classList.contains('sw-chrome-hidden') === want, { timeout: 2000, polling: 50 }, wantHidden).catch(() => {});
+  };
+  const p0 = await probe();
+  if (p0.missing) { fail(`${p0.missing} matches nothing — the arm cannot run, which is not the same as passing`); return; }
+  const arrivedPainted = p0.blocks.filter((b) => b.state === 'painted').map((b) => b.sel);
+  if (p0.hidden || p0.pressed !== 'false') fail(`arrived HIDDEN (root class ${p0.hidden}, aria-pressed ${JSON.stringify(p0.pressed)}, key ${JSON.stringify(p0.key)}) — a fresh context must arrive with its chrome shown`);
+  if (!p0.hittable) fail(`the button is not hit-testable at its centre (${p0.x}, ${p0.y}) on arrival — elementFromPoint gave ${p0.hitBy}`);
+  if (Math.min(p0.w, p0.h) < 44) fail(`the button's box is ${p0.w}x${p0.h} px on arrival, under the 44 px tap target .sw-btn promises`);
+  let p1 = null;
+  try {
+    await press(true);
+    p1 = await probe();
+    if (!p1.hidden) fail(`one press did not hide the chrome: the root has no .sw-chrome-hidden (aria-pressed ${JSON.stringify(p1.pressed)})`);
+    if (p1.pressed !== 'true') fail(`aria-pressed reads ${JSON.stringify(p1.pressed)} in the hidden state, not "true" — the state has no name for a screen reader`);
+    for (const b of p1.blocks) if (b.state !== 'hidden') fail(`${b.sel} is ${b.state} after the press — the button must make it disappear`);
+    if (!p1.hittable) fail(`in the hidden state the button is NOT hit-testable at its centre (${p1.x}, ${p1.y}) — elementFromPoint gave ${p1.hitBy}; the reader has no way back`);
+    if (Math.min(p1.w, p1.h) < 44) fail(`in the hidden state the button's box is ${p1.w}x${p1.h} px — the glyph may shrink, the 44 px target may not`);
+    if (p1.key !== '1') fail(`the hidden state is not remembered: sessionStorage key reads ${JSON.stringify(p1.key)}, wanted "1"`);
+  } finally {
+    /* The way back, taken whether or not the checks above passed. */
+    await press(false);
+  }
+  const p2 = await probe();
+  if (p2.hidden || p2.pressed !== 'false') fail(`the second press did not restore the chrome (root class ${p2.hidden}, aria-pressed ${JSON.stringify(p2.pressed)}) — every arm after this one would run on a chromeless screen`);
+  for (const b of p2.blocks) {
+    if (arrivedPainted.includes(b.sel) && b.state !== 'painted') fail(`${b.sel} was painted on arrival and is ${b.state} after the second press`);
+  }
+  if (p2.key !== null && p2.key !== 'UNREADABLE') fail(`the shown state left the key behind: sessionStorage reads ${JSON.stringify(p2.key)} — absence is the signal, a stored "shown" is a default impersonating a choice`);
+  notes.push(`${tag} 2g hide-all: arrived shown [${arrivedPainted.join(' ')}]; pressed -> hidden=${p1 ? p1.hidden : 'n/a'} `
+    + `blocks=[${p1 ? p1.blocks.map((b) => b.sel + ':' + b.state).join(' ') : 'n/a'}] button ${p1 ? p1.w + 'x' + p1.h : '?'} at (${p1 ? p1.x + ',' + p1.y : '?'}) hittable=${p1 ? p1.hittable : 'n/a'}; `
+    + `pressed again -> hidden=${p2.hidden} blocks=[${p2.blocks.map((b) => b.sel + ':' + b.state).join(' ')}] key=${JSON.stringify(p2.key)}; failures=${fails.length - before}`);
 }
 
 /** Chrome geometry, measured in viewport space — which is what the reader meets, rotation included. */
@@ -803,7 +891,11 @@ const readGeometry = (chromeSel, optionalSel) => {
     overlaps, covered, unhittable, offscreen, band: best, rotated,
     blocksFound: blocks.map((b) => b.sel), blocksMissing, blocksInvisible,
     pairs, hits: controls.length,
-    innerWidth, innerHeight: rows.length,
+    /* The window's own numbers under their own names. `innerHeight: rows.length` used to
+       stand here — the swept extent wearing the height's name — and read 640 only while
+       the sweep ran down y; along the rotated root it read 320, every portrait frame
+       keyed itself "320x320" and 2d found no floor for a frame it had one for. */
+    innerWidth, innerHeight, extent: rows.length,
     coveredPct: Math.round((coveredRows / rows.length) * 1000) / 10,
     scrollWidth: document.documentElement.scrollWidth,
     overflowX: document.documentElement.scrollWidth - innerWidth,
@@ -977,6 +1069,10 @@ async function walk(page, url, frame, scale) {
   }
   notes.push(`${tag} 2 --font-scale ${geo.fontScale || '1'} root ${geo.rootFontPx} viewport ${geo.innerWidth}x${geo.innerHeight}`);
   armChrome(tag, geo);
+  /* 2g right after 2's arrival read and before any gesture: it presses a real
+     button twice and restores in a finally, so arm 1 below meets the chrome it
+     expects. */
+  await armHideAll(page, tag);
   /* 4b SITS ABOVE ARM 1'S RETURN, ON PURPOSE. It owes arm 1 nothing -- the
      recorder was filled at boot -- and on a tree without the ppv publisher the
      frame returns right after the 1a rows. Measured on two branches: with the
@@ -1046,7 +1142,8 @@ async function walk(page, url, frame, scale) {
   const ft = await frameTime(page, PAN_MS).catch((e) => ({ err: e.message }));
   if (ft && ft.err) notes.push(`${tag} 3 frame time UNMEASURED (${ft.err})`);
   else if (!ft) notes.push(`${tag} 3 frame time UNMEASURED (no frames sampled)`);
-  else notes.push(`${tag} 3 deep-zoom frame time at ppv ${top.ppv}: median ${ft.median} ms, p95 ${ft.p95} ms, max ${ft.max} ms over ${ft.n} frames (${ft.moves} pointer moves) — PRINTED, NOT ASSERTED`);
+  else notes.push(`${tag} 3 deep-zoom frame time at ppv ${top.ppv}: median ${ft.median} ms, p95 ${ft.p95} ms, max ${ft.max} ms over ${ft.n} frames (${ft.moves} pointer moves) — PRINTED, NOT ASSERTED; `
+    + `renderer ${GL_RENDERER || 'UNDETERMINED'}; browser ${BROWSER_BUILD || 'UNDETERMINED'}`);
 
   const fall = await zoomArc(page, -1, (s) => s.ppv <= DENSITY_EXIT_PPV_CSS);
 
@@ -1112,7 +1209,8 @@ try {
     return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
   });
   await probe.close();
-  console.log('[e2e-swweb] renderer ' + JSON.stringify(renderer));
+  GL_RENDERER = renderer;
+  console.log('[e2e-swweb] renderer ' + JSON.stringify(renderer) + ' browser ' + JSON.stringify(BROWSER_BUILD));
 
   await armShaders(browser, own.base, own.url);
 

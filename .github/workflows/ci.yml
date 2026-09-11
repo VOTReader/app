@@ -432,8 +432,9 @@ jobs:
       - name: End-to-end Scripture Web walk
         # e2e-scriptureweb.mjs reaches the Scripture Web the way a reader does
         # (Home -> Library -> The Whole Counsel) and drives the real zoom
-        # buttons against the real WebGL canvas at 320x640 and 426x952, text
-        # scale 1 and 1.8.
+        # (the +/- keys on the focused root; the trim deleted the buttons)
+        # against the real WebGL canvas at 320x640 and 426x952, text scale 1
+        # and 1.8, and presses the hide-all button both ways per frame.
         #
         # WHY IT IS HERE. Landing 67 (the Essential auto-switch) shipped with
         # geometry.test.js as its only witness — a unit pair over the pure
