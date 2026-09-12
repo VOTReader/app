@@ -47,11 +47,16 @@
  *      full sits between two ticks <= 50 ms apart (the Verifier's bite, fade
  *      removed: 0 fading frames, both frames, 4-5 ms cadence), UNRESOLVED when
  *      the tick gap there is longer (neither passes).
- *      Launch classification, printed on every launch: release frames drawn
- *      as main-thread long tasks >= 50 ms mean the 2D canvas is in software
- *      raster for that browser (measured on the RTX 5080 D3D11 string: 330-502
- *      ms a frame on desktop, 73-105 ms on the phone frame, against 5-8 ms
- *      accelerated; a new page in the same browser inherits it), so that
+ *      Launch classification, printed on every launch, read on the HOLD
+ *      frames only (the capped picture drawn every frame for 150 ms), never
+ *      on the release frames: on a no-fade tree the release frame is the pop
+ *      itself, one full draw of ~2,600 strokes at 60-108 ms on the phone
+ *      frame even accelerated. A hold frame drawn as a long task >= 50 ms,
+ *      live ticks >= 50 ms apart, or fewer than 3 live ticks mean the 2D
+ *      canvas is in software raster for that browser (measured on the RTX
+ *      5080 D3D11 string: 330-558 ms a frame on desktop, 61-157 ms on the
+ *      phone frame, against 5-8 ms accelerated; a new page in the same
+ *      browser inherits it), so that
  *      launch is not a number: the browser is relaunched, up to three, and
  *      three software launches FAIL as "not a number". NO pixel read-back in
  *      this arm and it runs FIRST on a fresh page: two getImageData reads on
@@ -103,10 +108,12 @@ const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measure
 const NOTCHES = 22;
 const ARMS = arg('arms', 'R,O,S,T,C').split(',');
 const BAND_FILL = 0.6;
-// arm R launch classifier: an accelerated release frame draws in 5-8 ms here;
-// a software-raster one in 73-105 ms (phone) / 330-502 ms (desktop). 50 sits
-// between the two populations with a factor of >= 1.4 to the nearer one.
+// arm R launch classifier, read on the HOLD frames (never the release frame,
+// which on a no-fade tree is the pop itself): an accelerated hold frame draws
+// in 5-8 ms here; a software-raster one in 61-157 ms (phone) / 330-558 ms
+// (desktop). 50 sits between the populations with a factor >= 1.2 to the nearer.
 const SOFT_MS = 50;
+const LIVE_HOLD_MS = 150;   // the screen's hold (ScriptureWebScreen LIVE_HOLD_MS), for the live-tick floor
 // diagnosis only (e.g. --disable-features=SkiaGraphite); a run with args is
 // not the frame the reader gets and is printed as such
 const CHROME_ARGS = (process.env.MYWEB_CHROME_ARGS || '').split(' ').filter(Boolean);       // a rail "zoomed to a book": the book spans >= 60 % of the width
@@ -408,24 +415,34 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const gaps = after.slice(1).map((x, i) => x.t - after[i].t);
   const maxGap = gaps.length ? Math.max(...gaps) : 0;
   const cadence = after.length > 1 ? Math.round((after[after.length - 1].t - after[0].t) / (after.length - 1)) : 0;
-  const soft = longs.filter((l) => l.ms >= SOFT_MS);
   note(`${tag} R (launch ${attempt}): cap-fraction trace after the notch: ${shots.length} frames over ${shots[shots.length - 1].t - shots[0].t} ms (cadence ${cadence} ms, largest gap ${maxGap} ms): live ${live.length} frames (${lastLive ? 'to t+' + lastLive.t : 'none'}), fading ${fading.length} frames over ${fadeSpan} ms, falls ${falls}, full from t+${firstFull ? firstFull.t : '-'}; main-thread long tasks in the window: ${longs.length ? longs.map((l) => `${l.ms} ms at t+${l.t}`).join(', ') : 'none'}`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R-launch${attempt}.json`), JSON.stringify({ shots: all, longs }, null, 1));
-  // headless Chrome lands the 2D canvas in software raster on some launches
-  // (measured: 4 of 11 desktop launches drew every release frame as a
-  // 330-500 ms main-thread long task, the others at 5 ms cadence, same tree,
-  // same renderer string): that launch is not a number. Recreate the page and
-  // try again, up to three launches, every one printed.
-  // a trace with a >= 200 ms hole and no long task is a starved page (one
-  // launch gave a single tick in 1.76 s): the same verdict, not a number
-  const starved = !soft.length && (all.length < 3 || Math.max(...all.slice(1).map((x, i) => x.t - all[i].t)) >= 200);
-  if (starved) soft.push({ t: 0, ms: 0 });
-  if (soft.length) {
-    if (attempt < 3) { note(`${tag} R: launch ${attempt} ${starved ? `starved the page (${all.length} ticks, largest hole ${Math.max(...all.slice(1).map((x, i) => x.t - all[i].t))} ms, no long task)` : `drew the release as long tasks (${soft.map((l) => l.ms + ' ms').join(', ')}): software-raster canvas`}, not a number; relaunching the browser`); return 'software'; }
-    fails.push(`${tag} R: three browser launches drew the release as main-thread long tasks (last: ${soft.map((l) => l.ms + ' ms').join(', ')}): no accelerated canvas to judge the fade on; not a number`);
+  // LAUNCH CLASSIFICATION reads the HOLD frames only (the live picture drawn
+  // every frame for 150 ms after the notch), never the release frames: on a
+  // no-fade tree the release frame IS the pop, one full draw of ~2,600
+  // strokes costing 60-108 ms on the phone frame even accelerated, so a
+  // classifier that reads it can never let that tree read POP (the
+  // Verifier, 2026-09-11). A hold frame is the capped picture: 5-8 ms
+  // accelerated, 61-157 ms (phone) / 330-558 ms (desktop) in the software
+  // state headless Chrome lands in on some launches (a new page in the same
+  // browser inherits it). Software = a long task >= SOFT_MS starting before
+  // the last live tick, or live ticks >= SOFT_MS apart, or fewer than 3 live
+  // ticks in a 150 ms hold; the browser is relaunched, up to three.
+  const holdLongs = lastLive ? longs.filter((l) => l.t < lastLive.t && l.ms >= SOFT_MS) : [];
+  const liveGaps = live.slice(1).map((x, i) => x.t - live[i].t);
+  const liveGap = liveGaps.length ? Math.max(...liveGaps) : 0;
+  const upTo = lastLive ? all.filter((x) => x.t <= lastLive.t) : all;
+  const holeBefore = upTo.length > 1 ? Math.max(...upTo.slice(1).map((x, i) => x.t - upTo[i].t)) : 0;
+  const why = !live.length ? (holeBefore >= 200 ? `no live tick and a ${holeBefore} ms hole in the trace: starved page` : '')
+    : holdLongs.length ? `hold frames drawn as long tasks (${holdLongs.map((l) => l.ms + ' ms').join(', ')}): software-raster canvas`
+    : liveGap >= SOFT_MS ? `live ticks up to ${liveGap} ms apart in the hold: software-raster canvas`
+    : live.length < 3 ? `${live.length} live tick(s) in a ${LIVE_HOLD_MS} ms hold: software-raster canvas` : '';
+  if (why) {
+    if (attempt < 3) { note(`${tag} R: launch ${attempt} ${why}, not a number; relaunching the browser`); return 'software'; }
+    fails.push(`${tag} R: three browser launches gave no accelerated canvas (last: ${why}): the release cannot be judged; not a number`);
     return 'software';
   }
-  note(`${tag} R: launch ${attempt} classified accelerated (no long task >= ${SOFT_MS} ms in the release window)${attempt > 1 ? ' after ' + (attempt - 1) + ' software launch(es)' : ' first try'}`);
+  note(`${tag} R: launch ${attempt} classified accelerated on the hold frames (${live.length} live ticks, largest gap ${liveGap} ms, no long task >= ${SOFT_MS} ms before the last live tick)${attempt > 1 ? ' after ' + (attempt - 1) + ' software launch(es)' : ' first try'}; the release frames are judged separately below`);
   // the jump: the tick gap into the first full frame. Too few fading frames is
   // a POP only when the sampler saw the jump between two close ticks; a long
   // gap there is UNRESOLVED (the instrument did not see it; neither passes)
