@@ -200,9 +200,19 @@ describe('app.css — the Settings summary keeps whole words at large type', () 
    its 25 px paint. Three caps, one rule: the strip's type and height, the
    hero's padding, and a 44 px hit band on the pill with the paint unchanged. */
 describe('app.css — large-type caps on rem-scaled chrome', () => {
-  it('the "New here?" strip is capped at a third of the screen and its type stops growing', () => {
+  it('the "New here?" strip\'s type stops growing, and its height is its words (no cap of its own)', () => {
     // The strip's own rule, not the `.tour-card, .tour-prompt` block it shares with the tour card.
-    expect(CSS.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/[\n\r]\s*\.tour-prompt \{[^}]*max-height:\s*33vh/);
+    // Until 2026-09-12 this pinned `max-height: 33vh` here. Journey F1.1 measured what that cap
+    // did: the strip scrolled INSIDE itself with no scrollbar on touch and "Don't show this again"
+    // sat off the frame — on every landscape phone at any text size (194 px of words in a 117 px
+    // box at 800x360) and on a portrait phone at Text Size 3 (298 in 262). The type caps below are
+    // what bound the words now; the Home scroller reserves the strip's measured height; and
+    // tools/e2e-tour.mjs (stripGeometry) pins the geometry that a rule's presence cannot. What a
+    // cap-free strip costs is measured there too: 274 / 290 / 356 px of 800 at Text Size 1 / 1.8 / 3.
+    const own = ruleBlock(CSS, '\n      .tour-prompt {');
+    expect(own, 'the strip has a rule of its own').toBeTruthy();
+    expect(own, 'CONTROL: the extractor found the strip\'s own rule').toMatch(/z-index:\s*310/);
+    expect(own).not.toMatch(/max-height/);
     // Each selector's OWN rule (the title and text also appear in comma lists shared with the tour
     // card, which keep growing: the card is the only way out of the tour and must stay readable).
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
