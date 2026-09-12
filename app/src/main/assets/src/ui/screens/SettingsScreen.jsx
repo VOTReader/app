@@ -2088,6 +2088,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             {/* Dependent row: with no wash there is nothing to follow, so the
                 scroll toggle is UNMOUNTED rather than greyed (the disclosure
                 discipline the whole screen follows). */}
+            {/* w-audio-continue (2026-09-11): the player continues in site order by itself (no switch — Pause is
+                the off switch); this row governs the SCREEN only. "Turn the Page", not "Follow the audio": the
+                row below already owns Follow, and two rows named Follow would be the one-label confusion again. */}
+            <SettingsRow
+              label="Turn the Page with the Audio"
+              desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."
+              checked={settings.audioTurnPage !== false}
+              onToggle={() => onToggle("audioTurnPage")}
+            />
             {settings.readAlongHighlight !== false && (
               <SettingsRow
                 label="Follow the Voice"
