@@ -201,6 +201,17 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     fireEvent.keyDown(document.querySelector('.sw-root'), { key });
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
   };
+  /* Two touch taps inside the 300 ms double-tap window at one CSS point, then
+     one frame (40 ms, two rAF ticks) for the draw the handler schedules. */
+  const doubleTapAt = async (container, x, y) => {
+    const root = container.querySelector('.sw-root');
+    const at = { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: x, clientY: y };
+    for (let i = 0; i < 2; i++) {
+      root.dispatchEvent(new PointerEvent('pointerdown', at));
+      root.dispatchEvent(new PointerEvent('pointerup', at));
+    }
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+  };
 
   it('CONTROL and PRECONDITION: the canvas is sized, so + reaches the camera', async () => {
     const { container } = await mount();
@@ -392,6 +403,50 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(DRAWN[DRAWN.length - 1].ppv, 'the ceiling').toBeCloseTo(132, 6);
     expect(Number(root.getAttribute('data-cam-x')), 'centred on the tapped verse').toBeCloseTo(verse + 0.5, 3);
+  });
+
+  /* ── verifier-2's three M6 pin gaps (46070f7a HELD with these unpinned): none a defect, each a
+     branch the GUARD did not cover. Every case below is red under the bite named in its title and
+     green on the tip; the precondition lines are what make the branch reachable. ── */
+
+  it('M6 PIN: a double-tap on the ruler strip BELOW 22 px per verse steps 2x like the web — with `if (onRuler)` alone it would leap 5,132x to a verse nobody could address', async () => {
+    const { container } = await mount();
+    const fitPpv = DRAWN[DRAWN.length - 1].ppv;
+    expect(fitPpv, 'precondition: the overview, under the 22 px floor').toBeLessThan(22);
+    // (500, 300) is the ruler strip on this frame — the same point the ruler case uses past the floor
+    await doubleTapAt(container, 500, 300);
+    expect(DRAWN[DRAWN.length - 1].ppv / fitPpv, 'the 2x step, not the leap to the ceiling').toBeCloseTo(2, 6);
+  });
+
+  it('M6 PIN: a ruler double-tap clamps WITH the y frame — a raised camera keeps its height through the leap to the ceiling; the frameless clamp drops y to 0', async () => {
+    // The ruler case starts at y = 0, where clampCamera with and without the frame agree.
+    const { container } = await mount({}, tall);
+    for (let i = 0; i < 31; i++) await press('+');
+    const ppv = DRAWN[DRAWN.length - 1].ppv;
+    expect(ppv).toBeGreaterThan(22);
+    expect(ppv).toBeLessThan(132);
+    // five steps of 0.12 band at 26.5 px per verse: 5 * 0.12 * 260 / (26.5 * 0.64) = 9.2 verses up
+    for (let i = 0; i < 5; i++) await press('ArrowUp');
+    const y = Number(camY(container));
+    expect(y, 'precondition: the camera is raised').toBeGreaterThan(5);
+    await doubleTapAt(container, 500, 300);
+    expect(DRAWN[DRAWN.length - 1].ppv, 'the ceiling').toBeCloseTo(132, 6);
+    expect(Number(camY(container)), 'y kept through the leap (the band at 132 is 3.08 verses, far under the 1,000-verse world)').toBeCloseTo(y, 3);
+  });
+
+  it('M6 PIN: a double-tap on the web zooms at the camera\'s OWN height — a raised y is kept exactly while ppv doubles; an anchor at the frame\'s middle row or at the finger\'s row would lift it', async () => {
+    // The GUARD reads the ppv ratio only; the own-height choice M4 made for the keys was unpinned for the tap.
+    const { container } = await mount({}, tall);
+    for (let i = 0; i < 31; i++) await press('+');
+    const ppv = DRAWN[DRAWN.length - 1].ppv;
+    expect(ppv).toBeGreaterThan(22);
+    for (let i = 0; i < 5; i++) await press('ArrowUp');
+    const y = Number(camY(container));
+    expect(y, 'precondition: the camera is raised').toBeGreaterThan(5);
+    await doubleTapAt(container, 500, 120);
+    expect(DRAWN[DRAWN.length - 1].ppv / ppv, 'the 2x step').toBeCloseTo(2, 6);
+    // holding the middle row (180 of 360) would read y + (260 - 180) / (26.5 * 0.64) / 2 = y + 2.4; the finger's row y + 4.1
+    expect(Number(camY(container)), 'the camera\'s own height, kept').toBeCloseTo(y, 3);
   });
 
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
