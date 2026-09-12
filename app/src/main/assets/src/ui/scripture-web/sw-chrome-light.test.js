@@ -61,12 +61,19 @@ const SITES = {
   'legend': '.sw-legend',
 };
 
-/** Resolve `color` one level through the cascade: var(--x) -> the property's computed value. */
+/** Resolve `color` through the cascade: var(--x) -> the property's computed value, following a
+ *  var() CHAIN (a token that names another token) — jsdom 30 substitutes var() into neither `color`
+ *  nor a custom property's own value (measured 2026-09-12: `--cream-dim: var(--ink-cream-dim)` reads
+ *  back verbatim). Bounded, so a cycle throws instead of hanging. */
 function inkOf(el) {
   const cs = getComputedStyle(el);
   const decl = (cs.color || '').trim();
-  const v = /^var\((--[\w-]+)\)$/.exec(decl);
-  const raw = v ? cs.getPropertyValue(v[1]).trim() : decl;
+  let raw = decl;
+  for (let hop = 0; hop < 8; hop++) {
+    const v = /^var\((--[\w-]+)\)$/.exec(raw);
+    if (!v) break;
+    raw = cs.getPropertyValue(v[1]).trim();
+  }
   const hex = /^#([0-9a-f]{6})$/i.exec(raw);
   if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
   const rgb = /^rgba?\(([^)]+)\)/.exec(raw);
@@ -97,6 +104,34 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
     const ink = inkOf(root.querySelector(SITES['pill .sw-btn']));
     expect(ink).toEqual([0xf2, 0xed, 0xe5]);
     expect(onBlack(ink)).toBeCloseTo(18.02, 1);
+  });
+
+  /* The chrome rule and :root's dark set spelled the same seven literals twice (chrome-light,
+     2026-09-11: "values are :root's, verbatim"). Two definitions that must agree is the root:
+     each ink is now ONE token in :root (--ink-*), and both sites reference it. The rule text is
+     read straight from app.css because the resolved colour cannot tell a copied literal from a
+     shared token — the calibration case above is what proves the VALUE, this proves the SHARE. */
+  const INKS = ['gold', 'gold-bright', 'gold-dim', 'gold-faint', 'gold-border', 'cream-dim', 'cream-muted'];
+  const ruleBody = (selector) => {
+    const at = CSS.indexOf(selector + ' {');
+    expect(at, `rule ${selector} present in app.css`).toBeGreaterThan(-1);
+    return CSS.slice(at, CSS.indexOf('}', at));
+  };
+  const LITERAL = /#[0-9a-f]{3,8}\b|rgba?\(/i;
+
+  it('the chrome rule carries no colour literal — every ink is a shared --ink-* token that :root also reads', () => {
+    const chrome = ruleBody('.sw-topbar, .sw-controls, .sw-hide-all, .sw-legend');
+    // Positive control on the extractor + the matcher: :root's block is FULL of literals.
+    expect(ruleBody(':root')).toMatch(LITERAL);
+    expect(chrome, 'a literal here is a second definition of a :root value').not.toMatch(LITERAL);
+    const root = ruleBody(':root');
+    for (const ink of INKS) {
+      const shared = new RegExp('--' + ink + ':\\s*var\\(--ink-' + ink + '\\)');
+      expect(chrome, `chrome --${ink} reads --ink-${ink}`).toMatch(shared);
+      expect(root, `:root --${ink} reads --ink-${ink}`).toMatch(shared);
+      expect(root, `--ink-${ink} is declared once, in :root`).toMatch(new RegExp('--ink-' + ink + ':\\s*(#[0-9a-f]{6}|rgba?\\([^)]*\\));'));
+      expect(CSS.split('--ink-' + ink + ':').length - 1, `--ink-${ink} declared exactly once`).toBe(1);
+    }
   });
 
   it.each(Object.entries(SITES))('%s: light theme ink clears 4.5:1 on the black canvas and matches dark', (_name, sel) => {
