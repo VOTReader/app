@@ -10,7 +10,6 @@
    carries aria-pressed. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { computeAccessibleName } from 'dom-accessibility-api';
 import React from 'react';
 import { ModeToggle, renderCommentaryCite } from './ModeToggle.jsx';
 
@@ -78,7 +77,8 @@ describe('the Study Notes control shows every view at once and presses the one t
       const svg = b.querySelector('svg');
       expect(svg && svg.getAttribute('aria-hidden'), `${b.textContent.trim()}: the glyph is aria-hidden`).toBe('true');
       expect(svg && svg.getAttribute('focusable'), `${b.textContent.trim()}: the glyph takes no focus stop (IE/old Edge)`).toBe('false');
-      expect(computeAccessibleName(b), 'and the accessible name is the label').toBe(b.textContent.trim());
+      // testing-library resolves the role query by ACCESSIBLE NAME, so landing on this very element proves the name is the label
+      expect(screen.getByRole('button', { name: b.textContent.trim() }), 'and the accessible name is the label').toBe(b);
     }
   });
   it('the control is one labelled group, so a screen reader hears "Study Notes" once and then the three views', () => {
