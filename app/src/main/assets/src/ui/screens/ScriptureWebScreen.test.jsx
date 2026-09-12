@@ -59,7 +59,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
-        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density });
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY });
         return STATS;
       },
       dispose: vi.fn(),
@@ -223,6 +223,82 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(root.getAttribute('data-sw-draw-ms')).toMatch(/^\d+(\.\d+)?$/);
     await press('+');
     expect(Number(root.getAttribute('data-sw-frames'))).toBeGreaterThan(frames);
+  });
+
+  /* ── M4: the camera's y from the keyboard, published, clamped, and gauged ── */
+  /* One 10,000-verse thread, so the world is 5,000 verses tall and the ceiling's
+     9.23-verse band has somewhere to go. */
+  const tall = () => Object.assign(graph(), {
+    count: 1,
+    from: new Uint16Array([15000]), to: new Uint16Array([25000]), votes: new Int16Array([30]),
+    buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[15000, 25000]] }],
+    chunkSize: 256,
+  });
+  const camY = (container) => container.querySelector('.sw-root').getAttribute('data-cam-y');
+
+  it('M4: ArrowUp at the ceiling raises data-cam-y, and the renderer is handed that y (received: no attribute, camY 0)', async () => {
+    const { container } = await mount({}, tall);
+    for (let i = 0; i < 40; i++) await press('+');
+    expect(zoomText(container)).toBe('1711x');
+    expect(camY(container), 'data-cam-y published on .sw-root').not.toBeNull();
+    expect(Number(camY(container))).toBe(0);
+    await press('ArrowUp');
+    const y = Number(camY(container));
+    // 0.12 of the band: 260 / (44 * 0.64) * 0.12 = 1.108 verses on this frame (DPR 1)
+    expect(y).toBeGreaterThan(1.0);
+    expect(y).toBeLessThan(1.2);
+    expect(DRAWN[DRAWN.length - 1].camY, 'the last draw carried the camera\'s y').toBeCloseTo(y, 3);
+    await press('ArrowDown');
+    expect(Number(camY(container))).toBe(0);
+  });
+
+  it('CONTROL: ArrowUp at fit leaves data-cam-y at 0 — the band is taller than the world', async () => {
+    const { container } = await mount({}, tall);
+    await press('ArrowUp');
+    expect(camY(container)).not.toBeNull();
+    expect(Number(camY(container))).toBe(0);
+  });
+
+  it('M4: a resize that doubles the frame\'s height re-clamps y, so a shrunk world cannot leave the camera above its ceiling', async () => {
+    const { container } = await mount({}, tall);
+    for (let i = 0; i < 40; i++) await press('+');
+    // 1.108 verses a press: 5,000 presses reach the ceiling (4,990.8) with room to spare
+    for (let i = 0; i < 5000; i++) fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'ArrowUp' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    const top = Number(camY(container));
+    expect(top, 'held at the world\'s ceiling: apexMax 5,000 less the band').toBeGreaterThan(4000);
+    // the frame grows to 720 CSS px tall: the band doubles and the ceiling drops
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', { configurable: true, get() { return 720; } });
+    await act(async () => { window.dispatchEvent(new Event('resize')); await new Promise((r) => setTimeout(r, 40)); });
+    const after = Number(camY(container));
+    expect(after).toBeLessThan(top);
+    expect(after).toBeGreaterThan(0);
+  });
+
+  it('M4: with cam.y > 0 the UI canvas paints the span gauge — a label /^\\d[\\d,]* verses$/ — and none at the baseline', async () => {
+    const CALLS = [];
+    const fake2d = () => new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'measureText') return (s) => ({ width: 20 });
+        if (prop === 'canvas') return null;
+        return (...a) => { CALLS.push([String(prop), ...a]); };
+      },
+      set() { return true; },
+    });
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(/** @type {any} */ (function (kind) { return kind === '2d' ? fake2d() : null; }));
+    try {
+      const { container } = await mount({}, tall);
+      for (let i = 0; i < 40; i++) await press('+');
+      const gauge = () => CALLS.filter((c) => c[0] === 'fillText' && /^\d[\d,]* verses$/.test(String(c[1]))).map((c) => String(c[1]));
+      expect(CALLS.some((c) => c[0] === 'fillText'), 'PRECONDITION: the recorder sees the ruler paint').toBe(true);
+      expect(gauge(), 'no gauge at the baseline').toEqual([]);
+      CALLS.length = 0;
+      for (let i = 0; i < 10; i++) await press('ArrowUp');
+      expect(Number(camY(container))).toBeGreaterThan(5);
+      expect(gauge().length, 'gauge labels with the camera raised: ' + JSON.stringify(gauge())).toBeGreaterThan(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {
