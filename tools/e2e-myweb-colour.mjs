@@ -65,6 +65,14 @@ const FRAMES = {
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Poll from node in the MAIN world. puppeteer's waitForFunction runs in its isolated world, which in a fresh
+ *  browser context starved for the whole timeout while a plain evaluate saw the target at the same instant
+ *  (slot 5, 10:39: 'Continue' listed in the diagnostic, unseen by the wait); polling:200 does not help. */
+async function waitFor(page, fn, ms, ...args) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) { if (await page.evaluate(fn, ...args)) return true; await sleep(200); }
+  return false;
+}
 const fails = [];
 let nothingToCheck = null;
 const notes = [];
@@ -93,7 +101,7 @@ function seedPairs(n) {
 const finder = (l) => [...document.querySelectorAll('button,[role=button],a')]
   .find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0);
 async function clickLabel(page, label) {
-  const wait = (ms) => page.waitForFunction((l, s) => !!(new Function('return ' + s)())(l), { timeout: ms, polling: 200 }, label, finder.toString());
+  const wait = async (ms) => { if (!(await waitFor(page, (l, s) => !!(new Function('return ' + s)())(l), ms, label, finder.toString()))) throw new Error('timeout'); };
   try { await wait(NAV_MS); } catch (e) {
     // diagnostics first: what the page shows instead, then ONE reload (a starved fresh context woke on one)
     const seen = await page.evaluate(() => ({ ready: document.readyState, vis: document.visibilityState, url: location.href,
@@ -108,7 +116,7 @@ async function clickLabel(page, label) {
 const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new Function('return ' + s)())(l); if (!b) return false; b.click(); return true; }, label, finder.toString());
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
-  await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS, polling: 200 });
+  if (!(await waitFor(page, () => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, NAV_MS))) throw new Error('wait timed out (main-world poll)');
   await clickLabel(page, 'Continue'); await clickLabel(page, 'Begin Reading'); await sleep(500);
   await clickIfPresent(page, 'Maybe later'); await sleep(200);
 }
@@ -125,9 +133,9 @@ async function seed(page, pairs) {
 async function toMyWeb(page) {
   await clickLabel(page, 'Personal Study'); await sleep(400);
   await clickLabel(page, 'The Whole Counsel');
-  await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS, polling: 200 });
+  if (!(await waitFor(page, () => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
   if (await page.$('.sw-fallback')) return false;
-  await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS, polling: 200 });
+  if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
   await clickLabel(page, 'My web'); await sleep(800);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
   await clickIfPresent(page, 'Reset the view'); await sleep(700);
