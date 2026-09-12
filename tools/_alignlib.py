@@ -982,6 +982,18 @@ FAMILIES = {
         "unit": "verse",
         "psalm_superscription": "folded-v1",
     },
+    # The TSOT reading of Matthew (edition tsot-matthew, one book, one reader): the
+    # reference is matthew.js, the text the Matthew SCREEN renders, whose register is
+    # "YahuShua The Messiah" (173 times), "The Kingdom of Heaven", "Assuredly, I say to
+    # you" -- the names the model otherwise mangles, so they lead the prompt. No music bed,
+    # no superscriptions (carried key kept for the family shape).
+    "bible-tsot-matthew": {
+        "initial_prompt": ("The Gospel of Matthew, The Sword of Truth, read aloud. "
+                           "YahuShua The Messiah, The Son of David. The Kingdom of Heaven. "
+                           "Assuredly, I say to you."),
+        "unit": "verse",
+        "psalm_superscription": "unprinted",
+    },
 }
 
 RATIONALE = {

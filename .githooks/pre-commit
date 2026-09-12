@@ -385,10 +385,10 @@ fi
 # ReadAlongHighlight._bibleRowsFor reads position i back as verse NUMBER i + 1,
 # so the two ends meet by verse identity. Re-indexing that array by position
 # shifts every verse after a gap by one for the rest of the chapter, silently.
-ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py)$' || true)
+ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py|test_batch_align_bible_drive_index\.py|tools/_alignlib\.py)$' || true)
 if [ -n "$ship_changed" ]; then
   echo "[pre-commit] Read-along shipper changed — running the shipper tests..."
-  python -m unittest test_batch_align_ship test_batch_align_bible_ship
+  python -m unittest test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index
   status=$?
   if [ $status -ne 0 ]; then
     echo ""

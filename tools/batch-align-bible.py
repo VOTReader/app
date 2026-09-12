@@ -107,15 +107,57 @@ EDITIONS = {
         "mirror": None,
         "prefix": None,
         "driveFolder": "18. TSOT New Testament",
+        "book": "matthew",          # declared twice on purpose: here and at the extractor
     },
 }
+LISTING = os.path.join(BASE, "_audio-drive-listing.json")   # present on the generating machine, not in CI
+ARCHIVE = r"D:\VOT-Archive"
 
 MIN_PROVEN = 0.60          # below this the chapter ships nothing (owner policy)
 
 
+def drive_index(cfg, listing_path=LISTING, archive_root=ARCHIVE):
+    """(book, chapter) -> (local mp3 path, driveId) for a driveFolder edition (tsot-matthew).
+    Ids come from the Drive listing -- the SAME rows gen-bible-audio-manifest.mjs ships, so a
+    belt names the asset the app plays -- and bytes from the release cache
+    tools/_align-work/audio/<id>.mp3 when present, else the archive folder matched by
+    BASENAME (on disk the folder name carries full-width quotes U+FF02, the listing ASCII
+    ones; a basename match is immune). Case-insensitive on the extension: chapter 1 is the
+    one .MP3 in 5,151 files. A chapter with an id but no local bytes, or two files claiming
+    one chapter, is refused out loud rather than indexed short."""
+    import glob
+    book = cfg["book"]
+    pat = re.compile(r"Chapter-(\d{3})\.mp3$", re.I)
+    with open(listing_path, encoding="utf-8") as f:
+        listing = json.load(f)
+    idx, missing = {}, []
+    for row in listing:
+        if not row["path"].startswith(cfg["driveFolder"]):
+            continue
+        base = row["path"].split("/")[-1]
+        m = pat.search(base)
+        if not m:
+            continue                                    # a non-chapter file in the folder
+        ch = int(m.group(1))
+        if (book, ch) in idx:
+            raise RuntimeError(f"{cfg['driveFolder']}: two files claim {book} chapter {ch}")
+        cached = os.path.join(BASE, "_align-work", "audio", row["id"] + ".mp3")
+        local = [cached] if os.path.exists(cached) else glob.glob(os.path.join(archive_root, glob.escape(cfg["driveFolder"]) + "*", base))
+        if not local:
+            missing.append(f"{book} {ch} ({base}, id {row['id']})")
+            continue
+        idx[(book, ch)] = (local[0], row["id"])
+    if missing:
+        raise RuntimeError(f"{cfg['driveFolder']}: no local audio for {len(missing)} chapter(s): " + "; ".join(missing[:5]))
+    return idx
+
+
 def audio_index(ed):
-    """assetId -> local mp3 path, via the mirror script's own collect()."""
+    """assetId -> local mp3 path, via the mirror script's own collect() -- or, for an
+    edition with a driveFolder and no mirror script, the Drive listing (drive_index)."""
     cfg = EDITIONS[ed]
+    if cfg.get("driveFolder"):
+        return drive_index(cfg)
     mod = _load(cfg["mirror"], "mirror_" + ed.replace("-", "_"))
     idx = {}
     pat = re.compile(re.escape(cfg["prefix"]) + r"[12]_([a-z0-9]+)_(\d{3})\.mp3$")
