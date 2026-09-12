@@ -130,7 +130,7 @@ describe('the counter in the draw path: instances submitted against the corpus',
     expect(stats.visited, 'candidates examined').toBeLessThanOrEqual(160);
     expect(stats.window).toBe(stats.visited);
     expect(stats.draws).toBe(gl.rec.draws.length);
-    expect(gl.rec.subData.length, 'one upload per instance stream (from, to, votes, genre, id)').toBe(5);
+    expect(gl.rec.subData.length, 'one upload per instance stream (from, to, votes, genre, id, slotA, slotB)').toBe(7);
   });
 
   it('the gathered list is uploaded once per camera, not once per frame', () => {
@@ -141,7 +141,7 @@ describe('the counter in the draw path: instances submitted against the corpus',
     drawAt(r, 88, 0, 'famous');
     expect(gl.rec.subData.length, 'a second frame at the same camera uploads nothing').toBe(after1);
     drawAt(r, 88, 0.5, 'famous');
-    expect(gl.rec.subData.length, 'a moved camera uploads again').toBe(after1 + 5);
+    expect(gl.rec.subData.length, 'a moved camera uploads again').toBe(after1 + 7);
   });
 
   it('at 132 px per verse: 37 on the phone frame; Essential at the ceiling: 15', () => {

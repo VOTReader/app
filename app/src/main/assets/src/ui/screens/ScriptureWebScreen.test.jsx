@@ -278,12 +278,14 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       /* One 7-vote link, 15548 -> 15555, sitting AFTER the Essential prefix of its bucket
          (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
          nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
-         the camera settles on verse 15551 and the feet land at (15548 - 15551) * 44 + 400 = 268
-         and 576 CSS px. On this 800x360 frame (base 260, ceil 256, squash 0.64) the true law
-         (threadShape, w-sw-phase1 M1) gives R 154, A 98.6: the apex is at (422, 161.4), so the
-         tap at (422, 170) lands 8.6 px under it, inside the 14 px tolerance - a hit at Famous,
-         nothing at Essential, and above the rail band pickChapter owns (y >= 258). Under the
-         morph this read R 100, A 90 with a level run; the tap point did not need to move. */
+         the camera settles on verse 15551. A lone thread takes the MIDDLE departure slot at
+         both feet (M3), so they stand at 15548.5 and 15555.5: (15548.5 - 15551) * 44 + 400 = 290
+         and 598 CSS px. On this 800x360 frame (base 260, ceil 256, squash 0.64) the true law
+         (threadShape, w-sw-phase1 M1) gives R 154, A 98.6: the apex is at (444, 161.4), so the
+         tap at (444, 170) lands 8.6 px under it, inside the 14 px tolerance - a hit at Famous,
+         nothing at Essential, and above the rail band pickChapter owns (y >= 258). Before the
+         slots the feet stood at the verses' left edges and the apex at 422; under the morph
+         this read R 100, A 90 with a level run. */
       const linked = () => Object.assign(graph(), {
         count: 1,
         books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
@@ -296,8 +298,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await toCeiling();
       expect(zoomText(container)).toBe('1711x');
       const root = container.querySelector('.sw-root');
-      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 422, clientY: 170 });
-      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 422, clientY: 170 });
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 444, clientY: 170 });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 444, clientY: 170 });
       await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection card opened for the 7-vote thread').toBeTruthy();

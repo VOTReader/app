@@ -19,6 +19,7 @@ import { dirname, resolve } from 'node:path';
 import { buildIndex, windowSize, walkVisible, gather, countVisible } from './index.js';
 import { threadVisible } from './geometry.js';
 import { decodeGraph, bucketDrawCount, deltaRuns } from './decode.js';
+import * as decodeLaw from './decode.js';
 
 /** Deterministic PRNG (mulberry32) so a failing rectangle can be re-run by seed. */
 function rng(seed) {
@@ -63,13 +64,19 @@ function synth(seed, n, total) {
   }));
 }
 
-/** Every drawn thread the rectangle admits, by the predicate alone. */
+/**
+ * Every drawn thread the rectangle admits, by the predicate alone — on the
+ * feet as DRAWN, at their departure slots (M3): a foot at v + 0.9 inside a
+ * frame that starts at v + 0.5 is on screen, whatever the integer says.
+ */
 function brute(g, rect, density) {
+  const { slotA, slotB } = decodeLaw.slotsOf(g);
   const out = [];
   for (const b of g.buckets) {
     const end = b.off + bucketDrawCount(b, density);
     for (let p = b.off; p < end; p++) {
-      if (threadVisible(g.from[p], g.to[p], rect.xa, rect.xb, rect.y0, rect.y1)) out.push(p);
+      const a = g.from[p] + slotA[p] / 255, z = g.to[p] + slotB[p] / 255;
+      if (threadVisible(a, z, rect.xa, rect.xb, rect.y0, rect.y1)) out.push(p);
     }
   }
   return out;
@@ -182,6 +189,20 @@ describe('the index over the shipped asset (63,418 threads)', () => {
     for (const b of graph.buckets) runs += deltaRuns(b).length;
     expect(runs).toBe(8);
     expect(graph.count).toBe(63418);
+  });
+
+  it('M3: the busiest verse carries 102 threads, so slots sit 2.5 units apart and a byte never saturates; every slot is strictly inside its cell', () => {
+    const deg = new Uint16Array(graph.total);
+    for (let i = 0; i < graph.count; i++) { deg[graph.from[i]]++; deg[graph.to[i]]++; }
+    expect(Math.max(...deg)).toBe(102);
+    const { slotA, slotB } = decodeLaw.slotsOf(graph);
+    let lo = 255, hi = 0;
+    for (let i = 0; i < graph.count; i++) {
+      lo = Math.min(lo, slotA[i], slotB[i]);
+      hi = Math.max(hi, slotA[i], slotB[i]);
+    }
+    expect(lo).toBeGreaterThan(0);
+    expect(hi).toBeLessThan(255);
   });
 
   it('byFrom and byTo each ascend by their foot within every run, and each is a permutation of the run', () => {

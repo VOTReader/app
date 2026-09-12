@@ -64,6 +64,13 @@ describe('shader shape', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/in uint aTo;/);
   });
 
+  it('M3: the feet read the departure slots — normalized byte attributes added to the verse', () => {
+    expect(SHADER_SOURCE.vertex).toMatch(/in float aSlotA;/);
+    expect(SHADER_SOURCE.vertex).toMatch(/in float aSlotB;/);
+    expect(SHADER_SOURCE.vertex).toContain('(a + aSlotA - uCamX)*uPPV');
+    expect(SHADER_SOURCE.vertex).toContain('(b + aSlotB - uCamX)*uPPV');
+  });
+
   it('reads the instance id from its own attribute (inverted at M2: uInstanceBase is gone)', () => {
     // gl_InstanceID restarts at 0 for every draw, so a gathered list — whose
     // members are not contiguous in the asset — cannot recover an arc's id

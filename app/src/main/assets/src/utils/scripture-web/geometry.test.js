@@ -20,6 +20,18 @@ import {
   refOfVerse, chapterRange, findWebReference,
 } from './pick.js';
 import { deltaRuns, bucketDrawCount, minVotesFor, base64ToBytes, decodeGraph } from './decode.js';
+import * as decodeLaw from './decode.js';
+
+/**
+ * Where a thread's feet stand, verse units: at its departure slots once the
+ * tree has them (M3), at the verse's left edge before. Read off the module
+ * object so this file loads on both trees; the slot cases below are the RED.
+ */
+function feetOf(g, i) {
+  const slots = /** @type {any} */ (decodeLaw).slotsOf ? /** @type {any} */ (decodeLaw).slotsOf(g) : null;
+  if (!slots) return [g.from[i], g.to[i]];
+  return [g.from[i] + slots.slotA[i] / 255, g.to[i] + slots.slotB[i] / 255];
+}
 
 // ── a small synthetic graph: 2 books, 4 chapters, 40 verses ─────────────────
 function makeGraph(pairs) {
@@ -63,8 +75,9 @@ const VIEW = (over) => Object.assign({
  * points nobody can tap.
  */
 function pointOnArc(g, cam, view, index, t) {
-  const x0 = verseToX(cam, view.width, g.from[index]);
-  const x1 = verseToX(cam, view.width, g.to[index]);
+  const [fa, fb] = feetOf(g, index);
+  const x0 = verseToX(cam, view.width, fa);
+  const x1 = verseToX(cam, view.width, fb);
   const left = Math.min(x0, x1), right = Math.max(x0, x1);
   const { R, A } = threadShape((x1 - x0) / 2, view.squash);
   const lo = Math.max(left, 0), hi = Math.min(right, view.width);
@@ -404,6 +417,21 @@ describe('pickArc agrees with the drawn curve', () => {
     expect(pickArc(g, cam, VIEW(), 500, 20, 6)).toBeNull();
   });
 
+  it('M3: a tap 3 px left of the MIDDLE departure slot picks the middle thread, not its neighbour (today every foot coincides and there is no middle)', () => {
+    // three threads leave verse 5 for 12 < 20 < 30: slots 1/4, 1/2, 3/4 of
+    // the cell, 44/4 = 11 px apart at 44 px per verse. The middle foot stands
+    // at verse 5.5; 3 px to its left is 8 px from the left neighbour's foot.
+    const slotted = makeGraph([[5, 12], [5, 20], [5, 30]]);
+    const cam = createCamera(slotted.total);
+    cam.ppv = 44; cam.x = 8;
+    clampCamera(cam, 1000, 5000);
+    const view = VIEW();
+    const xMid = verseToX(cam, view.width, 5 + 128 / 255);
+    const hit = pickArc(slotted, cam, view, xMid - 3, view.base - 1, 6);
+    expect(hit, 'a thread under the finger at the middle slot').not.toBeNull();
+    expect(hit.index, 'the middle thread (to verse 20)').toBe(1);
+  });
+
   it('will not pick an arc the density filter has hidden', () => {
     // The shipped web stops at Famous (votes >= 7); weaker rows must stay
     // untappable, or the user hits something they cannot see.
@@ -591,6 +619,59 @@ describe('decode', () => {
    The cases read the law through an adapter so they REPLAY over the base:
    threadShape(rx, squash) on the tip; arcShape(...) + localizeFactor on a1d52a23. */
 import * as geoLaw from './geometry.js';
+describe('departure slots — the threads leaving one verse fan out across its cell in destination order (M3)', () => {
+  const { assignSlots, slotsOf } = /** @type {any} */ (decodeLaw);
+
+  it('three threads from one verse to destinations 12 < 40 < 900 take slots 1/4, 1/2, 3/4 in that order', () => {
+    const from = Uint16Array.from([5, 5, 5]), to = Uint16Array.from([900, 12, 40]);
+    const { slotA } = assignSlots(from, to, 3, 1000);
+    expect(slotA[1] / 255, 'to 12').toBeCloseTo(0.25, 2);
+    expect(slotA[2] / 255, 'to 40').toBeCloseTo(0.50, 2);
+    expect(slotA[0] / 255, 'to 900').toBeCloseTo(0.75, 2);
+  });
+
+  it('a lone thread takes the middle of its cell at both feet', () => {
+    const { slotA, slotB } = assignSlots(Uint16Array.from([7]), Uint16Array.from([30]), 1, 40);
+    expect(slotA[0] / 255).toBeCloseTo(0.5, 2);
+    expect(slotB[0] / 255).toBeCloseTo(0.5, 2);
+  });
+
+  it('a leftward thread ranks before every rightward one at the verse they share, so nothing crosses inside the cell', () => {
+    // at verse 50: [10, 50] arrives from the left; [50, 60] and [50, 70] leave to the right
+    const from = Uint16Array.from([50, 10, 50]), to = Uint16Array.from([70, 50, 60]);
+    const { slotA, slotB } = assignSlots(from, to, 3, 100);
+    expect(slotB[1], 'the leftward thread\'s foot at 50').toBeLessThan(slotA[2]);
+    expect(slotA[2], 'to 60 before to 70').toBeLessThan(slotA[0]);
+    expect([slotB[1], slotA[2], slotA[0]].map((s) => Math.round(s / 255 * 4) / 4)).toEqual([0.25, 0.5, 0.75]);
+  });
+
+  it('slotsOf builds once per graph object and returns Uint8Arrays the size of the graph', () => {
+    const g = makeGraph([[2, 8], [5, 35], [12, 18]]);
+    const s = slotsOf(g);
+    expect(slotsOf(g)).toBe(s);
+    expect(s.slotA).toBeInstanceOf(Uint8Array);
+    expect(s.slotA.length).toBe(3);
+    expect(s.slotB.length).toBe(3);
+  });
+
+  it('at 44 px per verse five threads from one verse leave 7.33 CSS px apart in destination order; at the phone\'s fit the whole fan is under 0.06 px', () => {
+    const g = makeGraph([[5, 39], [5, 10], [5, 30], [5, 20], [5, 35]]);
+    const { slotA } = slotsOf(g);
+    const cam = createCamera(g.total);
+    cam.ppv = 44; cam.x = 8;
+    clampCamera(cam, 1000, 5000);
+    const byDest = [1, 3, 2, 4, 0];                       // to 10, 20, 30, 35, 39
+    const xs = byDest.map((i) => verseToX(cam, 1000, g.from[i] + slotA[i] / 255));
+    for (let k = 1; k < xs.length; k++) {
+      expect(xs[k] - xs[k - 1], `gap ${k}`).toBeGreaterThan(7.33 - 0.15);
+      expect(xs[k] - xs[k - 1], `gap ${k}`).toBeLessThan(7.33 + 0.15);
+    }
+    // the same fan at the shipped asset's fit on the phone frame (1600 / 31102 px per verse)
+    const fitPpv = 1600 / 31102;
+    expect((Math.max(...slotA) - Math.min(...slotA)) / 255 * fitPpv).toBeLessThan(0.06);
+  });
+});
+
 describe('the true law: a thread is a half-ellipse whose height is its span, at every zoom (w-sw-phase1, M1)', () => {
   const CEIL = 512, SQUASH = 0.64, TOTAL = 31102;      // the phone landscape frame, device px
   const law = /** @type {any} */ (geoLaw);        // the base tree's names are not on the tip's type
