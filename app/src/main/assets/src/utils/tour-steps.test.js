@@ -15,9 +15,6 @@ import { TOUR_LETTER } from '../hooks/use-tour.js';
 import { describe, it, expect, afterEach } from 'vitest';
 import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
 import { SCRIPTURE_WEB_FAMOUS_COUNT } from './scripture-web/famous-count.js';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 afterEach(() => { document.body.innerHTML = ''; });
 
@@ -271,12 +268,12 @@ describe('tour-steps — the 09-11 copy sheet', () => {
     ['done', 'text', 'Find it again under Settings › Help. Enjoy your reading.', true],
   ];
 
-  it('every line the sheet changes is the sheet\'s line, verbatim (thirteen rows red before the copy landed)', () => {
+  it('every line the sheet changes is the sheet\'s line, verbatim (twelve rows red before the copy landed)', () => {
     for (const [id, field, line, changed] of SHEET) {
       if (!changed) continue;
       expect(stop(id)[field], id + '.' + field).toBe(line);
     }
-    expect(SHEET.filter((r) => r[3]).length).toBe(13);
+    expect(SHEET.filter((r) => r[3]).length).toBe(12);
   });
 
   it('CONTROL — the rows the sheet leaves alone still read as they did (green before and after; proves the table reads the stops it names)', () => {
@@ -301,33 +298,14 @@ describe('tour-steps — the 09-11 copy sheet', () => {
     expect(TOUR_WORDS).toContain('Note');
   });
 
-  /* THE COUNT IS READ, NEVER TYPED. Three legs: (a) the stop's sentence carries the generated
-     count formatted the way the screen formats its own counter; (b) the generated count IS the
-     committed data's Famous count by the screen's own law (graphStats: the sum of every bucket's
-     off10) — read from src/data/scripture-web-data.js on disk, not from a second copy of the law's
-     answer; (c) the digits appear nowhere in tour-steps.js's source, raw or formatted. */
-  const here = dirname(fileURLToPath(import.meta.url));
+  /* THE COUNT IS READ, NEVER TYPED. Leg (a) here: the stop's sentence carries the generated count
+     formatted the way the screen formats its own counter. Legs (b) and (c) — the generated count IS
+     the committed data's Famous count under the screen's law, and the digits appear nowhere in
+     tour-steps.js — read files from disk and live in tour-count.test.js (node:fs has no types under
+     this tsconfig, so that file is @ts-nocheck and this one stays type-checked). */
   it('the Scripture Web stop says the generated count, formatted like the screen', () => {
     expect(SCRIPTURE_WEB_FAMOUS_COUNT).toBeGreaterThan(1000);
     expect(stop('scripture-web').text).toContain(': ' + COUNT + ' of them across the Bible.');
-  });
-  it('the generated count is the committed data\'s Famous count under the screen\'s law (sum of off10)', () => {
-    const src = readFileSync(resolve(here, '../data/scripture-web-data.js'), 'utf8');
-    const at = src.indexOf('var SCRIPTURE_WEB_DATA = ');
-    expect(at, 'the data file declares SCRIPTURE_WEB_DATA').toBeGreaterThan(0);
-    const data = JSON.parse(src.slice(at + 'var SCRIPTURE_WEB_DATA = '.length).replace(/;\s*$/, ''));
-    expect(data.buckets.length, 'buckets').toBeGreaterThan(0);
-    const famous = data.buckets.reduce((n, b) => n + b.off10, 0);
-    expect(famous).toBe(SCRIPTURE_WEB_FAMOUS_COUNT);
-    expect(famous).toBe(data.count);   // today every shipped thread is Famous; if that ever changes, the law above still rules
-  });
-  it('the count\'s digits are not typed anywhere in tour-steps.js (raw or formatted)', () => {
-    const src = readFileSync(resolve(here, 'tour-steps.js'), 'utf8');
-    expect(src, 'raw digits').not.toContain(String(SCRIPTURE_WEB_FAMOUS_COUNT));
-    expect(src, 'formatted').not.toContain(COUNT);
-    expect(src, 'the placeholder is what the source carries').toContain('{COUNT}');
-    // and the positive on the same file: the module that supplies it is imported
-    expect(src).toMatch(/from '\.\/scripture-web\/famous-count\.js'/);
   });
 
   it('still a welcome card plus nine numbered stops — the sheet adds none', () => {

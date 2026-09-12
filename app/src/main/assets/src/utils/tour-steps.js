@@ -19,19 +19,29 @@
    overlay notices and moves on without acting twice.
 
    THE WORDS are the trailer's (Creative, 2026-09-04): "Press Listen", "The
-   words light up as they are read", "verse by verse", "a backup", "Export".
-   bannedWord() keeps the jargon out; the test pins both.
+   words light up as they are read", "verse by verse", "a backup", "Export" —
+   and since 2026-09-11 the copy sheet's (tour-copy-sheet.md: shorter lines in the
+   same register, Corbin's beats of 17:0x: the count, "tap any line", Link).
+   bannedWord() keeps the jargon out; the test pins every line of the sheet.
+
+   THE COUNT IS READ, NEVER TYPED. The Scripture Web stop says how many threads
+   there are; the number comes from utils/scripture-web/famous-count.js, which the
+   data generator writes in the same run as the data (the screen's own law, the sum
+   of every bucket's off10), and it is formatted the way the screen formats its
+   counter. {COUNT} in the sentence below is filled once the array is built.
 
    No Scripture is quoted here: the Bible stop shows whatever translation the
    reader chose, untouched.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { SCRIPTURE_WEB_FAMOUS_COUNT } from './scripture-web/famous-count.js';
+
 export const TOUR_WORDS = Object.freeze([
   'The Volumes of Truth', 'The Scriptures of Truth', 'Press Listen',
   'The words light up as they are read', 'verse by verse', 'Journal', 'New Entry',
   'a backup', 'Export', 'Import', 'Your Data',
-  // The two words the real selection bar shows, so the reader recognises them under their finger.
-  'Highlight', 'Note',
+  // The three words the real selection bar shows, so the reader recognises them under their finger.
+  'Highlight', 'Note', 'Link',
   // The two halves of the web, as the Home button and the screen's own control name them.
   'Scripture Web', 'My Web',
 ]);
@@ -73,7 +83,7 @@ const STOPS = [
     eyebrow: 'Show me around',
     title: 'Welcome to VOTReader',
     // The sentence is finished below, once the array knows how long it is.
-    text: 'This is a short tour: {stops} stops, about two minutes. You can leave at any time with Skip, and see it again from Settings.',
+    text: 'A short tour: {stops} stops, about two minutes. Skip any time. Find it again under Settings › Help.',
     primary: 'Start',
   },
   {
@@ -81,7 +91,7 @@ const STOPS = [
     target: { selector: '.home-nav-item', text: 'The Volumes of Truth' }, act: 'openLetter',
     label: 'The Letters',
     title: 'The Letters live here',
-    text: 'Tap a Volume, then a letter. Tap this tile now, or press Next and I will open one for you.',
+    text: 'Every letter of The Volumes of Truth lives here. Tap a Volume, then a letter, or press Next and I will open one.',
     primary: 'Next',
   },
   {
@@ -91,7 +101,10 @@ const STOPS = [
     title: 'Hear it read aloud',
     text: 'Press Listen. The words light up as they are read, and the page follows along.',
     tip: 'Tap it now, or press Next and I will do it for you.',
-    after: 'Hear it? The words light up as they are read, and the page follows along. Press Next when you are ready.',
+    // "Tap any line and the reading jumps to it": Corbin, 2026-09-11 17:0x. On the after-line, not the
+    // text, because the reader is watching the words light when this card shows and can try it at once;
+    // the text line stays the trailer's. True on this screen: tap-to-seek is the read-along's own handler.
+    after: 'Hear it? The words light up as they are read, and the page follows along. Tap any line and the reading jumps to it. Press Next when you are ready.',
     primary: 'Next',
   },
   /* HIGHLIGHTING GETS A STOP (Corbin, 2026-09-10). It used to be a clause in the closing
@@ -108,9 +121,9 @@ const STOPS = [
     target: { selector: '.letter-para' }, act: 'highlightDemo',
     label: 'Highlight',
     title: 'Mark what speaks to you',
-    text: 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note. Your highlights and notes collect in the Library.',
+    text: 'Hold any line for a moment. A small bar appears: Highlight, Note, or Link. Everything you mark collects in the Library.',
     tip: 'Try it now, or press Next and I will show you.',
-    after: 'See the colour? Hold on any line to do this yourself, any time. Press Next when you are ready.',
+    after: 'See the colour? Hold any line to do this yourself, any time. Link ties a line to any other passage. Press Next when you are ready.',
     primary: 'Next',
   },
   {
@@ -118,7 +131,7 @@ const STOPS = [
     target: { selector: '.hero-play-pill' }, act: 'press',
     label: 'The Scriptures',
     title: 'The Bible too, verse by verse',
-    text: 'I opened John 3 for you: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen and the verses light up one by one as they are read.',
+    text: 'This is John 3: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen. The verses light up one by one as they are read.',
     after: 'Hear it? Each verse lights up as it is read. Press Next when you are ready.',
     primary: 'Next',
   },
@@ -133,9 +146,9 @@ const STOPS = [
     id: 'scripture-web', screen: 'home', enter: 'goHome',
     target: { selector: '.home-shortcuts button', text: 'Scripture Web' }, act: null,
     label: 'The Scripture Web',
-    title: 'See the Scriptures as a web',
-    text: 'Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible\'s threads. My Web holds the links you make yourself.',
-    tip: 'Tap a thread to read both ends.',
+    title: 'The Bible as a web',
+    text: 'Every place one verse points to another is drawn as a thread: {COUNT} of them across the Bible. Tap a thread and both verses come up. My Web is the same web, made of the links you make yourself.',
+    tip: 'Explore the Bible like never before.',
     primary: 'Next',
   },
   {
@@ -143,7 +156,7 @@ const STOPS = [
     target: { selector: '.jrn-fab-newentry' }, act: null,
     label: 'Journal',
     title: 'Keep your own notes in the Journal',
-    text: 'Your Journal is in the Library. Tap New Entry to write one. It saves by itself as you write.',
+    text: 'Your Journal lives in the Library. Tap New Entry and write. It saves by itself.',
     primary: 'Next',
   },
   {
@@ -158,7 +171,7 @@ const STOPS = [
      features on/off in settings"). It rides the Settings screen the backup stop already opened
      (same `screen`, same `enter`, so no navigation is added), opens the Reading group and rings
      the dice row — the same feature the reader met on Home — and names three features by the
-     words the reader sees on screen. "toggle" is on the banned list; "switched on or off" is
+     words the reader sees on screen. "toggle" is on the banned list; "switched off here" is
      what the card says. The closing card stays the closing card. */
   {
     id: 'settings', screen: 'settings', enter: 'openSettingsData', settingsGroup: 'reading',
@@ -168,7 +181,7 @@ const STOPS = [
     /* Corbin, 2026-09-11: say too that whole features go quiet here — "control many UI
        features (like disabling search, history, other icons, etc)". Search and History are the
        rows' own names; "the icons in the top bar" is the Top-Nav Buttons group's own subtitle. */
-    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use.',
+    text: 'Most of what you have seen can be switched off here: Surprise Me, the Reading Position Marker, Auto-Scroll, and the parts of the screen you do not need, like Search, History and the icons in the top bar. Keep what you use.',
     primary: 'Next',
   },
   {
@@ -176,7 +189,7 @@ const STOPS = [
     title: "That's the tour",
     // Highlighting used to be taught here, in passing. It has its own stop now, so teaching it
     // again on the way out would repeat it at the one moment nothing can be shown.
-    text: 'You can see this tour again from Settings › Help. Enjoy your reading.',
+    text: 'Find it again under Settings › Help. Enjoy your reading.',
     primary: 'Done',
   },
 ];
@@ -192,7 +205,7 @@ export const TOUR_STEPS = Object.freeze(STOPS.map((s, i) => Object.freeze({
   ...s,
   number: i,
   eyebrow: i === 0 ? s.eyebrow : `${i} of ${NUMBERED}${s.label ? ' · ' + s.label : ''}`,
-  text: i === 0 ? s.text.replace('{stops}', TOUR_STOPS_WORD) : s.text,
+  text: s.text.replace('{stops}', TOUR_STOPS_WORD).replace('{COUNT}', SCRIPTURE_WEB_FAMOUS_COUNT.toLocaleString()),
 })));
 
 export function stepCount() { return TOUR_STEPS.length; }
