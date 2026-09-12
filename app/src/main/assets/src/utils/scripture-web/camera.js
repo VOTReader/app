@@ -83,6 +83,22 @@ export function clampCamera(cam, width, maxZoom, yf) {
   return cam;
 }
 
+/**
+ * The frame as a rectangle of the world, verse units: x from the left edge
+ * to the right, y from the baseline row (cam.y) to the top edge. What the
+ * index culls against and the shader clips to.
+ * @param {Camera} cam
+ * @param {number} width — viewport width, device px
+ * @param {number} base — the baseline row, device px from the top
+ * @param {number} squash — the frame's vertical squash
+ * @returns {{xa:number, xb:number, y0:number, y1:number}}
+ */
+export function worldRect(cam, width, base, squash) {
+  const half = width / cam.ppv / 2;
+  const y0 = cam.y > 0 ? cam.y : 0;
+  return { xa: cam.x - half, xb: cam.x + half, y0, y1: y0 + base / (cam.ppv * squash) };
+}
+
 /** Verse index → device px. */
 export function verseToX(cam, width, verse) {
   return (verse - cam.x) * cam.ppv + width / 2;

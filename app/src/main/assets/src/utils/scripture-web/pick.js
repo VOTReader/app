@@ -4,12 +4,12 @@
    "Tap any point on any line, whether at the peak of the curve or the
    beginning or ending" — this is that.
 
-   No GPU readback, no ID buffer, no spatial index. Every arc is an analytic
-   half-ellipse, so the distance from the finger to each curve is a closed
-   form (geometry.arcDistance), and a bounding-box reject kills the vast
-   majority before the maths runs. The shipped famous view is ~64k arcs, and
-   the visible set is always far smaller than that because the density prefix
-   and the bucket loop bound it.
+   No GPU readback, no ID buffer. Every arc is an analytic half-ellipse, so
+   the distance from the finger to each curve is a closed form
+   (geometry.arcDistance), and the index (index.js) hands over only the
+   threads with a piece inside the finger's tolerance box — the same
+   predicate the renderer gathers with, so what is drawn is what is
+   tappable, and nothing far from the finger is examined.
 
    The one invariant that matters: this must use the SAME law the vertex
    shader draws with, and geometry.js owns it: threadShape, the true world
@@ -25,6 +25,7 @@ import {
   arcDistance, threadShape, verseToX, xToVerse,
 } from './geometry.js';
 import { bucketDrawCount } from './decode.js';
+import { indexOf, walkVisible } from './index.js';
 
 /**
  * Nearest arc to a screen point.
@@ -66,80 +67,31 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const worldBase = base + (view.camY || 0) * ppv * squash;
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
-  const verseAtPoint = xToVerse(cam, width, px);
-  const verseTolerance = tol / ppv;
-
-  for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkSize = g.chunkSize || 256;
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < verseAtPoint - verseTolerance || ext[0] > verseAtPoint + verseTolerance)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
-      for (let i = start; i < end; i++) {
-        const x0 = (g.from[i] - camX) * ppv + half;
-        const x1 = (g.to[i] - camX) * ppv + half;
-        // Cheap x-range reject before any ellipse maths.
-        if (x1 < px - tol || x0 > px + tol) continue;
-        const shape = threadShape((x1 - x0) * 0.5, squash);
-        const d = arcDistance(px, py, x0, x1, worldBase, shape.R, shape.A, tol);
-        if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
-        let at = best.length;
-        while (at > 0 && best[at - 1].distance > d) at--;
-        best.splice(at, 0, {
-          index: i, distance: d, from: g.from[i], to: g.to[i], votes: g.votes[i],
-        });
-        if (best.length > cap) best.pop();
-      }
-    }
-  }
+  // The finger's tolerance box as a rectangle of the world, verse units: a
+  // curve point within tol px of the finger lies inside it, so the index's
+  // walk hands over every thread that can be hit and none that cannot.
+  const rise = ppv * squash;                          // device px per verse of height
+  const hv = (worldBase - py) / rise;                 // the finger's height above the world baseline
+  const dv = tol / rise;
+  const rect = {
+    xa: xToVerse(cam, width, px - tol), xb: xToVerse(cam, width, px + tol),
+    y0: hv - dv > 0 ? hv - dv : 0, y1: hv + dv,
+  };
+  if (rect.y1 < 0) return best;                       // more than tol below the baseline: nothing to hit
+  walkVisible(g, indexOf(g), rect, density, (i) => {
+    const x0 = (g.from[i] - camX) * ppv + half;
+    const x1 = (g.to[i] - camX) * ppv + half;
+    const shape = threadShape((x1 - x0) * 0.5, squash);
+    const d = arcDistance(px, py, x0, x1, worldBase, shape.R, shape.A, tol);
+    if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) return;
+    let at = best.length;
+    while (at > 0 && best[at - 1].distance > d) at--;
+    best.splice(at, 0, {
+      index: i, distance: d, from: g.from[i], to: g.to[i], votes: g.votes[i],
+    });
+    if (best.length > cap) best.pop();
+  });
   return best;
-}
-
-/**
- * How far outside the viewport a foot may sit and still count as anchoring
- * its arc to the passage on screen, device px. The crowding count below is
- * the last reader of this rule; the index (phase 1, M2) replaces it with the
- * exact visible set and deletes both.
- */
-const FOOT_MARGIN = 24;
-
-/** 1 when either foot of an arc is within FOOT_MARGIN of the viewport, else 0. */
-function footNear(x0, x1, width) {
-  const near = (x) => (x >= -FOOT_MARGIN && x <= width + FOOT_MARGIN ? 1 : 0);
-  return Math.max(near(x0), near(x1));
-}
-
-/**
- * How many DRAWN arcs are anchored to the passage on screen.
- *
- * Not `stats.instances`, which counts what was submitted to the GPU: chunk
- * extents overlapping the viewport, 18,944 on desktop at the ceiling against
- * the 336 that actually paint — 50x off the population the eye sees. This
- * counts a foot within FOOT_MARGIN of the frame over the same instances the
- * shader draws, so the style law is fed the number a reader is looking at.
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
- * @param {number} width — viewport width, device px
- * @param {import('./decode.js').Density} density
- * @returns {number}
- */
-export function countAnchored(g, cam, width, density) {
-  let n = 0;
-  const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  for (const bucket of g.buckets) {
-    const end = bucket.off + bucketDrawCount(bucket, density);
-    for (let i = bucket.off; i < end; i++) {
-      const x0 = (g.from[i] - camX) * ppv + half;
-      const x1 = (g.to[i] - camX) * ppv + half;
-      if (footNear(x0, x1, width)) n++;
-    }
-  }
-  return n;
 }
 
 /**

@@ -24,13 +24,14 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   depthMix, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle,
+  maxZoomFor, ribbonStyle, worldRect,
 } from '../../utils/scripture-web/geometry.js';
 import {
-  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
+  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
   arcsTouching,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+import { indexOf, countVisible } from '../../utils/scripture-web/index.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
@@ -77,21 +78,43 @@ const maxZoomOf = (graph, v) => (graph
 const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
 
 /**
- * Anchored arcs per CSS px of viewport width, which is what decides whether
- * the deep alpha reads as one clear ribbon or as fog. Counted over the drawn
- * set as a foot within 24 px of the frame (pick.countAnchored), cached until
- * the camera moves more than 5 % - 64k pairs is under a millisecond but not
- * per frame. The index (phase 1, M2) replaces this with the exact visible set.
+ * Visible threads per CSS px of viewport width, which is what decides whether
+ * the deep alpha reads as one clear ribbon or as fog. Counted as the exact
+ * visible set (index.countVisible over the frame's world rectangle — the
+ * predicate the renderer gathers with), cached until the camera moves more
+ * than 5 % of the frame on either axis: the walk is sub-millisecond at
+ * depth but not per frame.
  */
-function anchoredDensity(cache, g, cam, v, density) {
-  const moved = cache.W !== v.W || cache.density !== density
+function visibleDensity(cache, g, cam, view, dpr) {
+  const band = view.base / (cam.ppv * view.squash);
+  const camY = cam.y || 0;
+  const moved = cache.W !== view.width || cache.density !== view.density || cache.base !== view.base
     || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.05
-    || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
+    || Math.abs(cam.x - cache.x) * cam.ppv > view.width * 0.05
+    || Math.abs(camY - cache.y) > band * 0.05;
   if (moved) {
-    cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
-    cache.value = countAnchored(g, cam, v.W, density);
+    cache.ppv = cam.ppv; cache.x = cam.x; cache.y = camY;
+    cache.W = view.width; cache.base = view.base; cache.density = view.density;
+    cache.value = countVisible(g, indexOf(g), worldRect(cam, view.width, view.base, view.squash), view.density);
   }
-  return cache.value / ((v.W || 1) / (v.DPR || 1));
+  return cache.value / ((view.width || 1) / (dpr || 1));
+}
+
+/** The renderer's counters, published on .sw-root for the browser walks (M2). */
+const SW_STAT_KEYS = ['mode', 'submitted', 'draws', 'window', 'visible', 'visited'];
+function publishStats(el, stats, frames, drawMs) {
+  if (!el) return;
+  for (const k of SW_STAT_KEYS) {
+    if (stats && stats[k] != null) el.setAttribute('data-sw-' + k, String(stats[k]));
+    else el.removeAttribute('data-sw-' + k);
+  }
+  if (stats) {
+    el.setAttribute('data-sw-frames', String(frames));
+    el.setAttribute('data-sw-draw-ms', drawMs.toFixed(2));
+  } else {
+    el.removeAttribute('data-sw-frames');
+    el.removeAttribute('data-sw-draw-ms');
+  }
 }
 /** Height reserved below the baseline for the ruler + book names. */
 const RULER_H = 74;
@@ -213,7 +236,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
-  const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
+  const anchoredRef = React.useRef({ ppv: 0, x: 0, y: 0, W: 0, base: 0, density: '', value: 0 });
+  const framesRef = React.useRef(0);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
@@ -469,6 +493,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         colorMode: 'distance', density: 'essential', light: chrome.isLight, bg: chrome.bg,
         focusRange: null, focusArc: -1, hoverArc: -1,
       }));
+      // the counters describe the scripture web; an invisible Essential pass is not it
+      publishStats(wrapRef.current, null, 0, 0);
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
       if (ctx) {
@@ -495,9 +521,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // it and would have measured the old law against a new screen. Keyed on
     // zoom (depthMix) — the geometry has no crossover any more.
     const perCssPx = depthMix(zoom) > 0
-      ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
+      ? visibleDensity(anchoredRef.current, g, cam, base, v.DPR) : 0;
     const style = ribbonStyle(zoom, chrome.isLight, perCssPx);
-    r.draw(Object.assign({}, base, {
+    const t0 = performance.now();
+    const stats = r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,
@@ -507,6 +534,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
+    framesRef.current += 1;
+    publishStats(wrapRef.current, stats, framesRef.current, performance.now() - t0);
     // The book rail is drawn whether or not the chrome is hidden: the hide
     // button takes the pills and the counter, and the books along the bottom
     // are how the reader knows where in scripture the web is (Corbin,

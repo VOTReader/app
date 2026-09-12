@@ -14,8 +14,15 @@
        8 segments and only the longest get 48 — the average is ~12, not 48.
      · Each density is a PREFIX of its bucket, so switching Essential / Famous
        just shortens the instance count. Nothing re-uploads.
-     · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
-       skips whole runs of instances that cannot touch the viewport.
+     · Two regimes, chosen per camera by how many candidates the frame's
+       rectangle admits (utils/scripture-web/index.js). At the overview the
+       whole buckets draw from the static buffers, culled per 256-instance
+       chunk by verse extent. Once the index's windows fit GATHER_MAX the
+       exact visible set is gathered into dynamic buffers and only that is
+       submitted: 142 instances at the phone's 44 px ceiling where the chunk
+       cull submitted 18,944 (Corbin, 2026-09-11: "other lines that aren't
+       even close to user screen don't continually update and hog
+       resources"). Nothing is gathered twice for one camera.
 
    The law is not written here. It is imported from
    utils/scripture-web/geometry.js as GLSL and inlined, because the CPU hit
@@ -28,10 +35,21 @@
 
 import {
   threadShapeGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, worldRect,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
+import { indexOf, windowSize, gather } from '../../utils/scripture-web/index.js';
+
+/**
+ * The gathered regime's capacity, instances — and the walk budget per camera
+ * change, since the list is filled by a walk over the index's windows and a
+ * window that fits here cannot overflow it. Measured on the shipped asset,
+ * phone landscape, Famous: the windows hold 17,509 candidates at 16x (11,557
+ * visible) and 26,986 at 8x (17,042 visible), so 16x and deeper gather and 8x
+ * and wider draw whole buckets. 320 KB of dynamic buffers.
+ */
+export const GATHER_MAX = 20480;
 
 /** Colour modes, in the order the control cycles them. */
 export const COLOR_MODES = ['distance', 'testament', 'genre'];
@@ -48,8 +66,8 @@ uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (dep
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
-uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
+in float aId;                // the instance's position in the asset — its identity for the spotlight
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${threadShapeGLSL}
 ${rampGLSL()}
@@ -98,7 +116,7 @@ void main(){
   vec2 tg = normalize(tgv + vec2(1e-6, 0.));
   p += vec2(-tg.y, tg.x)*side*hw;
 
-  float id = float(gl_InstanceID) + uInstanceBase;
+  float id = aId;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
   float hovered = (uHoverArc >= 0. && abs(id - uHoverArc) < .5) ? 1. : 0.;
   float inRange = (uFocusRange.x <= uFocusRange.y &&
@@ -200,7 +218,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uSquash',
     'uCamY', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase']) {
+    'uHoverArc']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -233,44 +251,104 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-  /** @type {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number}>} */
-  const attribs = [];
-  const attrib = (data, name, type, isInt, bytes) => {
-    const loc = gl.getAttribLocation(program, name);
+  // The five per-instance streams, in one order for both regimes. Uint16
+  // verse ids widen to uint in the shader; votes stay signed; the id is a
+  // float (63,418 < 2^24, exact).
+  const ids = new Float32Array(graph.count);
+  for (let i = 0; i < graph.count; i++) ids[i] = i;
+  const STREAMS = [
+    { name: 'aFrom', type: gl.UNSIGNED_SHORT, isInt: true, bytes: 2, Ctor: Uint16Array, data: graph.from },
+    { name: 'aTo', type: gl.UNSIGNED_SHORT, isInt: true, bytes: 2, Ctor: Uint16Array, data: graph.to },
+    { name: 'aVotes', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: new Float32Array(graph.votes) },
+    { name: 'aGenre', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: genre },
+    { name: 'aId', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: ids },
+  ];
+  /** @typedef {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number}>} AttribSet */
+  /** One buffer per stream: the whole asset (STATIC_DRAW) or GATHER_MAX empty slots (DYNAMIC_DRAW). */
+  const attribSet = (fill) => STREAMS.map((s) => {
+    const loc = gl.getAttribLocation(program, s.name);
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    if (fill) gl.bufferData(gl.ARRAY_BUFFER, s.data, gl.STATIC_DRAW);
+    else gl.bufferData(gl.ARRAY_BUFFER, GATHER_MAX * s.bytes, gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribDivisor(loc, 1);
-    attribs.push({ buf, loc, type, isInt, bytes });
-  };
-  // Uint16 verse ids widen to uint in the shader; votes stay signed.
-  attrib(graph.from, 'aFrom', gl.UNSIGNED_SHORT, true, 2);
-  attrib(graph.to, 'aTo', gl.UNSIGNED_SHORT, true, 2);
-  attrib(new Float32Array(graph.votes), 'aVotes', gl.FLOAT, false, 4);
-  attrib(genre, 'aGenre', gl.FLOAT, false, 4);
+    return { buf, loc, type: s.type, isInt: s.isInt, bytes: s.bytes };
+  });
+  const statics = attribSet(true);
+  const dynamics = attribSet(false);
+  const staging = STREAMS.map((s) => new s.Ctor(GATHER_MAX));
 
   /**
-   * Point every instance attribute at `first`.
+   * Point every instance attribute at `first` of one set.
    *
    * WebGL2's drawArraysInstanced has NO base-instance parameter — instance
-   * data is always read from the start of the bound range. Drawing a bucket's
+   * data is always read from the start of the bound range. Drawing a
    * sub-range therefore means re-pointing the attributes at a byte offset,
    * not just passing a different first index. Getting this wrong silently
    * draws the WRONG arcs (every bucket rendering instance 0..n), which is
    * exactly what it did before this existed.
+   * @param {AttribSet} set @param {number} first
    */
-  let pointedAt = -1;
-  const pointInstances = (first) => {
-    if (first === pointedAt) return;
+  let pointedSet = null, pointedAt = -1;
+  const pointInstances = (set, first) => {
+    if (set === pointedSet && first === pointedAt) return;
+    pointedSet = set;
     pointedAt = first;
-    for (const a of attribs) {
+    for (const a of set) {
       gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
       if (a.isInt) gl.vertexAttribIPointer(a.loc, 1, a.type, 0, first * a.bytes);
       else gl.vertexAttribPointer(a.loc, 1, a.type, false, 0, first * a.bytes);
     }
   };
-  pointInstances(0);
+  pointInstances(statics, 0);
+
+  /**
+   * The regime for a camera, memoised on everything the rectangle reads: a
+   * frame at the same camera gathers nothing and uploads nothing. Past
+   * GATHER_MAX candidates the whole buckets are cheaper than the list.
+   * @type {{mode:'static'|'gathered', window:number, visible?:number, visited?:number}}
+   */
+  let plan = { mode: 'static', window: 0 };
+  let planKey = '';
+  const list = { ids: new Uint32Array(GATHER_MAX), count: 0, visited: 0 };
+  /** Runs of the gathered list by bucket (the walk hands positions over bucket-major). */
+  let groups = [];
+  const idx = indexOf(graph);
+  const planFor = (v) => {
+    const key = [v.camX, v.camY || 0, v.ppv, v.density, v.width, v.base, v.squash].join(',');
+    if (key === planKey) return plan;
+    planKey = key;
+    const rect = worldRect({ x: v.camX, y: v.camY || 0, ppv: v.ppv, total: graph.total }, v.width, v.base, v.squash);
+    const window = windowSize(graph, idx, rect, v.density);
+    if (window > GATHER_MAX) {
+      plan = { mode: 'static', window };
+      return plan;
+    }
+    gather(graph, idx, rect, v.density, list);
+    groups = [];
+    let bi = 0, first = 0;
+    for (let k = 0; k < list.count; k++) {
+      const p = list.ids[k];
+      while (p >= graph.buckets[bi].off + graph.buckets[bi].len) {
+        if (k > first) groups.push({ bucket: bi, first, n: k - first });
+        first = k;
+        bi++;
+      }
+      staging[0][k] = graph.from[p];
+      staging[1][k] = graph.to[p];
+      staging[2][k] = graph.votes[p];
+      staging[3][k] = genre[p];
+      staging[4][k] = p;
+    }
+    if (list.count > first) groups.push({ bucket: bi, first, n: list.count - first });
+    for (let i = 0; i < STREAMS.length; i++) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, dynamics[i].buf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, staging[i].subarray(0, list.count));
+    }
+    plan = { mode: 'gathered', window, visible: list.count, visited: list.visited };
+    return plan;
+  };
 
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
@@ -301,7 +379,8 @@ export function createRenderer(canvas, graph, opts = {}) {
   canvas.addEventListener('webglcontextlost', onLost, false);
   canvas.addEventListener('webglcontextrestored', onRestored, false);
 
-  let lastStats = { instances: 0, draws: 0 };
+  /** @type {{mode:string, submitted:number, draws:number, window:number, visible?:number, visited?:number}} */
+  let lastStats = { mode: 'static', submitted: 0, draws: 0, window: 0 };
 
   return {
     gl,
@@ -349,22 +428,41 @@ export function createRenderer(canvas, graph, opts = {}) {
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
 
-      // Viewport verse range, for chunk culling.
-      const viewLo = v.camX - (v.width / 2) / v.ppv;
-      const viewHi = v.camX + (v.width / 2) / v.ppv;
-      const chunkSize = graph.chunkSize || 256;
-
-      let instances = 0, draws = 0;
-      for (let bi = 0; bi < graph.buckets.length; bi++) {
+      // Segments from what this bucket can put ON SCREEN, not from its span;
+      // 2 * (segments + 1) vertices per strip.
+      const vertsFor = (bi) => {
         const bucket = graph.buckets[bi];
-        const count = bucketDrawCount(bucket, v.density);
-        if (count <= 0) continue;
-        // Segments from what this bucket can put ON SCREEN, not from its span.
         const segments = segmentsFor(bucket.segments, v.zoom || 1,
           bucketSpan[bi][0] * v.ppv * 0.5, bucketSpan[bi][1] * v.ppv * 0.5,
           v.squash, v.base, v.width, v.dpr || 1);
         gl.uniform1f(U.uSegments, segments);
-        const verts = 2 * (segments + 1);
+        return 2 * (segments + 1);
+      };
+
+      const p = planFor(v);
+      let submitted = 0, draws = 0;
+      if (p.mode === 'gathered') {
+        // The exact visible set, one draw per bucket it touches.
+        for (const grp of groups) {
+          const verts = vertsFor(grp.bucket);
+          pointInstances(dynamics, grp.first);
+          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, grp.n);
+          submitted += grp.n;
+          draws++;
+        }
+        lastStats = { mode: 'gathered', submitted, draws, window: p.window, visible: p.visible, visited: p.visited };
+        return lastStats;
+      }
+
+      // Whole buckets: viewport verse range, for chunk culling.
+      const viewLo = v.camX - (v.width / 2) / v.ppv;
+      const viewHi = v.camX + (v.width / 2) / v.ppv;
+      const chunkSize = graph.chunkSize || 256;
+      for (let bi = 0; bi < graph.buckets.length; bi++) {
+        const bucket = graph.buckets[bi];
+        const count = bucketDrawCount(bucket, v.density);
+        if (count <= 0) continue;
+        const verts = vertsFor(bi);
         // Walk chunks, coalescing adjacent visible ones into single draws.
         const chunks = bucket.chunks || [];
         let runStart = -1;
@@ -373,19 +471,17 @@ export function createRenderer(canvas, graph, opts = {}) {
           const first = runStart;
           const n = endExclusive - first;
           if (n > 0) {
-            pointInstances(bucket.off + first);
-            gl.uniform1f(U.uInstanceBase, bucket.off + first);
+            pointInstances(statics, bucket.off + first);
             gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
-            instances += n;
+            submitted += n;
             draws++;
           }
           runStart = -1;
         };
         if (!chunks.length) {
-          pointInstances(bucket.off);
-          gl.uniform1f(U.uInstanceBase, bucket.off);
+          pointInstances(statics, bucket.off);
           gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, count);
-          instances += count;
+          submitted += count;
           draws++;
           continue;
         }
@@ -402,14 +498,15 @@ export function createRenderer(canvas, graph, opts = {}) {
         }
         flush(count);
       }
-      lastStats = { instances, draws };
+      lastStats = { mode: 'static', submitted, draws, window: p.window };
       return lastStats;
     },
 
     dispose() {
       canvas.removeEventListener('webglcontextlost', onLost);
       canvas.removeEventListener('webglcontextrestored', onRestored);
-      for (const a of attribs) gl.deleteBuffer(a.buf);
+      for (const a of statics) gl.deleteBuffer(a.buf);
+      for (const a of dynamics) gl.deleteBuffer(a.buf);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);
       // NOTE: no loseContext() here. A rebuild after a real context loss

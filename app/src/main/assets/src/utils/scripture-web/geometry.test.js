@@ -383,10 +383,14 @@ describe('pickArc agrees with the drawn curve', () => {
       .toEqual([0, 1]);
   });
 
-  it('keeps chunk-culling consistent with the renderer', () => {
+  it('reads the index, not the chunk table (inverted at M2): a chunk table that lies about every extent hides nothing from the finger', () => {
+    // The renderer's overview regime still culls by chunk extent; the hit
+    // test used to as well, so a wrong table made an arc undrawn AND
+    // untappable together. Now the index decides what is tappable, from the
+    // threads' own feet — and the gathered regime draws from the same walk.
     const chunked = makeGraph([[2, 8], [5, 35], [12, 18], [0, 39], [21, 29]]);
     chunked.chunkSize = 2;
-    chunked.buckets[0].chunks = [[2, 35], [0, 39], [21, 29]];
+    chunked.buckets[0].chunks = [[100, 100], [100, 100], [100, 100]];
     const cam = createCamera(chunked.total);
     clampCamera(cam, 1000, 5000);
     const view = VIEW();
@@ -742,6 +746,7 @@ describe('the GLSL sampleTau IS the JS sampleTau — the twin transliterated and
     return out;
   }
   const T = Array.from({ length: 33 }, (_, k) => k / 32);
+  const at = (fn, t, a) => fn(t, a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
 
   it('agrees with the JS to 1e-9 on 1,500 tuples x 33 strip parameters, and both regimes are reached', () => {
     const twin = twinOf(threadShapeGLSL);
@@ -750,8 +755,8 @@ describe('the GLSL sampleTau IS the JS sampleTau — the twin transliterated and
       const [A, , , hHi, hw] = args;
       if (A <= hHi + SPLIT_MARGIN * hw) whole++; else split++;
       for (const t of T) {
-        const want = sampleTau(t, ...args);
-        expect(twin(t, ...args), `t=${t} args=${JSON.stringify(args)}`).toBeCloseTo(want, 9);
+        const want = at(sampleTau, t, args);
+        expect(at(twin, t, args), `t=${t} args=${JSON.stringify(args)}`).toBeCloseTo(want, 9);
       }
     }
     expect(split).toBeGreaterThan(300);
@@ -764,7 +769,7 @@ describe('the GLSL sampleTau IS the JS sampleTau — the twin transliterated and
     const bitten = twinOf(threadShapeGLSL.replace(needle, 'if (true)'));
     let disagree = 0;
     for (const args of sweep(5)) {
-      for (const t of T) if (Math.abs(bitten(t, ...args) - sampleTau(t, ...args)) > 1e-9) disagree++;
+      for (const t of T) if (Math.abs(at(bitten, t, args) - at(sampleTau, t, args)) > 1e-9) disagree++;
     }
     expect(disagree).toBeGreaterThan(1000);
   });

@@ -1,3 +1,4 @@
+// @ts-nocheck — reads the shipped asset from disk through node:fs, which this tsconfig has no types for; the fake gl is untyped on purpose
 /* web-renderer.gl-stub.test.js — the counter in the draw path (w-sw-phase1, M2).
    ─────────────────────────────────────────────────────────────────────────
    Corbin, 2026-09-11: "other lines that aren't even close to user screen
@@ -18,7 +19,7 @@
    cull submits every instance in the buckets whose extents touch the
    viewport — the number this file exists to bring down. */
 import { describe, it, expect, beforeAll } from 'vitest';
-import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createRenderer } from './web-renderer.js';
@@ -31,7 +32,7 @@ const ASSET = resolve(here, '../../data/scripture-web-data.js');
 /** The shipped asset, decoded once: 63,418 threads over 31,102 verses. */
 let graph = null;
 beforeAll(() => {
-  const src = fs.readFileSync(ASSET, 'utf8');
+  const src = readFileSync(ASSET, 'utf8');
   const m = /var SCRIPTURE_WEB_DATA = (\{[\s\S]*\});?\s*$/.exec(src);
   if (!m) throw new Error('the asset did not parse: nothing below is about the corpus');
   const data = JSON.parse(m[1]);
@@ -72,8 +73,9 @@ function fakeGL() {
   return gl;
 }
 
+/** @returns {HTMLCanvasElement} (a stand-in: the renderer reads only these three) */
 function fakeCanvas(gl) {
-  return { getContext: () => gl, addEventListener() {}, removeEventListener() {} };
+  return /** @type {any} */ ({ getContext: () => gl, addEventListener() {}, removeEventListener() {} });
 }
 
 /** The phone landscape frame at DPR 2: what ScriptureWebScreen's frame() computes for 800x360. */

@@ -1,3 +1,4 @@
+// @ts-nocheck — reads the shipped asset from disk through node:fs, which this tsconfig has no types for
 /* index.test.js — the exact visible set over the shipped layout (w-sw-phase1, M2).
    ─────────────────────────────────────────────────────────────────────────
    Two halves. The LAW half is a brute force: every thread of a synthetic
@@ -12,7 +13,7 @@
    113 with the camera raised ten bands. Those are the "nothing far from the
    frame is touched" numbers; a chunk cull submitted 18,944 for the 142. */
 import { describe, it, expect, beforeAll } from 'vitest';
-import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { buildIndex, windowSize, walkVisible, gather, countVisible } from './index.js';
@@ -56,10 +57,10 @@ function synth(seed, n, total) {
     for (const t of tier20.concat(tier7)) { from.push(t.a); to.push(t.b); votes.push(t.votes); }
     buckets.push({ off, len: members.length, off20: tier20.length, off10: members.length, segments: 8, chunks: [] });
   }
-  return {
+  return /** @type {import('./decode.js').ScriptureGraph} */ (/** @type {any} */ ({
     total, count: from.length, from: Uint16Array.from(from), to: Uint16Array.from(to),
     votes: Int16Array.from(votes), buckets, densityTiers: [20, 7],
-  };
+  }));
 }
 
 /** Every drawn thread the rectangle admits, by the predicate alone. */
@@ -101,14 +102,9 @@ describe('the index over a synthetic layout: the gathered list IS the predicate\
   const g = synth(7, N, TOTAL);
   const idx = buildIndex(g);
 
-  it('PRECONDITION: the synthetic layout has from ascending within every (bucket, tier) run, like the asset', () => {
+  it('PRECONDITION: one run per (bucket, tier), 2,000 threads', () => {
     let runs = 0;
-    for (const b of g.buckets) {
-      for (const [start, len] of deltaRuns(b)) {
-        runs++;
-        for (let p = start + 1; p < start + len; p++) expect(g.from[p]).toBeGreaterThanOrEqual(g.from[p - 1]);
-      }
-    }
+    for (const b of g.buckets) runs += deltaRuns(b).length;
     expect(runs, 'runs in the synthetic graph').toBe(idx.runs.length);
     expect(g.count).toBe(N);
   });
@@ -166,7 +162,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ASSET = resolve(here, '../../data/scripture-web-data.js');
 let graph = null;
 beforeAll(() => {
-  const src = fs.readFileSync(ASSET, 'utf8');
+  const src = readFileSync(ASSET, 'utf8');
   const m = /var SCRIPTURE_WEB_DATA = (\{[\s\S]*\});?\s*$/.exec(src);
   if (!m) throw new Error('the asset did not parse: nothing below is about the corpus');
   graph = decodeGraph(JSON.parse(m[1]));
@@ -181,29 +177,26 @@ function rectAt(ppv, camY, camX = 15000) {
 }
 
 describe('the index over the shipped asset (63,418 threads)', () => {
-  it('PRECONDITION: the shipped layout has from ascending within every (bucket, tier) run — the free byFrom the index relies on', () => {
+  it('PRECONDITION: 8 runs over 63,418 threads', () => {
     let runs = 0;
-    for (const b of graph.buckets) {
-      for (const [start, len] of deltaRuns(b)) {
-        runs++;
-        for (let p = start + 1; p < start + len; p++) {
-          if (graph.from[p] < graph.from[p - 1]) throw new Error(`from descends at ${p}: ${graph.from[p - 1]} -> ${graph.from[p]}`);
-        }
-      }
-    }
+    for (const b of graph.buckets) runs += deltaRuns(b).length;
     expect(runs).toBe(8);
     expect(graph.count).toBe(63418);
   });
 
-  it('byTo ascends within every run, and every position appears in it once', () => {
+  it('byFrom and byTo each ascend by their foot within every run, and each is a permutation of the run', () => {
     const idx = buildIndex(graph);
     for (const run of idx.runs) {
-      const seen = new Uint8Array(run.end - run.start);
-      for (let k = 0; k < run.byTo.length; k++) {
-        seen[run.byTo[k]] = 1;
-        if (k) expect(graph.to[run.start + run.byTo[k]]).toBeGreaterThanOrEqual(graph.to[run.start + run.byTo[k - 1]]);
+      for (const [order, foot] of [[run.byFrom, graph.from], [run.byTo, graph.to]]) {
+        const seen = new Uint8Array(run.end - run.start);
+        for (let k = 0; k < order.length; k++) {
+          seen[order[k]] = 1;
+          if (k && foot[run.start + order[k]] < foot[run.start + order[k - 1]]) {
+            throw new Error(`run ${run.bucket}@${run.start}: foot descends at ${k}`);
+          }
+        }
+        expect(seen.every((s) => s === 1), `run ${run.bucket}@${run.start} lists every position`).toBe(true);
       }
-      expect(seen.every((s) => s === 1), `run ${run.bucket}@${run.start} lists every position`).toBe(true);
     }
   });
 

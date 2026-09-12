@@ -203,6 +203,52 @@ export function threadShape(rx, squash) {
 }
 
 /**
+ * How far from a foot, along the baseline, a thread of half-span r (verse
+ * units, so also its apex height) reaches height y: the true world's one
+ * fact about depth, `r - sqrt(r^2 - y^2)` (y^2 / 2r for small y).
+ */
+export function footReach(r, y) {
+  if (!(r > 0)) return 0;
+  if (!(y > 0)) return 0;
+  return y >= r ? r : r - Math.sqrt(r * r - y * y);
+}
+
+/**
+ * Whether any piece of the thread [a, b] lies inside the world rectangle
+ * [xa, xb] x [y0, y1] (verse units) — the visibility the shader's band clip
+ * draws, as ONE predicate the index, the crowding count and the hit test all
+ * consume. Apex inside the band: one piece from x = a + reach(y0) to
+ * b - reach(y0); above it: the two legs, each within [reach(y0), reach(y1)]
+ * of its foot; below it: nothing.
+ */
+export function threadVisible(a, b, xa, xb, y0, y1) {
+  const r = (b - a) / 2;
+  if (!(r > 0) || r < y0) return false;
+  const t0 = footReach(r, y0);
+  if (r <= y1) return b - t0 >= xa && a + t0 <= xb;
+  const t1 = footReach(r, y1);
+  return (a + t1 >= xa && a + t0 <= xb) || (b - t0 >= xa && b - t1 <= xb);
+}
+
+/**
+ * The window a run of threads with spans in [spanLo, spanHi] must be searched
+ * over, in `from` and in `to`, for the rectangle: a superset of the members
+ * threadVisible admits (the run's spans are a range, the test is per
+ * thread), so the index can binary-search sorted feet and let the predicate
+ * decide each candidate. Members whose apex can sit inside the band need a
+ * foot within their whole span of the frame; members taller than the band
+ * need one within reach(y1) of it.
+ * @returns {{fromLo:number, fromHi:number, toLo:number, toHi:number}}
+ */
+export function footWindow(spanLo, spanHi, xa, xb, y0, y1) {
+  const rLo = spanLo / 2, rHi = spanHi / 2;
+  const anyInBand = rLo <= y1;
+  const pad = anyInBand ? Math.min(spanHi, 2 * y1) : footReach(rLo, y1);
+  const inner = footReach(rHi, y0);
+  return { fromLo: xa - pad, fromHi: xb - inner, toLo: xa + inner, toHi: xb + pad };
+}
+
+/**
  * The parameter this vertex samples, 0 <= t <= 1 along the strip: the
  * visible piece of the thread, so the segments land where the reader is
  * looking. Two regimes by the apex against the frame's band [hLo, hHi]
