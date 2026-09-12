@@ -79,22 +79,34 @@ const notes = [];
 const note = (s) => { notes.push(s); console.log('[e2e-myweb-colour] ' + s); };
 
 // ── the seed: the reader's links, in the shapes the legend names ──
-const LETTER_IDS = (() => {
-  const src = readFileSync(resolve(OWN, 'app/src/main/assets/src/data/volume-one.js'), 'utf8');
-  const ids = []; const re = /"id":\s*"([a-z0-9-]+)"/g; let m;
-  while ((m = re.exec(src)) && ids.length < 8) if (!ids.includes(m[1])) ids.push(m[1]);
-  return ids;
+// Letter ends from FOUR collections spread along the top rail (Vol I at the left edge, Vol IV, the
+// Lord's Rebuke near the middle, Letters to the Flock past it), each endpoint scoped by its volKey.
+// myweb-colour's review (D1/D2): with every letter drawn from volume-one, no 'within the Volumes'
+// link was on any picture (the amber dot - one of the three pin shapes Corbin approves - never
+// appeared) and the seven across links stacked out of the top-left corner with their pins clipped.
+const LETTER_SETS = (() => {
+  const files = { one: 'volume-one', four: 'volume-four', rebuke: 'lords-rebuke', flock: 'letters-flock' };
+  const out = {};
+  for (const [volKey, file] of Object.entries(files)) {
+    const src = readFileSync(resolve(OWN, `app/src/main/assets/src/data/${file}.js`), 'utf8');
+    const ids = []; const re = /"id":\s*"([a-z0-9-]+)"/g; let m;
+    while ((m = re.exec(src)) && ids.length < 8) if (!ids.includes(m[1])) ids.push(m[1]);
+    out[volKey] = ids;
+  }
+  return out;
 })();
+const VOL_KEYS = Object.keys(LETTER_SETS);
 const BIBLE = [['genesis', 1, 1], ['exodus', 20, 3], ['psalms', 23, 1], ['isaiah', 53, 5], ['john', 3, 16], ['romans', 8, 28],
   ['revelation', 21, 4], ['proverbs', 3, 5], ['deuteronomy', 6, 4], ['jeremiah', 29, 11], ['matthew', 5, 3], ['hebrews', 11, 1], ['micah', 6, 8], ['daniel', 3, 17]];
 const bibleEp = ([b, c, v]) => ({ type: 'bible', key: `bible:${b}:${c}:${v}`, bookId: b, chapter: c, verse: v, label: `${b} ${c}:${v}` });
-const letterEp = (id) => ({ type: 'letter', key: `letter:${id}`, volKey: 'one', letterId: id, label: id });
+const letterEp = (volKey, i) => { const id = LETTER_SETS[volKey][i % LETTER_SETS[volKey].length]; return { type: 'letter', key: `letter:${id}`, volKey, letterId: id, label: `${volKey}/${id}` }; };
 function seedPairs(n) {
   const pairs = [];
   const nWithin = Math.round(n * 0.35), nVol = Math.round(n * 0.3), nAcross = n - nWithin - nVol;
   for (let i = 0; i < nWithin; i++) pairs.push([bibleEp(BIBLE[i]), bibleEp(BIBLE[(i + 7) % BIBLE.length])]);
-  for (let i = 0; i < nVol; i++) pairs.push([letterEp(LETTER_IDS[i % LETTER_IDS.length]), letterEp(LETTER_IDS[(i + 3) % LETTER_IDS.length])]);
-  for (let i = 0; i < nAcross; i++) pairs.push([bibleEp(BIBLE[(i + 3) % BIBLE.length]), letterEp(LETTER_IDS[(i + 1) % LETTER_IDS.length])]);
+  // each within-the-Volumes pair joins two DIFFERENT collections; the across links' letter ends rotate through all four
+  for (let i = 0; i < nVol; i++) pairs.push([letterEp(VOL_KEYS[i % VOL_KEYS.length], i), letterEp(VOL_KEYS[(i + 1 + Math.floor(i / VOL_KEYS.length)) % VOL_KEYS.length], i + 2)]);
+  for (let i = 0; i < nAcross; i++) pairs.push([bibleEp(BIBLE[(i + 3) % BIBLE.length]), letterEp(VOL_KEYS[(i + 2) % VOL_KEYS.length], i + 4)]);
   return pairs;
 }
 
@@ -199,6 +211,23 @@ const simulate = (page, b64, kind) => page.evaluate(async (b64, kind) => {
   return c.toDataURL('image/png');
 }, b64, kind);
 
+/** Blobs of one colour (within tol per channel) along a horizontal band: columns holding the colour, merged
+ *  into runs, ignoring runs narrower than 2 px. Used for the pin count on a rail's row. */
+const countPins = (page, b64, y0, y1, W, rgb, tol) => page.evaluate(async (b64, y0, y1, W, rgb, tol) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+  const H = y1 - y0; const d = g.getImageData(0, y0, W, H).data;
+  const col = new Uint8Array(W);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = (y * W + x) * 4;
+    if (Math.abs(d[p] - rgb[0]) <= tol && Math.abs(d[p + 1] - rgb[1]) <= tol && Math.abs(d[p + 2] - rgb[2]) <= tol) col[x] = 1;
+  }
+  let blobs = 0, run = 0, widest = 0;
+  for (let x = 0; x <= W; x++) { if (x < W && col[x]) run++; else { if (run >= 2) { blobs++; widest = Math.max(widest, run); } run = 0; } }
+  return { blobs, widest };
+}, b64, y0, y1, W, rgb, tol);
+
 /** Distinct lit runs per row and the lit share over a band of the screenshot (scratch canvas). */
 const scanBand = (page, b64, x0, x1, y0, y1) => page.evaluate(async (b64, x0, x1, y0, y1) => {
   const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
@@ -260,6 +289,13 @@ async function walk(page, url, fname) {
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const dark = await page.screenshot({ encoding: 'base64' });
   if (OUT) writeFileSync(resolve(OUT, `${fname}-O-dark.png`), Buffer.from(dark, 'base64'));
+  // D1: at least one 'within the Volumes' link with BOTH pins on screen = >= 2 amber pin blobs on the top
+  // rail's row (amber 236,150,70 is the pin AND the ribbon of that kind; coral 236,120,96 differs by 30 in G)
+  if (r0) {
+    const pins = await countPins(page, dark, Math.round((c.t + r0.topY - 9) * f.dpr), Math.round((c.t + r0.topY + 9) * f.dpr), f.w * f.dpr, [236, 150, 70], 14);
+    note(`${tag} amber pins on the top rail's row: ${pins.blobs} (>= 2 means a within-the-Volumes link has both pins on screen), widest ${pins.widest} px`);
+    if (pins.blobs < 2) fails.push(`${tag} no within-the-Volumes link with both pins on screen (amber pin blobs on the top rail: ${pins.blobs}) - the amber dot would be missing from the picture`);
+  }
   // light: the theme applied as use-settings.js does; the screen's observer re-reads its tokens
   await page.evaluate(() => document.body.classList.toggle('light', true)); await sleep(600);
   await shot(page, `${fname}-O-light`);
@@ -315,7 +351,7 @@ try {
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], protocolTimeout: 240000 });
   const p0 = await (await browser.createBrowserContext()).newPage(); await p0.goto('about:blank');
   const renderer = await p0.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : 'unknown'; });
-  note(`tree ${OWN} @ ${SHA}; renderer ${renderer}; ceilings ${CEILINGS.join(',')}; ${N_LINKS} links (${LETTER_IDS.length} letter ids from volume-one)`);
+  note(`tree ${OWN} @ ${SHA}; renderer ${renderer}; ceilings ${CEILINGS.join(',')}; ${N_LINKS} links (letters from ${VOL_KEYS.map((k) => `${k}:${LETTER_SETS[k].length}`).join(' ')})`);
   for (const fname of FRAME_LIST) {
     if (!FRAMES[fname]) { fails.push(`unknown frame ${fname}`); continue; }
     const page = await (await browser.createBrowserContext()).newPage();
