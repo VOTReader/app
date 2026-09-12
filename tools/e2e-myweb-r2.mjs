@@ -36,16 +36,28 @@
  *      Each notch's capture is taken while the gesture is still LIVE (inside
  *      the 150 ms hold, data-cap-fraction 0): what a moving finger sees.
  *   R  release: from the overview one wheel notch over the Bible rail at the
- *      Matthew corridor, then the ui canvas's corridor box sampled every
- *      animation frame through the hold and the 250 ms fade back to the full
- *      picture. Runs FIRST, on a fresh page: a full-page screenshot before it
- *      (arm O) leaves the canvas where a sample costs ~430 ms on desktop and
- *      the fade is invisible. Registered: the largest RAW step in the corridor's mean
- *      luminance between consecutive samples (the "no pop" number, gate a
- *      third of the live dip), the sample cadence beside it, and the count of
- *      fading samples; fewer than three fading samples is UNRESOLVED and
- *      FAILS (the Verifier's bite: with the fade removed the whole dip landed
- *      in one sampler gap and a per-time normalisation waved it through).
+ *      Matthew corridor, then data-cap-fraction (the fraction the screen drew
+ *      that frame: 0 live, 1 full) read every animation frame through the
+ *      150 ms hold and the 250 ms fade, with a longtask observer beside it.
+ *      This asserts the app's coverage SCHEDULE, not the picture: the picture
+ *      is a pure function of the fraction (layerCap eases brightness in it),
+ *      and pixels cannot be read tonight without demoting the canvas (below).
+ *      Gate: after the last live frame at least three fading frames spanning
+ *      >= 100 ms, never falling, then 1. Fewer is a POP when the jump into
+ *      full sits between two ticks <= 50 ms apart (the Verifier's bite, fade
+ *      removed: 0 fading frames, both frames, 4-5 ms cadence), UNRESOLVED when
+ *      the tick gap there is longer (neither passes).
+ *      Launch classification, printed on every launch: release frames drawn
+ *      as main-thread long tasks >= 50 ms mean the 2D canvas is in software
+ *      raster for that browser (measured on the RTX 5080 D3D11 string: 330-502
+ *      ms a frame on desktop, 73-105 ms on the phone frame, against 5-8 ms
+ *      accelerated; a new page in the same browser inherits it), so that
+ *      launch is not a number: the browser is relaunched, up to three, and
+ *      three software launches FAIL as "not a number". NO pixel read-back in
+ *      this arm and it runs FIRST on a fresh page: two getImageData reads on
+ *      the ui canvas, even before the notch, demote it the same way; the
+ *      luminance instrument at 56133fd4 measured the defect it created (on a
+ *      quiet machine it read 0.51-0.96/255 per fading frame: information).
  *   T  two-rail: wheel over the top rail until Rebuke fills >= 60 % of the
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
@@ -90,7 +102,14 @@ const NAV_MS = 60000;
 const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
 const NOTCHES = 22;
 const ARMS = arg('arms', 'R,O,S,T,C').split(',');
-const BAND_FILL = 0.6;       // a rail "zoomed to a book": the book spans >= 60 % of the width
+const BAND_FILL = 0.6;
+// arm R launch classifier: an accelerated release frame draws in 5-8 ms here;
+// a software-raster one in 73-105 ms (phone) / 330-502 ms (desktop). 50 sits
+// between the two populations with a factor of >= 1.4 to the nearer one.
+const SOFT_MS = 50;
+// diagnosis only (e.g. --disable-features=SkiaGraphite); a run with args is
+// not the frame the reader gets and is printed as such
+const CHROME_ARGS = (process.env.MYWEB_CHROME_ARGS || '').split(' ').filter(Boolean);       // a rail "zoomed to a book": the book spans >= 60 % of the width
 
 for (const t of new Set([OWN, TREE])) {
   const dirty = execSync('git status --porcelain', { cwd: t }).toString().trim();
@@ -339,7 +358,7 @@ async function armC(page, tag, fname, c, r0, f) {
 }
 
 /** Arm R: the release fade, measured in the Matthew corridor. */
-async function armR(page, tag, fname, c, r0) {
+async function armR(page, tag, fname, c, r0, attempt) {
   // the corridor: the band between the rails over the Matthew stretch of the
   // bottom rail (the Study Bible notes), the densest ink on the overview
   const band = r0.bottom.find((b) => b.label === 'Matthew');
@@ -347,82 +366,82 @@ async function armR(page, tag, fname, c, r0) {
   const x0 = Math.max(0, band.x0 - 40), x1 = Math.min(c.w, band.x1 + 40);
   await clickIfPresent(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
-  // one instrument for rest, live and fade: the ui canvas's corridor box drawn
-  // scaled 1/4 into a scratch canvas (no read-back on the app canvas) and its
-  // mean luminance read, with data-cap-fraction as drawn that frame; sampled
-  // every animation frame (a screenshot takes 40-400 ms, blind to a 250 ms fade)
-  const SAMPLER = `(box, ms) => new Promise((done) => {
-    const ui = document.querySelector('.sw-canvas-ui');
+  // THE INSTRUMENT is data-cap-fraction read every animation frame: the
+  // fraction the screen drew that frame (0 live, 1 full, between = fading).
+  // The picture is a pure function of it (layerCap eases brightness in f), so
+  // the trace IS the picture's schedule. NO pixel read-back anywhere in this
+  // arm: two getImageData reads on the 3840x2160 ui canvas, even before the
+  // notch, demote it to software rasterisation (measured: one frame per
+  // ~500 ms on desktop, ~85 ms on the phone frame) and the fade cannot draw.
+  const SAMPLER = `(ms) => new Promise((done) => {
     const root = document.querySelector('.sw-root');
-    const s = ui.width / ui.getBoundingClientRect().width;
-    const X0 = Math.floor(box.x0 * s), Y0 = Math.floor(box.y0 * s), W = Math.floor((box.x1 - box.x0) * s), H = Math.floor((box.y1 - box.y0) * s);
-    const w = Math.max(8, Math.floor(W / 4)), h = Math.max(8, Math.floor(H / 4));
-    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    const g = cv.getContext('2d', { willReadFrequently: true });
-    const out = []; const t0 = performance.now();
+    const out = []; const t0 = performance.now(); const longs = [];
+    const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) longs.push({ t: +(e.startTime - t0).toFixed(0), ms: +e.duration.toFixed(0) }); });
+    po.observe({ entryTypes: ['longtask'] });
     const tick = () => {
-      g.clearRect(0, 0, w, h); g.drawImage(ui, X0, Y0, W, H, 0, 0, w, h);
-      const d = g.getImageData(0, 0, w, h).data;
-      let sum = 0;
-      for (let p = 0; p < d.length; p += 4) sum += (d[p] + d[p + 1] + d[p + 2]) * d[p + 3] / 255;
-      out.push({ t: +(performance.now() - t0).toFixed(0), cf: Number(root.getAttribute('data-cap-fraction')), lum: +(sum / 3 / (w * h)).toFixed(2) });
-      if (performance.now() - t0 < ms) requestAnimationFrame(tick); else done(out);
+      out.push({ t: +(performance.now() - t0).toFixed(0), cf: Number(root.getAttribute('data-cap-fraction')) });
+      if (performance.now() - t0 < ms) requestAnimationFrame(tick); else { po.disconnect(); done({ out, longs }); }
     };
     requestAnimationFrame(tick);
   })`;
-  const box = { x0, x1, y0: r0.topY + 4, y1: r0.bottomY - 4 };
-  const sample = (ms) => page.evaluate((src, box, ms) => (new Function('return ' + src)())(box, ms), SAMPLER, box, ms);
+  const sample = (ms) => page.evaluate((src, ms) => (new Function('return ' + src)())(ms), SAMPLER, ms);
   await page.mouse.move(c.l + (band.x0 + band.x1) / 2, c.t + r0.bottomY - 12); await sleep(150);
   // the sampler starts BEFORE the notch: a slow puppeteer round trip after the
   // wheel (132 ms seen on a loaded machine) would otherwise skip the 150 ms hold
   const pending = sample(1000);
   await sleep(80);
   await page.mouse.wheel({ deltaY: -120 });
-  const all = await pending;
+  const { out: all, longs } = await pending;
+  await page.mouse.move(c.l + 8, c.t + 8);
   const firstLiveIdx = all.findIndex((x) => x.cf === 0);
-  const pre = firstLiveIdx > 0 ? all.slice(0, firstLiveIdx) : all.slice(0, 1);
-  const rest0 = +(pre.reduce((a, x) => a + x.lum, 0) / pre.length).toFixed(2);
   const shots = firstLiveIdx >= 0 ? all.slice(firstLiveIdx) : all;
-  await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
-  const restEnd = (await sample(0))[0].lum;
-  // the RAW step between consecutive samples is the gate; a per-time
-  // normalisation would assume the luminance eased across a sampler gap,
-  // which is the property under test (the Verifier's bite iii)
-  // the RELEASE is what is measured: from the last live sample on. The
-  // sampler's first frames can precede the app's first live draw, and the
-  // rest-to-live drop at the notch is the cap taking hold, not the fade.
+  // after the last live frame the fraction must pass through at least three
+  // fading frames spanning >= 100 ms, never fall, and reach 1
   const live = shots.filter((x) => x.cf === 0);
   const lastLiveIdx = live.length ? shots.indexOf(live[live.length - 1]) : 0;
   const after = shots.slice(lastLiveIdx);
   const fading = after.filter((x) => x.cf > 0 && x.cf < 1), full = after.filter((x) => x.cf === 1);
   const first = shots[0], lastLive = live.length ? live[live.length - 1] : null, firstFull = full.length ? full[0] : null;
-  let maxStep = 0, at = -1, maxGap = 0;
-  for (let i = 1; i < after.length; i++) {
-    const d = Math.abs(after[i].lum - after[i - 1].lum), dt = after[i].t - after[i - 1].t;
-    if (d > maxStep) { maxStep = d; at = lastLiveIdx + i; }
-    if (dt > maxGap) maxGap = dt;
+  let falls = 0;
+  for (let i = 1; i < after.length; i++) if (after[i].cf < after[i - 1].cf) falls++;
+  const fadeSpan = fading.length ? fading[fading.length - 1].t - fading[0].t : 0;
+  const gaps = after.slice(1).map((x, i) => x.t - after[i].t);
+  const maxGap = gaps.length ? Math.max(...gaps) : 0;
+  const cadence = after.length > 1 ? Math.round((after[after.length - 1].t - after[0].t) / (after.length - 1)) : 0;
+  const soft = longs.filter((l) => l.ms >= SOFT_MS);
+  note(`${tag} R (launch ${attempt}): cap-fraction trace after the notch: ${shots.length} frames over ${shots[shots.length - 1].t - shots[0].t} ms (cadence ${cadence} ms, largest gap ${maxGap} ms): live ${live.length} frames (${lastLive ? 'to t+' + lastLive.t : 'none'}), fading ${fading.length} frames over ${fadeSpan} ms, falls ${falls}, full from t+${firstFull ? firstFull.t : '-'}; main-thread long tasks in the window: ${longs.length ? longs.map((l) => `${l.ms} ms at t+${l.t}`).join(', ') : 'none'}`);
+  if (OUT) writeFileSync(resolve(OUT, `${fname}-R-launch${attempt}.json`), JSON.stringify({ shots: all, longs }, null, 1));
+  // headless Chrome lands the 2D canvas in software raster on some launches
+  // (measured: 4 of 11 desktop launches drew every release frame as a
+  // 330-500 ms main-thread long task, the others at 5 ms cadence, same tree,
+  // same renderer string): that launch is not a number. Recreate the page and
+  // try again, up to three launches, every one printed.
+  // a trace with a >= 200 ms hole and no long task is a starved page (one
+  // launch gave a single tick in 1.76 s): the same verdict, not a number
+  const starved = !soft.length && (all.length < 3 || Math.max(...all.slice(1).map((x, i) => x.t - all[i].t)) >= 200);
+  if (starved) soft.push({ t: 0, ms: 0 });
+  if (soft.length) {
+    if (attempt < 3) { note(`${tag} R: launch ${attempt} ${starved ? `starved the page (${all.length} ticks, largest hole ${Math.max(...all.slice(1).map((x, i) => x.t - all[i].t))} ms, no long task)` : `drew the release as long tasks (${soft.map((l) => l.ms + ' ms').join(', ')}): software-raster canvas`}, not a number; relaunching the browser`); return 'software'; }
+    fails.push(`${tag} R: three browser launches drew the release as main-thread long tasks (last: ${soft.map((l) => l.ms + ' ms').join(', ')}): no accelerated canvas to judge the fade on; not a number`);
+    return 'software';
   }
-  const cadence = shots.length > 1 ? Math.round((shots[shots.length - 1].t - shots[0].t) / (shots.length - 1)) : 0;
-  note(`${tag} R: Matthew corridor (ui canvas) mean luminance: rest ${rest0} -> ${shots.length} samples over ${shots[shots.length - 1].t} ms (mean cadence ${cadence} ms, largest gap ${maxGap} ms): first sample ${first.lum} at t+${first.t} (cap ${first.cf}), live ${live.length}${lastLive ? ` (.. ${lastLive.lum} at t+${lastLive.t})` : ''}, fading ${fading.length}, full from t+${firstFull ? firstFull.t : '-'} (${firstFull ? firstFull.lum : '-'}); largest RAW step between consecutive samples ${maxStep.toFixed(2)}/255 (sample ${at}, t+${shots[at] ? shots[at].t : '-'} ms, cap ${shots[at] ? shots[at].cf : '-'}); rest again ${restEnd}`);
-  if (OUT) writeFileSync(resolve(OUT, `${fname}-R.json`), JSON.stringify({ rest0, restEnd, shots }, null, 1));
-  const dip = (firstFull ? firstFull.lum : rest0) - (lastLive ? lastLive.lum : first.lum);
-  if (!live.length) fails.push(`${tag} R: no live frame was sampled after the notch (first sample cap ${first.cf} at t+${first.t} ms): the hold was not seen`);
-  // the sampler's first frame can precede the app's first live draw (t+5 ms),
-  // so the hold is judged by any live or fading frame seen, not the first
-  if (!firstFull) fails.push(`${tag} R: the cap did not come back to full within 700 ms`);
-  // fewer than three fading samples: a POP when the sampler's gap around the
-  // largest step is shorter than a third of the 250 ms fade (it resolved the
-  // event fine and there WAS no fade: the defect), UNRESOLVED only when the
-  // gaps were too coarse to have seen a fade at all (the instrument's fault)
-  const gapAtStep = at > 0 ? shots[at].t - shots[at - 1].t : maxGap;
-  if (fading.length < 3) {
-    const pop = gapAtStep < 250 / 3;
-    fails.push(`${tag} R: ${pop ? 'POP' : 'UNRESOLVED'}: ${fading.length} fading samples; the largest step ${maxStep.toFixed(2)}/255 (dip ${dip.toFixed(2)}) sits in a ${gapAtStep} ms gap (cadence ${cadence} ms, largest gap ${maxGap} ms): ${pop ? 'the sampler saw the release and there was no fade' : 'the sampler could not have seen a 250 ms fade; fix the instrument, not the fade'}`);
-  } else if (!(maxStep <= dip * 0.35)) fails.push(`${tag} R: a raw step of ${maxStep.toFixed(2)}/255 between consecutive samples (${gapAtStep} ms gap) is more than a third of the live dip (${dip.toFixed(2)}): a pop`);
+  note(`${tag} R: launch ${attempt} classified accelerated (no long task >= ${SOFT_MS} ms in the release window)${attempt > 1 ? ' after ' + (attempt - 1) + ' software launch(es)' : ' first try'}`);
+  // the jump: the tick gap into the first full frame. Too few fading frames is
+  // a POP only when the sampler saw the jump between two close ticks; a long
+  // gap there is UNRESOLVED (the instrument did not see it; neither passes)
+  const jumpGap = firstFull ? firstFull.t - (after[after.indexOf(firstFull) - 1] || firstFull).t : Infinity;
+  if (!live.length) fails.push(`${tag} R: no live frame after the notch (first cap ${first.cf} at t+${first.t} ms): the hold was not seen`);
+  if (!firstFull) fails.push(`${tag} R: the cap did not come back to full within the sample window`);
+  if (fading.length < 3) fails.push(jumpGap <= 50
+    ? `${tag} R: POP: the cap fraction jumped to full ${jumpGap} ms after the previous tick through ${fading.length} fading frames (frame cadence ${cadence} ms): there was no fade`
+    : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
+  else if (!(fadeSpan >= 100)) fails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
+  if (falls) fails.push(`${tag} R: the cap fraction fell ${falls} times during the release: not monotone`);
   await clickIfPresent(page, 'Reset the view'); await sleep(300);
+  return 'ok';
 }
 
-async function walk(page, url, fname) {
+async function walk(page, url, fname, attempt) {
   const f = FRAMES[fname];
   const tag = `[${fname} ${f.w}x${f.h}]`;
   await page.setViewport({ width: f.w, height: f.h, deviceScaleFactor: f.dpr, isMobile: f.mobile, hasTouch: f.mobile });
@@ -431,9 +450,8 @@ async function walk(page, url, fname) {
   const c = await canvasRect(page);
   const r0 = await rails(page);
   note(`${tag} rails ${r0 ? `topY ${r0.topY} bottomY ${r0.bottomY}, ${r0.top.length} collections, ${r0.bottom.length} books` : 'NOT PUBLISHED (data-rails absent)'}`);
-  // R first, on the fresh page: even the O screenshot before it leaves the
-  // canvas where a sample costs ~430 ms on desktop (see the arm's note)
-  if (ARMS.includes('R')) { if (r0) await armR(page, tag, fname, c, r0); else fails.push(`${tag} R: no data-rails`); }
+  // R first, on the fresh page (see the arm's note)
+  if (ARMS.includes('R')) { if (r0) { if (await armR(page, tag, fname, c, r0, attempt) === 'software' && attempt < 3) return 'relaunch'; } else fails.push(`${tag} R: no data-rails`); }
   if (ARMS.includes('O')) { await page.mouse.move(c.l + 8, c.t + 8); await sleep(250); await shot(page, `${fname}-O-overview`); }
   if (ARMS.includes('S')) await armS(page, tag, fname, c, r0);
   if (ARMS.includes('C')) { if (r0) await armC(page, tag, fname, c, r0, f); else fails.push(`${tag} C: no data-rails`); }
@@ -460,15 +478,33 @@ async function walk(page, url, fname) {
 let browser, own;
 try {
   own = await serveOwnTree();
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], protocolTimeout: 240000 });
-  let page = await (await browser.createBrowserContext()).newPage();
-  const renderer = await (async () => { await page.goto('about:blank'); return page.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; }); })();
-  note(`tree ${TREE} @ ${sha(TREE)}${TREE !== OWN ? ` (instrument from ${sha(OWN)})` : ''}; renderer ${renderer}`);
+  const launch = async () => {
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', ...CHROME_ARGS], protocolTimeout: 240000 });
+    const page = await (await browser.createBrowserContext()).newPage();
+    await page.goto('about:blank');
+    return page.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : null; });
+  };
+  note(`tree ${TREE} @ ${sha(TREE)}${TREE !== OWN ? ` (instrument from ${sha(OWN)})` : ''}; renderer ${await launch()}${CHROME_ARGS.length ? '; CHROME ARGS ' + CHROME_ARGS.join(' ') + ' (diagnosis, not the frame the reader gets)' : ''}`);
   for (const fname of FRAME_LIST) {
     if (!FRAMES[fname]) { fails.push(`unknown frame ${fname}`); continue; }
-    // a fresh context per frame: the first walk's onboarding answers live in its storage
-    page = await (await browser.createBrowserContext()).newPage();
-    await walk(page, own.url, fname);
+    // a fresh context per frame: the first walk's onboarding answers live in its
+    // storage. A software-raster launch (arm R) gets a whole new browser: a new
+    // page in the same browser inherits the state (measured 3 of 3).
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const page = await (await browser.createBrowserContext()).newPage();
+      let r;
+      try { r = await walk(page, own.url, fname, attempt); } catch (e) {
+        // a software-raster launch can also fail to BOOT the desktop frame inside
+        // the 60 s wait (measured twice); it counts as one of the three launches
+        if (!(e && e.name === 'TimeoutError') || !ARMS.includes('R')) throw e;
+        note(`[${fname}] launch ${attempt}: boot exceeded ${NAV_MS / 1000} s (${String(e.message).split(String.fromCharCode(10))[0]}); not a number; relaunching the browser`);
+        r = attempt < 3 ? 'relaunch' : 'boot-timeout';
+        if (r === 'boot-timeout') fails.push(`[${fname}] three browser launches could not boot the frame or drew the release in software: not a number`);
+      }
+      if (r !== 'relaunch') break;
+      await browser.close(); browser = null;
+      await launch();
+    }
   }
 } catch (e) {
   console.error('[e2e-myweb-r2] harness: ' + (e && e.stack || e));
