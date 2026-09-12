@@ -60,14 +60,17 @@ export function maxCamY(cam, yf) {
 }
 
 /**
- * Clamp zoom into [fit, maxZoom×fit] and pan so the canon can't leave the
- * viewport. Mutates in place — this runs per gesture frame.
+ * Clamp zoom into [fit, maxZoom×fit], pan so the canon can't leave the
+ * viewport, and hold y inside [0, maxCamY] — or at 0 when the caller has no
+ * y frame, so a 1-D camera can never carry a stray height into its map.
+ * Mutates in place — this runs per gesture frame.
  *
  * @param {Camera} cam
  * @param {number} width — viewport width, device px
  * @param {number} maxZoom — multiple of fit
+ * @param {YFrame} [yf] - absent: a 1-D camera
  */
-export function clampCamera(cam, width, maxZoom) {
+export function clampCamera(cam, width, maxZoom, yf) {
   const min = fitPPV(cam, width);
   const max = min * (maxZoom || 5000);
   if (!(cam.ppv > 0)) cam.ppv = min;
@@ -75,6 +78,8 @@ export function clampCamera(cam, width, maxZoom) {
   const half = width / cam.ppv / 2;
   cam.x = (half * 2 >= cam.total) ? cam.total / 2
     : Math.min(Math.max(cam.x, half), cam.total - half);
+  const top = yf ? maxCamY(cam, yf) : 0;
+  cam.y = !(cam.y > 0) ? 0 : (cam.y > top ? top : cam.y);
   return cam;
 }
 
@@ -104,17 +109,22 @@ export function rotatePointer(clientX, clientY, physicalWidth) {
 }
 
 /**
- * Zoom about a fixed screen point — the anchor stays under the finger/cursor.
+ * Zoom about a fixed screen point — the anchor stays under the finger/cursor,
+ * in both axes when the caller has a y frame and names a vertical anchor.
  * @param {Camera} cam
  * @param {number} width — viewport width, device px
  * @param {number} anchorX — device px to hold still
  * @param {number} factor — multiplicative zoom (>1 zooms in)
  * @param {number} maxZoom
+ * @param {number} [anchorY] - device px to hold still vertically (needs yf)
+ * @param {YFrame} [yf]
  */
-export function zoomAbout(cam, width, anchorX, factor, maxZoom) {
+export function zoomAbout(cam, width, anchorX, factor, maxZoom, anchorY, yf) {
   const verse = xToVerse(cam, width, anchorX);
+  const height = (yf && anchorY != null) ? yToHeight(cam, yf, anchorY) : null;
   cam.ppv *= factor;
-  clampCamera(cam, width, maxZoom);
+  clampCamera(cam, width, maxZoom, yf);
   cam.x = verse - (anchorX - width / 2) / cam.ppv;
-  return clampCamera(cam, width, maxZoom);
+  if (height != null) cam.y = height - (yf.base - anchorY) / (cam.ppv * yf.squash);
+  return clampCamera(cam, width, maxZoom, yf);
 }
