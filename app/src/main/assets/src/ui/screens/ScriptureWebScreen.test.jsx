@@ -296,6 +296,11 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(Number(camY(container)), 'Reset returns to the baseline').toBe(0);
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    // the mode switch returns the camera to fit, where the clamp alone holds y at 0 (measured:
+    // the first form of this case passed under the bite for that reason); zoom the Bible rail
+    // back to the ceiling so the guard, not the clamp, is what keeps the swipe from moving y
+    for (let i = 0; i < 40; i++) await press('+');
+    expect(DRAWN[DRAWN.length - 1].ppv, 'the Bible rail is back at the ceiling').toBeCloseTo(44, 6);
     await swipeDown();
     expect(Number(camY(container)), 'My Web: the same swipe moves no y').toBe(0);
   });
