@@ -277,6 +277,29 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(after).toBeGreaterThan(0);
   });
 
+  it('M4 GUARD: in My Web a vertical drag leaves the camera at the baseline — its rails have no height (the same drag raises it in the scripture web first, as the precondition)', async () => {
+    // Bite m4i (the y frame handed to the rails too) survived every other case: nothing pinned
+    // that My Web's shared camera keeps y = 0. Without the guard a swipe on the Bible rail would
+    // raise the scripture camera behind the rails and the reader would come back to a web in the sky.
+    const { container } = await mount({}, tall);
+    for (let i = 0; i < 40; i++) await press('+');
+    const root = container.querySelector('.sw-root');
+    const swipeDown = async () => {
+      root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', clientX: 300, clientY: 100 }));
+      root.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', clientX: 300, clientY: 220 }));
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', clientX: 300, clientY: 220 }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    };
+    await swipeDown();
+    expect(Number(camY(container)), 'PRECONDITION: the swipe raises the scripture camera').toBeGreaterThan(1);
+    await press('0');
+    expect(Number(camY(container)), 'Reset returns to the baseline').toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    await swipeDown();
+    expect(Number(camY(container)), 'My Web: the same swipe moves no y').toBe(0);
+  });
+
   it('M4: with cam.y > 0 the UI canvas paints the span gauge — a label /^\\d[\\d,]* verses$/ — and none at the baseline', async () => {
     const CALLS = [];
     const fake2d = () => new Proxy({}, {
