@@ -246,3 +246,22 @@ describe('graceful degradation', () => {
     expect(createRenderer(canvas, /** @type {any} */ ({ count: 0 }))).toBeNull();
   });
 });
+
+describe('the true law in the vertex stage (w-sw-phase1, M1)', () => {
+  // The morph and the fly-over law go together: with every thread at its own
+  // height the field at depth is clean by geometry, and there is nothing left
+  // for a dimming law to dim (spine section 1). The y camera positions every
+  // vertex, and the segments go to the piece of the thread that is on screen.
+  it('carries no fly-over law and no localize: expected 0 sites', () => {
+    const hits = (SHADER_SOURCE.vertex.match(/flyOverDim|arcAnchored|uLocalize/g) || []).length;
+    expect(hits, 'fly-over / localize sites in the vertex stage').toBe(0);
+  });
+  it('positions every vertex from the y camera: uCamY, and p.y = uBase - (hgt - hOff)', () => {
+    expect(SHADER_SOURCE.vertex).toContain('uniform float uCamY');
+    expect(SHADER_SOURCE.vertex).toMatch(/uBase - \(hgt - hOff\)/);
+  });
+  it('spends its segments on the visible piece: the shared sampleTau is inlined and called', () => {
+    expect(SHADER_SOURCE.vertex).toContain('float sampleTau(');
+    expect(SHADER_SOURCE.vertex).toMatch(/float tau = sampleTau\(/);
+  });
+});

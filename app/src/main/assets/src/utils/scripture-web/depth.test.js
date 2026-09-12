@@ -344,3 +344,35 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
     }
   });
 });
+
+/* ── S2 inverted (w-sw-phase1, M1): the apex is the thread's own height ─────
+   S2 above pinned "a long arc's apex ABOVE the frame" -- the level run the
+   morph put there, which is the very thing that made panning up pointless
+   (53 % of the drawn ribbon length sat off the top at the ceiling, measured
+   09-11). Under the true law a long thread's apex is span/2 in verse units:
+   never level, never lifted, and reachable by panning. Adapter as in
+   geometry.test.js so the case replays over the base. */
+import * as geoLaw from './geometry.js';
+describe('S2 inverted — a long thread\'s apex is its OWN height, never a lifted level run (w-sw-phase1, M1)', () => {
+  const shapeAt = (rx, zoom, span) => (typeof geoLaw.threadShape === 'function'
+    ? geoLaw.threadShape(rx, SQUASH)
+    : geoLaw.arcShape(rx, CEIL, SQUASH, geoLaw.localizeFactor(zoom), geoLaw.spanLogOf(span, TOTAL)));
+
+  it('a 10,000-verse thread at the ceiling reaches 281,600 device px, not 1.15 x ceil, and rises steeper than the old law within 100 CSS px of its foot', () => {
+    const rx = rxOf(10000, 44);
+    const { R, A } = shapeAt(rx, zMax, 10000);
+    expect(A, 'apex = rx x squash').toBeCloseTo(rx * SQUASH, 6);
+    const rise100 = arcHeight(100 * DPR, R, A) / DPR;
+    expect(rise100, 'rise within 100 CSS px of the foot').toBeGreaterThan(100);
+    expect(flat10(R, A, CEIL, W), 'flat share on screen').toBeLessThanOrEqual(0.10);
+  });
+
+  it('GUARD, green under both laws (S1 already holds it on the morph): nothing on screen runs within 10 degrees of flat at three zooms', () => {
+    for (const zoom of [40, 400, zMax]) {
+      const ppv = (W / TOTAL) * zoom;
+      const rx = (10000 * ppv) / 2;
+      const { R, A } = shapeAt(rx, zoom, 10000);
+      expect(flat10(R, A, CEIL, W), `zoom ${zoom}`).toBeLessThanOrEqual(0.10);
+    }
+  });
+});

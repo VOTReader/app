@@ -598,3 +598,48 @@ describe('decode', () => {
     expect(() => decodeGraph({ count: 0 })).toThrow(/missing/);
   });
 });
+
+/* ── the true law (w-sw-phase1, M1) ──────────────────────────────────────────
+   Corbin, 2026-09-11: pan up and down the same as left and right; every line
+   clean and followable end to end. The morph (localizeFactor 6 -> 24, the
+   tanh ceiling, the level run at APEX_LIFT above the frame) is what made a
+   vertical camera useless: every long thread's body sat at the same height
+   above the frame. The true world (spine section 1): a thread from a to b is
+   the half-ellipse with feet at (a, 0) and (b, 0) and apex (b - a)/2 in verse
+   units, at EVERY zoom -- today's fit-time law, and nothing else.
+
+   The cases read the law through an adapter so they REPLAY over the base:
+   threadShape(rx, squash) on the tip; arcShape(...) + localizeFactor on a1d52a23. */
+import * as geoLaw from './geometry.js';
+describe('the true law: a thread is a half-ellipse whose height is its span, at every zoom (w-sw-phase1, M1)', () => {
+  const CEIL = 512, SQUASH = 0.64, TOTAL = 31102;      // the phone landscape frame, device px
+  const shapeAt = (rx, zoom, span) => (typeof geoLaw.threadShape === 'function'
+    ? geoLaw.threadShape(rx, SQUASH)
+    : geoLaw.arcShape(rx, CEIL, SQUASH, geoLaw.localizeFactor(zoom), geoLaw.spanLogOf(span, TOTAL)));
+
+  it("at the ceiling a 1,000-verse thread's apex is its own height: 28,160 device px (500 x 88 x 0.64), not 1.15 x ceil", () => {
+    const rx = 500 * 88;                                // half of 1,000 verses at 44 CSS px/verse, DPR 2
+    const { R, A } = shapeAt(rx, 1711, 1000);
+    expect(A, 'apex height').toBeCloseTo(28160, 6);
+    expect(R, 'quarter radius stays the half-span').toBe(rx);
+  });
+
+  it('is the fit-time law at every zoom: R = rx, A = rx x squash, for spans 3 to 10,000 at 1x, 40x and the ceiling', () => {
+    for (const zoom of [1, 40, 1711]) {
+      const ppv = (1600 / TOTAL) * zoom;
+      for (const span of [3, 40, 900, 10000]) {
+        const rx = (span * ppv) / 2;
+        const { R, A } = shapeAt(rx, zoom, span);
+        expect(R, `zoom ${zoom} span ${span} R`).toBe(rx);
+        expect(A, `zoom ${zoom} span ${span} A`).toBeCloseTo(rx * SQUASH, 9);
+      }
+    }
+  });
+
+  it('CONTROL — the adapter reaches a law that CAN differ: the fit row is the same under both (localize 0 is today\'s overview)', () => {
+    const rx = (900 * (1600 / TOTAL)) / 2;
+    const { R, A } = shapeAt(rx, 1, 900);
+    expect(R).toBe(rx);
+    expect(A).toBeCloseTo(rx * SQUASH, 9);
+  });
+});
