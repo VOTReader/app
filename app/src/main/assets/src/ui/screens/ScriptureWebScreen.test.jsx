@@ -473,18 +473,22 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(sub.textContent).toMatch(/\bLink\b/);
   });
 
-  it('R4 in My Web the legend names the reader\'s links and the canon axis its citations wear, never the distance ramp', async () => {
-    // r2: the Volumes' citations wear the canon's ramp by where they land in
-    // scripture, so the legend names that axis (Genesis to Revelation) and
-    // the reader's own gold links; it never claims the distance law.
+  it('R4 in My Web the legend names the two families, yours first, a pin per shape and a bar per source; never the canon axis or the distance ramp', async () => {
+    // 1b (design-myweb-colour.md, 5): the reader's links are the point of My
+    // Web, so "yours" leads with the three shapes and their pins; Timothy's
+    // four sources follow with a bar each. Canon hue is retired here.
     await openMyWeb();
     const legend = document.querySelector('.sw-legend');
     expect(legend).toBeTruthy();
-    expect(legend.textContent).toMatch(/your links/);
-    expect(legend.textContent).toMatch(/Genesis/);
-    expect(legend.textContent).toMatch(/Revelation/);
-    expect(legend.textContent).toMatch(/Volumes/);
-    expect(legend.textContent).not.toMatch(/across the canon|nearby/);
+    const text = legend.textContent;
+    expect(text.indexOf('yours')).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf('yours')).toBeLessThan(text.indexOf('Timothy'));
+    for (const w of ['within scripture', 'within the Volumes', 'across', 'footnotes', 'study notes', 'studies', 'Words To Live By']) expect(text).toContain(w);
+    expect(legend.querySelectorAll('.sw-key-pin').length).toBe(3);
+    expect(legend.querySelectorAll('.sw-key-pin.is-ring, .sw-key-pin.is-dot, .sw-key-pin.is-ring-dot').length).toBe(3);
+    expect(legend.querySelectorAll('.sw-key-line').length).toBe(4);
+    expect(legend.querySelector('.sw-key-gradient')).toBeNull();
+    expect(text).not.toMatch(/Genesis|Revelation|across the canon|nearby/);
   });
 
   it('offers a Dismiss control on the notice', async () => {

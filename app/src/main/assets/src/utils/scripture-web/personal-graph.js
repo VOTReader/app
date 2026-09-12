@@ -16,6 +16,8 @@
    version-bumps (hundreds of records, not hundreds of thousands).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { myWebSourceIndex } from './palette.js';
+
 /**
  * @typedef {{ total:number, index:Map<string, number>,
  *   segments:Array<{volKey:string, label:string, short?:string,
@@ -222,8 +224,11 @@ export function buildCuratedUnderlay(votEdges, ctx) {
   const n = rows.length;
   const versePos = new Float32Array(n);
   const votPos = new Float32Array(n);
-  for (let i = 0; i < n; i++) { versePos[i] = rows[i][0]; votPos[i] = rows[i][1]; }
-  return { count: n, versePos, votPos, records: rows.map((row) => row[2]) };
+  // the source (footnote / votNote / wtlb / study) decided once here, so the
+  // renderer strokes by bin and never reads a record per frame
+  const source = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { versePos[i] = rows[i][0]; votPos[i] = rows[i][1]; source[i] = myWebSourceIndex(rows[i][2].kind); }
+  return { count: n, versePos, votPos, source, records: rows.map((row) => row[2]) };
 }
 
 /**

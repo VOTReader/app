@@ -33,7 +33,7 @@ import {
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
-import { readChromeTokens, LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
+import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
@@ -472,6 +472,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         const ro = railOpts();
         drawPersonalWeb(ctx, p && p.graph, p && p.underlay, Object.assign(ro, {
           hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc, capFraction: capFractionNow(),
+          // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
+          // number here overrides the context's depth alpha ceiling; unset in the app
+          contextCeiling: typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined,
         }));
         if (wrapRef.current) wrapRef.current.setAttribute('data-cap-fraction', String(ro.capFraction));
         publishRails(ro, p, g, cam, camV, v);
@@ -694,6 +697,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         // walk can follow this one thread through the exported geometry
         verse: underlay.versePos[found.index], vot: underlay.votPos[found.index],
         joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
+        // the family in words (design-myweb-colour.md, 5): the source the thread's
+        // colour encodes, then the Volume
+        sourceName: MY_WEB_SOURCES[underlay.source ? underlay.source[found.index] : MY_WEB_SOURCES.length - 1].name,
         cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
       };
     }
@@ -1261,11 +1267,11 @@ function TipChip({ info, viewport }) {
       )}
       {s.kind === 'underlay' && (
         <React.Fragment>
-          <div className="sw-tip-eyebrow">Corpus connection</div>
+          <div className="sw-tip-eyebrow">Timothy&rsquo;s thread</div>
           <div className="sw-tip-ref">{s.source.label}</div>
           <div className="sw-tip-arrow">↕</div>
           <div className="sw-tip-ref sw-tip-ref-alt">{s.target ? endpointLabel(s.target) : 'Corpus passage'}</div>
-          <div className="sw-tip-meta">{s.joins}</div>
+          <div className="sw-tip-meta">{s.sourceName ? s.sourceName + ' \u00b7 ' + s.joins : s.joins}</div>
         </React.Fragment>
       )}
       {s.kind === 'chapter' && (
@@ -1345,13 +1351,13 @@ function DetailSheet({ info, onClose, onOpen }) {
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   const cards = info.cards || [];
   const eyebrow = info.kind === 'link' ? 'Your link'
-    : info.kind === 'underlay' ? 'Corpus connection'
+    : info.kind === 'underlay' ? 'Timothy\u2019s thread'
     : info.kind === 'arc' ? 'Connection'
     : info.kind === 'chapter' ? 'Chapter' : 'Verse';
   const meta = info.kind === 'arc'
     ? info.span.toLocaleString() + ' verses apart · weight ' + info.votes
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
-    : info.kind === 'underlay' ? info.joins
+    : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' \u00b7 ' + info.joins : info.joins)
     : info.kind === 'chapter'
       ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
       : info.connections.toLocaleString() + ' connections';
@@ -1463,15 +1469,33 @@ function legendFor(mode) {
       bars below — chapter length
     </span>
   );
-  // My Web (r2): the Volumes' citations wear the canon's ramp by where they
-  // land in scripture (Genesis magenta, Revelation green: the same colour
-  // names the same book on both screens); the reader's own links are gold.
-  // The legend names that axis, never the distance law this screen has no
-  // say in (design-perf, 2026-09-11; Corbin picked canon over amber/kind).
+  // My Web (1b, design-myweb-colour.md, 5): two families, yours first because
+  // the reader's own links are the point of My Web. A pin per shape for yours
+  // (the channel a deuteranope keeps once gold and amber meet), a bar per
+  // source for Timothy's. Canon hue retired here by Corbin (2026-09-11).
   if (mode === 'personal') {
+    const shapeWords = ['within scripture', 'within the Volumes', 'across'];
     return [
-      <span className="sw-key" key="links"><i className="sw-key-dot" style={{ background: 'rgb(232,192,80)' }} />your links</span>,
-      <span className="sw-key" key="ramp"><span>Genesis</span><i className="sw-key-gradient" /><span>Revelation</span> &mdash; the Volumes&rsquo; citations</span>,
+      <span className="sw-key" key="yours">
+        yours
+        {MY_WEB_LINK_KINDS.map((k, i) => (
+          <React.Fragment key={k.name}>
+            {i > 0 ? ' \u00b7 ' : ' '}
+            <i className={'sw-key-pin is-' + k.pin} style={{ color: 'rgb(' + k.rgb + ')' }} aria-hidden="true" />
+            {shapeWords[i]}
+          </React.Fragment>
+        ))}
+      </span>,
+      <span className="sw-key" key="timothy">
+        Timothy&rsquo;s
+        {MY_WEB_SOURCES.map((src, i) => (
+          <React.Fragment key={src.key}>
+            {i > 0 ? ' \u00b7 ' : ' '}
+            <i className="sw-key-line" style={{ background: 'rgb(' + src.rgb + ')' }} aria-hidden="true" />
+            {src.name}
+          </React.Fragment>
+        ))}
+      </span>,
       histKey,
     ];
   }
