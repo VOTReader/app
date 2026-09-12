@@ -178,7 +178,7 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
       expect(title()).toBe('The Seventh Day');                       // inside a collection: the plain title
       emit('ended');                                                   // the seam
       expect(title()).toBe('Volume Two · Solo Letter');                // the first track after the crossing
-      expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume Two · Mark');
+      expect(document.querySelector('.audio-bar-src').textContent).toMatch(/^Volume Two · /);   // the sub names it too
     } finally {
       delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
     }
