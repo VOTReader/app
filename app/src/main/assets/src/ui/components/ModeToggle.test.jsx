@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
-import { ModeToggle } from './ModeToggle.jsx';
+import { ModeToggle, renderCommentaryCite } from './ModeToggle.jsx';
 
 afterEach(cleanup);
 
@@ -69,5 +69,22 @@ describe('the Study Notes control shows every view at once and presses the one t
     mount('pdf', true);
     const group = screen.getByRole('group', { name: 'Study Notes' });
     expect(group.querySelectorAll('button').length).toBe(3);
+  });
+});
+
+/* The file also carries renderCommentaryCite, which InlineNotes and StudyPanels read as a bare bundle-d
+   global (_entry-d.js attaches it) and StudyPanels.test stubs — so no unit case saw the 1829d12a rewrite
+   drop the export; esbuild did ("No matching export … for import renderCommentaryCite"). This pins the
+   export where the file is, so removing it is a red case and not only a red build. */
+describe('renderCommentaryCite still ships from this file', () => {
+  it('styles an inline scripture reference and leaves the prose as text', () => {
+    const text = 'He is Elijah (Matthew 11:14) who was to come';
+    const parts = renderCommentaryCite(text);
+    expect(Array.isArray(parts)).toBe(true);
+    render(<span>{parts}</span>);
+    const ref = document.querySelector('.inline-scrip-ref');
+    expect(ref && ref.textContent).toBe('Matthew 11:14');
+    expect(document.body.textContent).toBe(text);
+    expect(renderCommentaryCite('')).toBe('');
   });
 });
