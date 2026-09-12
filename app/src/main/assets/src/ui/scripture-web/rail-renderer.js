@@ -17,7 +17,7 @@
    links, which is years away and would be a good problem to have.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { myWebColor, myWebCanonT, myWebBinColor, CONTEXT_BINS } from '../../utils/scripture-web/palette.js';
+import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 
 /** Clearance below the top chrome before the VOT rail is drawn, in CSS px. */
@@ -312,13 +312,13 @@ class ContextBatches {
     this.threads = [];
   }
   /**
-   * @param {number} t canon position 0..1
+   * @param {number} bin the source bin (MY_WEB_SOURCES index)
    * @param {number} bx the Bible end's x (device px)
    * @param {number} tx the Volumes end's x (device px)
    * @param {Array<[number, number]>} pts
    */
-  add(t, bx, tx, pts) {
-    this.threads.push({ bin: Math.min(CONTEXT_BINS - 1, Math.floor(t * CONTEXT_BINS)), bx, tx, layer: 0, pts });
+  add(bin, bx, tx, pts) {
+    this.threads.push({ bin: Math.min(CONTEXT_BINS - 1, Math.max(0, bin | 0)), bx, tx, layer: 0, pts });
   }
   /**
    * @param {CanvasRenderingContext2D} ctx
@@ -370,7 +370,7 @@ class ContextBatches {
     for (const key of keys) {
       const list = paths.get(key);
       const run = key & 1, bin = Math.floor(key / 8192);
-      const style = 'rgba(' + myWebBinColor(bin) + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
+      const style = 'rgba(' + MY_WEB_SOURCES[bin].rgb + ',' + (run ? alpha * RUN_ALPHA : alpha) + ')';
       if (style !== last) { ctx.strokeStyle = style; last = style; }
       ctx.beginPath();
       for (const seg of list) {
@@ -429,16 +429,22 @@ export function distanceToPath(pts, px, py) {
  * wider (2.0 -> 2.6 with depth, like a canon ribbon), haloed, pinned at both
  * ends. The unit test reads this export; the walk reads the pixels it makes.
  */
-export function personalInk(z) {
+/** The context's depth alpha ceiling (design-myweb-colour.md, 2; the corridor pair is its gate). */
+export const CONTEXT_CEILING = 0.70;
+export function personalInk(z, ceiling) {
   const zz = Math.max(1, z || 1);
+  const cap = ceiling > 0 ? ceiling : CONTEXT_CEILING;
   const t = Math.min(1, Math.log(zz) / Math.log(40));
   return {
-    // each thread's rgb comes from myWebColor() (its canon position); only
-    // the alpha and width are the ink law's
-    context: { rgb: '204,196,180', alpha: Math.min(0.45, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
+    // each thread's rgb is its source's (MY_WEB_SOURCES); only the alpha and
+    // width are the ink law's. The depth ceiling is 0.70 (reached at 45x), not
+    // the 0.45 cream was tuned for: no coloured ink darker than cream clears
+    // 3:1 on black at 0.45 (studies read 1.89:1), every source does at 0.70
+    // (3.1 to 4.9). Nothing below 25x changes (design-myweb-colour.md, 2).
+    context: { alpha: Math.min(cap, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
     // the link thickens with depth like a canon ribbon (2.0 -> 2.6 at 40x), so it
     // stays 6x a context thread with its halo even where the thread is 0.45 · 1.3
-    link: { alpha: 0.95, width: 2.0 + 0.6 * t, halo: 7, haloAlpha: 0.16, dot: 3, ring: 5.5,
+    link: { alpha: 0.95, width: 2.0 + 0.6 * t, halo: 7, haloAlpha: 0.16, dot: 3, dotSolo: 4, ring: 5.5,
       hoverWidth: 3 + 0.6 * t, hoverHalo: 11, hoverHaloAlpha: 0.3 },
   };
 }
@@ -502,7 +508,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const gap = Math.abs(rails.bottomY - rails.topY);
   const geo = { width, gap };
   if (underlay && opts.showUnderlay && underlay.count) {
-    const cx = personalInk(z).context;
+    const cx = personalInk(z, opts.contextCeiling).context;
     // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
     // the half-resolution layer read as "low resolution"). One stroke per
     // edge so corridors accumulate; a thread with no visible endpoint is not
@@ -515,7 +521,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
       const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
       if (!pts) continue;
-      batches.add(myWebCanonT({ verse: underlay.versePos[i], verseTotal: opts.verseTotal }), a[0], b[0], pts);
+      batches.add(underlay.source ? underlay.source[i] : CONTEXT_BINS - 1, a[0], b[0], pts);
     }
     batches.stroke(ctx, cx.alpha, ctx.lineWidth * 4, opts.capFraction);
   }
@@ -530,8 +536,10 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
     const cross = personal.aRail[i] !== personal.bRail[i];
     const pts = threadPath(a, b, cross, Object.assign({ n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }, geo));
-    const rgb = myWebColor({ link: true });
-    paths.push({ a, b, pts, rgb });
+    const kind = personal.kind ? personal.kind[i] : 2;
+    const rgb = myWebLinkColor(kind);
+    const pin = (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).pin;
+    paths.push({ a, b, pts, rgb, pin });
   }
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (let i = 0; i < personal.count; i++) {
@@ -547,7 +555,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     ctx.stroke();
   }
   for (let i = 0; i < personal.count; i++) {
-    const { a, b, pts, rgb } = paths[i];
+    const { a, b, pts, rgb, pin } = paths[i];
     if (!pts) continue;
     const isHover = i === opts.hoverIndex;
     const isFocus = i === opts.focusIndex;
@@ -558,15 +566,16 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.stroke();
-    // endpoint pins: a ring on the rail with a filled dot, so both ends read
+    // endpoint pins: a ring, a dot, or both, by the link's shape (the second
+    // channel a deuteranope has once gold and amber meet), so both ends read
     // as places, not as where a line happened to stop; only on screen
     ctx.fillStyle = 'rgba(' + rgb + ',' + dim + ')';
     ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.9 * dim) + ')';
     ctx.lineWidth = 1 * DPR;
     for (const p of [a, b]) {
       if (p[0] < -EDGE_MARGIN || p[0] > width + EDGE_MARGIN) continue;
-      ctx.beginPath(); ctx.arc(p[0], p[1], L.ring * DPR, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(p[0], p[1], L.dot * DPR, 0, Math.PI * 2); ctx.fill();
+      if (pin !== 'dot') { ctx.beginPath(); ctx.arc(p[0], p[1], L.ring * DPR, 0, Math.PI * 2); ctx.stroke(); }
+      if (pin !== 'ring') { ctx.beginPath(); ctx.arc(p[0], p[1], (pin === 'dot' ? L.dotSolo : L.dot) * DPR, 0, Math.PI * 2); ctx.fill(); }
     }
   }
   return rails;

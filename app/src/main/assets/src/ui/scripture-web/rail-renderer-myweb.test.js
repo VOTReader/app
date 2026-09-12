@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { myWebColor, MY_WEB_LINK_RGB } from '../../utils/scripture-web/palette.js';
+import { MY_WEB_SOURCES, myWebLinkColor } from '../../utils/scripture-web/palette.js';
 import * as RR from './rail-renderer.js';
 
 // Read off the namespace, not a named import: on the tree this RED was written
@@ -72,35 +72,52 @@ describe('My Web ink law', () => {
 
   it('R1 zoom rewards: the context thread at 5.8x is at least twice as strong as at 1x, and never past the cap', () => {
     expect(personalInk(5.8).context.alpha).toBeGreaterThanOrEqual(2 * personalInk(1).context.alpha);
-    expect(personalInk(4000).context.alpha).toBeLessThanOrEqual(0.5);
+    // the ceiling is 0.70 (1b: no coloured ink darker than cream clears 3:1 at 0.45; design-myweb-colour.md, 2)
+    expect(personalInk(4000).context.alpha).toBeLessThanOrEqual(0.75);
+    expect(personalInk(25).context.alpha).toBeCloseTo(0.45, 1);   // nothing below 25x moved
     expect(personalInk(0).context.alpha).toBe(personalInk(1).context.alpha);   // a bad z is overview, not NaN
   });
 
-  it('R2 a reader link outweighs a context thread (8x core to 5.8x, 6x with halo to 40x), in a different hue', () => {
+  it('R2 a reader link outweighs a context thread (8x core to 5.8x, 6x with halo to 25x, 3.5x at the 0.70 ceiling), in a different family', () => {
     for (const z of [1, 1.8, 3.24, 5.83, 10.5, 18.9, 40]) {
       const { context, link } = personalInk(z);
       const thread = context.alpha * context.width;
       const core = link.alpha * link.width;
       if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(8);
-      expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(6);
-      // the link is gold; no stop of the canon ramp a context thread wears is
-      expect(myWebColor({ link: true })).toBe(MY_WEB_LINK_RGB);
-      for (let t = 0; t <= 1; t += 0.05) expect(myWebColor({ verse: t * 100, verseTotal: 100 })).not.toBe(MY_WEB_LINK_RGB);
-      expect(context.rgb).not.toBe(MY_WEB_LINK_RGB);
+      // past 25x the context brightens to its 0.70 ceiling (1b) and the link's
+      // lead rests on hue (warm on cool, dE >= 32 under every deficiency) and
+      // its pins as well as ink; the ink ratio alone stays >= 3.5
+      expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(z <= 25 ? 6 : 3.5);
+      // no reader hue is a Timothy hue
+      for (let k = 0; k < 3; k++) for (const src of MY_WEB_SOURCES) expect(myWebLinkColor(k)).not.toBe(src.rgb);
     }
   });
 
-  it('R2 the drawn link is a halo pass, a core, and a ring-and-dot pin at each end', () => {
-    const personal = {
-      count: 1, aRail: new Uint8Array([0]), bRail: new Uint8Array([1]),
-      aPos: new Float32Array([5]), bPos: new Float32Array([0]), kind: new Uint8Array([0]),
-    };
-    const ctx = fakeCtx();
-    drawPersonalWeb(ctx, personal, null, Object.assign({}, opts, { showUnderlay: false }));
+  it('R2 the drawn link is a halo pass, a core, and a pin at each end BY SHAPE: ring / dot / ring-and-dot', () => {
+    // a two-node Volumes rail so a within-the-Volumes link has two places on screen
+    const rail2 = buildVotRail([{ volKey: 'one', label: 'Volume One', items: [{ id: 'letter-1', title: 'One' }, { id: 'letter-2', title: 'Two' }] }]);
+    const o2 = Object.assign({}, opts, { showUnderlay: false, votRail: rail2 });
     const ctx0 = fakeCtx();
-    drawPersonalWeb(ctx0, null, null, Object.assign({}, opts, { showUnderlay: false }));
-    // halo + core + 2 rings = 4 strokes over the rails; 2 dots = 2 fills over the labels
-    expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(4);
-    expect(ctx.calls.fill - ctx0.calls.fill).toBe(2);
+    drawPersonalWeb(ctx0, null, null, o2);
+    // 1b: the pin is the reader family's second channel (gold and amber meet
+    // under deuteranopia); kind 0 within scripture = ring, 1 within the
+    // Volumes = dot, 2 across = ring and dot. Rails are 0/1 so kind 2 is a
+    // cross-rail link and kinds 0/1 sit on one rail each.
+    const cases = [
+      { kind: 0, a: 0, b: 0, strokes: 4, fills: 0 },   // halo + core + 2 rings
+      { kind: 1, a: 1, b: 1, strokes: 2, fills: 2 },   // halo + core; 2 solo dots
+      { kind: 2, a: 0, b: 1, strokes: 4, fills: 2 },   // halo + core + 2 rings; 2 dots
+    ];
+    for (const c of cases) {
+      // both ends on screen: Bible verses 5 and 60 (verseX = 10 px a verse), Volumes nodes 0 and 1
+      const personal = {
+        count: 1, aRail: new Uint8Array([c.a]), bRail: new Uint8Array([c.b]),
+        aPos: new Float32Array([c.a ? 0 : 5]), bPos: new Float32Array([c.b ? 1 : 60]), kind: new Uint8Array([c.kind]),
+      };
+      const ctx = fakeCtx();
+      drawPersonalWeb(ctx, personal, null, o2);
+      expect(ctx.calls.stroke - ctx0.calls.stroke, 'kind ' + c.kind + ' strokes').toBe(c.strokes);
+      expect(ctx.calls.fill - ctx0.calls.fill, 'kind ' + c.kind + ' fills').toBe(c.fills);
+    }
   });
 });

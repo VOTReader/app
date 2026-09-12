@@ -60,11 +60,19 @@ describe('My Web r2 — G1 full resolution', () => {
   it('strokes every context edge on the canvas it is given, never through a half-resolution layer', () => {
     // jsdom has a document, so main takes its offscreen-layer branch here and
     // calls ctx.drawImage, which this context does not have: main throws.
-    const underlay = { count: 5, versePos: new Float32Array([5, 20, 50, 70, 95]), votPos: new Float32Array([0, 10, 20, 40, 60]) };
+    // 1b: the batch bin is the SOURCE (four of them), not one of 96 canon
+    // bins, so four far-apart edges of four sources are four paths, and two
+    // far-apart edges of ONE source share a path (they never overlap, so
+    // nothing is lost to the sharing; neighbours get their own layers below)
+    const underlay = { count: 4, versePos: new Float32Array([5, 20, 50, 95]), votPos: new Float32Array([0, 10, 20, 60]), source: new Uint8Array([0, 1, 2, 3]) };
     const ctx = fakeCtx(), ctx0 = fakeCtx();
     drawPersonalWeb(ctx, null, underlay, opts);
     drawPersonalWeb(ctx0, null, { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) }, opts);
-    expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(5);
+    expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(4);
+    const shared = { count: 3, versePos: new Float32Array([5, 50, 95]), votPos: new Float32Array([0, 20, 60]), source: new Uint8Array([0, 0, 1]) };
+    const ctx1 = fakeCtx();
+    drawPersonalWeb(ctx1, null, shared, opts);
+    expect(ctx1.calls.stroke - ctx0.calls.stroke).toBe(2);
     expect(/** @type {any} */ (RR).CONTEXT_SCALE).toBeUndefined();
   });
   it('batches threads by colour bin and layer: near-coincident threads keep a stroke each, a fan shares one', () => {

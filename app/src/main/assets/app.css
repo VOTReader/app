@@ -6953,6 +6953,16 @@
     }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
     .sw-key-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+    /* My Web's two families in the key (design-myweb-colour.md, 5): a bar in the
+       source colour for Timothy's threads; for yours the pin the canvas draws at a
+       link's ends, by shape (ring, dot, ring-and-dot) in the link colour. */
+    .sw-key-line { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+    .sw-key-pin {
+      width: 9px; height: 9px; border-radius: 50%; display: inline-block; box-sizing: border-box;
+      border: 2px solid currentColor;
+    }
+    .sw-key-pin.is-dot { border: 0; background: currentColor; }
+    .sw-key-pin.is-ring-dot { background: radial-gradient(circle, currentColor 0 1.5px, transparent 2px); }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
       width: 84px; height: 6px; border-radius: 3px; display: inline-block; margin: 0 6px;
