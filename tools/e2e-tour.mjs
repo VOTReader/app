@@ -77,8 +77,13 @@ const EXPECT_SCREEN = Object.fromEntries(TOUR_STEPS.filter((s) => s.target).map(
    phone at Text Size 3) — and neither of its two buttons may break a word ("SHOW ME / AROUND" on
    320 and 360) — nor overflow the strip sideways, which is where two unbreakable labels go when
    the row cannot wrap (bite C, 2026-09-12: the leg was green over a 23 px overflow until it read
-   the row's scrollWidth). Read as geometry, not as CSS: a rule can be present and still not bind. */
+   the row's scrollWidth — and green again over a 33 px spill off the START, which scrollWidth
+   cannot see, until it read every button's box and ink against the row on both sides;
+   verifier-2's finding). Read as geometry, not as CSS: a rule can be present and still not bind. */
 async function stripGeometry(page, note) {
+  // The web font decides where a label wraps; read after it has arrived (capped: a font that never
+  // comes must not hang the leg, and the read then says so through the wrap count).
+  await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]));
   const g = await page.evaluate(() => {
     const p = document.querySelector('.tour-prompt'); if (!p) return null;
     const r = p.getBoundingClientRect();
@@ -87,7 +92,18 @@ async function stripGeometry(page, note) {
     const btns = [...p.querySelectorAll('.tour-btn')];
     const prim = btns.find((b) => b.classList.contains('primary')); const later = btns.find((b) => !b.classList.contains('primary'));
     // Line boxes of the label's text: one rect per line the words occupy.
-    const lines = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return [...rg.getClientRects()].filter((x) => x.width > 0).length; };
+    const inkRects = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return [...rg.getClientRects()].filter((x) => x.width > 0); };
+    const lines = (el) => inkRects(el).length;
+    // The ink's extent against the row, on BOTH sides. scrollWidth sees only what spills off the
+    // END: with `justify-content: flex-end` two unbreakable buttons spill off the START, and a
+    // 360 phone showed the primary's box at -33..165 with its ink at -16 px — off the screen's
+    // left edge — while scrollWidth read 0 (verifier-2, 2026-09-12).
+    const rr = row ? row.getBoundingClientRect() : null;
+    const ink = btns.flatMap(inkRects);
+    const inkLeft = ink.length ? Math.min(...ink.map((x) => x.left)) : null;
+    const inkRight = ink.length ? Math.max(...ink.map((x) => x.right)) : null;
+    const boxLeft = btns.length ? Math.min(...btns.map((b) => b.getBoundingClientRect().left)) : null;
+    const boxRight = btns.length ? Math.max(...btns.map((b) => b.getBoundingClientRect().right)) : null;
     return {
       vh: innerHeight, vw: innerWidth, box: Math.round(r.height), bottom: Math.round(r.bottom),
       scrollsInside: p.scrollHeight > p.clientHeight + 1, scrollH: p.scrollHeight, clientH: p.clientHeight,
@@ -97,6 +113,10 @@ async function stripGeometry(page, note) {
       // Two labels that never wrap can instead push the row past the strip's edge: the row's
       // scrollWidth is the one number that sees it (a rect-inside check would too; this is cheaper).
       rowOverflow: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0,
+      spillStart: rr && boxLeft !== null ? Math.max(0, Math.round(rr.left - Math.min(boxLeft, inkLeft))) : 0,
+      spillEnd: rr && boxRight !== null ? Math.max(0, Math.round(Math.max(boxRight, inkRight) - rr.right)) : 0,
+      inkLeft: inkLeft === null ? null : Math.round(inkLeft), inkRight: inkRight === null ? null : Math.round(inkRight),
+      rowLeft: rr ? Math.round(rr.left) : null, rowRight: rr ? Math.round(rr.right) : null,
       fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() || '1',
     };
   });
@@ -106,7 +126,7 @@ async function stripGeometry(page, note) {
   if (g.scrollsInside) { bad = true; fail(`${where}: the strip scrolls inside itself — ${g.scrollH} px of words in a ${g.clientH} px box`); }
   if (!g.neverInside) { bad = true; fail(`${where}: "Don't show this again" is outside the strip or the frame (bottom ${g.neverBottom}, strip bottom ${g.bottom}, frame ${g.vh})`); }
   if (g.primaryLines !== 1 || g.laterLines !== 1) { bad = true; fail(`${where}: a button label wraps (Show me around ${g.primaryLines} lines, Maybe later ${g.laterLines})`); }
-  if (g.rowOverflow > 1) { bad = true; fail(`${where}: the button row overflows the strip sideways by ${g.rowOverflow} px`); }
+  if (g.rowOverflow > 1 || g.spillStart > 1 || g.spillEnd > 1) { bad = true; fail(`${where}: a button spills out of the row — ${g.spillStart} px off the start, ${g.spillEnd} px off the end (ink ${g.inkLeft}..${g.inkRight} in a row ${g.rowLeft}..${g.rowRight}; scrollWidth overflow ${g.rowOverflow})`); }
   if (!bad) ok(`${where}: strip ${g.box} px, never-link inside at ${g.neverBottom}/${g.vh}, both labels one line`);
 }
 
