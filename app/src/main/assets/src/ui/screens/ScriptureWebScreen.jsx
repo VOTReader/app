@@ -21,6 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
+import { createReleaseClock } from '../../utils/scripture-web/release-clock.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
@@ -289,23 +290,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // for LIVE_HOLD_MS so a run of notches never flickers between the two, and
   // the way back is a FADE_MS coverage ease, brightness only: nothing is
   // re-laid-out or re-bucketed, the cap is the one knob.
-  const liveUntilRef = React.useRef(0);
-  const releaseAtRef = React.useRef(0);
-  const live = React.useCallback(() => {
-    liveUntilRef.current = performance.now() + LIVE_HOLD_MS;
-    releaseAtRef.current = 0;
-  }, []);
-  /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while fading. */
+  // The clock itself is pure (release-clock.js, unit-tested on a fake clock);
+  // this is the one place it meets performance.now() and the frame scheduler.
+  const clockRef = React.useRef(createReleaseClock({ holdMs: LIVE_HOLD_MS, fadeMs: FADE_MS }));
+  const live = React.useCallback(() => { clockRef.current.live(performance.now()); }, []);
+  /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while live or fading. */
   const capFractionNow = React.useCallback(() => {
-    const now = performance.now();
     // a frame is kept pending through the hold, so the fade starts the moment
     // it ends even when the last gesture event drew the last frame
-    if (now < liveUntilRef.current) { schedule(); return 0; }
-    if (!liveUntilRef.current) return 1;
-    if (!releaseAtRef.current) releaseAtRef.current = now;
-    const f = Math.min(1, (now - releaseAtRef.current) / FADE_MS);
-    if (f >= 1) { liveUntilRef.current = 0; releaseAtRef.current = 0; return 1; }
-    schedule();
+    const { f, pending } = clockRef.current.fraction(performance.now());
+    if (pending) schedule();
     return f;
   }, [schedule]);
 
