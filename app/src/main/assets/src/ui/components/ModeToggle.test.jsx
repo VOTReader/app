@@ -10,6 +10,7 @@
    carries aria-pressed. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { computeAccessibleName } from 'dom-accessibility-api';
 import React from 'react';
 import { ModeToggle, renderCommentaryCite } from './ModeToggle.jsx';
 
@@ -70,6 +71,15 @@ describe('the Study Notes control shows every view at once and presses the one t
     const glyphs = screen.getAllByRole('button').map((b) => { const svg = b.querySelector('svg'); return svg ? svg.innerHTML : null; });
     expect(glyphs.every(Boolean), 'every segment carries an svg').toBe(true);
     expect(new Set(glyphs).size, 'and no two are the same drawing').toBe(3);
+  });
+  it('the glyphs are decoration: hidden from assistive tech, so each segment is heard as its label alone — never an unlabelled image first', () => {
+    mount('pdf', true);
+    for (const b of screen.getAllByRole('button')) {
+      const svg = b.querySelector('svg');
+      expect(svg && svg.getAttribute('aria-hidden'), `${b.textContent.trim()}: the glyph is aria-hidden`).toBe('true');
+      expect(svg && svg.getAttribute('focusable'), `${b.textContent.trim()}: the glyph takes no focus stop (IE/old Edge)`).toBe('false');
+      expect(computeAccessibleName(b), 'and the accessible name is the label').toBe(b.textContent.trim());
+    }
   });
   it('the control is one labelled group, so a screen reader hears "Study Notes" once and then the three views', () => {
     mount('pdf', true);
