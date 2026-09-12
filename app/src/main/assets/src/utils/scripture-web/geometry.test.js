@@ -864,3 +864,37 @@ describe('the GLSL sampleTau IS the JS sampleTau — the twin transliterated and
       .toThrow(/smoothstep/);
   });
 });
+
+/* ── M5: the vote ramp ───────────────────────────────────────────────────── */
+describe('voteStrength — a log ramp from the Famous floor, so the middle of the tiers separates (M5)', () => {
+  const { voteStrength, voteStrengthGLSL, VOTE_FLOOR, STRENGTH_FLOOR } = /** @type {any} */ (geoLaw);
+
+  it('7 -> 0.30, 10 -> 0.41, 20 -> 0.62, 35 -> 0.79, 70 -> 1.00 (the linear /70 read 0.30 for everything under 21)', () => {
+    expect(voteStrength(7)).toBeCloseTo(0.30, 2);
+    expect(voteStrength(10)).toBeCloseTo(0.41, 2);
+    expect(voteStrength(20)).toBeCloseTo(0.62, 2);
+    expect(voteStrength(35)).toBeCloseTo(0.79, 2);
+    expect(voteStrength(70)).toBeCloseTo(1.00, 6);
+    expect(voteStrength(1), 'below the floor it floors').toBe(STRENGTH_FLOOR);
+    expect(voteStrength(700), 'past a decade it saturates').toBe(1);
+    expect(VOTE_FLOOR).toBe(7);
+    expect(STRENGTH_FLOOR).toBe(0.3);
+  });
+
+  it('the GLSL voteStrength IS the JS voteStrength — the twin transliterated and run on 1..300 votes', () => {
+    const start = voteStrengthGLSL.indexOf('float voteStrength(');
+    expect(start, 'the template carries the function').toBeGreaterThanOrEqual(0);
+    let body = voteStrengthGLSL.slice(start);
+    body = body.slice(0, body.indexOf('\n}') + 2);
+    const js = body
+      .replace(/^float voteStrength\(([^)]*)\)/, (_, args) => `function voteStrength(${args.replace(/float /g, '')})`)
+      .replace(/\blog\(/g, 'Math.log(');
+    const allowed = new Set(['function', 'voteStrength', 'v', 'return', 'clamp', 'Math', 'log']);
+    for (const id of js.match(/[A-Za-z_]\w*/g) || []) {
+      if (!allowed.has(id)) throw new Error(`the GLSL twin uses \`${id}\`: extend the transliteration before trusting this pin`);
+    }
+    const clamp = (x, lo, hi) => Math.min(Math.max(x, lo), hi);
+    const twin = new Function('clamp', js + '; return voteStrength;')(clamp);
+    for (let v = 1; v <= 300; v++) expect(twin(v), `votes ${v}`).toBeCloseTo(voteStrength(v), 9);
+  });
+});

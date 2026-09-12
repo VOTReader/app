@@ -53,7 +53,7 @@ function bareInts(glsl) {
   return stripped.match(/\b\d+\b/g) || [];
 }
 
-const TEMPLATES = ['threadShapeGLSL'];
+const TEMPLATES = ['threadShapeGLSL', 'voteStrengthGLSL'];
 function templateBody(name) {
   const m = SOURCE.match(new RegExp('export const ' + name + ' = `([\\s\\S]*?)`;'));
   if (!m) throw new Error('glsl-float.test: could not find the ' + name + ' template in geometry.js');
@@ -93,18 +93,18 @@ describe('every constant interpolated into the GLSL templates routes through gls
     expect(rawSites('float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*x;')).toEqual(['FAN_FLOOR', '1 - FAN_FLOOR']);
   });
 
-  it('has no raw interpolation in threadShapeGLSL — THIS is the case with teeth today', () => {
+  it('has no raw interpolation in threadShapeGLSL or voteStrengthGLSL — THIS is the case with teeth today', () => {
     for (const name of TEMPLATES) {
       expect({ template: name, raw: rawSites(templateBody(name)) }).toEqual({ template: name, raw: [] });
     }
   });
 
-  it('is not reading an empty region: the constant the shader template inlines is seen as a site, twice', () => {
+  it('is not reading an empty region: every constant the two templates inline is seen as a site', () => {
     // The true law interpolates ONE constant (SPLIT_MARGIN, at the two sites
-    // where the split strip lifts its bridge above the frame); the six the
-    // morph and the fly-over law carried went with them.
+    // where the split strip lifts its bridge above the frame); the vote ramp
+    // (M5) four: its floor strength twice, the vote floor, and ln 10.
     const sites = TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim()));
-    expect(sites).toEqual(['SPLIT_MARGIN', 'SPLIT_MARGIN']);
+    expect(sites).toEqual(['SPLIT_MARGIN', 'SPLIT_MARGIN', 'STRENGTH_FLOOR', '1 - STRENGTH_FLOOR', 'VOTE_FLOOR', 'Math.LN10']);
   });
 });
 
@@ -117,5 +117,17 @@ describe('the emitted GLSL carries no bare integer literal', () => {
     expect(geo.SPLIT_MARGIN).toBe(2);
     expect(bareInts(geo.threadShapeGLSL)).toEqual([]);
     expect(geo.threadShapeGLSL).toContain('2.0*hw');
+  });
+
+  it('voteStrengthGLSL: none — VOTE_FLOOR is the whole number 7, so a raw `${VOTE_FLOOR}` would emit `v/7` (M5)', () => {
+    expect(geo.VOTE_FLOOR).toBe(7);
+    expect(bareInts(geo.voteStrengthGLSL)).toEqual([]);
+    expect(geo.voteStrengthGLSL).toContain('v/7.0');
+  });
+
+  it('the renderer routes its own width-ratio site through glslFloat, so a floor equal to the deep width could not emit `mix(1, …)` (M5)', () => {
+    const RENDERER = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../ui/scripture-web/web-renderer.js'), 'utf8');
+    expect(RENDERER).toContain('${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}');
+    expect(RENDERER).not.toContain('${STROKE_MIN_CSS / STROKE_DEEP_CSS}');
   });
 });

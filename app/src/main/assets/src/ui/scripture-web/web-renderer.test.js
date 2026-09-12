@@ -8,6 +8,7 @@
  * tappable where they look tappable — and nothing on screen looks wrong.
  */
 import { describe, it, expect } from 'vitest';
+import * as geo from '../../utils/scripture-web/geometry.js';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import { threadShapeGLSL } from '../../utils/scripture-web/geometry.js';
 import {
@@ -62,6 +63,14 @@ describe('shader shape', () => {
     // top of the range once the canon exceeds 2^24 — and read wrong now.
     expect(SHADER_SOURCE.vertex).toMatch(/in uint aFrom;/);
     expect(SHADER_SOURCE.vertex).toMatch(/in uint aTo;/);
+  });
+
+  it('M5: the vertex stage inlines voteStrengthGLSL verbatim and reads strength from it — the linear aVotes/70 is gone', () => {
+    const { voteStrengthGLSL } = /** @type {any} */ (geo);
+    expect(typeof voteStrengthGLSL, 'geometry exports the twin').toBe('string');
+    expect(SHADER_SOURCE.vertex).toContain(voteStrengthGLSL);
+    expect(SHADER_SOURCE.vertex).toContain('float strength = voteStrength(aVotes);');
+    expect(SHADER_SOURCE.vertex).not.toContain('aVotes/70.');
   });
 
   it('M3: the feet read the departure slots — normalized byte attributes added to the verse', () => {

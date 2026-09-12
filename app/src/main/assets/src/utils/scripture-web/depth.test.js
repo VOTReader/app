@@ -114,6 +114,14 @@ describe('D1 — a lone ribbon at the ceiling clears 3:1', () => {
   });
 });
 
+describe('S5 — the width floor at depth (M5)', () => {
+  it('STROKE_MIN_CSS is 1.0 CSS px (received 1.4): the weakest thread at the ceiling is a hairline and the strongest 2.4, a 2.4x range', () => {
+    const { STROKE_MIN_CSS, STROKE_DEEP_CSS } = /** @type {any} */ (geoLaw);
+    expect(STROKE_MIN_CSS).toBe(1.0);
+    expect(STROKE_DEEP_CSS).toBe(2.4);
+  });
+});
+
 describe('D2 — nothing below the ceiling washes out', () => {
   it('is the old law exactly at overview, whatever the density reads', () => {
     for (const light of [false, true]) {
