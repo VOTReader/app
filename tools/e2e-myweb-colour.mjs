@@ -56,6 +56,8 @@ if (dirty) { console.error(`[e2e-myweb-colour] REFUSING: dirty tree ${OWN}\n` + 
 const SHA = execSync('git rev-parse --short HEAD', { cwd: OWN }).toString().trim();
 const puppeteer = createRequire(pathToFileURL(resolve(OWN, 'package.json')))('puppeteer');
 const { serveOwnTree } = await import(pathToFileURL(resolve(OWN, 'tools/e2e-read-serve.mjs')).href);
+// the tree's own ink law, so the tool never restates 0.04*z^0.75 (two definitions that must agree)
+const { personalInk } = await import(pathToFileURL(resolve(OWN, 'app/src/main/assets/src/ui/scripture-web/rail-renderer.js')).href);
 if (OUT) mkdirSync(OUT, { recursive: true });
 
 const FRAMES = {
@@ -258,6 +260,12 @@ async function walk(page, url, fname) {
   const z = await zoomTopTo(page, c, r0, 'MTAM', 40);
   if (!z.ok) { fails.push(`${tag} corridor: ${z.why}`); return; }
   note(`${tag} corridor: top rail at ${z.zoom}x fit after ${z.steps} notches${z.saturated ? ' (the rail\'s own ceiling; the wheel stopped moving it)' : ''}, MTAM band ${Math.round(z.band.x0)}..${Math.round(z.band.x1)} CSS px`);
+  // the ceiling only BINDS where the depth alpha law reaches it (0.45 from ~25.5x fit, 0.70 from ~45x);
+  // below that the two ceilings paint one alpha by the law, the pair cannot differ, and the gate is not
+  // a measurement on this frame (run 3: the desktop rail caps at 18.2x, alpha 0.352 under both)
+  const aLo = personalInk(z.zoom, Math.min(...CEILINGS)).context.alpha, aHi = personalInk(z.zoom, Math.max(...CEILINGS)).context.alpha;
+  if (!(aHi > aLo)) { note(`${tag} corridor UNRESOLVED on this frame: at ${z.zoom}x fit the context alpha is ${aLo.toFixed(3)} under both ceilings (the law reaches ${Math.min(...CEILINGS)} only deeper); no pair, no gate here`); return; }
+  note(`${tag} corridor: context alpha ${aLo.toFixed(3)} @ ${Math.min(...CEILINGS)} vs ${aHi.toFixed(3)} @ ${Math.max(...CEILINGS)} at ${z.zoom}x fit - the ceiling binds, the pair is a measurement`);
   const rows = {}, shots = {};
   for (const ceil of CEILINGS) {
     await page.evaluate((v) => { globalThis.__swContextCeiling = v; }, ceil);
