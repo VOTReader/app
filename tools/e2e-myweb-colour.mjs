@@ -91,7 +91,16 @@ function seedPairs(n) {
 const finder = (l) => [...document.querySelectorAll('button,[role=button],a')]
   .find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0);
 async function clickLabel(page, label) {
-  await page.waitForFunction((l, s) => !!(new Function('return ' + s)())(l), { timeout: NAV_MS, polling: 200 }, label, finder.toString());
+  const wait = (ms) => page.waitForFunction((l, s) => !!(new Function('return ' + s)())(l), { timeout: ms, polling: 200 }, label, finder.toString());
+  try { await wait(NAV_MS); } catch (e) {
+    // diagnostics first: what the page shows instead, then ONE reload (a starved fresh context woke on one)
+    const seen = await page.evaluate(() => ({ ready: document.readyState, vis: document.visibilityState, url: location.href,
+      labels: [...document.querySelectorAll('button,[role=button],a')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => (b.getAttribute('aria-label') || b.textContent.trim()).slice(0, 24)).slice(0, 20),
+      text: (document.getElementById('root') || document.body).innerText.replace(/\s+/g, ' ').slice(0, 160) })).catch((x) => ({ evalError: String(x) }));
+    console.log(`[boot] '${label}' not visible after ${NAV_MS} ms; page shows ${JSON.stringify(seen)}; reloading once`);
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: NAV_MS });
+    try { await wait(30000); } catch (e2) { throw new Error(`'${label}' not visible after a reload either; before the reload the page showed ${JSON.stringify(seen)}`); }
+  }
   await page.evaluate((l, s) => (new Function('return ' + s)())(l).click(), label, finder.toString());
 }
 const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new Function('return ' + s)())(l); if (!b) return false; b.click(); return true; }, label, finder.toString());
