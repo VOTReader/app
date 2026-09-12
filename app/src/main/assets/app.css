@@ -7213,10 +7213,12 @@
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
          second drops to its own line, right-aligned under a full-width primary, instead of the
-         primary wrapping to SHOW ME / AROUND. On 412 and up both share one line as before. */
+         primary wrapping to SHOW ME / AROUND. On 412 and up both share one line as before. Two
+         lines, each load-bearing (bitten 2026-09-12): nowrap makes a label's min-content the whole
+         label, so the row breaks between buttons and never inside one; wrap gives the break
+         somewhere to go — without it two nowrap buttons overflow a 302 px row sideways. */
       .tour-prompt .tour-row { flex-wrap: wrap; justify-content: flex-end; }
       .tour-prompt .tour-btn { white-space: nowrap; }
-      .tour-prompt .tour-btn.primary { flex: 1 1 auto; }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {

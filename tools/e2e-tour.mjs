@@ -75,12 +75,15 @@ const EXPECT_SCREEN = Object.fromEntries(TOUR_STEPS.filter((s) => s.target).map(
    its words — a strip capped shorter scrolls INSIDE itself with no scrollbar on touch, and "Don't
    show this again" is cut off or off the frame (every landscape phone at Text Size 1; a portrait
    phone at Text Size 3) — and neither of its two buttons may break a word ("SHOW ME / AROUND" on
-   320 and 360). Read as geometry, not as CSS: a rule can be present and still not bind. */
+   320 and 360) — nor overflow the strip sideways, which is where two unbreakable labels go when
+   the row cannot wrap (bite C, 2026-09-12: the leg was green over a 23 px overflow until it read
+   the row's scrollWidth). Read as geometry, not as CSS: a rule can be present and still not bind. */
 async function stripGeometry(page, note) {
   const g = await page.evaluate(() => {
     const p = document.querySelector('.tour-prompt'); if (!p) return null;
     const r = p.getBoundingClientRect();
     const never = p.querySelector('.tour-never'); const nr = never ? never.getBoundingClientRect() : null;
+    const row = p.querySelector('.tour-row');
     const btns = [...p.querySelectorAll('.tour-btn')];
     const prim = btns.find((b) => b.classList.contains('primary')); const later = btns.find((b) => !b.classList.contains('primary'));
     // Line boxes of the label's text: one rect per line the words occupy.
@@ -91,6 +94,9 @@ async function stripGeometry(page, note) {
       neverBottom: nr ? Math.round(nr.bottom) : null,
       neverInside: !!nr && nr.top >= r.top - 1 && nr.bottom <= r.bottom + 1 && nr.bottom <= innerHeight + 1,
       primaryLines: prim ? lines(prim) : 0, laterLines: later ? lines(later) : 0,
+      // Two labels that never wrap can instead push the row past the strip's edge: the row's
+      // scrollWidth is the one number that sees it (a rect-inside check would too; this is cheaper).
+      rowOverflow: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0,
       fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() || '1',
     };
   });
@@ -100,6 +106,7 @@ async function stripGeometry(page, note) {
   if (g.scrollsInside) { bad = true; fail(`${where}: the strip scrolls inside itself — ${g.scrollH} px of words in a ${g.clientH} px box`); }
   if (!g.neverInside) { bad = true; fail(`${where}: "Don't show this again" is outside the strip or the frame (bottom ${g.neverBottom}, strip bottom ${g.bottom}, frame ${g.vh})`); }
   if (g.primaryLines !== 1 || g.laterLines !== 1) { bad = true; fail(`${where}: a button label wraps (Show me around ${g.primaryLines} lines, Maybe later ${g.laterLines})`); }
+  if (g.rowOverflow > 1) { bad = true; fail(`${where}: the button row overflows the strip sideways by ${g.rowOverflow} px`); }
   if (!bad) ok(`${where}: strip ${g.box} px, never-link inside at ${g.neverBottom}/${g.vh}, both labels one line`);
 }
 
