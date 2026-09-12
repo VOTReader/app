@@ -2246,11 +2246,14 @@ function next() {
   if (!_state.queue.length) return;
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
-  // The end of the queue is the end of a UNIT, not of the listening: the site order continues
-  // (_extendQueue). It was already tried when this track started, so at the end of the ORDER it
-  // is refused a second time here and the bar stops — both refusals return false by design; do
-  // not "fix" the double call into one, the second is what keeps stop() reachable.
-  if (_state.qi + 1 >= _state.queue.length && !_extendQueue()) { stop(); return; }
+  // The end of the queue is the end of the ORDER, not merely of a unit: the site order was
+  // already appended when this unit's last track STARTED (_start → _extendQueue, so the boundary
+  // track is warmed during this one), and nothing between that start and this end can turn a
+  // refused extension into a granted one — a queue edit switches the source to 'custom', which
+  // _extendQueue refuses. So a queue that still ends here has nowhere to go: stop().
+  // (A second _extendQueue() call lived here until 2026-09-12; verifier-2 measured that nothing
+  // exercised it and its comment's reason was false.)
+  if (_state.qi + 1 >= _state.queue.length) { stop(); return; }
   _state.qi++;
   _start();
   _lastPersistSec = -1;
