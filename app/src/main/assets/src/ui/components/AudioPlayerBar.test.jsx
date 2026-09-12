@@ -173,9 +173,18 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
     globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol2:solo': [['idSolo', 'M']] };
     try {
       render(<AudioPlayerBar />);
+      // From letter A: two part boundaries inside Volume One before the seam, so "nowhere else"
+      // is asserted at qi 1 and qi 2 INSIDE the collection, not only at qi 0 (verifier-2, 2026-09-12:
+      // `crossed = st.qi > 0` satisfied the qi-0-only form).
+      drive(() => AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' }));
+      expect(title()).toBe('The Wide Path · Part 1');                 // qi 0: the plain title
+      emit('ended');                                                   // a part boundary, not a unit boundary
+      expect(AudioPlayer.getState().qi).toBe(1);
+      expect(title()).toBe('The Wide Path · Part 2');                 // qi 1, inside the collection: plain
+      emit('ended');
+      expect(AudioPlayer.getState().qi).toBe(2);
+      expect(title()).toBe('The Seventh Day');                       // qi 2, vol1's last recording: plain
       // Letter C is vol1's last recording: the queue already carries Volume Two behind it.
-      drive(() => AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-c' }));
-      expect(title()).toBe('The Seventh Day');                       // inside a collection: the plain title
       emit('ended');                                                   // the seam
       expect(title()).toBe('Volume Two · Solo Letter');                // the first track after the crossing
       expect(document.querySelector('.audio-bar-src').textContent).toMatch(/^Volume Two · /);   // the sub names it too
