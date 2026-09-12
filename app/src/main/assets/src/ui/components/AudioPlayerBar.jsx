@@ -49,6 +49,14 @@ export function AudioPlayerBar() {
   const track = queue[st.qi] || {};
   const reader = AudioPlayer.readerLabel(track.readerCode);
   const part = displayPartLabel(track.title, track.partLabel);
+  // The player continues into the next collection by itself (w-audio-continue, 2026-09-11); for the
+  // FIRST track after a crossing the title names the collection — "Volume Two · Solo Letter" — so the
+  // reader is informed rather than surprised, no toast and no confirm. Every other track keeps its plain
+  // title (the sub line names the collection on all of them). Read off the previous queue item, so it
+  // holds with the page follower off; after a restart the rebuilt queue starts at this track (qi 0) and
+  // the title is plain again — harmless, the crossing is behind the reader by then.
+  const before = st.qi > 0 ? queue[st.qi - 1] : null;
+  const crossed = !!(before && track.sub && before.sub !== track.sub);
   // Buffering is an ACTIVE session: toggle() on a loading element pauses it,
   // so the button must promise Pause — the same rule AudioManagerSheet
   // applies. Splitting them told a screen reader the opposite of the truth
@@ -108,7 +116,7 @@ export function AudioPlayerBar() {
         >
           <span className="audio-bar-summary-text">
             <span className="audio-bar-title">
-              {track.title || ''}
+              {(crossed ? track.sub + ' · ' : '') + (track.title || '')}
               {/* Silent when it would only repeat the title: a per-chapter
                   Bible track is titled "Genesis 2" AND labelled "Chapter 2",
                   so the bar read both (2026-08-10). See displayPartLabel. */}
