@@ -171,10 +171,13 @@ describe('the counter in the draw path: instances submitted against the corpus',
     expect(s8.submitted, 'the whole-bucket path submits the chunk-culled set, a superset').toBeGreaterThan(17042);
   });
 
-  it('the spotlight reads the instance id from its own attribute, so a gathered list can light the tapped thread', () => {
+  it('WIRING PIN: the tapped id reaches the shader as itself in the gathered regime, and no base-offset uniform exists', () => {
     // A thread's id is data the instance carries (aId), never its position
     // in whatever list it was drawn from: uInstanceBase was that position's
-    // offset and is gone.
+    // offset and is gone. This case sees the UNIFORMS only — a stub cannot
+    // run the vertex stage, so `float id = aId;` itself is pinned by the
+    // shader-text case in web-renderer.test.js (bite d reddened that one
+    // alone), and the lit thread on screen is the morning's browser walk.
     const gl = fakeGL();
     const r = createRenderer(fakeCanvas(gl), graph);
     const stats = r.draw(Object.assign({}, {
