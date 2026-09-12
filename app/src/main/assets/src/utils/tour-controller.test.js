@@ -31,6 +31,15 @@ beforeEach(() => {
   delete window.__loadScreensE;
 });
 
+describe('TourController — the words bundles d and e reach only through here', () => {
+  it('hands out the highlight gesture words the hint pill says (F2.1), the same string tour-steps owns', async () => {
+    const steps = await import('./tour-steps.js');
+    expect(typeof TourController.highlightWords, 'TourController.highlightWords must exist').toBe('function');
+    expect(TourController.highlightWords()).toBe(steps.HIGHLIGHT_GESTURE_WORDS);
+    expect(TourController.stopsWord()).toBe(steps.TOUR_STOPS_WORD);      // the sibling it mirrors
+  });
+});
+
 describe('TourController — start', () => {
   it('starts inactive; start() activates at the welcome card and notifies', () => {
     const cb = vi.fn();

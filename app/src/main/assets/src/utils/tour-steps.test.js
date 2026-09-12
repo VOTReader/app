@@ -13,6 +13,7 @@
 */
 import { TOUR_LETTER } from '../hooks/use-tour.js';
 import { describe, it, expect, afterEach } from 'vitest';
+import * as mod from './tour-steps.js';
 import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarget, bannedWord, TOUR_WORDS } from './tour-steps.js';
 
 afterEach(() => { document.body.innerHTML = ''; });
@@ -51,6 +52,15 @@ describe('tour-steps — shape', () => {
      the count as a word and every sentence reads it. The table here is the test's OWN reading of
      the array, so a module that published the wrong word cannot satisfy this by agreeing with
      itself; the hand-written count above is the loud line that moves when a stop lands. */
+  it('publishes the gesture words the hint pill also says, as the head of the highlight stop (F2.1)', () => {
+    // One sentence pair, one owner: the pill (bundle d) reads them through TourController and
+    // must never hold a second copy that can drift from the stop it echoes.
+    expect(typeof mod.HIGHLIGHT_GESTURE_WORDS, 'tour-steps.js must export HIGHLIGHT_GESTURE_WORDS').toBe('string');
+    const stop = TOUR_STEPS.find((s) => s.id === 'highlight');
+    expect(stop.text.startsWith(mod.HIGHLIGHT_GESTURE_WORDS)).toBe(true);
+    expect(mod.HIGHLIGHT_GESTURE_WORDS).toContain('Highlight, or Note');
+  });
+
   it('publishes the stop count as a word, and the welcome card counts with it', () => {
     const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
     expect(TOUR_STOPS_WORD).toBe(words[TOUR_STEPS.length - 1]);
