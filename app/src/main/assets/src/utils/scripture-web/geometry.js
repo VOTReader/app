@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    scripture-web/geometry — Cluster F (esbuild bundle-f.js)
 
-   THE height law and the camera, in one place.
+   THE height law, in one place (the camera moved to camera.js and is
+   re-exported below, so every importer of the pair keeps one path).
 
    The GPU draws each cross-reference as a half-ellipse ribbon and the CPU
    hit-tests the same curve analytically. Those two must agree to the pixel or
@@ -22,6 +23,8 @@
    focuses something invisible. `flyOverGLSL` is the shader's copy;
    `arcAnchored` + `flyOverDim` are pick.js's.
    ═══════════════════════════════════════════════════════════════════════ */
+
+export * from './camera.js';
 
 /** Ceiling softness: larger = arcs stay circular longer before flattening. */
 export const CEIL_SOFTNESS = 1.9;
@@ -538,70 +541,4 @@ export function arcDistance(px, py, x0, x1, base, R, A, tol) {
   const gm = Math.hypot(gx, gy);
   if (gm < 1e-9) return Infinity;
   return Math.abs(f) / gm;
-}
-
-/**
- * The camera: a 1-D affine map from verse index to device px, plus the
- * vertical frame. Pure data + pure functions — the screen owns the instance
- * and mutates `x`/`ppv` imperatively during gestures (no React state per
- * frame, per the GardenView doctrine).
- */
-export function createCamera(total) {
-  return { x: total / 2, ppv: 0, total };
-}
-
-/** Pixels-per-verse at which the whole canon exactly fills the viewport. */
-export function fitPPV(cam, width) { return width / cam.total; }
-
-/**
- * Clamp zoom into [fit, maxZoom×fit] and pan so the canon can't leave the
- * viewport. Mutates in place — this runs per gesture frame.
- */
-export function clampCamera(cam, width, maxZoom) {
-  const min = fitPPV(cam, width);
-  const max = min * (maxZoom || 5000);
-  if (!(cam.ppv > 0)) cam.ppv = min;
-  cam.ppv = Math.min(Math.max(cam.ppv, min), max);
-  const half = width / cam.ppv / 2;
-  cam.x = (half * 2 >= cam.total) ? cam.total / 2
-    : Math.min(Math.max(cam.x, half), cam.total - half);
-  return cam;
-}
-
-/** Verse index → device px. */
-export function verseToX(cam, width, verse) {
-  return (verse - cam.x) * cam.ppv + width / 2;
-}
-
-/** Device px → verse index (fractional). */
-export function xToVerse(cam, width, x) {
-  return (x - width / 2) / cam.ppv + cam.x;
-}
-
-/**
- * Map viewport pointer coords into a screen that has been CSS-rotated 90°
- * clockwise into landscape (transform-origin top left, translateY(-100%)).
- * Layout metrics ignore transforms, so the rotated screen's own x axis runs
- * down the physical screen: local x = clientY, local y = physicalWidth − clientX.
- *
- * @param {number} clientX
- * @param {number} clientY
- * @param {number} physicalWidth — window.innerWidth (the portrait width)
- * @returns {{x:number, y:number}}
- */
-export function rotatePointer(clientX, clientY, physicalWidth) {
-  return { x: clientY, y: physicalWidth - clientX };
-}
-
-/**
- * Zoom about a fixed screen point — the anchor stays under the finger/cursor.
- * @param {number} anchorX — device px to hold still
- * @param {number} factor — multiplicative zoom (>1 zooms in)
- */
-export function zoomAbout(cam, width, anchorX, factor, maxZoom) {
-  const verse = xToVerse(cam, width, anchorX);
-  cam.ppv *= factor;
-  clampCamera(cam, width, maxZoom);
-  cam.x = verse - (anchorX - width / 2) / cam.ppv;
-  return clampCamera(cam, width, maxZoom);
 }
