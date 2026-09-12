@@ -22,6 +22,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
 import { AudioLibraryScreen } from './AudioLibraryScreen.jsx';
+import * as AT from '../../utils/audio-track.js';
 
 const savedTrack = {
   key: 'one:wide-path', title: 'The Wide Path', sub: 'Volume One', partLabel: 'Part 1',
@@ -137,6 +138,30 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(bibleRow.textContent).toContain('2 books');            // counted off its own manifest
     fireEvent.click(bibleRow);
     expect(onOpenCollection).toHaveBeenCalledWith('bible-brm-kjv');
+  });
+
+  /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
+     every chapter 404s live) is offered nowhere, through ONE registry flag and
+     ONE predicate (utils/audio-track.hide.test.js owns the registry half). The
+     shelf is the first door: it lists the REAL registry, so the counts here are
+     the registry's and move by one when the flag line is deleted. */
+  it('the shelf offers every edition the registry OFFERS, and a hidden one nowhere (4 of 5 today)', () => {
+    installGlobals({ votManifest: false });
+    // The manifest STILL carries the hidden edition's rows — the shelf must
+    // omit it on the flag alone, not on a missing manifest.
+    globalThis.BIBLE_AUDIO_MANIFEST['bible-tsot-matthew:matthew'] = [['tsot-1', '']];
+    renderScreen();
+    // The browse shelf only: the saved-recordings row shares the row class.
+    const rows = [...document.querySelectorAll('.audio-library-browse .audio-library-shelf-row')]
+      .map((row) => row.querySelector('strong').textContent)
+      .filter((label) => label !== 'The Volumes of Truth');
+    // The door itself, as the reader sees it:
+    expect(rows).not.toContain(AT.BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
+    expect(Object.keys(AT.BIBLE_AUDIO_EDITIONS)).toHaveLength(5);
+    expect(rows).toHaveLength(4);                                  // one hidden today
+    // And the rule it follows — the same predicate every other door asks:
+    expect(typeof AT.bibleAudioOffered, 'audio-track.js must export bibleAudioOffered').toBe('function');
+    expect(rows).toEqual(Object.values(AT.BIBLE_AUDIO_EDITIONS).filter(AT.bibleAudioOffered).map((e) => e.label));
   });
 
   it('turns the active recording into a clear control deck with progress and contextual actions', () => {

@@ -734,6 +734,26 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'NKJV · Dramatized' }));
     expect(AudioPlayer.getState().queue[0].url).toBe(BURL('wop1_genesis_002', 'audio-wop-v1'));
   });
+
+  /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
+     every chapter 404s live) is offered nowhere — ONE registry flag, ONE
+     predicate (utils/audio-track.hide.test.js owns the registry half). The
+     desk's chips are the door that would tap straight into the 404: the fixture
+     gives the hidden edition a row for THIS book, so the chip's absence is the
+     flag's doing and not the manifest's. Two of the three recorded voices. */
+  it('offers no Voice chip for a hidden edition, even on a book it has recorded', () => {
+    globalThis.BIBLE_AUDIO_BOOKS = [['matthew', 'Matthew']];
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:matthew': [['brm2_matthew_001', '', 'Chapter 1']],
+      'bible-wop-nkjv:matthew': [['wop2_matthew_001', '', 'Chapter 1']],
+      'bible-tsot-matthew:matthew': [['1AbCdEfGhIjKlMnOpQrStUvWxYz01234', '', 'Chapter 1']],
+    };
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'matthew', label: 'KJV · Biblical Restoration Ministries' }));
+    openSheet();
+    const chips = voiceChips().map((chip) => chip.textContent);
+    expect(chips).not.toContain('Matthew · TSOT');
+    expect(chips).toEqual(['KJV · BRM', 'NKJV · Dramatized']);
+  });
 });
 
 describe('AudioManagerSheet — title jump to text (owner request 2026-08-09)', () => {
