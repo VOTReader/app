@@ -426,22 +426,28 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
   /* All within ONE day group: spaced by seconds, not `today(minutes)` — a fixture that reaches 35
      minutes back straddles midnight for the first half-hour of every day (caught 2026-08-10). */
   const now = Date.now();
+  // Genesis 1 sits beside the Psalms 1 repeats on purpose: identity is the KEY, and a fold by
+  // (type, chapter number) would read "chapter 1 of some book" three times and make it one row
+  // (verifier-2's D', 2026-09-12). Genesis is not in this harness's BOOKS, so its row is chipless.
   const REPEATS = [
     chapter('psalms', 'Psalms', 23, now - 1000, 'The Lord Is My Shepherd'),
     chapter('psalms', 'Psalms', 1, now - 2000),
     chapter('psalms', 'Psalms', 1, now - 3000),
     chapter('psalms', 'Psalms', 1, now - 4000),
+    chapter('genesis', 'Genesis', 1, now - 5000),
   ];
+  const cardLabels = () => [...document.querySelectorAll('.chapter-card-label')].map((t) => t.textContent);
+  const rowVisits = () => [...document.querySelectorAll('.chapter-card-btn')]
+    .map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');
 
-  it('one row per reading per day, counting its visits, at the newest visit; a single visit says nothing', () => {
+  it('one row per reading per day, counting its visits, at the newest visit; a single visit says nothing; another book at the same number is its own row', () => {
     setupGlobals();
     renderScreen(REPEATS);
-    expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1']);
-    const rows = [...document.querySelectorAll('.chapter-card-btn')];
-    const visits = rows.map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');
-    expect(visits).toEqual(['', '3 visits']);
-    // The day header counts ROWS, not visits — "Today · 2", never "· 4".
-    expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 2');
+    expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1', 'Chapter 1']);
+    expect(cardLabels()).toEqual(['Psalms', 'Psalms', 'Genesis']);
+    expect(rowVisits()).toEqual(['', '3 visits', '']);
+    // The day header counts ROWS, not visits — "Today · 3", never "· 5".
+    expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 3');
     expect(document.querySelector('.history-dedupe-btn'), 'the chore button is gone').toBeNull();
   });
 
@@ -450,10 +456,28 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     const onSelect = vi.fn();
     renderScreen(REPEATS, { onSelect });
     const rows = [...document.querySelectorAll('.chapter-card-btn')];
-    expect(rows, 'two rows: the three Psalms 1 visits are one').toHaveLength(2);
+    expect(rows, 'three rows: the three Psalms 1 visits are one, Genesis 1 is not one of them').toHaveLength(3);
     fireEvent.click(rows[1]);
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0]).toMatchObject({ key: 'ch:psalms:1', ts: now - 2000 });
+  });
+
+  it('folds inside the year/month tree too: last month\'s repeats of one reading are one row (the older-month site is its own call)', () => {
+    // verifier-2's H2 (2026-09-12): every other fixture is today/yesterday, so a fold dropped at the
+    // tree site alone passed the file. The 10th of last month at noon is never today or yesterday
+    // and never straddles midnight; its year, month and week open by default, its day does not.
+    setupGlobals();
+    const d = new Date();
+    const noon = new Date(d.getFullYear(), d.getMonth() - 1, 10, 12).getTime();
+    renderScreen([
+      chapter('psalms', 'Psalms', 1, noon),
+      chapter('psalms', 'Psalms', 1, noon - 5000),
+    ]);
+    expect(cardTitles(), 'the day is shut until tapped').toEqual([]);
+    fireEvent.click(document.querySelector('.history-day-header'));
+    expect(cardTitles()).toEqual(['Chapter 1']);
+    expect(rowVisits()).toEqual(['2 visits']);
+    expect(document.querySelector('.history-day-count'), 'one row, so the day header shows no count').toBeNull();
   });
 
   it('CONTROL (green on the base tree by design): the same reading on ANOTHER day is its own row — collapse is per calendar day', () => {
@@ -471,7 +495,8 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     setupGlobals();
     renderScreen(REPEATS);
     type('chapter 1');
-    expect(cardTitles()).toEqual(['Chapter 1']);
-    expect(document.querySelector('.history-entry-visits').textContent).toBe('3 visits');
+    expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
+    expect(cardLabels()).toEqual(['Psalms', 'Genesis']);
+    expect(rowVisits()).toEqual(['3 visits', '']);
   });
 });
