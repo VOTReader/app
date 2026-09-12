@@ -7,7 +7,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS, displayPartLabel } from '../../utils/audio-track.js';
+import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel } from '../../utils/audio-track.js';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -105,10 +105,11 @@ function voiceChoices(current) {
   if (!split) return null;
 
   if (split.volKey.lastIndexOf('bible-', 0) === 0) {
-    // Only editions that actually ship this book — a chip for a recording that
-    // does not exist would tap through to silence.
+    // Only editions the registry OFFERS that actually ship this book — a chip
+    // for a recording that does not exist would tap through to silence, and one
+    // for an edition whose assets are not on the release taps into a 404.
     const editions = Object.entries(BIBLE_AUDIO_EDITIONS)
-      .filter(([, edition]) => AudioPlayer.hasAudio(edition.volKey, split.id));
+      .filter(([, edition]) => bibleAudioOffered(edition) && AudioPlayer.hasAudio(edition.volKey, split.id));
     if (editions.length < 2) return null;
     const active = editions.find(([, edition]) => edition.volKey === split.volKey);
     const chapterNum = chapterOfTrack(current);

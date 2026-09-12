@@ -2010,8 +2010,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={[
                 /* Registry source of truth: utils/audio-track.js
                    (BIBLE_AUDIO_EDITIONS, published as a global for this
-                   classic-globals screen). 'Off' is appended locally. */
-                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {}).map(([id, ed]) => {
+                   classic-globals screen, and bibleAudioOffered beside it —
+                   an edition whose assets are not on the release is offered
+                   at no door, this one included). 'Off' is appended locally. */
+                ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {})
+                  .filter(([, ed]) => /** @type {any} */ (globalThis).bibleAudioOffered(ed))
+                  .map(([id, ed]) => {
                   /* B2 (2026-08-10): "Whole-book audiobook" was true of BRM for
                      one day in s3. Every shipped edition is recorded a chapter
                      at a time; how many chapters that is lives in the registry

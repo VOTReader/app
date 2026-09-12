@@ -134,6 +134,13 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     driveFolder: '18. TSOT New Testament',
     releaseTag: AUDIO_RELEASE_PREFIX,
     books: ['matthew'],
+    // 2026-09-12: the 28 Drive ids are NOT on audio-v1 — every chapter 404s
+    // live — so the edition is offered nowhere until the mirror lands
+    // (bibleAudioOffered, below, is the one predicate every door asks). The
+    // manifest rows, the alignment and a reader's persisted choice all stay;
+    // the re-enable is deleting this line. Absent means offered: the flag is
+    // never written as false (utils/audio-track.hide.test.js).
+    unreleased: true,
   }),
   'john-film': Object.freeze({
     // The first LISTENING-ONLY edition. The Gospel of John film's narration is a
@@ -201,6 +208,26 @@ export function audioReaderLabel(code) {
 if (typeof globalThis !== 'undefined') {
   /** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS = BIBLE_AUDIO_EDITIONS;
   /** @type {any} */ (globalThis).AUDIO_READERS = AUDIO_READERS;
+  /** @type {any} */ (globalThis).bibleAudioOffered = bibleAudioOffered;
+}
+
+/**
+ * Whether an edition may be OFFERED — listed, chosen, or resolved for a Listen
+ * pill. THE one predicate, so a hidden edition cannot be hidden at four doors
+ * and shown at a fifth: the Listening Library's shelf, the desk's Voice chips,
+ * Settings' Bible Audio picker (through the globalThis bridge above), the
+ * pill's resolver and the desk→settings bridge all ask here. Lookups by volKey
+ * — a playing track's edition, its release tag, its sync file — are NOT doors
+ * and do not ask: a recording already on the queue keeps its name.
+ *
+ * `unreleased` is the fact (the assets are not on the release), absent means
+ * offered, and it is never written as false.
+ *
+ * @param {{volKey: string, unreleased?: boolean} | null | undefined} ed  a registry entry
+ * @returns {boolean}
+ */
+export function bibleAudioOffered(ed) {
+  return !!ed && !ed.unreleased;
 }
 
 /** Registry entry for a settings.bibleAudio value, or null for 'off'/unknown. */
@@ -447,11 +474,15 @@ export function resolveBibleAudio(opts) {
   const manifest = /** @type {any} */ (globalThis).BIBLE_AUDIO_MANIFEST || null;
   const carries = (ed) => !!(ed && manifest && o.bookId
     && manifest[ed.volKey + ':' + o.bookId]);
+  // A selection whose assets are not on the release stands in as the default
+  // — not as 'off', which would blank every book for a reader who chose it,
+  // and not as itself, which is a 404 on every chapter. The persisted choice is
+  // left alone so it comes back when the edition does.
+  let offer = selected && !bibleAudioOffered(selected) ? BIBLE_AUDIO_EDITIONS[BIBLE_AUDIO_DEFAULT] : selected;
   // No bookId asked about → no per-book question to answer, so the selection
-  // stands as given. With one, a selected edition that lacks the book yields to
-  // the default rather than removing the pill from that book entirely.
-  let offer = selected;
-  if (selected && o.bookId && !carries(selected)) {
+  // stands as given. With one, an edition that lacks the book yields to the
+  // default rather than removing the pill from that book entirely.
+  if (offer && o.bookId && !carries(offer)) {
     const fallback = BIBLE_AUDIO_EDITIONS[BIBLE_AUDIO_DEFAULT];
     offer = carries(fallback) ? fallback : null;
   }
