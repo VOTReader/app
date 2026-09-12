@@ -226,27 +226,27 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
   });
 
   /* ── M4: the camera's y from the keyboard, published, clamped, and gauged ── */
-  /* One 10,000-verse thread, so the world is 5,000 verses tall and the ceiling's
-     9.23-verse band has somewhere to go. */
+  /* One 2,000-verse thread, so the world is 1,000 verses tall and the ceiling's
+     3.08-verse band (260 / (132 · 0.64) at the 132 px ceiling, M6) has somewhere to go. */
   const tall = () => Object.assign(graph(), {
     count: 1,
-    from: new Uint16Array([15000]), to: new Uint16Array([25000]), votes: new Int16Array([30]),
-    buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[15000, 25000]] }],
+    from: new Uint16Array([15000]), to: new Uint16Array([17000]), votes: new Int16Array([30]),
+    buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[15000, 17000]] }],
     chunkSize: 256,
   });
   const camY = (container) => container.querySelector('.sw-root').getAttribute('data-cam-y');
 
   it('M4: ArrowUp at the ceiling raises data-cam-y, and the renderer is handed that y (received: no attribute, camY 0)', async () => {
     const { container } = await mount({}, tall);
-    for (let i = 0; i < 40; i++) await press('+');
-    expect(zoomText(container)).toBe('1711x');
+    for (let i = 0; i < 48; i++) await press('+');
+    expect(zoomText(container)).toBe('5132x');
     expect(camY(container), 'data-cam-y published on .sw-root').not.toBeNull();
     expect(Number(camY(container))).toBe(0);
     await press('ArrowUp');
     const y = Number(camY(container));
-    // 0.12 of the band: 260 / (44 * 0.64) * 0.12 = 1.108 verses on this frame (DPR 1)
-    expect(y).toBeGreaterThan(1.0);
-    expect(y).toBeLessThan(1.2);
+    // 0.12 of the band: 260 / (132 * 0.64) * 0.12 = 0.369 verses on this frame (DPR 1)
+    expect(y).toBeGreaterThan(0.35);
+    expect(y).toBeLessThan(0.39);
     expect(DRAWN[DRAWN.length - 1].camY, 'the last draw carried the camera\'s y').toBeCloseTo(y, 3);
     await press('ArrowDown');
     expect(Number(camY(container))).toBe(0);
@@ -261,15 +261,15 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
 
   it('M4: a resize that doubles the frame\'s WIDTH re-clamps y, so a grown band cannot leave the camera above its ceiling', async () => {
     const { container } = await mount({}, tall);
-    for (let i = 0; i < 40; i++) await press('+');
-    // 1.108 verses a press: 5,000 presses reach the ceiling (4,990.8) with room to spare
+    for (let i = 0; i < 48; i++) await press('+');
+    // 0.369 verses a press: 5,000 presses reach the ceiling (1,000 - 3.08 = 996.9) with room to spare
     for (let i = 0; i < 5000; i++) fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'ArrowUp' });
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const top = Number(camY(container));
-    expect(top, 'held at the world\'s ceiling: apexMax 5,000 less the band').toBeGreaterThan(4000);
+    expect(top, 'held at the world\'s ceiling: apexMax 1,000 less the band').toBeGreaterThan(990);
     // The frame grows to 1,600 CSS px WIDE: the band (W / (2 · ppv · 0.985) verses, since the
-    // dome's squash scales with the frame) doubles from 9.23 to 18.5 verses and the ceiling
-    // drops from 4,990.8 to 4,981.5. A taller frame changes nothing — the dome fills it.
+    // dome's squash scales with the frame) doubles from 3.08 to 6.16 verses and the ceiling
+    // drops from 996.9 to 993.8. A taller frame changes nothing — the dome fills it.
     Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', { configurable: true, get() { return 1600; } });
     await act(async () => { window.dispatchEvent(new Event('resize')); await new Promise((r) => setTimeout(r, 40)); });
     const after = Number(camY(container));
@@ -282,7 +282,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     // that My Web's shared camera keeps y = 0. Without the guard a swipe on the Bible rail would
     // raise the scripture camera behind the rails and the reader would come back to a web in the sky.
     const { container } = await mount({}, tall);
-    for (let i = 0; i < 40; i++) await press('+');
+    for (let i = 0; i < 48; i++) await press('+');
     const root = container.querySelector('.sw-root');
     const swipeDown = async () => {
       root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', clientX: 300, clientY: 100 }));
@@ -299,8 +299,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     // the mode switch returns the camera to fit, where the clamp alone holds y at 0 (measured:
     // the first form of this case passed under the bite for that reason); zoom the Bible rail
     // back to the ceiling so the guard, not the clamp, is what keeps the swipe from moving y
-    for (let i = 0; i < 40; i++) await press('+');
-    expect(DRAWN[DRAWN.length - 1].ppv, 'the Bible rail is back at the ceiling').toBeCloseTo(44, 6);
+    for (let i = 0; i < 48; i++) await press('+');
+    expect(DRAWN[DRAWN.length - 1].ppv, 'the Bible rail is back at the ceiling').toBeCloseTo(132, 6);
     await swipeDown();
     expect(Number(camY(container)), 'My Web: the same swipe moves no y').toBe(0);
   });
@@ -318,12 +318,12 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(/** @type {any} */ (function (kind) { return kind === '2d' ? fake2d() : null; }));
     try {
       const { container } = await mount({}, tall);
-      for (let i = 0; i < 40; i++) await press('+');
+      for (let i = 0; i < 48; i++) await press('+');
       const gauge = () => CALLS.filter((c) => c[0] === 'fillText' && /^\d[\d,]* verses$/.test(String(c[1]))).map((c) => String(c[1]));
       expect(CALLS.some((c) => c[0] === 'fillText'), 'PRECONDITION: the recorder sees the ruler paint').toBe(true);
       expect(gauge(), 'no gauge at the baseline').toEqual([]);
       CALLS.length = 0;
-      for (let i = 0; i < 10; i++) await press('ArrowUp');
+      for (let i = 0; i < 20; i++) await press('ArrowUp');
       expect(Number(camY(container))).toBeGreaterThan(5);
       expect(gauge().length, 'gauge labels with the camera raised: ' + JSON.stringify(gauge())).toBeGreaterThan(0);
     } finally {
@@ -331,11 +331,50 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     }
   });
 
-  it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {
+  it('stops at 132 CSS px per verse — 5,132x here (M6; received 1711x), never 4000x', async () => {
     const { container } = await mount();
-    for (let i = 0; i < 40; i++) await press('+');
-    // maxZoomFor(31102, 800) = 1710.61 -> the label rounds to 1711x.
-    expect(zoomText(container)).toBe('1711x');
+    // 1.25^48 = 44,000x >> 5,132x, so the ladder still saturates at the ceiling.
+    for (let i = 0; i < 48; i++) await press('+');
+    // maxZoomFor(31102, 800) = 5131.83 -> the label rounds to 5132x.
+    expect(zoomText(container)).toBe('5132x');
+  });
+
+  it('M6: + steps 1.25x (received 1.6x) and a double-tap on the web 2x (received 2.5x)', async () => {
+    const { container } = await mount();
+    const fitPpv = DRAWN[DRAWN.length - 1].ppv;
+    await press('+');
+    expect(DRAWN[DRAWN.length - 1].ppv / fitPpv).toBeCloseTo(1.25, 6);
+    const root = container.querySelector('.sw-root');
+    const tap = () => {
+      root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 400, clientY: 120 }));
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 400, clientY: 120 }));
+    };
+    tap(); tap();
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    // 1.25 from the key, then 2 from the double-tap (the old ladder read 1.6 * 2.5 = 4.0 here)
+    expect(DRAWN[DRAWN.length - 1].ppv / fitPpv).toBeCloseTo(1.25 * 2, 6);
+  });
+
+  it('M6: a double-tap on the ruler strip past 22 px per verse centres that verse at the ceiling: cam.x = verse + 0.5, ppv = 132', async () => {
+    const { container } = await mount();
+    // 31 presses at 1.25x: 0.0257 * 1.25^31 = 26.5 px per verse, past the 22 the rule needs
+    for (let i = 0; i < 31; i++) await press('+');
+    const ppv = DRAWN[DRAWN.length - 1].ppv;
+    expect(ppv).toBeGreaterThan(22);
+    expect(ppv).toBeLessThan(132);
+    const root = container.querySelector('.sw-root');
+    expect(root.getAttribute('data-cam-x'), 'data-cam-x published on .sw-root').not.toBeNull();
+    const camX = Number(root.getAttribute('data-cam-x'));
+    // the verse under x = 500 CSS px on this 800 px frame: (500 - 400) / ppv + cam.x
+    const verse = Math.floor((500 - 400) / ppv + camX);
+    const tap = () => {
+      root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 500, clientY: 300 }));
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 500, clientY: 300 }));
+    };
+    tap(); tap();
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(DRAWN[DRAWN.length - 1].ppv, 'the ceiling').toBeCloseTo(132, 6);
+    expect(Number(root.getAttribute('data-cam-x')), 'centred on the tapped verse').toBeCloseTo(verse + 0.5, 3);
   });
 
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
@@ -372,7 +411,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('RED today: at the ceiling the web is STILL drawn Famous — the control reads Famous, every frame past 22 px/verse drew Famous, nothing was announced', async () => {
       const { container } = await mount();
       await toCeiling();
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('5132x');
       expect(shown(), 'the density control').toBe('famous');
       const deep = DRAWN.filter((d) => d.ppv / d.dpr >= 22);
       expect(deep.length, 'frames drawn past 22 CSS px per verse').toBeGreaterThan(0);
@@ -385,13 +424,15 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
          (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
          nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
          the camera settles on verse 15551. A lone thread takes the MIDDLE departure slot at
-         both feet (M3), so they stand at 15548.5 and 15555.5: (15548.5 - 15551) * 44 + 400 = 290
-         and 598 CSS px. On this 800x360 frame (base 260, ceil 256, squash 0.64) the true law
-         (threadShape, w-sw-phase1 M1) gives R 154, A 98.6: the apex is at (444, 161.4), so the
-         tap at (444, 170) lands 8.6 px under it, inside the 14 px tolerance - a hit at Famous,
-         nothing at Essential, and above the rail band pickChapter owns (y >= 258). Before the
-         slots the feet stood at the verses' left edges and the apex at 422; under the morph
-         this read R 100, A 90 with a level run. */
+         both feet (M3), so they stand at 15548.5 and 15555.5: at the 132 px ceiling (M6)
+         (15548.5 - 15551) * 132 + 400 = 70 and 994 CSS px. On this 800x360 frame (base 260,
+         ceil 256, squash 0.64) the true law (threadShape, w-sw-phase1 M1) gives R 462,
+         A 295.7: the apex is 36 px ABOVE the frame, so the tap goes on the left leg — 50 px in
+         from the foot the curve is 133.8 px up (arcHeight), y = 126.2 — at (120, 134), 8 px
+         under it, inside the 14 px tolerance: a hit at Famous, nothing at Essential, and above
+         the rail band pickChapter owns (y >= 258). At the 44 px ceiling this read R 154,
+         A 98.6, apex (444, 161.4), tap (444, 170); before the slots the feet stood at the
+         verses' left edges; under the morph R 100, A 90 with a level run. */
       const linked = () => Object.assign(graph(), {
         count: 1,
         books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
@@ -402,10 +443,10 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       });
       const { container } = await mount({}, linked);
       await toCeiling();
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('5132x');
       const root = container.querySelector('.sw-root');
-      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 444, clientY: 170 });
-      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 444, clientY: 170 });
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 120, clientY: 134 });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: 120, clientY: 134 });
       await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection card opened for the 7-vote thread').toBeTruthy();

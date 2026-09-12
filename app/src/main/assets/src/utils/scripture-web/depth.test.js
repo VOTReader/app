@@ -31,7 +31,7 @@ const W = 800 * DPR;          // 1600
 const CEIL = 256 * DPR;       // 512, their measured dome ceiling
 const TOTAL = 31102;          // verses in the canon
 const SQUASH = squashFactor(CEIL, W);
-const zMax = maxZoomFor(TOTAL, W / DPR);   // 1710.61 on this frame
+const zMax = maxZoomFor(TOTAL, W / DPR);   // 5,131.8 on this frame (M6: the 132 px ceiling; 1,710.6 at 44)
 
 /** Half-span in device px of an arc of `span` verses at `ppvCss` CSS px/verse. */
 const rxOf = (span, ppvCss) => (span * ppvCss * DPR) / 2;
@@ -68,21 +68,24 @@ const oldDeep = (rx, ceilPx) => ({
 });
 
 describe('Z1 — the zoom ceiling is a RELATION, not a constant', () => {
-  it('is 44 CSS px per verse, so phoneLand tops out at 1,711 and not at 4000', () => {
-    expect(PPV_MAX_CSS).toBe(44);
-    expect(maxZoomFor(TOTAL, 800)).toBeCloseTo(1710.61, 2);
-    // The point of the relation: ppv at the ceiling is 44 on EVERY frame.
+  it('is 132 CSS px per verse (M6; received 44), so phoneLand tops out at 5,132 and not at 4000', () => {
+    // 44 was the tap rule's floor; with the true law, slots and the y camera
+    // the ceiling is where a bundle of five reads as five (22 px apart) and
+    // a verse's number sits in its own cell — spine section 10 row 1.
+    expect(PPV_MAX_CSS).toBe(132);
+    expect(maxZoomFor(TOTAL, 800)).toBeCloseTo(5131.83, 2);
+    // The point of the relation: ppv at the ceiling is 132 on EVERY frame.
     for (const widthCss of [360, 375, 800, 1920]) {
-      expect((maxZoomFor(TOTAL, widthCss) * widthCss) / TOTAL).toBeCloseTo(44, 9);
+      expect((maxZoomFor(TOTAL, widthCss) * widthCss) / TOTAL).toBeCloseTo(132, 9);
     }
   });
 
   it('scales with the canon and inversely with the frame', () => {
     expect(maxZoomFor(2 * TOTAL, 800)).toBeCloseTo(2 * maxZoomFor(TOTAL, 800), 6);
     expect(maxZoomFor(TOTAL, 1600)).toBeCloseTo(maxZoomFor(TOTAL, 800) / 2, 6);
-    // design-perf's three frames, from the spec's section 3.
-    expect(maxZoomFor(TOTAL, 375)).toBeCloseTo(3649.3, 1);
-    expect(maxZoomFor(TOTAL, 1920)).toBeCloseTo(712.8, 1);
+    // design-perf's three frames, from the spec's section 3, at 132 (3,649.3 / 712.8 at 44).
+    expect(maxZoomFor(TOTAL, 375)).toBeCloseTo(10947.9, 1);
+    expect(maxZoomFor(TOTAL, 1920)).toBeCloseTo(2138.3, 1);
   });
 
   it('refuses a frame it cannot divide by instead of returning Infinity', () => {
@@ -243,7 +246,7 @@ describe('S2 — no apex smear', () => {
 describe('S3 — tessellation follows the screen, not the arc', () => {
   // segmentsFor(bucketSegments, zoom, rxLo, rxHi, squash, base, width, dpr)
   const HW = 2 * DPR;                       // a 2 CSS px ribbon half width + skirt
-  const rxLong = rxOf(10000, 44);
+  const rxLong = rxOf(10000, PPV_MAX_CSS);  // at the ceiling's own px per verse, whatever it is
 
   it('is the bucket own count at fit, so 1x cannot move', () => {
     expect(segmentsFor(48, 1, 1, 1e9, SQUASH, CEIL, W, DPR)).toBe(48);
@@ -278,7 +281,7 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
   });
 
   it('does not spend the whole cap on an arc 24 px wide', () => {
-    expect(segmentsFor(8, zMax, rxOf(3, 44), rxOf(3, 44), SQUASH, CEIL, W, DPR)).toBeLessThan(24);
+    expect(segmentsFor(8, zMax, rxOf(3, PPV_MAX_CSS), rxOf(3, PPV_MAX_CSS), SQUASH, CEIL, W, DPR)).toBeLessThan(24);
   });
 
   /* The sweep. The two rules above are bounds on ONE arc on ONE frame; this
@@ -359,8 +362,8 @@ describe('S2 inverted — a long thread\'s apex is its OWN height, never a lifte
     ? law.threadShape(rx, SQUASH)
     : law.arcShape(rx, CEIL, SQUASH, law.localizeFactor(zoom), law.spanLogOf(span, TOTAL)));
 
-  it('a 10,000-verse thread at the ceiling reaches 281,600 device px, not 1.15 x ceil, and rises steeper than the old law within 100 CSS px of its foot', () => {
-    const rx = rxOf(10000, 44);
+  it('a 10,000-verse thread at the ceiling reaches 844,800 device px (281,600 at the 44 px ceiling), not 1.15 x ceil, and rises steeper than the old law within 100 CSS px of its foot', () => {
+    const rx = rxOf(10000, PPV_MAX_CSS);
     const { R, A } = shapeAt(rx, zMax, 10000);
     expect(A, 'apex = rx x squash').toBeCloseTo(rx * SQUASH, 6);
     const rise100 = arcHeight(100 * DPR, R, A) / DPR;

@@ -264,3 +264,17 @@ describe('the y gestures (w-sw-phase1, M4)', () => {
     expect(Math.abs(yToHeight(cam, YF, 250) - hBefore)).toBeLessThan(0.01);
   });
 });
+
+describe('a double-tap hands the handler both coordinates (M6: the ruler strip below the baseline has its own meaning)', () => {
+  it('doubleTap(x, y), not doubleTap(x)', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 250 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 250 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 250 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 250 }));
+    expect(handlers.doubleTap).toHaveBeenCalledTimes(1);
+    expect(handlers.doubleTap).toHaveBeenCalledWith(300, 250);
+  });
+});
