@@ -35,7 +35,7 @@ import { ClearProgressRow } from '../components/ClearProgressRow.jsx';
 import { FontPickerRow } from '../components/FontPickerRow.jsx';
 import { READING_FONTS, readingFontById } from '../../utils/reading-fonts.js';
 import {
-  AUDIO_PLAYBACK_RATES, AUDIO_READERS, BIBLE_AUDIO_EDITIONS, normalizeAudioRate,
+  AUDIO_PLAYBACK_RATES, AUDIO_READERS, BIBLE_AUDIO_EDITIONS, bibleAudioOffered, normalizeAudioRate,
 } from '../../utils/audio-track.js';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
@@ -119,6 +119,7 @@ export function setupSettingsGlobals(overrides = {}) {
   put('AUDIO_PLAYBACK_RATES', AUDIO_PLAYBACK_RATES);
   put('AudioLibraryStore', fakeAudioLibrary());
   put('BIBLE_AUDIO_EDITIONS', BIBLE_AUDIO_EDITIONS);
+  put('bibleAudioOffered', bibleAudioOffered);
   put('AUDIO_READERS', AUDIO_READERS);
 
   // Select option tables (index.html globals in the real app).

@@ -41,7 +41,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
-import { bibleAudioEdition, resolveBibleAudio } from '../utils/audio-track.js';
+import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
@@ -439,8 +439,9 @@ export function buildScreenRoutes({
   // Same bridge shape for the desk's Voice chips: switching Bible edition
   // there has to move settings.bibleAudio too, or every Listen pill elsewhere
   // would keep offering the edition the listener just left. Guarded on the
-  // registry so an unknown id can never be persisted.
-  window.__setBibleAudioEdition = (id) => { if (bibleAudioEdition(id)) updateSetting('bibleAudio', id); };
+  // registry so an unknown id can never be persisted, and on bibleAudioOffered
+  // so a hidden one cannot be either (no chip offers it; a tool could).
+  window.__setBibleAudioEdition = (id) => { if (bibleAudioOffered(bibleAudioEdition(id))) updateSetting('bibleAudio', id); };
   // Entering a Listening Library sub-screen chains the origin so backing out
   // lands on the hub, and the hub's own back still returns to Library/Volumes.
   const _enterAudioSub = (destination) => {

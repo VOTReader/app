@@ -9,7 +9,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered } from '../../utils/audio-track.js';
 import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
@@ -103,7 +103,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   const saved = library && typeof library.saved === 'function' ? library.saved() : [];
   const recent = library && typeof library.recent === 'function' ? library.recent() : [];
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];
-  const editions = Object.values(BIBLE_AUDIO_EDITIONS);
+  // Every edition the registry OFFERS — one whose assets are not on the
+  // release is a shelf row that opens onto 404s (bibleAudioOffered).
+  const editions = Object.values(BIBLE_AUDIO_EDITIONS).filter(bibleAudioOffered);
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
