@@ -9,23 +9,21 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
-import {
-  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
-} from '../../utils/scripture-web/geometry.js';
+import { threadShapeGLSL } from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
 
 describe('shader / CPU agreement', () => {
   it('inlines the SHARED curve law rather than restating it', () => {
-    expect(SHADER_SOURCE.vertex).toContain(arcShapeGLSL);
+    expect(SHADER_SOURCE.vertex).toContain(threadShapeGLSL);
   });
 
   it('calls that law for the arc radii, and draws the curve it returns', () => {
-    expect(SHADER_SOURCE.vertex)
-      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog\)/);
+    expect(SHADER_SOURCE.vertex).toMatch(/threadShape\(rx,\s*uSquash\)/);
     // The point and its tangent come from the shared arcAt, not from a
-    // hand-written cos/sin pair beside it.
+    // hand-written cos/sin pair beside it; the parameter from the shared
+    // sampler over the x window's arcTau pair.
     expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*R,\s*A,\s*P,/);
     expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(lo,/);
     expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(hi,/);
@@ -38,10 +36,12 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.fragment).not.toContain('uWidth');
   });
 
-  it('has exactly ONE definition of the softness constant in the vertex stage', () => {
-    // Two occurrences would mean a second, hand-written copy of the law.
-    const hits = SHADER_SOURCE.vertex.split(String(CEIL_SOFTNESS)).length - 1;
-    expect(hits).toBe(1);
+  it('has NO tanh ceiling and no softness constant anywhere in the vertex stage — the morph is gone', () => {
+    // The old case pinned exactly ONE copy of CEIL_SOFTNESS (1.9) so nobody
+    // could hand-write a second law beside the shared one. The true world has
+    // no ceiling to soften; a tanh here would be the morph coming back.
+    expect(SHADER_SOURCE.vertex).not.toContain('tanh');
+    expect(SHADER_SOURCE.vertex.split('1.9').length - 1).toBe(0);
   });
 
   it('inlines the generated colour ramps rather than hardcoding hexes', () => {
@@ -75,108 +75,11 @@ describe('shader shape', () => {
   });
 });
 
-describe('deep-zoom declutter', () => {
-  it('inlines the SHARED fly-over law rather than restating it', () => {
-    // Hand-written here, the fade could reach zero a hair before or after the
-    // picker's copy did, and taps would land on arcs painted at alpha 0 — the
-    // very thing the shared law exists to prevent. Nothing on screen would
-    // look wrong.
-    expect(SHADER_SOURCE.vertex).toContain(flyOverGLSL);
-  });
-
-  it('calls that law for the fly-over fade, in the viewport frame', () => {
-    // uRes.x is device px, the same frame pick.js measures its feet in.
-    expect(SHADER_SOURCE.vertex).toMatch(
-      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uLocalize\);/);
-  });
-
-  /* A RIBBON FADED TO ZERO IS STILL RASTERISED, AND THAT IS THE COST.
-     ─────────────────────────────────────────────────────────────────
-     `dim` reaching 0 makes the arc invisible; it does not make it free. The
-     fragment shader still runs for every pixel of every collapsed ribbon and
-     blends a zero-alpha colour over the frame.
-
-     MEASURED by Design & Performance with EXT_disjoint_timer_query_webgl2
-     around the real draw, medians of 10 frames after 2 warm-ups
-     (scripture-web-3-fill-measure.md). At phone 375@3, zoom 400x the chunk
-     cull already drops 63,418 instances to 18,944 — and of those only a few
-     dozen are visible:
-
-       hw (Radeon 890M)     3.05 ms -> 1.09 ms   (-64 %)
-       sw (SwiftShader)   319.7  ms -> 134.5 ms  (-58 %)
-
-     So roughly two of the three milliseconds in a deep-zoom frame were spent
-     blending ribbons the law defines as invisible. On a phone GPU with a
-     fraction of that fill rate, those two milliseconds are the part of the
-     gesture frame that does not fit in 16 ms.
-
-     Collapsing the vertex outside the clip volume costs one branch and skips
-     the rasteriser entirely. */
-  it('collapses a fly-over that faded to nothing instead of blending it', () => {
-    // Anchored to the multiply, not free-floating: a guard placed BEFORE the
-    // fly-over fade would test the focus dim (floor .05, never 0) and cull
-    // nothing at all, while looking exactly like this one.
-    expect(SHADER_SOURCE.vertex).toMatch(
-      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uLocalize\);\s*(?:\/\/[^\n]*\n\s*)*if \(dim <= 0\.\)/);
-  });
-
-  it('sends the collapsed vertex outside the clip volume and still writes its varyings', () => {
-    const guard = SHADER_SOURCE.vertex.match(/if \(dim <= 0\.\)\s*\{[^}]*\}/);
-    expect(guard).toBeTruthy();
-    const body = guard[0];
-    // Outside NDC on x and y, so the primitive is clipped whole rather than
-    // drawn degenerate somewhere on screen.
-    expect(body).toMatch(/gl_Position\s*=\s*vec4\(2\.,\s*2\.,\s*0\.,\s*1\.\)/);
-    // Varyings still written: an unwritten `out` is undefined behaviour, and
-    // an early return is exactly where that gets forgotten.
-    expect(body).toContain('vCol');
-    expect(body).toContain('vEdge');
-    expect(body).toContain('return');
-  });
-
-  /* ONE PREDICATE, TWO LANGUAGES. pick.js already refuses a tap on anything
-     the law fades to zero (pick.js:87). This makes the shader stop DRAWING
-     exactly that set — no wider, no narrower.
-
-     Wider would be worse than the waste it replaces: culling at, say,
-     `dim <= 0.02` would blank arcs inside the partial-fade band that the
-     picker still hands taps to, and the reader would be tapping a line that
-     is not there. That band (localize 0.55..1, floor .10 -> 0) exists so the
-     fade is gradual; the hard cull may only take the arcs that have arrived
-     at exactly zero. */
-  it('culls exactly the arcs pick.js already refuses — the same zero', () => {
-    // The threshold is a LITERAL zero, not an epsilon standing in for one...
-    const thresholds = [...SHADER_SOURCE.vertex.matchAll(/if \(dim <= ([^)]*)\)/g)].map((m) => m[1].trim());
-    expect(thresholds).toEqual(['0.']);
-    // ...and it is the same literal zero pick.js:87 refuses taps on
-    // (`if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue`),
-    // so draw and pick can never disagree about an arc at zero. BUT THE
-    // FLY-OVER LAW NO LONGER PRODUCES ONE: by owner rule (2026-09-10, "what
-    // you're trying to zoom into and tap disappears as you get closer") a
-    // fly-over settles at FLYOVER_FLOOR and stops. This used to assert
-    // flyOverDim(0, 1) === 0; it now asserts the opposite, at every depth,
-    // through the shared function rather than pick.js's text.
-    for (const loc of [0, 0.55, 0.8, 0.99, 1]) expect(flyOverDim(0, loc)).toBeGreaterThan(0);
-    expect(flyOverDim(0, 1)).toBe(FLYOVER_FLOOR);
-  });
-
-  it('settles fly-over arcs at a VISIBLE floor at full depth — dimmer than an anchored arc, never nothing', () => {
-    /* This case used to demand the floor reach zero, because the tanh ceiling
-       flattens every large apex to one height and at depth hundreds of
-       fly-overs stacked into horizontal smears (the on-device report). The
-       owner then met the other face of that law: the line he was zooming
-       toward vanished as he arrived. Both reports are real. The trade is
-       stated here as a property: the smear is DIMMED (below an anchored arc)
-       and the chased line is NEVER GONE (above zero). The number itself is
-       design-perf's to tune. */
-    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
-    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
-    // The FORMATTED literal, never the raw value: at FLYOVER_FLOOR = 1 the raw
-    // form is `float flyFloor = 1;`, which the compiler rejects (glsl-float.test.js).
-    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
-    expect(flyOverGLSL).not.toContain('smoothstep(.55, 1., localize)');
-  });
-});
+/* 'deep-zoom declutter' — the fly-over fade, its zero-alpha cull and the
+   floor it settled at — is RETIRED with the morph (w-sw-phase1, M1): with
+   every thread at its own height there is nothing overhead to fade. Its
+   inversion is 'the true law in the vertex stage' at the end of this file
+   (no fly-over site, no cull; the y camera positions every vertex). */
 
 describe('modes', () => {
   it('maps its three colour laws to uColorMode 0/1/2 — the screen offers only distance (sw-chrome-trim.test.jsx)', () => {
@@ -257,7 +160,8 @@ describe('the true law in the vertex stage (w-sw-phase1, M1)', () => {
     expect(hits, 'fly-over / localize sites in the vertex stage').toBe(0);
   });
   it('positions every vertex from the y camera: uCamY, and p.y = uBase - (hgt - hOff)', () => {
-    expect(SHADER_SOURCE.vertex).toContain('uniform float uCamY');
+    // declared in the camera's uniform line (uCamX, uPPV, uBase, uSquash, uCamY)
+    expect(SHADER_SOURCE.vertex).toMatch(/uniform float[^;]*\buCamY\b/);
     expect(SHADER_SOURCE.vertex).toMatch(/uBase - \(hgt - hOff\)/);
   });
   it('spends its segments on the visible piece: the shared sampleTau is inlined and called', () => {

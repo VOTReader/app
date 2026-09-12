@@ -53,7 +53,7 @@ function bareInts(glsl) {
   return stripped.match(/\b\d+\b/g) || [];
 }
 
-const TEMPLATES = ['arcShapeGLSL', 'flyOverGLSL'];
+const TEMPLATES = ['threadShapeGLSL'];
 function templateBody(name) {
   const m = SOURCE.match(new RegExp('export const ' + name + ' = `([\\s\\S]*?)`;'));
   if (!m) throw new Error('glsl-float.test: could not find the ' + name + ' template in geometry.js');
@@ -93,17 +93,18 @@ describe('every constant interpolated into the GLSL templates routes through gls
     expect(rawSites('float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*x;')).toEqual(['FAN_FLOOR', '1 - FAN_FLOOR']);
   });
 
-  it('has no raw interpolation in arcShapeGLSL or flyOverGLSL — THIS is the case with teeth today', () => {
+  it('has no raw interpolation in threadShapeGLSL — THIS is the case with teeth today', () => {
     for (const name of TEMPLATES) {
       expect({ template: name, raw: rawSites(templateBody(name)) }).toEqual({ template: name, raw: [] });
     }
   });
 
-  it('is not reading an empty region: the six constants the shaders inline are all seen as sites', () => {
-    const seen = new Set(TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim())));
-    for (const want of ['FAN_FLOOR', '1 - FAN_FLOOR', 'APEX_LIFT', 'CEIL_SOFTNESS', 'FLYOVER_MARGIN', 'FLYOVER_FLOOR']) {
-      expect([...seen]).toContain(want);
-    }
+  it('is not reading an empty region: the constant the shader template inlines is seen as a site, twice', () => {
+    // The true law interpolates ONE constant (SPLIT_MARGIN, at the two sites
+    // where the split strip lifts its bridge above the frame); the six the
+    // morph and the fly-over law carried went with them.
+    const sites = TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim()));
+    expect(sites).toEqual(['SPLIT_MARGIN', 'SPLIT_MARGIN']);
   });
 });
 
@@ -112,8 +113,9 @@ describe('the emitted GLSL carries no bare integer literal', () => {
     expect(bareInts('float f = 1; float g = 2.; float h = 1e-3; float i = .5; vec2 x0;')).toEqual(['1']);
   });
 
-  it('flyOverGLSL and arcShapeGLSL: none — CANNOT FAIL TODAY (every constant carries a fraction); it is the property the routing case above protects, and it goes red the day a whole number is tuned in past the helper', () => {
-    expect(bareInts(geo.flyOverGLSL)).toEqual([]);
-    expect(bareInts(geo.arcShapeGLSL)).toEqual([]);
+  it('threadShapeGLSL: none — and this one CAN fail today: SPLIT_MARGIN is the whole number 2, so a raw `${SPLIT_MARGIN}` would emit `2*hw`', () => {
+    expect(geo.SPLIT_MARGIN).toBe(2);
+    expect(bareInts(geo.threadShapeGLSL)).toEqual([]);
+    expect(geo.threadShapeGLSL).toContain('2.0*hw');
   });
 });

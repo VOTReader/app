@@ -9,10 +9,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
-  localizeFactor, squashFactor, arcDistance,
-  arcShape, arcShapeGLSL, arcHeight, spanLogOf, APEX_LIFT, FAN_FLOOR,
-  arcAnchored, flyOverDim, flyOverGLSL, glslFloat,
+  DEPTH_START, DEPTH_END, MAX_STRETCH,
+  depthMix, squashFactor, arcDistance,
+  threadShape, threadShapeGLSL, arcHeight, sampleTau, SPLIT_MARGIN, glslFloat,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
 } from './geometry.js';
@@ -47,7 +46,7 @@ function makeGraph(pairs) {
 }
 
 const VIEW = (over) => Object.assign({
-  width: 1000, height: 600, base: 520, ceil: 480, localize: 0,
+  width: 1000, height: 600, base: 520, ceil: 480, camY: 0,
   squash: squashFactor(480, 1000), density: 'famous', rulerDepth: 40,
 }, over);
 
@@ -67,31 +66,31 @@ function pointOnArc(g, cam, view, index, t) {
   const x0 = verseToX(cam, view.width, g.from[index]);
   const x1 = verseToX(cam, view.width, g.to[index]);
   const left = Math.min(x0, x1), right = Math.max(x0, x1);
-  const { R, A } = arcShape((x1 - x0) / 2, view.ceil, view.squash, view.localize,
-    spanLogOf(Math.abs(g.to[index] - g.from[index]), g.total));
+  const { R, A } = threadShape((x1 - x0) / 2, view.squash);
   const lo = Math.max(left, 0), hi = Math.min(right, view.width);
   const x = lo + (hi - lo) * t;
-  return [x, view.base - arcHeight(Math.min(x - left, right - x), R, A)];
+  const worldBase = view.base + (view.camY || 0) * cam.ppv * view.squash;
+  return [x, worldBase - arcHeight(Math.min(x - left, right - x), R, A)];
 }
 
-describe('the curve law', () => {
-  // arcShape returns the two radii of the curve that is DRAWN: R, the
-  // horizontal radius of the quarter-ellipse rising from each foot, and A,
-  // its apex. At overview they are (rx, rx * squash) and the curve is exactly
-  // the semi-ellipse this shipped with; localized, R stops following rx and
-  // the apex lifts above the frame so nothing level is left on screen.
-  const A = (rx, ceil, squash, loc, span) => arcShape(rx, ceil, squash, loc, span).A;
+describe('the curve law — the true world', () => {
+  // threadShape returns the two radii of the curve that is DRAWN: R, the
+  // horizontal radius, and A, its apex. They are (rx, rx * squash) at every
+  // zoom: the semi-ellipse this shipped with at the overview is the world,
+  // and the camera moves over it (spine section 1). The morph that once
+  // bounded R by the ceiling and lifted A to 1.15 x ceil at depth is gone.
+  const A = (rx, squash) => threadShape(rx, squash).A;
 
-  it('is a true semicircle at overview (localize 0, squash 1)', () => {
-    expect(A(100, 480, 1, 0, 0.5)).toBeCloseTo(100, 6);
-    expect(A(37.5, 480, 1, 0, 0.5)).toBeCloseTo(37.5, 6);
-    expect(arcShape(100, 480, 1, 0, 0.5).R).toBe(100);
+  it('is a true semicircle at squash 1', () => {
+    expect(A(100, 1)).toBeCloseTo(100, 6);
+    expect(A(37.5, 1)).toBeCloseTo(37.5, 6);
+    expect(threadShape(100, 1).R).toBe(100);
   });
 
   it('applies the squash so the widest arc fits a landscape frame', () => {
     const squash = squashFactor(300, 1000);   // 300 / 500
     expect(squash).toBeCloseTo(0.6, 6);
-    expect(A(500, 300, squash, 0, 0.5)).toBeCloseTo(300, 6);
+    expect(A(500, squash)).toBeCloseTo(300, 6);
   });
 
   it('stretches \u2014 within limits \u2014 so a portrait phone is not left half empty', () => {
@@ -99,67 +98,86 @@ describe('the curve law', () => {
     // An unstretched semicircle would sit in the bottom quarter.
     const tall = squashFactor(2000, 1080);
     expect(tall).toBe(MAX_STRETCH);
-    expect(A(540, 2000, tall, 0, 0.5)).toBeCloseTo(540 * MAX_STRETCH, 6);
+    expect(A(540, tall)).toBeCloseTo(540 * MAX_STRETCH, 6);
     // and it never becomes a noodle
     expect(squashFactor(999999, 1080)).toBe(MAX_STRETCH);
     expect(squashFactor(300, 0)).toBe(1);
   });
 
-  it('lifts the apex ABOVE the frame once localized, and never further', () => {
-    // The old law saturated AT the ceiling, which put every long arc's flat
-    // top on screen at the same height - the apex smear S2 names.
-    for (const rx of [10, 500, 5000, 100000]) {
-      expect(A(rx, 480, 1, 1, 1)).toBeLessThanOrEqual(480 * APEX_LIFT);
+  it('never bounds R by any ceiling and never lifts A: a 1e6 px half-span is a 1e6 px radius', () => {
+    // The old law's R <= ceil and A -> 1.15 x ceil were the squatty-lines fix
+    // AND the reason no camera could follow a long arc; both are gone.
+    expect(threadShape(1e6, 1).R).toBe(1e6);
+    expect(threadShape(1e6, 0.64).A).toBe(640000);
+    expect(threadShape(30, 1).R).toBe(30);
+  });
+
+  it('is monotonic in rx, in both radii, and refuses a negative half-span', () => {
+    let prevA = -1, prevR = -1;
+    for (let rx = 0; rx < 3000; rx += 37) {
+      const sh = threadShape(rx, 0.9);
+      expect(sh.A).toBeGreaterThanOrEqual(prevA);
+      expect(sh.R).toBeGreaterThanOrEqual(prevR);
+      prevA = sh.A; prevR = sh.R;
     }
-    expect(A(1e9, 480, 1, 1, 1)).toBeCloseTo(480 * APEX_LIFT, 3);
-    expect(A(1e9, 480, 1, 1, 1)).toBeGreaterThan(480);
+    expect(threadShape(-5, 1)).toEqual({ R: 0, A: 0 });
   });
 
-  it('bounds the quarter by the ceiling, so a long arc leaves near its foot', () => {
-    // R following rx is the whole of the squatty-lines defect: a 440,000 px
-    // radius near its foot is a horizontal line.
-    expect(arcShape(1e6, 480, 1, 1, 1).R).toBeLessThanOrEqual(480);
-    expect(arcShape(1e6, 480, 1, 1, 0).R).toBeCloseTo(480 * FAN_FLOOR, 6);
-    // A short arc keeps its own radius - there is nothing to bound.
-    expect(arcShape(30, 480, 1, 1, 1).R).toBe(30);
+  it('publishes the same law to the GLSL the shader inlines', () => {
+    expect(threadShapeGLSL).toContain('return vec2(r, r*squash);');
+    expect(threadShapeGLSL).not.toContain('tanh');
+    expect(threadShapeGLSL).not.toContain('localize');
+    // glslFloat, not String: String(2) is '2', an int literal GLSL rejects.
+    expect(threadShapeGLSL).toContain(glslFloat(SPLIT_MARGIN) + '*hw');
   });
+});
 
-  it('stays near-circular for small arcs even when localized', () => {
-    // tanh(x) ~ x for small x, so a short arc is still a proper arch -
-    // this is what makes deep zoom look right instead of flattened.
-    const rx = 5;
-    expect(A(rx, 480, 1, 1, 0.5)).toBeCloseTo(APEX_LIFT * rx / CEIL_SOFTNESS, 2);
+describe('sampleTau — the strip spends its segments on the piece inside the band', () => {
+  // The JS twin of the shader's sampler. A = apex, device px; the band is
+  // [hLo, hHi] above the world baseline; hw the ribbon's half width + skirt;
+  // [txLo, txHi] the x window as parameters (arcTauOf). P = pi.
+  const P = Math.PI;
+  it('a dome inside the band runs the whole curve: tau 0 .. pi', () => {
+    expect(sampleTau(0, 100, P, 0, 500, 2, 0, P)).toBe(0);
+    expect(sampleTau(0.5, 100, P, 0, 500, 2, 0, P)).toBeCloseTo(P / 2, 12);
+    expect(sampleTau(1, 100, P, 0, 500, 2, 0, P)).toBeCloseTo(P, 12);
   });
-
-  it('is monotonic in rx at every localize step, in both radii', () => {
-    for (const loc of [0, 0.25, 0.5, 0.75, 1]) {
-      let prevA = -1, prevR = -1;
-      for (let rx = 0; rx < 3000; rx += 37) {
-        const s = arcShape(rx, 480, 0.9, loc, 0.6);
-        expect(s.A).toBeGreaterThanOrEqual(prevA);
-        expect(s.R).toBeGreaterThanOrEqual(prevR);
-        prevA = s.A; prevR = s.R;
-      }
+  it('a raised band cuts the feet off a dome: the piece starts where the curve crosses the band bottom', () => {
+    const sLo = Math.asin(50 / 100);
+    expect(sampleTau(0, 100, P, 50, 500, 2, 0, P)).toBeCloseTo(sLo, 12);
+    expect(sampleTau(1, 100, P, 50, 500, 2, 0, P)).toBeCloseTo(P - sLo, 12);
+  });
+  it('an apex above the band splits the strip: the first half is the left leg, the second the right, each clipped a little above the frame', () => {
+    const A = 10000, hHi = 500, hw = 2;
+    const top = hHi + SPLIT_MARGIN * hw;
+    const sHi = Math.asin(top / A);
+    expect(sampleTau(0, A, P, 0, hHi, hw, 0, P)).toBe(0);
+    expect(sampleTau(0.4999, A, P, 0, hHi, hw, 0, P)).toBeLessThanOrEqual(sHi);
+    expect(sampleTau(0.5, A, P, 0, hHi, hw, 0, P)).toBeCloseTo(P - sHi, 12);
+    expect(sampleTau(1, A, P, 0, hHi, hw, 0, P)).toBeCloseTo(P, 12);
+    // and nothing between the legs is ever sampled: no tau lands in (sHi, pi - sHi)
+    for (let t = 0; t <= 1; t += 1 / 64) {
+      const tau = sampleTau(t, A, P, 0, hHi, hw, 0, P);
+      expect(tau <= sHi + 1e-12 || tau >= P - sHi - 1e-12, `t ${t} tau ${tau}`).toBe(true);
     }
   });
-
-  it('widens the quarter with the span, monotonically', () => {
-    let prev = -1;
-    for (let spanLog = 0; spanLog <= 1.0001; spanLog += 0.05) {
-      const R = arcShape(1e6, 480, 1, 1, spanLog).R;
-      expect(R).toBeGreaterThanOrEqual(prev);
-      prev = R;
-    }
+  it('a thread entirely below a raised band collapses to nothing (a degenerate strip)', () => {
+    expect(sampleTau(0, 100, P, 200, 500, 2, 0, P)).toBeCloseTo(P / 2, 12);
+    expect(sampleTau(1, 100, P, 200, 500, 2, 0, P)).toBeCloseTo(P / 2, 12);
   });
-
-  it('publishes the same constants to the GLSL the shader inlines', () => {
-    // glslFloat, not String: String(1.0) is '1', an int literal GLSL rejects.
-    expect(arcShapeGLSL).toContain(glslFloat(CEIL_SOFTNESS));
-    expect(arcShapeGLSL).toContain(glslFloat(APEX_LIFT));
-    expect(arcShapeGLSL).toContain(glslFloat(FAN_FLOOR));
-    expect(arcShapeGLSL).toContain('tanh');
-    expect(arcShapeGLSL).toContain('mix(r, deepR, localize)');
-    expect(arcShapeGLSL).toContain('mix(r*squash, deepA, localize)');
+  it('the x window cuts both regimes', () => {
+    expect(sampleTau(0, 100, P, 0, 500, 2, 1, 2)).toBe(1);
+    expect(sampleTau(1, 100, P, 0, 500, 2, 1, 2)).toBe(2);
+    // a leg entirely outside the x window is degenerate (both ends at its own
+    // start, so it draws nothing); the other leg draws
+    const A = 10000, sHi = Math.asin(504 / A);
+    expect(sampleTau(0.25, A, P, 0, 500, 2, 0, sHi)).toBeCloseTo(sHi / 2, 12);
+    expect(sampleTau(0.75, A, P, 0, 500, 2, 0, sHi)).toBeCloseTo(P - sHi, 12);
+    expect(sampleTau(1, A, P, 0, 500, 2, 0, sHi)).toBeCloseTo(P - sHi, 12);
+  });
+  it('is inlined verbatim in the GLSL', () => {
+    expect(threadShapeGLSL).toContain('float sampleTau(float t, float A, float P, float hLo, float hHi, float hw, float txLo, float txHi)');
+    expect(threadShapeGLSL).toContain('bool left = t < .5;');
   });
 });
 
@@ -181,19 +199,19 @@ describe('rotatePointer — the CSS-landscape pointer map', () => {
   });
 });
 
-describe('localizeFactor', () => {
+describe('depthMix — the ink law\'s key, the log ramp the geometry used to share', () => {
   it('is 0 at and below the overview threshold', () => {
-    expect(localizeFactor(1)).toBe(0);
-    expect(localizeFactor(LOCALIZE_START)).toBe(0);
+    expect(depthMix(1)).toBe(0);
+    expect(depthMix(DEPTH_START)).toBe(0);
   });
   it('reaches 1 at the end of the ramp and stays there', () => {
-    expect(localizeFactor(LOCALIZE_END)).toBeCloseTo(1, 6);
-    expect(localizeFactor(5000)).toBe(1);
+    expect(depthMix(DEPTH_END)).toBeCloseTo(1, 6);
+    expect(depthMix(5000)).toBe(1);
   });
   it('rises monotonically across the ramp', () => {
     let prev = -1;
     for (let z = 1; z < 64; z *= 1.2) {
-      const v = localizeFactor(z);
+      const v = depthMix(z);
       expect(v).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
@@ -274,7 +292,7 @@ describe('pickArc agrees with the drawn curve', () => {
   it('finds every arc at every point along it, at overview', () => {
     const cam = createCamera(g.total);
     clampCamera(cam, 1000, 5000);
-    const view = VIEW({ localize: localizeFactor(1) });
+    const view = VIEW();
     for (let i = 0; i < g.count; i++) {
       for (const t of [0.02, 0.15, 0.35, 0.5, 0.65, 0.85, 0.98]) {
         const [px, py] = pointOnArc(g, cam, view, i, t);
@@ -297,13 +315,11 @@ describe('pickArc agrees with the drawn curve', () => {
     }
   });
 
-  it('still finds arcs when zoomed deep, with localize engaged', () => {
+  it('still finds arcs when zoomed deep', () => {
     // Every arc here has a foot on verse 20, which the camera holds at screen
-    // centre — so all four stay ANCHORED however deep the zoom goes, and what
-    // this pins is the tanh ceiling alone. Fly-overs are a separate law: past
-    // localize .55 the shader fades them out, and the picker follows (see
-    // "the fly-over cull is a hit-test law" below), so sampling one here
-    // would only re-test that.
+    // centre — so all four keep a stem on screen however deep the zoom goes,
+    // and what this pins is the true law's stems being where the hit test
+    // looks for them.
     const anchoredGraph = makeGraph([[20, 21], [19, 20], [12, 20], [20, 28]]);
     const cam = createCamera(anchoredGraph.total);
     clampCamera(cam, 1000, 5000);
@@ -311,16 +327,27 @@ describe('pickArc agrees with the drawn curve', () => {
       cam.ppv = fitPPV(cam, 1000) * zoom;
       cam.x = 20;
       clampCamera(cam, 1000, 5000);
-      const view = VIEW({ localize: localizeFactor(zoom) });
+      const view = VIEW();
       let found = 0;
       for (let i = 0; i < anchoredGraph.count; i++) {
-        // Deep in, a foot is the only part of a long arc still on screen, so
-        // sample the near-foot parameters as well as the apex.
-        for (const t of [0.02, 0.25, 0.5, 0.75, 0.98]) {
-          const [px, py] = pointOnArc(anchoredGraph, cam, view, i, t);
+        // Deep in, a stem is the only part of a long arc still on screen — at
+        // 3000x a verse is 75,000 px wide and the piece inside the frame is
+        // the 4 px of leg nearest the foot — so sample the near leg by HEIGHT
+        // (the inverse of arcHeight), not by fractions of the x window.
+        const x0 = verseToX(cam, view.width, anchoredGraph.from[i]);
+        const x1 = verseToX(cam, view.width, anchoredGraph.to[i]);
+        const { R, A } = threadShape((x1 - x0) / 2, view.squash);
+        const footOnScreen = (x0 >= 0 && x0 <= view.width) ? x0 : x1;
+        const sign = footOnScreen === x0 ? 1 : -1;      // the leg rises away from its foot
+        const top = Math.min(A, view.base);
+        for (const f of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+          const h = top * f;
+          const d = R * (1 - Math.sqrt(Math.max(0, 1 - (h / A) * (h / A))));
+          const px = footOnScreen + sign * d;
+          const py = view.base - h;
           if (px < -50 || px > 1050 || py < -50 || py > 650) continue;
           const hit = pickArc(anchoredGraph, cam, view, px, py, 6);
-          expect(hit, `zoom ${zoom} arc ${i} t=${t}`).not.toBeNull();
+          expect(hit, `zoom ${zoom} arc ${i} h=${h.toFixed(1)}`).not.toBeNull();
           found++;
         }
       }
@@ -332,12 +359,16 @@ describe('pickArc agrees with the drawn curve', () => {
     const famous = makeGraph([[6, 33, 7]]);
     const cam = createCamera(famous.total);
     clampCamera(cam, 1000, 5000);
-    for (const localize of [0, localizeFactor(40), 1]) {
-      const view = VIEW({ density: 'famous', localize });
+    for (const zoom of [1, 40, 1711]) {
+      cam.ppv = fitPPV(cam, 1000) * zoom;
+      cam.x = 6;
+      clampCamera(cam, 1000, 5000);
+      const view = VIEW({ density: 'famous' });
       for (const t of [0.08, 0.5, 0.92]) {
         const [px, py] = pointOnArc(famous, cam, view, 0, t);
+        if (py < -50) continue;                  // that piece is above the frame at this zoom
         const hit = pickArc(famous, cam, view, px, py, 6);
-        expect(hit, `Famous arc at localize=${localize}, t=${t}`).toMatchObject({ index: 0 });
+        expect(hit, `Famous arc at zoom=${zoom}, t=${t}`).toMatchObject({ index: 0 });
       }
     }
   });
@@ -385,106 +416,51 @@ describe('pickArc agrees with the drawn curve', () => {
   });
 });
 
-describe('visibility law', () => {
-  // The JS twins of the shader's fly-over lines. GLSL's step(e, x) is
-  // `x >= e ? 1 : 0`, so both margins are inclusive — an arc whose foot sits
-  // EXACTLY on the margin is still drawn, and must therefore still be picked.
-  it('anchors an arc when either foot is inside the frame', () => {
-    expect(arcAnchored(200, 800, 1000)).toBe(1);
-    expect(arcAnchored(-4000, 300, 1000)).toBe(1);
-    expect(arcAnchored(700, 9000, 1000)).toBe(1);
-  });
-
-  it('treats the margin as inclusive, on both edges', () => {
-    expect(FLYOVER_MARGIN).toBe(24);
-    expect(arcAnchored(-24, 9000, 1000)).toBe(1);
-    expect(arcAnchored(-24.001, 9000, 1000)).toBe(0);
-    expect(arcAnchored(-9000, 1024, 1000)).toBe(1);
-    expect(arcAnchored(-9000, 1024.001, 1000)).toBe(0);
-    expect(arcAnchored(-9000, 9000, 1000, 9000)).toBe(1);
-  });
-
-  it('leaves everything painted at overview, however far the feet are', () => {
-    expect(flyOverDim(0, 0)).toBe(1);
-    expect(flyOverDim(1, 0)).toBe(1);
-  });
-
-  it('never dims an anchored arc, at any depth', () => {
-    for (const loc of [0, 0.55, 0.8, 1]) expect(flyOverDim(1, loc)).toBe(1);
-  });
-
-  /* THE OLD CASE HERE ASSERTED THE DEFECT: "fades a fly-over through the floor
-     and reaches EXACTLY zero at depth". That zero is what the owner met --
-     "what you're trying to zoom into and tap disappears as you get closer" --
-     because zooming into a line's middle is exactly what carries both its feet
-     out of the frame. Inverted, not deleted. */
-  it("NEVER fades a fly-over to nothing — the line the reader is zooming toward must not vanish as they arrive", () => {
-    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
-  });
-
-  it('holds every fly-over at or above the named, tappable floor at every depth', () => {
-    for (const loc of [0, 0.3, 0.55, 0.8, 1]) {
-      expect(flyOverDim(0, loc)).toBeGreaterThanOrEqual(FLYOVER_FLOOR);
-    }
-    /* And the floor itself is a value a reader can see and tap, not a token
-       0.10 that reads as "trimmed away" on a thin line over black. */
-    expect(FLYOVER_FLOOR).toBeGreaterThanOrEqual(0.3);
-  });
-
-  it('still dims a fly-over below an anchored arc at depth — the clutter case is kept, weaker', () => {
-    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
-  });
-
-  it('publishes the margin and the floor to the GLSL the shader inlines', () => {
-    // glslFloat spells both: `24.` was right only while the margin stayed whole,
-    // and the raw floor is an int literal the moment it is tuned to 1 (glsl-float.test.js).
-    expect(flyOverGLSL).toContain('float m = ' + glslFloat(FLYOVER_MARGIN) + ';');
-    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
-    expect(flyOverGLSL).toContain('mix(1., mix(flyFloor, 1., anchored), localize)');
-  });
-});
-
-describe('the fly-over cull is a hit-test law, not only a draw law', () => {
-  // At full localize the shader fades an arc with NEITHER foot within 24 device
-  // px of the viewport to alpha 0 — it is not on the screen at all. The picker
-  // used to ignore that, so on the real 63k-arc asset a tap deep in a passage
-  // silently focused a fly-over the reader could not see and spotlit nothing.
-  // A narrow frame with a low ceiling keeps one fly-over's apex on screen at
-  // BOTH localize steps, so the only thing changing between the legs is the cull.
+describe('there is no fly-over law: a thread with a piece on screen is drawn at every depth, so it is picked', () => {
+  // The fly-over dimming law (arcAnchored + flyOverDim, floor 0.35) existed
+  // to hide the level runs the morph put above the frame; under the true
+  // law a thread's body is at its own height and the field at depth is
+  // clean by geometry, so the law and its shader branch are gone (spine
+  // section 1). What replaces it is stronger than "never fades to nothing":
+  // nothing is dimmed at all, and the picker has no visibility test to
+  // agree with.
   const FLY = (over) => Object.assign({
-    width: 400, height: 600, base: 520, ceil: 200, localize: 0,
+    width: 400, height: 600, base: 520, ceil: 200, camY: 0,
     squash: squashFactor(200, 400), density: 'famous', rulerDepth: 40,
   }, over);
-  /** [18,22] flies over the frame (feet at -30 and 430); [20,22] is anchored. */
+  /** [18,22] has both feet off the frame (at -30 and 430); [20,22] has one on it. */
   const g = makeGraph([[18, 22], [20, 22]]);
   const cam = createCamera(g.total);
   cam.ppv = 115;
   clampCamera(cam, 400, 5000);
 
-  it("PICKS the fly-over at its own midpoint at full depth — Corbin's chase, in one arc", () => {
-    /* This case used to assert toBeNull() here: the fly-over faded to nothing,
-       so the picker refused it. That is the owner's defect stated as a
-       property. Zoomed onto the middle of [18,22] until both feet (-30, 430)
-       are outside a 400 px frame, the line is still drawn and still tappable
-       at the point on screen the reader is looking at. */
-    const view = FLY({ localize: 1 });
+  it("PICKS the thread at its own midpoint with both feet off the frame — Corbin's chase, in one arc", () => {
+    const view = FLY();
     const [px, py] = pointOnArc(g, cam, view, 0, 0.5);
     expect(px).toBeGreaterThan(0);
     expect(px).toBeLessThan(view.width);
     expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 0 });
   });
 
-  it('still picks that same arc at overview, where it is painted', () => {
-    const view = FLY({ localize: 0 });
-    const [px, py] = pointOnArc(g, cam, view, 0, 0.5);
-    expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 0 });
-  });
-
-  it('keeps an anchored arc pickable at full localize', () => {
-    // One foot inside the frame is enough — the shader draws it, so we pick it.
-    const view = FLY({ localize: 1 });
+  it('picks the thread with one foot on the frame at the same depth', () => {
+    const view = FLY();
     const [px, py] = pointOnArc(g, cam, view, 1, 0.5);
     expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 1 });
+  });
+
+  it('picks a stem the y camera has raised into view, against the WORLD baseline', () => {
+    // Pan the camera 2 verses up: the feet are now below the frame and the
+    // stems cross it higher. A tap on the stem must measure against the
+    // world baseline (base + camY x ppv x squash), not the frame's row.
+    const view = FLY({ camY: 2 });
+    const [px, py] = pointOnArc(g, cam, view, 1, 0.25);
+    expect(pickArc(g, cam, view, px, py, 6)).toMatchObject({ index: 1 });
+    const wrong = FLY({ camY: 0 });
+    expect(pickArc(g, cam, wrong, px, py, 6), 'the same point read against the frame row').toBeNull();
+  });
+
+  it('carries no fly-over symbol into the shader law', () => {
+    expect(threadShapeGLSL).not.toMatch(/flyOver|arcAnchored|flyFloor/);
   });
 });
 
@@ -613,9 +589,10 @@ describe('decode', () => {
 import * as geoLaw from './geometry.js';
 describe('the true law: a thread is a half-ellipse whose height is its span, at every zoom (w-sw-phase1, M1)', () => {
   const CEIL = 512, SQUASH = 0.64, TOTAL = 31102;      // the phone landscape frame, device px
-  const shapeAt = (rx, zoom, span) => (typeof geoLaw.threadShape === 'function'
-    ? geoLaw.threadShape(rx, SQUASH)
-    : geoLaw.arcShape(rx, CEIL, SQUASH, geoLaw.localizeFactor(zoom), geoLaw.spanLogOf(span, TOTAL)));
+  const law = /** @type {any} */ (geoLaw);        // the base tree's names are not on the tip's type
+  const shapeAt = (rx, zoom, span) => (typeof law.threadShape === 'function'
+    ? law.threadShape(rx, SQUASH)
+    : law.arcShape(rx, CEIL, SQUASH, law.localizeFactor(zoom), law.spanLogOf(span, TOTAL)));
 
   it("at the ceiling a 1,000-verse thread's apex is its own height: 28,160 device px (500 x 88 x 0.64), not 1.15 x ceil", () => {
     const rx = 500 * 88;                                // half of 1,000 verses at 44 CSS px/verse, DPR 2

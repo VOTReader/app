@@ -259,10 +259,11 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
          (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
          nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
          the camera settles on verse 15551 and the feet land at (15548 - 15551) * 44 + 400 = 268
-         and 576 CSS px. On this 800x360 frame (base 260, ceil 256) arcShape gives R 100, A 90:
-         the apex is at y = 260 - 90 = 170 and runs level from x 368 to 476, so the tap goes to
-         the midpoint (422, 170) - measured distance 0.22 px at Famous, nothing at Essential,
-         and it is above the rail band pickChapter owns (y >= 258). */
+         and 576 CSS px. On this 800x360 frame (base 260, ceil 256, squash 0.64) the true law
+         (threadShape, w-sw-phase1 M1) gives R 154, A 98.6: the apex is at (422, 161.4), so the
+         tap at (422, 170) lands 8.6 px under it, inside the 14 px tolerance - a hit at Famous,
+         nothing at Essential, and above the rail band pickChapter owns (y >= 258). Under the
+         morph this read R 100, A 90 with a level run; the tap point did not need to move. */
       const linked = () => Object.assign(graph(), {
         count: 1,
         books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],

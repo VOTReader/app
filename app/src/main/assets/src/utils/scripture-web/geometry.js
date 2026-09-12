@@ -1,48 +1,57 @@
 /* ═══════════════════════════════════════════════════════════════════════
    scripture-web/geometry — Cluster F (esbuild bundle-f.js)
 
-   THE height law, in one place (the camera moved to camera.js and is
-   re-exported below, so every importer of the pair keeps one path).
+   THE law, in one place (the camera lives in camera.js and is re-exported
+   below, so every importer of the pair keeps one path).
 
    The GPU draws each cross-reference as a half-ellipse ribbon and the CPU
    hit-tests the same curve analytically. Those two must agree to the pixel or
    arcs become untappable exactly where they look tappable. So the law lives
    here once, in a form both sides consume: the vertex shader inlines
-   `arcRadiusGLSL` verbatim, and pick.js calls `arcRadiusY`.
+   `threadShapeGLSL` verbatim, and pick.js calls `threadShape`.
 
-   The law itself: at overview an arc is a TRUE semicircle (globally squashed
-   to fit the viewport), which is what gives the canon its dome. As you zoom
-   in, arcs would tower far off-screen, so the radius crosses over to a soft
-   `tanh` ceiling that saturates at the top of the view — every apex stays
-   reachable at every zoom. `localize` (0 at overview → 1 zoomed in) drives
-   the crossover, and the same factor fades arcs merely flying overhead.
+   THE TRUE WORLD (spine section 1, 2026-09-11). A thread from verse a to
+   verse b is the half-ellipse with feet at (a, 0) and (b, 0) and apex height
+   (b - a)/2 in verse units, at EVERY zoom: `R = rx`, `A = rx * squash`, the
+   law this shipped with at the overview and nothing else. The world is
+   fixed; the camera moves over it in two dimensions (camera.js). There is no
+   morph at depth any more -- the tanh ceiling that flattened every long
+   arc's apex to one lifted level run above the frame is what made a vertical
+   camera useless, and the fly-over dimming law that existed to hide those
+   runs has nothing left to dim. Clean at depth comes from geometry: a
+   half-ellipse of radius r is below height y only within y^2/(2r) of a
+   foot, so at the ceiling only the stems of the verses in view are on
+   screen, each at its own height.
 
-   TWO laws live here now, for the same reason. The fly-over fade is the
-   second: at full localize it reaches zero, so an arc with neither foot near
-   the viewport is not on the screen at all, and the picker must agree or it
-   focuses something invisible. `flyOverGLSL` is the shader's copy;
-   `arcAnchored` + `flyOverDim` are pick.js's.
+   What follows from a fixed world is that the SAMPLING has to find the
+   piece on screen: `sampleTau` (JS and GLSL twins) spends a strip's segments
+   on the visible part of the thread -- the dome when the apex is inside the
+   frame's band, the two legs when it is above it -- so a 440,000 px arc at
+   the ceiling draws its 520 px stem with the segments that stem needs.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export * from './camera.js';
 
-/** Ceiling softness: larger = arcs stay circular longer before flattening. */
-export const CEIL_SOFTNESS = 1.9;
-
-/** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
-export const LOCALIZE_START = 6;
-export const LOCALIZE_END = 24;
+/**
+ * Where the ink law crosses from the overview regime (votes on alpha) to the
+ * depth regime (votes on width, one deep alpha divided by crowding): the
+ * crossover starts at 6x and is complete by 24x, on a log ramp. This used to
+ * be the geometry's localize factor as well; the geometry no longer has a
+ * crossover, and this is the INK law's key alone.
+ */
+export const DEPTH_START = 6;
+export const DEPTH_END = 24;
 
 /**
- * How far the semicircle→ceiling crossover has progressed, and how strongly
- * fly-over arcs are faded. 0 at overview, 1 once zoomed well in.
+ * How far the ink law's crossover has progressed. 0 at overview, 1 once
+ * zoomed well in.
  * @param {number} zoom — current scale as a multiple of fit-to-width
  * @returns {number} 0..1
  */
-export function localizeFactor(zoom) {
-  if (!(zoom > LOCALIZE_START)) return 0;
-  const t = (Math.log2(zoom) - Math.log2(LOCALIZE_START)) /
-            (Math.log2(LOCALIZE_END) - Math.log2(LOCALIZE_START));
+export function depthMix(zoom) {
+  if (!(zoom > DEPTH_START)) return 0;
+  const t = (Math.log2(zoom) - Math.log2(DEPTH_START)) /
+            (Math.log2(DEPTH_END) - Math.log2(DEPTH_START));
   return t < 0 ? 0 : t > 1 ? 1 : t;
 }
 
@@ -88,22 +97,6 @@ export function maxZoomFor(total, widthCss) {
 }
 
 /**
- * An arc's span on a log scale against the canon: 0 for a one-verse arc, 1
- * for one spanning the whole canon. The shader computes the same value from
- * aFrom/aTo and uTotal.
- *
- * @param {number} span - |to - from| in verses
- * @param {number} total
- * @returns {number} 0..1
- */
-export function spanLogOf(span, total) {
-  const t = total > 1 ? total : 2;
-  const s = span > 1 ? span : 1;
-  const k = Math.log(s) / Math.log(t);
-  return k < 0 ? 0 : k > 1 ? 1 : k;
-}
-
-/**
  * Alpha every anchored ribbon reaches at the ceiling. The worst Distance stop
  * needs an effective 0.83 on black and 0.85 on parchment to clear WCAG's 3:1
  * non-text floor alone (design-perf, from the ramp and relative luminance).
@@ -111,7 +104,7 @@ export function spanLogOf(span, total) {
 export const ALPHA_DEEP = 0.90;
 
 /**
- * Anchored arcs per CSS px of viewport width at which the deep alpha starts
+ * Visible arcs per CSS px of viewport width at which the deep alpha starts
  * being divided down. 0.20 clamps to 1 at every frame's ceiling (0.157-0.176
  * measured), so D1 is untouched by the exponent whatever it is.
  */
@@ -144,23 +137,26 @@ export const STROKE_MIN_CSS = 1.4;
  * harness could import it, so every instrument re-typed it and would have
  * silently measured the old law against a new screen.
  *
+ * Keyed on zoom directly (depthMix), not on a geometry factor: the ink law
+ * keeps its two regimes and its numbers; the geometry no longer has a
+ * crossover to borrow from.
+ *
  * @param {number} zoom - multiple of fit-to-width
- * @param {number} localize - localizeFactor()
  * @param {boolean} light - parchment theme
- * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
+ * @param {number} visiblePerCssPx - threads with a piece on screen, per CSS px of viewport width
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
+export function ribbonStyle(zoom, light, visiblePerCssPx) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
   const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
   const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
-  const t = smoothstep(0.55, 1, localize);
+  const t = smoothstep(0.55, 1, depthMix(zoom));
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
   // Crowding, not zoom, is what decides whether the deep value washes: at the
-  // ceiling ~0.17 anchored arcs share each CSS px of width and almost nothing
+  // ceiling ~0.17 visible arcs share each CSS px of width and almost nothing
   // overlaps, so each ribbon is drawn alone and needs the full value; at 40x
   // there are thirty times as many and the same value would be a neon fog.
-  const per = anchoredPerCssPx > 0 ? anchoredPerCssPx : 0;
+  const per = visiblePerCssPx > 0 ? visiblePerCssPx : 0;
   const crowd = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
   const deep = ALPHA_DEEP / crowd;
   return {
@@ -168,28 +164,6 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
     strokeWidthCss: strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
     voteMix: t,
   };
-}
-
-/**
- * The piece of an arc worth tessellating, in device px.
- *
- * At overview this is the whole arc, so the 1x frame cannot move. As the
- * reader localizes it closes onto the viewport, because a 440,000 px arc
- * spending 47 of its 48 segments off screen is what draws the visible piece
- * as one straight chord. Clipping changes only WHERE the samples land, never
- * the curve they land on.
- *
- * @param {number} x0 @param {number} x1 - feet, device px
- * @param {number} width - viewport width, device px
- * @param {number} localize - localizeFactor()
- * @returns {[number, number]} the parameter window, device px
- */
-export function visibleWindow(x0, x1, width, localize) {
-  const lo = Math.min(x0, x1);
-  const hi = Math.max(x0, x1);
-  const a = lo + (Math.max(lo, -CLIP_MARGIN) - lo) * localize;
-  const b = hi + (Math.min(hi, width + CLIP_MARGIN) - hi) * localize;
-  return [a, b < a ? a : b];
 }
 
 /** How far outside the viewport the tessellation window still reaches. */
@@ -208,109 +182,118 @@ export const CHORD_TOL_CSS = 0.5;
 export const SEGMENT_TARGET_CSS = 16;
 
 /**
- * Segments to tessellate one draw range with.
+ * Where the bridge between a split strip's two legs is lifted to, in stroke
+ * half-widths above the frame's top edge, so its triangles are clipped and
+ * never rasterised. Two: the ribbon's own half width plus its feather skirt.
+ */
+export const SPLIT_MARGIN = 2;
+
+/**
+ * The DRAWN CURVE of a thread, as two radii: R the horizontal radius, A the
+ * apex height, device px. The true world: R = rx, A = rx * squash, the
+ * half-ellipse this shipped with at the overview, at every zoom.
+ *
+ * @param {number} rx - half the thread's on-screen span, device px
+ * @param {number} squash - squashFactor(), the frame's constant
+ * @returns {{R:number, A:number}}
+ */
+export function threadShape(rx, squash) {
+  const r = rx > 0 ? rx : 0;
+  return { R: r, A: r * (squash > 0 ? squash : 1) };
+}
+
+/**
+ * The parameter this vertex samples, 0 <= t <= 1 along the strip: the
+ * visible piece of the thread, so the segments land where the reader is
+ * looking. Two regimes by the apex against the frame's band [hLo, hHi]
+ * (device px above the world baseline): inside it, one piece from the
+ * band-bottom crossing on the left leg to its mirror on the right; above
+ * it, the two legs, one per half of the strip, each clipped at the top a
+ * little ABOVE the frame (SPLIT_MARGIN half-widths) so the bridge the strip
+ * draws between the halves lies off screen and is never rasterised. Both
+ * regimes are then cut to the x window's parameter range [txLo, txHi].
+ * MUST stay identical to sampleTau in threadShapeGLSL below.
+ *
+ * @param {number} t - 0..1 along the strip
+ * @param {number} A - apex height, device px
+ * @param {number} P - parameter length of the whole curve (pi)
+ * @param {number} hLo @param {number} hHi - the band, device px above the world baseline
+ * @param {number} hw - the ribbon's half width plus skirt, device px
+ * @param {number} txLo @param {number} txHi - the x window as parameters (arcTauOf)
+ * @returns {number} tau
+ */
+export function sampleTau(t, A, P, hLo, hHi, hw, txLo, txHi) {
+  const clamp01 = (v) => (v < 0 ? 0 : (v > 1 ? 1 : v));
+  const sLo = Math.asin(clamp01(hLo / A));
+  if (A <= hHi + SPLIT_MARGIN * hw) {
+    const a0 = Math.max(sLo, txLo);
+    const a1 = Math.max(Math.min(P - sLo, txHi), a0);
+    return a0 + (a1 - a0) * t;
+  }
+  const sHi = Math.asin(clamp01((hHi + SPLIT_MARGIN * hw) / A));
+  const left = t < 0.5;
+  const u = left ? t * 2 : t * 2 - 1;
+  let a0 = left ? sLo : P - sHi;
+  let a1 = left ? sHi : P - sLo;
+  a0 = Math.max(a0, txLo);
+  a1 = Math.max(Math.min(a1, txHi), a0);
+  return a0 + (a1 - a0) * u;
+}
+
+/**
+ * Segments to tessellate one draw group with: the worst member of a bucket
+ * of threads whose half-spans run rxLo..rxHi, at this camera.
+ *
+ * At fit the answer is the asset's own per-bucket count, so the 1x frame
+ * cannot move. Past it, two rules on the VISIBLE piece (sampleTau's):
+ * (1) LENGTH: no on-screen segment longer than the target — the piece's run
+ * is at most its x extent plus its rise (twice, when the apex is above the
+ * frame and both legs draw); (2) CURVATURE: sampling uniformly in the
+ * parameter, a step of dTau strays at most |p''| dTau^2 / 8 from its chord,
+ * and |p''| <= max(R, A), over the parameter range the piece covers. The
+ * worst member is not monotone in rx (a dome whose apex sits at the frame's
+ * top costs the most), so the rule is read at both ends of the bucket and at
+ * that member, and the largest wins. Even, so a split strip halves cleanly.
  *
  * @param {number} bucketSegments - the asset's own per-bucket count
- * @param {number} localize - localizeFactor()
- * @param {number} maxRx - largest half-span in the range, device px
- * @param {number} ceil - usable height above the baseline, device px
+ * @param {number} zoom - multiple of fit-to-width
+ * @param {number} rxLo @param {number} rxHi - the bucket's half-spans, device px
+ * @param {number} squash - squashFactor()
+ * @param {number} base - the frame's baseline row, device px (the band's height at cam.y = 0)
  * @param {number} width - viewport width, device px
  * @param {number} dpr - device pixel ratio, so the target is in CSS px
  * @returns {number}
  */
-export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr) {
-  const base = bucketSegments > 0 ? bucketSegments : 8;
-  if (!(localize > 0)) return base;
+export function segmentsFor(bucketSegments, zoom, rxLo, rxHi, squash, base, width, dpr) {
+  const bs = bucketSegments > 0 ? bucketSegments : 8;
+  if (!(zoom > 1.0001)) return bs;
   const d = dpr > 0 ? dpr : 1;
-  const shape = arcShape(maxRx, ceil, 1, 1, 1);
-  // (1) LENGTH: no on-screen segment longer than the target. The tallest this
-  // range can reach on screen comes from the same apex law the shader draws
-  // with, not from a second estimate of it.
-  const apex = Math.min(ceil, shape.A);
-  const runCss = (Math.min(2 * maxRx, width + 2 * CLIP_MARGIN) + apex) / d;
-  const byLength = Math.ceil(runCss / SEGMENT_TARGET_CSS);
-  // (2) CURVATURE: a short arc is a whole semi-ellipse in half a screen, so it
-  // needs segments the length rule does not ask for. Sampling uniformly in the
-  // parameter, a step of dTau strays at most |p''| dTau^2 / 8 from its chord,
-  // and |p''| <= max(R, A). Measured, not assumed: without this a 2-verse arc
-  // at the ceiling reads 0.835 CSS px of chord error on the 8-segment floor.
+  const sq = squash > 0 ? squash : 1;
   const tol = CHORD_TOL_CSS * d;
-  const maxRA = Math.max(shape.R, shape.A);
-  const flatTau = shape.R > 0
-    ? Math.min(Math.max(0, (2 * maxRx - 2 * shape.R) / shape.R), (width + 2 * CLIP_MARGIN) / shape.R)
-    : 0;
-  const byCurve = Math.ceil((Math.PI + flatTau) * Math.sqrt(maxRA / (8 * tol)));
-  const want = byLength > byCurve ? byLength : byCurve;
-  const capped = want < 8 ? 8 : (want > SEGMENT_CAP ? SEGMENT_CAP : want);
-  const n = Math.round(base + (capped - base) * localize);
-  return n < 8 ? 8 : n;
-}
-/**
- * How far above the frame a long arc's apex sits. Above 1 by design: an arc
- * whose level run is ON screen is the apex smear the tanh ceiling produced.
- */
-export const APEX_LIFT = 1.15;
-
-/**
- * Narrowest quarter, as a share of the ceiling. The quarter widens with the
- * arc's span, so the seven arcs leaving one verse leave at seven different
- * angles instead of fanning across a few pixels.
- */
-export const FAN_FLOOR = 0.25;
-
-/**
- * The DRAWN CURVE of an arc, as two radii.
- *
- * One family covers both regimes, so there is no branch anywhere that has to
- * agree with another branch. The curve is:
- *
- *   d = distance in x from the nearer foot
- *   u = 1 - clamp(d / R, 0, 1)          (1 at a foot, 0 once R px in)
- *   height = A * sqrt(1 - u*u)
- *
- * With R = rx and A = the old arcRadiusY that is EXACTLY today's half-ellipse
- * of radii (rx, ry): at the left foot d = x - x0 so u = (cx - x)/rx, and
- * u*u is the ellipse's (x - cx)^2 / rx^2 term. Nothing about the overview
- * picture moves. With R < rx the middle of the arc runs LEVEL at height A
- * between the two quarter-ellipses, which is what lets a long arc leave the
- * frame near its foot instead of creeping across it.
- *
- * @param {number} rx - half the arc's on-screen span, device px
- * @param {number} ceil - usable height above the baseline, device px
- * @param {number} squash - squashFactor()
- * @param {number} localize - localizeFactor()
- * @param {number} spanLog - spanLogOf(): how long this arc is, 0..1
- * @returns {{R:number, A:number}} horizontal quarter radius and apex height
- */
-export function arcShape(rx, ceil, squash, localize, spanLog) {
-  const r = rx > 0 ? rx : 0;
-  const c = ceil > 0 ? ceil : 1;
-  const k = FAN_FLOOR + (1 - FAN_FLOOR) * (spanLog > 0 ? (spanLog < 1 ? spanLog : 1) : 0);
-  const deepR = Math.min(r, c * k);
-  const deepA = APEX_LIFT * c * Math.tanh(r / (c * CEIL_SOFTNESS));
-  return {
-    R: r + (deepR - r) * localize,
-    A: r * squash + (deepA - r * squash) * localize,
+  const need = (rx) => {
+    const { R, A } = threadShape(rx, sq);
+    const split = A > base;
+    const up = Math.min(A, base);
+    const reach = R - Math.sqrt(Math.max(0, R * R - (up / sq) * (up / sq)));
+    const across = split ? 2 * reach : Math.min(2 * R, width + 2 * CLIP_MARGIN);
+    const runCss = (across + (split ? 2 : 1) * up) / d;
+    const byLength = Math.ceil(runCss / SEGMENT_TARGET_CSS);
+    const tauVisible = split ? 2 * Math.asin(Math.min(1, base / A)) : Math.PI;
+    const byCurve = Math.ceil(tauVisible * Math.sqrt(Math.max(R, A) / (8 * tol)));
+    return byLength > byCurve ? byLength : byCurve;
   };
-}
-
-/**
- * Parameter length of the whole curve: a quarter at each foot (pi/2 each)
- * plus the level run between them, measured in units of R so the run is
- * sampled at the same speed as the quarter's top.
- *
- * @param {number} rx - half the arc's span, device px
- * @param {number} R - quarter radius from arcShape()
- */
-export function arcParamLength(rx, R) {
-  const r = rx > 0 ? rx : 0;
-  return Math.PI + (R > 0 ? Math.max(0, (2 * r - 2 * R) / R) : 0);
+  const lo = rxLo > 0 ? rxLo : 0;
+  const hi = rxHi > lo ? rxHi : lo;
+  const atTop = Math.min(Math.max(base / sq, lo), hi);
+  const want = Math.max(need(lo), need(hi), need(atTop), 8);
+  const even = want + (want & 1);
+  return even > SEGMENT_CAP ? SEGMENT_CAP : even;
 }
 
 /**
  * Parameter at a given x - the inverse of arcPointAt, so a caller can clip
  * the parameter range to the part of the arc that is on screen.
- * MUST stay identical to arcTau in arcShapeGLSL below.
+ * MUST stay identical to arcTau in threadShapeGLSL below.
  */
 export function arcTauOf(x, left, right, R, P) {
   if (!(R > 0)) return 0;
@@ -322,7 +305,7 @@ export function arcTauOf(x, left, right, R, P) {
 
 /**
  * The point on the curve at parameter tau, and the tangent the ribbon offsets
- * along. MUST stay identical to arcAt in arcShapeGLSL below.
+ * along. MUST stay identical to arcAt in threadShapeGLSL below.
  *
  * @returns {{x:number, h:number, tx:number, ty:number}} x, height above the
  *   baseline, and the tangent (which points BACKWARDS along tau, matching the
@@ -366,22 +349,19 @@ export function glslFloat(n) {
 }
 
 /**
- * The same two laws as GLSL ES 3.00, for the vertex shader to inline. Kept
- * beside their JS originals so the pair can never drift apart unnoticed;
- * web-renderer.test.js asserts the shader contains this text verbatim.
+ * The law as GLSL ES 3.00, for the vertex shader to inline. Kept beside its
+ * JS originals so the pair can never drift apart unnoticed; web-renderer
+ * .test.js asserts the shader contains this text verbatim.
  *
- * arcTau inverts x -> parameter, so the shader can spend its segments on the
- * piece of the arc that is ON SCREEN. arcAt is the curve and its tangent.
+ * threadShape is the curve's two radii; arcTau inverts x -> parameter and
+ * arcAt is the curve and its tangent; sampleTau spends the strip's segments
+ * on the piece that is on screen.
  */
-export const arcShapeGLSL = `
+export const threadShapeGLSL = `
 const float ARC_HALF = 1.5707963;
-vec2 arcShape(float rx, float ceil, float squash, float localize, float spanLog){
+vec2 threadShape(float rx, float squash){
   float r = max(rx, 0.);
-  float c = max(ceil, 1.);
-  float k = ${glslFloat(FAN_FLOOR)} + ${glslFloat(1 - FAN_FLOOR)}*clamp(spanLog, 0., 1.);
-  float deepR = min(r, c*k);
-  float deepA = ${glslFloat(APEX_LIFT)}*c*tanh(r/(c*${glslFloat(CEIL_SOFTNESS)}));
-  return vec2(mix(r, deepR, localize), mix(r*squash, deepA, localize));
+  return vec2(r, r*squash);
 }
 float arcTau(float x, float left, float right, float R, float P){
   if (R <= 0.) return 0.;
@@ -402,6 +382,22 @@ void arcAt(float tau, float left, float right, float R, float A, float P,
     x = left + R + (tau - ARC_HALF)*R;  h = A;
     tg = vec2(-R, 0.);
   }
+}
+float sampleTau(float t, float A, float P, float hLo, float hHi, float hw, float txLo, float txHi){
+  float sLo = asin(clamp(hLo/A, 0., 1.));
+  if (A <= hHi + ${glslFloat(SPLIT_MARGIN)}*hw) {
+    float a0 = max(sLo, txLo);
+    float a1 = max(min(P - sLo, txHi), a0);
+    return mix(a0, a1, t);
+  }
+  float sHi = asin(clamp((hHi + ${glslFloat(SPLIT_MARGIN)}*hw)/A, 0., 1.));
+  bool left = t < .5;
+  float u = left ? t*2. : t*2. - 1.;
+  float a0 = left ? sLo : P - sHi;
+  float a1 = left ? sHi : P - sLo;
+  a0 = max(a0, txLo);
+  a1 = max(min(a1, txHi), a0);
+  return mix(a0, a1, u);
 }`;
 /**
  * Height of the drawn curve above the baseline, `d` px in from the nearer
@@ -409,8 +405,8 @@ void arcAt(float tau, float left, float right, float R, float A, float P,
  * the vertex shader draws it.
  *
  * @param {number} d - distance in x from the nearer foot, device px
- * @param {number} R - quarter radius from arcShape()
- * @param {number} A - apex height from arcShape()
+ * @param {number} R - horizontal radius from threadShape()
+ * @param {number} A - apex height from threadShape()
  */
 export function arcHeight(d, R, A) {
   if (!(R > 0) || !(A > 0)) return 0;
@@ -418,87 +414,13 @@ export function arcHeight(d, R, A) {
   const u = 1 - s;
   return A * Math.sqrt(1 - u * u);
 }
-/**
- * How far outside the viewport a foot may sit and still count as anchoring
- * its arc to the passage on screen. Device px, matching uRes.x's frame.
- */
-export const FLYOVER_MARGIN = 24;
 
-/**
- * The alpha a fly-over settles at once the reader has localized. NEVER ZERO.
- *
- * It used to fall from 0.10 to exactly 0 at full depth, so that hundreds of
- * long arcs' flattened apexes stopped smearing the view -- and the owner met
- * the other face of that law: "what you're trying to zoom into and tap
- * disappears as you get closer" (2026-09-10). Zooming into a line's middle is
- * exactly what carries both its feet out of the frame, so the line being
- * chased became a fly-over and vanished on arrival. The owner's rule: a line
- * crossing the viewport must not vanish as zoom increases.
- *
- * 0.35 is a first setting, not a measured optimum: visibly present and
- * tappable on a thin line over black, still clearly below an anchored arc so
- * the clutter case survives in a weaker form. design-perf tunes it with the
- * S-metrics they already hold. The literal rule ("never decrease with zoom")
- * is satisfiable only by deleting fly-over dimming altogether, because zoom is
- * what turns an anchored arc into a fly-over; this keeps the dimming and bans
- * the disappearance.
- */
-export const FLYOVER_FLOOR = 0.35;
-
-/**
- * 1 when either foot of an arc is within `margin` of the viewport, else 0.
- * An exact JS mirror of the shader's `step()` pair — GLSL's step(e, x) is
- * `x >= e ? 1 : 0`, so both edges are inclusive here too.
- *
- * @param {number} x0 — left foot, device px
- * @param {number} x1 — right foot, device px
- * @param {number} width — viewport width, device px (the shader's uRes.x)
- * @param {number} [margin]
- * @returns {0|1}
- */
-export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
-  const near = (x) => (x >= -margin && x <= width + margin ? 1 : 0);
-  return /** @type {0|1} */ (Math.max(near(x0), near(x1)));
-}
-
-/**
- * The alpha multiplier the shader applies to a fly-over: 1 while the reader
- * is at overview, falling to FLYOVER_FLOOR as they localize, and NO FURTHER.
- * It no longer reaches 0 -- see FLYOVER_FLOOR for why -- so the shader's
- * `dim <= 0` cull is never fed by this law, and every fly-over stays
- * pickable at its on-screen midpoint.
- *
- * MUST stay identical to flyOverGLSL below and to the shader that inlines it.
- *
- * @param {number} anchored — arcAnchored(), 0 or 1
- * @param {number} localize — localizeFactor()
- */
-export function flyOverDim(anchored, localize) {
-  const floored = FLYOVER_FLOOR + (1 - FLYOVER_FLOOR) * anchored;
-  return 1 + (floored - 1) * localize;
-}
-
-/** GLSL's smoothstep, for the two laws that must mirror the shader exactly. */
+/** GLSL's smoothstep, for the ink law that mirrors the shader exactly. */
 function smoothstep(e0, e1, x) {
   let t = (x - e0) / (e1 - e0);
   t = t < 0 ? 0 : t > 1 ? 1 : t;
   return t * t * (3 - 2 * t);
 }
-
-/**
- * The same two functions as GLSL ES 3.00, for the vertex shader to inline.
- * Kept beside their JS twins so the pair can never drift apart unnoticed.
- */
-export const flyOverGLSL = `
-float arcAnchored(float x0, float x1, float width){
-  float m = ${glslFloat(FLYOVER_MARGIN)};
-  return max(step(-m, x0)*step(x0, width + m),
-             step(-m, x1)*step(x1, width + m));
-}
-float flyOverDim(float anchored, float localize){
-  float flyFloor = ${glslFloat(FLYOVER_FLOOR)};
-  return mix(1., mix(flyFloor, 1., anchored), localize);
-}`;
 
 /**
  * Distance in device px from a point to an arc, or Infinity if the point is
@@ -517,8 +439,8 @@ float flyOverDim(float anchored, float localize){
  * @param {number} px @param {number} py - query point, device px, y down
  * @param {number} x0 @param {number} x1 - arc endpoints on the baseline
  * @param {number} base - baseline y, device px
- * @param {number} R - quarter radius from arcShape()
- * @param {number} A - apex height from arcShape()
+ * @param {number} R - horizontal radius from threadShape()
+ * @param {number} A - apex height from threadShape()
  * @param {number} tol - hit tolerance, device px
  */
 export function arcDistance(px, py, x0, x1, base, R, A, tol) {

@@ -11,17 +11,18 @@
    the visible set is always far smaller than that because the density prefix
    and the bucket loop bound it.
 
-   The one invariant that matters: this must use the SAME laws the vertex
-   shader draws with. There are TWO of them, and geometry.js owns both.
-   Height (geometry.arcShape) — or arcs become untappable exactly where
-   they look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
-   the reverse: at full localize an arc with neither foot near the viewport
-   paints alpha 0, and picking it silently focuses a line nobody can see.
-   Visible equals pickable, in both directions.
+   The one invariant that matters: this must use the SAME law the vertex
+   shader draws with, and geometry.js owns it: threadShape, the true world
+   (a thread's height is its span, at every zoom) — or arcs become
+   untappable exactly where they look tappable. The camera has a y: the
+   frame's baseline row sits camY verses above the world's, so the hit test
+   measures against the world baseline (view.base + camY·ppv·squash).
+   There is no fly-over law any more: every thread with a piece inside the
+   frame is drawn at full dim, so visible equals pickable by construction.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, spanLogOf, flyOverDim, verseToX, xToVerse,
+  arcDistance, threadShape, verseToX, xToVerse,
 } from './geometry.js';
 import { bucketDrawCount } from './decode.js';
 
@@ -31,7 +32,7 @@ import { bucketDrawCount } from './decode.js';
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
- *   localize:number, density:import('./decode.js').Density,
+ *   camY?:number, density:import('./decode.js').Density,
  *   rulerDepth?:number}} view
  * @param {number} px
  * @param {number} py
@@ -49,7 +50,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
- *   localize:number, density:import('./decode.js').Density}} view
+ *   camY?:number, density:import('./decode.js').Density}} view
  * @param {number} px
  * @param {number} py
  * @param {number} tol
@@ -57,9 +58,12 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
-  const { width, base, ceil, squash, localize, density } = view;
+  const { width, base, squash, density } = view;
   const half = width / 2;
   const camX = cam.x, ppv = cam.ppv;
+  // The world baseline, device px: below the frame's baseline row by the
+  // camera's height — the same `uBase - (hgt - hOff)` the shader positions with.
+  const worldBase = base + (view.camY || 0) * ppv * squash;
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   const verseAtPoint = xToVerse(cam, width, px);
@@ -80,14 +84,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         const x1 = (g.to[i] - camX) * ppv + half;
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
-        // Pickable iff painted. `width` is device px — the shader's uRes.x
-        // frame — so this is the fly-over fade the GPU applies, evaluated
-        // exactly. Only a full zero is skipped: an arc still showing the
-        // partial fly-over floor is dim, but it is there to be tapped.
-        if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
-        const shape = arcShape((x1 - x0) * 0.5, ceil, squash, localize,
-          spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total));
-        const d = arcDistance(px, py, x0, x1, base, shape.R, shape.A, tol);
+        const shape = threadShape((x1 - x0) * 0.5, squash);
+        const d = arcDistance(px, py, x0, x1, worldBase, shape.R, shape.A, tol);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
         while (at > 0 && best[at - 1].distance > d) at--;
@@ -102,13 +100,27 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
 }
 
 /**
+ * How far outside the viewport a foot may sit and still count as anchoring
+ * its arc to the passage on screen, device px. The crowding count below is
+ * the last reader of this rule; the index (phase 1, M2) replaces it with the
+ * exact visible set and deletes both.
+ */
+const FOOT_MARGIN = 24;
+
+/** 1 when either foot of an arc is within FOOT_MARGIN of the viewport, else 0. */
+function footNear(x0, x1, width) {
+  const near = (x) => (x >= -FOOT_MARGIN && x <= width + FOOT_MARGIN ? 1 : 0);
+  return Math.max(near(x0), near(x1));
+}
+
+/**
  * How many DRAWN arcs are anchored to the passage on screen.
  *
  * Not `stats.instances`, which counts what was submitted to the GPU: chunk
  * extents overlapping the viewport, 18,944 on desktop at the ceiling against
  * the 336 that actually paint — 50x off the population the eye sees. This
- * applies the shader's own arcAnchored law to the same instances the shader
- * draws, so the style law is fed the number a reader is looking at.
+ * counts a foot within FOOT_MARGIN of the frame over the same instances the
+ * shader draws, so the style law is fed the number a reader is looking at.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
@@ -124,7 +136,7 @@ export function countAnchored(g, cam, width, density) {
     for (let i = bucket.off; i < end; i++) {
       const x0 = (g.from[i] - camX) * ppv + half;
       const x1 = (g.to[i] - camX) * ppv + half;
-      if (arcAnchored(x0, x1, width)) n++;
+      if (footNear(x0, x1, width)) n++;
     }
   }
   return n;

@@ -23,7 +23,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
+  depthMix, squashFactor, MAX_STRETCH, rotatePointer,
   maxZoomFor, ribbonStyle,
 } from '../../utils/scripture-web/geometry.js';
 import {
@@ -79,8 +79,9 @@ const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
 /**
  * Anchored arcs per CSS px of viewport width, which is what decides whether
  * the deep alpha reads as one clear ribbon or as fog. Counted over the drawn
- * set with the shader's own arcAnchored law, cached until the camera moves
- * more than 5 % - 64k pairs is under a millisecond but not per frame.
+ * set as a foot within 24 px of the frame (pick.countAnchored), cached until
+ * the camera moves more than 5 % - 64k pairs is under a millisecond but not
+ * per frame. The index (phase 1, M2) replaces this with the exact visible set.
  */
 function anchoredDensity(cache, g, cam, v, density) {
   const moved = cache.W !== v.W || cache.density !== density
@@ -371,7 +372,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return {
       width: v.W, height: v.H, base: f.base, ceil: f.ceil,
       squash: squashFactor(f.ceil, v.W),
-      localize: localizeFactor(cam.ppv / fitPPV(cam, v.W)),
+      // The camera's two axes, for the shader and the picker alike: camY is
+      // the frame's baseline row in world verses above the world's baseline
+      // (0 until the y gestures land; the law and the hit test already read it).
+      camY: cam.y || 0,
+      zoom: cam.ppv / fitPPV(cam, v.W),
       density, rulerDepth: f.ruler,
     };
   }, [density, frame]);
@@ -487,10 +492,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     // The alpha and stroke law lives in geometry.js, not here: it used to be
     // written inline where no harness could import it, so every probe re-typed
-    // it and would have measured the old law against a new screen.
-    const perCssPx = base.localize > 0
+    // it and would have measured the old law against a new screen. Keyed on
+    // zoom (depthMix) — the geometry has no crossover any more.
+    const perCssPx = depthMix(zoom) > 0
       ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
-    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
+    const style = ribbonStyle(zoom, chrome.isLight, perCssPx);
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,

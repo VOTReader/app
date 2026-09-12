@@ -17,15 +17,17 @@
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
-   Neither the height law nor the fly-over cull is written here. Both are
-   imported from utils/scripture-web/geometry.js as GLSL and inlined, because
-   the CPU hit test applies the same two laws — if either drifts, arcs stop
-   being tappable where they look tappable, or start being tappable where
-   nothing is drawn. Tests assert this shader contains them.
+   The law is not written here. It is imported from
+   utils/scripture-web/geometry.js as GLSL and inlined, because the CPU hit
+   test applies the same law — if it drifts, arcs stop being tappable where
+   they look tappable. Tests assert this shader contains it. The world is
+   fixed (a thread's height is its span) and the camera has two axes: uCamX
+   and uCamY place the frame over it, and sampleTau spends each strip's
+   segments on the piece of the thread that is inside the frame's band.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
+  threadShapeGLSL, segmentsFor, CLIP_MARGIN,
   STROKE_MIN_CSS, STROKE_DEEP_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
@@ -36,31 +38,10 @@ export const COLOR_MODES = ['distance', 'testament', 'genre'];
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
 
-// The zero-alpha cull in VERT's main(), on the line marked `zero-alpha cull`.
-//
-// A zero dim is not drawn. flyOverDim can no longer produce one (FLYOVER_FLOOR
-// is never 0, by owner rule), so this cull is kept for any OTHER zero the law
-// is ever handed, and is not the fly-over law's exit any more.
-// (Original rationale follows.) Once flyOverDim has faded an arc to zero, STOP DRAWING IT. Alpha 0 still costs a full
-// rasterise and blend of every pixel of the ribbon. Measured with
-// EXT_disjoint_timer_query_webgl2 on the real asset (Design & Performance,
-// scripture-web-3-fill-measure.md): phone 375@3 at zoom 400x, 3.05 -> 1.09 ms on a
-// Radeon 890M (-64 %) and 319.7 -> 134.5 ms on SwiftShader (-58 %). The chunk cull already
-// dropped 63,418 instances to 18,944 there; only a few dozen of those are visible, and the
-// rest were being blended for nothing.
-//
-// The threshold is EXACTLY the zero pick.js refuses taps on (pick.js:87), not an epsilon
-// near it. Culling any wider would blank arcs inside the partial fade band that are still
-// tappable, and the reader would be tapping a line that is not on the screen.
-//
-// This lives out here, not beside the line, because a template literal ships its comments
-// verbatim: inside the shader these twelve lines were 821 B of the 917 B that put bundle-f
-// over its byte ceiling. esbuild strips them here and the shipped shader is unchanged.
-
 const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
-uniform float uCamX, uPPV, uBase, uCeil, uSquash, uLocalize;
+uniform float uCamX, uPPV, uBase, uSquash, uCamY;
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
@@ -70,8 +51,7 @@ uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 out vec4 vCol; out float vEdge; out float vHalfW;
-${arcShapeGLSL}
-${flyOverGLSL}
+${threadShapeGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -81,41 +61,41 @@ void main(){
   float cx = x0 + rx;
   float r = max(rx, 0.);
   float left = cx - r, right = cx + r;
-  float spanLog = log(max(abs(b - a), 1.))/log(max(uTotal, 2.));
-  vec2 sh = arcShape(rx, uCeil, uSquash, uLocalize, spanLog);
+  vec2 sh = threadShape(rx, uSquash);
   float R = sh.x, A = sh.y;
-  // Parameter length: a quarter at each foot plus the level run between them,
-  // measured in units of R so the run is sampled at the quarter's own speed.
-  float P = 3.14159265 + (R > 0. ? max(0., (2.*r - 2.*R)/R) : 0.);
+  float P = 3.14159265;
 
-  // The piece worth tessellating. At overview this is the whole arc, so the 1x
-  // frame cannot move; as the reader localizes it closes onto the viewport,
-  // because a 440,000 px arc spending 47 of its 48 segments off screen is what
-  // draws the visible piece as one straight chord. Clipping moves only WHERE
-  // the samples land — never the curve they land on. geometry.visibleWindow.
+  // The frame's band, device px above the WORLD baseline: the camera's height
+  // at the baseline row, up to the canvas's top edge.
+  float hOff = uCamY*uPPV*uSquash;
+  float hLo = hOff, hHi = hOff + uBase;
+
+  // The x window: a 440,000 px arc spending 47 of its 48 segments off screen
+  // is what draws the visible piece as one straight chord, so the parameter
+  // range is cut to the viewport (plus a margin). At fit every foot is inside
+  // the frame and the window is the whole arc, so the 1x frame cannot move.
   float m = ${CLIP_MARGIN}.;
-  float lo = mix(left,  max(left,  -m),         uLocalize);
-  float hi = mix(right, min(right, uRes.x + m), uLocalize);
-  hi = max(hi, lo);
+  float lo = max(left, -m);
+  float hi = max(min(right, uRes.x + m), lo);
+  float txLo = arcTau(lo, left, right, R, P), txHi = arcTau(hi, left, right, R, P);
 
-  // Ribbon: two vertices per segment step, offset along the curve normal.
-  int vid = gl_VertexID;
-  float t = float(vid >> 1) / uSegments;
-  float side = float(vid & 1)*2. - 1.;
-  float tau = mix(arcTau(lo, left, right, R, P), arcTau(hi, left, right, R, P), t);
-  float px, hgt; vec2 tgv;
-  arcAt(tau, left, right, R, A, P, px, hgt, tgv);
-  vec2 p = vec2(px, uBase - hgt);
-  vec2 tg = normalize(tgv + vec2(1e-6, 0.));
-
-  // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
-  // votes can no longer ride on alpha; they drive WIDTH instead. uVoteMix is
-  // the same fly-over crossover the cull uses, so there is never a zoom where
-  // an arc is culled under one law and styled under another.
+  // At depth every ribbon needs the full alpha to clear 3:1 alone, so votes
+  // can no longer ride on alpha; they drive WIDTH instead.
   float strength = clamp(aVotes/70., .30, 1.);
   float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
   float hw = halfW + 1.0;                        // +1px feather skirt
+
+  // Ribbon: two vertices per segment step, offset along the curve normal, the
+  // parameter spent on the piece inside the band (geometry.sampleTau).
+  int vid = gl_VertexID;
+  float t = float(vid >> 1) / uSegments;
+  float side = float(vid & 1)*2. - 1.;
+  float tau = sampleTau(t, A, P, hLo, hHi, hw, txLo, txHi);
+  float px, hgt; vec2 tgv;
+  arcAt(tau, left, right, R, A, P, px, hgt, tgv);
+  vec2 p = vec2(px, uBase - (hgt - hOff));
+  vec2 tg = normalize(tgv + vec2(1e-6, 0.));
   p += vec2(-tg.y, tg.x)*side*hw;
 
   float id = float(gl_InstanceID) + uInstanceBase;
@@ -130,17 +110,6 @@ void main(){
   float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
   float dim = mix(1., mix(.05, 1., lit), focusing);
   float bright = max(spot, hovered);
-
-  // Semantic zoom: once the reader is inside a passage, arcs merely passing
-  // overhead recede so the local weave is legible instead of fogged. At FULL
-  // depth they are culled outright — the tanh ceiling flattens every big
-  // arc's apex to the same height, so hundreds of fly-overs otherwise stack
-  // into horizontal smears across the view (the on-device report).
-  // The law lives in geometry.js, inlined above, because pick.js applies the
-  // same test — an arc faded to nothing here must not win a tap there.
-  dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
-  // zero-alpha cull: why, and why exactly zero, above this shader
-  if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
   vec3 col;
   if (uColorMode < .5) {
@@ -228,24 +197,26 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.useProgram(program);
 
   const U = {};
-  for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uCeil', 'uSquash',
-    'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
+  for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uSquash',
+    'uCamY', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
-  // Widest arc in each bucket, once. Tessellation is chosen per draw from the
-  // camera, and a bucket of 3-verse arcs must not be given 96 segments because
-  // a bucket of 10,000-verse ones needs them.
-  const bucketMaxSpan = graph.buckets.map((b) => {
-    let m = 0;
+  // Narrowest and widest arc in each bucket, once. Tessellation is chosen per
+  // draw from the camera, and a bucket of 3-verse arcs must not be given 96
+  // segments because a bucket of 10,000-verse ones needs them — nor the other
+  // way round: the member whose apex sits at the frame's top costs the most.
+  const bucketSpan = graph.buckets.map((b) => {
+    let lo = Infinity, hi = 0;
     const end = b.off + b.len;
     for (let i = b.off; i < end; i++) {
       const s = Math.abs(graph.to[i] - graph.from[i]);
-      if (s > m) m = s;
+      if (s > hi) hi = s;
+      if (s < lo) lo = s;
     }
-    return m;
+    return [lo === Infinity ? 0 : lo, hi];
   });
 
   // Per-instance genre of the earlier endpoint — precomputed once so the
@@ -340,7 +311,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     /**
      * Draw one frame.
      * @param {{width:number, height:number, base:number, ceil:number,
-     *   squash:number, localize:number, camX:number, ppv:number,
+     *   squash:number, camX:number, camY?:number, ppv:number, zoom?:number,
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
@@ -364,9 +335,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uCamX, v.camX);
       gl.uniform1f(U.uPPV, v.ppv);
       gl.uniform1f(U.uBase, v.base);
-      gl.uniform1f(U.uCeil, v.ceil);
       gl.uniform1f(U.uSquash, v.squash);
-      gl.uniform1f(U.uLocalize, v.localize);
+      gl.uniform1f(U.uCamY, v.camY || 0);
       gl.uniform1f(U.uWidth, v.strokeWidth);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
@@ -390,8 +360,9 @@ export function createRenderer(canvas, graph, opts = {}) {
         const count = bucketDrawCount(bucket, v.density);
         if (count <= 0) continue;
         // Segments from what this bucket can put ON SCREEN, not from its span.
-        const segments = segmentsFor(bucket.segments, v.localize,
-          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1);
+        const segments = segmentsFor(bucket.segments, v.zoom || 1,
+          bucketSpan[bi][0] * v.ppv * 0.5, bucketSpan[bi][1] * v.ppv * 0.5,
+          v.squash, v.base, v.width, v.dpr || 1);
         gl.uniform1f(U.uSegments, segments);
         const verts = 2 * (segments + 1);
         // Walk chunks, coalescing adjacent visible ones into single draws.
