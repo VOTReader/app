@@ -158,6 +158,31 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
      "Genesis 2 · Chapter 2". The label is still the data every consumer parses
      — only the echo is suppressed, and only when the title already ends with
      that number (2026-08-10). */
+  /* w-audio-continue (2026-09-11): the player continues into the next collection by itself, so the reader
+     is told rather than surprised — for the FIRST track after a crossing the title reads
+     "<collection> · <reading>", computed from the previous queue item's sub; every other track keeps its
+     plain title (the sub line names the collection on all of them). Independent of the page follower. */
+  it('names the collection in the title for the first track after a crossing, and nowhere else', () => {
+    globalThis.COLLECTIONS = [
+      { volKey: 'vol1', cardId: 'v1', label: 'Volume One' },
+      { volKey: 'vol2', cardId: 'v2', label: 'Volume Two' },
+    ];
+    globalThis.COL_BY_KEY = new Map(globalThis.COLLECTIONS.map((c) => [c.volKey, c]));
+    globalThis.colPreface = () => null;
+    globalThis.colLetterArr = (col) => (col.volKey === 'vol1' ? ITEMS : [{ id: 'solo', title: 'Solo Letter' }]);
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol2:solo': [['idSolo', 'M']] };
+    try {
+      render(<AudioPlayerBar />);
+      // Letter C is vol1's last recording: the queue already carries Volume Two behind it.
+      drive(() => AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-c' }));
+      expect(title()).toBe('The Seventh Day');                       // inside a collection: the plain title
+      emit('ended');                                                   // the seam
+      expect(title()).toBe('Volume Two · Solo Letter');                // the first track after the crossing
+      expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume Two · Mark');
+    } finally {
+      delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
+    }
+  });
   it('prints a Bible chapter ONCE — the title already carries the number', () => {
     globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
     globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
