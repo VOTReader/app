@@ -13,7 +13,8 @@
    pressed one (aria-pressed, the gold fill) is where the reader IS, and each
    segment names a VIEW — never an action like Show or Hide — and keeps the glyph
    the old pill drew for it (lines, pen, circle-slash; app.css sizes .mode-btn svg
-   and lifts its opacity on the pressed one). Tapping a view while
+   and lifts its opacity on the pressed one; aria-hidden, so a screen reader hears the
+   label and never an unlabelled image before it). Tapping a view while
    the notes are hidden turns them on in that view; Off hides them; tapping the
    pressed segment does nothing.
 
@@ -38,7 +39,7 @@ export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
       onClick={() => pick(id)}
       title={title}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">{glyph}</svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" focusable="false">{glyph}</svg>
       {label}
     </button>
   );
