@@ -47,16 +47,19 @@ export function isChromeTarget(target) {
  * @param {{
  *   loc: (e: PointerEvent) => {x:number, y:number},
  *   dpr: () => number,
- *   cam: () => {x:number, ppv:number, total:number},
- *   camFor?: (yDevice:number) => {x:number, ppv:number, total:number},
+ *   cam: () => {x:number, y?:number, ppv:number, total:number},
+ *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
  *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
- *   clampCamera: (cam:object, width:number, maxZoom:number) => void,
- *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number) => void,
+ *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
+ *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number, y?:number, yf?:object) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
+ *   yFrame?: (cam:object) => ({base:number, squash:number, apexMax:number}|null),
+ *   yToHeight?: (cam:object, yf:object, sy:number) => number,
+ *   camYForHeight?: (yf:object, ppv:number, sy:number, h:number) => number,
  * }} deps
  * @returns {() => void} detach
  */
@@ -67,6 +70,11 @@ export function attachWebGestures(el, deps) {
   // below); a surface without it (the canon web) has one camera for all.
   const camAt = (yCss) => (deps.camFor ? deps.camFor(yCss * dpr()) : cam());
   const zoomCap = (c) => maxZoom(c);
+  // The y axis (M4): the frame a camera moves its y inside — {base, squash,
+  // apexMax} for the scripture camera, null for a My Web rail, whose y stays
+  // where it is. A finger moving DOWN shows what is higher, as a page does:
+  // sy = base - (h - y)·k, so y' = y + dy/k with k = ppv·squash.
+  const yFrameOf = (c) => (deps.yFrame ? deps.yFrame(c) : null);
   const pointers = new Map();
   let drag = null, pinch = null, moved = false, lastTap = 0;
 
@@ -87,13 +95,16 @@ export function attachWebGestures(el, deps) {
     if (pointers.size === 2) {
       const [p, q] = Array.from(pointers.values());
       const mid = (p.x + q.x) / 2;
-      const pc = camAt((p.y + q.y) / 2);
+      const midY = (p.y + q.y) / 2;
+      const pc = camAt(midY);
+      const yf = yFrameOf(pc);
       pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, cam: pc,
-                mid, verse: xToVerse(pc, view().W, mid * dpr()) };
+                mid, verse: xToVerse(pc, view().W, mid * dpr()),
+                midY, height: yf ? deps.yToHeight(pc, yf, midY * dpr()) : null };
       drag = null;
     } else {
       const dc = camAt(pt.y);
-      drag = { x: pt.x, y: pt.y, camx: dc.x, cam: dc };
+      drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc };
     }
   };
   const move = (e) => {
@@ -102,11 +113,14 @@ export function attachWebGestures(el, deps) {
     const W = view().W;
     if (pinch && pointers.size === 2) {
       const c = pinch.cam;
+      const yf = yFrameOf(c);
       const [p, q] = Array.from(pointers.values());
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
-      clampCamera(c, W, zoomCap(c));
+      clampCamera(c, W, zoomCap(c), yf);
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
-      clampCamera(c, W, zoomCap(c));
+      // the height under the fingers' midpoint holds, as its verse does
+      if (yf && pinch.height != null) c.y = deps.camYForHeight(yf, c.ppv, pinch.midY * dpr(), pinch.height);
+      clampCamera(c, W, zoomCap(c), yf);
       moved = true; if (deps.live) deps.live(); schedule(); return;
     }
     if (drag) {
@@ -122,7 +136,9 @@ export function attachWebGestures(el, deps) {
       // between the rails is likewise a gesture and not a tap.
       if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
-      clampCamera(c, W, zoomCap(c));
+      const yf = yFrameOf(c);
+      if (yf) c.y = drag.camy + (pt.y - drag.y) * dpr() / (c.ppv * yf.squash);
+      clampCamera(c, W, zoomCap(c), yf);
       if (deps.live) deps.live(); schedule(); return;
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
@@ -154,7 +170,9 @@ export function attachWebGestures(el, deps) {
     e.preventDefault();
     const pt = loc(e), W = view().W;
     const c = camAt(pt.y);
-    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c));
+    const yf = yFrameOf(c);
+    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c),
+      yf ? pt.y * dpr() : undefined, yf || undefined);
     if (deps.live) deps.live();
     schedule();
   };

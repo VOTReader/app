@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { attachWebGestures, SW_CHROME_SELECTOR, isChromeTarget } from './gestures.js';
-import { createCamera, clampCamera, zoomAbout, xToVerse, yToHeight } from '../../utils/scripture-web/geometry.js';
+import { createCamera, clampCamera, zoomAbout, xToVerse, yToHeight, camYForHeight } from '../../utils/scripture-web/geometry.js';
 
 /** `.sw-root` containing one of every chrome surface the selector lists. */
 function makeDom() {
@@ -204,7 +204,7 @@ describe('the y gestures (w-sw-phase1, M4)', () => {
       loc: (e) => ({ x: e.clientX, y: e.clientY }),
       dpr: () => view.DPR, cam: () => cam, view: () => view,
       handlers: () => handlers, schedule: vi.fn(), maxZoom: () => 4000,
-      clampCamera, zoomAbout, xToVerse, yToHeight,
+      clampCamera, zoomAbout, xToVerse, yToHeight, camYForHeight,
       yFrame: () => YF,
     });
     return { detach, cam, view, handlers };

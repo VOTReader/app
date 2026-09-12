@@ -44,6 +44,16 @@ export function yToHeight(cam, yf, sy) {
   return cam.y + (yf.base - sy) / (cam.ppv * yf.squash);
 }
 
+/**
+ * The camera y that puts world height `h` (verses) at screen row `sy` — the
+ * inverse of yToHeight, the one place it is written: a zoom or a pinch holds
+ * a height under the pointer by setting cam.y to this after the ppv moves.
+ * @param {YFrame} yf @param {number} ppv @param {number} sy @param {number} h
+ */
+export function camYForHeight(yf, ppv, sy, h) {
+  return h - (yf.base - sy) / (ppv * yf.squash);
+}
+
 /** How much world height the frame shows above the baseline row, verse units. */
 export function bandHeight(cam, yf) {
   return yf.base / (cam.ppv * yf.squash);
@@ -141,6 +151,6 @@ export function zoomAbout(cam, width, anchorX, factor, maxZoom, anchorY, yf) {
   cam.ppv *= factor;
   clampCamera(cam, width, maxZoom, yf);
   cam.x = verse - (anchorX - width / 2) / cam.ppv;
-  if (height != null) cam.y = height - (yf.base - anchorY) / (cam.ppv * yf.squash);
+  if (height != null) cam.y = camYForHeight(yf, cam.ppv, anchorY, height);
   return clampCamera(cam, width, maxZoom, yf);
 }

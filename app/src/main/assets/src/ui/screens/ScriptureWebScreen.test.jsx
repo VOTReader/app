@@ -259,7 +259,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(Number(camY(container))).toBe(0);
   });
 
-  it('M4: a resize that doubles the frame\'s height re-clamps y, so a shrunk world cannot leave the camera above its ceiling', async () => {
+  it('M4: a resize that doubles the frame\'s WIDTH re-clamps y, so a grown band cannot leave the camera above its ceiling', async () => {
     const { container } = await mount({}, tall);
     for (let i = 0; i < 40; i++) await press('+');
     // 1.108 verses a press: 5,000 presses reach the ceiling (4,990.8) with room to spare
@@ -267,8 +267,10 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const top = Number(camY(container));
     expect(top, 'held at the world\'s ceiling: apexMax 5,000 less the band').toBeGreaterThan(4000);
-    // the frame grows to 720 CSS px tall: the band doubles and the ceiling drops
-    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', { configurable: true, get() { return 720; } });
+    // The frame grows to 1,600 CSS px WIDE: the band (W / (2 · ppv · 0.985) verses, since the
+    // dome's squash scales with the frame) doubles from 9.23 to 18.5 verses and the ceiling
+    // drops from 4,990.8 to 4,981.5. A taller frame changes nothing — the dome fills it.
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', { configurable: true, get() { return 1600; } });
     await act(async () => { window.dispatchEvent(new Event('resize')); await new Promise((r) => setTimeout(r, 40)); });
     const after = Number(camY(container));
     expect(after).toBeLessThan(top);
@@ -279,7 +281,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     const CALLS = [];
     const fake2d = () => new Proxy({}, {
       get(_t, prop) {
-        if (prop === 'measureText') return (s) => ({ width: 20 });
+        if (prop === 'measureText') return () => ({ width: 20 });
         if (prop === 'canvas') return null;
         return (...a) => { CALLS.push([String(prop), ...a]); };
       },

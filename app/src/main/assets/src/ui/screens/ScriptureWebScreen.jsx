@@ -24,7 +24,7 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   depthMix, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, worldRect,
+  maxZoomFor, ribbonStyle, worldRect, yToHeight, camYForHeight, bandHeight,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
@@ -457,6 +457,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return maxZoomOf(graph, v);
   }, [graph]);
 
+  /** The tallest apex in the world, verses: the y camera's ceiling. Read off
+   * the index's runs once per graph (an empty graph has no height). */
+  const apexMax = React.useMemo(() => {
+    if (!graph || !graph.count) return 0;
+    let hi = 0;
+    for (const run of indexOf(graph).runs) if (run.spanHi > hi) hi = run.spanHi;
+    return hi / 2;
+  }, [graph]);
+
+  /** The frame the scripture camera moves its y inside — {base, squash,
+   * apexMax}; null for a My Web rail, whose y stays at the baseline. Absence
+   * is the signal: clampCamera without a frame holds y at 0. */
+  const yFrameFor = React.useCallback((c) => {
+    if (modeRef.current === 'personal' || !c || c !== camRef.current) return null;
+    const v = viewRef.current;
+    const f = frame();
+    return { base: f.base, squash: squashFactor(f.ceil, v.W), apexMax };
+  }, [frame, apexMax]);
+
   /** The camera under a device-px y: above the gap's midline the Volumes
    * rail, below it the Bible rail; the canon web has one camera for all. */
   const camFor = React.useCallback((yDevice) => {
@@ -478,7 +497,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     /* The zoom's own input, published for the browser walks (the same line the
        scripture-web walk branch carries, so the two merge as one): a walk that
        reads pixels after "three zoom steps" must first know the steps took. */
-    if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+    if (wrapRef.current) {
+      wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+      // the camera's height, world verses — a rounded witness is a quantisation trap, so 4 significant figures
+      wrapRef.current.setAttribute('data-cam-y', (cam.y || 0).toPrecision(4));
+    }
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
     if (wrapRef.current && camV) wrapRef.current.setAttribute('data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
@@ -608,7 +631,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       glc.height = uic.height = H;
       const cam = camRef.current;
       if (!(cam.ppv > 0)) cam.ppv = fitPPV(cam, W);
-      clampCamera(cam, W, maxZoomOf(graph, viewRef.current));
+      // with the y frame: a frame that grew cannot leave y above the new ceiling
+      clampCamera(cam, W, maxZoomOf(graph, viewRef.current), yFrameFor(cam));
       schedule();
     };
     resize();
@@ -625,7 +649,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [graph, schedule, glRetry]);
+  }, [graph, schedule, glRetry, yFrameFor]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
@@ -655,8 +679,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current, live,
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
+      yFrame: yFrameFor, yToHeight, camYForHeight,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
@@ -868,6 +893,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam) return;
     cam.ppv = fitPPV(cam, v.W);
     cam.x = cam.total / 2;
+    cam.y = 0;
     clampCamera(cam, v.W, maxZoomOf(graph, v));
     if (camVRef.current) resetRail('top');
     focusRef.current = { arc: -1, range: null };
@@ -894,15 +920,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam || !v.W) return;
     const step = (v.W / cam.ppv) * 0.12;
     const ceiling = zoomCapFor(cam);
+    const yf = yFrameFor(cam);
     let atCeiling = false;
     if (e.key === 'ArrowLeft') { cam.x -= step; }
     else if (e.key === 'ArrowRight') { cam.x += step; }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      // 0.12 of the band a press, like the x keys; a rail has no height
+      if (!yf) return;
+      cam.y = (cam.y || 0) + (e.key === 'ArrowUp' ? 1 : -1) * 0.12 * bandHeight(cam, yf);
+    }
     else if (e.key === '+' || e.key === '=') {
+      // about the frame's centre column at the camera's own height: a key
+      // has no pointer to hold a height under, and holding the frame's
+      // middle would fly the reader into the sky (measured: 3,068 verses up
+      // after forty presses from fit)
       const before = cam.ppv;
-      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling);
+      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, undefined, yf || undefined);
       atCeiling = cam.ppv === before;
     }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling); }
+    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, undefined, yf || undefined); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
       // The notice is an overlay like the five below and goes first for the
@@ -920,13 +956,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     } else return;
     e.preventDefault();
-    clampCamera(cam, v.W, ceiling);
+    clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
-      emptyShown, dismissEmpty, zoomCapFor]);
+      emptyShown, dismissEmpty, zoomCapFor, yFrameFor]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
@@ -1140,6 +1176,8 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
   ctx.lineWidth = DPR;
   ctx.beginPath(); ctx.moveTo(0, base + 1.5 * DPR); ctx.lineTo(W, base + 1.5 * DPR); ctx.stroke();
 
+  drawSpanGauge(ctx, cam, view, DPR, chrome, ink);
+
   // chapter numerals in the middle zoom band
   if (cam.ppv > 2.4 * DPR && cam.ppv <= 30 * DPR) {
     ctx.font = chrome.fsRuler * DPR + 'px Georgia,serif';
@@ -1155,6 +1193,40 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
 
   // book names + separators
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
+}
+
+/** The spans the gauge ticks, verses: a thread of span s peaks at height s / 2. */
+const GAUGE_SPANS = [100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+
+/**
+ * The span gauge (M4): how high the camera is, drawn only when it has left
+ * the baseline. A hairline 14 CSS px in from the left edge, a tick and a
+ * label wherever a "nice" span's apex falls inside the frame, and at the
+ * foot of the line the span whose apex is the frame's own bottom edge
+ * (2 x cam.y) — so the reader always has one number. Legend, not control:
+ * on the UI canvas with the book rail, under the hidden chrome like it.
+ */
+function drawSpanGauge(ctx, cam, view, DPR, chrome, ink) {
+  const camY = view.camY || 0;
+  if (!(camY > 0)) return;
+  const base = view.base, k = cam.ppv * view.squash;
+  const x = 14 * DPR;
+  const label = (n) => Math.round(n).toLocaleString('en-US') + ' verses';
+  ctx.strokeStyle = 'rgba(' + ink + ',0.35)';
+  ctx.lineWidth = DPR;
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, base); ctx.stroke();
+  ctx.font = chrome.fsRuler * DPR + 'px Georgia,serif';
+  ctx.fillStyle = 'rgba(' + ink + ',0.62)';
+  ctx.textAlign = 'left';
+  for (const s of GAUGE_SPANS) {
+    const sy = base - (s / 2 - camY) * k;
+    if (sy < 12 * DPR || sy > base - 12 * DPR) continue;
+    ctx.fillRect(x - 3 * DPR, sy - 0.5 * DPR, 7 * DPR, DPR);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label(s), x + 7 * DPR, sy);
+  }
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(label(2 * camY), x + 7 * DPR, base - 3 * DPR);
 }
 
 /**
