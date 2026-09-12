@@ -1,82 +1,55 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ModeToggle — Cluster D (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════
+   The "Study Notes" control on the Matthew Study Bible: PDF | Inline | Off.
+
+   THREE SEGMENTS, ALWAYS ON SCREEN, ONE PRESSED (Corbin, 2026-09-11, via the
+   Orchestrator). This used to be one button whose label was the CURRENT mode
+   — it read "PDF" while you were in PDF mode and tapping it took you to
+   Inline; hidden, it collapsed to a single "Show". On a touch screen there is
+   no tooltip to explain that, and the 17:5x audit found it the one either-or
+   control in the app that shows one label. Now the control is the same grammar
+   the Scripture Web's "Scripture | My web" pair uses: every view is named, the
+   pressed one (aria-pressed, the gold fill) is where the reader IS, and each
+   segment names a VIEW — never an action like Show or Hide. Tapping a view while
+   the notes are hidden turns them on in that view; Off hides them; tapping the
+   pressed segment does nothing.
+
+   `mode` ('pdf' | 'inline') and `showStudy` are per-tab fields (hooks/use-tabs)
+   — the two callbacks write them; this component holds no state of its own.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
-  // The pill floats over scripture with no context — without this caption a
+  const isPdf = mode === 'pdf';
+  const current = !showStudy ? 'off' : (isPdf ? 'pdf' : 'inline');
+  const pick = (next) => {
+    if (next === current) return;
+    if (next === 'off') { onShowStudyChange(false); return; }
+    if (!showStudy) onShowStudyChange(true);
+    if (next !== (isPdf ? 'pdf' : 'inline')) onChange(next);
+  };
+  const seg = (id, label, title) => (
+    <button
+      type="button"
+      className={'mode-btn' + (current === id ? ' active' : '')}
+      aria-pressed={current === id}
+      onClick={() => pick(id)}
+      title={title}
+    >{label}</button>
+  );
+  // The caption floats over scripture with no other context — without it a
   // first-time reader can't tell what "PDF / Inline / Off" applies to
-  // (tooltips don't exist on touch).
-  const caption = <div className="mode-toggle-label">Study Notes</div>;
-  if (!showStudy) {
-    return (
-      <div className="mode-toggle-wrap">
-        {caption}
-        <div className="mode-toggle">
-          <button
-            className="mode-btn active"
-            onClick={() => onShowStudyChange(true)}
-            title="Show study notes, references, and further reading"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-            {"Show"}
-          </button>
-        </div>
-      </div>
-    );
-
-  }
-  const isPdf = mode === "pdf";
+  // (tooltips don't exist on touch). It labels the group for a screen reader too.
   return (
     <div className="mode-toggle-wrap">
-      {caption}
-      <div className="mode-toggle">
-        <button
-          className="mode-btn active"
-          onClick={() => onChange(isPdf ? "inline" : "pdf")}
-          title={isPdf ? "PDF Mode — tap to switch to Inline" : "Inline Mode — tap to switch to PDF"}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            {isPdf ? <path d="M2 6h20M2 12h20M2 18h12" /> : <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />}
-          </svg>
-          {isPdf ? "PDF" : "Inline"}
-        </button>
+      <div className="mode-toggle-label" id="mode-toggle-caption">Study Notes</div>
+      <div className="mode-toggle" role="group" aria-labelledby="mode-toggle-caption">
+        {seg('pdf', 'PDF', 'Study notes as the PDF page')}
         <div className="mode-divider" />
-        <button
-          className="mode-btn"
-          onClick={() => onShowStudyChange(false)}
-          title="Hide study notes, references, and further reading"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <circle cx="12" cy="12" r="9" />
-            <line x1="4.5" y1="4.5" x2="19.5" y2="19.5" />
-          </svg>
-          {"Off"}
-        </button>
+        {seg('inline', 'Inline', 'Study notes in the text')}
+        <div className="mode-divider" />
+        {seg('off', 'Off', 'No study notes, references, or further reading')}
       </div>
     </div>
   );
-
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   INLINE NOTES COMPONENT
-═══════════════════════════════════════════════════════════════ */
-// Commentary cites (non-lookup scripture notes) may embed inline refs like
-// "(Matthew 11:14)". Detect Book-Ch:Vs patterns and style them gold.
-export function renderCommentaryCite(text) {
-  if (!text) return text;
-  // Matches "Matthew 11:14", "1 John 2:15-17", "Psalm 22:1", etc.
-  const rx = /\b((?:[123]\s)?[A-Z][a-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:[-,\s\d]+)?)\b/g;
-  const parts = [];
-  let last = 0,m;
-  while ((m = rx.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(<span key={m.index} className="inline-scrip-ref">{m[0]}</span>);
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length ? parts : text;
 }
