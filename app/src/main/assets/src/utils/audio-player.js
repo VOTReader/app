@@ -531,6 +531,8 @@ function _ensureEl() {
   // Both the listen-count bridge and the position map read PRE-advance state,
   // so they run in this slot, before next() moves qi.
   el.addEventListener('ended', () => {
+    // An 'ended' always belongs to queue[qi]: a src swap fires 'emptied', never 'ended', so no url
+    // guard is needed here — and none would work, el.src being the RESOLVED absolute URL.
     const finished = _state.queue[_state.qi];
     _notifyListened();
     // A recording heard to its end has no place to return to. Drop the record,
@@ -788,6 +790,14 @@ function _start() {
     _toast(LOAD_FAIL_MSG);
     return;
   }
+  // THE QUEUE IS THE SITE ORDER, ONE UNIT AHEAD (w-audio-continue, 2026-09-11). Crossing into
+  // another collection moves the descriptor FIRST — the desk and the boot snapshot describe THIS
+  // track's collection, and a restart rebuilds around it (the rebuild reads r.volKey, not a saved
+  // queue). Then a unit's LAST track appends the next unit, here and not later: _maybePrefetchNext
+  // reads queue[qi+1 ..] from the first timeupdate after this returns, so the boundary track is
+  // warmed during this track instead of played cold at the seam.
+  _crossInto(track);
+  if (_state.qi === _state.queue.length - 1) _extendQueue();
   const el = _ensureEl();
   _clearStallWatchdog();
   // The preference store hydrates independently in bundle-b. Pull its latest
@@ -2056,8 +2066,104 @@ function toggle() {
   if (p && typeof p.catch === 'function') p.catch(() => {});
 }
 
+/* ── the site order (w-audio-continue, 2026-09-11) ──────────────────────────
+   A reader who pressed Listen once never touches the phone again: a spent collection continues
+   into the next one in catalogue order (COLLECTIONS, the Home cards' order — only entries WITH a
+   card; Hidden Manna has none and is never entered uninvited), a spent Bible book into the next
+   book of the same edition (BIBLE_AUDIO_BOOKS order); a carded collection with no recordings is
+   passed over; the order ENDS at its last unit — no wrap. There is no switch on this: Pause is
+   the off switch, and a setting nobody asked for is a setting to explain, test and maintain (the
+   Orchestrator, 2026-09-11). Everything here is synchronous — the registries are in memory
+   whenever anything from them is playing — so the seam stays inside the 'ended' task on the one
+   element, which is what carries the Listen tap's activation across every boundary. Screen
+   following is NOT this module's business: hooks/use-audio-follow.js watches the unit boundary.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/** volKey of a "volKey:id" track key, or '' (range-compilation sections carry no key). */
+function _volKeyOf(key) {
+  if (typeof key !== 'string') return '';
+  const at = key.indexOf(':');
+  return at > 0 ? key.slice(0, at) : '';
+}
+
 /**
- * Advance one track; stop() at the end of the queue. Also the 'ended' handler.
+ * A track from another collection is starting: the descriptor follows it, with the horizon
+ * cleared (the start key belonged to the collection being left). Bible books share one volKey
+ * per edition, so a book boundary changes nothing here — the snapshot's `key` names the book.
+ *
+ * @param {Track} track
+ * @returns {void}
+ */
+function _crossInto(track) {
+  if (!_source || _source.mode !== 'collection') return;
+  const volKey = _volKeyOf(track.key);
+  if (!volKey || volKey === _source.volKey) return;
+  _setSource({ mode: 'collection', volKey, label: track.sub || null, startKey: null, startReader: null, startPartIndex: 0 });
+}
+
+/**
+ * The carded collections after `volKey` in site order, each with its items — the same items a
+ * hero Listen would queue (_collectionItems: preface first, then the letters).
+ *
+ * @param {string} volKey
+ * @returns {{ volKey: string, label: string | null, items: any[] }[]}
+ */
+function _collectionsAfter(volKey) {
+  const cols = Array.isArray(_g().COLLECTIONS) ? _g().COLLECTIONS : [];
+  const at = cols.findIndex((c) => c && c.volKey === volKey);
+  if (at < 0) return [];
+  return cols.slice(at + 1)
+    .filter((c) => c && c.cardId)
+    .map((c) => ({ volKey: c.volKey, label: c.label || null, items: _collectionItems(c.volKey) || [] }));
+}
+
+/**
+ * The books after `bookId` that this edition recorded, in canonical order, as one-item units.
+ *
+ * @param {string} volKey
+ * @param {string} bookId
+ * @returns {{ volKey: string, label: string | null, items: any[] }[]}
+ */
+function _booksAfter(volKey, bookId) {
+  const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
+  const at = books.findIndex((b) => Array.isArray(b) && b[0] === bookId);
+  if (at < 0) return [];
+  const m = _mapFor(volKey);
+  const label = _source ? _source.label : null;
+  return books.slice(at + 1)
+    .filter((b) => ((m && m[volKey + ':' + b[0]]) || []).length > 0)
+    .map((b) => ({ volKey, label, items: [{ id: b[0], title: b[1] }] }));
+}
+
+/**
+ * Append the next unit of the site order to the queue. False when there is none — a queue that
+ * is not a collection (a section run, a saved track, a lone letter with no registry), a key-less
+ * last track, or the end of the order. Idempotent: refusing twice is the designed path at the end.
+ *
+ * @returns {boolean}
+ */
+function _extendQueue() {
+  if (!_source || _source.mode !== 'collection') return false;
+  const last = _state.queue[_state.queue.length - 1];
+  const volKey = last ? _volKeyOf(last.key) : '';
+  if (!volKey) return false;
+  const units = _isBibleVol(volKey)
+    ? _booksAfter(volKey, /** @type {string} */ (last.key).slice(volKey.length + 1))
+    : _collectionsAfter(volKey);
+  for (const unit of units) {
+    /** @type {Track[]} */
+    const tracks = [];
+    for (const item of unit.items) for (const t of _tracksFor(unit.volKey, item, unit.label)) tracks.push(t);
+    if (!tracks.length) continue;   // carded, but nothing recorded yet — pass over it
+    _state.queue = _state.queue.concat(tracks);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Advance one track; extend into the next unit of the site order at the end of the queue, and
+ * stop() only at the end of the order. Also the 'ended' handler.
  *
  * @returns {void}
  */
@@ -2065,7 +2171,11 @@ function next() {
   if (!_state.queue.length) return;
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
   _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
-  if (_state.qi + 1 >= _state.queue.length) { stop(); return; }
+  // The end of the queue is the end of a UNIT, not of the listening: the site order continues
+  // (_extendQueue). It was already tried when this track started, so at the end of the ORDER it
+  // is refused a second time here and the bar stops — both refusals return false by design; do
+  // not "fix" the double call into one, the second is what keeps stop() reachable.
+  if (_state.qi + 1 >= _state.queue.length && !_extendQueue()) { stop(); return; }
   _state.qi++;
   _start();
   _lastPersistSec = -1;

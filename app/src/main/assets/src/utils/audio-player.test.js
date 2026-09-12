@@ -2699,15 +2699,19 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     expect(AudioPlayer.collectionHasAudio('bible-brm-kjv')).toBe(true);
   });
 
-  it('playBibleBook queues ONLY the tapped book (book scope, owner 2026-08-10), streaming from audio-bible-v1', () => {
+  it('playBibleBook queues the tapped book — and its LAST track carries the next recorded book behind it (site order, Corbin 2026-09-11), streaming from audio-bible-v1', () => {
     AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'exodus', label: 'KJV · Biblical Restoration Ministries' });
     const s = AudioPlayer.getState();
-    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus')]);   // the BOOK, nothing after it
+    // The 08-10 book scope still bounds what a TAP queues (Exodus alone); the whole-book shape's one track
+    // is the book's last, so the site order has already appended the next recorded book (Revelation).
+    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus'), BURL('brm-kjv_revelation')]);
     expect(s.qi).toBe(0);
     expect(s.queue[0].title).toBe('Exodus');
     expect(s.queue[0].sub).toBe('KJV · Biblical Restoration Ministries');
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
-    // Book scope: the queue ends where the book ends — next() at the tail stops.
+    // next() walks into Revelation; Revelation is the edition's last recorded book, so the order ends there.
+    AudioPlayer.next();
+    expect(el().src).toBe(BURL('brm-kjv_revelation'));
     AudioPlayer.next();
     expect(AudioPlayer.getState().status).toBe('idle');
   });
@@ -2744,7 +2748,9 @@ describe('audio-player — whole-book Bible audiobooks (bible-* volKeys)', () =>
     AudioPlayer.toggle();                            // first transport tap rebuilds
     await Promise.resolve(); await Promise.resolve();
     s = AudioPlayer.getState();
-    expect(s.queue.length).toBe(1);                  // book scope: only Exodus rebuilds
+    // Book scope for the REBUILD (only Exodus is rebuilt from the snapshot), then the site order appends
+    // the next recorded book because the rebuilt track is the queue's last (Corbin 2026-09-11).
+    expect(s.queue.map((t) => t.url)).toEqual([BURL('brm-kjv_exodus'), BURL('brm-kjv_revelation')]);
     expect(s.qi).toBe(0);
     expect(el().src).toBe(BURL('brm-kjv_exodus'));
   });
@@ -2843,11 +2849,13 @@ describe('audio-player — per-chapter Bible edition (Word of Promise)', () => {
     expect(s.queue[0].partLabel).toBe('Chapter 3');
     expect(s.qi).toBe(0);
     expect(el().src).toBe(OT('wop1_jonah_003'));
-    // next() walks to chapter 4; the queue ENDS with the book.
+    // next() walks to chapter 4 — the book's last, so starting it appends Micah (site order, Corbin
+    // 2026-09-11); the next boundary crosses into Micah 1 instead of stopping.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_jonah_004'));
     AudioPlayer.next();
-    expect(AudioPlayer.getState().status).toBe('idle');    // book done — no bleed into Micah
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('wop1_micah_001'));
   });
 
   it('a chapterNum past the book clamps to its last chapter', () => {
@@ -2935,11 +2943,13 @@ describe('audio-player — per-chapter Bible edition (BRM KJV)', () => {
     el().duration = 300;
     el().dispatchEvent(new Event('loadedmetadata'));
     expect(el().currentTime).toBe(0);
-    // next() walks the remaining chapters; the queue ENDS with the book.
+    // next() walks to chapter 4 — the book's last, so starting it appends Micah (site order, Corbin
+    // 2026-09-11); the next boundary crosses into Micah 1 instead of stopping.
     AudioPlayer.next();
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_jonah_004'));
     AudioPlayer.next();
-    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].url).toBe(OT('brm1_micah_001'));
   });
 
   it('a chapterNum past the book clamps to its last chapter', () => {
