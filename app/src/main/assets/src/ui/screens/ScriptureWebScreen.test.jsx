@@ -355,6 +355,23 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(DRAWN[DRAWN.length - 1].ppv / fitPpv).toBeCloseTo(1.25 * 2, 6);
   });
 
+  it('M6 GUARD: past 22 px per verse a double-tap on the WEB (above the ruler) still zooms 2x about the point, not to the ceiling', async () => {
+    // Bite m6f (the ruler rule applied everywhere) survived every other case: the 2x case
+    // double-taps at fit, where the rule's zoom floor keeps it out. Same zoom as the ruler case.
+    const { container } = await mount();
+    for (let i = 0; i < 31; i++) await press('+');
+    const ppv = DRAWN[DRAWN.length - 1].ppv;
+    expect(ppv).toBeGreaterThan(22);
+    const root = container.querySelector('.sw-root');
+    const tap = () => {
+      root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 500, clientY: 120 }));
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: 500, clientY: 120 }));
+    };
+    tap(); tap();
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(DRAWN[DRAWN.length - 1].ppv / ppv, 'a double-tap on the web is the 2x step').toBeCloseTo(2, 6);
+  });
+
   it('M6: a double-tap on the ruler strip past 22 px per verse centres that verse at the ceiling: cam.x = verse + 0.5, ppv = 132', async () => {
     const { container } = await mount();
     // 31 presses at 1.25x: 0.0257 * 1.25^31 = 26.5 px per verse, past the 22 the rule needs
