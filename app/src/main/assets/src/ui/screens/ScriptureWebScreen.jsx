@@ -893,6 +893,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam) return;
     cam.ppv = fitPPV(cam, v.W);
     cam.x = cam.total / 2;
+    // explicit, though the frameless clamp below also holds y at 0: Reset
+    // MEANS the baseline, whatever clamp a later edit puts after it
     cam.y = 0;
     clampCamera(cam, v.W, maxZoomOf(graph, v));
     if (camVRef.current) resetRail('top');
