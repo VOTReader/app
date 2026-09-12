@@ -36,7 +36,7 @@ function mountChrome() {
   const root = document.createElement('div');
   root.className = 'sw-root';
   root.innerHTML = `
-    <div class="sw-topbar"><div class="sw-title"><h1>My Web</h1><div class="sw-sub">No links yet</div></div></div>
+    <div class="sw-topbar"><div class="sw-title"><h1>My Web</h1><p>No links yet</p></div></div>
     <div class="sw-controls">
       <div class="sw-seg"><button class="sw-seg-btn is-on">Scripture</button><button class="sw-seg-btn">My web</button></div>
       <select class="sw-select"><option>Famous</option></select>
@@ -51,7 +51,7 @@ function mountChrome() {
 
 const SITES = {
   'title h1': '.sw-title h1',
-  'subtitle': '.sw-sub',
+  'subtitle': '.sw-title p',
   'pill .sw-btn': '.sw-btn:not(.is-on):not(.sw-hide-all)',
   'pill .sw-btn.is-on (Corpus context rests ON)': '.sw-btn.is-on',
   'segment off': '.sw-seg-btn:not(.is-on)',
