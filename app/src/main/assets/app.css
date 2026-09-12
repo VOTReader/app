@@ -6759,6 +6759,18 @@
       -webkit-user-select: none; user-select: none;
     }
     .sw-root:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    /* ONE PALETTE, ONE CANVAS. The canvas is black in both themes (SW_PALETTE,
+       palette.js: "this screen has one palette") and this chrome floats over it,
+       so its ink tokens are the web's own dark values in BOTH themes. When they
+       followed the theme, verifier-2 measured every resting pill at 1.08:1 under
+       body.light from live pixels (2026-09-11; the dark arm read 18.02:1). Sheets,
+       tips, cards and the empty notice keep the theme: they sit on --bg3 / --bg,
+       which flip with it. Values are :root's, verbatim. */
+    .sw-topbar, .sw-controls, .sw-hide-all, .sw-legend {
+      --gold: #e8c050; --gold-bright: #f5d86a; --gold-dim: #d0a838;
+      --gold-faint: rgba(232,192,80,0.14); --gold-border: rgba(232,192,80,0.38);
+      --cream-dim: #f2ede5; --cream-muted: #ccc4b4;
+    }
     /* Portrait phones: the whole instrument lays itself out in landscape via a
        CSS rotation — no Android orientation change. Layout metrics
        (clientWidth/Height) ignore transforms, so the canvases size themselves
