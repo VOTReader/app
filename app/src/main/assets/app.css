@@ -302,11 +302,24 @@
            read. Text, gold, highlight colors untouched. */
         --bg2:         #000000;
         --bg3:         #070707;
-        --gold:        #e8c050;
-        --gold-bright: #f5d86a;
-        --gold-dim:    #d0a838;
-        --gold-faint:  rgba(232,192,80,0.14);
-        --gold-border: rgba(232,192,80,0.38);
+        /* THE DARK INK, NAMED ONCE. These seven are the theme's dark values AND
+           the Scripture Web chrome's ink in both themes (the chrome floats over a
+           canvas that is black by construction; chrome-light, 2026-09-11). The
+           chrome rule used to copy the literals verbatim — two definitions that
+           must agree — so both sites now read these, and sw-chrome-light.test.js
+           refuses a colour literal in that rule. Change a value HERE only. */
+        --ink-gold:        #e8c050;
+        --ink-gold-bright: #f5d86a;
+        --ink-gold-dim:    #d0a838;
+        --ink-gold-faint:  rgba(232,192,80,0.14);
+        --ink-gold-border: rgba(232,192,80,0.38);
+        --ink-cream-dim:   #f2ede5;
+        --ink-cream-muted: #ccc4b4;
+        --gold:        var(--ink-gold);
+        --gold-bright: var(--ink-gold-bright);
+        --gold-dim:    var(--ink-gold-dim);
+        --gold-faint:  var(--ink-gold-faint);
+        --gold-border: var(--ink-gold-border);
         --gold-glow:   rgba(232,192,80,0.50);
         /* The QUIET hairline — the neutral sibling of --gold-border, for a
            card or pill that should have an edge without announcing it.
@@ -326,8 +339,8 @@
            on any var(--name) with no declaration and no fallback. */
         --border:      rgba(200,164,86,0.16);
         --cream:       #ffffff;
-        --cream-dim:   #f2ede5;
-        --cream-muted: #ccc4b4;
+        --cream-dim:   var(--ink-cream-dim);
+        --cream-muted: var(--ink-cream-muted);
         --study-note:  rgba(232,192,80,0.10);
         --study-border: rgba(232,192,80,0.24);
         --radius:      6px;
@@ -6765,11 +6778,12 @@
        followed the theme, verifier-2 measured every resting pill at 1.08:1 under
        body.light from live pixels (2026-09-11; the dark arm read 18.02:1). Sheets,
        tips, cards and the empty notice keep the theme: they sit on --bg3 / --bg,
-       which flip with it. Values are :root's, verbatim. */
+       which flip with it. The values are :root's --ink-* tokens — the one
+       definition of the dark ink, never a copy (w-sw-ink-tokens, 2026-09-12). */
     .sw-topbar, .sw-controls, .sw-hide-all, .sw-legend {
-      --gold: #e8c050; --gold-bright: #f5d86a; --gold-dim: #d0a838;
-      --gold-faint: rgba(232,192,80,0.14); --gold-border: rgba(232,192,80,0.38);
-      --cream-dim: #f2ede5; --cream-muted: #ccc4b4;
+      --gold: var(--ink-gold); --gold-bright: var(--ink-gold-bright); --gold-dim: var(--ink-gold-dim);
+      --gold-faint: var(--ink-gold-faint); --gold-border: var(--ink-gold-border);
+      --cream-dim: var(--ink-cream-dim); --cream-muted: var(--ink-cream-muted);
     }
     /* Portrait phones: the whole instrument lays itself out in landscape via a
        CSS rotation — no Android orientation change. Layout metrics
