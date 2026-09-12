@@ -280,8 +280,10 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
     expect(n, 'and it does not need the cap to do it').toBeLessThan(128);
   });
 
-  it('does not spend the whole cap on an arc 24 px wide', () => {
-    expect(segmentsFor(8, zMax, rxOf(3, PPV_MAX_CSS), rxOf(3, PPV_MAX_CSS), SQUASH, CEIL, W, DPR)).toBeLessThan(24);
+  it('does not spend the whole cap on a 3-verse arc: 396 CSS px wide and 127 tall at the 132 px ceiling, it asks 34, not 128 (at the 44 px ceiling: 132 wide, under 24)', () => {
+    const n = segmentsFor(8, zMax, rxOf(3, PPV_MAX_CSS), rxOf(3, PPV_MAX_CSS), SQUASH, CEIL, W, DPR);
+    expect(n).toBeLessThanOrEqual(40);
+    expect(n).toBeGreaterThanOrEqual(8);
   });
 
   /* The sweep. The two rules above are bounds on ONE arc on ONE frame; this

@@ -51,7 +51,7 @@ export function isChromeTarget(target) {
  *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
- *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
+ *   handlers: () => {hover:Function, tap:Function, doubleTap:(x:number, y:number) => void},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
@@ -149,7 +149,7 @@ export function attachWebGestures(el, deps) {
     if (drag && !moved) {
       const pt = loc(e);
       const now = Date.now();
-      if (now - lastTap < 300) { handlers().doubleTap(pt.x); lastTap = 0; }
+      if (now - lastTap < 300) { handlers().doubleTap(pt.x, pt.y); lastTap = 0; }
       else { lastTap = now; handlers().tap(pt.x, pt.y); }
     }
     drag = null;

@@ -24,7 +24,7 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   depthMix, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, worldRect, yToHeight, camYForHeight, bandHeight,
+  maxZoomFor, ribbonStyle, worldRect, yToHeight, camYForHeight, bandHeight, PPV_MAX_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching,
@@ -76,6 +76,10 @@ const maxZoomOf = (graph, v) => (graph
 
 /** What the live region says when + does nothing because it can do nothing. */
 const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
+/** The zoom a key or a double-tap steps: 1.25x and 2x (were 1.6x and 2.5x) —
+ * three finer steps between where the old ladder jumped once (M6). */
+const KEY_STEP = 1.25;
+const TAP_STEP = 2;
 
 /**
  * Visible threads per CSS px of viewport width, which is what decides whether
@@ -501,6 +505,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
       // the camera's height, world verses — a rounded witness is a quantisation trap, so 4 significant figures
       wrapRef.current.setAttribute('data-cam-y', (cam.y || 0).toPrecision(4));
+      // and its verse, to the hundredth (a centred verse reads N.50)
+      wrapRef.current.setAttribute('data-cam-x', cam.x.toFixed(2));
     }
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
@@ -868,11 +874,27 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     commitFound(described[0]);
   }, [commitFound, describe, hitCandidatesAt, schedule]);
 
-  const doubleTap = React.useCallback((cx) => {
+  const doubleTap = React.useCallback((cx, cy) => {
     const cam = camRef.current, v = viewRef.current;
-    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v));
+    const view = viewFor();
+    const py = cy * v.DPR;
+    // On the ruler strip, once verses are addressable (22 px per verse, the
+    // same floor pickVerse uses), a double-tap centres THAT verse at the
+    // ceiling: the reader names a verse and gets its cell (M6).
+    const onRuler = modeRef.current !== 'personal' && py >= view.base - 2 && py <= view.base + (view.rulerDepth || 40);
+    if (onRuler && cam.ppv >= 22 * v.DPR) {
+      const verse = Math.floor(xToVerse(cam, v.W, cx * v.DPR));
+      if (verse >= 0 && verse < cam.total) {
+        cam.x = verse + 0.5;
+        cam.ppv = PPV_MAX_CSS * v.DPR;
+        clampCamera(cam, v.W, maxZoomOf(graph, v), yFrameFor(cam));
+        schedule();
+        return;
+      }
+    }
+    zoomAbout(cam, v.W, cx * v.DPR, TAP_STEP, maxZoomOf(graph, v), undefined, yFrameFor(cam) || undefined);
     schedule();
-  }, [graph, schedule]);
+  }, [graph, schedule, viewFor, yFrameFor]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
@@ -937,10 +959,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // middle would fly the reader into the sky (measured: 3,068 verses up
       // after forty presses from fit)
       const before = cam.ppv;
-      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, undefined, yf || undefined);
+      zoomAbout(cam, v.W, v.W / 2, KEY_STEP, ceiling, undefined, yf || undefined);
       atCeiling = cam.ppv === before;
     }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, undefined, yf || undefined); }
+    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / KEY_STEP, ceiling, undefined, yf || undefined); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
       // The notice is an overlay like the five below and goes first for the

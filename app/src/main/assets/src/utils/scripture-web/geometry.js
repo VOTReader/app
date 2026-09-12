@@ -76,14 +76,19 @@ export function squashFactor(ceil, width) {
   return Math.min(MAX_STRETCH, ceil / (width / 2));
 }
 
-/** CSS px per verse at which one verse is a comfortable tap target. */
-export const PPV_MAX_CSS = 44;
+/**
+ * CSS px per verse at the zoom ceiling. 44 was the tap rule's floor (one
+ * verse a comfortable target) and, under the old law, the last zoom where
+ * anything new could separate. With the true law, the departure slots and
+ * the y camera (M1-M4) a verse's cell keeps separating past it: at 132 five
+ * threads leaving one verse stand 22 px apart and its number sits in its own
+ * cell (spine section 10 row 1; M6).
+ */
+export const PPV_MAX_CSS = 132;
 
 /**
  * The zoom ceiling, as a RELATION rather than a constant: the reader may
- * zoom until one verse is PPV_MAX_CSS wide, and no further, because past that
- * nothing new can separate - every arc leaving a verse shares one foot at
- * every zoom, so more magnification only zooms into a void.
+ * zoom until one verse is PPV_MAX_CSS wide, and no further.
  *
  * @param {number} total - verses in the canon
  * @param {number} widthCss - viewport width in CSS px
