@@ -95,7 +95,7 @@ function tickBuffered() {
   const e = el();
   e.duration = 100;
   e.buffered = { length: 1, end: () => 100 };
-  e.currentTime = 1;
+  e.currentTime = 6;   // past the 5-s persist floor, so the tick also writes the boot snapshot
   e.dispatchEvent(new Event('timeupdate'));
 }
 
