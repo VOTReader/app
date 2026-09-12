@@ -49,8 +49,10 @@ describe('VolumesHome — every collection tile shows its count', () => {
     const numbers = all.map((t) => (t.sub.match(/^(\d+) /) || [])[1]);
     const missing = all.filter((_, i) => !numbers[i]).map((t) => t.title);
     expect(missing, 'tiles with no count').toEqual([]);
-    // Fourteen distinct counts read back: no two tiles share one, so none reads another's list.
-    expect(new Set(numbers).size).toBe(KEYS.length);
+    // Each tile's number is ITS OWN list's length, in tile order (the seven volumes, then the seven
+    // collections) — a typed number or a neighbour's list reads wrong here (bite B, 2026-09-12: a
+    // typed 31 passed the distinct-count form of this line).
+    expect(numbers).toEqual(KEYS.map((k) => String(count(k))));
   });
 
   it('CONTROL: with no letters loaded yet, the Rebuke keeps its subtitle and no number', () => {
