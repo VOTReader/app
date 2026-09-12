@@ -174,6 +174,11 @@ export function useSettings({ savedSettings, theme }) {
       doubleTapFullscreen: true, fullscreenHintCount: 0,
       tabsEnabled: true,
       searchEnabled: true, historyEnabled: true,
+      // Synonym Search is read as `!== false` and written by toggleSetting, which
+      // negates the STORED value — with no default its first tap was dead (2026-09-12,
+      // the sweep behind audioTurnPage's fix; on main since the 07-31 row). New key:
+      // `...savedS` cannot shadow it, so every profile starts ON, as the row's desc says.
+      searchSynonyms: true,
       historyInNav: true,
       showBookmarkNav: true,
       showThemeBtn: true,
@@ -201,6 +206,11 @@ export function useSettings({ savedSettings, theme }) {
       // (no paint, nothing to follow).
       readAlongHighlight: true,
       readAlongFollow: true,
+      // "Turn the Page with the Audio" (w-audio-continue). Read as `!== false`, but
+      // toggleSetting negates the STORED value: with no default the first tap went
+      // `!undefined -> true` and the row stayed on (verifier-2, 2026-09-12). A NEW key,
+      // so `...savedS` cannot shadow it and every existing profile starts ON.
+      audioTurnPage: true,
       ...savedS,
       ...migrated // migration wins over stale saved values
     };
