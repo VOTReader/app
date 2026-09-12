@@ -11,6 +11,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { AnnotationHint } from './AnnotationHint.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
+import * as TS from '../../utils/tour-steps.js';
 
 function makeStore(overrides) {
   let version = 1;
@@ -35,17 +37,45 @@ function makeFlagStore(initiallySet = false) {
   };
 }
 
-function setupStores({ anns = {}, notes = 0, bkms = 0, hintDismissed = false } = {}) {
+/* The tour controller is a bundle-b bare global too (window.TourController); the pill reads the
+   tour's state and the gesture's words through it (journey F2.1, 2026-09-12). The stub hands out
+   the REAL words from tour-steps.js, so a case here can only pass when the pill asks for them. */
+function makeTourController(active = false) {
+  let state = { active, index: 0, ready: true };
+  const store = makeStore({
+    getState: () => ({ ...state }),
+    highlightWords: () => TS.HIGHLIGHT_GESTURE_WORDS,
+    _setActive(next) { state = { ...state, active: next }; store._bumpForTest(); },
+  });
+  return store;
+}
+
+function setupStores({ anns = {}, notes = 0, bkms = 0, hintDismissed = false, tourActive = false } = {}) {
   window.AnnotationStore = makeStore({ all: () => anns });
   window.NoteStore = makeStore({ count: () => notes });
   window.BookmarkStore = makeStore({ count: () => bkms });
   window.AnnHintDismissedFlagStore = makeFlagStore(hintDismissed);
+  window.TourController = makeTourController(tourActive);
+}
+
+/* The audio bar is open whenever the player is not idle (AudioPlayerBar.jsx:25). The real player
+   is driven here — a stubbed getState would prove the pill reads a stub. */
+class FakeAudio extends EventTarget {
+  constructor() { super(); this.src = ''; this.currentTime = 0; this.duration = 0; this.paused = true; this.preload = ''; this.defaultPlaybackRate = 1; this.playbackRate = 1; }
+  play() { this.paused = false; return Promise.resolve(); }
+  pause() { this.paused = true; }
+  load() {}
+  removeAttribute() { this.src = ''; }
 }
 
 beforeEach(() => { vi.useFakeTimers(); delete window.__annHintDismissed; });
 afterEach(() => {
   cleanup();
+  AudioPlayer.stop();
+  delete globalThis.Audio;
+  delete globalThis.AUDIO_MANIFEST;
   vi.useRealTimers();
+  delete window.TourController;
   delete window.AnnotationStore;
   delete window.NoteStore;
   delete window.BookmarkStore;
@@ -53,7 +83,9 @@ afterEach(() => {
   delete window.__annHintDismissed;
 });
 
-const HINT_TEXT = /Press and hold any text/;
+/* Any text at all inside the pill: the words are the tour's now, and the pill's presence is
+   what every case below is about. */
+const HINT_TEXT = (_, el) => !!el && el.classList.contains('ann-hint-text') && el.textContent.trim().length > 0;
 
 describe('AnnotationHint', () => {
   it('shows after the settle delay for a user with zero data', () => {
@@ -138,5 +170,53 @@ describe('AnnotationHint', () => {
     expect(close.tagName).toBe('BUTTON');
     const pill = document.querySelector('.ann-hint-pill');
     expect(pill.querySelectorAll('button, a, input, [tabindex]').length).toBe(1);
+  });
+});
+
+/* JOURNEY F2.1 (2026-09-12): on the tour's Listen stop three layers stacked at the bottom of the
+   screen — the tour card, this pill under it, the audio bar under that — and outside the tour the
+   pill was drawn over the audio bar (pill y 729–789, bar y 730–800 on a 360x800 phone). The pill
+   yields: it holds while the tour is up or the bar is open, and comes when they leave. And its
+   words are the tour's own for the same gesture — one sentence pair, owned by tour-steps.js. */
+describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)', () => {
+  it('holds while the tour is up, and appears when the tour ends', () => {
+    setupStores({ tourActive: true });
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(document.querySelector('.ann-hint-pill'), 'the tour is up: no pill').toBeNull();
+    act(() => { window.TourController._setActive(false); });
+    expect(document.querySelector('.ann-hint-pill'), 'the tour ended: the pill comes').toBeTruthy();
+  });
+
+  it('holds while the audio bar is open (the player is not idle), and appears when it goes idle', () => {
+    globalThis.Audio = FakeAudio;
+    globalThis.AUDIO_MANIFEST = { 'vol1:letter-a': [['idA', 'B']] };
+    setupStores();
+    act(() => { AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'A' }, collectionLabel: 'Volume One' }); });
+    expect(AudioPlayer.getState().status, 'PRECONDITION: the bar is open').not.toBe('idle');
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(document.querySelector('.ann-hint-pill'), 'the bar is open: no pill').toBeNull();
+    act(() => { AudioPlayer.stop(); });
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(document.querySelector('.ann-hint-pill'), 'the bar closed: the pill comes').toBeTruthy();
+  });
+
+  it('CONTROL: with neither up, the pill still comes after the delay', () => {
+    setupStores();
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(document.querySelector('.ann-hint-pill')).toBeTruthy();
+  });
+
+  it('says the tour\'s words for the gesture — the head of the highlight stop\'s own text', () => {
+    setupStores();
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    const said = document.querySelector('.ann-hint-text').textContent.trim();
+    const stop = TS.TOUR_STEPS.find((s) => s.id === 'highlight');
+    expect(said.length, 'the pill says something').toBeGreaterThan(20);
+    expect(stop.text.startsWith(said), `the pill's words "${said}" must open the highlight stop's text`).toBe(true);
+    expect(said).toContain('Highlight, or Note');
   });
 });
