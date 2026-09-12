@@ -7201,9 +7201,22 @@
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
         max-height: calc(100vh - 24px); overflow-y: auto;
       }
-      /* Never more than a third of the screen: at Text Size 1.8 the strip was 350 px of 800 with every
-         library tile under it (2026-09-05). Its type is chrome and stops growing past ~1.25x. */
-      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; max-height: 33vh; }
+      /* As tall as its words and no taller (journey F1.1, 2026-09-12). The 33vh cap of 2026-09-05
+         ("never more than a third of the screen": at Text Size 1.8 the strip was 350 px of 800)
+         predates the type caps below, which now bound the words — and it made the strip scroll
+         INSIDE itself wherever the words were taller than a third: every landscape phone
+         (800x360: 119 px of room for 194 px of strip at Text Size 1, "Don't show this again" off
+         the frame) and a portrait phone at Text Size 3 (264 for 298). The Home scroller reserves
+         the strip's measured height below, so growing costs no tile its reach. Measured after:
+         portrait 360x800 194 / 232 / 298 px at Text Size 1 / 1.8 / 3. */
+      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
+      /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
+         later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
+         second drops to its own line, right-aligned under a full-width primary, instead of the
+         primary wrapping to SHOW ME / AROUND. On 412 and up both share one line as before. */
+      .tour-prompt .tour-row { flex-wrap: wrap; justify-content: flex-end; }
+      .tour-prompt .tour-btn { white-space: nowrap; }
+      .tour-prompt .tour-btn.primary { flex: 1 1 auto; }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {
