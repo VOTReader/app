@@ -78,6 +78,7 @@ function makeRoutes(bookId, bibleAudio = 'web-ebible') {
     mode: 'read', setMode: vi.fn(), showStudy: false, setShowStudy: vi.fn(),
     surpriseAnchor: null,
   };
+  makeRoutes.last = props;                       // the mocks a case wants to read back
   return buildScreenRoutes(props);
 }
 
@@ -143,5 +144,38 @@ describe('the Bible-audio prop is resolved per BOOK, not once per app', () => {
   it('and Bible audio off still yields nothing, per book or otherwise', () => {
     expect(audioPropFor('genesis', 'off')).toBeNull();
     expect(audioPropFor('john', 'off')).toBeNull();
+  });
+});
+
+/* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
+   every chapter 404s live) is offered nowhere — ONE registry flag, ONE
+   predicate (utils/audio-track.hide.test.js owns the registry half). The
+   desk's Voice chips are filtered, so no chip can call this bridge with the
+   hidden id; tools and the console still can, and a persisted choice is a 404
+   carried into every Bible book. The bridge is the shared function the chips
+   route through, so the guard lives here and the chip filter is the visible
+   half (AudioManagerSheet.test.jsx). */
+describe('window.__setBibleAudioEdition — the desk→settings bridge refuses a hidden edition', () => {
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = MANIFEST;
+    globalThis.BibleChapterView = function BibleChapterView() { return null; };
+    globalThis.ChapterIndex = function ChapterIndex() { return null; };
+    globalThis.MatthewChapterView = function MatthewChapterView() { return null; };
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BibleChapterView; delete globalThis.ChapterIndex; delete globalThis.MatthewChapterView;
+    delete window.__setBibleAudioEdition;
+  });
+
+  it('persists an offered edition and never the hidden one (and still never an unknown id)', () => {
+    makeRoutes('genesis', 'brm-kjv');
+    const { updateSetting } = makeRoutes.last;
+    window.__setBibleAudioEdition('wop-nkjv');                     // CONTROL: the bridge is live
+    expect(updateSetting).toHaveBeenCalledWith('bibleAudio', 'wop-nkjv');
+    updateSetting.mockClear();
+    window.__setBibleAudioEdition('tsot-matthew');
+    window.__setBibleAudioEdition('no-such-edition');
+    expect(updateSetting).not.toHaveBeenCalled();
   });
 });
