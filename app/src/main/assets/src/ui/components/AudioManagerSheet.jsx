@@ -311,7 +311,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
             <button
               type="button"
               className="audio-manager-track-copy audio-manager-jump"
-              aria-label={'Open the text of ' + trackLabel(current.title) + ' — playback continues'}
+              aria-label={'Open the reading — ' + trackLabel(current.title) + '; playback continues'}
+              title="Open the reading"
               onClick={() => { window.__openAudioText(current); onClose(); }}
             >
               {/* '›' — the same go-to cue the home cards carry; marks the
