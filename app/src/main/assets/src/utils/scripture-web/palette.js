@@ -73,52 +73,42 @@ export function genreOfBook(bookIndex) {
   return GENRE_BOOK_ENDS.length - 1;
 }
 
-/**
- * The distance ramp on the CPU, the same eight stops the shader mixes
- * (rampGLSL below), so a Canvas2D surface speaks the canon's colour language.
- * @param {number} t 0..1
- * @returns {string} 'r,g,b' in 0..255
- */
-export function distanceRampRGB(t) {
-  const s = Math.min(1, Math.max(0, t)) * (DISTANCE_RAMP.length - 1);
-  const i = Math.floor(s), j = Math.min(i + 1, DISTANCE_RAMP.length - 1), f = s - i;
-  return DISTANCE_RAMP[i].map((v, k) => Math.round((v + (DISTANCE_RAMP[j][k] - v) * f) * 255)).join(',');
+/* ── My Web's colour law (design-myweb-colour.md, 2026-09-11) ──────────────
+   Two families a reader tells apart at a glance, and a colour-blind reader by
+   lightness, width and pin. Timothy's threads (the Volumes' own citations of
+   scripture) are a COOL family, hue by SOURCE, four steps 0.07 apart in WCAG
+   luminance so the source survives a deuteranope's collapse of the hues; the
+   reader's links are a WARM family, hue by SHAPE, pin by shape. The families
+   sit on opposite sides of Lab b* under every deficiency (warm-versus-cool is
+   the axis red-green blindness keeps). Salience (alpha, width) never touches
+   hue. Canon hue on My Web was retired by Corbin ("My web color yes replaces
+   canon"). Every number is measured in sessions/2026-09-11-orchestrator/
+   myweb-colour/contrast-v2.md and pinned by palette-myweb-colour.test.js. */
+
+/** Timothy's sources, brightest first; the index is the batch bin the renderer strokes. */
+export const MY_WEB_SOURCES = [
+  { key: 'footnote', name: 'footnotes', rgb: '74,195,210' },        // teal,   L .45 (cyan-leaning: keeps b* -13 under protanopia)
+  { key: 'votNote', name: 'study notes', rgb: '106,166,255' },      // sky,    L .38
+  { key: 'wtlb', name: 'Words To Live By', rgb: '139,149,173' },    // slate,  L .30
+  { key: 'study', name: 'studies', rgb: '148,108,222' },            // violet, L .22
+];
+const SOURCE_INDEX = new Map(MY_WEB_SOURCES.map((s, i) => [s.key, i]));
+/** Bin for a curated edge's storage kind; a kind the table does not know draws as a study, the commonest. */
+export function myWebSourceIndex(kind) {
+  const i = SOURCE_INDEX.get(kind);
+  return i === undefined ? MY_WEB_SOURCES.length - 1 : i;
 }
+/** The context is stroked in one colour bin per source (one path per bin and corridor layer, see rail-renderer). */
+export const CONTEXT_BINS = MY_WEB_SOURCES.length;
 
-/** The reader's own links: gold, the app's one saturated ink. */
-export const MY_WEB_LINK_RGB = '232,192,80';
-
-/**
- * My Web's colour law. A bridge (a Volumes citation of scripture) is
- * coloured by WHERE in the canon it lands, on the same ramp the Scripture
- * Web uses for distance, so Genesis reads magenta and Revelation green on
- * both screens; the legend under My Web names the axis. The reader's own
- * links are gold with their pins. Corbin picked this over an amber depth
- * ramp and a per-kind palette (2026-09-11: "Canon is my favorite").
- *
- * @param {{verse?:number, verseTotal?:number, link?:boolean}} o
- * @returns {string} 'r,g,b'
- */
-export function myWebColor(o) {
-  if (o.link) return MY_WEB_LINK_RGB;
-  return distanceRampRGB(myWebCanonT(o));
-}
-
-/** Where a citation lands in the canon, 0..1. */
-export function myWebCanonT(o) {
-  return o.verseTotal > 0 ? Math.min(1, Math.max(0, (o.verse || 0) / o.verseTotal)) : 0;
-}
-
-/** The context is stroked in this many colour bins along the canon (one
- * path per bin and corridor layer, see rail-renderer): 96 bins over eight
- * ramp stops is at most ~19/255 per channel between neighbours, under one
- * unit in a pixel once the context's alpha (0.04 at 1x) is applied. */
-export const CONTEXT_BINS = 96;
-export function myWebBinColor(bin) {
-  return distanceRampRGB((bin + 0.5) / CONTEXT_BINS);
-}
-
-export const LINK_KIND_NAMES = ['Within scripture', 'Within the Volumes', 'Scripture ↔ Volumes'];
+/** The reader's links by shape (personal-graph `kind` 0 / 1 / 2): colour and pin. */
+export const MY_WEB_LINK_KINDS = [
+  { name: 'Within scripture', rgb: '232,192,80', pin: 'ring' },        // gold (--gold), L .55
+  { name: 'Within the Volumes', rgb: '236,150,70', pin: 'dot' },       // amber, L .40
+  { name: 'Scripture ↔ Volumes', rgb: '236,120,96', pin: 'ring-dot' }, // coral, L .32
+];
+export function myWebLinkColor(kind) { return (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).rgb; }
+export const LINK_KIND_NAMES = MY_WEB_LINK_KINDS.map((k) => k.name);
 
 /** GLSL for the ramps, generated from the tables above so they cannot drift. */
 export function rampGLSL() {
