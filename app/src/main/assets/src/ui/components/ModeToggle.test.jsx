@@ -65,6 +65,12 @@ describe('the Study Notes control shows every view at once and presses the one t
     expect(c.onShowStudyChange).not.toHaveBeenCalled();   // already shown: the view changes, the visibility does not
   });
 
+  it('each segment keeps the pill\'s glyph — three SVGs, one per segment, all different (PDF lines, Inline pen, Off circle-slash)', () => {
+    mount('pdf', true);
+    const glyphs = screen.getAllByRole('button').map((b) => { const svg = b.querySelector('svg'); return svg ? svg.innerHTML : null; });
+    expect(glyphs.every(Boolean), 'every segment carries an svg').toBe(true);
+    expect(new Set(glyphs).size, 'and no two are the same drawing').toBe(3);
+  });
   it('the control is one labelled group, so a screen reader hears "Study Notes" once and then the three views', () => {
     mount('pdf', true);
     const group = screen.getByRole('group', { name: 'Study Notes' });
