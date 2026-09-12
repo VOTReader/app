@@ -24,7 +24,9 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
   // letters is "Coming Soon").
   const _locked = (k) => _votReady && _cnt(k) === 0;
   const collections = [
-  { id: "lords-rebuke", title: "The Lord's Rebuke", sub: "Correction & Warning", locked: _locked('rebuke') },
+  // Its count like every other tile's (catalogue row 17, 2026-09-12): the collection's own letter
+  // list, never a typed number — 31 today, and the same "N Letters · <subtitle>" shape as the Holy Days.
+  { id: "lords-rebuke", title: "The Lord's Rebuke", sub: _cnt('rebuke') > 0 ? `${_cnt('rebuke')} Letters · Correction & Warning` : "Correction & Warning", locked: _locked('rebuke') },
   { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: _cnt('wtlb1') > 0 ? `${_cnt('wtlb1')} Entries · Words of Wisdom` : "Words of Wisdom", locked: _locked('wtlb1') },
   { id: "words-to-live-by-2", title: "Words To Live By: Part Two", sub: _cnt('wtlb2') > 0 ? `${_cnt('wtlb2')} Entries · More Words of Wisdom` : "More Words of Wisdom", locked: _locked('wtlb2') },
   { id: "the-blessed", title: "The Blessed", sub: _cnt('blessed') > 0 ? `${_cnt('blessed')} Entries · Blessings & Promises` : "Blessings & Promises", locked: _locked('blessed') },
