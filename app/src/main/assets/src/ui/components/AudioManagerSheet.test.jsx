@@ -773,6 +773,31 @@ describe('AudioManagerSheet — title jump to text (owner request 2026-08-09)', 
     expect(el().src).toBe(srcBefore);           // …never restarted
   });
 
+  it('the words "Open the reading" are DRAWN on the desk — in the button\'s text, not only its aria-label (2026-09-12)', () => {
+    // The Settings row "Turn the Page with the Audio" tells a reader who turns it
+    // off to "use Open the reading on the player". A phone shows no title
+    // tooltip and reads no aria-label, so the words have to be on the desk
+    // itself: a caption under the head line, in the sheet's own label idiom.
+    globalThis.COL_BY_KEY = new Map([['vol1', { letterScreen: 'vol1-letter' }]]);
+    window.__openAudioText = vi.fn();
+    startCollection();
+    emit('playing');
+    openSheet();
+    const jump = document.querySelector('.audio-manager-jump');
+    expect(jump).toBeTruthy();
+    // The visible text, never the attribute: textContent does not read aria-label.
+    expect(jump.textContent).toMatch(/Open the reading/);
+    // As its own line, so the CSS can set it apart from the title and the head
+    // line — and the title itself is untouched by the caption.
+    const cue = jump.querySelector('.audio-manager-jump-cue');
+    expect(cue).toBeTruthy();
+    expect(cue.textContent.trim()).toBe('Open the reading');
+    expect(jump.querySelector('h2').textContent).not.toMatch(/Open the reading/);
+    expect(jump.querySelector('h2').textContent).toContain('A Word of Warning');
+    // The accessible name still names the action AND the reading (unchanged).
+    expect(jump.getAttribute('aria-label')).toMatch(/^Open the reading — A Word of Warning/);
+  });
+
   it('a track with no destination keeps the plain, untappable title', () => {
     // No COL_BY_KEY installed → vol1 resolves no letterScreen → plain copy.
     window.__openAudioText = vi.fn();
