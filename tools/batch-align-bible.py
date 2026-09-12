@@ -417,6 +417,15 @@ def main():
         # Windows WDDM spills allocations past the ceiling into system memory
         # over PCIe and torch never gives the cache back on its own. Returning
         # it costs milliseconds; the models stay resident either way.
+        # Sample BOTH memory readers BEFORE the release and again after, and print
+        # both pairs on the one line with their own labels. Sampled only after
+        # release_caches() every row was a post-release TROUGH: a chapter that
+        # spiked to 30 GB and gave it back logged the same as one that never grew,
+        # which is exactly the chapter the column exists to find (2026-09-11).
+        # The two fields after `rss`/`commit` keep their old position and meaning
+        # (the trough) so nothing that parses this line moves; the pre-release pair
+        # is appended under its own label. `\s([\d.]+)s\s+rss` still matches.
+        rss_pre, commit_pre = al.rss_gb(), al.commit_gb()
         al.release_caches()
         flag = "" if share >= 0.90 else ("  REVIEW" if share >= MIN_PROVEN else "  EXCLUDED")
         if flag:
@@ -425,7 +434,7 @@ def main():
         print(f"  [{n}/{len(work)}] {tag}  {len(d['verses'])}v  "
               f"C{d['confirmed']} P{d['probed']} R{d['review']}  proven {share:.3f}{flag}"
               f"   {time.time() - t0:5.1f}s  rss {al.rss_gb():.2f} GB "
-              f"commit {al.commit_gb():.2f} GB", flush=True)
+              f"commit {al.commit_gb():.2f} GB  pre-release rss {rss_pre:.2f} GB commit {commit_pre:.2f} GB", flush=True)
         checkpoint(tag)
     if last_book is not None:
         book_summary(last_book)
