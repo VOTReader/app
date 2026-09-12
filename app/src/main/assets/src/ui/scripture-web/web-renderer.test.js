@@ -64,10 +64,14 @@ describe('shader shape', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/in uint aTo;/);
   });
 
-  it('offsets the spotlight test by uInstanceBase', () => {
-    // gl_InstanceID restarts at 0 for every sub-range draw, so the shader can
-    // only identify a specific arc by adding the range's base back on.
-    expect(SHADER_SOURCE.vertex).toContain('float id = float(gl_InstanceID) + uInstanceBase;');
+  it('reads the instance id from its own attribute (inverted at M2: uInstanceBase is gone)', () => {
+    // gl_InstanceID restarts at 0 for every draw, so a gathered list — whose
+    // members are not contiguous in the asset — cannot recover an arc's id
+    // from its position plus a base offset. The id rides with the instance.
+    expect(SHADER_SOURCE.vertex).toMatch(/in float aId;/);
+    expect(SHADER_SOURCE.vertex).toContain('float id = aId;');
+    expect(SHADER_SOURCE.vertex).not.toContain('uInstanceBase');
+    expect(SHADER_SOURCE.vertex).not.toContain('gl_InstanceID');
   });
 
   it('emits premultiplied alpha, matching both blend modes the renderer sets', () => {

@@ -29,6 +29,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
    `no-var` is configured nowhere and the directive was an unused disable — the
    third time that shape has held a branch tonight, and this one was mine. */
 const DRAWN = [];
+/* What the real renderer's draw() returns at the phone ceiling (M2): the
+   counters the screen publishes for the browser walks. One object, so a
+   case can read the shape the screen was handed. */
+const STATS = { mode: 'gathered', submitted: 142, visible: 142, visited: 149, draws: 3, window: 149 };
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
 
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
@@ -49,14 +53,14 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
   return {
     .../** @type {any} */ (real),
     createRenderer: vi.fn(() => ({
-      gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
+      gl: {}, contextLost: false, stats: STATS,
       // Each draw records the (ppv, density) it was actually asked for. The
       // auto-switch's early return suppresses ONE frame, and with a mock that
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density });
-        return { instances: 0, draws: 0 };
+        return STATS;
       },
       dispose: vi.fn(),
     })),
@@ -203,6 +207,22 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(zoomText(container)).toBe('Overview');
     await press('+');
     expect(zoomText(container)).not.toBe('Overview');
+  });
+
+  it('publishes the renderer\'s counters on .sw-root after every frame: data-sw-mode/submitted/visible/visited/draws/window/frames/draw-ms (M2)', async () => {
+    const { container } = await mount();
+    const root = container.querySelector('.sw-root');
+    expect(root.getAttribute('data-sw-mode')).toBe('gathered');
+    expect(root.getAttribute('data-sw-submitted')).toBe('142');
+    expect(root.getAttribute('data-sw-visible')).toBe('142');
+    expect(root.getAttribute('data-sw-visited')).toBe('149');
+    expect(root.getAttribute('data-sw-draws')).toBe('3');
+    expect(root.getAttribute('data-sw-window')).toBe('149');
+    const frames = Number(root.getAttribute('data-sw-frames'));
+    expect(frames).toBeGreaterThanOrEqual(1);
+    expect(root.getAttribute('data-sw-draw-ms')).toMatch(/^\d+(\.\d+)?$/);
+    await press('+');
+    expect(Number(root.getAttribute('data-sw-frames'))).toBeGreaterThan(frames);
   });
 
   it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {

@@ -620,3 +620,157 @@ describe('the true law: a thread is a half-ellipse whose height is its span, at 
     expect(A).toBeCloseTo(rx * SQUASH, 9);
   });
 });
+
+/* ── M2: the visibility predicate every consumer shares ─────────────────── */
+// Read off the module object so the file loads on the base tree too: there
+// the two are undefined and each case fails on its own line ("footReach is
+// not a function"), not the whole file at import.
+const { footReach, threadVisible } = /** @type {any} */ (geoLaw);
+
+/** mulberry32, so a failing pair can be re-run by seed. */
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe('threadVisible — the true world\'s half-ellipse against a rectangle, exact', () => {
+  it('footReach: nothing at the baseline, the whole half-span at the apex, r - sqrt(r^2 - y^2) between', () => {
+    expect(footReach(10, 0)).toBe(0);
+    expect(footReach(10, 10)).toBe(10);
+    expect(footReach(10, 12), 'above the apex it saturates').toBe(10);
+    expect(footReach(5, 3)).toBeCloseTo(1, 12);          // 5 - 4
+    expect(footReach(0, 3), 'a degenerate thread reaches nowhere').toBe(0);
+  });
+
+  it('agrees with a 2,048-sample rasterisation of the curve over 600 random (thread, rectangle) pairs, both verdicts reached', () => {
+    // The curve in verse units: x = a + r(1 - cos tau), h = r sin tau — the
+    // apex IS the half-span (the true law). Sampled-inside implies the
+    // predicate (it has no false negatives); the predicate implies a sample
+    // inside the rectangle grown by two sample gaps (it has no false
+    // positives beyond the sampling resolution).
+    const r = rng(23);
+    const N = 2048;
+    let yes = 0, no = 0, legs = 0;
+    for (let i = 0; i < 600; i++) {
+      const half = Math.exp(r() * Math.log(4000));
+      const a = r() * 8000, b = a + 2 * half;
+      const w = Math.exp(r() * Math.log(8000)) * (r() < 0.2 ? 0.001 : 1);
+      // six in ten rectangles overlap the thread's feet in x, so both verdicts are common
+      const xa = r() < 0.6 ? a - w + (w + 2 * half) * r() : r() * 9000 - 500;
+      const xb = xa + w;
+      const y0 = r() < 0.5 ? 0 : r() * half * 1.3;
+      const y1 = y0 + Math.exp(r() * Math.log(4000)) * (r() < 0.2 ? 0.001 : 1);
+      const gap = Math.PI * half / N;                     // the longest step between samples
+      let inside = false, near = false;
+      for (let k = 0; k <= N; k++) {
+        const tau = Math.PI * k / N;
+        const x = a + half * (1 - Math.cos(tau)), h = half * Math.sin(tau);
+        if (x >= xa && x <= xb && h >= y0 && h <= y1) inside = true;
+        if (x >= xa - 2 * gap && x <= xb + 2 * gap && h >= y0 - 2 * gap && h <= y1 + 2 * gap) near = true;
+      }
+      const v = threadVisible(a, b, xa, xb, y0, y1);
+      if (inside) expect(v, `sampled inside but refused: ${JSON.stringify({ a, b, xa, xb, y0, y1 })}`).toBe(true);
+      if (v) expect(near, `admitted but no sample near: ${JSON.stringify({ a, b, xa, xb, y0, y1 })}`).toBe(true);
+      if (v) yes++; else no++;
+      if (v && half > y1) legs++;
+    }
+    expect(yes).toBeGreaterThan(100);
+    expect(no).toBeGreaterThan(100);
+    expect(legs, 'admitted through a leg alone (apex above the band)').toBeGreaterThan(20);
+  });
+
+  it('the three regimes by hand: apex in the band, legs only, apex below the band', () => {
+    // thread [100, 120]: r = 10, apex at 10
+    expect(threadVisible(100, 120, 105, 115, 0, 20), 'apex inside').toBe(true);
+    expect(threadVisible(100, 120, 105, 115, 0, 5), 'only the legs reach the band, and neither leg is in the x window').toBe(false);
+    expect(threadVisible(100, 120, 100, 101.5, 0, 5), 'the left leg crosses the band inside the window (reach(5) = 1.34)').toBe(true);
+    expect(threadVisible(100, 120, 100, 101.5, 6, 8), 'the same leg higher up: reach(6) = 2 > 1.5, so it has left the window').toBe(false);
+    expect(threadVisible(100, 120, 0, 1000, 11, 20), 'apex below the band').toBe(false);
+    expect(threadVisible(100, 120, 0, 1000, 10, 20), 'apex exactly at the band bottom').toBe(true);
+    expect(threadVisible(100, 100, 0, 1000, 0, 20), 'a zero-span thread has no curve').toBe(false);
+  });
+});
+
+describe('the GLSL sampleTau IS the JS sampleTau — the twin transliterated and run (verifier-2, M1)', () => {
+  /**
+   * Turn the GLSL body of sampleTau into a JS function. Every identifier the
+   * result uses must be on the allow-list, so a GLSL built-in the twin gains
+   * later fails this pin loudly instead of being silently miscompared.
+   */
+  function twinOf(glsl) {
+    const start = glsl.indexOf('float sampleTau(');
+    if (start < 0) throw new Error('threadShapeGLSL has no sampleTau');
+    let body = glsl.slice(start);
+    body = body.slice(0, body.indexOf('\n}') + 2);
+    const js = body
+      .replace(/^float sampleTau\(([^)]*)\)/, (_, args) => `function sampleTau(${args.replace(/float /g, '')})`)
+      .replace(/\b(float|bool) /g, 'let ')
+      .replace(/\basin\(/g, 'Math.asin(')
+      .replace(/\bmax\(/g, 'Math.max(')
+      .replace(/\bmin\(/g, 'Math.min(');
+    const allowed = new Set(['function', 'sampleTau', 't', 'A', 'P', 'hLo', 'hHi', 'hw', 'txLo', 'txHi',
+      'let', 'sLo', 'sHi', 'a0', 'a1', 'u', 'left', 'if', 'else', 'return', 'Math', 'asin', 'max', 'min',
+      'clamp', 'mix', 'true', 'false']);
+    const idents = js.match(/[A-Za-z_]\w*/g) || [];   // an identifier starts with a letter, so 2.0 and .5 never match
+    for (const id of idents) {
+      if (!allowed.has(id)) throw new Error(`the GLSL twin uses \`${id}\`: extend the transliteration before trusting this pin`);
+    }
+    const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+    const mix = (x, y, f) => x + (y - x) * f;
+    return new Function('clamp', 'mix', js + '; return sampleTau;')(clamp, mix);
+  }
+
+  /** 1,500 tuples across both regimes, both legs, and x windows that cut. */
+  function sweep(seed) {
+    const r = rng(seed);
+    const out = [];
+    for (let i = 0; i < 1500; i++) {
+      const A = 20 + r() * 5000;
+      const hLo = r() < 0.4 ? 0 : r() * A * 1.2;
+      const hHi = hLo + r() * A * 1.5;
+      const hw = 0.5 + r() * 12;
+      const lo = r() * Math.PI, hi = r() * Math.PI;
+      const txLo = r() < 0.15 ? 0 : Math.min(lo, hi), txHi = r() < 0.15 ? Math.PI : Math.max(lo, hi);
+      out.push([A, Math.PI, hLo, hHi, hw, r() < 0.05 ? txHi : txLo, txHi]);
+    }
+    return out;
+  }
+  const T = Array.from({ length: 33 }, (_, k) => k / 32);
+
+  it('agrees with the JS to 1e-9 on 1,500 tuples x 33 strip parameters, and both regimes are reached', () => {
+    const twin = twinOf(threadShapeGLSL);
+    let split = 0, whole = 0;
+    for (const args of sweep(5)) {
+      const [A, , , hHi, hw] = args;
+      if (A <= hHi + SPLIT_MARGIN * hw) whole++; else split++;
+      for (const t of T) {
+        const want = sampleTau(t, ...args);
+        expect(twin(t, ...args), `t=${t} args=${JSON.stringify(args)}`).toBeCloseTo(want, 9);
+      }
+    }
+    expect(split).toBeGreaterThan(300);
+    expect(whole).toBeGreaterThan(300);
+  });
+
+  it('BITES: forcing the twin\'s split test true (verifier-2\'s bite f) makes it disagree with the JS', () => {
+    const needle = `if (A <= hHi + ${glslFloat(SPLIT_MARGIN)}*hw)`;
+    expect(threadShapeGLSL).toContain(needle);
+    const bitten = twinOf(threadShapeGLSL.replace(needle, 'if (true)'));
+    let disagree = 0;
+    for (const args of sweep(5)) {
+      for (const t of T) if (Math.abs(bitten(t, ...args) - sampleTau(t, ...args)) > 1e-9) disagree++;
+    }
+    expect(disagree).toBeGreaterThan(1000);
+  });
+
+  it('BITES: a GLSL built-in the transliteration does not know is refused, not miscompared', () => {
+    expect(() => twinOf(threadShapeGLSL.replace('asin(clamp(hLo/A, 0., 1.))', 'smoothstep(0., 1., hLo/A)')))
+      .toThrow(/smoothstep/);
+  });
+});

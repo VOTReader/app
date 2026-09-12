@@ -17,6 +17,7 @@ import {
   createCamera, fitPPV, clampCamera, zoomAbout, xToVerse,
   heightToY, yToHeight, bandHeight, maxCamY,
 } from './camera.js';
+import * as cameraLaw from './camera.js';
 
 const TOTAL = 31102;
 const W = 1600;                       // 800 CSS px at DPR 2
@@ -92,5 +93,27 @@ describe('the y camera clamps to the world (RED at e27818cb: clampCamera ignores
     c.y = 50;
     zoomAbout(c, W, 400, 2, MAX_ZOOM);
     expect(c.y).toBe(0);
+  });
+});
+
+describe('worldRect — the frame as a rectangle of the world (M2)', () => {
+  // off the module object so the file loads on the base tree, where it is undefined
+  const { worldRect } = /** @type {any} */ (cameraLaw);
+  it('at the phone ceiling: 18.18 verses wide about cam.x, the band 9.23 verses tall from the baseline', () => {
+    const c = createCamera(TOTAL);
+    c.x = 15000; c.ppv = 88;
+    const rect = worldRect(c, W, 520, 0.64);
+    expect(rect.xa).toBeCloseTo(15000 - 9.0909, 3);
+    expect(rect.xb).toBeCloseTo(15000 + 9.0909, 3);
+    expect(rect.y0).toBe(0);
+    expect(rect.y1).toBeCloseTo(520 / (88 * 0.64), 9);
+  });
+
+  it('a raised camera lifts the band: y0 is cam.y and the height is unchanged', () => {
+    const c = createCamera(TOTAL);
+    c.x = 15000; c.ppv = 88; c.y = 40;
+    const rect = worldRect(c, W, 520, 0.64);
+    expect(rect.y0).toBe(40);
+    expect(rect.y1 - rect.y0).toBeCloseTo(bandHeight(c, { base: 520, squash: 0.64, apexMax: 15551 }), 9);
   });
 });
