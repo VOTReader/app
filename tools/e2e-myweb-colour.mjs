@@ -127,7 +127,10 @@ const rails = (page) => page.evaluate(() => JSON.parse((document.querySelector('
 const canvasRect = (page) => page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { l: b.left, t: b.top, w: b.width, h: b.height }; });
 const subtitle = (page) => page.evaluate(() => { const p = document.querySelector('.sw-title p'); return p ? p.textContent.trim() : ''; });
 async function shot(page, name, clip) { if (!OUT) return; await page.screenshot(Object.assign({ path: resolve(OUT, name + '.png') }, clip ? { clip } : {})); }
-async function settle(page) { await page.evaluate(() => window.dispatchEvent(new Event('resize'))); await sleep(900); }
+/** Schedule a REAL frame: a zero-delta wheel over the top rail is a no-op zoom that calls schedule().
+ *  (A window 'resize' event reaches nothing - the screen observes its canvas with a ResizeObserver -
+ *  and the first run's two corridor captures were one frame twice: 93 of 1,152,000 px differed.) */
+async function settle(page, at) { await page.mouse.move(at.x, at.y); await page.mouse.wheel({ deltaY: 0 }); await sleep(900); }
 
 /** The longest task while the screen redraws once: the launch classification, printed, never gated. */
 async function classify(page) {
@@ -173,33 +176,38 @@ const scanBand = (page, b64, x0, x1, y0, y1) => page.evaluate(async (b64, x0, x1
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const W = x1 - x0, H = y1 - y0;
   const d = g.getImageData(x0, y0, W, H).data;
-  const runs = []; let lit = 0;
+  const runs = []; let lit = 0, sum = 0;
   for (let y = 0; y < H; y++) {
     let n = 0, prev = 0;
     for (let x = 0; x < W; x++) {
       const p = (y * W + x) * 4; const on = (d[p] + d[p + 1] + d[p + 2] > 90) ? 1 : 0;
+      sum += d[p] + d[p + 1] + d[p + 2];
       lit += on; if (on && !prev) n++; prev = on;
     }
     runs.push(n);
   }
   runs.sort((a, b) => a - b);
-  return { rows: H, medianRuns: runs[Math.floor(H / 2)], maxRuns: runs[H - 1], litShare: +(lit / (W * H)).toFixed(3) };
+  return { rows: H, medianRuns: runs[Math.floor(H / 2)], maxRuns: runs[H - 1], litShare: +(lit / (W * H)).toFixed(3), meanLum: +(sum / (3 * W * H)).toFixed(2) };
 }, b64, x0, x1, y0, y1);
 
 async function zoomTopTo(page, c, r0, label, factor) {
   const v0 = Number(await attr(page, 'data-ppv-vot'));
-  for (let i = 0; i < 40; i++) {
+  let last = v0, same = 0;
+  for (let i = 0; i < 60; i++) {
     const r = await rails(page);
     if (!r) return { ok: false, why: 'data-rails not published' };
     const band = r.top.find((b) => b.label.toLowerCase().startsWith(label.toLowerCase()));
     if (!band) return { ok: false, why: `band ${label} not visible after ${i} notches` };
     const v = Number(await attr(page, 'data-ppv-vot'));
-    if (v / v0 >= factor) return { ok: true, band, steps: i, zoom: +(v / v0).toFixed(1) };
+    if (v / v0 >= factor) return { ok: true, band, steps: i, zoom: +(v / v0).toFixed(1), saturated: false };
+    same = v === last ? same + 1 : 0; last = v;
+    // the rail's own ceiling: the wheel no longer moves it (the desktop Volumes rail caps under 40x fit)
+    if (same >= 2 && i > 3) return { ok: true, band, steps: i, zoom: +(v / v0).toFixed(1), saturated: true };
     const cx = c.l + Math.max(4, Math.min(c.w - 4, (band.x0 + band.x1) / 2));
     await page.mouse.move(cx, c.t + r0.topY + 12);
     await page.mouse.wheel({ deltaY: -120 }); await sleep(160);
   }
-  return { ok: false, why: 'ran out of notches' };
+  return { ok: false, why: `ran out of notches at ${(Number(await attr(page, 'data-ppv-vot')) / v0).toFixed(1)}x fit` };
 }
 
 async function walk(page, url, fname) {
@@ -240,12 +248,13 @@ async function walk(page, url, fname) {
   if (!r0) { fails.push(`${tag} corridor: no data-rails`); return; }
   const z = await zoomTopTo(page, c, r0, 'MTAM', 40);
   if (!z.ok) { fails.push(`${tag} corridor: ${z.why}`); return; }
-  note(`${tag} corridor: top rail at ${z.zoom}x fit after ${z.steps} notches, MTAM band ${Math.round(z.band.x0)}..${Math.round(z.band.x1)} CSS px`);
-  const rows = {};
+  note(`${tag} corridor: top rail at ${z.zoom}x fit after ${z.steps} notches${z.saturated ? ' (the rail\'s own ceiling; the wheel stopped moving it)' : ''}, MTAM band ${Math.round(z.band.x0)}..${Math.round(z.band.x1)} CSS px`);
+  const rows = {}, shots = {};
   for (const ceil of CEILINGS) {
     await page.evaluate((v) => { globalThis.__swContextCeiling = v; }, ceil);
-    await settle(page);
+    await settle(page, { x: c.l + c.w / 2, y: c.t + r0.topY + 12 });
     const b64 = await page.screenshot({ encoding: 'base64' });
+    shots[ceil] = b64;
     if (OUT) writeFileSync(resolve(OUT, `${fname}-corridor-${ceil}.png`), Buffer.from(b64, 'base64'));
     const x0 = Math.round(Math.max(0, z.band.x0) * f.dpr), x1 = Math.round(Math.min(c.w, z.band.x1) * f.dpr);
     const y0 = Math.round((c.t + r0.topY + 4) * f.dpr), y1 = Math.round((c.t + r0.topY + 44) * f.dpr);
@@ -255,6 +264,9 @@ async function walk(page, url, fname) {
   await page.evaluate(() => { delete globalThis.__swContextCeiling; });
   const lo = rows[Math.min(...CEILINGS)], hi = rows[Math.max(...CEILINGS)];
   if (lo && hi) {
+    const rel = lo.meanLum > 0 ? hi.meanLum / lo.meanLum : 0;
+    note(`${tag} corridor band mean luminance ${lo.meanLum} @ ${Math.min(...CEILINGS)} -> ${hi.meanLum} @ ${Math.max(...CEILINGS)} (x${rel.toFixed(3)}; the knob reached the paint iff this moved)`);
+    if (!(rel >= 1.03)) fails.push(`${tag} corridor: the two ceilings painted the same band (mean luminance x${rel.toFixed(3)}, want >= 1.03) - the knob did not reach the paint, so the pair is one frame twice`);
     if (hi.medianRuns < 0.8 * lo.medianRuns) fails.push(`${tag} corridor: strokes per row fell ${lo.medianRuns} -> ${hi.medianRuns} at the higher ceiling (threads merging)`);
     if (hi.litShare >= 0.9) fails.push(`${tag} corridor: lit share ${hi.litShare} at the higher ceiling reads as a slab`);
   }
