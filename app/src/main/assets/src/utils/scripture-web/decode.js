@@ -122,6 +122,63 @@ export function decodeGraph(data) {
 }
 
 /**
+ * A slot is stored as a byte: the foot stands slot / 255 of the way across
+ * its verse's cell. One verse, the unit the slots divide.
+ */
+export const SLOT_UNIT = 1 / 255;
+
+/**
+ * Departure slots: where along its verse's cell each foot of each thread
+ * stands, so the threads leaving one verse fan out instead of standing on
+ * one pixel (Corbin, 2026-09-11: at the ceiling "one foot per verse,
+ * bundles inseparable"). At every verse the incident threads — arriving or
+ * leaving — are ranked by their OTHER end ascending, ties by position, and
+ * the k-th of N takes (k + 1) / (N + 1) of the cell: a lone thread stands
+ * in the middle, a leftward thread ranks before every rightward one, so
+ * nothing crosses inside a cell. The shipped asset's busiest verse carries
+ * 102 threads, so slots sit 2.5 byte-units apart and never saturate.
+ *
+ * @param {Uint16Array} from @param {Uint16Array} to
+ * @param {number} count @param {number} total
+ * @returns {{slotA:Uint8Array, slotB:Uint8Array}} slotA at `from`, slotB at `to`
+ */
+export function assignSlots(from, to, count, total) {
+  // counting sort of the 2·count feet by verse
+  const start = new Uint32Array(total + 1);
+  for (let i = 0; i < count; i++) { start[from[i] + 1]++; start[to[i] + 1]++; }
+  for (let v = 0; v < total; v++) start[v + 1] += start[v];
+  // one key per foot: (other end, position, side) packed so a numeric sort ranks them
+  const fill = new Uint32Array(total);
+  const keys = new Uint32Array(2 * count);
+  for (let i = 0; i < count; i++) {
+    keys[start[from[i]] + fill[from[i]]++] = to[i] * 131072 + i * 2;
+    keys[start[to[i]] + fill[to[i]]++] = from[i] * 131072 + i * 2 + 1;
+  }
+  const slotA = new Uint8Array(count), slotB = new Uint8Array(count);
+  for (let v = 0; v < total; v++) {
+    const s = start[v], n = start[v + 1] - s;
+    if (n === 0) continue;
+    if (n > 1) keys.subarray(s, s + n).sort();
+    for (let k = 0; k < n; k++) {
+      const key = keys[s + k];
+      const i = (key >>> 1) & 0xffff;
+      const slot = Math.round(255 * (k + 1) / (n + 1));
+      if (key & 1) slotB[i] = slot; else slotA[i] = slot;
+    }
+  }
+  return { slotA, slotB };
+}
+
+/** One slot table per graph object, built on first use — the renderer, the index and the hit test share it. */
+const SLOTS = new WeakMap();
+/** @param {ScriptureGraph} g @returns {{slotA:Uint8Array, slotB:Uint8Array}} */
+export function slotsOf(g) {
+  let s = SLOTS.get(g);
+  if (!s) { s = assignSlots(g.from, g.to, g.count, g.total); SLOTS.set(g, s); }
+  return s;
+}
+
+/**
  * How many instances a bucket draws at a given density.
  * The layout is pre-sorted so each density is a PREFIX of the bucket — the
  * renderer just shortens its instance count; nothing is re-uploaded.

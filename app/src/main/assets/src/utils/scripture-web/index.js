@@ -19,14 +19,18 @@
    blending that moves the 1x picture the spine promises not to touch.
 
    The predicate that decides each candidate is the law's own
-   (geometry.threadVisible), so the renderer's gathered list, the ink law's
-   crowding count and the hit test all read ONE definition of "on screen".
+   (geometry.threadVisible) on the feet as DRAWN — at their departure slots
+   inside the verse cell (decode.assignSlots) — so the renderer's gathered
+   list, the ink law's crowding count and the hit test all read ONE
+   definition of "on screen". The sorted feet are the integer verses, so the
+   windows are widened by one verse each side and the predicate settles the
+   rest.
    A thread is one entry however many of its pieces show — the shader splits
    a strip onto its two legs itself (geometry.sampleTau) — so nothing can
    be drawn twice by construction.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { deltaRuns, bucketDrawCount } from './decode.js';
+import { deltaRuns, bucketDrawCount, slotsOf, SLOT_UNIT } from './decode.js';
 import { threadVisible, footWindow } from './geometry.js';
 
 /**
@@ -126,7 +130,7 @@ function drawnRuns(g, idx, density) {
 export function windowSize(g, idx, rect, density) {
   let n = 0;
   for (const run of drawnRuns(g, idx, density)) {
-    const w = footWindow(run.spanLo, run.spanHi, rect.xa, rect.xb, rect.y0, rect.y1);
+    const w = footWindow(run.spanLo, run.spanHi, rect.xa - 1, rect.xb + 1, rect.y0, rect.y1);
     const f0 = lowerBound(0, run.byFrom.length, w.fromLo, (k) => g.from[run.start + run.byFrom[k]]);
     const f1 = upperBound(0, run.byFrom.length, w.fromHi, (k) => g.from[run.start + run.byFrom[k]]);
     const t0 = lowerBound(0, run.byTo.length, w.toLo, (k) => g.to[run.start + run.byTo[k]]);
@@ -154,15 +158,16 @@ export function walkVisible(g, idx, rect, density, emit) {
   const gen = ++idx.gen;
   const mark = idx.mark;
   const { xa, xb, y0, y1 } = rect;
+  const { slotA, slotB } = slotsOf(g);
   let visited = 0;
   const consider = (p) => {
     visited++;
     if (mark[p] === gen) return;
     mark[p] = gen;
-    if (threadVisible(g.from[p], g.to[p], xa, xb, y0, y1)) emit(p);
+    if (threadVisible(g.from[p] + slotA[p] * SLOT_UNIT, g.to[p] + slotB[p] * SLOT_UNIT, xa, xb, y0, y1)) emit(p);
   };
   for (const run of drawnRuns(g, idx, density)) {
-    const w = footWindow(run.spanLo, run.spanHi, xa, xb, y0, y1);
+    const w = footWindow(run.spanLo, run.spanHi, xa - 1, xb + 1, y0, y1);
     const f0 = lowerBound(0, run.byFrom.length, w.fromLo, (k) => g.from[run.start + run.byFrom[k]]);
     const f1 = upperBound(0, run.byFrom.length, w.fromHi, (k) => g.from[run.start + run.byFrom[k]]);
     for (let k = f0; k < f1; k++) consider(run.start + run.byFrom[k]);

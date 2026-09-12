@@ -13,8 +13,9 @@
    The camera rows are the plan's (sessions/2026-09-11-orchestrator/
    plan-sw-phase1.md section (b)): phone landscape 800x360 at DPR 2 (frame
    base 520, squash 0.64), Famous, centre verse 15,000: at fit every one of
-   the 63,418 threads; at the 44 px ceiling 142 threads have a piece on
-   screen (141 were anchored under the old law); at 132 px, 37.
+   the 63,418 threads; at the 44 px ceiling 136 threads have a piece on
+   screen (142 on integer feet before the departure slots, M3; 141 were
+   anchored under the old law); at 132 px, 33 (was 37).
    MEASURED FIRST on the tree the RED was cut on: at the ceiling the chunk
    cull submits every instance in the buckets whose extents touch the
    viewport — the number this file exists to bring down. */
@@ -117,17 +118,18 @@ describe('the counter in the draw path: instances submitted against the corpus',
     expect('visible' in stats, 'static mode does not count: absence is the signal, never a 0').toBe(false);
   });
 
-  it('at the 44 px ceiling the renderer submits the 142 threads with a piece on screen, not every chunk that touches the viewport', () => {
+  it('at the 44 px ceiling the renderer submits the 136 threads with a piece on screen, not every chunk that touches the viewport', () => {
     const gl = fakeGL();
     const r = createRenderer(fakeCanvas(gl), graph);
     const stats = drawAt(r, 88, 0, 'famous');
     const submitted = gl.rec.draws.reduce((n, d) => n + d.n, 0);
-    expect(submitted, 'instances submitted at the phone ceiling').toBe(142);
-    expect(stats.submitted).toBe(142);
-    expect(stats.visible).toBe(142);
+    expect(submitted, 'instances submitted at the phone ceiling').toBe(136);
+    expect(stats.submitted).toBe(136);
+    expect(stats.visible).toBe(136);
     expect(stats.mode).toBe('gathered');
     expect(gl.rec.draws.length, 'draw calls (one per bucket with members, at most)').toBeLessThanOrEqual(8);
-    expect(stats.visited, 'candidates examined').toBeLessThanOrEqual(160);
+    // 161 with the slots' one-verse window slack (149 on integer feet)
+    expect(stats.visited, 'candidates examined').toBeLessThanOrEqual(170);
     expect(stats.window).toBe(stats.visited);
     expect(stats.draws).toBe(gl.rec.draws.length);
     expect(gl.rec.subData.length, 'one upload per instance stream (from, to, votes, genre, id, slotA, slotB)').toBe(7);
@@ -144,10 +146,10 @@ describe('the counter in the draw path: instances submitted against the corpus',
     expect(gl.rec.subData.length, 'a moved camera uploads again').toBe(after1 + 7);
   });
 
-  it('at 132 px per verse: 37 on the phone frame; Essential at the ceiling: 15', () => {
+  it('at 132 px per verse: 33 on the phone frame; Essential at the ceiling: 15', () => {
     const gl = fakeGL();
     const r = createRenderer(fakeCanvas(gl), graph);
-    expect(drawAt(r, 264, 0, 'famous').submitted).toBe(37);
+    expect(drawAt(r, 264, 0, 'famous').submitted).toBe(33);
     expect(drawAt(r, 88, 0, 'essential').submitted).toBe(15);
   });
 
@@ -160,12 +162,12 @@ describe('the counter in the draw path: instances submitted against the corpus',
     expect(gl.rec.uniforms.uCamY, 'the y camera reached the shader').toBeCloseTo(10 * band, 9);
   });
 
-  it('the regime switch is by the window, not by zoom: 16x gathers 11,557 and 8x stays static', () => {
+  it('the regime switch is by the window, not by zoom: 16x gathers 11,560 and 8x stays static', () => {
     const gl = fakeGL();
     const r = createRenderer(fakeCanvas(gl), graph);
     const s16 = drawAt(r, fit() * 16, 0, 'famous');
     expect(s16.mode).toBe('gathered');
-    expect(s16.submitted).toBe(11557);
+    expect(s16.submitted).toBe(11560);
     const s8 = drawAt(r, fit() * 8, 0, 'famous');
     expect(s8.mode).toBe('static');
     expect(s8.submitted, 'the whole-bucket path submits the chunk-culled set, a superset').toBeGreaterThan(17042);
@@ -187,7 +189,7 @@ describe('the counter in the draw path: instances submitted against the corpus',
       colorMode: 'distance', density: 'famous', light: false, bg: '#000',
       focusRange: null, focusArc: 40211, hoverArc: -1,
     }));
-    expect(stats.submitted).toBe(142);
+    expect(stats.submitted).toBe(136);
     expect(gl.rec.uniforms.uFocusArc, 'the tapped id goes to the shader as itself').toBe(40211);
     expect('uInstanceBase' in gl.rec.uniforms, 'no base-offset uniform any more').toBe(false);
   });

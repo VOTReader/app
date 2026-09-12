@@ -38,7 +38,7 @@ import {
   STROKE_MIN_CSS, STROKE_DEEP_CSS, worldRect,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
-import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
+import { bucketDrawCount, slotsOf } from '../../utils/scripture-web/decode.js';
 import { indexOf, windowSize, gather } from '../../utils/scripture-web/index.js';
 
 /**
@@ -68,13 +68,16 @@ uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything els
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 in float aId;                // the instance's position in the asset — its identity for the spotlight
+in float aSlotA; in float aSlotB; // departure slots, 0..1 across the foot's verse cell (decode.assignSlots)
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${threadShapeGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
-  float x0 = (a - uCamX)*uPPV + uRes.x*.5;
-  float x1 = (b - uCamX)*uPPV + uRes.x*.5;
+  // The feet stand at their departure slots inside the verse cell; the focus
+  // range and the distance colour below keep the integer verse.
+  float x0 = (a + aSlotA - uCamX)*uPPV + uRes.x*.5;
+  float x1 = (b + aSlotB - uCamX)*uPPV + uRes.x*.5;
   float rx = (x1 - x0)*.5;
   float cx = x0 + rx;
   float r = max(rx, 0.);
@@ -251,19 +254,23 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-  // The five per-instance streams, in one order for both regimes. Uint16
+  // The seven per-instance streams, in one order for both regimes. Uint16
   // verse ids widen to uint in the shader; votes stay signed; the id is a
-  // float (63,418 < 2^24, exact).
+  // float (63,418 < 2^24, exact); the slots are bytes the GPU normalises
+  // to 0..1.
   const ids = new Float32Array(graph.count);
   for (let i = 0; i < graph.count; i++) ids[i] = i;
+  const slots = slotsOf(graph);
   const STREAMS = [
-    { name: 'aFrom', type: gl.UNSIGNED_SHORT, isInt: true, bytes: 2, Ctor: Uint16Array, data: graph.from },
-    { name: 'aTo', type: gl.UNSIGNED_SHORT, isInt: true, bytes: 2, Ctor: Uint16Array, data: graph.to },
-    { name: 'aVotes', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: new Float32Array(graph.votes) },
-    { name: 'aGenre', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: genre },
-    { name: 'aId', type: gl.FLOAT, isInt: false, bytes: 4, Ctor: Float32Array, data: ids },
+    { name: 'aFrom', type: gl.UNSIGNED_SHORT, isInt: true, norm: false, bytes: 2, Ctor: Uint16Array, data: graph.from },
+    { name: 'aTo', type: gl.UNSIGNED_SHORT, isInt: true, norm: false, bytes: 2, Ctor: Uint16Array, data: graph.to },
+    { name: 'aVotes', type: gl.FLOAT, isInt: false, norm: false, bytes: 4, Ctor: Float32Array, data: new Float32Array(graph.votes) },
+    { name: 'aGenre', type: gl.FLOAT, isInt: false, norm: false, bytes: 4, Ctor: Float32Array, data: genre },
+    { name: 'aId', type: gl.FLOAT, isInt: false, norm: false, bytes: 4, Ctor: Float32Array, data: ids },
+    { name: 'aSlotA', type: gl.UNSIGNED_BYTE, isInt: false, norm: true, bytes: 1, Ctor: Uint8Array, data: slots.slotA },
+    { name: 'aSlotB', type: gl.UNSIGNED_BYTE, isInt: false, norm: true, bytes: 1, Ctor: Uint8Array, data: slots.slotB },
   ];
-  /** @typedef {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number}>} AttribSet */
+  /** @typedef {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, norm:boolean, bytes:number}>} AttribSet */
   /** One buffer per stream: the whole asset (STATIC_DRAW) or GATHER_MAX empty slots (DYNAMIC_DRAW). */
   const attribSet = (fill) => STREAMS.map((s) => {
     const loc = gl.getAttribLocation(program, s.name);
@@ -273,7 +280,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     else gl.bufferData(gl.ARRAY_BUFFER, GATHER_MAX * s.bytes, gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribDivisor(loc, 1);
-    return { buf, loc, type: s.type, isInt: s.isInt, bytes: s.bytes };
+    return { buf, loc, type: s.type, isInt: s.isInt, norm: s.norm, bytes: s.bytes };
   });
   const statics = attribSet(true);
   const dynamics = attribSet(false);
@@ -298,7 +305,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     for (const a of set) {
       gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
       if (a.isInt) gl.vertexAttribIPointer(a.loc, 1, a.type, 0, first * a.bytes);
-      else gl.vertexAttribPointer(a.loc, 1, a.type, false, 0, first * a.bytes);
+      else gl.vertexAttribPointer(a.loc, 1, a.type, a.norm, 0, first * a.bytes);
     }
   };
   pointInstances(statics, 0);
@@ -340,6 +347,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       staging[2][k] = graph.votes[p];
       staging[3][k] = genre[p];
       staging[4][k] = p;
+      staging[5][k] = slots.slotA[p];
+      staging[6][k] = slots.slotB[p];
     }
     if (list.count > first) groups.push({ bucket: bi, first, n: list.count - first });
     for (let i = 0; i < STREAMS.length; i++) {

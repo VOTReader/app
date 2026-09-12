@@ -8,16 +8,18 @@
    as a set difference in both directions, never a count, because matching
    totals survive two rows swapping places. The DATA half registers the
    numbers on the shipped asset that the plan's acceptance walk quotes:
-   phone landscape, Famous, centre verse 15,000 — 142 threads at the 44 px
-   ceiling visiting no more than 160 candidates, 37 at 132 px, 15 Essential,
+   phone landscape, Famous, centre verse 15,000 — 136 threads at the 44 px
+   ceiling visiting no more than 170 candidates, 33 at 132 px, 15 Essential,
    113 with the camera raised ten bands. Those are the "nothing far from the
-   frame is touched" numbers; a chunk cull submitted 18,944 for the 142. */
+   frame is touched" numbers; a chunk cull submitted 18,944 for them. (On
+   integer feet, before the departure slots, they read 142 / 149 / 37: the
+   feet that stand in their slots past the frame's right edge left it.) */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { buildIndex, windowSize, walkVisible, gather, countVisible } from './index.js';
-import { threadVisible } from './geometry.js';
+import { threadVisible, squashFactor } from './geometry.js';
 import { decodeGraph, bucketDrawCount, deltaRuns } from './decode.js';
 import * as decodeLaw from './decode.js';
 
@@ -175,8 +177,8 @@ beforeAll(() => {
   graph = decodeGraph(JSON.parse(m[1]));
 });
 
-/** Phone landscape 800x360 at DPR 2: frame base 520, squash 0.64, the camera at verse 15,000. */
-const W = 1600, BASE = 520, SQUASH = 0.64, FIT = W / 31102;
+/** Phone landscape 800x360 at DPR 2: frame base 520, ceil 512.2 (squash 0.6403 — the renderer test's frame), the camera at verse 15,000. */
+const W = 1600, BASE = 520, SQUASH = squashFactor(512.2, W), FIT = W / 31102;
 function rectAt(ppv, camY, camX = 15000) {
   const half = W / ppv / 2;
   const y0 = camY > 0 ? camY : 0;
@@ -229,14 +231,14 @@ describe('the index over the shipped asset (63,418 threads)', () => {
     expect(out.visited).toBeLessThanOrEqual(2 * 63418);
   });
 
-  it('at the 44 px ceiling: 142 visible, no more than 160 candidates examined (a chunk cull submitted 18,944)', () => {
+  it('at the 44 px ceiling: 136 visible, no more than 170 candidates examined (a chunk cull submitted 18,944)', () => {
     const idx = buildIndex(graph);
     const out = { ids: new Uint32Array(1024), count: 0, visited: 0 };
     gather(graph, idx, rectAt(88, 0), 'famous', out);
-    expect(out.count).toBe(142);
-    expect(out.visited).toBeLessThanOrEqual(160);
+    expect(out.count).toBe(136);
+    expect(out.visited).toBeLessThanOrEqual(170);
     expect(countVisible(graph, idx, rectAt(88, 0), 'essential')).toBe(15);
-    expect(countVisible(graph, idx, rectAt(264, 0), 'famous')).toBe(37);
+    expect(countVisible(graph, idx, rectAt(264, 0), 'famous')).toBe(33);
   });
 
   it('a camera raised ten band heights at the ceiling sees the 113 threads whose stems cross that band', () => {
@@ -245,12 +247,12 @@ describe('the index over the shipped asset (63,418 threads)', () => {
     expect(countVisible(graph, idx, rectAt(88, 10 * band), 'famous')).toBe(113);
   });
 
-  it('the windows that decide the regime: 17,509 candidates at 16x and 26,986 at 8x on this frame', () => {
+  it('the windows that decide the regime: 17,513 candidates at 16x and 26,991 at 8x on this frame', () => {
     // Registered as data: the renderer gathers when the window fits its
-    // budget and draws whole buckets past it. These two straddle the budget.
+    // budget (20,480) and draws whole buckets past it. These two straddle it.
     const idx = buildIndex(graph);
-    expect(windowSize(graph, idx, rectAt(FIT * 16, 0), 'famous')).toBe(17509);
-    expect(windowSize(graph, idx, rectAt(FIT * 8, 0), 'famous')).toBe(26986);
-    expect(countVisible(graph, idx, rectAt(FIT * 16, 0), 'famous')).toBe(11557);
+    expect(windowSize(graph, idx, rectAt(FIT * 16, 0), 'famous')).toBe(17513);
+    expect(windowSize(graph, idx, rectAt(FIT * 8, 0), 'famous')).toBe(26991);
+    expect(countVisible(graph, idx, rectAt(FIT * 16, 0), 'famous')).toBe(11560);
   });
 });

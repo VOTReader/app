@@ -24,7 +24,7 @@
 import {
   arcDistance, threadShape, verseToX, xToVerse,
 } from './geometry.js';
-import { bucketDrawCount } from './decode.js';
+import { bucketDrawCount, slotsOf, SLOT_UNIT } from './decode.js';
 import { indexOf, walkVisible } from './index.js';
 
 /**
@@ -78,9 +78,10 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
     y0: hv - dv > 0 ? hv - dv : 0, y1: hv + dv,
   };
   if (rect.y1 < 0) return best;                       // more than tol below the baseline: nothing to hit
+  const { slotA, slotB } = slotsOf(g);                // the feet stand at their departure slots, as drawn
   walkVisible(g, indexOf(g), rect, density, (i) => {
-    const x0 = (g.from[i] - camX) * ppv + half;
-    const x1 = (g.to[i] - camX) * ppv + half;
+    const x0 = (g.from[i] + slotA[i] * SLOT_UNIT - camX) * ppv + half;
+    const x1 = (g.to[i] + slotB[i] * SLOT_UNIT - camX) * ppv + half;
     const shape = threadShape((x1 - x0) * 0.5, squash);
     const d = arcDistance(px, py, x0, x1, worldBase, shape.R, shape.A, tol);
     if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) return;

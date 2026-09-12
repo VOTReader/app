@@ -338,7 +338,10 @@ describe('pickArc agrees with the drawn curve', () => {
     clampCamera(cam, 1000, 5000);
     for (const zoom of [8, 40, 300, 3000]) {
       cam.ppv = fitPPV(cam, 1000) * zoom;
-      cam.x = 20;
+      // on the [20, 21] thread's foot as drawn (its departure slot at verse
+      // 20): at 3,000x the frame is 0.013 verse wide, so a camera on the
+      // verse's left edge would show no foot at all
+      cam.x = feetOf(anchoredGraph, 0)[0];
       clampCamera(cam, 1000, 5000);
       const view = VIEW();
       let found = 0;
@@ -347,8 +350,9 @@ describe('pickArc agrees with the drawn curve', () => {
         // 3000x a verse is 75,000 px wide and the piece inside the frame is
         // the 4 px of leg nearest the foot — so sample the near leg by HEIGHT
         // (the inverse of arcHeight), not by fractions of the x window.
-        const x0 = verseToX(cam, view.width, anchoredGraph.from[i]);
-        const x1 = verseToX(cam, view.width, anchoredGraph.to[i]);
+        const [fa, fb] = feetOf(anchoredGraph, i);
+        const x0 = verseToX(cam, view.width, fa);
+        const x1 = verseToX(cam, view.width, fb);
         const { R, A } = threadShape((x1 - x0) / 2, view.squash);
         const footOnScreen = (x0 >= 0 && x0 <= view.width) ? x0 : x1;
         const sign = footOnScreen === x0 ? 1 : -1;      // the leg rises away from its foot
@@ -374,7 +378,7 @@ describe('pickArc agrees with the drawn curve', () => {
     clampCamera(cam, 1000, 5000);
     for (const zoom of [1, 40, 1711]) {
       cam.ppv = fitPPV(cam, 1000) * zoom;
-      cam.x = 6;
+      cam.x = feetOf(famous, 0)[0];            // on the foot as drawn (its slot), so the piece is on screen at 1,711x
       clampCamera(cam, 1000, 5000);
       const view = VIEW({ density: 'famous' });
       for (const t of [0.08, 0.5, 0.92]) {
