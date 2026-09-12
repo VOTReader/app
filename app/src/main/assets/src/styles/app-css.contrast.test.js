@@ -61,7 +61,21 @@ const LIGHT = customProps(exactRuleBlock(CSS, 'body.light'));
    the exact mechanism the bug exploits, so the fallback must be modeled,
    not treated as "missing". */
 function themed(block, name) {
-  return block[name] !== undefined ? block[name] : ROOT[name];
+  return resolveVar(block[name] !== undefined ? block[name] : ROOT[name]);
+}
+
+/* A token may be an ALIAS of another (`--gold-dim: var(--ink-gold-dim)` since w-sw-ink-tokens,
+   2026-09-12: the dark ink is named once in :root and the theme set reads it), and this reader
+   used to hand the alias text to parseInt — NaN, and every comparison false, so two cases named
+   "untouched" went red while no colour moved. Follow the chain through :root, bounded at 8 hops
+   (a cycle must throw, not spin); the value at the end is the hex the browser paints. */
+function resolveVar(value, hops = 0) {
+  const m = typeof value === 'string' ? value.match(/^var\(--([\w-]+)\)$/) : null;
+  if (!m) return value;
+  if (hops >= 8) throw new Error('var() chain deeper than 8 hops at --' + m[1]);
+  const next = ROOT[m[1]];
+  if (next === undefined) throw new Error('var(--' + m[1] + ') names no :root token');
+  return resolveVar(next, hops + 1);
 }
 
 function srgbToLinear(c) {
@@ -111,7 +125,11 @@ describe('app.css — light --gold-dim contrast against every light surface (a11
     expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
   });
   it('dark --gold-dim still reaches WCAG AA against dark --bg3 (untouched)', () => {
-    expect(contrastRatio(themed(ROOT, 'gold-dim'), themed(ROOT, 'bg3'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    // The alias resolves to a hex (a NaN ratio compares false and reads as a failure of the colour).
+    expect(themed(ROOT, 'gold-dim')).toMatch(/^#[0-9a-f]{6}$/i);
+    const ratio = contrastRatio(themed(ROOT, 'gold-dim'), themed(ROOT, 'bg3'));
+    expect(Number.isFinite(ratio)).toBe(true);
+    expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
   });
 });
 
@@ -150,7 +168,10 @@ describe('app.css — light --gold-bright contrast at its small-text grounds (a1
     expect(relLuminance(themed(LIGHT, 'gold-bright'))).toBeLessThanOrEqual(relLuminance(themed(LIGHT, 'gold')));
   });
   it('dark --gold-bright still reaches WCAG AA against dark --bg3 (untouched)', () => {
-    expect(contrastRatio(themed(ROOT, 'gold-bright'), themed(ROOT, 'bg3'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    expect(themed(ROOT, 'gold-bright')).toMatch(/^#[0-9a-f]{6}$/i);
+    const ratio = contrastRatio(themed(ROOT, 'gold-bright'), themed(ROOT, 'bg3'));
+    expect(Number.isFinite(ratio)).toBe(true);
+    expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
   });
   /* The one site where --gold-bright is a GROUND under text: the Listening
      Library's primary action on hover. Its text was #17130a for the dark
