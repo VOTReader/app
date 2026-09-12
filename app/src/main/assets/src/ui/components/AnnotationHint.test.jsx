@@ -201,6 +201,12 @@ describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)
     render(<AnnotationHint />);
     act(() => { vi.advanceTimersByTime(2600); });
     expect(document.querySelector('.ann-hint-pill'), 'the bar is open: no pill').toBeNull();
+    // PAUSED is the commonest open bar (a reader who paused to read), and the fake never reaches
+    // 'playing' on its own — so a yield narrowed to playing || loading would pass the line above
+    // and draw the pill over the paused bar again (verifier-2 F1, 2026-09-12). Pause it and look.
+    act(() => { AudioPlayer.pauseIfPlaying(); });
+    expect(AudioPlayer.getState().status, 'PRECONDITION: the bar is open, paused').toBe('paused');
+    expect(document.querySelector('.ann-hint-pill'), 'the bar is open, paused: no pill').toBeNull();
     act(() => { AudioPlayer.stop(); });
     expect(AudioPlayer.getState().status).toBe('idle');
     expect(document.querySelector('.ann-hint-pill'), 'the bar closed: the pill comes').toBeTruthy();
