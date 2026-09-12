@@ -14,6 +14,9 @@ import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
 import { AnnotationHint } from './AnnotationHint.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import * as TS from '../../utils/tour-steps.js';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function makeStore(overrides) {
   let version = 1;
@@ -219,5 +222,20 @@ describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)
     expect(said.length, 'the pill says something').toBeGreaterThan(20);
     expect(stop.text.startsWith(said), `the pill's words "${said}" must open the highlight stop's text`).toBe(true);
     expect(said).toContain('Highlight, or Note');
+  });
+
+  /* THE ONE THING THE CASE ABOVE CANNOT SEE: a pill holding an IDENTICAL copy of the words passes it
+     perfectly, and an identical copy is exactly how the two drift apart later. So the source is read:
+     the pill's own file names no part of the sentence and reaches the words through the controller.
+     Comments are stripped first (a comment quoting the words would fail the negative for a reason
+     that is not the program), and the stripper is proven on this very file: its header comment
+     quotes the OLD copy, which must be in the raw text and gone from the stripped text. */
+  it('holds no copy of the words in its own source — it reaches them through TourController', () => {
+    const raw = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'AnnotationHint.jsx'), 'utf8');
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(raw, 'CONTROL: the header comment quotes the old copy').toMatch(/highlight, note, or bookmark/);
+    expect(code, 'CONTROL: the stripper removed it').not.toMatch(/highlight, note, or bookmark/);
+    expect(code, 'CONTROL: the stripped text is still the program').toMatch(/highlightWords\(\)/);
+    expect(code).not.toMatch(/Hold your finger|A small bar appears|Highlight, or Note/);
   });
 });
