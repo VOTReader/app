@@ -142,6 +142,17 @@ async function shot(page, name, clip) { if (!OUT) return; await page.screenshot(
  *  (A window 'resize' event reaches nothing - the screen observes its canvas with a ResizeObserver -
  *  and the first run's two corridor captures were one frame twice: 93 of 1,152,000 px differed.) */
 async function settle(page, at) { await page.mouse.move(at.x, at.y); await page.mouse.wheel({ deltaY: 0 }); await sleep(900); }
+/** The pointer that settled the frame rests on the rail and a 'Your link' hover card (.sw-tip) covered half
+ *  the corridor in runs 3 and 4. Park it over the topbar's subtitle (chrome: the canvas hears no hover there)
+ *  and clear the card with Escape - pressed ONLY while .sw-tip is in the DOM, since with nothing open Escape
+ *  is onBack() and leaves the screen. */
+async function clearHover(page) {
+  const r = await page.evaluate(() => { const e = document.querySelector('.sw-title p') || document.querySelector('.sw-title'); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  if (r) await page.mouse.move(r.x, r.y);
+  await sleep(250);
+  if (await page.$('.sw-tip')) { await page.focus('.sw-root'); await page.keyboard.press('Escape'); await sleep(350); }
+  if (await page.$('.sw-tip')) note('WARN a hover card is still on screen after Escape');
+}
 
 /** The longest task while the screen redraws once: the launch classification, printed, never gated. */
 async function classify(page) {
@@ -270,6 +281,7 @@ async function walk(page, url, fname) {
   for (const ceil of CEILINGS) {
     await page.evaluate((v) => { globalThis.__swContextCeiling = v; }, ceil);
     await settle(page, { x: c.l + c.w / 2, y: c.t + r0.topY + 12 });
+    await clearHover(page);
     const b64 = await page.screenshot({ encoding: 'base64' });
     shots[ceil] = b64;
     if (OUT) writeFileSync(resolve(OUT, `${fname}-corridor-${ceil}.png`), Buffer.from(b64, 'base64'));
