@@ -31,6 +31,7 @@ import { TOUR_STEPS } from '../app/src/main/assets/src/utils/tour-steps.js';
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
+const STRIP_ONLY = argv.includes('--strip-only');   // the strip's geometry legs alone (seconds, no tour walk)
 
 /* The harness serves its own tree on an ephemeral port. A shared fixed port (8097) let
    several preview servers bind at once with allow_reuse_address, and a green here could be
@@ -70,6 +71,72 @@ const STOPS = TOUR_STEPS.map((s) => s.id);
 const RINGED = TOUR_STEPS.filter((s) => s.target).map((s) => s.id);            // every stop that rings a control
 const EXPECT_SCREEN = Object.fromEntries(TOUR_STEPS.filter((s) => s.target).map((s) => [s.id, s.screen]));
 
+/* THE STRIP'S GEOMETRY (journey F1.1 + F1.2, 2026-09-12). The "New here?" strip must be as tall as
+   its words — a strip capped shorter scrolls INSIDE itself with no scrollbar on touch, and "Don't
+   show this again" is cut off or off the frame (every landscape phone at Text Size 1; a portrait
+   phone at Text Size 3) — and neither of its two buttons may break a word ("SHOW ME / AROUND" on
+   320 and 360). Read as geometry, not as CSS: a rule can be present and still not bind. */
+async function stripGeometry(page, note) {
+  const g = await page.evaluate(() => {
+    const p = document.querySelector('.tour-prompt'); if (!p) return null;
+    const r = p.getBoundingClientRect();
+    const never = p.querySelector('.tour-never'); const nr = never ? never.getBoundingClientRect() : null;
+    const btns = [...p.querySelectorAll('.tour-btn')];
+    const prim = btns.find((b) => b.classList.contains('primary')); const later = btns.find((b) => !b.classList.contains('primary'));
+    // Line boxes of the label's text: one rect per line the words occupy.
+    const lines = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return [...rg.getClientRects()].filter((x) => x.width > 0).length; };
+    return {
+      vh: innerHeight, vw: innerWidth, box: Math.round(r.height), bottom: Math.round(r.bottom),
+      scrollsInside: p.scrollHeight > p.clientHeight + 1, scrollH: p.scrollHeight, clientH: p.clientHeight,
+      neverBottom: nr ? Math.round(nr.bottom) : null,
+      neverInside: !!nr && nr.top >= r.top - 1 && nr.bottom <= r.bottom + 1 && nr.bottom <= innerHeight + 1,
+      primaryLines: prim ? lines(prim) : 0, laterLines: later ? lines(later) : 0,
+      fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale').trim() || '1',
+    };
+  });
+  if (!g) { fail(`${note}: no strip to measure`); return; }
+  const where = `${note} (${g.vw}x${g.vh}, text ${g.fontScale}x)`;
+  let bad = false;
+  if (g.scrollsInside) { bad = true; fail(`${where}: the strip scrolls inside itself — ${g.scrollH} px of words in a ${g.clientH} px box`); }
+  if (!g.neverInside) { bad = true; fail(`${where}: "Don't show this again" is outside the strip or the frame (bottom ${g.neverBottom}, strip bottom ${g.bottom}, frame ${g.vh})`); }
+  if (g.primaryLines !== 1 || g.laterLines !== 1) { bad = true; fail(`${where}: a button label wraps (Show me around ${g.primaryLines} lines, Maybe later ${g.laterLines})`); }
+  if (!bad) ok(`${where}: strip ${g.box} px, never-link inside at ${g.neverBottom}/${g.vh}, both labels one line`);
+}
+
+/* Strip only, no tour: About → Home, then the strip at Text Size 1 / 1.8 / 3 through the inline
+   --font-scale (the strip's type reads it through the --fs-* tokens; the tour's own walk above sets
+   the size through the app's state, which is the slower and fuller instrument). A landscape phone
+   is not a frame the tour walk drives, and this is the frame the cap cut the strip on. */
+async function stripOnly(browser, { width, height, label, scales }) {
+  console.log(`\n== ${label} ${width}x${height} strip only`);
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await page.setViewport({ width, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.setRequestInterception(true);
+  page.on('request', (r) => { const u = r.url(); if (/github\.com\/VOTReader\/votreader-assets|\.mp3(\?|$)/.test(u)) r.respond({ status: 404, body: '' }); else r.continue(); });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
+  await sleep(600);
+  const click = async (l) => {
+    await page.waitForFunction((l) => [...document.querySelectorAll('button,[role=button]')].some((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0), { timeout: 30000 }, l);
+    await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0); b.click(); }, l);
+    await sleep(400);
+  };
+  await click('Continue'); await click('Begin Reading');
+  await page.waitForFunction(() => document.querySelector('.tour-prompt'), { timeout: 15000 });
+  await sleep(500);
+  for (const s of scales) {
+    await page.evaluate((v) => document.documentElement.style.setProperty('--font-scale', String(v)), s);
+    await sleep(300);
+    await stripGeometry(page, `${label} strip`);
+    if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-strip-x${s}.png`) });
+  }
+  await page.close();
+  await context.close();
+  return errors;
+}
 async function run(browser, { width, height, label, light }) {
   console.log(`\n== ${label} ${width}x${height} ${light ? 'light' : 'dark'}`);
   // A fresh profile per size: the phone run's durable flags must not leak into the tablet run.
@@ -170,6 +237,7 @@ async function run(browser, { width, height, label, light }) {
   let f = await facts();
   if (!f.prompt) fail('the strip did not appear on Home after About');
   else ok('the strip offers the tour on Home');
+  if (f.prompt) await stripGeometry(page, `${label} strip`);
   await shot('00-prompt');
   await clickLabel('Prophetic Letters'); await sleep(400);
   if ((await facts()).prompt) fail('the strip is showing off Home'); else ok('the strip is Home-only');
@@ -416,9 +484,14 @@ try {
   // 320x640 first: every tour defect anyone has measured came from that frame, and neither the
   // 36 % cap nor the 55 % floor binds at 800 tall, so a two-viewport run could not see the rule
   // it was judging (the Verifier, 2026-09-10).
-  errs.push(...await run(browser, { width: 320, height: 640, label: 'small-phone' }));
-  errs.push(...await run(browser, { width: 360, height: 800, label: 'phone' }));
-  errs.push(...await run(browser, { width: 800, height: 1280, label: 'tablet', light: true }));
+  if (!STRIP_ONLY) {
+    errs.push(...await run(browser, { width: 320, height: 640, label: 'small-phone' }));
+    errs.push(...await run(browser, { width: 360, height: 800, label: 'phone' }));
+    errs.push(...await run(browser, { width: 800, height: 1280, label: 'tablet', light: true }));
+  }
+  // The strip at the sizes and the frame the tour walks do not reach (F1.1 measured on both).
+  errs.push(...await stripOnly(browser, { width: 800, height: 360, label: 'landscape-phone', scales: [1, 1.8, 3] }));
+  errs.push(...await stripOnly(browser, { width: 360, height: 800, label: 'phone', scales: [1, 1.8, 3] }));
   const real = errs.filter((e) => !/ERR_FAILED|Failed to load resource|404|net::/.test(e));
   if (real.length) fail('browser errors:\n  ' + real.slice(0, 8).join('\n  '));
 } finally { await browser.close(); server.close(); }
