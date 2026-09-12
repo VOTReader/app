@@ -5,7 +5,8 @@
    moves to the new reading ONLY when the active tab shows the unit that just ended — the live-pane rule. A
    reader on the Journal, Home, another reading, or with a sheet open (other than the listening desk) is never
    moved; the navigation pushes no history entry (suppressNextHistoryPush, the hardware-back handshake); the
-   row off keeps the audio going and the screen still; window.__openReading() is the manual path either way. */
+   row off keeps the audio going and the screen still (the desk's own "Open the reading" — window.__openAudioText,
+   screen-routes — is the manual path, unchanged by this hook). */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -47,7 +48,6 @@ beforeEach(() => {
 afterEach(() => {
   delete globalThis.AudioPlayer;
   delete globalThis.COL_BY_KEY;
-  delete globalThis.__openReading;
   for (const id of modalRegistry.openIds()) modalRegistry.unregister(id);
 });
 
@@ -88,15 +88,13 @@ describe('the follower moves the live pane with the audio — and nothing else',
     expect(m2.setChapterNum).toHaveBeenCalledWith(4);
   });
 
-  it('with the row off the screen stays — and "Open the reading" (window.__openReading) still lands on the playing track', () => {
+  it('with the row off the screen stays and no history is touched — the audio goes on', () => {
     const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
     const m = mount(player, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null }, false);
     act(() => player.advance());
     expect(m.setScreen).not.toHaveBeenCalled();
-    expect(typeof globalThis.__openReading).toBe('function');
-    act(() => globalThis.__openReading());
-    expect(m.setLetterId).toHaveBeenCalledWith('first');
-    expect(m.setScreen).toHaveBeenCalledWith('vot-two-letter');
+    expect(m.setLetterId).not.toHaveBeenCalled();
+    expect(suppressNextHistoryPush).not.toHaveBeenCalled();
   });
 
   it('an open sheet other than the listening desk blocks the follow; the desk alone does not', () => {
@@ -123,11 +121,10 @@ describe('the follower moves the live pane with the audio — and nothing else',
     expect(m.setScreen).not.toHaveBeenCalled();
   });
 
-  it('unmounting unsubscribes and withdraws the bridge; a missing player is a no-op, never a throw', () => {
+  it('unmounting unsubscribes; a missing player is a no-op, never a throw', () => {
     const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
     const m = mount(player, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null });
     m.hook.unmount();
-    expect(globalThis.__openReading).toBeUndefined();
     act(() => player.advance());
     expect(m.setScreen).not.toHaveBeenCalled();
     delete globalThis.AudioPlayer;

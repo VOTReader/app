@@ -116,6 +116,7 @@ import { useBibleStudies } from '../hooks/use-bible-studies.js';
 import { useJournalMutations } from '../hooks/use-journal-mutations.js';
 import { useTapThrough } from '../hooks/use-tap-through.js';
 import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
+import { useAudioFollow } from '../hooks/use-audio-follow.js';
 import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
 import { useTranslationLoader } from '../hooks/use-translation-loader.js';
@@ -235,6 +236,7 @@ Object.assign(window, {
   useJournalMutations,
   useTapThrough,
   useReadingPositionNav,
+  useAudioFollow,
   useReadingChainNav,
   useSurprise,
   useTranslationLoader,
