@@ -111,7 +111,6 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} clearReadForBook
  * @property {*} clearAllProgress
  * @property {*} clearHistory
- * @property {*} pruneHistoryDay
  * @property {*} activeLetter
  * @property {*} activeVolKey
  * @property {*} book
@@ -216,7 +215,7 @@ export function buildScreenRoutes({
   lastReadChapters, setLastReadChapters,
   lastReadLetterMap, setLastReadForVol,
   readItems, readHistory,
-  markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
+  markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory,
   // ── Data resolved from screen state (F3: the active letter/entry only) ──
   activeLetter, activeVolKey,
   book, chapter,
@@ -740,7 +739,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onSettings={goSettings}
         onHistory={goHistory}
-        onPruneDay={pruneHistoryDay}
         theme={theme} onThemeChange={setTheme}
       />
     ),
