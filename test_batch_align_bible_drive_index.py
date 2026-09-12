@@ -85,11 +85,23 @@ class DriveIndex(unittest.TestCase):
                 self.m.drive_index(self.cfg, listing_path=listing, archive_root=archive)
         self.assertIn("two files claim matthew chapter 1", str(cm.exception))
 
-    def test_audio_index_routes_a_drive_edition_here(self):
-        # the dispatch, not the data: a driveFolder edition never reaches the mirror loader
+    def test_registry_declares_the_drive_edition(self):
         self.assertIsNone(self.m.EDITIONS["tsot-matthew"]["mirror"])
         self.assertEqual(self.m.EDITIONS["tsot-matthew"]["book"], "matthew")
         self.assertTrue(self.m.EDITIONS["tsot-matthew"].get("driveFolder"))
+
+    def test_audio_index_dispatches_a_drive_edition_to_drive_index_and_never_loads_a_mirror(self):
+        # THE DISPATCH ITSELF, witnessed without the gitignored listing (verifier-2, 2026-09-12):
+        # the registry case above passes with the two dispatch lines deleted from audio_index(),
+        # and the identity control skips everywhere but the generating machine, so in CI the
+        # defect this branch fixes (audio_index -> _load(None) -> AttributeError) could return
+        # green. Stub the two exits: drive_index returns a sentinel, the mirror loader raises.
+        sentinel = {("matthew", 1): ("stub.mp3", "id-stub")}
+        seen = {}
+        self.m.drive_index = lambda cfg, **kw: (seen.setdefault("cfg", cfg), sentinel)[1]
+        self.m._load = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("the mirror loader was entered for a driveFolder edition"))
+        self.assertIs(self.m.audio_index("tsot-matthew"), sentinel)
+        self.assertEqual(seen["cfg"]["driveFolder"], "18. TSOT New Testament")
 
     @unittest.skipUnless(os.path.exists(os.path.join(HERE, "tools", "_audio-drive-listing.json")),
                          "the Drive listing is gitignored; runs on the generating machine only")
