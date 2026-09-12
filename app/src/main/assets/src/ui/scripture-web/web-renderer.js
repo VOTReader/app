@@ -34,8 +34,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  threadShapeGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, worldRect,
+  threadShapeGLSL, voteStrengthGLSL, glslFloat, segmentsFor, CLIP_MARGIN,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, STRENGTH_FLOOR, worldRect,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, slotsOf } from '../../utils/scripture-web/decode.js';
@@ -71,6 +71,7 @@ in float aId;                // the instance's position in the asset — its ide
 in float aSlotA; in float aSlotB; // departure slots, 0..1 across the foot's verse cell (decode.assignSlots)
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${threadShapeGLSL}
+${voteStrengthGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -102,8 +103,9 @@ void main(){
 
   // At depth every ribbon needs the full alpha to clear 3:1 alone, so votes
   // can no longer ride on alpha; they drive WIDTH instead.
-  float strength = clamp(aVotes/70., .30, 1.);
-  float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
+  float strength = voteStrength(aVotes);
+  float wScale = mix(1., mix(${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, 1.,
+    (strength - ${glslFloat(STRENGTH_FLOOR)})/${glslFloat(1 - STRENGTH_FLOOR)}), uVoteMix);
   float halfW = uWidth*.5*wScale;
   float hw = halfW + 1.0;                        // +1px feather skirt
 

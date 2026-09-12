@@ -128,8 +128,29 @@ export const DENSITY_EXP = 0.57;
 /** Widest stroke, CSS px. At depth votes drive width from 1.4 up to this. */
 export const STROKE_DEEP_CSS = 2.4;
 
-/** Narrowest stroke at depth, CSS px - the floor a 0.30-strength arc gets. */
-export const STROKE_MIN_CSS = 1.4;
+/**
+ * Narrowest stroke at depth, CSS px - the floor a 0.30-strength arc gets.
+ * 1.0 (was 1.4): a hairline for the weakest thread against 2.4 for the
+ * strongest, a 2.4x range, so the tiers read as tiers (M5).
+ */
+export const STROKE_MIN_CSS = 1.0;
+
+/**
+ * The vote ramp (M5). The linear votes / 70 read 0.30 for everything under
+ * 21 votes — the whole bottom half of Famous at one strength. Now a decade
+ * up from the Famous floor: strength = .3 + .7 * clamp(log10(votes / 7), 0, 1),
+ * so 7 -> 0.30, 10 -> 0.41, 20 -> 0.62, 35 -> 0.79, 70 -> 1.00. At depth
+ * strength drives width (see the shader); at the overview, alpha. The GLSL
+ * below is the same law, emitted from the same constants, and
+ * geometry.test.js runs the two against each other.
+ */
+export const VOTE_FLOOR = 7;
+export const STRENGTH_FLOOR = 0.3;
+/** @param {number} votes */
+export function voteStrength(votes) {
+  const t = Math.log(votes / VOTE_FLOOR) / Math.LN10;
+  return STRENGTH_FLOOR + (1 - STRENGTH_FLOOR) * (t < 0 ? 0 : (t > 1 ? 1 : t));
+}
 
 /**
  * The alpha and stroke law, as ONE export both the screen and the probes
@@ -403,6 +424,11 @@ export function glslFloat(n) {
  * arcAt is the curve and its tangent; sampleTau spends the strip's segments
  * on the piece that is on screen.
  */
+export const voteStrengthGLSL = `
+float voteStrength(float v){
+  return ${glslFloat(STRENGTH_FLOOR)} + ${glslFloat(1 - STRENGTH_FLOOR)}*clamp(log(v/${glslFloat(VOTE_FLOOR)})/${glslFloat(Math.LN10)}, 0., 1.);
+}`;
+
 export const threadShapeGLSL = `
 const float ARC_HALF = 1.5707963;
 vec2 threadShape(float rx, float squash){
