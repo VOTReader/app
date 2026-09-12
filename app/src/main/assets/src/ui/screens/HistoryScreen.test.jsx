@@ -16,7 +16,7 @@
        row and the card drift apart, which is the whole point of the
        shared chip helper. */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, within } from '@testing-library/react';
 import { HistoryScreen } from './HistoryScreen.jsx';
 import { HistoryEntryCard } from '../components/HistoryEntryCard.jsx';
@@ -417,33 +417,61 @@ describe('HistoryScreen — accordion state is announced', () => {
   });
 });
 
-/* Deduplicate acts on a whole calendar day, so it may not be offered while a
-   query is showing a subset of that day — the count would describe the
-   filtered rows and the press would remove more than it named. */
-describe('HistoryScreen — deduplicate during a search', () => {
-  /* These three must land in ONE day group for the button to appear at all, so
-     they are spaced by SECONDS rather than by `today(minutes)`: a fixture that
-     reaches 35 minutes back straddles midnight for the first half-hour of every
-     day, and the suite failed there (caught 2026-08-10, 00:0x). */
-  const DUPES = [
-    chapter('psalms', 'Psalms', 1, Date.now() - 1000),
-    chapter('psalms', 'Psalms', 1, Date.now() - 2000),
-    chapter('psalms', 'Psalms', 23, Date.now() - 3000, 'The Lord Is My Shepherd'),
+/* JOURNEY ROW 3 (2026-09-12): a reader's screen must not ask them to clean it. Three "Chosen by God"
+   rows at 4 m, 25 m and 31 m ago used to sit under a "Deduplicate (2)" chore button; now the
+   same reading on the same calendar day is ONE row carrying how many times it was opened, at its
+   newest visit's time, and the button is gone. Collapsed at display time, so a trail written
+   before today collapses too and no stored row is touched — the store keeps every visit. */
+describe('HistoryScreen — repeats collapse into one row per reading per day', () => {
+  /* All within ONE day group: spaced by seconds, not `today(minutes)` — a fixture that reaches 35
+     minutes back straddles midnight for the first half-hour of every day (caught 2026-08-10). */
+  const now = Date.now();
+  const REPEATS = [
+    chapter('psalms', 'Psalms', 23, now - 1000, 'The Lord Is My Shepherd'),
+    chapter('psalms', 'Psalms', 1, now - 2000),
+    chapter('psalms', 'Psalms', 1, now - 3000),
+    chapter('psalms', 'Psalms', 1, now - 4000),
   ];
 
-  it('offers deduplicate on the unfiltered day', () => {
+  it('one row per reading per day, counting its visits, at the newest visit; a single visit says nothing', () => {
     setupGlobals();
-    renderScreen(DUPES);
-    expect(document.querySelector('.history-dedupe-btn').textContent).toBe('Deduplicate (1)');
+    renderScreen(REPEATS);
+    expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1']);
+    const rows = [...document.querySelectorAll('.chapter-card-btn')];
+    const visits = rows.map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');
+    expect(visits).toEqual(['', '3 visits']);
+    // The day header counts ROWS, not visits — "Today · 2", never "· 4".
+    expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 2');
+    expect(document.querySelector('.history-dedupe-btn'), 'the chore button is gone').toBeNull();
   });
 
-  it('withdraws it while a query is filtering that day', () => {
+  it('the collapsed row is the NEWEST visit and opens that reading', () => {
     setupGlobals();
-    renderScreen(DUPES);
-    type('psalms');
-    expect(cardTitles()).toHaveLength(3);
-    expect(document.querySelector('.history-dedupe-btn')).toBeNull();
-    type('');
-    expect(document.querySelector('.history-dedupe-btn')).toBeTruthy();
+    const onSelect = vi.fn();
+    renderScreen(REPEATS, { onSelect });
+    const rows = [...document.querySelectorAll('.chapter-card-btn')];
+    expect(rows, 'two rows: the three Psalms 1 visits are one').toHaveLength(2);
+    fireEvent.click(rows[1]);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0]).toMatchObject({ key: 'ch:psalms:1', ts: now - 2000 });
+  });
+
+  it('CONTROL (green on the base tree by design): the same reading on ANOTHER day is its own row — collapse is per calendar day', () => {
+    setupGlobals();
+    const twoDays = [
+      chapter('psalms', 'Psalms', 1, now - 1000),
+      chapter('psalms', 'Psalms', 1, now - 1000 - 86400000),        // yesterday: default-open, like today
+    ];
+    renderScreen(twoDays);
+    expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
+    expect(document.querySelectorAll('.history-entry-visits')).toHaveLength(0);
+  });
+
+  it('a filtering query collapses the same way (the rule is the view\'s, not the button\'s)', () => {
+    setupGlobals();
+    renderScreen(REPEATS);
+    type('chapter 1');
+    expect(cardTitles()).toEqual(['Chapter 1']);
+    expect(document.querySelector('.history-entry-visits').textContent).toBe('3 visits');
   });
 });
