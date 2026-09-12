@@ -31,7 +31,7 @@
    session-only by design: "Maybe later" means later.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { TOUR_STEPS, TOUR_STOPS_WORD, nextIndex, prevIndex, findTarget } from './tour-steps.js';
+import { TOUR_STEPS, TOUR_STOPS_WORD, HIGHLIGHT_GESTURE_WORDS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 const listeners = new Set();
@@ -160,6 +160,10 @@ export const TourController = {
   /** The stop count as a word ("seven"), for the sentences in bundles d and e that count the stops
       and can reach the steps only through here. tour-steps.js owns the number; nobody types it. */
   stopsWord() { return TOUR_STOPS_WORD; },
+
+  /** The gesture's words ("Hold your finger on any line…"), for the first-run hint pill in bundle d:
+      the same string the highlight stop opens with, owned by tour-steps.js, reached only through here. */
+  highlightWords() { return HIGHLIGHT_GESTURE_WORDS; },
 
   /** The control a stop rings, if it is on screen (bundle-e's overlay reaches findTarget through here). */
   findTarget(step) { return findTarget(step); },

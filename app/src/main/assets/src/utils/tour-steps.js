@@ -61,6 +61,13 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
  * @property {string} [settingsGroup] a Settings group the stop needs open
  */
 
+/** THE GESTURE, IN ONE SENTENCE PAIR, OWNED HERE (journey F2.1, 2026-09-12). The highlight stop
+    opens with these words and the first-run hint pill (AnnotationHint, bundle d) says exactly
+    them, read through TourController.highlightWords() the way the stop count travels — so the
+    pill can never drift from the stop it echoes, as its own copy did ("highlight, note, or
+    bookmark" against "Highlight, or Note"). */
+export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note.';
+
 /* THE COUNT IS WRITTEN ONCE (2026-09-10). A stop's `number` is its position in this array and
    its eyebrow's "N of M" is built from that; the word every sentence uses to count the stops
    ("seven stops, about two minutes" on the welcome card, the Home strip and the Settings Help
@@ -108,7 +115,7 @@ const STOPS = [
     target: { selector: '.letter-para' }, act: 'highlightDemo',
     label: 'Highlight',
     title: 'Mark what speaks to you',
-    text: 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note. Your highlights and notes collect in the Library.',
+    text: HIGHLIGHT_GESTURE_WORDS + ' Your highlights and notes collect in the Library.',
     tip: 'Try it now, or press Next and I will show you.',
     after: 'See the colour? Hold on any line to do this yourself, any time. Press Next when you are ready.',
     primary: 'Next',

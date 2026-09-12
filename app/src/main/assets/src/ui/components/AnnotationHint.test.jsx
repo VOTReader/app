@@ -1,3 +1,4 @@
+// @ts-nocheck -- drives the REAL AudioPlayer singleton through a fake media element (F2.1), as AudioPlayerBar.test does.
 /* AnnotationHint — first-run annotation discoverability tip.
    ─────────────────────────────────────────────────────────────────
    The long-press gesture is invisible chrome, so a pill teaches it — but
