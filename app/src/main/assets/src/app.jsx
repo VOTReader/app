@@ -296,7 +296,7 @@ function App() {
   // App-global: read history shared across all tabs.
   // State + mutators extracted to useHistory(); auto-track effect stays
   // below (depends on tab-local nav state).
-  const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
+  const { readHistory, addToHistory, clearHistory } = useHistory(settings.historyEnabled);
   /* useThumbnails — tab card thumbnail capture + IDB persistence + GC.
      Extracted to src/hooks/use-thumbnails.js (P6d). */
   const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
@@ -674,7 +674,7 @@ function App() {
     lastReadChapters, setLastReadChapters,
     lastReadLetterMap, setLastReadForVol,
     readItems, readHistory,
-    markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
+    markRead, unmarkRead, isRead, getReadKey, clearReadForBook, clearAllProgress, clearHistory,
     activeLetter, activeVolKey,
     book, chapter,
     goHome, goNavOrigin, navOrigin, goSearch, goHistory, goSettings, goAbout,

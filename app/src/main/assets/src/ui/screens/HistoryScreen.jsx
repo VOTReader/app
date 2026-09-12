@@ -29,7 +29,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings, theme, onThemeChange, onPruneDay }) {
+export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings, theme, onThemeChange }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -51,12 +51,23 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   const { currentDays, tree } = React.useMemo(() => {
     const curMs = new Map();   // dayNum → entries[]
     const ys = new Map();       // year → Map(month → Map(weekKey → { weekStart, days: Map(day → entries[]) }))
+    // ONE ROW PER READING PER CALENDAR DAY (journey row 3, 2026-09-12). The store keeps every
+    // visit; the view folds a day's repeats of one key into the NEWEST visit and counts them, so
+    // three "Chosen by God" rows at 4 m, 25 m and 31 m ago are one row saying "3 visits" — and
+    // nobody is asked to Deduplicate their own trail. Display-time, so a trail written before
+    // today folds too. History is newest-first, so the first seen is the newest; `key` is
+    // stamped by HistoryStore on every load (legacy rows included).
+    const pushFolded = (list, entry) => {
+      const prior = entry.key ? list.find((e) => e.key === entry.key) : null;
+      if (prior) { prior.visits += 1; return; }
+      list.push({ ...entry, visits: 1 });
+    };
     for (const entry of matches) {
       const d = new Date(entry.ts);
       const y = d.getFullYear(),m = d.getMonth(),day = d.getDate();
       if (y === curY && m === curM) {
         if (!curMs.has(day)) curMs.set(day, []);
-        curMs.get(day).push(entry);
+        pushFolded(curMs.get(day), entry);
         continue;
       }
       // Compute Sunday-of-week key for older entries
@@ -69,7 +80,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
       if (!ws.has(wkKey)) ws.set(wkKey, { weekStart: wkStart, days: new Map() });
       const wd = ws.get(wkKey).days;
       if (!wd.has(day)) wd.set(day, []);
-      wd.get(day).push(entry);
+      pushFolded(wd.get(day), entry);
     }
     const sortDesc = (a, b) => b[0] - a[0];
     const currentDays = [...curMs.entries()].sort(sortDesc).map(([day, entries]) => ({ day, entries }));
@@ -135,18 +146,6 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     const next = !isOpen(id);
     if (q) setSearchOverrides((prev) => ({ ...prev, [id]: next }));
     else setOverrides((prev) => ({ ...prev, [id]: next }));
-  };
-
-  // Dedupe-confirmation state (per-day; latest pending wins). The
-  // ConfirmStrip itself is the dismissal affordance — Cancel / Yes are
-  // explicit, so no auto-cancel timer or click-outside listener.
-  const [confirmingDayId, setConfirmingDayId] = React.useState(null);
-
-  const dupeCount = (entries) => {
-    const seen = new Set();
-    let n = 0;
-    for (const e of entries) {if (seen.has(e.key)) n++;else seen.add(e.key);}
-    return n;
   };
 
   const dayLabel = (y, m, d) => {
@@ -218,8 +217,6 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   const renderDaySection = (year, month, dg, isCurrent) => {
     const dId = isCurrent ? `cd:${year}-${month}-${dg.day}` : `ymd:${year}-${month}-${dg.day}`;
     const dOpen = isOpen(dId);
-    const dupes = dupeCount(dg.entries);
-    const isConfirming = confirmingDayId === dId;
     return (
       <div key={dId} className="history-day-section">
         {/* C2-C [C8]: all four accordion levels announce their state. The
@@ -232,27 +229,6 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
           <span className="history-day-spacer" />
           <span className={`history-chevron${dOpen ? ' is-open' : ''}`}>{"›"}</span>
         </button>
-        {/* Deduplicate counts the day's REAL entries; while a query is
-            filtering them the number on the button would describe a subset
-            and the press would act on the whole day. Maintenance belongs to
-            the unfiltered view. */}
-        {dOpen && dupes > 0 && !q && (
-          <div className="history-dedupe-row">
-            {isConfirming ? (
-              <ConfirmStrip
-                question={`Remove ${dupes} duplicate ${dupes === 1 ? 'entry' : 'entries'} from this day?`}
-                yesLabel="Yes, remove"
-                onCancel={() => setConfirmingDayId(null)}
-                onConfirm={() => { onPruneDay(year, month, dg.day); setConfirmingDayId(null); }}
-              />
-            ) : (
-              <button
-                className="history-dedupe-btn"
-                onClick={() => setConfirmingDayId(dId)}
-              >Deduplicate ({dupes})</button>
-            )}
-          </div>
-        )}
         {dOpen && (
           <div className="chapter-cards">
             {dg.entries.map((entry, i) => (

@@ -34,7 +34,12 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
         <div className="chapter-card-title">{title || fallback}</div>
       </div>
       {chip}
-      <div className="history-entry-time">{timeAgo(entry.ts)}</div>
+      <div className="history-entry-time">
+        {timeAgo(entry.ts)}
+        {/* A day's repeats of this reading are one row (HistoryScreen folds them); more than one
+            visit says so, under the newest visit's time. Absent, not "1 visits". */}
+        {entry.visits > 1 ? <span className="history-entry-visits">{entry.visits} visits</span> : null}
+      </div>
     </button>
   );
 }

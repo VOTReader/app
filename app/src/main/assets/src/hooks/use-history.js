@@ -7,7 +7,6 @@
      - readHistory state (persisted to localStorage['vot-history'])
      - addToHistory(entry)       gated by historyEnabled
      - clearHistory()
-     - pruneHistoryDay(y, m, d)  dedupes within one calendar day
 
    DOES NOT OWN:
      - The auto-track useEffect that decides WHEN to call addToHistory.
@@ -24,7 +23,7 @@
                       sees the latest setting without needing a fresh
                       closure each render.
 
-   RETURNS: { readHistory, addToHistory, clearHistory, pruneHistoryDay }
+   RETURNS: { readHistory, addToHistory, clearHistory }
 
    STORAGE: localStorage 'vot-history' (JSON array of entries, newest
             first, cap 2000). The 2000 cap is enforced on every add.
@@ -34,8 +33,8 @@
    ENTRY SHAPE (newest-first, per existing schema):
      { type: 'chapter' | 'letter' | 'study-chapter',
        ...type-specific fields...,
-       key: stable dedup key (NOT used for dedup on add; pruneHistoryDay
-            uses it per-calendar-day),
+       key: stable identity key (NOT used for dedup on add; HistoryScreen
+            folds a day's repeats of one key into one row at display time),
        ts: Date.now() at record time }
 
    THE KEY HELPER:
@@ -55,7 +54,7 @@ const _getHistorySnapshot = () => HistoryStore.list();
 
 /**
  * One reading-history entry. The `key` field is computed at add() time
- * and used by pruneHistoryDay for per-calendar-day dedup. `ts` is the
+ * and names the reading (HistoryScreen folds a day's repeats by it). `ts` is the
  * visit timestamp. Other fields are type-specific:
  *   - 'chapter' carries bookId/chapterNum/... title fields
  *   - 'study-chapter' carries studyId/studyChapterId/... title fields
@@ -70,8 +69,8 @@ const _getHistorySnapshot = () => HistoryStore.list();
  */
 
 /**
- * App-global reading-history hook. Owns the state container + 3 mutators
- * (addToHistory / clearHistory / pruneHistoryDay) and the localStorage
+ * App-global reading-history hook. Owns the state container + 2 mutators
+ * (addToHistory / clearHistory) and the localStorage
  * persistence. Does NOT own the "when to record" decision — that lives
  * in the App()-local auto-track useEffect that calls addToHistory based
  * on nav state.
@@ -84,8 +83,7 @@ const _getHistorySnapshot = () => HistoryStore.list();
  * @returns {{
  *   readHistory: HistoryEntry[],
  *   addToHistory: (entry: HistoryEntry) => void,
- *   clearHistory: () => void,
- *   pruneHistoryDay: (year: number, month: number, day: number) => void
+ *   clearHistory: () => void
  * }}
  */
 export function useHistory(historyEnabled) {
@@ -110,9 +108,8 @@ export function useHistory(historyEnabled) {
 
   const clearHistory = () => { HistoryStore.clear(); };
 
-  const pruneHistoryDay = (year, month, day) => {
-    HistoryStore.pruneDay(year, month, day);
-  };
-
-  return { readHistory, addToHistory, clearHistory, pruneHistoryDay };
+  // pruneHistoryDay left with the Deduplicate button (journey row 3, 2026-09-12): the screen folds
+  // a day's repeats into one row itself, so nobody is asked to clean their own trail. The store's
+  // pruneDay stays for its own tests and for any future import-time repair; no screen reaches it.
+  return { readHistory, addToHistory, clearHistory };
 }

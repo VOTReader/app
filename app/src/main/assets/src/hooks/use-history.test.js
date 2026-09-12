@@ -10,11 +10,10 @@
         is wrong-direction (rejects when enabled), the entire feature
         silently produces an empty trail.
 
-     B) pruneHistoryDay's same-day dedup. The function must dedup ONLY
-        within the requested calendar day; over-aggressive dedup (across
-        days) silently loses legitimate visit history. Under-aggressive
-        leaves the duplicates the user asked to clean. Both fail
-        silently — the user just sees "weird gaps" later.
+     B) (pruneHistoryDay left with the Deduplicate button, journey row 3,
+        2026-09-12: HistoryScreen folds a day's repeats into one row at
+        display time and its own cases pin that; HistoryStore.pruneDay keeps
+        its store-level cases.)
 
    Tests use real localStorage via jsdom + renderHook (no mocks per
    [[dont-over-mock]]).
@@ -218,124 +217,5 @@ describe('useHistory — clearHistory', () => {
     act(() => { result.current.clearHistory(); });
 
     expect(HistoryStore.list()).toEqual([]);
-  });
-});
-
-describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
-  // Helper: ts for a given (y, m, d, hour). Default hour is 0 so a
-  // boundary call like `ts(2026, 0, 15)` returns Jan 15 00:00 — matching
-  // what production's `new Date(year, month, day)` (the dayStart in
-  // pruneHistoryDay) computes. A non-zero default would silently cross
-  // day boundaries in filter assertions.
-  const ts = (y, m, d, h = 0) => new Date(y, m, d, h).getTime();
-
-  it('dedupes by key within ONE calendar day (keeps newest of each key)', () => {
-    // 3 visits to matthew:5 on the same day; pruning should keep just
-    // the most-recent (which is the first occurrence in the newest-first
-    // list).
-    const seed = [
-      { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: ts(2026, 0, 15, 14) },
-      { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
-      { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: ts(2026, 0, 15, 8) },
-    ];
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    // Just the newest survivor.
-    expect(result.current.readHistory.length).toBe(1);
-    expect(result.current.readHistory[0].ts).toBe(ts(2026, 0, 15, 14));
-  });
-
-  it('does NOT dedup across days (different key visits on different days survive)', () => {
-    // Three days, three duplicates each. Prune ONE day; only that day's
-    // dups collapse — others untouched.
-    const seed = [
-      // Jan 15 — 2 visits to ch:matthew:5
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 8) },
-      // Jan 16 — 2 visits to ch:matthew:5
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 16, 10) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 16, 8) },
-    ];
-    // Newest-first ordering.
-    seed.sort((a, b) => b.ts - a.ts);
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    // Prune only Jan 15.
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    // Jan 15: dedup'd to 1. Jan 16: both still there.
-    const jan15 = result.current.readHistory.filter(e => e.ts >= ts(2026, 0, 15) && e.ts < ts(2026, 0, 16));
-    const jan16 = result.current.readHistory.filter(e => e.ts >= ts(2026, 0, 16) && e.ts < ts(2026, 0, 17));
-    expect(jan15.length).toBe(1);
-    expect(jan16.length).toBe(2);
-  });
-
-  it('preserves DIFFERENT keys on the same day (multi-key independence)', () => {
-    // The dedup must be by KEY within a day. Two visits to chapter A
-    // and two to chapter B on the same day → 2 survivors (one per key).
-    const seed = [
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 9) },
-      { type: 'chapter', key: 'ch:matthew:6', ts: ts(2026, 0, 15, 8) },
-      { type: 'chapter', key: 'ch:matthew:6', ts: ts(2026, 0, 15, 7) },
-    ];
-    seed.sort((a, b) => b.ts - a.ts);
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    // 2 survivors — one per distinct key.
-    expect(result.current.readHistory.length).toBe(2);
-    const keys = result.current.readHistory.map(e => e.key).sort();
-    expect(keys).toEqual(['ch:matthew:5', 'ch:matthew:6']);
-  });
-
-  it('preserves entries OUTSIDE the pruned day (other-day entries pass through)', () => {
-    // Entry on Jan 14 must survive a prune of Jan 15.
-    const seed = [
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 12) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 11) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 14, 12) },
-    ];
-    seed.sort((a, b) => b.ts - a.ts);
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    // Jan 15 dedup'd to 1; Jan 14 entry preserved → 2 total.
-    expect(result.current.readHistory.length).toBe(2);
-    expect(result.current.readHistory.find(e => e.ts === ts(2026, 0, 14, 12))).toBeDefined();
-  });
-
-  it('is a no-op when the day has no entries', () => {
-    const seed = [
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 14, 10) },
-    ];
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    // Prune a different day.
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    expect(result.current.readHistory).toEqual(seed);
-  });
-
-  it('persists the prune to HistoryStore', () => {
-    const seed = [
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
-      { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 8) },
-    ];
-    HistoryStore._cache = /** @type {any} */ (seed);
-    const { result } = renderHook(() => useHistory(true));
-
-    act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
-
-    expect(HistoryStore.list().length).toBe(1);
   });
 });

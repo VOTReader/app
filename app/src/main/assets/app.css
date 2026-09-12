@@ -3388,19 +3388,9 @@
     }
     .history-chevron.is-open { transform:rotate(90deg); color:var(--gold); }
     .history-day-section .chapter-cards { padding-left:0.9rem; }
-    .history-dedupe-row {
-      padding:0.5rem 1.2rem 0.7rem 1.8rem;
-      display:flex; justify-content:flex-start;
-    }
-    .history-dedupe-btn {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em;
-      color:var(--gold-dim); padding:0.6rem 1rem; border-radius:6px;
-      border:1px solid var(--gold-border); background:transparent;
-      cursor:pointer; -webkit-tap-highlight-color:transparent;
-      transition:color 0.15s, border-color 0.15s, background 0.15s;
-      min-height:40px;
-    }
-    .history-dedupe-btn:active { color:var(--gold); border-color:var(--gold-dim); }
+    /* "3 visits" under the newest visit's time: a day's repeats of one reading are one row
+       (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
+    .history-entry-visits { display:block; text-align:right; color:var(--cream-muted); }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
