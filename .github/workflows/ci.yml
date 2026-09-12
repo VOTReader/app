@@ -234,9 +234,14 @@ jobs:
         # file cannot catch it -- KJV is dense in all 1,161 chapters, so both
         # shippers emit identical bytes -- so the test carries a real gapped
         # chapter of its own.
+        # test_batch_align_bible_drive_index.py rides the same call (2026-09-12): a
+        # driveFolder edition (tsot-matthew) is indexed from the Drive listing, not a
+        # mirror script; the fixture carries the .MP3 chapter, the full-width folder
+        # name, a chapter with an id but no bytes, and a duplicate chapter. The
+        # identity control against the shipped manifest skips here (no listing in CI).
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_align_commit -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_align_commit -v
           python check_balance.py
 
       - name: Check App() size budget (P11 canary)
