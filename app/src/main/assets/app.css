@@ -1111,7 +1111,8 @@
       .audio-manager-jump { background: none; border: 0; padding: 0; margin: 0; display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
       .audio-manager-jump:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
       .audio-manager-jump-chevron { color: var(--gold-dim); font-family: inherit; }
-      @media (hover: hover) { .audio-manager-jump:hover h2 { color: var(--gold); } .audio-manager-jump:hover .audio-manager-jump-chevron { color: var(--gold); } }
+      .audio-manager-jump-cue { display: block; margin-top: 0.4rem; color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.04em; }
+      @media (hover: hover) { .audio-manager-jump:hover h2 { color: var(--gold); } .audio-manager-jump:hover .audio-manager-jump-chevron, .audio-manager-jump:hover .audio-manager-jump-cue { color: var(--gold); } }
       .audio-manager-save {
         flex: 0 0 auto; min-width: 58px; min-height: 44px; padding: 0.3rem 0.55rem;
         display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.05rem;

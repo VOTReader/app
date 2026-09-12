@@ -319,6 +319,9 @@ export function AudioManagerSheet({ open, state, onClose }) {
                   title as the tap that opens the text. */}
               <h2 id="audio-manager-title">{trackLabel(current.title)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
               <p>{headLine}</p>
+              {/* The words, drawn (2026-09-12): the Settings row sends a reader here
+                  by name, and a phone shows neither the tooltip nor the aria-label. */}
+              <span className="audio-manager-jump-cue">Open the reading</span>
             </button>
           ) : (
           <div className="audio-manager-track-copy">
