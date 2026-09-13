@@ -62,21 +62,21 @@ const CARD_MIN_H = 160;
    So such a stop's card sits on the bottom edge, above the player
    bar when it is up, never beside the ring; and once Listen has been pressed the dim panes leave the
    reading column open from the top of its scroller down to the card, with no ring: the words are the
-   ring. The card takes at most DOCK_MAX_FRAC of the screen, and less when the player bar is up, so
-   that at least DOCK_OPEN_FRAC of the screen stays open above it (on the emulator at 1.8x, 2026-09-04:
-   36 % of 699 above a 100 px bar left 48 % open and the lit sentence wrapped under the card). While
+   ring. The card takes DOCK_MAX_FRAC of the screen by preference, more when its words need it, and
+   never past the room that leaves DOCK_OPEN_PX of the reading column open below its scroller's top
+   (on the emulator at 1.8x, 2026-09-04: 36 % of 699 above a 100 px bar left the lit sentence wrapped
+   under the card; a 55 % share of the screen then ruled until 2026-09-13, when it cut the card's own
+   words at Text Size 1 on a 320 phone and at 1.8 everywhere — the Tour Reviewer's D6). While
    docked, the card declares itself to the reading column as scroll-padding-bottom, which read-along's
    follow band (ReadAlongHighlight) and the engine's scrollIntoView both measure against. */
 const DOCK_MAX_FRAC = 0.36;
-const DOCK_OPEN_FRAC = 0.55;
-/* A SHORT FRAME — a phone in landscape (the Tour Reviewer, 800x360 at Text Size 1, 2026-09-13): 55 %
-   of 360 leaves 150 px of room, so every docked card sat at its 160 px floor and hid its own words —
-   the Listen promise cut in half, five of nine stops. A fraction of the screen is the wrong unit
-   there. What must stay open is the reading column: SHORT_OPEN_PX of it below the top of its
-   scroller, the same floor the highlight band keeps (e2e-tour's 120 px band), and the card may
-   take the rest. Above SHORT_FRAME_H the fraction rules as before and nothing moves. */
-const SHORT_FRAME_H = 480;
-const SHORT_OPEN_PX = 120;
+/* THE RULE IS THE COLUMN, NOT A SHARE OF THE SCREEN (the Tour Reviewer, 2026-09-13). 55 % of 360 in
+   landscape left 150 px of room, so every docked card sat at its 160 px floor and hid its own words —
+   the Listen promise cut in half (D3); and 55 % of 640 cut seven stops at Text Size 1 on a 320 phone
+   and 55 % of 800 cut twelve rows at 1.8, the player stop's edition sentence among them (D6). What
+   must stay open is the reading column: DOCK_OPEN_PX of it below the top of its scroller, the same
+   floor the highlight band keeps (e2e-tour's 120 px band), and the card may take the rest. */
+const DOCK_OPEN_PX = 120;
 
 function _rect(el) {
   const r = el.getBoundingClientRect();
@@ -305,16 +305,15 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   let docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
   dockPadRef.current = 0;
   const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
-  /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_FRAC is the rule. A fraction of the screen is the
+  /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_PX is the rule. A fraction of the screen is the
      wrong unit for a card whose content is measured in lines: on a 640 px screen 36 % is 230 px
      while the Listen stop's words need 270, so the card scrolled and its own sticky button row
      covered the last sentence — "Tap it now, or press Next and I will do it for you." cut in half
      on a first run (Native Builder on device at 320x640 dp, 2026-09-06; headless read −29 px at
      320x640 CSS px against +13 px at 426x952). So the card may exceed the fraction up to what its
-     content needs, and never past the room DOCK_OPEN_FRAC leaves open. On a tall screen the
+     content needs, and never past the room DOCK_OPEN_PX leaves open. On a tall screen the
      content is well under the fraction and nothing moves. */
-  const openAbove = vh < SHORT_FRAME_H ? scrollerTopRef.current + SHORT_OPEN_PX : vh * DOCK_OPEN_FRAC;
-  const dockRoom = Math.floor(vh - dockBottom - openAbove);
+  const dockRoom = Math.floor(vh - dockBottom - (scrollerTopRef.current + DOCK_OPEN_PX));
   const dockCap = Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom));
   /* A PRESSED STOP WHOSE RING IS THE PRESS'S RESULT (the player stop: the voice row the sheet
      revealed) docks only if the docked card clears that ring; otherwise it sits beside the ring like

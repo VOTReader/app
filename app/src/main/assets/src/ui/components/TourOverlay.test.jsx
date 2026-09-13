@@ -816,7 +816,7 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
     expect(TourController.getState().pressed).toBe(true);
     expect(ringBox()).toEqual({ top: 140 - 8, left: 16 - 8, height: 90 + 16 });
     expect(described()).toEqual(['audio-manager-voice-top']);
-    expect(screen.getByText(/Under Listening now/)).toBeTruthy();
+    expect(screen.getByText(/Tap another edition under Listening now/)).toBeTruthy();
     // Not opened: the dims still frame the ring, not the reading column.
     const d = [...document.querySelectorAll('.tour-dim')].map((x) => parseFloat(/** @type {HTMLElement} */ (x).style.height));
     expect(d[0]).toBe(140 - 8);                              // the pane above the ring ends at the ring
@@ -902,7 +902,7 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
     await settle();
     expect(TourController.getState().pressed).toBe(true);
     expect(described()).toEqual(['audio-manager-voice-top']);
-    expect(screen.getByText(/Under Listening now/)).toBeTruthy();
+    expect(screen.getByText(/Tap another edition under Listening now/)).toBeTruthy();
   });
 
   it('the back-to-words stop: the sheet\'s ‹ ringed; once the sheet is gone — by any door — the ring goes, the words are the window', async () => {

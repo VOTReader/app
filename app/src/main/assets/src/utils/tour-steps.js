@@ -226,7 +226,8 @@ const STOPS = [
     text: 'The bar at the bottom shows what is being read. Tap it to open the player.',
     tip: 'Tap it now, or press Next and I will open it for you.',
     // Five lines of a docked card on a phone: 162 characters (tour-steps.test.js, measured 2026-09-13).
-    after: 'Pause, skip or slow the reading here. Under Listening now, tap another edition: the chapter starts again in that voice, the rest follow. Press Next when ready.',
+    // Leads with the teaching (the Tour Reviewer's D6): where a card is cut, the cut line must not be this one.
+    after: 'Tap another edition under Listening now: the chapter starts again in that voice, and the rest follow. Pause, skip or slow the reading here. Press Next when ready.',
     primary: 'Next',
   },
   /* BACK TO THE WORDS. The sheet's ‹ (a real 44 px button, SheetHandle) is the ring; the press
