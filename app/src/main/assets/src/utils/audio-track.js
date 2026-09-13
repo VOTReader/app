@@ -134,13 +134,6 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     driveFolder: '18. TSOT New Testament',
     releaseTag: AUDIO_RELEASE_PREFIX,
     books: ['matthew'],
-    // 2026-09-12: the 28 Drive ids are NOT on audio-v1 — every chapter 404s
-    // live — so the edition is offered nowhere until the mirror lands
-    // (bibleAudioOffered, below, is the one predicate every door asks). The
-    // manifest rows, the alignment and a reader's persisted choice all stay;
-    // the re-enable is deleting this line. Absent means offered: the flag is
-    // never written as false (utils/audio-track.hide.test.js).
-    unreleased: true,
   }),
   'john-film': Object.freeze({
     // The first LISTENING-ONLY edition. The Gospel of John film's narration is a
