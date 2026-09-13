@@ -107,7 +107,7 @@ def rebuild(belt):
     for r in rows:
         t = r.get("t")
         if t is not None and r.get("status") != "UNSPOKEN":
-            arr[r["n"] - 1] = max(0, int(round(t * 100)))
+            arr[r["n"] - 1] = max(1, int(round(t * 100)))   # 1, never 0: 0 reads as unproven (ship())
     last = 0
     for i, v in enumerate(arr):
         if v and v < last:
@@ -227,8 +227,14 @@ def check(ed, a):
                 problems.append((tag, f"proven share {bab.proven_share(belt):.3f} below the gate"))
             if rebuild(belt) != arr:
                 problems.append((tag, "shipped array != rebuilt from belt"))
-    # every gate-clearing current belt must be in the file
+    # every gate-clearing current belt must be in the file -- unless its BOOK is
+    # partial (ship() holds a half-aligned book back whole, by the same
+    # partial_books() rule; 2026-09-13, Joshua 10 of 24 at the 07:45 stop): those
+    # belts are expected absent and are printed, never silently skipped. And the
+    # shipped side must hold whole books only: a partial book in the file is the
+    # shipper without the rule.
     missing = []
+    clearing = {}
     for name in ([] if structural else os.listdir(belts_dir)):
         if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name or name.startswith(("CAMPAIGN", "progress", "audio-index")):
             continue
@@ -238,10 +244,24 @@ def check(ed, a):
         key = (d.get("bookId"), d.get("chapter"))
         entry = idx.get(key)
         if (d.get("settings_hash") == want and entry and d.get("audioSize") == os.path.getsize(entry[0])
-                and bab.proven_share(d) >= bab.MIN_PROVEN and key not in shipped):
-            missing.append(f"{key[0]}_{key[1]:03d}")
+                and bab.proven_share(d) >= bab.MIN_PROVEN):
+            clearing.setdefault(key[0], set()).add(key[1])
+    held = {} if structural else bab.partial_books(clearing, idx)
+    for book, chs in clearing.items():
+        for ch in chs:
+            if book not in held and (book, ch) not in shipped:
+                missing.append(f"{book}_{ch:03d}")
     for tag in sorted(missing):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
+    if held:
+        print("  held back as partial books (whole book or nothing; their belts are expected absent): "
+              + ", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())))
+    if not structural:
+        shipped_by_book = {}
+        for book, ch in shipped:
+            shipped_by_book.setdefault(book, set()).add(ch)
+        for book, (h, w) in sorted(bab.partial_books(shipped_by_book, idx).items()):
+            problems.append((book, f"shipped PARTIAL: {h} of the {w} chapters the audio index knows (whole book or nothing)"))
 
     mode = "STRUCTURAL (corpus shape only; belts + audio not checked)" if structural else "FULL"
     print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, "

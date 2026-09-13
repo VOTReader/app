@@ -18,7 +18,7 @@ each of acts 8 (:37), acts 15 (:34), acts 24 (:7) and luke 17 (:36); today's
 shipper places verse 38 of acts 8 at index 37 (CORRECT), a dense shipper places
 it at index 36 (WRONG, and so on to the end of the chapter).
 
-The shipped brm-kjv file cannot catch this: KJV is dense in all 1,161 of its
+The shipped brm-kjv file cannot catch this: KJV is dense in all 1,189 of its
 chapters, so `max(n)` and `len(rows)` agree everywhere in it and both shippers
 produce identical bytes. The gap is the whole discriminator, so the fixture below
 is a real gapped chapter and not a synthetic one.
@@ -74,12 +74,14 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
     def _restore(self):
         bab.DATA = self._saved_data
 
-    def _ship(self, *belts):
+    def _ship(self, *belts, idx=None):
         for d in belts:
             name = "%s_%03d.json" % (d["bookId"], d["chapter"])
             with open(os.path.join(self.belts, name), "w", encoding="utf-8") as fh:
                 json.dump(d, fh)
-        bab.ship("web-ebible", self.belts)
+        # idx is the audio index; the existing cases pass none (no audio leg, no
+        # whole-book leg), the partial-book case passes one built on empty files.
+        bab.ship("web-ebible", self.belts, idx=idx)
         src = open(os.path.join(bab.DATA, "bible-sync-web-ebible.js"), encoding="utf-8").read()
         body = re.search(r"var BIBLE_SYNC_WEB_EBIBLE = (\{.*\});\s*$", src, re.S)
         self.assertTrue(body, "shipper wrote no assignment this test can read")
@@ -95,6 +97,41 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         # The verse this edition does not have paints nothing rather than
         # borrowing its neighbour's onset.
         self.assertEqual(arr[36], 0, "acts 8:37 is absent from WEB and must stay 0")
+
+    def test_a_half_aligned_book_ships_whole_or_not_at_all(self):
+        # 2026-09-13: the 07:45 deadline stopped chunk 2 at Joshua 10 of 24. A book
+        # that ships half-way meets the reader with read-along on ten chapters and
+        # silence on fourteen, so ship() holds a PARTIAL book back (by the audio
+        # index's chapter list) and names it, while a complete book beside it
+        # ships. Bitten by deleting the partial_books() filter: joshua ships.
+        # The audio index names every chapter's recording; ship() compares each
+        # belt's audioSize with the file on disk, so the fixture has real (empty)
+        # files and belts stamped audioSize 0.
+        idx = {}
+        for book, n in (("joshua", 24), ("ruth", 4)):
+            for ch in range(1, n + 1):
+                p = os.path.join(self.dir.name, "%s_%03d.mp3" % (book, ch))
+                open(p, "wb").close()
+                idx[(book, ch)] = (p, "id")
+        belts = [belt("joshua", ch, [1, 2, 3]) for ch in range(1, 11)] +                 [belt("ruth", ch, [1, 2]) for ch in range(1, 5)]
+        for d in belts:
+            d["audioSize"] = 0
+        table = self._ship(*belts, idx=idx)
+        self.assertNotIn("joshua", table, "10 of 24 Joshua chapters must not ship")
+        self.assertEqual(sorted(table.get("ruth", {})), ["1", "2", "3", "4"], "the complete book beside it ships")
+        self.assertEqual(bab.partial_books({"joshua": set(range(1, 11)), "ruth": {1, 2, 3, 4}}, idx),
+                         {"joshua": (10, 24)})
+
+    def test_a_proven_verse_the_recording_opens_on_ships_as_one_centisecond_not_zero(self):
+        # 2 Samuel 20:1 in the WOP belts is CONFIRMED at t = 0.00 (the only such
+        # row in four editions, 2026-09-13). A 0 slot is what the renderer reads
+        # as "unproven" (`if (cs[i] > 0)`), so shipping 0 there is a proven verse
+        # that never paints. The pre-registered identity check caught it: 44 zero
+        # slots against 43 untimed rows, one name too many.
+        d = belt("2samuel", 20, [1, 2, 3])
+        d["verses"][0]["t"] = 0.0
+        arr = self._ship(d)["2samuel"]["20"]
+        self.assertEqual(arr, [1, 200, 300], "verse 1 at the very start ships as 1 cs, never 0")
 
     def test_a_dense_chapter_is_unaffected(self):
         # The control. Without it the assertion above would also pass on a
