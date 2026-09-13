@@ -240,18 +240,22 @@ const scanBand = (page, b64, x0, x1, y0, y1) => page.evaluate(async (b64, x0, x1
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const W = x1 - x0, H = y1 - y0;
   const d = g.getImageData(x0, y0, W, H).data;
-  const runs = []; let lit = 0, sum = 0;
+  const runs = []; let lit = 0, sum = 0, litSum = 0;
   for (let y = 0; y < H; y++) {
     let n = 0, prev = 0;
     for (let x = 0; x < W; x++) {
       const p = (y * W + x) * 4; const on = (d[p] + d[p + 1] + d[p + 2] > 90) ? 1 : 0;
       sum += d[p] + d[p + 1] + d[p + 2];
+      if (on) litSum += d[p] + d[p + 1] + d[p + 2];
       lit += on; if (on && !prev) n++; prev = on;
     }
     runs.push(n);
   }
   runs.sort((a, b) => a - b);
-  return { rows: H, medianRuns: runs[Math.floor(H / 2)], maxRuns: runs[H - 1], litShare: +(lit / (W * H)).toFixed(3), meanLum: +(sum / (3 * W * H)).toFixed(2) };
+  return { rows: H, medianRuns: runs[Math.floor(H / 2)], maxRuns: runs[H - 1], litShare: +(lit / (W * H)).toFixed(3), meanLum: +(sum / (3 * W * H)).toFixed(2),
+    // the mean over the INK alone (pixels above the lit threshold): the per-stroke brightness, which is what a
+    // reader calls "the colours"; the band mean above confounds it with how many strokes cross the band
+    litMean: lit ? +(litSum / (3 * lit)).toFixed(2) : 0 };
 }, b64, x0, x1, y0, y1);
 
 async function zoomTopTo(page, c, r0, label, factor, vFit) {
@@ -335,12 +339,20 @@ async function walk(page, url, fname) {
     const y0 = Math.round((c.t + r0.topY + 4) * f.dpr), y1 = Math.round((c.t + r0.topY + 44) * f.dpr);
     const row = await scanBand(page, b64, x0, x1, y0, y1);
     rungs[step] = Object.assign({ zoom: zl.zoom, saturated: zl.saturated }, row);
-    note(`${tag} ladder ${step}x: top rail at ${zl.zoom}x fit${zl.saturated ? ' (the rail\'s ceiling)' : ''}, MTAM band ${Math.round(zl.band.x0)}..${Math.round(zl.band.x1)} CSS px: mean luminance ${row.meanLum}, median ${row.medianRuns} strokes per row, lit share ${row.litShare}`);
+    note(`${tag} ladder ${step}x: top rail at ${zl.zoom}x fit${zl.saturated ? ' (the rail\'s ceiling)' : ''}, MTAM band ${Math.round(zl.band.x0)}..${Math.round(zl.band.x1)} CSS px: mean luminance ${row.meanLum}, lit-pixel mean ${row.litMean}, median ${row.medianRuns} strokes per row, lit share ${row.litShare}`);
   }
   if (rungs['16'] && rungs.ceil) {
-    const rel = rungs['16'].meanLum > 0 ? rungs.ceil.meanLum / rungs['16'].meanLum : 0;
-    note(`${tag} ladder plateau leg 16x -> ceiling: mean luminance x${rel.toFixed(3)} (must not rise; the alpha is flat there and the band only thins)`);
-    if (rel > 1.05) fails.push(`${tag} ladder: the band got BRIGHTER from 16x to the ceiling (x${rel.toFixed(3)}); the plateau is not holding`);
+    // THE GATE reads the ink, not the band: the band's x-range is the MTAM segment, which widens with zoom until it
+    // spans the frame, and the strokes crossing it per pixel RISE (measured on the old law, phoneLand: 20 strokes
+    // over 565 px at 16x, 78 over 1,364 px at the ceiling, x1.6 per px), so the band mean climbs under a flat
+    // alpha and would fail the right law. The lit-pixel mean is the per-stroke brightness; it may rise a little
+    // on the plateau leg because the stroke widens 1.43 -> 1.6 px and a wider stroke has more fully-covered
+    // core per anti-aliased edge - 10 % is that allowance. The old law (alpha 0.35 -> 0.68 on this leg) must
+    // FAIL this gate, or the instrument cannot see the complaint: the BEFORE run is its positive control.
+    const rel = rungs['16'].litMean > 0 ? rungs.ceil.litMean / rungs['16'].litMean : 0;
+    const relBand = rungs['16'].meanLum > 0 ? rungs.ceil.meanLum / rungs['16'].meanLum : 0;
+    note(`${tag} ladder plateau leg 16x -> ceiling: lit-pixel mean x${rel.toFixed(3)} (the gate: the ink must not brighten; <= 1.10 allows the 1.43 -> 1.6 px width); band mean x${relBand.toFixed(3)} (information: it also counts how many strokes cross the band)`);
+    if (rel > 1.10) fails.push(`${tag} ladder: the ink got BRIGHTER from 16x to the ceiling (lit-pixel mean x${rel.toFixed(3)}); the plateau is not holding`);
   }
   if (!CEILINGS.length) return;
   // the corridor pair through the knob (opt-in, --ceilings a,b): the plateau forced to each value at the ceiling
