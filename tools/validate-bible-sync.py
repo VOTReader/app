@@ -69,6 +69,12 @@ def flat_translation_map(translation):
     if translation == "nkjv":
         return None
     path = os.path.join(DATA, f"bible-{translation}.js")
+    if not os.path.exists(path):
+        # A MARKER translation has no flat map: tsot-matthew's 'vot-matthew' names the
+        # text the Matthew SCREEN renders (matthew.js), which only the extractor can
+        # read. Route it there like nkjv rather than crash CI's --all-editions leg on
+        # the first partial edition (2026-09-13).
+        return None
     prefix = "var BIBLE_" + translation.upper() + " = "
     src = open(path, encoding="utf-8").read()
     if not src.startswith(prefix):
