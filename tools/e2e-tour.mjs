@@ -60,6 +60,14 @@ if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 const failures = [];
 const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
 const ok = (m) => console.log('  ok  ' + m);
+/* THE CUT RULE (the Verifier's gate-cut on 121, 2026-09-13: 58 of 300 pictures had a line of the card's
+   words straddling the sticky button row's top edge — the title and the tip as often as the text).
+   A line wholly under the row is the accepted scroll-cue extent; a line the row's edge runs THROUGH
+   is glyphs cut in half. Read on every stop's first view and after each press. */
+const cutCheck = (f, where) => {
+  if (!f.cut || !f.cut.length) return;
+  fail(`${where}: the button row's top edge (${f.cut[0].row}) cuts through ${f.cut.length} line(s) of the card's words — ${f.cut.map((c) => `${c.of} ${c.t}..${c.b}`).join(', ')}`);
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* The stops come from the tour itself (tour-steps.js is pure, so node can import it): a stop
@@ -238,6 +246,21 @@ async function run(browser, { width, height, label, light }) {
       })(),
       text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
       vh: window.innerHeight,
+      // Lines of the card's words (Range client rects, one per line) that the button row's top edge runs through.
+      cut: (() => {
+        if (!card) return [];
+        const row = card.querySelector('.tour-row');
+        const rt = Math.round(row ? row.getBoundingClientRect().top : card.getBoundingClientRect().bottom);
+        const out = [];
+        for (const el of card.querySelectorAll('.tour-eyebrow, .tour-title, .tour-text, .tour-tip')) {
+          const rg = document.createRange(); rg.selectNodeContents(el);
+          for (const r of rg.getClientRects()) {
+            const t = Math.round(r.top), b = Math.round(r.bottom);
+            if (r.width > 0 && t < rt - 1 && b > rt + 1) out.push({ of: el.className, t, b, row: rt });
+          }
+        }
+        return out;
+      })(),
       /* THE LISTENING STOPS (2026-09-13). The player stop's press opens the sheet and rings the voice
          row (`afterTarget`); the back-to-words stop's press closes it; `doneIf` names the page fact
          each press must leave behind. Read here as geometry — the row's box, the sheet's scrollTop —
@@ -322,6 +345,7 @@ async function run(browser, { width, height, label, light }) {
     if (!f.focusInside && !(f.sheetOpen && f.focusInSheet)) fail(`${id}: focus is not inside the card${f.sheetOpen ? ' nor the open sheet' : ''}`);
     else if (!f.focusInside) ok(`${id}: focus is in the open listening sheet (its trap is the topmost)`);
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
+    cutCheck(f, id);
     const want = EXPECT_SCREEN[id];
     if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
     if (RINGED.includes(id)) {
@@ -414,6 +438,7 @@ async function run(browser, { width, height, label, light }) {
       else if ((f.text || '') !== step.after) fail(`${id}: after the press the card does not say its after-words ("${f.text}")`);
       else ok(`${id}: pressed and stayed, the card says its after-words`);
       if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen after the press`);
+      cutCheck(f, `${id} after the press`);
       // What the press must leave on the page (the sheet open; the sheet gone), by the stop's own doneIf.
       if (step.doneIf && f.doneIfHolds !== true) fail(`${id}: after the press ${step.doneIf.selector} is ${step.doneIf.present ? 'not on' : 'still on'} the page`);
       // A press that CLOSED the sheet hands focus back to the card (the sheet's trap restores it).

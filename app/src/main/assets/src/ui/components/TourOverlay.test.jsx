@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { TourOverlay } from './TourOverlay.jsx';
+import * as TO from './TourOverlay.jsx';   // the cap floor is read off the module object: this file loads on the base tree
 import { TourController } from '../../utils/tour-controller.js';
 import { TourDoneFlagStore } from '../../stores/app-flag-stores.js';
 import { AnnotationStore } from '../../stores/annotation-store.js';
@@ -1079,5 +1080,85 @@ describe('TourOverlay — the highlight stop obeys the dock floor too', () => {
     card.getBoundingClientRect = rect(12, Math.round(vh() * 0.62), 336, Math.round(vh() * 0.38));
     await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
     expect(calls).toContain('start');
+  });
+});
+
+/* THE ROW'S TOP EDGE LANDS BETWEEN TWO LINES, NEVER THROUGH ONE (the Verifier's gate-cut on 121,
+   2026-09-13: 58 of 300 stop pictures had a line of the card's words straddling the sticky button
+   row's top edge — 41 at Text Size 1.8, 17 at 3 — and the cut line was the title or the tip as often
+   as the text, so no single line-height can snap them all). The cap is a height in px; the lines are
+   measured (Range client rects, one per line), and a cap that would put the row's edge inside a line
+   is floored to the gap above that line: the bottom of the last whole line.
+   jsdom lays out nothing, so the lines are stubbed here per element (Range.getClientRects reads the
+   element whose contents it selected) and the card's own rect is jsdom's zero rect, which makes the
+   row's edge sit exactly `cap` px below the card's top — the D6 room, 452, in a 640 frame. */
+describe('TourOverlay — the cap floors to the last whole line above the button row', () => {
+  const vh = () => window.innerHeight;
+  const letterScreen = () => {
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><main class="letter-body"><button class="hero-play-pill">Listen</button><p>Thus says The Lord…</p></main></div></div>';
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    scroller.getBoundingClientRect = rect(0, 56, 360, vh() - 56);
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill')).getBoundingClientRect = rect(133, 271, 94, 25);
+  };
+  const drect = (t, b) => ({ x: 0, y: t, left: 0, right: 300, top: t, bottom: b, width: 300, height: b - t });
+  /** Render the listen card in a 640 frame with 900 px of words and the given lines per element. */
+  const renderWith = (linesOf) => {
+    const proto = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get() { return this.classList && this.classList.contains('tour-card') ? 900 : 0; } });
+    const ro0 = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+    const rp = /** @type {any} */ (Range.prototype);
+    const gcr0 = rp.getClientRects;
+    const calls = { n: 0 };
+    rp.getClientRects = function () { calls.n += 1; const el = this.startContainer; return (linesOf[(el && el.className) || ''] || []).map(([t, b]) => drect(t, b)); };
+    const restore = () => {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } });
+      globalThis.ResizeObserver = ro0;
+      if (gcr0) rp.getClientRects = gcr0; else delete rp.getClientRects;
+    };
+    try {
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      return { maxHeight: parseFloat(card.style.maxHeight), calls: calls.n, restore };
+    } catch (e) { restore(); throw e; }
+  };
+
+  it('the floor itself: a cap whose row edge runs through a line drops to the gap above that line; one above every line, or through the first, stays', () => {
+    const floor = TO._floorCapToLines;
+    expect(typeof floor, 'TourOverlay.jsx must export _floorCapToLines').toBe('function');
+    // rowOff 73 (portrait: 1 px border + the 72 px row): the edge of a 452 cap is 379 from the card's top.
+    const lines = [{ t: 17, b: 32 }, { t: 40, b: 76 }, { t: 92, b: 123 }, { t: 131, b: 162 }, { t: 170, b: 201 }, { t: 209, b: 240 }, { t: 248, b: 279 }, { t: 287, b: 318 }, { t: 326, b: 357 }, { t: 365, b: 396 }, { t: 404, b: 435 }];
+    expect(floor(452, { rowOff: 73, lines })).toBe(452 - (379 - (357 + 365) / 2));   // 434: the edge lands at 361, between the ninth line and the tenth
+    expect(floor(430, { rowOff: 73, lines })).toBe(430);                             // the edge at 357 is the ninth line's own bottom: not through it
+    expect(floor(700, { rowOff: 73, lines })).toBe(700);                             // the edge is below every line (the card does not overflow)
+    expect(floor(100, { rowOff: 73, lines })).toBe(100);                             // through the first line: nothing whole above it, the floor rules
+    expect(floor(452, { rowOff: 0, lines: [] })).toBe(452);                          // nothing measured (jsdom): out of the way
+  });
+
+  it('the listen card at 640: with 900 px of words the D6 room is 452, and a line at 440..470 floors it to 435 — the gap above that line', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 640;
+    let r;
+    try {
+      letterScreen();
+      startAt('listen');
+      r = renderWith({ 'tour-title': [[20, 56]], 'tour-text': [[80, 111], [119, 150], [400, 430], [440, 470], [480, 510]], 'tour-tip': [[530, 556]] });
+      expect(r.calls, 'the lines were measured (Range.getClientRects was read)').toBeGreaterThan(0);
+      expect(r.maxHeight).toBe(435);                                                 // not 452: the row's edge would have run through 440..470
+    } finally { if (r) r.restore(); window.innerHeight = vh0; }
+  });
+
+  it('CONTROL (green on both trees by design): the same card whose lines all end above the edge keeps the D6 room, 452', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 640;
+    let r;
+    try {
+      letterScreen();
+      startAt('listen');
+      r = renderWith({ 'tour-title': [[20, 56]], 'tour-text': [[80, 111], [119, 150], [400, 430]], 'tour-tip': [[460, 486], [494, 520], [528, 554]] });
+      expect(r.maxHeight).toBe(640 - 12 - (56 + 120));                               // 452: the edge at 452 sits in the gap 430..460 — the fixture's own control on the fixture above
+    } finally { if (r) r.restore(); window.innerHeight = vh0; }
   });
 });
