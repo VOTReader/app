@@ -264,6 +264,19 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     expect(block).toMatch(/\.tour-card \.tour-btn \{[^}]*min-height:\s*44px/);
     expect(block).not.toMatch(/\.tour-prompt/);                       // the strip keeps its own shape
   });
+  /* THE PLAYER BAR'S CHROME IS PINNED IN PX (measured 2026-09-13, probe-bar3x.mjs: at Text Size 3 on a
+     320x640 phone the bar's 0.5rem gap read 24 px and its 0.6rem side padding 28.8, so 44 + 40 + 40 + 40
+     of buttons, four gaps and two paddings came to 318 of the bar's 304 px and `.audio-bar-main` — the
+     title, the summary button the tour's player stop rings, the seek — measured 0 px wide). Type scales;
+     chrome is pinned, as the rest of the app's chrome has been since the Text Size control (06-03). */
+  it('the player bar\'s gap and padding grow with Text Size only up to a px ceiling', () => {
+    const bar = ruleBlock(CSS, '\n      .audio-bar {');
+    expect(bar, 'the .audio-bar rule').toBeTruthy();
+    expect(bar).toMatch(/gap:\s*min\(0\.5rem,\s*\d+px\)/);
+    expect(bar).toMatch(/padding:\s*min\(0\.5rem,\s*\d+px\)\s+min\(0\.6rem,\s*\d+px\)/);
+    // CONTROL: the matcher sees a bare rem that is there.
+    expect(bar).not.toMatch(/gap:\s*0\.5rem;/);
+  });
   it('the hero pads in rem up to a px ceiling, never past it', () => {
     const hero = ruleBlock(CSS, '.hero {');
     expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+1\.8rem\s+min\(4rem,\s*\d+px\)/);
