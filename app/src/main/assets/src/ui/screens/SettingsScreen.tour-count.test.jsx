@@ -10,7 +10,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings } from './settings-harness.jsx';
 import { TourController } from '../../utils/tour-controller.js';
-import { TOUR_STOPS_WORD } from '../../utils/tour-steps.js';
+import * as steps from '../../utils/tour-steps.js';
+const { TOUR_STOPS_WORD } = steps;
+const TOUR_MINUTES_WORD = steps.TOUR_MINUTES_WORD;   // read off the module so this file loads on the base tree
 
 const note = () => /** @type {HTMLElement} */ (document.querySelector('.settings-help-note')).textContent;
 
@@ -21,12 +23,14 @@ describe('SettingsScreen — the Help note counts the stops the tour actually ha
   it('reads the count from the tour when the controller is on the page', () => {
     /** @type {any} */ (globalThis).TourController = TourController;
     renderSettings();
-    expect(note()).toContain(`${TOUR_STOPS_WORD} stops, about two minutes`);
+    expect(note()).toContain(`${TOUR_STOPS_WORD} stops, about ${TOUR_MINUTES_WORD} minutes`);
   });
 
   it('states no number at all when there is no controller to ask', () => {
     renderSettings();
-    expect(note()).toContain('a few stops, about two minutes');
-    expect(note()).not.toMatch(/\b(five|six|seven|eight|nine|ten) stops\b/);
+    // Neither the count nor the minutes: a number the page cannot read is a number it must not state.
+    expect(note()).toContain('a few stops, a few minutes');
+    expect(note()).not.toMatch(/\b(five|six|seven|eight|nine|ten|eleven|twelve) stops\b/);
+    expect(note()).not.toMatch(/\b(two|three|four) minutes\b/);
   });
 });

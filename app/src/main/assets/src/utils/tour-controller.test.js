@@ -37,6 +37,7 @@ describe('TourController — the words bundles d and e reach only through here',
     expect(typeof TourController.highlightWords, 'TourController.highlightWords must exist').toBe('function');
     expect(TourController.highlightWords()).toBe(steps.HIGHLIGHT_GESTURE_WORDS);
     expect(TourController.stopsWord()).toBe(steps.TOUR_STOPS_WORD);      // the sibling it mirrors
+    expect(TourController.minutesWord()).toBe(steps.TOUR_MINUTES_WORD);  // and the minutes beside it
   });
 });
 
@@ -304,12 +305,210 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
   it('a stop the tour did not press is left alone', () => {
     pill(); toListen();
     TourController.next(); TourController.next();   // press Listen, → highlight: stopped once
-    TourController.next(); TourController.next();   // demonstrate, → bible: the demonstration starts no audio
+    TourController.next(); TourController.next();   // demonstrate, → scripture-web: the demonstration starts no audio
     expect(audio.stop).toHaveBeenCalledTimes(1);
-    TourController.next(); TourController.next();   // press John 3, → journal: stopped twice
-    expect(audio.stop).toHaveBeenCalledTimes(2);
-    TourController.next(); TourController.next(); TourController.next();  // backup, done, end
-    expect(audio.stop).toHaveBeenCalledTimes(2);
+    TourController.next(); TourController.next(); TourController.next();   // journal, backup, settings → bible
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(audio.stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* THE LISTENING SPAN (Corbin, 2026-09-12; the reorder of 2026-09-13). The tour ends over the Bible:
+   the Bible stop presses Listen, the player stop and the back-to-words stop teach the player over that
+   playback, and the closing card sits over the verses. So the playback the Bible press started is KEPT
+   while the tour moves inside the span (bible → player → back-to-words → done) and STOPPED — with the
+   sheet closed — when the tour leaves the span for any other stop (Back to the Bible stop, which presses
+   Listen afresh and would otherwise pause it) or ends by Skip, Escape or Android Back. Only Done keeps
+   it: the reader is left listening. */
+describe('TourController — the listening span keeps the Bible playback, and the tour ends it by every door but Done', () => {
+  const bibleScreen = () => {
+    document.body.innerHTML = '<button class="hero-play-pill">Listen</button>';
+    const el = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
+    el.getBoundingClientRect = () => /** @type {any} */ ({ x: 133, y: 271, width: 94, height: 25, left: 133, right: 227, top: 271, bottom: 296 });
+    return el;
+  };
+  const sheetOpen = () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="audio-manager-sheet"><button class="sheet-handle-back">‹</button></div>');
+    const close = vi.fn(() => { const s = document.querySelector('.audio-manager-sheet'); if (s) s.remove(); });
+    /** @type {any} */ (window).__closeSheet = close;
+    return close;
+  };
+  /** Walk to the Bible stop from the start (every earlier stop pressed by the reader, so nothing plays yet). */
+  const toBible = () => {
+    TourController.attachNav(nav());
+    TourController.start('settings');
+    for (let i = 0; i < 20 && TourController.getState().step.id !== 'bible'; i++) TourController.targetPressed();
+    expect(TourController.getState().step.id).toBe('bible');
+    audio.stop.mockClear();
+  };
+  let audio;
+  beforeEach(() => {
+    audio = { stop: vi.fn(), syncKeepAlive: vi.fn(), getState: vi.fn(() => ({ status: 'playing', queue: [{ key: 'bible-brm-kjv:john' }], qi: 0 })) };
+    /** @type {any} */ (globalThis).AudioPlayer = audio;
+  });
+  afterEach(() => { delete /** @type {any} */ (window).__closeSheet; });
+
+  it('leaving the pressed Bible stop for the player stop keeps the playback; so does moving on to back-to-words and to the closing card', () => {
+    bibleScreen(); toBible();
+    TourController.next();                                   // press Listen: playing, the tour's
+    expect(TourController.getState().pressed).toBe(true);
+    TourController.next();                                   // → player
+    expect(TourController.getState().step.id).toBe('player');
+    expect(audio.stop).not.toHaveBeenCalled();
+    TourController.next(); TourController.next();            // press the bar (nothing here to click), → back-to-words
+    expect(TourController.getState().step.id).toBe('back-to-words');
+    TourController.next(); TourController.next();            // press ‹ (nothing here), → done
+    expect(TourController.getState().step.id).toBe('done');
+    expect(audio.stop).not.toHaveBeenCalled();
+  });
+
+  it('Done on the closing card ends the tour and LEAVES the reading running; the flag is recorded', () => {
+    bibleScreen(); toBible();
+    TourController.next(); TourController.next(); TourController.next(); TourController.next(); TourController.next(); TourController.next();
+    expect(TourController.getState().step.id).toBe('done');
+    TourController.next();                                   // Done
+    expect(TourController.getState().active).toBe(false);
+    expect(audio.stop).not.toHaveBeenCalled();
+    expect(TourDoneFlagStore.is()).toBe(true);
+    expect(audio.syncKeepAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('Skip from inside the span stops the playback and closes the sheet the player stop opened', () => {
+    bibleScreen(); toBible();
+    TourController.next(); TourController.next();            // playing, → player
+    const close = sheetOpen();                               // the press opened the sheet
+    TourController.next();                                   // press the bar: pressed
+    TourController.skip();
+    expect(audio.stop).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.audio-manager-sheet')).toBeNull();
+  });
+
+  it('Skip from the closing card stops it too (only Done keeps it)', () => {
+    bibleScreen(); toBible();
+    for (let i = 0; i < 6; i++) TourController.next();
+    expect(TourController.getState().step.id).toBe('done');
+    TourController.skip();
+    expect(audio.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back from the player stop to the Bible stop stops the playback — the Bible stop presses Listen afresh', () => {
+    bibleScreen(); toBible();
+    TourController.next(); TourController.next();            // playing, → player
+    const close = sheetOpen();
+    TourController.back();
+    expect(TourController.getState().step.id).toBe('bible');
+    expect(TourController.getState().pressed).toBe(false);
+    expect(audio.stop).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back from the closing card to back-to-words, and from there to the player stop, keeps it (inside the span)', () => {
+    bibleScreen(); toBible();
+    for (let i = 0; i < 6; i++) TourController.next();
+    expect(TourController.getState().step.id).toBe('done');
+    TourController.back(); expect(TourController.getState().step.id).toBe('back-to-words');
+    TourController.back(); expect(TourController.getState().step.id).toBe('player');
+    expect(audio.stop).not.toHaveBeenCalled();
+  });
+
+  it('a sheet left open outside the span is closed by Skip as well (the reader opened it; the tour tidies)', () => {
+    TourController.attachNav(nav()); TourController.start('settings'); TourController.next();   // letters
+    const close = sheetOpen();
+    TourController.skip();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(audio.stop).not.toHaveBeenCalled();               // the tour pressed nothing: not its playback
+  });
+
+  it('a Settings select sheet is not the listening sheet: with no .audio-manager-sheet on the page, __closeSheet is left alone', () => {
+    TourController.attachNav(nav()); TourController.start('settings'); TourController.next();
+    const close = vi.fn(); /** @type {any} */ (window).__closeSheet = close;
+    TourController.skip();
+    expect(close).not.toHaveBeenCalled();
+  });
+});
+
+/* ensureListening's second half. The listening stops' `enter` (hooks/use-tour.js) opens John 3 and asks
+   the controller to press the Bible screen's own Listen pill — the very press the Bible stop makes —
+   unless the tour's book is already up. The pill may mount a frame after the screen is asked for, so
+   the press waits for it (bounded), and it is FENCED like next()'s own press: the overlay's listener on
+   the pill must not read it as the reader's tap. */
+describe('TourController.pressListenIfIdle — the listening span starts John 3 when nothing of the tour\'s is up', () => {
+  const pill = () => {
+    document.body.innerHTML = '<button class="hero-play-pill">Listen</button>';
+    const el = /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill'));
+    el.getBoundingClientRect = () => /** @type {any} */ ({ x: 133, y: 271, width: 94, height: 25, left: 133, right: 227, top: 271, bottom: 296 });
+    return el;
+  };
+  const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+  let audio, state;
+  beforeEach(() => {
+    state = { status: 'idle', queue: [], qi: 0 };
+    audio = { stop: vi.fn(), syncKeepAlive: vi.fn(), getState: vi.fn(() => state) };
+    /** @type {any} */ (globalThis).AudioPlayer = audio;
+  });
+
+  it('presses the pill once when nothing plays, and reports isPressing() during the click (the fence)', async () => {
+    const el = pill();
+    const seen = [];
+    el.addEventListener('click', () => seen.push(TourController.isPressing()));
+    TourController.pressListenIfIdle('john');
+    expect(seen).toEqual([]);                                // the press waits for a frame: the screen may be mounting
+    await frame(); await frame();
+    expect(seen).toEqual([true]);
+    await frame(); await frame();
+    expect(seen).toEqual([true]);                            // once
+  });
+
+  it('presses nothing when the tour\'s book is already up — playing, paused or loading', async () => {
+    const el = pill(); const clicks = vi.fn(); el.addEventListener('click', clicks);
+    for (const status of ['playing', 'paused', 'loading']) {
+      state = { status, queue: [{ key: 'bible-wop-nkjv:john' }], qi: 0 };
+      TourController.pressListenIfIdle('john');
+      await frame(); await frame();
+    }
+    expect(clicks).not.toHaveBeenCalled();
+  });
+
+  it('a letter, or another book, playing is not the tour\'s: the pill is pressed (the press replaces it, as the Bible stop\'s does)', async () => {
+    const el = pill(); const clicks = vi.fn(); el.addEventListener('click', clicks);
+    state = { status: 'playing', queue: [{ key: 'one:chosen-by-god' }], qi: 0 };
+    TourController.pressListenIfIdle('john');
+    await frame(); await frame();
+    state = { status: 'playing', queue: [{ key: 'bible-brm-kjv:genesis' }], qi: 0 };
+    TourController.pressListenIfIdle('john');
+    await frame(); await frame();
+    expect(clicks).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for a pill that mounts late, and gives up quietly after the wait', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      TourController.pressListenIfIdle('john');
+      await frame(); await frame();                          // no pill yet
+      const el = pill(); const clicks = vi.fn(); el.addEventListener('click', clicks);
+      await frame(); await frame();
+      expect(clicks).toHaveBeenCalledTimes(1);
+      // And a press still waiting past the bound presses nothing that appears later.
+      document.body.innerHTML = '';
+      TourController.pressListenIfIdle('john');
+      vi.setSystemTime(Date.now() + 4000);
+      await frame(); await frame();
+      const late = pill(); const lateClicks = vi.fn(); late.addEventListener('click', lateClicks);
+      await frame(); await frame();
+      expect(lateClicks).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('leaving the span cancels a press still waiting (Back to the Bible stop must not press Listen twice)', async () => {
+    TourController.attachNav(nav()); TourController.start('settings');
+    for (let i = 0; i < 20 && TourController.getState().step.id !== 'player'; i++) TourController.targetPressed();
+    expect(TourController.getState().step.id).toBe('player');
+    TourController.pressListenIfIdle('john');                // waiting: no pill on the page
+    TourController.back();                                   // → bible, outside the span
+    const el = pill(); const clicks = vi.fn(); el.addEventListener('click', clicks);
+    await frame(); await frame();
+    expect(clicks).not.toHaveBeenCalled();
   });
 });
 

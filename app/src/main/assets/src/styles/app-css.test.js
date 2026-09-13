@@ -220,6 +220,38 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
       expect(bare, sel).toMatch(new RegExp('[\\n\\r]\\s*' + sel + ' \\{[^}]*font-size:\\s*min\\(var\\(--fs-\\d+\\),\\s*\\d+px\\)'));
     }
   });
+  /* THE TOUR CARD'S OWN LINES (the Tour Reviewer, 2026-09-13, five measured defects on 5fc80c69): the
+     card's type had no caps (the strip's were added 09-12), so at Text Size 3 on a 360x800 phone the
+     Listen card showed 4 of its 15 lines; its button row had no wrap and no font cap, so Next sat 13 px
+     past the card at 1.8 on a 360 and at 3 the welcome card could not be started; in landscape the
+     card kept its 520 px width over 800 and cut the promise; and the never-link grew to 48 px. Rules
+     as text here — tools/e2e-tour.mjs measures the geometry these cannot (every button's box inside
+     the card and the frame, at 1.8 and 3, portrait and landscape). */
+  it('the tour card\'s eyebrow, title, text, tip, buttons and never-link stop growing at a px ceiling', () => {
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const capped = (sel, token) => new RegExp('[\\n\\r]\\s*' + sel + '[^{]*\\{[^}]*font-size:\\s*min\\(var\\(--' + token + '\\),\\s*\\d+px\\)');
+    expect(bare).toMatch(capped('\\.tour-eyebrow', 'fs-11'));
+    expect(bare).toMatch(capped('\\.tour-title, \\.tour-prompt-title', 'fs-20'));
+    expect(bare).toMatch(capped('\\.tour-text, \\.tour-prompt-text', 'fs-18'));
+    expect(bare).toMatch(capped('\\.tour-tip', 'fs-16'));
+    expect(bare).toMatch(capped('\\.tour-card \\.tour-btn', 'fs-14'));
+    expect(bare).toMatch(capped('\\.tour-never', 'fs-16'));
+    // CONTROL: the matcher sees a cap that is there and not one that is not.
+    expect(bare).toMatch(capped('\\.tour-prompt \\.tour-btn', 'fs-14'));
+    expect(bare).not.toMatch(capped('\\.tour-wait', 'fs-16'));
+  });
+  it('the tour card\'s button row wraps between whole buttons, and the card takes the width a short frame has', () => {
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const row = ruleBlock(bare, '\n      .tour-card .tour-row {');
+    const btn = ruleBlock(bare, '\n      .tour-card .tour-btn {');
+    expect(row, 'a .tour-card .tour-row rule of its own').toBeTruthy();
+    expect(btn, 'a .tour-card .tour-btn rule of its own').toBeTruthy();
+    expect(row).toMatch(/flex-wrap:\s*wrap/);
+    expect(btn).toMatch(/white-space:\s*nowrap/);
+    const short = bare.match(/@media \(max-height: 480px\) \{\s*\.tour-card \{([^}]*)\}/);
+    expect(short, 'a max-height: 480px rule for .tour-card').toBeTruthy();
+    expect(short[1]).toMatch(/max-width:\s*calc\(100vw - 24px\)/);
+  });
   it('the hero pads in rem up to a px ceiling, never past it', () => {
     const hero = ruleBlock(CSS, '.hero {');
     expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+1\.8rem\s+min\(4rem,\s*\d+px\)/);

@@ -19,31 +19,31 @@ import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarge
 afterEach(() => { document.body.innerHTML = ''; });
 
 describe('tour-steps — shape', () => {
-  it('is a welcome card plus nine numbered stops', () => {
-    expect(stepCount()).toBe(10);
+  it('is a welcome card plus eleven numbered stops', () => {
+    expect(stepCount()).toBe(12);
     expect(TOUR_STEPS[0].id).toBe('welcome');
     expect(TOUR_STEPS[0].number).toBe(0);
-    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(TOUR_STEPS[9].id).toBe('done');
+    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(TOUR_STEPS[11].id).toBe('done');
   });
 
   it('every teaching stop points at a real control and knows how to get there', () => {
-    for (const s of TOUR_STEPS.slice(1, 9)) {
+    for (const s of TOUR_STEPS.slice(1, 11)) {
       expect(s.target && s.target.selector, s.id).toBeTruthy();
       expect(s.screen, s.id).toBeTruthy();
       expect(typeof s.enter, s.id).toBe('string');
     }
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'bible', 'scripture-web', 'journal', 'backup', 'settings', 'done']);
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'journal', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
   });
 
   /* THE NUMBER IS WRITTEN TWICE — once as `number`, once inside the eyebrow's words — and
      nothing but this case makes the two agree. Adding a stop moved every eyebrow after it,
      and an eyebrow reading "3 of 6" on the fourth of eight stops is the kind of wrong that
      no other assertion here can see. Derived from the array, never hand-listed. */
-  it('every eyebrow counts itself out of nine, and the welcome card says how many are coming', () => {
+  it('every eyebrow counts itself out of eleven, and the welcome card says how many are coming', () => {
     const teaching = TOUR_STEPS.slice(1);
     for (const s of teaching) expect(s.eyebrow, s.id).toContain(`${s.number} of ${teaching.length}`);
-    expect(TOUR_STEPS[0].text).toContain('nine stops');
+    expect(TOUR_STEPS[0].text).toContain('eleven stops');
   });
 
   /* THE COUNT IS WRITTEN ONCE (2026-09-10). Four sentences counted the stops by hand — every
@@ -62,9 +62,9 @@ describe('tour-steps — shape', () => {
   });
 
   it('publishes the stop count as a word, and the welcome card counts with it', () => {
-    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
     expect(TOUR_STOPS_WORD).toBe(words[TOUR_STEPS.length - 1]);
-    expect(TOUR_STEPS[0].text).toContain(`${TOUR_STOPS_WORD} stops`);
+    expect(TOUR_STEPS[0].text).toContain(`${TOUR_STOPS_WORD} stops, about ${mod.TOUR_MINUTES_WORD} minutes`);
   });
 
   it('every stop has a title and plain text under 60 words', () => {
@@ -80,9 +80,11 @@ describe('tour-steps — shape', () => {
     expect(backup.act).toBeNull();
   });
 
-  it('the listen stops press the Listen pill on Next; the letters stop navigates', () => {
+  it('the listen stops and the two player stops press their control on Next; the letters stop navigates', () => {
     expect(TOUR_STEPS.find((s) => s.id === 'listen').act).toBe('press');
     expect(TOUR_STEPS.find((s) => s.id === 'bible').act).toBe('press');
+    expect(TOUR_STEPS.find((s) => s.id === 'player').act).toBe('press');
+    expect(TOUR_STEPS.find((s) => s.id === 'back-to-words').act).toBe('press');
     expect(TOUR_STEPS.find((s) => s.id === 'letters').act).toBe('openLetter');
   });
 
@@ -122,10 +124,10 @@ describe('tour-steps — shape', () => {
      shortcut the same ask restores, so `enter` is goHome (the Bible stop left the tour on
      bible-ch). Its three sentences are the trailer slide's own (Creative's cut 8 plan), so the
      app and the trailer agree, and they name BOTH halves by their on-screen names. */
-  it('the scripture-web stop follows the Bible stop, returns Home, and rings the shortcut the ask restored', () => {
+  it('the scripture-web stop follows the highlight stop (the Bible moved to the end, 2026-09-13), returns Home, and rings the shortcut the ask restored', () => {
     const sw = TOUR_STEPS.find((s) => s.id === 'scripture-web');
-    const bible = TOUR_STEPS.find((s) => s.id === 'bible');
-    expect(TOUR_STEPS.indexOf(sw)).toBe(TOUR_STEPS.indexOf(bible) + 1);
+    const hl = TOUR_STEPS.find((s) => s.id === 'highlight');
+    expect(TOUR_STEPS.indexOf(sw)).toBe(TOUR_STEPS.indexOf(hl) + 1);
     expect(sw.screen).toBe('home');
     expect(sw.enter).toBe('goHome');
     expect(sw.target).toEqual({ selector: '.home-shortcuts button', text: 'Scripture Web' });
@@ -196,15 +198,16 @@ describe('tour-steps — shape', () => {
 describe('tour-steps — bounds', () => {
   it('nextIndex stops at the last stop, prevIndex at the first', () => {
     expect(nextIndex(0)).toBe(1);
-    expect(nextIndex(9)).toBe(9);
+    expect(nextIndex(11)).toBe(11);
+    expect(nextIndex(10)).toBe(11);
     expect(prevIndex(0)).toBe(0);
     expect(prevIndex(3)).toBe(2);
   });
 });
 
 describe('tour-steps — words', () => {
-  it('uses none of the words an older reader would have to decode', () => {
-    for (const s of TOUR_STEPS) expect(bannedWord(s.title + ' ' + s.text), s.id).toBeNull();
+  it('uses none of the words an older reader would have to decode — on any field of any stop', () => {
+    for (const s of TOUR_STEPS) expect(bannedWord([s.title, s.text, s.tip, s.after, s.label].join(' ')), s.id).toBeNull();
     expect(bannedWord('Welcome to the onboarding')).toBe('onboarding');
     expect(bannedWord('tap the UI')).toBe('UI');
   });
@@ -235,6 +238,99 @@ describe('tour-steps — findTarget', () => {
   it('returns null when nothing matches or the step has no target', () => {
     expect(findTarget({ target: { selector: '.nope' } })).toBeNull();
     expect(findTarget({ target: null })).toBeNull();
+  });
+});
+
+
+/* THE TOUR ENDS ON THE BIBLE, AND TEACHES THE PLAYER THERE (Corbin, 2026-09-12: "show users how to
+   navigate through the media player at the bottom and change the audiobook version or for the
+   letters the voice … and then dismiss it once again so they can listen to the text as it reads";
+   the order is the Tour Reviewer's, accepted by the Orchestrator 2026-09-13). Two press stops after
+   the Bible stop, over its playback: the player stop rings the bar's own button, presses it, and
+   rings the voice row the press revealed (afterTarget); the back-to-words stop rings the sheet's ‹
+   and presses it. The closing card sits over John 3 with the reading still running. The copy is
+   pinned verbatim: it is Corbin's ask in the Orchestrator's words, and every field of every stop
+   passes bannedWord. */
+describe('tour-steps — the player stops, and the tour ends over the Bible', () => {
+  const at = (id) => TOUR_STEPS.find((s) => s.id === id);
+  const idx = (id) => TOUR_STEPS.indexOf(at(id));
+
+  it('the order: … settings › bible › player › back-to-words › done, the Bible stop entered from Settings', () => {
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'journal', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
+    expect(idx('bible')).toBe(idx('settings') + 1);
+    expect(at('bible').enter).toBe('openBible');
+    expect(at('bible').text).toContain('I opened John 3 for you');
+  });
+
+  it('the player stop: the bar\'s own button, pressed; then the voice row is ringed; the sheet already open counts as pressed', () => {
+    const p = at('player');
+    expect(idx('player')).toBe(idx('bible') + 1);
+    expect(p.screen).toBe('bible-ch');
+    expect(p.enter).toBe('ensureListening');
+    expect(p.listening).toBe(true);
+    expect(p.target).toEqual({ selector: '.audio-bar-summary' });
+    expect(p.act).toBe('press');
+    expect(p.afterTarget).toEqual({ selector: '.audio-manager-voice-top, .audio-manager-transport' });
+    expect(p.doneIf).toEqual({ selector: '.audio-manager-sheet', present: true });
+    expect(p.label).toBe('The Player');
+    expect(p.primary).toBe('Next');
+  });
+
+  it('the player stop\'s words, verbatim', () => {
+    const p = at('player');
+    expect(p.title).toBe('Whatever is playing lives here');
+    expect(p.text).toBe('The bar at the bottom shows what is being read. Tap it to open the player.');
+    expect(p.tip).toBe('Tap it now, or press Next and I will open it for you.');
+    expect(p.after).toBe('Pause, skip, or slow the reading here. Under Listening now, tap a different recording: this chapter starts again in that voice, and the chapters after it follow. Letters with more than one voice work the same way. Press Next when you are ready.');
+    // The sheet's own kicker, so the reader finds the row under the words the card used.
+    expect(p.after).toContain('Listening now');
+    expect(TOUR_WORDS).toContain('Listening now');
+  });
+
+  it('the back-to-words stop: the sheet\'s ‹, pressed; no sheet on the page counts as pressed; nothing ringed after', () => {
+    const b = at('back-to-words');
+    expect(idx('back-to-words')).toBe(idx('player') + 1);
+    expect(b.screen).toBe('bible-ch');
+    expect(b.enter).toBe('ensureListening');
+    expect(b.listening).toBe(true);
+    expect(b.target).toEqual({ selector: '.audio-manager-sheet .sheet-handle-back' });
+    expect(b.act).toBe('press');
+    expect(b.afterTarget).toBeUndefined();
+    expect(b.doneIf).toEqual({ selector: '.audio-manager-sheet', present: false });
+    expect(b.label).toBe('Back to the Words');
+    expect(b.primary).toBe('Next');
+  });
+
+  it('the back-to-words stop\'s words, verbatim — nothing the reader can try inside the tour and fail', () => {
+    const b = at('back-to-words');
+    expect(b.title).toBe('Close the player, keep listening');
+    expect(b.text).toBe('Tap ‹ at the top of the player to put it away. The reading goes on.');
+    expect(b.tip).toBe('Tap it now, or press Next and I will do it for you.');
+    expect(b.after).toBe('You are back with the words, and they keep lighting up as they are read. The bar stays at the bottom whenever something is playing. Press Next when you are ready.');
+    expect(b.text).not.toContain('anywhere above it');     // the dim panes cover that region during the stop
+  });
+
+  it('the closing card sits over John 3, listening, with no control to ring, and says the reading goes on', () => {
+    const d = at('done');
+    expect(idx('done')).toBe(TOUR_STEPS.length - 1);
+    expect(d.screen).toBe('bible-ch');
+    expect(d.enter).toBe('ensureListening');
+    expect(d.listening).toBe(true);
+    expect(d.target).toBeNull();
+    expect(d.act).toBeNull();
+    expect(d.text).toBe('You can see this tour again from Settings › Help. The reading goes on. Enjoy your reading.');
+    expect(d.primary).toBe('Done');
+  });
+
+  it('only the three stops over the Bible\'s playback are listening stops; the Bible stop itself is not', () => {
+    expect(TOUR_STEPS.filter((s) => s.listening).map((s) => s.id)).toEqual(['player', 'back-to-words', 'done']);
+    expect(at('bible').listening).toBeUndefined();
+  });
+
+  it('the count and the minutes are published once and read into the welcome card', () => {
+    expect(TOUR_STOPS_WORD).toBe('eleven');
+    expect(mod.TOUR_MINUTES_WORD).toBe('three');
+    expect(TOUR_STEPS[0].text).toContain('eleven stops, about three minutes');
   });
 });
 
