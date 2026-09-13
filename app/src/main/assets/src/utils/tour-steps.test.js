@@ -281,7 +281,7 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
     expect(p.title).toBe('Whatever is playing lives here');
     expect(p.text).toBe('The bar at the bottom shows what is being read. Tap it to open the player.');
     expect(p.tip).toBe('Tap it now, or press Next and I will open it for you.');
-    expect(p.after).toBe('Pause, skip, or slow the reading here. Under Listening now, tap a different recording: this chapter starts again in that voice, and the chapters after it follow. Letters with more than one voice work the same way. Press Next when you are ready.');
+    expect(p.after).toBe('Pause, skip or slow the reading here. Under Listening now, tap another edition: the chapter starts again in that voice, the rest follow. Press Next when you are ready.');
     // The sheet's own kicker, so the reader finds the row under the words the card used.
     expect(p.after).toContain('Listening now');
     expect(TOUR_WORDS).toContain('Listening now');
@@ -301,12 +301,23 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
     expect(b.primary).toBe('Next');
   });
 
+  /* THE AFTER-WORDS FIT THE DOCKED CARD (measured 2026-09-13 on 61c1464b, 360x800 at Text Size 1: the
+     card above the player bar is capped at 276 px by the 55 % rule and shows the eyebrow, the title and
+     FIVE lines of 18 px text — 162 characters filled them exactly; the player stop's 244 hid its last
+     two lines under the button row, "Press Next" among them). The budget is that measurement, not a
+     taste: a longer sentence is a hidden one. tools/e2e-tour.mjs reads the same fact as geometry. */
+  it('no after-words run past the five lines a docked card shows on a phone (162 characters, measured)', () => {
+    const withAfter = TOUR_STEPS.filter((s) => s.after);
+    expect(withAfter.map((s) => s.id)).toEqual(['listen', 'highlight', 'bible', 'player', 'back-to-words']);
+    for (const s of withAfter) expect(s.after.length, `${s.id}: "${s.after}"`).toBeLessThanOrEqual(162);
+  });
+
   it('the back-to-words stop\'s words, verbatim — nothing the reader can try inside the tour and fail', () => {
     const b = at('back-to-words');
     expect(b.title).toBe('Close the player, keep listening');
     expect(b.text).toBe('Tap ‹ at the top of the player to put it away. The reading goes on.');
     expect(b.tip).toBe('Tap it now, or press Next and I will do it for you.');
-    expect(b.after).toBe('You are back with the words, and they keep lighting up as they are read. The bar stays at the bottom whenever something is playing. Press Next when you are ready.');
+    expect(b.after).toBe('You are back with the words, and they keep lighting up as they are read. A letter\'s reader is changed the same way. Press Next when you are ready.');
     expect(b.text).not.toContain('anywhere above it');     // the dim panes cover that region during the stop
   });
 
