@@ -365,12 +365,11 @@ async function run(browser, { width, height, label, light }) {
           if (!f.docked) fail(`${id}: the card is not docked`);
           const floor = f.bar ? f.bar.t : f.vh;
           if (f.card && Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
-          // The rule the 36 % preference exists to serve: at least DOCK_OPEN_FRAC of the screen stays
-          // open above the docked card. Asserting the fraction itself was wrong on a short screen —
-          // 36 % of 640 is 230 px where the Listen words need 270, so the card scrolled and its own
-          // button row covered the last sentence (2026-09-06). The card may now take what it needs up
-          // to this line, and this is the line.
-          if (f.card && f.card.t < Math.floor(f.vh * 0.55) - 1) fail(`${id}: the docked card leaves only ${Math.round(f.card.t)} px of ${f.vh} open above it, under 55 %`);
+          // The rule the 36 % preference exists to serve: 120 px of the reading column stays open below
+          // its scroller's top (TourOverlay DOCK_OPEN_PX; a 55 % share of the screen ruled here until
+          // the Tour Reviewer's D6, 2026-09-13, when it cut the card's own words on a 320 phone). The
+          // card may take what it needs up to this line, and this is the line.
+          if (f.card && f.card.t < f.scrollerTop + 120 - 1) fail(`${id}: the docked card leaves only ${Math.round(f.card.t - f.scrollerTop)} px of column open below its top at ${Math.round(f.scrollerTop)}, under 120`);
         } else if (f.docked) fail(`${id}: docked, but it is not a stop that shows something on the text`);
         if (!textTarget && (f.ring.t < 0 || f.ring.b > f.vh + 1)) fail(`${id}: the ring is off screen (${Math.round(f.ring.t)}..${Math.round(f.ring.b)} of ${f.vh})`);
         if (textTarget) {
@@ -450,8 +449,8 @@ async function run(browser, { width, height, label, light }) {
         const covered = f.dimBoxes.filter((d) => d.w > 0 && d.h > 0 && d.t < f.card.t - 1 && d.b > f.scrollerTop + 1);
         if (covered.length) fail(`${id}: a dim pane covers the reading column between ${Math.round(f.scrollerTop)} and the card at ${Math.round(f.card.t)}: ${covered.map((d) => `${Math.round(d.t)}..${Math.round(d.b)}`).join(', ')}`);
         if (Math.abs((f.scrollPad || 0) - (f.vh - f.card.t)) > 2) fail(`${id}: the scroller's scroll-padding-bottom is ${f.scrollPad}, the docked card covers ${Math.round(f.vh - f.card.t)} (read-along's band would run under it)`);
-        // The docked card's contract (TourOverlay DOCK_OPEN_FRAC): its top at or below 55 % of the screen.
-        if (f.column && f.card.t < f.vh * 0.55 - 1) fail(`${id}: the card's top at ${Math.round(f.card.t)} leaves ${Math.round(100 * f.card.t / f.vh)} % of the screen open above it, expected 55 %`);
+        // The docked card's contract (TourOverlay DOCK_OPEN_PX): 120 px of column open below the scroller's top.
+        if (f.column && f.card.t < f.scrollerTop + 120 - 1) fail(`${id}: the card's top at ${Math.round(f.card.t)} leaves ${Math.round(f.card.t - f.scrollerTop)} px of column open below ${Math.round(f.scrollerTop)}, expected 120`);
         else ok(`${id}: the reading column is open from ${Math.round(f.scrollerTop)} to the card at ${Math.round(f.card.t)} (${Math.round(100 * (f.card.t - f.scrollerTop) / (f.vh - f.scrollerTop))} % of it), card ${Math.round(f.card.b - f.card.t)} px, scroll-padding ${Math.round(f.scrollPad || 0)}, text ${f.fontScale || '1'}x, no ring`);
         if (String(f.fontScale || '1') !== String(SCALE)) fail(`${id}: --font-scale is ${f.fontScale || 'unset'} at this stop, the walk asked for ${SCALE}`);
       }
