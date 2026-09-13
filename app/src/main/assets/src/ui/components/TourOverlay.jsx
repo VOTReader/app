@@ -69,6 +69,14 @@ const CARD_MIN_H = 160;
    follow band (ReadAlongHighlight) and the engine's scrollIntoView both measure against. */
 const DOCK_MAX_FRAC = 0.36;
 const DOCK_OPEN_FRAC = 0.55;
+/* A SHORT FRAME — a phone in landscape (the Tour Reviewer, 800x360 at Text Size 1, 2026-09-13): 55 %
+   of 360 leaves 150 px of room, so every docked card sat at its 160 px floor and hid its own words —
+   the Listen promise cut in half, five of nine stops. A fraction of the screen is the wrong unit
+   there. What must stay open is the reading column: SHORT_OPEN_PX of it below the top of its
+   scroller, the same floor the highlight band keeps (e2e-tour's 120 px band), and the card may
+   take the rest. Above SHORT_FRAME_H the fraction rules as before and nothing moves. */
+const SHORT_FRAME_H = 480;
+const SHORT_OPEN_PX = 120;
 
 function _rect(el) {
   const r = el.getBoundingClientRect();
@@ -294,7 +302,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
   const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
   const top0 = ringOn && targetRef.current ? _scrollerTop(targetRef.current) : 0;
-  const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
+  let docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
   dockPadRef.current = 0;
   const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
   /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_FRAC is the rule. A fraction of the screen is the
@@ -305,8 +313,15 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
      320x640 CSS px against +13 px at 426x952). So the card may exceed the fraction up to what its
      content needs, and never past the room DOCK_OPEN_FRAC leaves open. On a tall screen the
      content is well under the fraction and nothing moves. */
-  const dockRoom = Math.floor(vh - dockBottom - vh * DOCK_OPEN_FRAC);
-  const cap = docked ? Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom))
+  const openAbove = vh < SHORT_FRAME_H ? scrollerTopRef.current + SHORT_OPEN_PX : vh * DOCK_OPEN_FRAC;
+  const dockRoom = Math.floor(vh - dockBottom - openAbove);
+  const dockCap = Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom));
+  /* A PRESSED STOP WHOSE RING IS THE PRESS'S RESULT (the player stop: the voice row the sheet
+     revealed) docks only if the docked card clears that ring; otherwise it sits beside the ring like
+     any ringed stop — above it, in a landscape phone. Measured 800x360 at Text Size 1 (2026-09-13):
+     the docked card at 118..278 covered the chips it was pointing at (229..273). */
+  if (docked && ring && st.pressed && step.afterTarget && vh - dockBottom - Math.min(cardH || CARD_EST_H, dockCap) < ring.top + ring.height + CARD_GAP) docked = false;
+  const cap = docked ? dockCap
     : ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE;
   const h = Math.min(cardH || CARD_EST_H, cap);
   let below = false, cardTop = 0;

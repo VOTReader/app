@@ -225,7 +225,8 @@ const STOPS = [
     title: 'Whatever is playing lives here',
     text: 'The bar at the bottom shows what is being read. Tap it to open the player.',
     tip: 'Tap it now, or press Next and I will open it for you.',
-    after: 'Pause, skip, or slow the reading here. Under Listening now, tap a different recording: this chapter starts again in that voice, and the chapters after it follow. Letters with more than one voice work the same way. Press Next when you are ready.',
+    // Five lines of a docked card on a phone: 162 characters (tour-steps.test.js, measured 2026-09-13).
+    after: 'Pause, skip or slow the reading here. Under Listening now, tap another edition: the chapter starts again in that voice, the rest follow. Press Next when ready.',
     primary: 'Next',
   },
   /* BACK TO THE WORDS. The sheet's ‹ (a real 44 px button, SheetHandle) is the ring; the press
@@ -241,7 +242,8 @@ const STOPS = [
     title: 'Close the player, keep listening',
     text: 'Tap ' + CLOSE_GLYPH + ' at the top of the player to put it away. The reading goes on.',
     tip: 'Tap it now, or press Next and I will do it for you.',
-    after: 'You are back with the words, and they keep lighting up as they are read. The bar stays at the bottom whenever something is playing. Press Next when you are ready.',
+    // The letters' half of Corbin's ask lives here: the same row switches a letter's reader.
+    after: 'You are back with the words, and they keep lighting up as they are read. A letter\'s reader is changed the same way. Press Next when you are ready.',
     primary: 'Next',
   },
   /* The closing card docks over John 3 with the verses still being read: Done leaves the

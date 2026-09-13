@@ -281,7 +281,7 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
     expect(p.title).toBe('Whatever is playing lives here');
     expect(p.text).toBe('The bar at the bottom shows what is being read. Tap it to open the player.');
     expect(p.tip).toBe('Tap it now, or press Next and I will open it for you.');
-    expect(p.after).toBe('Pause, skip or slow the reading here. Under Listening now, tap another edition: the chapter starts again in that voice, the rest follow. Press Next when you are ready.');
+    expect(p.after).toBe('Pause, skip or slow the reading here. Under Listening now, tap another edition: the chapter starts again in that voice, the rest follow. Press Next when ready.');
     // The sheet's own kicker, so the reader finds the row under the words the card used.
     expect(p.after).toContain('Listening now');
     expect(TOUR_WORDS).toContain('Listening now');

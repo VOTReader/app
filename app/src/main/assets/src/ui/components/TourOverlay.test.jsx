@@ -833,16 +833,19 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
       await settle();
       act(() => { TourController.next(); });
       openSheet();
-      // The voice row where a landscape phone puts it: 200..290, ringed 192..298; the docked card
-      // (360 - 92 - 160 = 108) would cover it, and 192 - 18 - 160 = 14 px is room above it.
-      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-voice-top')).getBoundingClientRect = rect(16, 200, 328, 90);
+      // The voice row low on the sheet, as a landscape phone puts it (191..313 measured), here at
+      // 260..350 — ringed 252..358 — so that jsdom's UNMEASURED card (CARD_EST_H 220; the phone's
+      // compact card measures 160) has the same 14 px of room above the ring: 252 - 18 - 220. The
+      // docked card (360 - 92 - 160 = 108) would cover it.
+      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-voice-top')).getBoundingClientRect = rect(16, 260, 328, 90);
       await settle();
       expect(TourController.getState().pressed).toBe(true);
-      expect(ringBox()).toEqual({ top: 200 - 8, left: 16 - 8, height: 90 + 16 });
+      expect(ringBox()).toEqual({ top: 260 - 8, left: 16 - 8, height: 90 + 16 });
       const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
       expect(card.classList.contains('docked')).toBe(false);
       expect(card.style.bottom).toBe('');
-      expect(parseFloat(card.style.top) + parseFloat(card.style.maxHeight)).toBeLessThanOrEqual(192 - 18 + 1);   // wholly above the ring
+      // Wholly above the ring: the 12 px edge clamp may eat into the 18 px gap, never into the ring.
+      expect(parseFloat(card.style.top) + parseFloat(card.style.maxHeight)).toBeLessThanOrEqual(252);
     } finally { window.innerHeight = vh0; }
   });
 
