@@ -70,23 +70,35 @@ describe('My Web ink law', () => {
     expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(3);
   });
 
-  it('R1 zoom rewards: the context thread at 5.8x is at least twice as strong as at 1x, and never past the cap', () => {
-    expect(personalInk(5.8).context.alpha).toBeGreaterThanOrEqual(2 * personalInk(1).context.alpha);
-    // the ceiling is 0.70 (1b: no coloured ink darker than cream clears 3:1 at 0.45; design-myweb-colour.md, 2)
-    expect(personalInk(4000).context.alpha).toBeLessThanOrEqual(0.75);
-    expect(personalInk(25).context.alpha).toBeCloseTo(0.45, 1);   // nothing below 25x moved
-    expect(personalInk(0).context.alpha).toBe(personalInk(1).context.alpha);   // a bad z is overview, not NaN
+  it('R1 the ink law after call 07 (Corbin, 2026-09-12: "the normal is probably too faint" and zooming "makes the colors get brighter and brighter ... odd"): floor 0.06 at 1x, today\'s curve x1.5 up to a 0.30 plateau, FLAT from there to the ceiling on both frames', () => {
+    const a = (z) => personalInk(z).context.alpha;
+    expect(a(1)).toBeCloseTo(0.06, 3);                        // the overview floor, lifted from 0.04 ("a touch")
+    expect(a(6)).toBeCloseTo(0.06 * Math.pow(6, 0.75), 3);    // 0.230 - below the plateau the ramp is today's shape at 1.5x
+    expect(a(16)).toBeCloseTo(0.30, 3);                       // the plateau (reached at 8.6x)
+    expect(a(43.8)).toBe(a(16));                              // the phone's top-rail ceiling: not one bit brighter than 16x
+    expect(a(18.2)).toBe(a(16));                              // the desktop's top-rail ceiling: the same
+    expect(a(4000)).toBe(a(16));
+    expect(a(5.8)).toBeGreaterThanOrEqual(2 * a(1));          // the 5.8x reward survives (design-perf 09-10)
+    expect(a(0)).toBe(a(1));                                  // a bad z is overview, not NaN
+    // the approved 0.70 ceiling is the law's hard BOUND: the walk's knob can raise the plateau to it and no further
+    expect(RR.CONTEXT_PLATEAU).toBe(0.30);
+    expect(RR.CONTEXT_CEILING).toBe(0.70);
+    expect(personalInk(1e6, 0.70).context.alpha).toBeCloseTo(0.70, 3);
+    expect(personalInk(1e6, 0.95).context.alpha).toBe(RR.CONTEXT_CEILING);
+    // "a little clearer lines as you zoom in is fine": the width, not the alpha, carries depth (0.8 -> 1.6 at 40x)
+    expect(personalInk(1).context.width).toBeCloseTo(0.8, 3);
+    expect(personalInk(40).context.width).toBeCloseTo(1.6, 3);
   });
 
-  it('R2 a reader link outweighs a context thread (8x core to 5.8x, 6x with halo to 25x, 3.5x at the 0.70 ceiling), in a different family', () => {
+  it('R2 a reader link outweighs a context thread (8x core to 5.8x, 6x with halo to 25x, 3.5x past it), in a different family', () => {
     for (const z of [1, 1.8, 3.24, 5.83, 10.5, 18.9, 40]) {
       const { context, link } = personalInk(z);
       const thread = context.alpha * context.width;
       const core = link.alpha * link.width;
       if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(8);
-      // past 25x the context brightens to its 0.70 ceiling (1b) and the link's
+      // past 25x the context sits on its 0.30 plateau at 1.6 px and the link's
       // lead rests on hue (warm on cool, dE >= 32 under every deficiency) and
-      // its pins as well as ink; the ink ratio alone stays >= 3.5
+      // its pins as well as ink; the ink ratio alone stays >= 3.5 (it is ~7.5)
       expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(z <= 25 ? 6 : 3.5);
       // no reader hue is a Timothy hue
       for (let k = 0; k < 3; k++) for (const src of MY_WEB_SOURCES) expect(myWebLinkColor(k)).not.toBe(src.rgb);

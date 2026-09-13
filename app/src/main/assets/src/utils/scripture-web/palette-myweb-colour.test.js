@@ -84,16 +84,26 @@ describe('contrast on the black canvas (WCAG 1.4.11, 3:1 where a thread is meant
     expect(coverage).toBeGreaterThan(0.79);
     for (const c of T) expect(onBlack(over(c, coverage))).toBeGreaterThanOrEqual(3);
   });
-  it('a lone thread at the depth ceiling clears 3:1 for every source (the reason the ceiling is 0.70, not cream\'s 0.45)', () => {
+  it('a lone thread at depth sits on the 0.30 plateau (call 07, Corbin 2026-09-12): 1.39-1.73:1 per source, in the ladder order, and width carries the rest', () => {
+    // The 3:1 that justified 0.70 is given up on Corbin's word ("brighter and brighter ... odd";
+    // "a little clearer lines as you zoom in is fine"): at depth the ink stays at the plateau and the
+    // stroke widens to 1.6 px. Recorded so the next reader knows the number was chosen, not missed.
     const top = personalInk(1e6).context.alpha;
-    expect(top).toBeCloseTo(0.70, 2);
-    for (const c of T) expect(onBlack(over(c, top)), `source ${c}`).toBeGreaterThanOrEqual(3);
-    // and the darkest source did NOT clear it at 0.45: the RED that moved the ceiling
+    expect(top).toBeCloseTo(0.30, 3);
+    const ratios = T.map((c) => onBlack(over(c, top)));
+    expect(ratios[0]).toBeGreaterThan(1.7); expect(ratios[3]).toBeGreaterThan(1.35);
+    for (let i = 1; i < ratios.length; i++) expect(ratios[i]).toBeLessThan(ratios[i - 1]);   // brightest first
+    expect(personalInk(1e6).context.width).toBeCloseTo(1.6, 3);
+  });
+  it('the 0.70 bound keeps its property for the walk\'s knob: every source clears 3:1 there and the darkest did not at 0.45', () => {
+    const bound = personalInk(1e6, 0.70).context.alpha;
+    expect(bound).toBeCloseTo(0.70, 2);
+    for (const c of T) expect(onBlack(over(c, bound)), `source ${c}`).toBeGreaterThanOrEqual(3);
     expect(onBlack(over(T[3], 0.45))).toBeLessThan(3);
   });
-  it('the brightest source at the ceiling stays under the darkest reader hue at full ink', () => {
-    const top = personalInk(1e6).context.alpha;
-    expect(lum(over(T[0], top))).toBeLessThan(lum(over(R[2], 0.95)));
+  it('the brightest source at the bound stays under the darkest reader hue at full ink', () => {
+    const bound = personalInk(1e6, 0.70).context.alpha;
+    expect(lum(over(T[0], bound))).toBeLessThan(lum(over(R[2], 0.95)));
   });
 });
 
