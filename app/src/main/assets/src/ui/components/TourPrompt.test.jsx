@@ -7,6 +7,7 @@ import { render, cleanup, act } from '@testing-library/react';
 import { TourPrompt } from './TourPrompt.jsx';
 import { TourController } from '../../utils/tour-controller.js';
 import { TOUR_STOPS_WORD } from '../../utils/tour-steps.js';
+import * as steps from '../../utils/tour-steps.js';   // TOUR_MINUTES_WORD read off the module so this file loads on the base tree
 import { AboutSeenFlagStore, TourDoneFlagStore } from '../../stores/app-flag-stores.js';
 
 beforeEach(() => {
@@ -57,6 +58,6 @@ describe('TourPrompt — the strip declares the room it takes', () => {
   it('counts the stops the tour actually has', () => {
     render(<TourPrompt screen="home" />);
     const text = document.querySelector('.tour-prompt-text').textContent;
-    expect(text).toContain(`${TOUR_STOPS_WORD} short stops`);
+    expect(text).toContain(`${TOUR_STOPS_WORD} short stops, about ${steps.TOUR_MINUTES_WORD} minutes`);
   });
 });

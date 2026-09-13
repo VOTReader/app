@@ -554,16 +554,19 @@ describe('AudioManagerSheet — the whole-queue picker', () => {
     expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(true);
   });
 
-  it('centres the playing row when the desk opens', () => {
+  /* The Tour Reviewer, 2026-09-13: on a 360x800 phone the desk opened at scrollTop 352 — the queue
+     row centred, the voice row at y −103 — so a reader who opened the player to change the voice
+     saw the queue first and the picker not at all. The desk now opens at its top; the queue row is
+     centred only when the TRACK CHANGES while it is open (the case below this one). */
+  it('opens at its top: the playing row is NOT scrolled to on the open, so the voice row is the first thing seen', () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
     try {
       startCollection();
       drive(() => AudioPlayer.playAt(2));
       openSheet();
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
-      expect(scrollIntoView.mock.calls[0][0]).toEqual({ block: 'center' });
-      expect(scrollIntoView.mock.instances[0]).toBe(document.querySelector('.audio-manager-queue li.is-current'));
+      expect(document.querySelector('.audio-manager-queue li.is-current')).toBeTruthy();
+      expect(scrollIntoView).not.toHaveBeenCalled();
     } finally {
       delete Element.prototype.scrollIntoView;
     }
@@ -924,14 +927,15 @@ describe('AudioManagerSheet — the queue window follows playback', () => {
       drive(() => AudioPlayer.playCollection({ volKey: 'big', items: BIG_ITEMS, collectionLabel: 'Big' }));
       drive(() => AudioPlayer.playAt(100));
       openSheet();
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).not.toHaveBeenCalled();     // the open itself scrolls nothing (2026-09-13)
 
       // An auto-advance with the desk OPEN: the window and the centring both
       // have to follow, or the playing chapter drifts out of view entirely.
       emit('ended');
       expect(AudioPlayer.getState().qi).toBe(101);
-      expect(scrollIntoView).toHaveBeenCalledTimes(2);
-      expect(scrollIntoView.mock.instances[1]).toBe(document.querySelector('.audio-manager-queue li.is-current'));
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.calls[0][0]).toEqual({ block: 'center' });
+      expect(scrollIntoView.mock.instances[0]).toBe(document.querySelector('.audio-manager-queue li.is-current'));
       expect(document.querySelector('.audio-manager-queue li.is-current .audio-manager-queue-main strong').textContent)
         .toBe('Track 102');
     } finally {

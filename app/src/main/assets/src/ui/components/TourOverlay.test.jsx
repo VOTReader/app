@@ -42,9 +42,9 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 const startAt = (id) => {
   TourController.attachNav(nav());
   TourController.start('prompt');
-  for (let i = 0; i < 12 && TourController.getState().step.id !== id; i++) TourController.targetPressed();
+  for (let i = 0; i < 20 && TourController.getState().step.id !== id; i++) TourController.targetPressed();
   const at = TourController.getState().step.id;
-  if (at !== id) throw new Error(`startAt("${id}") never reached that stop: twelve presses from the start landed on "${at}". If a step was renamed or reordered, fix the id here rather than letting every case below assert about a different card.`);
+  if (at !== id) throw new Error(`startAt("${id}") never reached that stop: twenty presses from the start landed on "${at}". If a step was renamed or reordered, fix the id here rather than letting every case below assert about a different card.`);
 };
 
 describe('TourOverlay — dialog', () => {
@@ -715,6 +715,168 @@ describe('TourOverlay — the demonstration leaves by every door', () => {
       await new Promise((r) => setTimeout(r, 60));
     });
     expect(TourController.getState().pressed).toBe(true);
+  });
+});
+
+/* THE PLAYER STOPS (Corbin, 2026-09-12). The player stop rings the bar's own button; once pressed the
+   ring moves to the voice row inside the sheet (afterTarget), the column is NOT opened (the sheet is
+   what the reader looks at), and a tap on the ringed row is not a step (a voice chip changes the
+   voice; Next moves on). The back-to-words stop rings the sheet's ‹; once the sheet is gone the words
+   are the window and the ring goes. `doneIf` reads the page: the sheet already open on the player stop,
+   or already gone on the back-to-words stop, is the press done — by the reader, or by Back. The closing
+   card docks over John 3 with the column open and no ring at all. */
+describe('TourOverlay — the player stops ring the bar, then the voice row; the sheet\'s ‹; and the closing card is open over the words', () => {
+  const vh = () => window.innerHeight;
+  const bibleScreen = ({ bar = true, sheet = false } = {}) => {
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><main class="bible-body"><button class="hero-play-pill">Listen</button><p>In the beginning…</p></main></div>'
+      + (bar ? '<div class="audio-bar"><button class="audio-bar-summary">John 3</button></div>' : '')
+      + (sheet ? '<div class="audio-manager-sheet" style="overflow-y:auto"><button class="sheet-handle-back">‹</button><div class="audio-manager-voice-top">Audio Bible</div><div class="audio-manager-transport">−15</div></div>' : '') + '</div>';
+    const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
+    scroller.getBoundingClientRect = rect(0, 56, 360, vh() - 56);
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
+    /** @type {HTMLElement} */ (document.querySelector('.hero-play-pill')).getBoundingClientRect = rect(133, 271, 94, 25);
+    if (bar) {
+      /** @type {HTMLElement} */ (document.querySelector('.audio-bar')).getBoundingClientRect = rect(8, vh() - 80, 344, 80);
+      /** @type {HTMLElement} */ (document.querySelector('.audio-bar-summary')).getBoundingClientRect = rect(60, vh() - 70, 240, 40);
+    }
+    if (sheet) {
+      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-sheet')).getBoundingClientRect = rect(0, 60, 360, vh() - 60);
+      /** @type {HTMLElement} */ (document.querySelector('.sheet-handle-back')).getBoundingClientRect = rect(8, 64, 44, 44);
+      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-voice-top')).getBoundingClientRect = rect(16, 140, 328, 90);
+      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-transport')).getBoundingClientRect = rect(16, 300, 328, 60);
+    }
+  };
+  const openSheet = () => {
+    document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="audio-manager-sheet" style="overflow-y:auto"><button class="sheet-handle-back">‹</button><div class="audio-manager-voice-top">Audio Bible</div><div class="audio-manager-transport">−15</div></div>');
+    /** @type {HTMLElement} */ (document.querySelector('.audio-manager-sheet')).getBoundingClientRect = rect(0, 60, 360, vh() - 60);
+    /** @type {HTMLElement} */ (document.querySelector('.sheet-handle-back')).getBoundingClientRect = rect(8, 64, 44, 44);
+    /** @type {HTMLElement} */ (document.querySelector('.audio-manager-voice-top')).getBoundingClientRect = rect(16, 140, 328, 90);
+    /** @type {HTMLElement} */ (document.querySelector('.audio-manager-transport')).getBoundingClientRect = rect(16, 300, 328, 60);
+  };
+  const ringBox = () => { const r = /** @type {HTMLElement|null} */ (document.querySelector('.tour-ring')); return r ? { top: parseFloat(r.style.top), left: parseFloat(r.style.left), height: parseFloat(r.style.height) } : null; };
+  const described = () => [...document.querySelectorAll('[aria-describedby="tour-desc"]')].map((e) => e.className);
+  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+  beforeEach(() => { /** @type {any} */ (globalThis).AudioPlayer = { stop: vi.fn(), syncKeepAlive: vi.fn(), getState: () => ({ status: 'playing', queue: [{ key: 'bible-brm-kjv:john' }], qi: 0 }) }; });
+
+  it('the player stop: docked above the bar, the bar\'s button ringed and described, four dims', async () => {
+    bibleScreen();
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(true);
+    expect(parseFloat(card.style.bottom)).toBe(12 + 80);
+    expect(ringBox()).toEqual({ top: vh() - 70 - 8, left: 60 - 8, height: 40 + 16 });
+    expect(described()).toEqual(['audio-bar-summary']);
+    expect(document.querySelectorAll('.tour-dim').length).toBe(4);
+    expect(screen.getByText(/Tap it to open the player/)).toBeTruthy();
+  });
+
+  it('after the press the ring moves to the voice row, the card says the after-words, and the column is NOT opened', async () => {
+    bibleScreen();
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    act(() => { TourController.next(); });                   // the tour presses the bar (no click reaches a fake sheet)
+    openSheet();                                             // …and the sheet opens
+    await settle();
+    expect(TourController.getState().pressed).toBe(true);
+    expect(ringBox()).toEqual({ top: 140 - 8, left: 16 - 8, height: 90 + 16 });
+    expect(described()).toEqual(['audio-manager-voice-top']);
+    expect(screen.getByText(/Under Listening now/)).toBeTruthy();
+    // Not opened: the dims still frame the ring, not the reading column.
+    const d = [...document.querySelectorAll('.tour-dim')].map((x) => parseFloat(/** @type {HTMLElement} */ (x).style.height));
+    expect(d[0]).toBe(140 - 8);                              // the pane above the ring ends at the ring
+  });
+
+  it('a recording with one voice: no voice row, so the transport is ringed instead (first on-screen match)', async () => {
+    bibleScreen();
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    act(() => { TourController.next(); });
+    openSheet();
+    document.querySelector('.audio-manager-voice-top').remove();
+    await settle();
+    expect(described()).toEqual(['audio-manager-transport']);
+    expect(ringBox()).toEqual({ top: 300 - 8, left: 16 - 8, height: 60 + 16 });
+  });
+
+  it('a tap on the ringed voice row is not a step: the tour stays on the player stop', async () => {
+    bibleScreen();
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    act(() => { TourController.next(); });
+    openSheet();
+    await settle();
+    fireEvent.click(document.querySelector('.audio-manager-voice-top'));
+    await settle();
+    expect(TourController.getState().step.id).toBe('player');
+    expect(TourController.getState().pressed).toBe(true);
+  });
+
+  it('the sheet already open when the player stop shows (the reader tapped the bar; Back from the next stop) counts as pressed', async () => {
+    bibleScreen({ sheet: true });
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    expect(TourController.getState().pressed).toBe(true);
+    expect(described()).toEqual(['audio-manager-voice-top']);
+    expect(screen.getByText(/Under Listening now/)).toBeTruthy();
+  });
+
+  it('the back-to-words stop: the sheet\'s ‹ ringed; once the sheet is gone — by any door — the ring goes, the words are the window', async () => {
+    bibleScreen({ sheet: true });
+    startAt('back-to-words');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    expect(TourController.getState().pressed).toBe(false);
+    expect(ringBox()).toEqual({ top: 64 - 8, left: 8 - 8, height: 44 + 16 });
+    expect(described()).toEqual(['sheet-handle-back']);
+    expect(screen.getByText(/Tap ‹ at the top of the player/)).toBeTruthy();
+    // The reader taps the backdrop (no click on ‹): the sheet unmounts.
+    document.querySelector('.audio-manager-sheet').remove();
+    await settle();
+    expect(TourController.getState().pressed).toBe(true);
+    expect(document.querySelector('.tour-ring')).toBeNull();
+    expect(screen.getByText(/You are back with the words/)).toBeTruthy();
+    expect(screen.queryByText(/could not find it/)).toBeNull();
+    // Opened: the dims leave the reading column open from its scroller (56) down to the card.
+    const d = [...document.querySelectorAll('.tour-dim')].map((x) => ({ top: parseFloat(/** @type {HTMLElement} */ (x).style.top), height: parseFloat(/** @type {HTMLElement} */ (x).style.height), width: parseFloat(/** @type {HTMLElement} */ (x).style.width) }));
+    expect(d[0]).toEqual({ top: 0, height: 56, width: window.innerWidth });
+    expect(d[2].width).toBe(0); expect(d[3].width).toBe(0);
+  });
+
+  it('no sheet when the back-to-words stop shows (Back from the closing card) counts as pressed at once, with no "could not find it"', async () => {
+    bibleScreen();
+    startAt('back-to-words');
+    render(<TourOverlay waitMs={30} />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    expect(TourController.getState().pressed).toBe(true);
+    expect(screen.getByText(/You are back with the words/)).toBeTruthy();
+    expect(screen.queryByText(/could not find it/)).toBeNull();
+    expect(document.querySelector('.tour-ring')).toBeNull();
+  });
+
+  it('the closing card docks over John 3 with the reading column open above it and nothing ringed', async () => {
+    bibleScreen();
+    startAt('done');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(true);
+    expect(parseFloat(card.style.bottom)).toBe(12 + 80);
+    expect(document.querySelector('.tour-ring')).toBeNull();
+    expect(screen.getByText(/The reading goes on/)).toBeTruthy();
+    const d = [...document.querySelectorAll('.tour-dim')].map((x) => ({ top: parseFloat(/** @type {HTMLElement} */ (x).style.top), height: parseFloat(/** @type {HTMLElement} */ (x).style.height), width: parseFloat(/** @type {HTMLElement} */ (x).style.width) }));
+    expect(d.length).toBe(4);
+    expect(d[0]).toEqual({ top: 0, height: 56, width: window.innerWidth });
+    expect(d[1].top).toBe(vh() - 92 - 220);                  // the dim resumes at the card (CARD_EST_H before ResizeObserver reports)
+    expect(d[2].width).toBe(0); expect(d[3].width).toBe(0);
+    // The column carries the card's height as scroll-padding, so read-along's band stays above the card.
+    expect(/** @type {HTMLElement} */ (document.querySelector('.screen-scroll')).style.scrollPaddingBottom).toBe(Math.round(92 + 220) + 'px');
   });
 });
 
