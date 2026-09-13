@@ -328,7 +328,12 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     } finally { window.innerHeight = vh0; }
   });
 
-  it('a docked card that wants more than the room is still stopped by the open-space rule', () => {
+  /* THE RULE IS THE COLUMN, IN EVERY FRAME (the Tour Reviewer's D6, 2026-09-13): 55 % of the screen
+     cut the docked card's words at Text Size 1 on a 320 phone (seven stops) and at 1.8 everywhere —
+     and on the player stop the cut line was the sentence the stop exists for. What must stay open is
+     120 px of the reading column below its scroller's top; the card takes what it needs of the rest.
+     640 - 12 - (56 + 120) = 452, where 55 % had left 276. */
+  it('a docked card that wants more than the room is stopped where the column would lose its 120 px', () => {
     const vh0 = window.innerHeight;
     window.innerHeight = 640;
     try {
@@ -341,18 +346,16 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
       try {
         render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
         const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
-        expect(parseFloat(card.style.maxHeight)).toBe(Math.floor(640 - 12 - 640 * 0.55));   // 276, the room
+        expect(parseFloat(card.style.maxHeight)).toBe(640 - 12 - (56 + 120));            // 452, the room; 55 % left 276
       } finally { Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } }); globalThis.ResizeObserver = ro0; }
     } finally { window.innerHeight = vh0; }
   });
 
-  /* A SHORT FRAME (a phone in landscape, under 480 px tall — the Tour Reviewer's D3, 2026-09-13): 55 %
-     of 360 leaves 150 px of room, so every docked card sat at its 160 px floor and hid its own words
-     (the Listen promise cut in half, five of nine stops at Text Size 1). A fraction of the screen is
-     the wrong unit there; what must stay open is the reading column — 120 px of it below the top bar,
-     the same floor the highlight band keeps — and the card may take the rest. The fixture's scroller
-     starts at 56, so the room is 360 - 12 - (56 + 120) = 172, not the floor. */
-  it('in a frame under 480 px tall a docked card may take what leaves 120 px of column below the scroller\'s top', () => {
+  /* A SHORT FRAME (a phone in landscape — the Tour Reviewer's D3, 2026-09-13): 55 % of 360 leaves 150
+     px of room, so every docked card sat at its 160 px floor and hid its own words (the Listen promise
+     cut in half, five of nine stops at Text Size 1). The column rule was born here and, since D6, is
+     the rule in every frame. The fixture's scroller starts at 56: 360 - 12 - (56 + 120) = 172. */
+  it('in a 360 px frame a docked card may take what leaves 120 px of column below the scroller\'s top', () => {
     const vh0 = window.innerHeight;
     window.innerHeight = 360;
     try {
@@ -457,7 +460,7 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     for (const y of [60, 200, cardTop - 1]) expect(d.some((p) => p.width > 0 && y >= p.top && y < p.top + p.height)).toBe(false);
   });
 
-  it('on a 699 px phone with the bar up, the card shrinks so 55 % of the screen stays open above it', () => {
+  it('on a 699 px phone with the bar up, an unmeasured card keeps the 36 % preference and the column keeps its 120 px', () => {
     const vh0 = window.innerHeight;
     window.innerHeight = 699;
     try {
@@ -466,10 +469,11 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
       render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
       const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
       expect(parseFloat(card.style.bottom)).toBe(112);
-      expect(parseFloat(card.style.maxHeight)).toBe(Math.floor(699 - 112 - 699 * 0.55));   // 202, not 36 % = 252
+      // Unmeasured (no ResizeObserver here): the 36 % preference, 252 — the room is 699 - 112 - 176 = 411.
+      expect(parseFloat(card.style.maxHeight)).toBe(Math.round(699 * 0.36));
       fireEvent.click(pill);
       const cardTop = dims()[1].top;
-      expect(cardTop).toBeGreaterThanOrEqual(699 * 0.55);
+      expect(cardTop).toBeGreaterThanOrEqual(56 + 120);                   // the column keeps 120 px below its top
     } finally { window.innerHeight = vh0; }
   });
 
