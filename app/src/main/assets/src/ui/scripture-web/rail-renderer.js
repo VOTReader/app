@@ -422,28 +422,38 @@ export function distanceToPath(pts, px, py) {
  * measured). z = the corpus's on-screen width / the screen width: 1 at
  * overview, 1.8^n after n zoom steps.
  *
- * Context (the Volumes' own citations) is cream, faint per edge at overview
- * so corridors glow where citations pile and a lone thread whispers, rising
- * with zoom so a thread reads on its own at depth (0.15 at 5.8x, 0.45 at
- * 40x). The reader's links are the only saturated ink: their kind colour,
- * wider (2.0 -> 2.6 with depth, like a canon ribbon), haloed, pinned at both
- * ends. The unit test reads this export; the walk reads the pixels it makes.
+ * Context (the Volumes' own citations) is faint per edge at overview so
+ * corridors glow where citations pile and a lone thread whispers, and rises
+ * with zoom only until a PLATEAU: from there to the ceiling the picture only
+ * thins and widens, it never brightens. The reader's links are the only
+ * saturated ink: their kind colour, wider (2.0 -> 2.6 with depth, like a
+ * canon ribbon), haloed, pinned at both ends. The unit test reads this
+ * export; the walk reads the pixels it makes.
+ *
+ * Call 07 (Corbin, 2026-09-12): "zooming (on either side, top or bottom)
+ * makes the colors get brighter and brighter. Not necessarily bad, the normal
+ * is probably too faint, but it's odd and feels confusing ... a little clearer
+ * lines as you zoom in is fine." So: the floor rose 0.04 -> 0.06, the ramp
+ * keeps its shape at 1.5x and STOPS at 0.30 (reached at 8.6x), and depth is
+ * carried by width (0.8 -> 1.6 px at 40x), not alpha. The lone-thread 3:1 that
+ * put the ceiling at 0.70 is given up on his word (1.39-1.73:1 at the plateau,
+ * palette-myweb-colour.test.js records it); 0.70 stays as the hard BOUND the
+ * walk's knob may raise the plateau to for a corridor comparison.
  */
-/** The context's depth alpha ceiling (design-myweb-colour.md, 2; the corridor pair is its gate). */
+/** Where the context's zoom ramp stops (call 07); the default look past 8.6x. */
+export const CONTEXT_PLATEAU = 0.30;
+/** The context alpha's hard bound (design-myweb-colour.md, 2; the walk's knob may raise the plateau to it, never past). */
 export const CONTEXT_CEILING = 0.70;
 export function personalInk(z, ceiling) {
   const zz = Math.max(1, z || 1);
-  const cap = ceiling > 0 ? ceiling : CONTEXT_CEILING;
+  const cap = ceiling > 0 ? Math.min(ceiling, CONTEXT_CEILING) : CONTEXT_PLATEAU;
   const t = Math.min(1, Math.log(zz) / Math.log(40));
   return {
     // each thread's rgb is its source's (MY_WEB_SOURCES); only the alpha and
-    // width are the ink law's. The depth ceiling is 0.70 (reached at 45x), not
-    // the 0.45 cream was tuned for: no coloured ink darker than cream clears
-    // 3:1 on black at 0.45 (studies read 1.89:1), every source does at 0.70
-    // (3.1 to 4.9). Nothing below 25x changes (design-myweb-colour.md, 2).
-    context: { alpha: Math.min(cap, 0.04 * Math.pow(zz, 0.75)), width: 0.8 + 0.5 * t },
+    // width are the ink law's: 0.06 at 1x, 0.23 at 6x, the plateau from 8.6x.
+    context: { alpha: Math.min(cap, 0.06 * Math.pow(zz, 0.75)), width: 0.8 + 0.8 * t },
     // the link thickens with depth like a canon ribbon (2.0 -> 2.6 at 40x), so it
-    // stays 6x a context thread with its halo even where the thread is 0.45 · 1.3
+    // stays 6x a context thread with its halo to 25x and ~7.5x on the plateau (0.30 · 1.6)
     link: { alpha: 0.95, width: 2.0 + 0.6 * t, halo: 7, haloAlpha: 0.16, dot: 3, dotSolo: 4, ring: 5.5,
       hoverWidth: 3 + 0.6 * t, hoverHalo: 11, hoverHaloAlpha: 0.3 },
   };
