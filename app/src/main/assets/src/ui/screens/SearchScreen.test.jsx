@@ -258,6 +258,43 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* CATALOGUE SR1 + SR2 (audit row 6, 2026-09-12): the screen showed two chip rows — the corpus pills
+     (All / Scriptures / Volumes, a persisted setting that narrows what is SEARCHED) and, under the
+     summary, the [8] result-filter chips (All / Scriptures · n / Volumes · n / WTLB · n / Studies · n)
+     that narrowed what was RENDERED — the same three words twice on one screen, and the second row
+     the only place in the app that spelled Words To Live By as "WTLB". One row: the filter chips go;
+     the sort toggle stays as that row's one button. */
+  it('SR1+SR2: results across several sections render NO filter chips and no "WTLB"; the sort toggle is the row\'s one button', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;         // real grouping for this case
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: null,
+      results: [
+        { score: 3, doc: { kind: 'verse', ref: 'Ps 23:1', text: 't', g: 'bible' } },
+        { score: 2, doc: { kind: 'verse', ref: 'Ps 23:2', text: 't', g: 'bible' } },
+        { score: 1, doc: { kind: 'letter', title: 'A', text: 't', g: 'v2' } },
+        { score: 1, doc: { kind: 'wtlb', title: 'B', text: 't', g: 'wtlb1' } },
+      ],
+      parsedTerms: [],
+    }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="shepherd" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('3 sections');
+    expect(document.querySelectorAll('.srch-filter-chip')).toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/\bWTLB\b/);
+    // The corpus row is THE chip row: three pills, once.
+    expect([...document.querySelectorAll('.srch-corpus-btn')].map((b) => b.textContent)).toEqual(['All', 'Scriptures', 'Volumes']);
+    // Two verses in a scripture group: the sort toggle shows, alone in its row.
+    const row = document.querySelector('.srch-filter-row');
+    expect(row, 'the sort row').toBeTruthy();
+    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn']);
+    expect(row.querySelector('.srch-sort-btn').textContent).toBe('Book order');
+    vi.useRealTimers();
+  });
+
   it('(a) the summary keeps the exact count below the cap', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
