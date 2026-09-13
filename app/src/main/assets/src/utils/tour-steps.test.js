@@ -149,10 +149,10 @@ describe('tour-steps — shape', () => {
      `screen`, same `enter`, no navigation added), opens the Reading group and rings the dice row, and
      names three features by the words the reader sees on screen. It says nothing the closing card
      says, so 'done' stays the closing card. */
-  it('the settings stop is the last teaching stop, on the screen the backup stop opened, and rings the dice row', () => {
+  it('the settings stop follows the backup stop on the screen it opened (the Bible stops come after, since 2026-09-13), and rings the dice row', () => {
     const st = TOUR_STEPS.find((s) => s.id === 'settings');
     const backup = TOUR_STEPS.find((s) => s.id === 'backup');
-    expect(TOUR_STEPS.indexOf(st)).toBe(TOUR_STEPS.length - 2);
+    expect(TOUR_STEPS.indexOf(st)).toBe(TOUR_STEPS.indexOf(backup) + 1);
     expect(st.screen).toBe('settings');
     expect(st.screen).toBe(backup.screen);
     expect(st.enter).toBe(backup.enter);

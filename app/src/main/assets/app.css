@@ -7223,24 +7223,39 @@
          somewhere to go — without it two nowrap buttons overflow a 302 px row sideways. */
       .tour-prompt .tour-row { flex-wrap: wrap; justify-content: flex-end; }
       .tour-prompt .tour-btn { white-space: nowrap; }
+      /* The card's row too (the Tour Reviewer, 2026-09-13): with no wrap and no font cap, Next sat
+         13 px past the card's edge at Text Size 1.8 on a 360 phone, 41 px off the screen at 1.8 on a
+         320, and at Text Size 3 on a 360 the primary ran to x 505 — the welcome card could not be
+         started. Same two rules as the strip, same reason; the cap is the strip's. */
+      .tour-card .tour-row { flex-wrap: wrap; }
+      .tour-card .tour-btn { white-space: nowrap; font-size: min(var(--fs-14), 16px); }
+      /* On a frame under 480 px tall (a phone in landscape) the card takes the width the screen
+         has: at 520 px wide over 800 its 160 px floor cut the Listen promise in half and the
+         Settings card to three of six lines (the Tour Reviewer, 800x360, 2026-09-13). */
+      @media (max-height: 480px) { .tour-card { max-width: calc(100vw - 24px); } }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {
         padding-bottom: calc(var(--tour-prompt-h, 200px) + 28px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
       }
+      /* THE CARD'S TYPE IS CAPPED, like the strip's since 2026-09-12 (the Tour Reviewer, 2026-09-13):
+         uncapped, Text Size 3 on a 360x800 phone showed the Listen card's eyebrow and title with 11
+         of its 15 lines under the fold, and "Press Listen" was never seen. The caps are the largest
+         each line can be and still fit a stop's words on a phone at first view; the reader's Text
+         Size still scales everything up to them. */
       .tour-eyebrow {
-        font-family: var(--font-cinzel); font-size: var(--fs-11);
+        font-family: var(--font-cinzel); font-size: min(var(--fs-11), 15px);
         letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
       }
       .tour-title, .tour-prompt-title {
-        font-family: var(--font-cinzel); font-weight: 600; font-size: var(--fs-20);
+        font-family: var(--font-cinzel); font-weight: 600; font-size: min(var(--fs-20), 30px);
         line-height: 1.2; color: var(--cream); margin: 0 0 8px;
       }
       .tour-prompt-title { font-size: min(var(--fs-18), 22px); margin-bottom: 4px; }
-      .tour-text, .tour-prompt-text { font-size: var(--fs-18); line-height: 1.4; margin: 0 0 14px; }
+      .tour-text, .tour-prompt-text { font-size: min(var(--fs-18), 28px); line-height: 1.4; margin: 0 0 14px; }
       .tour-prompt-text { font-size: min(var(--fs-16), 20px); margin-bottom: 12px; }
       .tour-prompt .tour-btn { font-size: min(var(--fs-14), 16px); }
-      .tour-tip { font-size: var(--fs-16); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
+      .tour-tip { font-size: min(var(--fs-16), 24px); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
       .tour-row { display: flex; gap: 8px; align-items: center;
         /* Stuck to the card's bottom edge while its text scrolls (a tall card at a large text
            size is capped to the room beside the ring): Skip, Back and Next never scroll away. */
@@ -7271,7 +7286,9 @@
       .tour-never {
         display: block; margin: 8px auto 0; min-height: 44px;
         background: none; border: 0; color: var(--cream-muted); cursor: pointer;
-        font-family: var(--font-body); font-size: var(--fs-16); text-decoration: underline;
+        /* Capped like the strip's other lines (the Tour Reviewer, 2026-09-13): at Text Size 3 this
+           link was 48 px, the largest type on the strip under a 22 px title. */
+        font-family: var(--font-body); font-size: min(var(--fs-16), 18px); text-decoration: underline;
       }
       .tour-wait {
         position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 322; text-align: center;

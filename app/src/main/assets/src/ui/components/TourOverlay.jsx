@@ -136,7 +136,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
        reader made on the Listen stop, say) would otherwise advance this stop on its first frame
        with nothing taught. `selUp` starts null so the entry frame can only RECORD, never fire. */
     let selUp = null;
-    const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo'));
+    const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
     const detach = () => {
       const t = targetRef.current;
       if (t) { t.removeEventListener('click', onTargetClick); if (t.getAttribute('aria-describedby') === descId) t.removeAttribute('aria-describedby'); }
@@ -145,7 +145,30 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     function onTargetClick() { if (ctl && ctl.isPressing && ctl.isPressing()) return; detach(); if (ctl) ctl.targetPressed(); }
     const tick = () => {
       if (stopped) return;
-      const el = step && step.target && ctl ? ctl.findTarget(step) : null;
+      // getState(), not the `st` this effect closed over: `pressed` moves without re-running it.
+      const pressedNow = !!(ctl && ctl.getState().pressed);
+      /* What is ringed on this frame: the stop's target; once pressed, the `afterTarget` where the
+         stop has one (the player stop: the voice row the press revealed), and NOTHING where the
+         press's result is the words themselves — the reading column is the window then, found
+         below by its own class, because the pressed target may be gone (the sheet's ‹ closed the
+         sheet it lived in) and a gone target is not a missing one. */
+      const ringed = !step ? null : pressedNow ? (step.afterTarget ? { target: step.afterTarget } : null) : (step.target ? step : null);
+      const el = ringed && ctl ? ctl.findTarget(ringed) : null;
+      /* THE PRESS ALREADY HAPPENED (`doneIf`, the listening stops): the sheet is open before the
+         player stop asks for it (the reader tapped the bar; Back from the next stop), or gone
+         before the back-to-words stop asks (‹, the backdrop, Android Back; Back from the closing
+         card). Read every frame, so the reader's own tap on the backdrop — no click on the ringed
+         ‹ for the listener below to hear — still moves the card to its after-words. */
+      if (step && step.doneIf && ctl && !pressedNow) {
+        const present = !!document.querySelector(step.doneIf.selector);
+        if (present === step.doneIf.present) ctl.targetPressed();
+      }
+      if (docked && !ringed && ctl) {
+        // The reading column: what the dims leave open and what carries the card's scroll-padding.
+        const col = ctl.findTarget({ target: { selector: '.screen-scroll' } });
+        if (col) { scrollerRef.current = /** @type {HTMLElement} */ (col); scrollerTopRef.current = Math.max(0, col.getBoundingClientRect().top); }
+        if (missing) setMissing(false);
+      }
       const bar = document.querySelector('.audio-bar');
       const bt = bar ? bar.getBoundingClientRect().top : null;
       if (bt !== lastBar) { lastBar = bt; setBarTop(bt); }
@@ -157,7 +180,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       }
       if (el !== targetRef.current) {
         detach();
-        if (el) { targetRef.current = el; el.addEventListener('click', onTargetClick); el.setAttribute('aria-describedby', descId); }
+        // The afterTarget is pointed at, not listened to: a tap on a voice chip changes the voice, and
+        // the reader moves on with Next when they have heard it.
+        if (el) { targetRef.current = el; if (!pressedNow) el.addEventListener('click', onTargetClick); el.setAttribute('aria-describedby', descId); }
       }
       if (el) {
         const r = _rect(el);
@@ -199,10 +224,10 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         }
         if (!_sameRect(r, last)) { last = r; setRect(r); }
         if (missing) setMissing(false);
-      } else if (step && step.target && Date.now() - started > waitMs) {
+      } else if (ringed && Date.now() - started > waitMs) {
         if (last) { last = null; setRect(null); }
         setMissing(true);
-      }
+      } else if (!ringed && last) { last = null; setRect(null); }
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -269,7 +294,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
   const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
   const top0 = ringOn && targetRef.current ? _scrollerTop(targetRef.current) : 0;
-  const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo'));
+  const docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
   dockPadRef.current = 0;
   const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
   /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_FRAC is the rule. A fraction of the screen is the
@@ -299,8 +324,10 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const cardStyle = docked ? { bottom: Math.round(dockBottom) + 'px', maxHeight: Math.round(cap) + 'px' }
     : ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
   // What the dims leave open: the ringed control, or, once Listen is pressed, the reading column
-  // from the top of its scroller down to the card (the lit words are somewhere in it).
-  const opened = docked && st.pressed;
+  // from the top of its scroller down to the card (the lit words are somewhere in it). A pressed
+  // stop with an afterTarget rings that instead; a docked stop with no target at all (the closing
+  // card over John 3) is open from the start.
+  const opened = docked && !step.afterTarget && (st.pressed || !step.target);
   const winTop = opened ? (targetRef.current ? _scrollerTop(targetRef.current) : scrollerTopRef.current) : 0;
   const win = opened ? { left: 0, top: winTop, width: vw, height: Math.max(0, cardTop - winTop) } : ring;
   const dims = win ? [

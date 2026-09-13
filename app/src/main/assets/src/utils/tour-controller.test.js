@@ -129,10 +129,10 @@ describe('TourController — moving', () => {
     expect(TourController.getState().pressed).toBe(true);
     // Three stops on, through the highlight demonstration, and the pill is still not clicked.
     TourController.next();                            // → highlight
-    TourController.next(); TourController.next();      // demonstrate, stay; then → bible
+    TourController.next(); TourController.next();      // demonstrate, stay; then → scripture-web
     expect(onClick).not.toHaveBeenCalled();
-    expect(TourController.getState().step.id).toBe('bible');
-    expect(n.openBible).toHaveBeenCalledTimes(1);
+    expect(TourController.getState().step.id).toBe('scripture-web');
+    expect(n.goHome).toHaveBeenCalledTimes(3);        // the welcome card's enter, the letters stop's, and this stop's
   });
 
   it('next() on a press stop clicks the visible target once, then moves on', () => {
@@ -149,21 +149,27 @@ describe('TourController — moving', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(TourController.getState().step.id).toBe('listen');
     TourController.next();                            // → highlight
-    TourController.next(); TourController.next();      // demonstrate, stay; then → bible
+    TourController.next(); TourController.next();      // demonstrate, stay; then → scripture-web
     expect(onClick).toHaveBeenCalledTimes(1);         // once, and only on the stop that asked for it
+    expect(TourController.getState().step.id).toBe('scripture-web');
+    // Four stops on, at the Bible stop, the pill on this page is pressed again — and only then.
+    TourController.next(); TourController.next(); TourController.next(); TourController.next();
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);     // the bible stop's enter
+    expect(onClick).toHaveBeenCalledTimes(1);
+    TourController.next();
+    expect(onClick).toHaveBeenCalledTimes(2);
   });
 
   it('back() re-enters the previous stop', () => {
     const n = nav();
     TourController.attachNav(n);
     TourController.start('prompt');
-    // welcome → letters → listen (press, stay) → highlight (demonstrate, stay) → bible.
+    // welcome → letters → listen (press, stay) → highlight (demonstrate, stay) → scripture-web.
     // A count is the wrong unit here — the press-style stops take two next()s each — so the walk
     // is asserted at its destination rather than trusted.
     for (let i = 0; i < 6; i++) TourController.next();
-    expect(TourController.getState().step.id).toBe('bible');
+    expect(TourController.getState().step.id).toBe('scripture-web');
     const entered = n.openLetter.mock.calls.length;
     TourController.back();
     expect(TourController.getState().step.id).toBe('highlight');
@@ -307,7 +313,7 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
     TourController.next(); TourController.next();   // press Listen, → highlight: stopped once
     TourController.next(); TourController.next();   // demonstrate, → scripture-web: the demonstration starts no audio
     expect(audio.stop).toHaveBeenCalledTimes(1);
-    TourController.next(); TourController.next(); TourController.next();   // journal, backup, settings → bible
+    for (let i = 0; i < 4; i++) TourController.next();                    // journal, backup, settings → bible
     expect(TourController.getState().step.id).toBe('bible');
     expect(audio.stop).toHaveBeenCalledTimes(1);
   });
@@ -564,7 +570,8 @@ describe('TourController — the letter Listen stop seeks to the first lit claus
   it('the Bible stop has no seek key: John 3 starts where it starts', () => {
     pill(); toListen();
     TourController.next(); TourController.next();      // press Listen, → highlight
-    TourController.next(); TourController.next();      // demonstrate, → bible
+    TourController.next(); TourController.next();      // demonstrate, → scripture-web
+    for (let i = 0; i < 4; i++) TourController.next(); // journal, backup, settings → bible
     expect(TourController.getState().step.id).toBe('bible');
     TourController.next();                              // press
     state = { time: 0, duration: 200 }; notify();

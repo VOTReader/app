@@ -217,8 +217,17 @@ export function AudioManagerSheet({ open, state, onClose }) {
   }, [open]);
 
   const currentRowRef = React.useRef(/** @type {any} */ (null));
+  /* The queue row is centred when the TRACK CHANGES while the desk is open — never on the open
+     itself. Centring it on every open put a phone's sheet at scrollTop 352 with the voice row at
+     y −103 (the Tour Reviewer, 360x800 at Text Size 1, 2026-09-13): the reader opened the desk and
+     the first thing to see was the queue, the picker gone above. The sheet now opens at its top,
+     the voice row in view. */
+  const prevQiRef = React.useRef(/** @type {number|null} */ (null));
   React.useEffect(() => {
-    if (!renders) return undefined;
+    if (!renders) { prevQiRef.current = null; return undefined; }
+    const prevQi = prevQiRef.current;
+    prevQiRef.current = state.qi;
+    if (prevQi === null || prevQi === state.qi) return undefined;
     const node = currentRowRef.current;
     // jsdom has no scrollIntoView; a guarded no-op keeps the suite silent.
     if (!node || typeof node.scrollIntoView !== 'function') return undefined;
