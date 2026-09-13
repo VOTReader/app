@@ -346,6 +346,31 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     } finally { window.innerHeight = vh0; }
   });
 
+  /* A SHORT FRAME (a phone in landscape, under 480 px tall — the Tour Reviewer's D3, 2026-09-13): 55 %
+     of 360 leaves 150 px of room, so every docked card sat at its 160 px floor and hid its own words
+     (the Listen promise cut in half, five of nine stops at Text Size 1). A fraction of the screen is
+     the wrong unit there; what must stay open is the reading column — 120 px of it below the top bar,
+     the same floor the highlight band keeps — and the card may take the rest. The fixture's scroller
+     starts at 56, so the room is 360 - 12 - (56 + 120) = 172, not the floor. */
+  it('in a frame under 480 px tall a docked card may take what leaves 120 px of column below the scroller\'s top', () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 360;
+    try {
+      letterScreen(null);
+      startAt('listen');
+      const proto = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get() { return this.classList && this.classList.contains('tour-card') ? 900 : 0; } });
+      const ro0 = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+      try {
+        render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+        const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+        expect(parseFloat(card.style.maxHeight)).toBe(360 - 12 - (56 + 120));   // 172: the column keeps 120 px
+        expect(parseFloat(card.style.maxHeight)).not.toBe(160);                 // not the floor the 55 % rule left
+      } finally { Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } }); globalThis.ResizeObserver = ro0; }
+    } finally { window.innerHeight = vh0; }
+  });
+
   /* THE SCROLL AFFORDANCE (Corbin, 2026-09-06, on "best and most professional"): when the card's
      content overflows, a soft fade above the sticky button row and a small centred chevron, both
      gone once the reader reaches the end. No scrollbar styling, no text. RED first: at 320x640 and
@@ -791,6 +816,49 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
     // Not opened: the dims still frame the ring, not the reading column.
     const d = [...document.querySelectorAll('.tour-dim')].map((x) => parseFloat(/** @type {HTMLElement} */ (x).style.height));
     expect(d[0]).toBe(140 - 8);                              // the pane above the ring ends at the ring
+  });
+
+  /* THE PRESSED CARD MUST NOT COVER WHAT IT POINTS AT (measured 2026-09-13, 800x360 at Text Size 1: the
+     docked card sat at 118..278 over the voice row it ringed at 191..313 — the chips were under the
+     card, only the sheet's note showed beneath it). Docked is the rule for a card over the words; once
+     the press has moved the ring to the voice row, the card docks only if it clears that ring, and
+     otherwise sits beside it like any ringed stop — above, here, where a 160 px card fits. */
+  it('in a short frame the pressed player card sits ABOVE the voice row instead of docking over it', async () => {
+    const vh0 = window.innerHeight;
+    window.innerHeight = 360;
+    try {
+      bibleScreen();
+      startAt('player');
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      await settle();
+      act(() => { TourController.next(); });
+      openSheet();
+      // The voice row where a landscape phone puts it: 200..290, ringed 192..298; the docked card
+      // (360 - 92 - 160 = 108) would cover it, and 192 - 18 - 160 = 14 px is room above it.
+      /** @type {HTMLElement} */ (document.querySelector('.audio-manager-voice-top')).getBoundingClientRect = rect(16, 200, 328, 90);
+      await settle();
+      expect(TourController.getState().pressed).toBe(true);
+      expect(ringBox()).toEqual({ top: 200 - 8, left: 16 - 8, height: 90 + 16 });
+      const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+      expect(card.classList.contains('docked')).toBe(false);
+      expect(card.style.bottom).toBe('');
+      expect(parseFloat(card.style.top) + parseFloat(card.style.maxHeight)).toBeLessThanOrEqual(192 - 18 + 1);   // wholly above the ring
+    } finally { window.innerHeight = vh0; }
+  });
+
+  it('CONTROL: on a tall frame the pressed player card stays docked, clear of the ring below the bar', async () => {
+    bibleScreen();
+    startAt('player');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    await settle();
+    act(() => { TourController.next(); });
+    openSheet();
+    await settle();
+    const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
+    expect(card.classList.contains('docked')).toBe(true);
+    expect(parseFloat(card.style.bottom)).toBe(12 + 80);
+    // The docked card's top clears the ring (140..230, ringed to 238) with the gap to spare.
+    expect(vh() - (12 + 80) - parseFloat(card.style.maxHeight)).toBeGreaterThanOrEqual(238 + 18);
   });
 
   it('a recording with one voice: no voice row, so the transport is ringed instead (first on-screen match)', async () => {

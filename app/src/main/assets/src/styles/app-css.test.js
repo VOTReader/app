@@ -251,6 +251,18 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     const short = bare.match(/@media \(max-height: 480px\) \{\s*\.tour-card \{([^}]*)\}/);
     expect(short, 'a max-height: 480px rule for .tour-card').toBeTruthy();
     expect(short[1]).toMatch(/max-width:\s*calc\(100vw - 24px\)/);
+    /* And the card is COMPACT there (measured 2026-09-13, 800x360 at Text Size 1): the width alone left
+       every docked card at its 160 px floor with lines hidden, because ~110 of those px are chrome —
+       paddings, the eyebrow's own line, margins, the row. The eyebrow shares the title's line, the
+       gaps halve, the buttons keep 44 px. The media block is read whole, braces counted. */
+    const at = bare.indexOf('@media (max-height: 480px) {');
+    let depth = 0, end = at;
+    for (let i = at; i < bare.length; i++) { if (bare[i] === '{') depth++; else if (bare[i] === '}') { depth--; if (depth === 0) { end = i; break; } } }
+    const block = bare.slice(at, end);
+    expect(block).toMatch(/\.tour-card \.tour-eyebrow \{[^}]*display:\s*inline\b/);
+    expect(block).toMatch(/\.tour-card \.tour-title \{[^}]*display:\s*inline\b/);
+    expect(block).toMatch(/\.tour-card \.tour-btn \{[^}]*min-height:\s*44px/);
+    expect(block).not.toMatch(/\.tour-prompt/);                       // the strip keeps its own shape
   });
   it('the hero pads in rem up to a px ceiling, never past it', () => {
     const hero = ruleBlock(CSS, '.hero {');
