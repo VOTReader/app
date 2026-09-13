@@ -69,6 +69,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
    tour-steps.test; this instrument's job is each stop on the real screen. */
 const STOPS = TOUR_STEPS.map((s) => s.id);
 const RINGED = TOUR_STEPS.filter((s) => s.target).map((s) => s.id);            // every stop that rings a control
+// The stops whose card docks on the bottom edge — TourOverlay's own rule, derived here rather than
+// listed (a hand list of three went stale the night the listening stops arrived, 2026-09-13) — and
+// the stops that press their control and STAY, showing their after-words.
+const DOCKED = TOUR_STEPS.filter((s) => s.act === 'press' || s.act === 'highlightDemo' || s.listening).map((s) => s.id);
+const PRESS = TOUR_STEPS.filter((s) => s.act === 'press').map((s) => s.id);
 const EXPECT_SCREEN = Object.fromEntries(TOUR_STEPS.filter((s) => s.target).map((s) => [s.id, s.screen]));
 
 /* THE STRIP'S GEOMETRY (journey F1.1 + F1.2, 2026-09-12). The "New here?" strip must be as tall as
@@ -233,6 +238,17 @@ async function run(browser, { width, height, label, light }) {
       })(),
       text: card ? (card.querySelector('.tour-text') || {}).textContent : null,
       vh: window.innerHeight,
+      /* THE LISTENING STOPS (2026-09-13). The player stop's press opens the sheet and rings the voice
+         row (`afterTarget`); the back-to-words stop's press closes it; `doneIf` names the page fact
+         each press must leave behind. Read here as geometry — the row's box, the sheet's scrollTop —
+         because "the sheet opens with the voice row on screen" is a position, not a presence. */
+      afterTarget: box(st && st.step && st.step.afterTarget ? window.TourController.findTarget({ target: st.step.afterTarget }) : null),
+      afterDescribed: (() => { const t = st && st.step && st.step.afterTarget ? window.TourController.findTarget({ target: st.step.afterTarget }) : null; return !!(t && t.getAttribute('aria-describedby')); })(),
+      doneIfHolds: st && st.step && st.step.doneIf ? !!document.querySelector(st.step.doneIf.selector) === st.step.doneIf.present : null,
+      sheetOpen: !!document.querySelector('.audio-manager-sheet'),
+      focusInSheet: (() => { const s = document.querySelector('.audio-manager-sheet'); return !!(s && s.contains(document.activeElement)); })(),
+      sheetScrollTop: (() => { const s = document.querySelector('.audio-manager-sheet'); return s ? s.scrollTop : null; })(),
+      audio: window.AudioPlayer && typeof window.AudioPlayer.getState === 'function' ? window.AudioPlayer.getState().status : null,
     };
   });
   const shot = async (name) => { if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-${light ? 'light' : 'dark'}-${name}.png`) }); };
@@ -300,7 +316,11 @@ async function run(browser, { width, height, label, light }) {
     if (!f.dialog || !f.labelled) fail(`${id}: the card is not a labelled modal dialog`);
     if (!f.skip) fail(`${id}: Skip is not on the card`);
     if (f.back !== (id === 'welcome' ? 'disabled' : 'enabled')) fail(`${id}: Back is ${f.back}`);
-    if (!f.focusInside) fail(`${id}: focus is not inside the card`);
+    /* Focus lives in the card — or, on a stop that opens with the listening sheet up (back-to-words:
+       the sheet the player stop opened), in the sheet, whose own trap is the topmost: the card's ‹
+       words point INTO the sheet, and Escape or ‹ closes it and hands focus back (asserted below). */
+    if (!f.focusInside && !(f.sheetOpen && f.focusInSheet)) fail(`${id}: focus is not inside the card${f.sheetOpen ? ' nor the open sheet' : ''}`);
+    else if (!f.focusInside) ok(`${id}: focus is in the open listening sheet (its trap is the topmost)`);
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
     const want = EXPECT_SCREEN[id];
     if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
@@ -341,7 +361,7 @@ async function run(browser, { width, height, label, light }) {
         if (f.card && roomForFloor && !textTarget && !(f.card.b <= f.target.t + 1 || f.card.t >= f.target.b - 1)) fail(`${id}: the card covers the control`);
         // Listen stops dock: the card sits on the bottom edge (above the player bar when it is up),
         // never beside the ring, so the text column above it is the reader's (Corbin's walk, 2026-09-04).
-        if (id === 'listen' || id === 'bible' || id === 'highlight') {
+        if (DOCKED.includes(id)) {
           if (!f.docked) fail(`${id}: the card is not docked`);
           const floor = f.bar ? f.bar.t : f.vh;
           if (f.card && Math.abs(f.card.b - (floor - 12)) > 2) fail(`${id}: the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round(floor - 12)}`);
@@ -369,20 +389,57 @@ async function run(browser, { width, height, label, light }) {
         if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);
         ok(`${id}: ringed on ${f.title}`);
       }
+    } else if (DOCKED.includes(id)) {
+      /* The closing card, since the tour ends over John 3 (2026-09-13): docked, no ring, the column
+         open above it and the bar up — the reader is left with the verses being read. */
+      if (!f.docked) fail(`${id}: the closing card is not docked over the words`);
+      if (f.ring) fail(`${id}: a ring is drawn on the closing card`);
+      if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes, expected 4`);
+      if (!f.bar) fail(`${id}: no player bar under the closing card — nothing is playing`);
+      if (f.card) {
+        const covered = f.dimBoxes.filter((d) => d.w > 0 && d.h > 0 && d.t < f.card.t - 1 && d.b > f.scrollerTop + 1);
+        if (covered.length) fail(`${id}: a dim pane covers the reading column between ${Math.round(f.scrollerTop)} and the card at ${Math.round(f.card.t)}`);
+        else ok(`${id}: docked over the open column, the bar at ${Math.round(f.bar ? f.bar.t : -1)}, audio ${f.audio}`);
+      }
     } else ok(`${id}: card on ${f.title}`);
     // The whole card (Skip, Next) is on screen at every stop, whatever the ring's size or place.
     if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen (${Math.round(f.card.t)}..${Math.round(f.card.b)} of ${f.vh})`);
     await shot(`${STOPS.indexOf(id)}-${id}`);
-    if (id === 'listen' || id === 'bible') {
-      // A Listen stop stays after the press, with the words to look for; the second Next moves on.
+    if (PRESS.includes(id)) {
+      // A press stop stays after the press, with its own after-words; the second Next moves on.
+      const step = TOUR_STEPS.find((s) => s.id === id);
       await page.evaluate(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); b && b.click(); });
       await sleep(600);
       f = await facts();
-      if (f.step !== id || !f.pressed) fail(`${id}: the tour did not stay after pressing Listen (at ${f.step}, pressed ${f.pressed})`);
-      else if (!/Hear it\?/.test(f.text || '')) fail(`${id}: after the press the card does not say what to look for ("${f.text}")`);
-      else ok(`${id}: pressed Listen and stayed, the card says what to look for`);
+      if (f.step !== id || !f.pressed) fail(`${id}: the tour did not stay after the press (at ${f.step}, pressed ${f.pressed})`);
+      else if ((f.text || '') !== step.after) fail(`${id}: after the press the card does not say its after-words ("${f.text}")`);
+      else ok(`${id}: pressed and stayed, the card says its after-words`);
       if (f.card && (f.card.t < 0 || f.card.b > f.vh + 1)) fail(`${id}: the card is off screen after the press`);
-      // Once Listen is pressed the words are the ring: no ring, and no dim pane between the top of
+      // What the press must leave on the page (the sheet open; the sheet gone), by the stop's own doneIf.
+      if (step.doneIf && f.doneIfHolds !== true) fail(`${id}: after the press ${step.doneIf.selector} is ${step.doneIf.present ? 'not on' : 'still on'} the page`);
+      // A press that CLOSED the sheet hands focus back to the card (the sheet's trap restores it).
+      if (step.doneIf && step.doneIf.present === false && !f.focusInside) fail(`${id}: the sheet closed but focus did not come back to the card`);
+      if (step.afterTarget) {
+        /* THE PLAYER STOP'S SECOND HALF: the press opened the sheet, and the ring moved to the voice row —
+           whole on screen, inside the frame, described by the card, the card clear of it, the dims
+           around it (the column is NOT opened: the sheet is what the reader looks at). The row must be
+           where the sheet opens, not scrolled past (D5: it opened at scrollTop 352 with the row at
+           y -103 on a phone, the Tour Reviewer 2026-09-13). */
+        if (!f.afterTarget) fail(`${id}: after the press the ${step.afterTarget.selector} row is not on the page`);
+        else {
+          if (!f.ring) fail(`${id}: no ring on the row the press revealed`);
+          else if (!(f.ring.t <= f.afterTarget.t - 7 && f.ring.b >= f.afterTarget.b + 7)) fail(`${id}: the ring (${Math.round(f.ring.t)}..${Math.round(f.ring.b)}) does not wrap the row (${Math.round(f.afterTarget.t)}..${Math.round(f.afterTarget.b)})`);
+          if (f.afterTarget.t < 0 || f.afterTarget.b > f.vh + 1) fail(`${id}: the ringed row is off screen (${Math.round(f.afterTarget.t)}..${Math.round(f.afterTarget.b)} of ${f.vh}; sheet scrollTop ${f.sheetScrollTop})`);
+          if (f.card && !(f.card.b <= f.afterTarget.t + 1 || f.card.t >= f.afterTarget.b - 1)) fail(`${id}: the card (${Math.round(f.card.t)}..${Math.round(f.card.b)}) covers the row it rings (${Math.round(f.afterTarget.t)}..${Math.round(f.afterTarget.b)})`);
+          if (!f.afterDescribed) fail(`${id}: the ringed row is not described by the card`);
+          if (f.dims !== 4) fail(`${id}: ${f.dims} dim panes after the press, expected 4`);
+          ok(`${id}: the sheet opened (scrollTop ${f.sheetScrollTop}) with the row ringed at ${Math.round(f.afterTarget.t)}..${Math.round(f.afterTarget.b)}, the card at ${Math.round(f.card ? f.card.t : -1)}..${Math.round(f.card ? f.card.b : -1)}`);
+        }
+        if (f.card && f.docked && Math.abs(f.card.b - ((f.bar ? f.bar.t : f.vh) - 12)) > 2) fail(`${id}: after the press the docked card's bottom is at ${Math.round(f.card.b)}, expected ${Math.round((f.bar ? f.bar.t : f.vh) - 12)}`);
+        if (String(f.fontScale || '1') !== String(SCALE)) fail(`${id}: --font-scale is ${f.fontScale || 'unset'} at this stop, the walk asked for ${SCALE}`);
+        await shot(`${STOPS.indexOf(id)}-${id}-pressed`);
+      } else {
+      // Once the control is pressed the words are the ring: no ring, and no dim pane between the top of
       // the reading column's scroller and the card, so wherever read-along lights a line it is the
       // brightest thing on the screen. The card still sits above the player bar.
       if (f.ring) fail(`${id}: a ring is still drawn after the press`);
@@ -399,6 +456,7 @@ async function run(browser, { width, height, label, light }) {
         if (String(f.fontScale || '1') !== String(SCALE)) fail(`${id}: --font-scale is ${f.fontScale || 'unset'} at this stop, the walk asked for ${SCALE}`);
       }
       await shot(`${STOPS.indexOf(id)}-${id}-pressed`);
+      }
     }
     if (id === 'highlight') {
       /* THE DEMONSTRATION, and the whole of what makes it safe. Next paints the real
@@ -450,8 +508,19 @@ async function run(browser, { width, height, label, light }) {
   if (f.demo !== 0) fail(`${f.demo} elements still carry the demonstration after Done`);
   if (f.active) fail('the tour is still active after Done');
   if (!f.tourDone) fail('Done did not record the flag');
+  /* DONE KEEPS THE READING (2026-09-13): the closing card sits over John 3 with the tour's playback up,
+     and Done leaves it running — the bar stays, the sheet is gone. This harness 404s the audio, so the
+     player reads 'paused' (a load failure keeps the queue and the bar); 'idle' would mean the tour
+     stopped it, which is what Skip does and Done must not. */
+  if (f.audio === 'idle' || f.audio === null) fail(`Done stopped the reading (audio ${f.audio})`);
+  if (f.sheetOpen) fail('the listening sheet is still open after Done');
+  if (!f.bar) fail('no player bar after Done — the reading the closing card promised is gone');
+  ok(`Done ends the tour and keeps the reading (audio ${f.audio}, bar ${f.bar ? 'up' : 'down'})`);
+  // The strip stays away: it lives on Home, which the tour no longer ends on.
+  await clickLabel('Home'); await sleep(500);
+  f = await facts();
   if (f.prompt) fail('the strip came back after the tour');
-  ok('Done ends the tour; the strip stays away');
+  else ok('the strip stays away');
 
   // Escape means Skip (through the registry), from a fresh start.
   await clickLabel('App Configuration'); await sleep(400);
