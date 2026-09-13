@@ -148,14 +148,15 @@ describe('the Bible-audio prop is resolved per BOOK, not once per app', () => {
 });
 
 /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
-   every chapter 404s live) is offered nowhere — ONE registry flag, ONE
+   every chapter 404ed live) was offered nowhere — ONE registry flag, ONE
    predicate (utils/audio-track.hide.test.js owns the registry half). The
-   desk's Voice chips are filtered, so no chip can call this bridge with the
-   hidden id; tools and the console still can, and a persisted choice is a 404
-   carried into every Bible book. The bridge is the shared function the chips
-   route through, so the guard lives here and the chip filter is the visible
-   half (AudioManagerSheet.test.jsx). */
-describe('window.__setBibleAudioEdition — the desk→settings bridge refuses a hidden edition', () => {
+   bridge is the shared function the desk's chips route through, so the guard
+   lives here (tools and the console can call it with any id). 2026-09-13: the
+   mirror landed and the flag line is deleted; the case inverts — the bridge
+   persists tsot-matthew again — so the flag's return reddens it. The hidden
+   refusal is dormant on this registry (nothing is flagged); the unknown-id
+   refusal keeps its own assertion. */
+describe('window.__setBibleAudioEdition — the desk→settings bridge persists an offered edition and refuses an unknown id', () => {
   beforeEach(() => {
     globalThis.BIBLE_AUDIO_MANIFEST = MANIFEST;
     globalThis.BibleChapterView = function BibleChapterView() { return null; };
@@ -168,13 +169,15 @@ describe('window.__setBibleAudioEdition — the desk→settings bridge refuses a
     delete window.__setBibleAudioEdition;
   });
 
-  it('persists an offered edition and never the hidden one (and still never an unknown id)', () => {
+  it('persists every offered edition — tsot-matthew again among them (mirrored 2026-09-13) — and still never an unknown id', () => {
     makeRoutes('genesis', 'brm-kjv');
     const { updateSetting } = makeRoutes.last;
     window.__setBibleAudioEdition('wop-nkjv');                     // CONTROL: the bridge is live
     expect(updateSetting).toHaveBeenCalledWith('bibleAudio', 'wop-nkjv');
     updateSetting.mockClear();
     window.__setBibleAudioEdition('tsot-matthew');
+    expect(updateSetting).toHaveBeenCalledWith('bibleAudio', 'tsot-matthew');
+    updateSetting.mockClear();
     window.__setBibleAudioEdition('no-such-edition');
     expect(updateSetting).not.toHaveBeenCalled();
   });

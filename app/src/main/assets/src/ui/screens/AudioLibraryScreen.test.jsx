@@ -141,14 +141,18 @@ describe('AudioLibraryScreen -- the hub', () => {
   });
 
   /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
-     every chapter 404s live) is offered nowhere, through ONE registry flag and
+     every chapter 404ed live) was offered nowhere, through ONE registry flag and
      ONE predicate (utils/audio-track.hide.test.js owns the registry half). The
      shelf is the first door: it lists the REAL registry, so the counts here are
-     the registry's and move by one when the flag line is deleted. */
-  it('the shelf offers every edition the registry OFFERS, and a hidden one nowhere (4 of 5 today)', () => {
+     the registry's. 2026-09-13: the mirror landed and the flag line is deleted;
+     this case reads the edition back on the shelf, so the flag's return reddens
+     it. The filter itself is dormant on this registry (nothing is flagged): the
+     derived line at the end keeps the shelf ON the predicate, and the synthetic
+     Settings case is the live witness that a flagged entry is filtered. */
+  it('the shelf offers every edition the registry OFFERS — all five today, tsot-matthew back among them (mirrored 2026-09-13)', () => {
     installGlobals({ votManifest: false });
-    // The manifest STILL carries the hidden edition's rows — the shelf must
-    // omit it on the flag alone, not on a missing manifest.
+    // Same fixture as the hide's case: the manifest carries the edition's row,
+    // so the shelf's answer is the flag's alone.
     globalThis.BIBLE_AUDIO_MANIFEST['bible-tsot-matthew:matthew'] = [['tsot-1', '']];
     renderScreen();
     // The browse shelf only: the saved-recordings row shares the row class.
@@ -156,9 +160,9 @@ describe('AudioLibraryScreen -- the hub', () => {
       .map((row) => row.querySelector('strong').textContent)
       .filter((label) => label !== 'The Volumes of Truth');
     // The door itself, as the reader sees it:
-    expect(rows).not.toContain(AT.BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
+    expect(rows).toContain(AT.BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
     expect(Object.keys(AT.BIBLE_AUDIO_EDITIONS)).toHaveLength(5);
-    expect(rows).toHaveLength(4);                                  // one hidden today
+    expect(rows).toHaveLength(5);                                  // none hidden today
     // And the rule it follows — the same predicate every other door asks:
     expect(typeof AT.bibleAudioOffered, 'audio-track.js must export bibleAudioOffered').toBe('function');
     expect(rows).toEqual(Object.values(AT.BIBLE_AUDIO_EDITIONS).filter(AT.bibleAudioOffered).map((e) => e.label));

@@ -736,12 +736,14 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
   });
 
   /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
-     every chapter 404s live) is offered nowhere — ONE registry flag, ONE
+     every chapter 404ed live) was offered nowhere — ONE registry flag, ONE
      predicate (utils/audio-track.hide.test.js owns the registry half). The
-     desk's chips are the door that would tap straight into the 404: the fixture
-     gives the hidden edition a row for THIS book, so the chip's absence is the
-     flag's doing and not the manifest's. Two of the three recorded voices. */
-  it('offers no Voice chip for a hidden edition, even on a book it has recorded', () => {
+     desk's chips are the door that would tap straight into the 404. 2026-09-13:
+     the mirror landed and the flag line is deleted; same fixture (the edition
+     has a row for THIS book), inverted: all three recorded voices get a chip,
+     so the flag's return reddens this case. The chip filter itself is dormant
+     on this registry; the synthetic Settings case is the live witness. */
+  it('offers a Voice chip for every recorded voice of the book — tsot-matthew back among them (mirrored 2026-09-13)', () => {
     globalThis.BIBLE_AUDIO_BOOKS = [['matthew', 'Matthew']];
     globalThis.BIBLE_AUDIO_MANIFEST = {
       'bible-brm-kjv:matthew': [['brm2_matthew_001', '', 'Chapter 1']],
@@ -751,8 +753,8 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'matthew', label: 'KJV · Biblical Restoration Ministries' }));
     openSheet();
     const chips = voiceChips().map((chip) => chip.textContent);
-    expect(chips).not.toContain('Matthew · TSOT');
-    expect(chips).toEqual(['KJV · BRM', 'NKJV · Dramatized']);
+    expect(chips).toContain('Matthew · TSOT');
+    expect(chips).toEqual(['KJV · BRM', 'NKJV · Dramatized', 'Matthew · TSOT']);
   });
 });
 

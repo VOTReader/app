@@ -1,12 +1,15 @@
 // @ts-nocheck — free-var globals through settings-harness, same shape as SettingsScreen.editiondesc.test.jsx
 /* Settings → Listening → Bible Audio offers no row for a hidden edition.
    ═══════════════════════════════════════════════════════════════════════
-   2026-09-12: tsot-matthew's assets are not on the release (every chapter
-   404s live), so ONE registry flag, `unreleased: true`, takes the edition out
+   2026-09-12: tsot-matthew's assets were not on the release (every chapter
+   404ed live), so ONE registry flag, `unreleased: true`, took the edition out
    of every door through ONE predicate, bibleAudioOffered()
    (utils/audio-track.hide.test.js owns the registry half). This picker is the
-   door that would PERSIST the choice: a reader who selected the hidden edition
-   here would carry a 404 into every Bible book.
+   door that would PERSIST the choice: a reader who selected a hidden edition
+   here would carry a 404 into every Bible book. 2026-09-13: the mirror landed
+   and the flag line is deleted; the real-registry case inverts (five and Off,
+   tsot-matthew among them) and the synthetic-registry case below is the one
+   live witness, across every door, that a flagged entry is filtered.
 
    The screen is a classic-globals bundle and reads the registry off
    globalThis; the predicate rides the same bridge (audio-track.js publishes
@@ -36,14 +39,14 @@ async function optionLabels() {
 
 afterEach(() => { cleanup(); teardownSettingsGlobals(); });
 
-describe('Bible Audio picker — a hidden edition is not offered', () => {
-  it('the REAL registry: four editions and Off today, and never the hidden one', async () => {
+describe('Bible Audio picker — every offered edition, and never a hidden one', () => {
+  it('the REAL registry: five editions and Off today, tsot-matthew among them (mirrored 2026-09-13)', async () => {
     setupSettingsGlobals({ BIBLE_AUDIO_EDITIONS });
     renderSettings({ bibleAudio: 'brm-kjv' });
     const labels = await optionLabels();
-    expect(labels).not.toContain(BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
+    expect(labels).toContain(BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
     expect(Object.keys(BIBLE_AUDIO_EDITIONS)).toHaveLength(5);
-    expect(labels).toHaveLength(4 + 1);                            // one hidden today, plus Off
+    expect(labels).toHaveLength(5 + 1);                            // none hidden today, plus Off
     expect(labels[labels.length - 1]).toBe('Off');
   });
 
