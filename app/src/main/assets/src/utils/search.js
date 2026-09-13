@@ -1,12 +1,14 @@
 /* ===================================================================
    Search helpers — srchGroupKey (result bucketing) + the FABLE5 [8]
-   result-filter chips / canonical-sort pure halves
+   canonical-sort pure half
    ===================================================================
    Global-scope module. Concatenates with index.html via <script src>.
    Bundled helpers (P5e):
    - srchGroupKey
-   - SRCH_FILTER_CATS / srchFilterCategories / srchApplyFilter
    - srchSortCanonical
+   (The [8] result-filter chips and their SRCH_FILTER_CATS / srchFilterCategories /
+   srchApplyFilter left 2026-09-13 — catalogue SR1 + SR2: the chips said the corpus
+   row twice and wrote "WTLB".)
    =================================================================== */
 
 
@@ -33,52 +35,10 @@ export function srchGroupKey(doc) {
   return 'other';
 }
 
-/* ── FABLE5 [8] — result filter chips + canonical verse sort ─────────
-   These are CLIENT-SIDE views over the already-fetched result set (the
-   engine's corpus/scope options narrow what is SEARCHED; these chips
-   narrow what is RENDERED — instant, no re-query). */
-
-/** Category → group-key map for the filter chips. Order = chip order.
- *  ('hidden-manna' is deliberately absent — never indexed, per policy.) */
-export const SRCH_FILTER_CATS = [
-  { id: 'scriptures', label: 'Scriptures', keys: ['bible', 'matthew'] },
-  { id: 'volumes',    label: 'Volumes',    keys: ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', 'flock', 'rebuke', 'letters', 'holydays'] },
-  { id: 'wtlb',       label: 'WTLB',       keys: ['wtlb1', 'wtlb2', 'blessed'] },
-  { id: 'studies',    label: 'Studies',    keys: ['bible-studies', 'matthew-study'] },
-];
-
-/**
- * Which filter categories are PRESENT in a grouped result set, with match
- * counts. Returns [] when 0 or 1 category is present — chips that can't
- * change anything are noise, so the caller renders nothing.
- *
- * @param {Array<{key: string, items: any[]}>} groups
- * @returns {Array<{id: string, label: string, count: number}>}
- */
-export function srchFilterCategories(groups) {
-  const out = [];
-  for (const cat of SRCH_FILTER_CATS) {
-    let count = 0;
-    for (const g of groups) if (cat.keys.indexOf(g.key) !== -1) count += g.items.length;
-    if (count > 0) out.push({ id: cat.id, label: cat.label, count });
-  }
-  return out.length > 1 ? out : [];
-}
-
-/**
- * Filter grouped results to one category ('all' passes everything through,
- * including 'other'-keyed groups no category claims).
- *
- * @param {Array<{key: string, items: any[]}>} groups
- * @param {string} catId - 'all' or a SRCH_FILTER_CATS id
- * @returns {Array<{key: string, items: any[]}>}
- */
-export function srchApplyFilter(groups, catId) {
-  if (!catId || catId === 'all') return groups;
-  const cat = SRCH_FILTER_CATS.find((c) => c.id === catId);
-  if (!cat) return groups;
-  return groups.filter((g) => cat.keys.indexOf(g.key) !== -1);
-}
+/* ── FABLE5 [8] — canonical verse sort ───────────────────────────────
+   A CLIENT-SIDE view over the already-fetched result set (the engine's
+   corpus/scope options narrow what is SEARCHED; this re-orders what is
+   RENDERED — instant, no re-query). */
 
 /** Canonical Bible order as a CONSTANT — the canon doesn't change, so the
  *  sort must never depend on the lazy bible corpus being loaded (it usually
