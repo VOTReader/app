@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 540 distinct identifiers.
+// Total: 541 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -50,6 +50,7 @@ export const projectGlobals = {
   BIBLE_RNKJV: "readonly",
   BIBLE_STUDIES: "readonly",
   BIBLE_SYNC_BRM_KJV: "readonly",
+  BIBLE_SYNC_TSOT_MATTHEW: "readonly",
   BIBLE_SYNC_WEB_EBIBLE: "readonly",
   BIBLE_SYNC_WOP_NKJV: "readonly",
   BIBLE_WEB: "readonly",
