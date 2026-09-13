@@ -15,7 +15,11 @@
  *   5. colour-vision pairs from the dark overview PNG (decoded in a scratch
  *      canvas, never getImageData on the app canvas): Machado 2009 severity 1.0
  *      deuteranopia and protanopia, `<frame>-cvd-deutan.png`, `<frame>-cvd-protan.png`
- *   6. THE CORRIDOR PAIR (the Orchestrator's gate on the 0.45 -> 0.70 ceiling):
+ *   6. THE ZOOM LADDER (call 07's adjust, 2026-09-12): the top rail wheeled at MTAM to
+ *      1x, 6x, 16x and its ceiling under the one law, `<frame>-ladder-<z>x.png`, the band
+ *      under the rail scanned at each; gate: mean luminance must not rise from 16x to the
+ *      ceiling (the plateau leg). Then, only with --ceilings a,b (the knob comparison):
+ *      THE CORRIDOR PAIR (the Orchestrator's gate on the 0.45 -> 0.70 ceiling):
  *      the top rail wheeled at the Study Bible's segment (MTAM) until its
  *      camera reads >= 40x fit, then the same view drawn under each ceiling in
  *      --ceilings (the screen's walk knob globalThis.__swContextCeiling, unset
@@ -46,7 +50,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OWN = resolve(HERE, '..');
 const OUT = arg('out', '');
 const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
-const CEILINGS = arg('ceilings', '0.45,0.70').split(',').map(Number);
+const CEILINGS = arg('ceilings', '').split(',').filter(Boolean).map(Number);   // opt-in: the knob comparison (call 07's first pictures)
+const LADDER = arg('ladder', '1,6,16,ceil').split(',');                          // the zoom ladder under the ONE law (call 07's adjust)
 const N_LINKS = Number(arg('links', '20'));
 const NAV_MS = 60000;
 const MIN_PLACED = 15;
@@ -249,8 +254,8 @@ const scanBand = (page, b64, x0, x1, y0, y1) => page.evaluate(async (b64, x0, x1
   return { rows: H, medianRuns: runs[Math.floor(H / 2)], maxRuns: runs[H - 1], litShare: +(lit / (W * H)).toFixed(3), meanLum: +(sum / (3 * W * H)).toFixed(2) };
 }, b64, x0, x1, y0, y1);
 
-async function zoomTopTo(page, c, r0, label, factor) {
-  const v0 = Number(await attr(page, 'data-ppv-vot'));
+async function zoomTopTo(page, c, r0, label, factor, vFit) {
+  const v0 = vFit > 0 ? vFit : Number(await attr(page, 'data-ppv-vot'));
   let last = v0, same = 0;
   for (let i = 0; i < 60; i++) {
     const r = await rails(page);
@@ -310,9 +315,36 @@ async function walk(page, url, fname) {
     if (OUT) writeFileSync(resolve(OUT, `${fname}-cvd-${kind}.png`), Buffer.from(url2.split(',')[1], 'base64'));
   }
   note(`${tag} O-dark, O-light, legend, cvd-deutan, cvd-protan written`);
-  // the corridor pair
-  if (!r0) { fails.push(`${tag} corridor: no data-rails`); return; }
-  const z = await zoomTopTo(page, c, r0, 'MTAM', 40);
+  if (!r0) { fails.push(`${tag} ladder: no data-rails`); return; }
+  // THE ZOOM LADDER (call 07's adjust, Corbin 2026-09-12: "brighter and brighter ... odd"): the top rail wheeled
+  // at the MTAM band to 1x, 6x, 16x and its ceiling under the ONE law; at each step the 40 CSS px band under the
+  // rail is scanned (mean luminance, strokes per row, lit share). The plateau leg is the gate: from 16x to the
+  // ceiling the alpha is flat and the band only thins, so its mean luminance must not rise (5 % noise margin).
+  const vFit = Number(await attr(page, 'data-ppv-vot'));
+  const rungs = {};
+  for (const step of LADDER) {
+    const want = step === 'ceil' ? 1e6 : Number(step);
+    let zl = { ok: true, band: r0.top.find((b) => b.label.toLowerCase().startsWith('mtam')), steps: 0, zoom: 1, saturated: false };
+    if (want > 1) zl = await zoomTopTo(page, c, r0, 'MTAM', want, vFit);
+    if (!zl.ok || !zl.band) { fails.push(`${tag} ladder ${step}: ${zl.why || 'MTAM band not on the rail'}`); break; }
+    await settle(page, { x: c.l + c.w / 2, y: c.t + r0.topY + 12 });
+    await clearHover(page);
+    const b64 = await page.screenshot({ encoding: 'base64' });
+    if (OUT) writeFileSync(resolve(OUT, `${fname}-ladder-${step}x.png`), Buffer.from(b64, 'base64'));
+    const x0 = Math.round(Math.max(0, zl.band.x0) * f.dpr), x1 = Math.round(Math.min(c.w, zl.band.x1) * f.dpr);
+    const y0 = Math.round((c.t + r0.topY + 4) * f.dpr), y1 = Math.round((c.t + r0.topY + 44) * f.dpr);
+    const row = await scanBand(page, b64, x0, x1, y0, y1);
+    rungs[step] = Object.assign({ zoom: zl.zoom, saturated: zl.saturated }, row);
+    note(`${tag} ladder ${step}x: top rail at ${zl.zoom}x fit${zl.saturated ? ' (the rail\'s ceiling)' : ''}, MTAM band ${Math.round(zl.band.x0)}..${Math.round(zl.band.x1)} CSS px: mean luminance ${row.meanLum}, median ${row.medianRuns} strokes per row, lit share ${row.litShare}`);
+  }
+  if (rungs['16'] && rungs.ceil) {
+    const rel = rungs['16'].meanLum > 0 ? rungs.ceil.meanLum / rungs['16'].meanLum : 0;
+    note(`${tag} ladder plateau leg 16x -> ceiling: mean luminance x${rel.toFixed(3)} (must not rise; the alpha is flat there and the band only thins)`);
+    if (rel > 1.05) fails.push(`${tag} ladder: the band got BRIGHTER from 16x to the ceiling (x${rel.toFixed(3)}); the plateau is not holding`);
+  }
+  if (!CEILINGS.length) return;
+  // the corridor pair through the knob (opt-in, --ceilings a,b): the plateau forced to each value at the ceiling
+  const z = await zoomTopTo(page, c, r0, 'MTAM', 40, vFit);
   if (!z.ok) { fails.push(`${tag} corridor: ${z.why}`); return; }
   note(`${tag} corridor: top rail at ${z.zoom}x fit after ${z.steps} notches${z.saturated ? ' (the rail\'s own ceiling; the wheel stopped moving it)' : ''}, MTAM band ${Math.round(z.band.x0)}..${Math.round(z.band.x1)} CSS px`);
   // the ceiling only BINDS where the depth alpha law reaches it (0.45 from ~25.5x fit, 0.70 from ~45x);
@@ -351,7 +383,7 @@ try {
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], protocolTimeout: 240000 });
   const p0 = await (await browser.createBrowserContext()).newPage(); await p0.goto('about:blank');
   const renderer = await p0.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : 'unknown'; });
-  note(`tree ${OWN} @ ${SHA}; renderer ${renderer}; ceilings ${CEILINGS.join(',')}; ${N_LINKS} links (letters from ${VOL_KEYS.map((k) => `${k}:${LETTER_SETS[k].length}`).join(' ')})`);
+  note(`tree ${OWN} @ ${SHA}; renderer ${renderer}; ladder ${LADDER.join(',')}; ceilings ${CEILINGS.length ? CEILINGS.join(',') : 'none (knob comparison off)'}; ${N_LINKS} links (letters from ${VOL_KEYS.map((k) => `${k}:${LETTER_SETS[k].length}`).join(' ')})`);
   for (const fname of FRAME_LIST) {
     if (!FRAMES[fname]) { fails.push(`unknown frame ${fname}`); continue; }
     const page = await (await browser.createBrowserContext()).newPage();
@@ -365,7 +397,7 @@ try {
   if (browser) await browser.close();
   if (own) own.server.close();
 }
-if (OUT) writeFileSync(resolve(OUT, 'e2e-myweb-colour.json'), JSON.stringify({ sha: SHA, ceilings: CEILINGS, notes, fails }, null, 2));
+if (OUT) writeFileSync(resolve(OUT, 'e2e-myweb-colour.json'), JSON.stringify({ sha: SHA, ladder: LADDER, ceilings: CEILINGS, notes, fails }, null, 2));
 if (process.exitCode === 3) process.exit(3);
 if (nothingToCheck) { console.log('[e2e-myweb-colour] NOTHING TO CHECK: ' + nothingToCheck); process.exit(2); }
 if (fails.length) { console.log('[e2e-myweb-colour] FAIL\n  ' + fails.join('\n  ')); process.exit(1); }
