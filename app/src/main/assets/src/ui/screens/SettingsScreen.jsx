@@ -2466,7 +2466,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
                 controller on the page the note states no number rather than a stale one. */}
-            <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' ? _tour.stopsWord() : 'a few'} stops, about two minutes. It points at the real buttons; you can leave at any time.</p>
+            <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes'}. It points at the real buttons; you can leave at any time.</p>
           </div>
         </SettingsGroup>
         </div>

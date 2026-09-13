@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useTour — hands the tour its five navigation verbs
+   useTour — hands the tour its six navigation verbs
    ═══════════════════════════════════════════════════════════════════════
    ES module, bundle-b. App() calls this once with its own nav helpers and
    state setters; the hook builds the small vocabulary the stops in
@@ -14,6 +14,10 @@
      openSettingsData  App's goSettings; SettingsScreen opens whichever group
                        the stop's `settingsGroup` asks for (Your Data for the
                        backup stop, Reading for the settings stop)
+     ensureListening   openBible, then the Bible screen's own Listen pill
+                       unless John is already up — the listening stops' enter
+                       (player, back-to-words, done), so the bar is there to
+                       teach on, Back from beyond them included
 
    App is at its 800-line canary: this hook exists so the tour costs App()
    two lines (this call, and `screen` on AppShellOverlays).
@@ -26,12 +30,14 @@ export const TOUR_BIBLE = Object.freeze({ bookId: 'john', chapterNum: 3, screen:
 
 export function useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum }) {
   React.useEffect(() => {
+    const openBible = () => { setBookId(TOUR_BIBLE.bookId); setChapterNum(TOUR_BIBLE.chapterNum); setScreen(TOUR_BIBLE.screen); };
     TourController.attachNav({
       goHome,
       openLetter: () => { setLetterId(TOUR_LETTER.id); setScreen(TOUR_LETTER.screen); },
-      openBible: () => { setBookId(TOUR_BIBLE.bookId); setChapterNum(TOUR_BIBLE.chapterNum); setScreen(TOUR_BIBLE.screen); },
+      openBible,
       goJournalHub,
       openSettingsData: goSettings,
+      ensureListening: () => { openBible(); TourController.pressListenIfIdle(TOUR_BIBLE.bookId); },
     });
   });
 }

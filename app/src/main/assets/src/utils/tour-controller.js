@@ -12,7 +12,7 @@
      TourOverlay              next() · back() · skip() · targetPressed() ·
                               clearHighlightDemo()
      App (hooks/use-tour.js)  attachNav({ goHome, openLetter, openBible,
-                              goJournalHub, openSettingsData })
+                              goJournalHub, openSettingsData, ensureListening })
 
    A stop's `enter` runs through that nav every time the stop becomes
    current, forwards or back, so the picture always matches the words.
@@ -31,7 +31,7 @@
    session-only by design: "Maybe later" means later.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { TOUR_STEPS, TOUR_STOPS_WORD, HIGHLIGHT_GESTURE_WORDS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
+import { TOUR_STEPS, TOUR_STOPS_WORD, TOUR_MINUTES_WORD, HIGHLIGHT_GESTURE_WORDS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 const listeners = new Set();
@@ -51,22 +51,86 @@ function runEnter(step) {
   const fn = step && step.enter && nav[step.enter];
   if (typeof fn === 'function') { try { fn(); } catch (_e) { /* the picture may lag the words; the overlay says so */ } }
 }
-/* The tour ends what the tour started. A Listen stop's press begins real playback; leaving that
-   stop (Next, Back, Skip, Done) stops it, or the player bar follows the reader into the Journal and
-   Settings and covers the very controls the next stops ring (seen on emulator-5554, 2026-09-04).
+/* The tour ends what the tour started — and keeps it across the listening span. A Listen stop's
+   press begins real playback; leaving that stop (Next, Back, Skip) stops it, or the player bar
+   follows the reader into the Journal and Settings and covers the very controls the next stops
+   ring (seen on emulator-5554, 2026-09-04). The exception is the span of `listening` stops that
+   ends the tour (bible → player → back-to-words → done; tour-steps.js, 2026-09-13): playback is
+   the tour's there by construction (ensureListening), ENTERING one keeps what plays, and leaving
+   the span for any other stop — forward on Skip, or Back to the Bible stop, which presses Listen
+   afresh and would otherwise PAUSE it — stops it and closes the sheet the player stop opened.
+   Done keeps it (end(true)): the reader is left with the verses being read.
    AudioPlayer is a bundle-d global; absent on a bare host. */
 function stopTourAudio() {
-  if (cancelSeek) cancelSeek();
-  /* `pressed` means "this stop has done its thing and is showing `after`", which is TWO different
-     facts now that a stop can demonstrate without pressing anything. Only a 'press' stop starts
-     playback, so only leaving one of those should stop it — otherwise leaving the highlight stop
-     stops audio the tour never began, which is the reader's own playback if they started any.
-     Read before the state moves: goTo and end both call this while `index` is still the stop
-     being left. */
-  const leaving = TOUR_STEPS[state.index];
-  if (!state.pressed || !leaving || leaving.act !== 'press') return;
   const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
   try { if (ap && typeof ap.stop === 'function') ap.stop(); } catch (_e) { /* the player's problem */ }
+}
+/* The listening sheet, if it is open: window.__closeSheet is the sheet's own close, published
+   while it renders (AudioManagerSheet) — asked only when the sheet is on the page, so a Settings
+   select sheet's close is never taken for it. */
+function closeTourSheet() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  if (!document.querySelector('.audio-manager-sheet')) return;
+  const close = /** @type {any} */ (window).__closeSheet;
+  if (typeof close === 'function') { try { close(); } catch (_e) { /* the sheet's problem */ } }
+}
+/** Leaving the current stop for `dest` (a stop index; null when the tour ends). Read before the
+    state moves: goTo and end both call this while `index` is still the stop being left. */
+function leaveStop(dest) {
+  if (cancelSeek) cancelSeek();
+  if (cancelListen) cancelListen();
+  const to = dest == null ? null : TOUR_STEPS[dest];
+  if (to && to.listening) return;                       // inside the span: what plays, plays on
+  /* `pressed` means "this stop has done its thing and is showing `after`", which is TWO different
+     facts now that a stop can demonstrate without pressing anything. Only a 'press' stop starts
+     playback, so only leaving one of those — or a listening stop, where the playback is the
+     tour's by construction — should stop it; otherwise leaving the highlight stop stops audio
+     the tour never began, which is the reader's own playback if they started any. */
+  const leaving = TOUR_STEPS[state.index];
+  if (!leaving) return;
+  if (!leaving.listening && !(state.pressed && leaving.act === 'press')) return;
+  stopTourAudio();
+  closeTourSheet();
+}
+/* THE LISTENING SPAN'S PRECONDITION. The player stops teach over the Bible stop's playback and
+   the closing card sits over it; Back from beyond the span, or a reader who closed the player on
+   the Bible stop, arrives with nothing playing. This presses the Bible screen's own Listen pill —
+   the same press the Bible stop makes, John 3 in the reader's edition — unless the tour's book is
+   already up (playing, paused or loading: the bar is up whenever the status is not idle). The
+   screen mounts a frame or two after `enter` asks for it, so the pill is awaited (bounded, like
+   the overlay's own wait), and the click is fenced like next()'s, so the overlay's listener on
+   the previous stop's pill cannot read it as the reader's tap. */
+const LISTEN_WAIT_MS = 3000;
+/** Cancels a press still waiting for the pill; leaving the span must not press it later. */
+let cancelListen = null;
+function pressListenIfIdle(bookId) {
+  if (cancelListen) cancelListen();
+  const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
+  if (!ap || typeof ap.getState !== 'function' || typeof requestAnimationFrame !== 'function') return;
+  const up = () => {
+    const s = ap.getState() || {};
+    const t = Array.isArray(s.queue) ? s.queue[s.qi] : null;
+    const key = t && typeof t.key === 'string' ? t.key : '';
+    return s.status !== 'idle' && key.indexOf('bible-') === 0 && key.slice(-(String(bookId).length + 1)) === ':' + bookId;
+  };
+  if (up()) return;
+  const started = Date.now();
+  let raf = 0, done = false;
+  cancelListen = () => { done = true; cancelAnimationFrame(raf); cancelListen = null; };
+  const tick = () => {
+    if (done) return;
+    if (up()) { cancelListen(); return; }
+    const el = /** @type {HTMLElement|null} */ (findTarget({ target: { selector: '.hero-play-pill' } }));
+    if (el && typeof el.click === 'function') {
+      cancelListen();
+      pressing = true;
+      try { el.click(); } finally { pressing = false; }
+      return;
+    }
+    if (Date.now() - started > LISTEN_WAIT_MS) { cancelListen(); return; }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
 }
 /* THE HIGHLIGHT DEMONSTRATION, and the whole of its safety.
    The stop teaches a gesture that has no control to press, so the tour does to a real paragraph
@@ -131,14 +195,19 @@ function seekTourStart(step) {
   attempt();
 }
 function goTo(index, skipEnter) {
-  stopTourAudio();
+  leaveStop(index);
   clearTourHighlight();
   state = { ...state, index, pressed: false };
   if (!skipEnter) runEnter(TOUR_STEPS[index]);
   bump();
 }
-function end() {
-  stopTourAudio();
+/** @param {boolean} [keepAudio]  Done on the closing card: the reading goes on (tour-steps.js). */
+function end(keepAudio) {
+  if (keepAudio) { if (cancelSeek) cancelSeek(); if (cancelListen) cancelListen(); } else {
+    leaveStop(null);
+    // Skip from ANY stop tidies the sheet the reader may have opened, the tour's playback or not.
+    closeTourSheet();
+  }
   clearTourHighlight();
   state = { ...state, active: false, pressed: false };
   // Playback the reader began during the tour by some other control ran under the held
@@ -165,14 +234,21 @@ export const TourController = {
       the same string the highlight stop opens with, owned by tour-steps.js, reached only through here. */
   highlightWords() { return HIGHLIGHT_GESTURE_WORDS; },
 
+  /** The minutes the same sentences promise ("about three minutes"), owned by tour-steps.js like the count. */
+  minutesWord() { return TOUR_MINUTES_WORD; },
+
   /** The control a stop rings, if it is on screen (bundle-e's overlay reaches findTarget through here). */
   findTarget(step) { return findTarget(step); },
+
+  /** Press the Bible screen's Listen pill unless the tour's book is already up — the `ensureListening`
+      verb's second half (hooks/use-tour.js navigates, this presses; see pressListenIfIdle). */
+  pressListenIfIdle(bookId) { pressListenIfIdle(bookId); },
 
   /** Take the demonstration's colour back. goTo and end already do; the overlay calls this from its
       per-stop effect cleanup, which is the one that fires when the SCREEN changes under a stop. */
   clearHighlightDemo() { clearTourHighlight(); },
 
-  /** The app hands over the five navigation verbs the stops use. Idempotent; call on every render if you like. */
+  /** The app hands over the six navigation verbs the stops use. Idempotent; call on every render if you like. */
   attachNav(n) { nav = n || {}; },
 
   /** Begin at the welcome card. `from` is where the reader started it ('prompt' | 'settings'), for the closing words and the tests. */
@@ -188,11 +264,12 @@ export const TourController = {
     bump();
   },
 
-  /** Next: do what the stop promised, then move on; on the closing card, finish. */
+  /** Next: do what the stop promised, then move on; on the closing card, finish — and keep the reading
+      the tour left running (only Done does; Skip, Escape and Android Back stop it). */
   next() {
     if (!state.active) return;
     const step = TOUR_STEPS[state.index];
-    if (state.index >= TOUR_STEPS.length - 1) { end(); return; }
+    if (state.index >= TOUR_STEPS.length - 1) { end(true); return; }
     if (step.act === 'press' && !state.pressed) {
       // The overlay listens on the ringed control to notice the reader's own tap; this click is
       // ours, so it is fenced off or the tour would advance twice (seen in the browser walk).
@@ -262,5 +339,5 @@ export const TourController = {
     return true;
   },
 
-  _resetForTests() { clearTourHighlight(); state = fresh(); nav = {}; pressing = false; listeners.clear(); version = 0; },
+  _resetForTests() { clearTourHighlight(); if (cancelListen) cancelListen(); if (cancelSeek) cancelSeek(); state = fresh(); nav = {}; pressing = false; listeners.clear(); version = 0; },
 };
