@@ -7242,7 +7242,19 @@
       /* On a frame under 480 px tall (a phone in landscape) the card takes the width the screen
          has: at 520 px wide over 800 its 160 px floor cut the Listen promise in half and the
          Settings card to three of six lines (the Tour Reviewer, 800x360, 2026-09-13). */
-      @media (max-height: 480px) { .tour-card { max-width: calc(100vw - 24px); } }
+      @media (max-height: 480px) {
+        .tour-card { max-width: calc(100vw - 24px); padding: 10px 16px 8px; }
+        /* And COMPACT (measured 2026-09-13, 800x360 at Text Size 1): the width alone left every docked
+           card at its 160 px floor with lines hidden, because ~110 of those px were chrome — the two
+           paddings, the eyebrow's own line, three margins, the row. Here the eyebrow shares the
+           title's line, the gaps halve, and the buttons keep the app's 44 px touch floor. */
+        .tour-card .tour-eyebrow { display: inline; margin: 0 12px 0 0; }
+        .tour-card .tour-title { display: inline; margin: 0; }
+        .tour-card .tour-text { margin: 6px 0 8px; }
+        .tour-card .tour-tip { margin: -2px 0 8px; }
+        .tour-card .tour-row { padding: 6px 0 8px; bottom: -8px; margin-bottom: -8px; }
+        .tour-card .tour-btn { min-height: 44px; }
+      }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {
