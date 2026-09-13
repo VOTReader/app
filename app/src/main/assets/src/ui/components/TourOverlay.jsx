@@ -99,6 +99,47 @@ function _scrollerTop(el) {
   const s = _scrollerEl(el);
   return s ? Math.max(0, s.getBoundingClientRect().top) : 0;
 }
+/* THE ROW'S TOP EDGE LANDS BETWEEN TWO LINES, NEVER THROUGH ONE (the Verifier's gate-cut on 121,
+   2026-09-13: 58 of 300 stop pictures had a line of the card's words straddling the sticky button
+   row's top edge — 41 at Text Size 1.8, 17 at 3 — and the cut line was the title or the tip as
+   often as the text). A cap is a height in px and the words are lines of four heights (eyebrow,
+   title, text, tip), so no one line-height snaps them all: the lines are MEASURED — one Range
+   client rect per line, from the card's top at scrollTop 0 — with the row's offset from the card's
+   bottom (its stuck and its in-flow place are the same distance). jsdom, which lays out nothing,
+   reads no lines and the floor stays out of the way. */
+function _lineGeom(card) {
+  const cr = card.getBoundingClientRect();
+  const row = card.querySelector('.tour-row');
+  const rowOff = row ? cr.bottom - row.getBoundingClientRect().top : 0;
+  const lines = [];
+  for (const el of card.querySelectorAll('.tour-eyebrow, .tour-title, .tour-text, .tour-tip')) {
+    const rg = document.createRange();
+    rg.selectNodeContents(el);
+    if (typeof rg.getClientRects !== 'function') continue;
+    for (const r of Array.from(rg.getClientRects())) {
+      if (r.width > 0) lines.push({ t: r.top - cr.top + card.scrollTop, b: r.bottom - cr.top + card.scrollTop });
+    }
+  }
+  lines.sort((a, b) => a.t - b.t);
+  // Rects that share a line (the eyebrow inline beside the title in a short frame) are one line.
+  const merged = [];
+  for (const ln of lines) {
+    const last = merged[merged.length - 1];
+    if (last && ln.t < last.b) last.b = Math.max(last.b, ln.b); else merged.push({ t: ln.t, b: ln.b });
+  }
+  return { rowOff, lines: merged, key: Math.round(rowOff) + '|' + merged.map((l) => Math.round(l.t) + ':' + Math.round(l.b)).join(',') };
+}
+/** A cap whose row edge would run through a line is floored to the gap above that line — the bottom
+    of the last whole line. Through the first line there is nothing whole above it and the cap stands
+    (CARD_MIN_H rules there); an edge below every line is a card that does not overflow. */
+export function _floorCapToLines(cap, geom) {
+  const edge = cap - geom.rowOff;
+  for (let i = 0; i < geom.lines.length; i++) {
+    const ln = geom.lines[i];
+    if (edge > ln.t && edge < ln.b) return i === 0 ? cap : cap - (edge - (geom.lines[i - 1].b + ln.t) / 2);
+  }
+  return cap;
+}
 function _sameRect(a, b) {
   return !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
@@ -251,6 +292,8 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
      maxHeight the cap put on it, so reading it back cannot ratchet the cap down on itself. The
      docked cap below needs this to tell "the card is short" from "the card was cut". */
   const [cardNeed, setCardNeed] = React.useState(0);
+  // The card's lines and its row's offset (see _lineGeom): what the cap is floored against.
+  const [geom, setGeom] = React.useState({ rowOff: 0, lines: /** @type {{t: number, b: number}[]} */ ([]), key: '' });
   /* Is there more of the card below the fold? At a large text size on a small screen the words do
      not fit at any cap (557 px in 276 px of room at 1.8 on 320x640) and the sticky row's own
      background makes the tail look finished rather than continued. So when it overflows the card
@@ -266,6 +309,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     const measure = () => {
       const h = el.getBoundingClientRect().height; if (h) setCardH((prev) => (prev === h ? prev : h));
       const need = el.scrollHeight; if (need) setCardNeed((prev) => (prev === need ? prev : need));
+      const g = _lineGeom(el); setGeom((prev) => (prev.key === g.key ? prev : g));
       checkMore();
     };
     measure();
@@ -320,8 +364,8 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
      any ringed stop — above it, in a landscape phone. Measured 800x360 at Text Size 1 (2026-09-13):
      the docked card at 118..278 covered the chips it was pointing at (229..273). */
   if (docked && ring && st.pressed && step.afterTarget && vh - dockBottom - Math.min(cardH || CARD_EST_H, dockCap) < ring.top + ring.height + CARD_GAP) docked = false;
-  const cap = docked ? dockCap
-    : ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE;
+  const cap = _floorCapToLines(docked ? dockCap
+    : ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE, geom);
   const h = Math.min(cardH || CARD_EST_H, cap);
   let below = false, cardTop = 0;
   if (docked) {
