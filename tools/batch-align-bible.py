@@ -227,6 +227,23 @@ def chapters_for(args, idx, books_meta):
     return sorted(set(want), key=lambda bc: (order.get(bc[0], 999), bc[1]))
 
 
+def partial_books(shipped, idx):
+    """{book: (have, want)} for every book whose chapter set is not the whole book
+    the audio index knows. A book ships WHOLE OR NOT AT ALL: the 2026-09-13 07:45
+    deadline stopped chunk 2 at Joshua 10 of 24, and a book that ships half-way
+    meets the listener with read-along on ten chapters and silence on fourteen,
+    which reads as a defect, not a partial edition. Shared by ship() (holds the
+    book back and names it) and validate-bible-sync.py (a held-back book's belts
+    are expected absent; a shipped partial book is a problem)."""
+    if idx is None:
+        return {}
+    want = {}
+    for book, ch in idx:
+        want.setdefault(book, set()).add(ch)
+    return {b: (len(chs), len(want.get(b, ()))) for b, chs in shipped.items()
+            if set(chs) != want.get(b, set())}
+
+
 def ship(ed, belts_dir, want_settings=None, idx=None):
     """Rebuild src/data/bible-sync-<edition>.js from the CURRENT belts on disk.
 
@@ -272,7 +289,11 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
         for r in rows:
             t = r.get("t")
             if t is not None and r.get("status") != "UNSPOKEN":
-                arr[r["n"] - 1] = max(0, int(round(t * 100)))
+                # 1, never 0, for a proven row: the renderer reads 0 as "unproven"
+                # (`if (cs[i] > 0)`), so a verse the recording opens on (2 Samuel
+                # 20:1, CONFIRMED at t = 0.00 -- the only such row in four editions,
+                # 2026-09-13) would never paint. One centisecond is the start.
+                arr[r["n"] - 1] = max(1, int(round(t * 100)))
         # Monotonic within the chapter: the app binary-searches these, so a
         # backwards step would make a verse unreachable.
         last = 0
@@ -281,10 +302,18 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
                 arr[i] = last
             elif v:
                 last = v
-        verses_timed += sum(1 for v in arr if v)
-        verses_total += len(arr)
         table.setdefault(book_id, {})[str(chapter)] = arr
-        kept += 1
+
+    # Whole book or nothing (see partial_books): a half-aligned book is held back
+    # and NAMED on the ship line, so a short ship is never silent about it.
+    held = partial_books({b: {int(c) for c in chs} for b, chs in table.items()}, idx)
+    for book in held:
+        del table[book]
+    for chs in table.values():
+        for arr in chs.values():
+            verses_timed += sum(1 for v in arr if v)
+            verses_total += len(arr)
+            kept += 1
 
     var = "BIBLE_SYNC_" + ed.upper().replace("-", "_")
     lines = []
@@ -312,7 +341,8 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
     size = os.path.getsize(path)
     print(f"\nship: {kept} chapters ({dropped} below the {MIN_PROVEN:.0%} proven gate; "
           f"not shipped: {stale_settings} other settings, {stale_audio} audio changed since the belt, "
-          f"{no_audio} no local audio), "
+          f"{no_audio} no local audio; held back as partial books: "
+          + (", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())) or "none") + "), "
           f"{verses_timed}/{verses_total} verses timed -> {path} ({size // 1024} KB)")
     return path
 
