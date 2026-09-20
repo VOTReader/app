@@ -170,7 +170,7 @@ describe('visibleArcs: the drawn threads a label pass walks', () => {
 
   it('honours the density prefix: a thread past bucketDrawCount is not drawn, so it is not walked', () => {
     const g = makeGraph([[5, 35], [10, 20]]);
-    g.buckets = [{ off: 0, len: 2, off20: 1, off10: 1, segments: 32, chunks: [] }];
+    g.buckets = [{ off: 0, len: 2, off20: 1, off10: 2, segments: 32, chunks: [] }];   // Essential draws one, Famous both
     const view = Object.assign(viewOf(520), { density: 'essential' });
     const got = Array.from(pick.visibleArcs(g, camAt(g, 20), view, 100));
     expect(got).toEqual([0]);
