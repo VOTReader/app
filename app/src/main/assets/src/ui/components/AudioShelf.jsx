@@ -114,8 +114,26 @@ export function relativePlayedAt(stamp) {
  * @param {any} track
  * @returns {boolean}
  */
+/**
+ * The "volKey:id" of the text a track is a reading OF. A keyed track is its own
+ * key. A WTLB compilation (key null: one file, many letters, 2026-09-20) is the
+ * letter under the clock while it is the loaded track, else the section's first
+ * letter (AudioPlayer.sectionLetterKeyAt / sectionOpeningKey); null until its
+ * timings land, which keeps the tap inert exactly as it was.
+ * @param {any} track
+ * @returns {string | null}
+ */
+export function textKeyOf(track) {
+  if (!track) return null;
+  if (typeof track.key === 'string') return track.key;
+  const st = AudioPlayer.getState();
+  const cur = st && Array.isArray(st.queue) ? st.queue[st.qi] : null;
+  const live = cur && cur.url === track.url ? AudioPlayer.sectionLetterKeyAt(track, st.time) : null;
+  return live || AudioPlayer.sectionOpeningKey(track);
+}
+
 export function hasTextDestination(track) {
-  const key = track && typeof track.key === 'string' ? track.key : '';
+  const key = textKeyOf(track) || '';
   const divider = key.indexOf(':');
   if (divider < 1 || divider >= key.length - 1) return false;
   if (key.indexOf('bible-') === 0) return true;

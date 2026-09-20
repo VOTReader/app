@@ -60,8 +60,8 @@ const DESK_ID = 'audio-manager-sheet';
  */
 
 /**
- * The reading unit of the track at queue[qi], or null (no track, or a key-less
- * range-compilation section, which has no reading pane of its own).
+ * The reading unit of the track at queue[qi], or null (no track; a range-
+ * compilation section before its first letter or before its timings land).
  *
  * @param {any} player
  * @returns {Unit | null}
@@ -69,11 +69,18 @@ const DESK_ID = 'audio-manager-sheet';
 function unitOf(player) {
   const st = player.getState();
   const t = st && Array.isArray(st.queue) ? st.queue[st.qi] : null;
-  if (!t || typeof t.key !== 'string') return null;
-  const at = t.key.indexOf(':');
+  if (!t) return null;
+  // A WTLB compilation (key null) reads many letters from one file: the letter
+  // under the clock is the player's answer (sectionLetterKeyAt, 2026-09-20), so a
+  // crossing inside the file is a boundary like any other. Null before the first
+  // row, and until its timings land — nothing to follow into, exactly as before.
+  const key = typeof t.key === 'string' ? t.key
+    : (typeof player.sectionLetterKeyAt === 'function' ? player.sectionLetterKeyAt(t, Number(st.time) || 0) : null);
+  if (typeof key !== 'string') return null;
+  const at = key.indexOf(':');
   if (at <= 0) return null;
-  const volKey = t.key.slice(0, at);
-  const id = t.key.slice(at + 1);
+  const volKey = key.slice(0, at);
+  const id = key.slice(at + 1);
   if (volKey.lastIndexOf('bible-', 0) === 0) {
     const chapter = typeof player.bibleChapterOfTrack === 'function' ? player.bibleChapterOfTrack(t) : 0;
     return { kind: 'bible', volKey, bookId: id, chapter: chapter > 0 ? chapter : 1 };

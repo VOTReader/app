@@ -46,6 +46,7 @@ import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
+import { textKeyOf } from './components/AudioShelf.jsx';
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 
@@ -384,12 +385,15 @@ export function buildScreenRoutes({
   //     and its Loading… surface. The study id therefore comes from the
   //     key: every shipped chapter id is `<study.id>-ch<n>`, pinned over
   //     the live corpus and manifest by screen-routes.studyaudio.test.jsx.
-  //   - Hidden Manna (no index) and range compilations (key null) have no
-  //     destination — hasTextDestination gates every tap on the same rule.
+  //   - Hidden Manna (no index) has no destination; a range compilation (key
+  //     null) opens the letter under the clock once its timings have landed
+  //     (2026-09-20) — hasTextDestination gates every tap on the same rule.
   // Pure navigation: the AudioPlayer singleton is never touched, so playback
   // continues across the jump.
   const _openAudioText = (track, sourceScreen) => {
-    const key = track && typeof track.key === 'string' ? track.key : '';
+    // textKeyOf (AudioShelf): the track's own key, or for a WTLB compilation the
+    // letter under the clock — the same rule hasTextDestination gates the tap on.
+    const key = textKeyOf(track) || '';
     const divider = key.indexOf(':');
     if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
     const volKey = key.slice(0, divider);

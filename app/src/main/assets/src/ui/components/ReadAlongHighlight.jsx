@@ -90,7 +90,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { bibleSyncGlobalFor, resolveBibleAudio } from '../../utils/audio-track.js';
-import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore } from '../../utils/sync-loaders.js';
+import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore, audioSyncSectionsStore } from '../../utils/sync-loaders.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 
 const HL_NAME = 'vot-reading';
@@ -250,7 +250,21 @@ function _partOf(key, track) {
  *   means paint nothing rather than fall back to the Settings edition.
  * @returns {any[] | null}
  */
-function _syncFor(key, track, chapter, paintVolKey) {
+/**
+ * A WTLB compilation's rows for the letter on screen: AUDIO_SYNC_SECTIONS[asset][key],
+ * on the FILE's clock, only while the player says that letter is the one under the
+ * clock (`sectionKey === key`). See audio-player.js sectionLetterKeyAt.
+ * @param {string} key @param {any} track @param {string | null} sectionKey
+ * @returns {any[] | null}
+ */
+function _sectionRowsFor(key, track, sectionKey) {
+  if (!sectionKey || sectionKey !== key) return null;
+  const g = /** @type {any} */ (globalThis);
+  const table = g.AUDIO_SYNC_SECTIONS && g.AUDIO_SYNC_SECTIONS[_assetIdOf(track)];
+  return (table && table[key]) || null;
+}
+
+function _syncFor(key, track, chapter, paintVolKey, sectionKey) {
   const g = /** @type {any} */ (globalThis);
   // Bible first, and never through the letters' primary-asset check below —
   // that reads AUDIO_MANIFEST, while Bible recordings live in
@@ -268,6 +282,8 @@ function _syncFor(key, track, chapter, paintVolKey) {
   }
   const alt = _altRowsFor(track);
   if (alt) return alt;
+  const section = _sectionRowsFor(key, track, sectionKey);
+  if (section) return section;
   const rows = (g.AUDIO_SYNC && g.AUDIO_SYNC[key]) || null;
   if (!rows) return null;
   // The primary-rendition proof and the part index are the same manifest scan.
@@ -609,9 +625,14 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // outright on a chapter whose timings were already in memory. For a Bible
   // surface the question is the BOOK; the edition is answered by paintVolKey
   // above and by nothing else. Letters keep the exact key.
+  // A WTLB compilation (key null) reads many letters from one file; the letter
+  // under the clock is the player's answer, and this page is "loaded" while it
+  // is that letter (2026-09-20). Null for keyed tracks and until the table lands
+  // (the call kicks the lazy fetch; sectionsVersion below re-renders on arrival).
+  const sectionKey = (!chapter && track && track.key == null) ? AudioPlayer.sectionLetterKeyAt(track, st.time) : null;
   const loaded = !!track && (chapter
     ? (!!paintVolKey && track.key === paintVolKey + ':' + letterId)
-    : track.key === key);
+    : (track.key === key || (!!sectionKey && sectionKey === key)));
   const active = loaded && (st.status === 'playing' || st.status === 'loading');
   const time = st.time;
   const lastFrag = React.useRef(-1);
@@ -651,7 +672,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // two loader effects, because those effects depend on it — see read-along-5.
   const bibleVersion = React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
   const letterVersion = React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
-  const corpusVersion = bibleVersion + letterVersion;
+  const sectionsVersion = React.useSyncExternalStore(audioSyncSectionsStore.subscribe, audioSyncSectionsStore.getVersion);
+  const corpusVersion = bibleVersion + letterVersion + sectionsVersion;
 
   const needBibleSync = !!chapter && loaded && readAlongOn;
   React.useEffect(() => {
@@ -703,11 +725,12 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // loader's version, for the loop reason above.
   }, [needLetterSync, key, playerVersion]);
 
-  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey) : null;
+  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey, sectionKey) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
-  // nothing to them. Bible rows are per CHAPTER and likewise always part 0.
-  const perAsset = !!rows && (!!chapter || rows === _altRowsFor(track));
+  // nothing to them. Bible rows are per CHAPTER and likewise always part 0, and
+  // so are a compilation's (one file, one clock).
+  const perAsset = !!rows && (!!chapter || rows === _altRowsFor(track) || (!!sectionKey && sectionKey === key));
   const frags = React.useMemo(() => {
     if (!rows || !rows.length) return null;
     const want = perAsset ? 0 : part;

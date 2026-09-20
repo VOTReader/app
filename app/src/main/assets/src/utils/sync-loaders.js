@@ -177,9 +177,54 @@ export const bibleSyncStore = {
   },
 };
 
+/* ── The WTLB compilation timings (AUDIO_SYNC_SECTIONS), a third lazy file ──
+   One recording of many letters; rows per letter on the file's clock (shape
+   agreed with the align lane 2026-09-20, D:/Swarm/lanes/align/wtlb-shape.md).
+   The renderer (audio-player.js sectionLetterKeyAt, ReadAlongHighlight,
+   use-audio-follow) landed first and reads these two exports; the DATA commit
+   lights them by replacing the one `null` in _sectionsLoader with the
+   __makeLazyLoader call for the sections file — the literal path is what the
+   asset gates derive the lazy set from (see the header), so it must not appear
+   here before the file exists on disk. Until then: no loader, load() resolves,
+   the store never bumps, and every consumer answers "not landed". */
+/** @type {LazyLoader | null} */
+let _sections = null;
+
+/** @returns {LazyLoader | null} */
+function _sectionsLoader() {
+  if (_sections) return _sections;
+  if (!_hasFactory()) return null;
+  _sections = null;   // DATA COMMIT: `= __makeLazyLoader('audio-sync-sections', <the sections file path>, null)`
+  return _sections;
+}
+
+/**
+ * Fetch the compilation timings (AUDIO_SYNC_SECTIONS), once per page. Resolves
+ * on failure and where no loader exists, like loadAudioSync.
+ * @returns {Promise<void>}
+ */
+export function loadAudioSyncSections() {
+  const l = _sectionsLoader();
+  if (!l) return Promise.resolve();
+  return l.load().catch(() => undefined);
+}
+
+/** useSyncExternalStore contract for the compilation timings' arrival. */
+export const audioSyncSectionsStore = {
+  /** @param {() => void} cb */
+  subscribe(cb) {
+    const l = _sectionsLoader();
+    return l ? l.corpus.subscribe(cb) : () => {};
+  },
+  getVersion() {
+    return _sections ? _sections.corpus.getVersion() : 0;
+  },
+};
+
 /** Test-only: forget every loader so a suite can install a fresh factory. */
 export function resetSyncLoadersForTests() {
   _audio = null;
+  _sections = null;
   _bible.clear();
   _bibleVersion = 0;
   _bibleListeners.clear();

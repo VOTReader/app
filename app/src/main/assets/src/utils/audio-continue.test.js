@@ -143,6 +143,17 @@ describe('w-audio-continue — the queue is the site order, one unit ahead', () 
     expect(el().srcHistory).not.toContain(URL_OF('idSecret'));
   });
 
+  it('a range-compilation run (WTLB Part N) extends into the next carded collection when its LAST part starts (2026-09-20)', () => {
+    globalThis.AUDIO_SECTIONS = { vol1: [['Part 1 · Intro–19', 'idPart1', 'V'], ['Part 2 · 20–39', 'idPart2', 'V']] };
+    try {
+      AudioPlayer.playSection('vol1', 1, 'Volume One');       // Part 2 is the last part: this start IS the last track's start
+      expect(urls()).toEqual([URL_OF('idPart2'), URL_OF('idSolo')]);
+      expect(AudioPlayer.getState().queue[0].key).toBe(null);  // the section keeps its one-file identity
+      ended();
+      expect(el().src).toBe(URL_OF('idSolo'));                 // site order: Volume Two's first recording
+    } finally { delete globalThis.AUDIO_SECTIONS; }
+  });
+
   it('a single letter played alone (no registry) still ends cleanly — nothing to continue into', () => {
     delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; delete globalThis.colPreface;
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });

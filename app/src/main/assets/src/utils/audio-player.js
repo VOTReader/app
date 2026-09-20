@@ -27,6 +27,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { showToast } from './toast.js';
+import { loadAudioSyncSections } from './sync-loaders.js';
 import {
   AUDIO_BIBLE_RELEASE_PREFIX,
   AUDIO_RESUME_END_FRACTION,
@@ -723,6 +724,68 @@ function _chapterOfTrack(track) {
  */
 function bibleChapterOfTrack(track) {
   return _chapterOfTrack(track);
+}
+
+/* ── WTLB compilations: one file, many letters (2026-09-20) ─────────────────
+   A range-compilation section (AUDIO_SECTIONS: WTLB Part 1-7, Section 1-7) is
+   ONE recording of many entries. The queue item keeps `key: null` — one file,
+   one resume position, one track — and the entry being read is a function of
+   (asset, clock), answered HERE for every consumer: the read-along's rows, the
+   follower's page turn, the desk's "Open the reading", the shelf's text icon.
+   Shape (agreed with the align lane, D:/Swarm/lanes/align/wtlb-shape.md):
+     AUDIO_SYNC_SECTIONS[assetId][volKey:letterId] = [[t, pi, cs, ce, 0], …]
+   rows in the AUDIO_SYNC shape on the FILE's clock, inner keys in playback
+   order; letter i is current while rows_i[0][0] <= t < rows_{i+1}[0][0]; the
+   last runs to the end of the file; before the first row nothing is current
+   (an intro silence paints and navigates nothing); a letter the belt could not
+   prove is ABSENT, never a wrong highlight, so the page follows to the next
+   PRESENT one. The table is its own lazy file (src/data/audio-sync-sections.js):
+   asking for a section's letter before it lands kicks the fetch (idempotent)
+   and answers null until it does. */
+
+/** The section-table entry for a track, or null (keyed track, not a section asset, table not landed). */
+function _sectionTableFor(track) {
+  if (!track || track.key != null || typeof track.url !== 'string') return null;
+  const tail = track.url.slice(track.url.lastIndexOf('/') + 1);
+  const id = tail.slice(-4).toLowerCase() === '.mp3' ? tail.slice(0, -4) : '';
+  const sections = _sections();
+  if (!id || !sections || !Object.keys(sections).some((vk) => (sections[vk] || []).some((sec) => sec && sec[1] === id))) return null;
+  const all = _g().AUDIO_SYNC_SECTIONS;
+  if (!all) { void loadAudioSyncSections(); return null; }   // idempotent kick; null until it lands
+  return all[id] || null;
+}
+
+/**
+ * The letter a range-compilation section is reading at `time` (seconds on the
+ * file's clock), as a "volKey:letterId" key — or null before its first row, for
+ * a keyed track, or until the section table lands.
+ * @param {any} track
+ * @param {number} time
+ * @returns {string | null}
+ */
+function sectionLetterKeyAt(track, time) {
+  const table = _sectionTableFor(track);
+  if (!table) return null;
+  let cur = null;
+  for (const k of Object.keys(table)) {
+    const rows = table[k];
+    if (!Array.isArray(rows) || !rows.length || !Array.isArray(rows[0]) || rows[0][0] > time) break;
+    cur = k;
+  }
+  return cur;
+}
+
+/**
+ * The FIRST letter of a range-compilation section — where "Open the reading"
+ * lands during the intro silence, and what a shelf row of a section that is not
+ * playing opens. Null on the same conditions as sectionLetterKeyAt.
+ * @param {any} track
+ * @returns {string | null}
+ */
+function sectionOpeningKey(track) {
+  const table = _sectionTableFor(track);
+  const first = table ? Object.keys(table)[0] : null;
+  return first || null;
 }
 
 /**
@@ -2243,15 +2306,18 @@ function _booksAfter(volKey, bookId) {
 
 /**
  * Append the next unit of the site order to the queue. False when there is none — a queue that
- * is not a collection (a section run, a saved track, a lone letter with no registry), a key-less
- * last track, or the end of the order. Idempotent: refusing twice is the designed path at the end.
+ * is neither a collection nor a section run (a saved track, a lone letter with no registry), a
+ * key-less last track outside a section run, or the end of the order. Idempotent: refusing twice
+ * is the designed path at the end.
  *
  * @returns {boolean}
  */
 function _extendQueue() {
-  if (!_source || _source.mode !== 'collection') return false;
+  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return false;
   const last = _state.queue[_state.queue.length - 1];
-  const volKey = last ? _volKeyOf(last.key) : '';
+  // A section run's tracks carry key null (one file, many letters); the run
+  // belongs to its collection, so the site order continues from THAT (2026-09-20).
+  const volKey = _source.mode === 'section' ? (_source.volKey || '') : (last ? _volKeyOf(last.key) : '');
   if (!volKey) return false;
   const units = _isBibleVol(volKey)
     ? _booksAfter(volKey, /** @type {string} */ (last.key).slice(volKey.length + 1))
@@ -2804,6 +2870,8 @@ export const AudioPlayer = {
   playBibleBook,
   bibleChapterStart,
   bibleChapterOfTrack,
+  sectionLetterKeyAt,
+  sectionOpeningKey,
   playTrack,
   toggle,
   next,

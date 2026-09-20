@@ -173,3 +173,41 @@ describe('study chapters — a third unit kind', () => {
     expect(m.setScreen).toHaveBeenCalledWith('vot-one-letter');
   });
 });
+
+/* A WTLB COMPILATION IS ONE TRACK WITH MANY LETTERS (2026-09-20): key null, and
+   the letter under the clock is the player's answer (sectionLetterKeyAt). The
+   follower asks it on every tick and treats the crossing like any letter
+   boundary — same live-pane rule, same in-place navigation. */
+describe('WTLB compilations — the letter comes from the clock', () => {
+  function sectionPlayer(order) {
+    const subs = new Set();
+    const st = { queue: [{ key: null, title: 'Part 1 · Intro–19', sub: 'Words To Live By: Part One', url: 'https://x/1U0x.mp3' }], qi: 0, status: 'playing', time: 0 };
+    return {
+      subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); },
+      getState: () => st,
+      bibleChapterOfTrack: () => 0,
+      sectionLetterKeyAt: (t, time) => { let cur = null; for (const [k, at] of order) { if (at > time) break; cur = k; } return cur; },
+      tick: (time) => { st.time = time; subs.forEach((cb) => cb()); },
+    };
+  }
+  const ORDER = [['wtlb1:introduction', 4.2], ['wtlb1:come-love-awaits-you', 61], ['wtlb1:crowning-glory', 118.5]];
+  beforeEach(() => { globalThis.COL_BY_KEY.set('wtlb1', { volKey: 'wtlb1', letterScreen: 'wtlb-one-entry', label: 'Words To Live By: Part One' }); });
+
+  it('the clock crossing into the next letter while the pane shows the current one opens the next entry, in place', () => {
+    const player = sectionPlayer(ORDER);
+    const m = mount(player, { screen: 'wtlb-one-entry', letterId: 'introduction', bookId: null, chapterNum: null });
+    act(() => player.tick(10));                    // the intro is current; nothing to follow yet
+    expect(m.setLetterId).not.toHaveBeenCalled();
+    act(() => player.tick(61));
+    expect(m.setLetterId).toHaveBeenCalledWith('come-love-awaits-you');
+    expect(m.setScreen).toHaveBeenCalledWith('wtlb-one-entry');
+    expect(suppressNextHistoryPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('nothing navigates before the first row, and a reader elsewhere is never moved', () => {
+    const player = sectionPlayer(ORDER);
+    const m = mount(player, { screen: 'home', letterId: null, bookId: null, chapterNum: null });
+    act(() => player.tick(2)); act(() => player.tick(10)); act(() => player.tick(61)); act(() => player.tick(120));
+    expect(m.setScreen).not.toHaveBeenCalled();
+  });
+});

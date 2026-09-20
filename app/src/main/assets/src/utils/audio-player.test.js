@@ -3624,3 +3624,62 @@ describe('audio-player — the boot resume retries ONCE past the activation race
     expect(offer).not.toHaveBeenCalled();
   });
 });
+
+/* The two-asset fixture the align lane ships for this shape (tools/fixtures/audio-sync-sections.fixture.js,
+   d-wtlb-sections 49d12d65) — inlined so this suite is green on this branch alone. Asset 1 = Part 1: three
+   letters, first row 4.2 s (intro silence), the intro's first row the Format-B sentinel. Asset 2 = Section 1:
+   wtlb2:i-am-the-lord-s is ABSENT between two present letters; the last letter has ONE row to the file's end. */
+const SECTIONS_FIXTURE = {
+  '1U0xmOIDAo6Q99aZMeKh-3CYVDninq62g': {
+    'wtlb1:introduction': [[4.2, 0, -1, -1, 0], [5.31, 0, 30, 50, 0], [6.97, 0, 58, 91, 0], [12.66, 0, 99, 131, 0]],
+    'wtlb1:come-love-awaits-you': [[61.0, 0, 0, 54, 0], [66.16, 1, 0, 40, 0], [69.32, 1, 42, 82, 0], [72.5, 2, 0, 33, 0]],
+    'wtlb1:crowning-glory': [[118.5, 0, 0, 40, 0], [121.7, 1, 0, 50, 0], [125.34, 1, 52, 90, 0]],
+  },
+  '1xFRVnuKEBAjhk3ccHkl6nWkJFv7zo7rL': {
+    'wtlb2:introduction': [[3.0, 0, 2, 18, 0], [4.51, 0, 24, 32, 0], [5.66, 1, 1, 21, 0]],
+    'wtlb2:the-bridegroom-approaches': [[90.0, 0, -1, -1, 0], [94.34, 0, 35, 197, 0], [106.0, 0, 198, 222, 0]],
+    'wtlb2:the-only-way': [[150.25, 0, 0, 40, 0]],
+  },
+};
+const SECTIONS_MANIFEST = {
+  wtlb1: [['Part 1 · Intro–19', '1U0xmOIDAo6Q99aZMeKh-3CYVDninq62g', 'V'], ['Part 2 · 20–39', '1LTCwtvaNo8aqhyYBltky8cwfmVFe46su', 'V']],
+  wtlb2: [['Section 1 · Intro–28', '1xFRVnuKEBAjhk3ccHkl6nWkJFv7zo7rL', 'V']],
+};
+
+/* THE WTLB COMPILATIONS READ MANY LETTERS FROM ONE FILE (2026-09-20). A section
+   track keeps key null (one file, one resume position); the letter being read is
+   a function of (asset, clock) — AUDIO_SYNC_SECTIONS[assetId] in playback order,
+   letter i current while rows_i[0][0] <= t < rows_{i+1}[0][0]. The player answers
+   it once, here, for the read-along, the follower, the desk and the shelf. */
+describe('audio-player — sectionLetterKeyAt / sectionOpeningKey (WTLB compilations)', () => {
+  const PART1 = () => ({ key: null, title: 'Part 1 · Intro–19', sub: 'Words To Live By: Part One', url: URL_OF('1U0xmOIDAo6Q99aZMeKh-3CYVDninq62g'), readerCode: 'V', partLabel: null });
+  const SEC1 = () => ({ key: null, title: 'Section 1 · Intro–28', sub: 'Words To Live By: Part Two', url: URL_OF('1xFRVnuKEBAjhk3ccHkl6nWkJFv7zo7rL'), readerCode: 'V', partLabel: null });
+  beforeEach(() => { globalThis.AUDIO_SECTIONS = SECTIONS_MANIFEST; globalThis.AUDIO_SYNC_SECTIONS = SECTIONS_FIXTURE; });
+  afterEach(() => { delete globalThis.AUDIO_SECTIONS; delete globalThis.AUDIO_SYNC_SECTIONS; });
+
+  it('answers the letter under the clock, nothing before the first row, the last letter to the end of the file', () => {
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 2)).toBe(null);                          // intro silence
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 4.2)).toBe('wtlb1:introduction');
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 60.99)).toBe('wtlb1:introduction');
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 61)).toBe('wtlb1:come-love-awaits-you');
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 5000)).toBe('wtlb1:crowning-glory');     // runs to the end
+  });
+
+  it('an absent letter is skipped by construction: Section 1 goes introduction -> the-bridegroom-approaches', () => {
+    expect(AudioPlayer.sectionLetterKeyAt(SEC1(), 40)).toBe('wtlb2:introduction');
+    expect(AudioPlayer.sectionLetterKeyAt(SEC1(), 90)).toBe('wtlb2:the-bridegroom-approaches');
+    expect(AudioPlayer.sectionLetterKeyAt(SEC1(), 150.25)).toBe('wtlb2:the-only-way');
+  });
+
+  it('is null for a keyed track, for a section the table lacks, and before the table lands', () => {
+    expect(AudioPlayer.sectionLetterKeyAt({ key: 'vol1:letter-a', url: URL_OF('idA1') }, 100)).toBe(null);
+    expect(AudioPlayer.sectionLetterKeyAt({ key: null, url: URL_OF('1LTCwtvaNo8aqhyYBltky8cwfmVFe46su') }, 100)).toBe(null);   // Part 2: not timed yet
+    delete globalThis.AUDIO_SYNC_SECTIONS;
+    expect(AudioPlayer.sectionLetterKeyAt(PART1(), 100)).toBe(null);
+  });
+
+  it('the opening letter (for "Open the reading" during the intro silence) is the first key', () => {
+    expect(AudioPlayer.sectionOpeningKey(PART1())).toBe('wtlb1:introduction');
+    expect(AudioPlayer.sectionOpeningKey({ key: 'vol1:letter-a', url: URL_OF('idA1') })).toBe(null);
+  });
+});
