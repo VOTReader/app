@@ -343,13 +343,18 @@ export function useSearch({
   // (a typo-corrected match), merged the way SrchCard merges them for <mark>.
   // The engine is bundle-e (lazy): without it, no excerpt — the letter opens
   // at the top exactly as before, never a thrown dispatch.
-  const excerptAnchor = (doc, terms, entry) => {
+  // `letterId` names the unit the excerpt was cut from: the consumers land it
+  // ONLY on that unit, so an anchor that outlives the landing (the follower
+  // turning the page, the arrows) cannot re-land a stale search on a letter it
+  // was never about. For a study doc that is the CHAPTER id (what LetterView
+  // renders), not doc.letterId (the study).
+  const excerptAnchor = (doc, terms, entry, letterId) => {
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
     const own = Array.isArray(terms) ? terms : [];
     const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
     const text = sm.matchExcerpt(doc.text, own.concat(hit));
-    return text ? { type: 'excerpt', text } : null;
+    return text ? { type: 'excerpt', text, letterId: letterId || null } : null;
   };
 
   /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) */
@@ -430,7 +435,7 @@ export function useSearch({
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId));
       if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
       else vm.lastReadFn(doc.letterId);
       setScreen(vm.screen);
@@ -440,7 +445,7 @@ export function useSearch({
       // Open the study at the given chapter
       setStudyId(doc.letterId || null);
       setStudyChapterId(doc.chapterNum || null);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.chapterNum));
       setScreen('bible-study-chapter');
       return;
     }

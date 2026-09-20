@@ -70,6 +70,12 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(scrolled).toEqual(['wtlb:matters-of-the-heart:0']);
   });
 
+  it('an anchor made for ANOTHER entry is ignored', () => {
+    renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'All who are weary', letterId: 'some-other-entry' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+  });
+
   it('nothing found: nothing scrolls, nothing seeks', () => {
     renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'zebra crossing at dawn' } });
     act(() => { vi.advanceTimersByTime(200); });

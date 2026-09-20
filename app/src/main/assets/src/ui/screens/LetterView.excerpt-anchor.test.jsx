@@ -93,6 +93,19 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     expect(seekToSeen.every((v) => v == null)).toBe(true);
   });
 
+  it('an anchor made for ANOTHER letter is ignored: the follower turning the page must not re-land a stale search', () => {
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'still small voice', letterId: 'some-other-letter' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+    expect(seekToSeen.every((v) => v == null)).toBe(true);
+  });
+
+  it('an anchor made for THIS letter lands (letterId named)', () => {
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'still small voice', letterId: 'the-wide-path' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['letter:the-wide-path:2']);
+  });
+
   it('the landing fades: seekTo is withdrawn after the flash so a later Listen does not re-seek', () => {
     renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'still small voice' } });
     act(() => { vi.advanceTimersByTime(200); });

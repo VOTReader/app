@@ -41,6 +41,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const [landedPara, setLandedPara] = React.useState(/** @type {number} */ (-1));
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
+    if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
     const squash = (s) => String(s || '').replace(/\{\{[^}]+\}\}/g, ' ').replace(/\s+/g, ' ').trim();
     const excerpt = squash(surpriseAnchor.text);
     const paras = entry.paragraphs || [];

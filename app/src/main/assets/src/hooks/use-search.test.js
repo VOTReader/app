@@ -675,16 +675,17 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       ['still', 'voice'],
     ); });
     expect(calls).toEqual([['the still small voice spoke', ['still', 'voice', 'spoke']]]);
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'wide-path' });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
   });
 
   it('a WTLB hit and a study hit take the same anchor', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'wtlb1', letterId: 'e1', text: 'body' } }, ['body']); });
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'e1' });
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 'ch1', text: 'body' } }, ['body']); });
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    // A study doc's letterId is the STUDY; the chapter LetterView renders has the chapter id.
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'ch1' });
     expect(props.setScreen).toHaveBeenLastCalledWith('bible-study-chapter');
   });
 

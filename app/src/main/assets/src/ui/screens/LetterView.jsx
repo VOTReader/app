@@ -158,6 +158,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== "excerpt") return;
+    // Made for another unit (the follower or the arrows moved on; the anchor did not): not ours.
+    if (surpriseAnchor.letterId && surpriseAnchor.letterId !== letter.id) return;
     // The excerpt comes from the search index's flattened text (a search hit's
     // matched words, matchExcerpt). Its HEAD is what must sit inside one block:
     // it starts at the matched word and may run past the block's end, so
