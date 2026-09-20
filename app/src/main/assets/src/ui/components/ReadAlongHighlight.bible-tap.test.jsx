@@ -12,8 +12,9 @@
 
      genesis 1   WOP carries it (31 timed slots, c52) — a tap on a verse seeks to that verse's
                  own centiseconds from the table
-     joshua 1    WOP has no Joshua at all (32 of 66 books today) — the tap does nothing; the
-                 clock does not move
+     joshua 1    WOP carried no Joshua until c58 (32 of 66 books at c52; every book since) —
+                 the untimed-BOOK leg removes it from its per-case copy, the way numbers 9
+                 removes a slot: the tap does nothing; the clock does not move
      numbers 9   WOP carries it whole today (23 slots, no zero) — the file's own census says so
                  below — so the untimed leg zeroes verse 5 DELIBERATELY: the tap on 5 is silent
                  while the tap on 4 still seeks. A fixture no release could produce would be a
@@ -128,13 +129,14 @@ afterEach(() => {
 });
 
 describe('tap-to-seek on the dramatized NKJV — the c52 table, three chapters', () => {
-  it('the table today: genesis 1 and numbers 9 timed whole, no joshua (the census the legs below rest on)', () => {
+  it('the table today: genesis 1 and numbers 9 timed whole, all 66 books (the census the legs below rest on)', () => {
     expect(WOP.genesis[1]).toHaveLength(31);
     expect(WOP.genesis[1].filter((cs) => !cs)).toEqual([]);
     expect(WOP.numbers[9]).toHaveLength(23);
     expect(WOP.numbers[9].filter((cs) => !cs)).toEqual([]);        // no untimed slot to tap today
-    expect(WOP.joshua).toBeUndefined();
-    expect(manifestCtx.M['bible-wop-nkjv:joshua'], 'the RECORDING exists — only its timings do not').toBeTruthy();
+    expect(Object.keys(WOP)).toHaveLength(66);                      // c58: no untimed BOOK to tap today either
+    expect(WOP.joshua[1]).toHaveLength(18);
+    expect(manifestCtx.M['bible-wop-nkjv:joshua'], 'the RECORDING exists').toBeTruthy();
   });
 
   it('genesis 1: a tap on verse 2 seeks to verse 2\'s own onset from the table', () => {
@@ -148,6 +150,7 @@ describe('tap-to-seek on the dramatized NKJV — the c52 table, three chapters',
 
   it('joshua 1: the recording plays, no timings ship, a tap moves nothing', () => {
     const verses = [1, 2, 3];
+    delete globalThis.BIBLE_SYNC_WOP_NKJV.joshua;                   // the book untimed, deliberately (c52's world)
     mount('joshua', 1, verses); playChapter('joshua', 1); clockTo(7);
     expect(AudioPlayer.getState().status).not.toBe('idle');
     caretInVerse(2, verses); tap();

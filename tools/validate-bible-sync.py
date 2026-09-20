@@ -138,6 +138,7 @@ def check(ed, a):
         return 1
     table = json.loads(m.group(1))
     problems = []
+    pinned = []                 # chapters in the file below the gate by bab.GATE_PINS (printed, never silent)
     tmp = tempfile.mkdtemp(prefix="bible-sync-validate-")
     chapters = slots = zeros = 0
     shipped = set()
@@ -223,8 +224,14 @@ def check(ed, a):
                 problems.append((tag, "belt versesHash != current corpus text"))
             if belt.get("audioSize") != os.path.getsize(entry[0]):
                 problems.append((tag, "belt audioSize != local mp3 (audio changed since alignment)"))
-            if bab.proven_share(belt) < bab.MIN_PROVEN:
+            pin = bab.gate_pin(ed, belt)
+            if bab.proven_share(belt) < bab.MIN_PROVEN and pin is None:
                 problems.append((tag, f"proven share {bab.proven_share(belt):.3f} below the gate"))
+            elif pin is not None and bab.proven_share(belt) >= bab.MIN_PROVEN:
+                # the register only shrinks: a pin the chapter no longer needs is a lie about it
+                problems.append((tag, f"GATE_PINS lists this chapter but it clears the gate on its own ({bab.proven_share(belt):.3f}); retire the pin"))
+            elif pin is not None:
+                pinned.append(f"{tag} ({bab.proven_share(belt):.3f}: {pin})")
             if rebuild(belt) != arr:
                 problems.append((tag, "shipped array != rebuilt from belt"))
     # every gate-clearing current belt must be in the file -- unless its BOOK is
@@ -244,7 +251,7 @@ def check(ed, a):
         key = (d.get("bookId"), d.get("chapter"))
         entry = idx.get(key)
         if (d.get("settings_hash") == want and entry and d.get("audioSize") == os.path.getsize(entry[0])
-                and bab.proven_share(d) >= bab.MIN_PROVEN):
+                and bab.clears_gate(ed, d)):
             clearing.setdefault(key[0], set()).add(key[1])
     held = {} if structural else bab.partial_books(clearing, idx)
     for book, chs in clearing.items():
@@ -253,6 +260,8 @@ def check(ed, a):
                 missing.append(f"{book}_{ch:03d}")
     for tag in sorted(missing):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
+    if pinned:
+        print("  shipped BELOW the gate by GATE_PINS (proven rows only, the rest dark): " + "; ".join(sorted(pinned)))
     if held:
         print("  held back as partial books (whole book or nothing; their belts are expected absent): "
               + ", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())))

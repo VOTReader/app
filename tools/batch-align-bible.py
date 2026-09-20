@@ -115,6 +115,30 @@ ARCHIVE = r"D:\VOT-Archive"
 
 MIN_PROVEN = 0.60          # below this the chapter ships nothing (owner policy)
 
+# Chapters PINNED to ship below the gate, by ruling, each with its reason -- a
+# hand-reviewed residue, never a knob. The whisper witness is deaf to a Hebrew
+# name list: Nehemiah 10's seal-list read 20 of 39 verses UNSPOKEN with the
+# other 19 proven (7 CONFIRMED, 12 PROBED), and the ruling (hub for Corbin,
+# 2026-09-20 02:1x) was twelve full chapters plus an honest gap over an absent
+# book. A pinned chapter ships its proven rows only; the rest stay 0 (dark),
+# never interpolated. validate-bible-sync.py FAILS a pin whose chapter clears
+# the gate on its own -- the register only shrinks -- so a name-tolerant
+# re-align retires the pin instead of hiding behind it.
+GATE_PINS = {
+    ("wop-nkjv", "nehemiah", 10): "seal-list of names, 19/39 proven, witness-deaf not misaligned",
+}
+
+
+def gate_pin(ed, d):
+    """The pin's reason when this belt's chapter is pinned, else None."""
+    return GATE_PINS.get((ed, d.get("bookId"), d.get("chapter")))
+
+
+def clears_gate(ed, d):
+    """The chapter gate ship() and the validator share: proven share >= MIN_PROVEN,
+    or a pinned exception (which ships its proven rows and names itself)."""
+    return proven_share(d) >= MIN_PROVEN or gate_pin(ed, d) is not None
+
 
 def drive_index(cfg, listing_path=LISTING, archive_root=ARCHIVE):
     """(book, chapter) -> (local mp3 path, driveId) for a driveFolder edition (tsot-matthew).
@@ -256,6 +280,7 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
     table = {}
     kept = dropped = verses_timed = verses_total = 0
     stale_settings = stale_audio = no_audio = 0
+    pinned = []                 # chapters shipped below the gate by GATE_PINS, named on their own line
     for name in sorted(os.listdir(belts_dir)):
         # Belts only. The same directory holds each chapter's cached whisper
         # transcript (<tag>.tx.json) and its silence map (<tag>.16k.wav.sil.json),
@@ -281,9 +306,11 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
             if d.get("audioSize") != os.path.getsize(entry[0]):
                 stale_audio += 1
                 continue
-        if proven_share(d) < MIN_PROVEN:
+        if not clears_gate(ed, d):
             dropped += 1
             continue
+        if proven_share(d) < MIN_PROVEN:
+            pinned.append(f"{book_id} {chapter} ({proven_share(d):.3f}: {gate_pin(ed, d)})")
         n_max = max(r["n"] for r in rows)
         arr = [0] * n_max
         for r in rows:
@@ -344,6 +371,8 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
           f"{no_audio} no local audio; held back as partial books: "
           + (", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())) or "none") + "), "
           f"{verses_timed}/{verses_total} verses timed -> {path} ({size // 1024} KB)")
+    if pinned:
+        print("  shipped BELOW the gate by GATE_PINS (proven rows only, the rest dark): " + "; ".join(pinned))
     return path
 
 

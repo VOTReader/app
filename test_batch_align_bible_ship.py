@@ -122,6 +122,26 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         self.assertEqual(bab.partial_books({"joshua": set(range(1, 11)), "ruth": {1, 2, 3, 4}}, idx),
                          {"joshua": (10, 24)})
 
+    def test_a_pinned_chapter_ships_its_proven_rows_below_the_gate_and_only_by_name(self):
+        # 2026-09-20: Nehemiah 10 is a seal-list of names the whisper witness is
+        # deaf to (19 of 39 proven). The ruling ships the proven rows with the
+        # rest dark rather than losing the book; the pin is BY NAME (edition,
+        # book, chapter) with a reason, so the same share in any other chapter
+        # still ships nothing (the control).
+        low = {**belt("nehemiah", 10, [1, 2, 29, 30]), "verseCount": 39, "confirmed": 4, "probed": 0}
+        low["verses"] += [{"n": n, "t": None, "status": "UNSPOKEN"} for n in (3, 4, 5)]
+        twin = {**belt("ezra", 2, [1, 2, 3, 4]), "verseCount": 39, "confirmed": 4, "probed": 0}
+        twin["verses"] += [{"n": n, "t": None, "status": "UNSPOKEN"} for n in (5, 6, 7)]   # the same 4 of 7
+        self._saved_pins = dict(bab.GATE_PINS)
+        self.addCleanup(lambda: (bab.GATE_PINS.clear(), bab.GATE_PINS.update(self._saved_pins)))
+        bab.GATE_PINS.clear()
+        bab.GATE_PINS[("web-ebible", "nehemiah", 10)] = "test pin"
+        table = self._ship(low, twin)
+        self.assertEqual(table["nehemiah"]["10"][:5], [100, 200, 0, 0, 0], "proven rows ship, the unspoken stay 0")
+        self.assertEqual(table["nehemiah"]["10"][28:30], [2900, 3000])
+        self.assertNotIn("ezra", table, "the same share unpinned ships nothing")
+        self.assertIsNone(bab.gate_pin("brm-kjv", low), "a pin names its edition too")
+
     def test_a_proven_verse_the_recording_opens_on_ships_as_one_centisecond_not_zero(self):
         # 2 Samuel 20:1 in the WOP belts is CONFIRMED at t = 0.00 (the only such
         # row in four editions, 2026-09-13). A 0 slot is what the renderer reads
