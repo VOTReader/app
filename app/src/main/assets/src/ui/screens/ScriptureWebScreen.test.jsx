@@ -372,7 +372,11 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(zoomText(container)).toBe('1711x');
-      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      // the recorder holds every frame since the mount, the middle band's chapter numerals
+      // included: read ONE frame at the ceiling (a press at the cap redraws without zooming)
+      TEXTS.length = 0;
+      await pressFrame('+');
+      expect(TEXTS.length, 'precondition: the frame at the ceiling was painted').toBeGreaterThan(0);
       // the far foot, on the body: RED if no label pass exists
       expect(TEXTS.some((t) => /Gen 2:5101/.test(t)), 'a body label naming the far foot; texts: ' + TEXTS.slice(-12).join(' | ')).toBe(true);
       // the near foot, on the ruler: the verse numeral under its tick, the chapter numeral (sticky at close zoom: RED today, the chapter row stopped at 30 px/verse), the book
@@ -382,10 +386,19 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'the count of body labels drawn is published for the walks').toBe('1');
     });
 
-    it('CONTROL: at the overview no body label is written (the feet are on the ruler, the sky is closed)', async () => {
-      await mount({}, threaded);
-      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-      expect(TEXTS.some((t) => /Gen 2:5101|Gen 2:552/.test(t))).toBe(false);
+    it('CONTROL: in the middle band the far foot is off-screen and NO body label is written; the labels belong to the verse-numeral zoom', async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 12; i++) await pressFrame('+');
+      const last = DRAWN[DRAWN.length - 1];
+      const ppvCss = last.ppv / last.dpr;
+      // the far foot (4,549 verses off) leaves the 800 px frame past 0.088 px/verse; verse numerals begin at 30
+      expect(ppvCss, 'precondition: the far foot is off-screen at this zoom (' + zoomText(container) + ')').toBeGreaterThan(0.2);
+      expect(ppvCss, 'precondition: not yet the verse-numeral band').toBeLessThan(30);
+      TEXTS.length = 0;
+      await pressFrame('ArrowLeft');
+      expect(TEXTS.length, 'precondition: a frame was painted').toBeGreaterThan(0);
+      expect(TEXTS.some((t) => /Gen 2:5101|Gen 2:552/.test(t)), 'no body label in the middle band; texts: ' + TEXTS.slice(-8).join(' | ')).toBe(false);
+      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels')).toBe('0');
     });
   });
 
