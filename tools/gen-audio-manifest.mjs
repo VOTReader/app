@@ -249,6 +249,15 @@ function resolveLetter(parsed) {
     if (byNumInCands) return { col, letter: byNumInCands };
     return { err: `title matches ${cands.length} letters` };
   }
+  // Words to Live By is ONE series numbered twice upstream: "WTLB2.125_A Return
+  // to the Garden" (Benjamin's voice, 2026-09-20) is Part One's letter 125, and
+  // Part Two's 125 is another letter. An EXACT title in the sister volume wins;
+  // never fuzzy across volumes (the two share dozens of near-titles).
+  const sisterKey = { wtlb1: 'wtlb2', wtlb2: 'wtlb1' }[col.volKey];
+  if (sisterKey) {
+    const sc = TITLE_IDX.get(sisterKey).get(normkey(parsed.title)) || [];
+    if (sc.length === 1) return { col: COLS.find((c) => c.volKey === sisterKey), letter: sc[0], note: 'matched by title in the sister WTLB volume' };
+  }
   // Staged fuzzy scan (truncated titles, dropped parentheticals/words).
   const all = [col.preface, ...col.letters].filter(Boolean);
   const loose = all.filter((l) => titleMatches(parsed.title, l.title));

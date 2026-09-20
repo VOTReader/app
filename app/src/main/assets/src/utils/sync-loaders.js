@@ -194,7 +194,7 @@ let _sections = null;
 function _sectionsLoader() {
   if (_sections) return _sections;
   if (!_hasFactory()) return null;
-  _sections = null;   // DATA COMMIT: `= __makeLazyLoader('audio-sync-sections', <the sections file path>, null)`
+  _sections = /** @type {any} */ (globalThis).__makeLazyLoader('audio-sync-sections', 'src/data/audio-sync-sections.js', null);
   return _sections;
 }
 

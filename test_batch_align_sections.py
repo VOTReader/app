@@ -103,6 +103,24 @@ class ShipOrderAndCarryForward(unittest.TestCase):
             bas.ship({"A": {"wtlb1:x": [[1.0, 0, 0, 3]]}}, sections, manifest, "h")
 
 
+class AssetErrors(unittest.TestCase):
+    """asset_errors: a tie in starts or a skipped mid-asset letter keeps the asset out."""
+
+    def test_strict_order_and_skipped_letter(self):
+        keys = [("a", None), ("b", None), ("c", None)]
+        ok = {"a": [[1.0, 0, 0, 3, 0]], "b": [[5.0, 0, 0, 3, 0]], "c": [[9.0, 0, 0, 3, 0]]}
+        spoken = {"a": (1.0, 0.0, 1, 1), "b": (1.0, 0.0, 1, 1), "c": (1.0, 0.0, 1, 1)}
+        self.assertEqual(bas.asset_errors(keys, ok, spoken), [])
+        tie = dict(ok, b=[[5.0, 0, 0, 3, 0]], c=[[5.0, 0, 0, 3, 0]])
+        self.assertIn("strict", bas.asset_errors(keys, tie, spoken)[0])
+        # b unspoken (the reader skipped it) with c still read after it -> refuse
+        skipped = {"a": [[1.0, 0, 0, 3, 0]], "c": [[9.0, 0, 0, 3, 0]]}
+        self.assertIn("skips b", bas.asset_errors(keys, skipped, dict(spoken, b=(0.0, 1.0, 0, 4)))[0])
+        # the LAST letter skipped drags nobody -> ships
+        last = {"a": [[1.0, 0, 0, 3, 0]], "b": [[5.0, 0, 0, 3, 0]]}
+        self.assertEqual(bas.asset_errors(keys, last, dict(spoken, c=(0.0, 1.0, 0, 4))), [])
+
+
 class GateSeesSectionOrder(unittest.TestCase):
     """tools/check-audio-sync.js on the committed fixture, both arms (~4 s each)."""
 

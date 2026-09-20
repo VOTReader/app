@@ -147,6 +147,31 @@ def per_letter(d, owner, frags):
     return rows, stats
 
 
+def asset_errors(keys, timeline, stats):
+    """Why an asset must NOT ship, as one line each (empty = ship it).
+
+    Playback order is the candidates' order and the audio must agree, STRICTLY:
+    equal starts are the signature of leg A dragging a pile of letters onto one
+    instant. The cause seen 2026-09-20 (WTLB II Section 1): the recording SKIPS
+    a letter (unspoken share ~1.0) that is not the last one, and MMS forced
+    alignment stretches its fragments over the neighbours' audio. The
+    upgrade is a second belt without the skipped letters; until then the asset
+    stays absent and the page plays it without the wash.
+    """
+    errs = []
+    starts = [timeline[k][0][0] for k, _ in keys if k in timeline]
+    if any(b <= a_ for a_, b in zip(starts, starts[1:])):
+        errs.append("letters are not in strict candidate order in the audio (a tie = a collapsed pile); see the report")
+    present = [k for k, _ in keys if k in timeline]
+    last = present[-1] if present else None
+    skipped = [k for k, _ in keys if stats.get(k, (0, 0, 0, 0))[1] > 0.5 and k != last
+               and any(k2 in timeline for k2 in [x for x, _ in keys][[x for x, _ in keys].index(k) + 1:])]
+    if skipped:
+        errs.append(f"the recording skips {', '.join(skipped)} before letters it does read; "
+                    "leg A drags the neighbours - re-run without the skipped letters (TODO)")
+    return errs
+
+
 def belt_path(fid):
     return os.path.join(ha.HONE, f"sections__{fid}.large-v3.json")
 
@@ -205,10 +230,11 @@ def main():
                 report.append((fid, label, key, cov, shp, tot, tag, uns))
                 if tag != "EXCLUDED" and lrows.get(key):
                     timeline[key] = lrows[key]
-            # playback order is the candidates' order; the audio must agree
-            starts = [timeline[k][0][0] for k, _ in keys if k in timeline]
-            if any(b < a_ for a_, b in zip(starts, starts[1:])):
-                failures.append((fid, "letters are not in candidate order in the audio; see the report"))
+            errs = asset_errors(keys, timeline, stats)
+            if errs:
+                failures.append((fid, errs[0]))
+                print(f"  NOT SHIPPED: {errs[0]}")
+                continue                     # absent from the file: never a wrong highlight
             result[fid] = timeline
             print(f"  {len(timeline)}/{len(keys)} letters shipped  "
                   f"{sum(len(v) for v in timeline.values())} rows  rss {al.rss_gb():.2f} GB")
