@@ -331,6 +331,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           hlKeyFn={(bookId, n) => studyHlKey(bookId + '-' + chapter.num, n)}
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}
+          seekTo={highlightedVerses.length ? studyHlKey(book.id + '-' + chapter.num, highlightedVerses[0]) : null}
         />
       )}
       {/* position:fixed sheet, skipped in an inert peek (a clone is

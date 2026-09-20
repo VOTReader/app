@@ -325,7 +325,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (typeof window.addRecentSearch === 'function') setRecents(window.addRecentSearch(q));
   };
 
-  const handleSelect = (entry) => { recordSearch(); onSelect(entry); };
+  // The query's terms ride along so the dispatcher can cut the matched excerpt
+  // out of the doc and land the reader ON the passage (use-search.js).
+  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms); };
 
   const clearQuery = () => {onQueryChange('');setShowSuggest(false);setSuggestDismissed(true);};
 

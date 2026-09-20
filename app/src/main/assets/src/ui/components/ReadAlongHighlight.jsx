@@ -582,8 +582,12 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  *   Its presence is what selects the verse-timing path; letters omit it.
  * @param {(blockIndex: number) => ((off: number, isEnd?: boolean) => number) | null} [props.offsetMapFn]
  *   Format B only: projects a corpus offset onto the rendered one.
+ * @param {string | null} [props.seekTo] - the hl-key of a block the reader has just
+ *   been LANDED on (a search hit, a reference, a Scripture Web card — the screens'
+ *   anchor flash). While this unit is the loaded track the audio seeks to that
+ *   block's first shipped fragment, once per landing; otherwise nothing moves.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -821,6 +825,28 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       el.removeEventListener('click', onClick);
     };
   }, [frags, mainRef, letterId, hlKeyFn, offsetMapFn]);
+
+  // ARRIVE AT A PLACE IN THE UNIT YOU ARE LISTENING TO, AND THE READING GOES
+  // THERE (2026-09-20). The screens flash the landing block for a few seconds
+  // and hand its hl-key here as `seekTo`. `frags` is non-null only while this
+  // unit is the loaded track (the same gate tap-to-seek stands behind), so a
+  // landing on a chapter that is not playing moves no clock. Once per landing:
+  // the ref remembers the key it has served, so the wash running on past the
+  // block does not get dragged back on the next render; the frags dep is only
+  // there for the lazy table landing a beat after the screen did. Untimed text
+  // (no fragment in that block) stays silent, exactly like the tap.
+  const seekServed = React.useRef(/** @type {string | null} */ (null));
+  React.useEffect(() => {
+    if (!seekTo) { seekServed.current = null; return; }
+    if (!frags || seekServed.current === seekTo) return;
+    for (let i = 0; i < frags.length; i++) {
+      if (hlKeyFn(letterId, frags[i][1]) === seekTo) {
+        seekServed.current = seekTo;
+        AudioPlayer.seek(frags[i][0]);
+        return;
+      }
+    }
+  }, [seekTo, frags, letterId, hlKeyFn]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {

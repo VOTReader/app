@@ -326,6 +326,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           hlKeyFn={bibleKeyFn}
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}
+          seekTo={highlightedVerses.length ? bibleKeyFn(book.id, highlightedVerses[0]) : null}
         />
       )}
     </ScreenLayout>

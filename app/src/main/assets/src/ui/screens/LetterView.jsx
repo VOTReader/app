@@ -9,10 +9,21 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 
+/** Whitespace-squashed — the search index's text domain (index-builder letterText). */
+const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+/** A block's plain text, walked the way the search index flattens it: prose
+    segments or poetry lines. Headings carry no hl-key (nothing to land on). */
+function _blockText(b) {
+  if (!b) return '';
+  if (b.segments) return b.segments.map((s) => s.v || '').join(' ');
+  if (b.lines) return b.lines.map((ln) => Array.isArray(ln) ? ln.map((s) => s.v || '').join(' ') : '').join(' ');
+  return '';
+}
+
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
-  const [_surpriseBlockId, setSurpriseBlockId] = React.useState(null); // value unread; setter drives the highlight-pulse effect
+  const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);
@@ -125,7 +136,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   React.useEffect(() => {
     setSheetFn(null);
     setScripRef(null);
-    setSurpriseBlockId(null);
+    setSurpriseBlockKey(null);
     const pending = window.navHandoff.peek('pendingHighlight');
     if (pending && pending.letterId === letter.id && pending.excerpt) {
       setHighlightExcerpt(pending.excerpt);
@@ -147,24 +158,31 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== "excerpt") return;
-    const excerpt = surpriseAnchor.text;
+    // The excerpt comes from the search index's flattened text (a search hit's
+    // matched words, matchExcerpt). Its HEAD is what must sit inside one block:
+    // it starts at the matched word and may run past the block's end, so
+    // shorter heads are tried before giving up, in the index's whitespace
+    // domain. (Until 2026-09-20 this looked up `#letter-block-<i>`, an id
+    // nothing renders — the anchor never scrolled; blocks carry data-hl-key.)
+    const excerpt = _squash(surpriseAnchor.text);
     const blocks = letter.blocks || [];
-    let foundId = null;
-    for (let i = 0; i < blocks.length; i++) {
-      const segs = blocks[i].segments || [];
-      const blockText = segs.map((s) => s.v || "").join(" ");
-      if (blockText.includes(excerpt.slice(0, 40))) {
-        foundId = `letter-block-${i}`;
-        break;
+    let found = -1;
+    for (const len of [40, 24, 12]) {
+      const head = excerpt.slice(0, len);
+      if (!head) break;
+      for (let i = 0; i < blocks.length && found < 0; i++) {
+        if (_squash(_blockText(blocks[i])).includes(head)) found = i;
       }
+      if (found >= 0) break;
     }
-    if (!foundId) return;
-    setSurpriseBlockId(foundId);
+    if (found < 0) return;
+    const hlKey = letterHlKey(letter.id, found);
+    setSurpriseBlockKey(hlKey);
     const timer = setTimeout(() => {
-      const el = document.getElementById(foundId);
+      const el = mainRef.current && mainRef.current.querySelector(`[data-hl-key="${hlKey}"]`);
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
-    const fadeTimer = setTimeout(() => setSurpriseBlockId(null), 4000);
+    const fadeTimer = setTimeout(() => setSurpriseBlockKey(null), 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: letter.blocks is corpus data (read-only after boot); letter.id uniquely identifies the letter. Re-running when surpriseAnchor changes OR letter.id changes is the intent — letter.blocks changing without letter.id changing is impossible by design.
   }, [surpriseAnchor, letter.id]);
@@ -623,7 +641,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           ::highlight(vot-reading) registration, and must never write the
           live container's scrollTop. Both halves are separately gated in
           Settings → Reading. */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

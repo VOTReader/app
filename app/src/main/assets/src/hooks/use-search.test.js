@@ -651,3 +651,61 @@ describe('useSearch — handleSearchCommand', () => {
     expect(props.handleSurprise).not.toHaveBeenCalled();
   });
 });
+
+// ── handleSearchSelect — "find" lands on the passage (2026-09-20) ───────────
+// A letter/WTLB/study hit used to set nav state only: the letter opened at its
+// first line and the reader scrolled to find the words again. The matched
+// excerpt now rides the same anchor "Surprise me" uses; the reading screen
+// resolves it to a block, scrolls there and, when that unit is the loaded
+// recording, seeks the audio to it. Bible hits already carry a verse anchor.
+
+describe('useSearch — handleSearchSelect lands letter-shaped hits on the passage', () => {
+  const REAL_SM = window.VotSearchMini;
+  const calls = [];
+  beforeEach(() => {
+    calls.length = 0;
+    window.VotSearchMini = { matchExcerpt: (text, terms) => { calls.push([text, terms]); return terms.length ? 'still small voice spoke' : ''; } };
+  });
+  afterEach(() => { window.VotSearchMini = REAL_SM; });
+
+  it('a letter hit sets an excerpt anchor cut from the doc text by the query AND the engine terms', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'the still small voice spoke' }, terms: ['spoke'] },
+      ['still', 'voice'],
+    ); });
+    expect(calls).toEqual([['the still small voice spoke', ['still', 'voice', 'spoke']]]);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
+  });
+
+  it('a WTLB hit and a study hit take the same anchor', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'wtlb1', letterId: 'e1', text: 'body' } }, ['body']); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 'ch1', text: 'body' } }, ['body']); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke' });
+    expect(props.setScreen).toHaveBeenLastCalledWith('bible-study-chapter');
+  });
+
+  it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter-title', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+  });
+
+  it('a parsed letter reference ("Volume Two 3") clears the anchor too', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-letter', volumeId: 'vot-two', letterId: 'wide-path' } }); });
+    expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+  });
+
+  it('survives an engine that has not loaded (bundle-e lazy): opens the letter, anchor null', () => {
+    window.VotSearchMini = undefined;
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'x' } }, ['x']); });
+    expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+  });
+});

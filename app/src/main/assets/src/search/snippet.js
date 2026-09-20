@@ -9,18 +9,18 @@
 import { expandArchaicTerms } from './tokenize.js';
 
 /**
- * Extract a ~maxLen-char excerpt centered on the first matched term.
+ * The ~maxLen-wide window covering the MOST DISTINCT query terms — the passage
+ * where the query words actually cluster (the remembered phrase), not the
+ * first stray hit of one common word. Ties resolve to the earliest window.
+ * Archaic-aware (a "you" query finds "thee"/"thou"/"ye"). Null when no term
+ * occurs in the text.
  * @param {string} text
  * @param {string[]} terms
- * @param {number} [maxLen=180]
- * @returns {string}
+ * @param {number} maxLen
+ * @returns {{ start: number, span: number } | null}
  */
-export function snippet(text, terms, maxLen) {
-  maxLen = maxLen || 180;
-  if (!text) return '';
-  if (!terms || !terms.length) {
-    return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
-  }
+export function bestMatch(text, terms, maxLen) {
+  if (!text || !terms || !terms.length) return null;
   const expanded = expandArchaicTerms(terms);
   const lower = text.toLowerCase();
   // Collect EVERY occurrence of every matchable term (capped for long bodies).
@@ -34,11 +34,8 @@ export function snippet(text, terms, maxLen) {
       idx = lower.indexOf(t, idx + t.length);
     }
   }
-  if (!occ.length) return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+  if (!occ.length) return null;
   occ.sort((a, b) => a.idx - b.idx);
-  // Pick the maxLen-wide window covering the MOST DISTINCT query terms — the
-  // passage where the query words actually cluster (the remembered phrase), not
-  // the first stray hit of one common word. Ties resolve to the earliest window.
   let bestStart = occ[0].idx;
   let bestCount = 0;
   let bestSpan = occ[0].len;
@@ -53,15 +50,47 @@ export function snippet(text, terms, maxLen) {
     }
     if (count > bestCount) { bestCount = count; bestStart = winStart; bestSpan = spanEnd - winStart; }
   }
+  return { start: bestStart, span: bestSpan };
+}
+
+/**
+ * Extract a ~maxLen-char excerpt centered on the best-matching passage.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {number} [maxLen=180]
+ * @returns {string}
+ */
+export function snippet(text, terms, maxLen) {
+  maxLen = maxLen || 180;
+  if (!text) return '';
+  const m = bestMatch(text, terms, maxLen);
+  if (!m) return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
   // Center the matched span within maxLen.
-  const pad = Math.max(0, Math.floor((maxLen - bestSpan) / 2));
-  let start = Math.max(0, bestStart - pad);
+  const pad = Math.max(0, Math.floor((maxLen - m.span) / 2));
+  let start = Math.max(0, m.start - pad);
   const end = Math.min(text.length, start + maxLen);
   if (end - start < maxLen) start = Math.max(0, end - maxLen);
   let clip = text.slice(start, end);
   if (start > 0) clip = '…' + clip;
   if (end < text.length) clip = clip + '…';
   return clip;
+}
+
+/**
+ * Where a hit LANDS: the text starting AT the first matched term of the best
+ * window, `len` chars long, uncentred and unadorned. The reading screens match
+ * its head against each block's text (LetterView / WtlbEntryView excerpt
+ * anchor), so the block that holds the matched word holds this string's head.
+ * '' when no term occurs — the letter then opens at the top, as before.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {number} [len=48]
+ * @returns {string}
+ */
+export function matchExcerpt(text, terms, len) {
+  len = len || 48;
+  const m = bestMatch(text, terms, len);
+  return m ? text.slice(m.start, m.start + len) : '';
 }
 
 /**

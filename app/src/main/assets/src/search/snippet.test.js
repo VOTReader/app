@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snippet, highlightSpans } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt } from './snippet.js';
 
 describe('snippet', () => {
   it('returns short text unchanged when no terms', () => {
@@ -73,5 +73,21 @@ describe('highlightSpans', () => {
 
   it('handles empty text', () => {
     expect(highlightSpans('', ['x'])).toEqual([{ text: '', hit: false }]);
+  });
+});
+
+describe('matchExcerpt — where a search hit LANDS in its letter', () => {
+  const text = 'In the beginning was the Word. And the still small voice spoke to him in the cave. He listened.';
+  it('starts AT the first matched term of the best window, not centred on it', () => {
+    const ex = matchExcerpt(text, ['still', 'voice']);
+    expect(ex.startsWith('still small voice')).toBe(true);
+  });
+  it('runs the asked length and no further', () => {
+    expect(matchExcerpt(text, ['cave'], 12)).toBe('cave. He lis');
+  });
+  it('is empty when no term occurs (the letter opens at the top, as before)', () => {
+    expect(matchExcerpt(text, ['zebra'])).toBe('');
+    expect(matchExcerpt('', ['still'])).toBe('');
+    expect(matchExcerpt(text, [])).toBe('');
   });
 });

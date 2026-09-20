@@ -29,7 +29,7 @@ import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { kjvEncode } from './tokenize.js';
-import { snippet, highlightSpans } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 
@@ -423,6 +423,7 @@ export const VotSearchMini = {
   search,
   suggest,
   snippet,
+  matchExcerpt,
   highlightSpans,
   levenshtein,
   fuzzyBookSuggest,

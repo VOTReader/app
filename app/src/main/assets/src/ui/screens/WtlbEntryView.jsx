@@ -9,6 +9,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -18,7 +19,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
@@ -31,6 +32,37 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   } : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const wtlbMainRef = React.useRef(null);
+  // A LANDING (a search hit's matched words — use-search.js excerptAnchor):
+  // find the paragraph whose text holds the excerpt's head in the search
+  // index's own domain ({{refs}} removed, whitespace squashed — index-builder
+  // pushEntryCollection), scroll it, pulse it, and hand its hl-key to
+  // ReadAlongHighlight as `seekTo` so a playing recording of THIS entry goes
+  // there too. Shorter heads are tried: the excerpt may run past the paragraph.
+  const [landedPara, setLandedPara] = React.useState(/** @type {number} */ (-1));
+  React.useEffect(() => {
+    if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
+    const squash = (s) => String(s || '').replace(/\{\{[^}]+\}\}/g, ' ').replace(/\s+/g, ' ').trim();
+    const excerpt = squash(surpriseAnchor.text);
+    const paras = entry.paragraphs || [];
+    let found = -1;
+    for (const len of [40, 24, 12]) {
+      const head = excerpt.slice(0, len);
+      if (!head) break;
+      for (let i = 0; i < paras.length && found < 0; i++) {
+        if (squash(paras[i] && paras[i].text).includes(head)) found = i;
+      }
+      if (found >= 0) break;
+    }
+    if (found < 0) return;
+    setLandedPara(found);
+    const timer = setTimeout(() => {
+      const el = wtlbMainRef.current && wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, found)}"]`);
+      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    }, 150);
+    const fadeTimer = setTimeout(() => setLandedPara(-1), 4000);
+    return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the refAnalysis memo above)
+  }, [surpriseAnchor, entry.id]);
   React.useEffect(() => {
     const pending = window.navHandoff.peek('pendingHighlight');
     if (!pending || pending.letterId !== entry.id || !pending.excerpt) return;
@@ -425,7 +457,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                 <p
                   key={entry.id + ":" + pi}
                   style={{ textAlign: p.align }}
-                  className={p.align === 'center' ? 'letter-poetry' : 'letter-para'}
+                  className={(p.align === 'center' ? 'letter-poetry' : 'letter-para') + (landedPara === pi ? ' pulse' : '')}
                   data-hl-key={wtlbHlKey(entry.id, pi)}
                   data-hl-dom={true}
                 >
@@ -510,7 +542,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           offsetMapFn projects onto whatever is on screen right now, which is
           what lets these entries paint a line at a time instead of washing a
           whole paragraph. Both halves are separately gated in Settings.  */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

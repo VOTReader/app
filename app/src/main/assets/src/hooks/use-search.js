@@ -208,7 +208,7 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   searchContext: any,
  *   goSearch: () => void,
  *   goSearchOrigin: () => void,
- *   handleSearchSelect: (entry: any) => void,
+ *   handleSearchSelect: (entry: any, terms?: string[]) => void,
  *   handleSearchCommand: (action: string) => void
  * }}
  */
@@ -331,7 +331,29 @@ export function useSearch({
   //
   // Each branch sets the appropriate nav state + setSurpriseAnchor (for
   // verse-anchor scroll) and routes to the destination screen.
-  const handleSearchSelect = (entry) => {
+  // "FIND" LANDS ON THE PASSAGE (2026-09-20). A letter / WTLB / study hit used
+  // to set nav state only, so the letter opened at its first line and the
+  // reader scrolled to find the words again. The matched excerpt now rides the
+  // same `{type:'excerpt'}` anchor "Surprise me" was designed to use:
+  // LetterView / WtlbEntryView resolve it to a block, scroll and flash it, and
+  // — when that unit is the LOADED recording — hand the block to
+  // ReadAlongHighlight as `seekTo`, so the voice goes where the eye went. Bible
+  // hits already carry a verse anchor and take the same seek. `terms` are the
+  // query's (SearchScreen); `entry.terms` the engine's per-hit matched words
+  // (a typo-corrected match), merged the way SrchCard merges them for <mark>.
+  // The engine is bundle-e (lazy): without it, no excerpt — the letter opens
+  // at the top exactly as before, never a thrown dispatch.
+  const excerptAnchor = (doc, terms, entry) => {
+    const sm = /** @type {any} */ (window).VotSearchMini;
+    if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
+    const own = Array.isArray(terms) ? terms : [];
+    const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
+    const text = sm.matchExcerpt(doc.text, own.concat(hit));
+    return text ? { type: 'excerpt', text } : null;
+  };
+
+  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) */
+  const handleSearchSelect = (entry, terms) => {
     setFromSearch(true);
     // Wave 0 (sticky genreId): genreId is set ONLY by goScriptureGenre and
     // consulted by the bible-idx / matthew-idx / single-chapter back
@@ -369,6 +391,7 @@ export function useSearch({
         const lid = srchResolveLetterId(r.volumeId, r.letterNum, r.letterId);
         if (!lid) return;
         setLetterId(lid);
+        setSurpriseAnchor(null);   // a reference names the letter, not a place in it
         if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
         else vm.lastReadFn(lid);
         setScreen(vm.screen);
@@ -407,6 +430,7 @@ export function useSearch({
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry));
       if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
       else vm.lastReadFn(doc.letterId);
       setScreen(vm.screen);
@@ -416,6 +440,7 @@ export function useSearch({
       // Open the study at the given chapter
       setStudyId(doc.letterId || null);
       setStudyChapterId(doc.chapterNum || null);
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry));
       setScreen('bible-study-chapter');
       return;
     }
