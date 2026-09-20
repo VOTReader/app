@@ -95,6 +95,10 @@ const BUDGETS = [
   // ~630 KB raw, +15%. Served RAW on purpose: 156 KB vs 150 KB gzipped, and a
   // minify step would put a second copy of the bytes on disk.
   { file: 'src/data/audio-sync.js', measured: 497951, max: 730000 },
+  // The WTLB compilation timelines (AUDIO_SYNC_SECTIONS, tools/batch-align-sections.py):
+  // 352 letters x ~15 rows x ~28 B ≈ 150 KB projected, lazy like audio-sync.js and
+  // loaded only while a Part/Section compilation plays. Optional until it lands.
+  { file: 'src/data/audio-sync-sections.js', measured: 150000, max: 260000, optional: true },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';

@@ -333,6 +333,41 @@ for (const [assetId, rows] of Object.entries(AUDIO_SYNC_ALT)) {
   checkTimeline('alt:' + assetId, owner, rows);
 }
 
+// ------------------------------------------------- the WTLB compilations --
+/**
+ * AUDIO_SYNC_SECTIONS[sectionAssetId][letterKey] = rows in the AUDIO_SYNC shape
+ * on the SECTION file's clock (tools/batch-align-sections.py; one recording
+ * reads many letters). Every letter's rows take the checks above verbatim --
+ * same item, same text domain -- plus two facts only this shape has: the asset
+ * must be one AUDIO_SECTIONS can play (a shipped id that resolves to nothing
+ * is fifteen guaranteed nothings), and the letters must START in key order,
+ * because the page-follow reads the next key's first row as the boundary and
+ * a key out of order navigates backwards. The file is optional until it lands;
+ * AUDIO_SYNC_SECTIONS_FILE points the leg at a fixture (tests only).
+ */
+const SECTIONS_FILE = process.env.AUDIO_SYNC_SECTIONS_FILE || 'audio-sync-sections.js';
+const AUDIO_SYNC_SECTIONS = existsSync(resolve(DATA, SECTIONS_FILE))
+  ? (readGlobal(SECTIONS_FILE, 'AUDIO_SYNC_SECTIONS') || {}) : {};
+const SECTION_IDS = new Set(Object.values(manifestCtx.AUDIO_SECTIONS || {}).flat().map((r) => r[1]));
+let sectionLetters = 0;
+for (const [assetId, letters] of Object.entries(AUDIO_SYNC_SECTIONS)) {
+  const skey = 'section:' + assetId;
+  if (!SECTION_IDS.has(assetId)) note(failures, skey, 'NO-SECTION-ASSET', { detail: 'asset is not in AUDIO_SECTIONS; nothing can ever play this timeline' });
+  let prevStart = -1;
+  let prevKey = null;
+  for (const [key, rows] of Object.entries(letters || {})) {
+    const lkey = skey + '/' + key;
+    sectionLetters++;
+    if (!AUDIO_MANIFEST[key]) note(failures, lkey, 'NO-MANIFEST-ROW', { detail: 'letter has no manifest row; the resolver cannot place it in the volume' });
+    checkTimeline(lkey, key, rows);
+    const start = Array.isArray(rows) && rows.length && Array.isArray(rows[0]) ? rows[0][0] : null;
+    if (start == null) { note(failures, lkey, 'EMPTY-LETTER', { detail: 'a letter with no rows has no start; drop the key instead' }); continue; }
+    if (start < prevStart) note(failures, lkey, 'SECTION-ORDER', { start, prevStart, prevKey });
+    prevStart = start;
+    prevKey = key;
+  }
+}
+
 // ------------------------------------------------------- provenance --
 /**
  * A primary timeline is keyed by LETTER, but it was aligned against one
@@ -408,6 +443,25 @@ function lostTimings() {
   for (const a of Object.keys(ctx.AUDIO_SYNC_ALT || {})) {
     if (!(a in AUDIO_SYNC_ALT) && ALT_OWNER.has(a)) lost.push('alt:' + a);
   }
+  // The compilations ride the same floor: a letter timed at HEAD under an asset
+  // AUDIO_SECTIONS still plays must still be timed (its own file, own HEAD read).
+  let headSections;
+  try {
+    headSections = execFileSync('git', ['show', 'HEAD:app/src/main/assets/src/data/audio-sync-sections.js'],
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    headSections = null;    // new in this commit, or never shipped
+  }
+  if (headSections && !process.env.AUDIO_SYNC_SECTIONS_FILE) {
+    const sctx = {};
+    runInNewContext(headSections, sctx, { filename: 'audio-sync-sections.js@HEAD' });
+    for (const [a, letters] of Object.entries(sctx.AUDIO_SYNC_SECTIONS || {})) {
+      if (!SECTION_IDS.has(a)) continue;
+      for (const k of Object.keys(letters || {})) {
+        if (!(AUDIO_SYNC_SECTIONS[a] && k in AUDIO_SYNC_SECTIONS[a])) lost.push('section:' + a + '/' + k);
+      }
+    }
+  }
   return lost.sort();
 }
 const lost = lostTimings();
@@ -447,7 +501,8 @@ if (asJson) {
 }
 
 const nTimelines = Object.keys(AUDIO_SYNC).length + Object.keys(AUDIO_SYNC_ALT).length;
-console.log(`[audio-sync] ${rowsChecked} rows across ${nTimelines} timelines; ` +
+console.log(`[audio-sync] ${rowsChecked} rows across ${nTimelines} timelines` +
+  (sectionLetters ? ` + ${sectionLetters} letters in ${Object.keys(AUDIO_SYNC_SECTIONS).length} compilations` : '') + '; ' +
   `${touchedChars ? Math.round((timedChars / touchedChars) * 1000) / 10 : 0}% of touched characters timed`);
 
 if (lost === null) {
