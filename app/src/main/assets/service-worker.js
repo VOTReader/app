@@ -40,7 +40,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-132dae3ea9';
+const CACHE_VERSION = 'v1.0.2-db7cdf7e65';
 const CORPUS_VERSION = 'c56'; // c55->c56 (2026-09-20): Volume Seven gains the letter "My Anger Runs Deep" (4/3/10, spoken to Timothy, regarding abortion), which had a Timothy recording on Drive but no corpus text, so the app could not show it and the recording could not be aligned. The page is an orphan on thevolumesoftruth.com - real, canonical, but absent from the Volume Seven index, which is how the corpus builder missed it. It lands in date order between "I Alone Sit as Judge, Says The Lord" (4/2/10) and "Lost Sheep" (4/8/10); Volume Seven is now 67 letters and every num from 44 on shifts by one so num keeps meaning ordinal position.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -287,7 +287,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-c.js': 'bff22d74a82a8fddf2da2c7a89dd47df02292646634d184870ba6486fca1547f',
   './dist/bundle-d.js': '44c6ca2ec4764a5c4fb00693dc159dd9d4697753ac49d17bb3d040f1aa338191',
   './dist/bundle-e.js': '8a3c4388de4eae03584c1c348d7c15c4f4cbf7f86205578b437b6bc720e1269e',
-  './dist/bundle-f.js': '95f724a874650874ea9b3acb5ed68349dec502e4fa75d3a1c0da7d2ed9990a44',
+  './dist/bundle-f.js': '7e0f0b43cab7c1783affb8e37e7fd615cf0a85019f187ed771cb90eb2f35bc59',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'd19be6f51585ea59ac09dbeda64c7df7672bd844bb7b86a85acd828c5202edb2',
   './manifest.json': '5483690fc42f1d3738c0fbc96cd41b04eb3ce26ad15d9e5684a71c9e75745052',
