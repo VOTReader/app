@@ -1259,7 +1259,9 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
       const hh = (Math.abs(Math.sin(rot)) * w + Math.abs(Math.cos(rot)) * fs) / 2;
       const box = { x0: cx - hw, x1: cx + hw, y0: cy - hh, y1: cy + hh };
       if (box.y0 < skyTop - fs || box.y1 > view.base + fs) continue;
-      if (!chosen && placed.some((q) => box.x0 < q.x1 + 2 && box.x1 > q.x0 - 2 && box.y0 < q.y1 + 2 && box.y1 > q.y0 - 2)) continue;
+      // a gap between neighbours, or two labels on one line read as one
+      const m = 6 * DPR;
+      if (!chosen && placed.some((q) => box.x0 < q.x1 + m && box.x1 > q.x0 - m && box.y0 < q.y1 + m && box.y1 > q.y0 - m)) continue;
       placed.push(box);
       ctx.save();
       ctx.translate(cx, cy);
