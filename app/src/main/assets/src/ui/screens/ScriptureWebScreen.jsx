@@ -466,14 +466,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     /* The zoom's own input, published for the browser walks (the same line the
        scripture-web walk branch carries, so the two merge as one): a walk that
        reads pixels after "three zoom steps" must first know the steps took. */
+    // My Web's world is exactly the frame: its camera has no y frame, so a
+    // height carried over from the canon web is dropped here, not drawn —
+    // before the attribute below, so the published height is the drawn one.
+    if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
     if (wrapRef.current) {
       wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
       // the camera's height, device px, for the walks (0 at the baseline)
       wrapRef.current.setAttribute('data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
     }
-    // My Web's world is exactly the frame: its camera has no y frame, so a
-    // height carried over from the canon web is dropped here, not drawn.
-    if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
     if (wrapRef.current && camV) wrapRef.current.setAttribute('data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));

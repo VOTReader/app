@@ -227,13 +227,25 @@ export const SEGMENT_TARGET_CSS = 16;
  * @param {number} ceil - usable height above the baseline, device px
  * @param {number} width - viewport width, device px
  * @param {number} dpr - device pixel ratio, so the target is in CSS px
+ * @param {number} [spanLog] - spanLogOf() of the range's widest span; 1 when
+ *   omitted, which reads the widest quarter (the least conservative run)
  * @returns {number}
  */
-export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr) {
+export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr, spanLog = 1) {
   const base = bucketSegments > 0 ? bucketSegments : 8;
   if (!(localize > 0)) return base;
   const d = dpr > 0 ? dpr : 1;
-  const shape = arcShape(maxRx, ceil, 1, 1, 1);
+  // Two shapes bound the range. The WIDEST quarter any foot can draw (the
+  // fan's top rank widens a quarter by a quarter, and a wider ellipse bends
+  // more per parameter step) bounds the curvature; the NARROWEST (the fan's
+  // bottom rank) leaves the longest run, and the run is where the parameter
+  // is spent. A is the same at every fan. The range's own spanLog, not 1:
+  // with 1 a span-7 bucket's quarter reads 512 px where the arc draws 150,
+  // its 316 px run vanishes from the estimate, and the dome on it draws
+  // 0.55 CSS px of chord against the 0.5 promise (the Architect's refutation
+  // pin, 2026-09-20).
+  const shape = arcShape(maxRx, ceil, 1, 1, spanLog, 0.5);
+  const narrow = arcShape(maxRx, ceil, 1, 1, spanLog, -0.5);
   // (1) LENGTH: no on-screen segment longer than the target. The tallest this
   // range can reach on screen comes from the same apex law the shader draws
   // with, not from a second estimate of it.
@@ -243,12 +255,20 @@ export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr) {
   // (2) CURVATURE: a short arc is a whole semi-ellipse in half a screen, so it
   // needs segments the length rule does not ask for. Sampling uniformly in the
   // parameter, a step of dTau strays at most |p''| dTau^2 / 8 from its chord,
-  // and |p''| <= max(R, A). Measured, not assumed: without this a 2-verse arc
-  // at the ceiling reads 0.835 CSS px of chord error on the 8-segment floor.
+  // and |p''| <= max(R, A) on a quarter. Measured, not assumed: without this a
+  // 2-verse arc at the ceiling reads 0.835 CSS px of chord error on the
+  // 8-segment floor. On the RUN the dome bends A * DOME * pi^2 / 2 per
+  // parameter step at its fullest, which is the arc whose run is exactly its
+  // two quarters (rx = 2R: the taper holds the figure there for every
+  // shorter run, the cos^2 falls off as 1/run^2 past it), so the run's bound
+  // is that figure at the A of THAT arc, not of the range's widest — the
+  // widest arc's dome is spread over a run hundreds of quarters long.
   const tol = CHORD_TOL_CSS * d;
-  const maxRA = Math.max(shape.R, shape.A);
-  const flatTau = shape.R > 0
-    ? Math.min(Math.max(0, (2 * maxRx - 2 * shape.R) / shape.R), (width + 2 * CLIP_MARGIN) / shape.R)
+  const domeA = arcShape(Math.min(maxRx, 2 * narrow.R), ceil, 1, 1, spanLog).A;
+  const domeCurv = domeA * DOME * (Math.PI * Math.PI) / 2;
+  const maxRA = Math.max(shape.R, shape.A, domeCurv);
+  const flatTau = narrow.R > 0
+    ? Math.min(Math.max(0, (2 * maxRx - 2 * narrow.R) / narrow.R), (width + 2 * CLIP_MARGIN) / narrow.R)
     : 0;
   const byCurve = Math.ceil((Math.PI + flatTau) * Math.sqrt(maxRA / (8 * tol)));
   const want = byLength > byCurve ? byLength : byCurve;

@@ -155,6 +155,27 @@ describe('(b) the departure rank sets the quarter: a verse\'s n threads leave in
     expect(Array.from(slotA)).toEqual([0.75, 0.25, 0.5]);
   });
 
+  it('ranks correctly past 32,768 verses and past 65,536 threads (a Uint32 key would wrap silently)', () => {
+    expect(dec.assignSlots, 'decode.assignSlots is not exported on this tree').toBeTypeOf('function');
+    // 70,000 threads from verse 39,990 (past 2^15) to 39,991..39,999 in rotation: at verse 39,990 they rank
+    // by their other end, so the first thread (to 39,991) is first of 70,000 and the last (to 39,999) is last
+    const n = 70000, total = 40000;
+    const from = new Uint16Array(n).fill(39990), to = new Uint16Array(n);
+    for (let i = 0; i < n; i++) to[i] = 39991 + (i % 9);
+    const { slotA, slotB } = dec.assignSlots(from, to, n, total);
+    // the reference order, by (other end, position), from a plain sort
+    const order = Array.from({ length: n }, (_, i) => i).sort((p, q) => (to[p] - to[q]) || (p - q));
+    expect(slotA[order[0]]).toBeCloseTo(1 / (n + 1), 6);   // Float32 slots: 1e-7 is the store, not the law
+    expect(slotA[order[n - 1]]).toBeCloseTo(n / (n + 1), 6);
+    expect(order[n - 1], 'the last is the last thread to the farthest verse').toBe(69992);
+    for (const k of [1, 777, 35000, 69998]) expect(slotA[order[k]]).toBeCloseTo((k + 1) / (n + 1), 6);
+    // at verse 39,991 the 7,778 arrivals all come from 39,990: ranked by position, the first is first
+    const arrivals = [];
+    for (let i = 0; i < n; i++) if (to[i] === 39991) arrivals.push(i);
+    expect(slotB[arrivals[0]]).toBeCloseTo(1 / (arrivals.length + 1), 6);
+    expect(slotB[arrivals[arrivals.length - 1]]).toBeCloseTo(arrivals.length / (arrivals.length + 1), 6);
+  });
+
   it('the fan of a foot is its slot centred: (k+1)/(n+1) - 1/2, so the middle thread of three is today\'s', () => {
     expect(dec.fansOf, 'decode.fansOf is not exported on this tree').toBeTypeOf('function');
     const g = { from: Uint16Array.from([5, 5, 5]), to: Uint16Array.from([900, 12, 40]), count: 3, total: 1000 };
@@ -332,6 +353,28 @@ describe('gestures: a drag moves y when the surface has a y frame', () => {
     root.dispatchEvent(pointerEvent('pointermove', { clientX: 400, clientY: 100 }));
     expect(cam.y).toBe(0);
     root.dispatchEvent(pointerEvent('pointerup', { clientX: 400, clientY: 100 }));
+  });
+
+  it('a wheel zoom keeps the camera\'s height (re-clamped), so a scroll-zoom does not drop the reader back to the baseline', () => {
+    const { root, cam } = attach(true);
+    cam.y = 100;
+    clampCamera(cam, W, 5000, { base: BASE, ceil: CEIL, squash: SQUASH, maxSpan: TOTAL - 1 });
+    expect(cam.y, 'precondition: the sky is open at the ceiling').toBe(100);
+    root.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 60, clientX: 400, clientY: 100 }));
+    // RED if the wheel forgets its y frame: a frameless clamp reads y back to 0
+    expect(cam.y).toBeGreaterThan(0);
+  });
+
+  it('a pinch keeps the camera\'s height too', () => {
+    const { root, cam } = attach(true);
+    cam.y = 100;
+    clampCamera(cam, W, 5000, { base: BASE, ceil: CEIL, squash: SQUASH, maxSpan: TOTAL - 1 });
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 300, clientY: 100 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 500, clientY: 100 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, clientX: 480, clientY: 100 }));
+    expect(cam.y).toBeGreaterThan(0);
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 480, clientY: 100 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 300, clientY: 100 }));
   });
 
   it('the same drag on a surface with no y frame leaves y at 0 (a My Web rail)', () => {

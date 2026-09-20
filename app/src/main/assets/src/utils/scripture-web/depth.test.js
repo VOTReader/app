@@ -280,12 +280,12 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
     const rx = rxOf(10000, 44);
     const [xa, xb] = visibleWindow(-rx, rx, W, 1);
     const windowRunCss = (xb - xa + CEIL) / DPR;
-    const n = segmentsFor(48, 1, rx, CEIL, W, DPR);
+    const n = segmentsFor(48, 1, rx, CEIL, W, DPR, spanLogOf(10000, TOTAL));
     expect(windowRunCss / n).toBeLessThanOrEqual(24);
   });
 
   it('does not spend the whole cap on an arc 24 px wide', () => {
-    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W, DPR)).toBeLessThan(24);
+    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W, DPR, spanLogOf(3, TOTAL))).toBeLessThan(24);
   });
 
   /* The sweep. The two rules above are bounds on ONE arc on ONE frame; this
@@ -295,7 +295,16 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
      misses were invisible to the bounds: the 8-segment floor left 0.835 CSS px
      of chord error on a 2-verse arc, and the old 96 cap left a 24.4 CSS px
      segment at the desktop ceiling. Neither showed up on phoneLand. */
-  it('walks the drawn curve: no segment over 24 CSS px, no chord over 0.5', () => {
+  it('walks the drawn curve, with the departure fans at both extremes: no segment over 24 CSS px, no chord over 0.5', () => {
+    /* Two chord measures. The eye's is the PERPENDICULAR distance from a curve
+       point to the chord line: that is what a polyline gets wrong. The
+       same-parameter gap (curve at u against chord at u) is stricter and was
+       the only one here until the fans: with RL != RR the parameter runs at a
+       different speed on each side of a join, so a straddling segment reads
+       0.85 CSS px of "chord" on a curve that is 1 px from straight. It stays,
+       for fan 0 only, as the pin on sampling uniformity where the speed is
+       continuous. */
+    const fans = [[0, 0], [-0.5, 0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, -0.5]];
     const frames = [
       { name: 'phoneLand', wCss: 800, dpr: 2, ceilCss: 256 },
       { name: 'phone375', wCss: 375, dpr: 3, ceilCss: 413 },
@@ -312,32 +321,38 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
       for (const zoom of [40, 400, maxZoomFor(TOTAL, f.wCss)]) {
         const localize = localizeFactor(zoom);
         const ppv = (wPx / TOTAL) * zoom;
-        for (const span of spans) {
+        for (const span of spans) for (const [fa, fb] of fans) {
           const rx = (span * ppv) / 2;
-          const { R, A } = arcShape(rx, ceilPx, squash, localize, spanLogOf(span, TOTAL));
-          if (!(R > 0) || !(A > 0)) continue;
+          const sl = spanLogOf(span, TOTAL);
+          const { R: RL, A } = arcShape(rx, ceilPx, squash, localize, sl, fa);
+          const { R: RR } = arcShape(rx, ceilPx, squash, localize, sl, fb);
+          if (!(RL > 0) || !(A > 0)) continue;
           const left = wPx / 2;             // a foot mid-screen: the reader's case
           const right = left + 2 * rx;
-          const P = arcParamLength(rx, R, R);
+          const P = arcParamLength(rx, RL, RR);
           const bow = DOME * localize;
           const [lo, hi] = visibleWindow(left, right, wPx, localize);
-          const tA = arcTauOf(lo, left, right, R, R, P);
-          const tB = arcTauOf(hi, left, right, R, R, P);
-          const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr);
-          const where = `${f.name} z${Math.round(zoom)} span${span} n${n}`;
+          const tA = arcTauOf(lo, left, right, RL, RR, P);
+          const tB = arcTauOf(hi, left, right, RL, RR, P);
+          const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr, sl);
+          const where = `${f.name} z${Math.round(zoom)} span${span} fans ${fa}/${fb} n${n}`;
           for (let i = 0; i < n; i++) {
-            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, R, R, A, P, bow);
-            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, R, R, A, P, bow);
+            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, RL, RR, A, P, bow);
+            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, RL, RR, A, P, bow);
             if ((p0.h > ceilPx && p1.h > ceilPx) || (p0.x > wPx && p1.x > wPx)) continue;
-            expect(Math.hypot(p1.x - p0.x, p1.h - p0.h) / f.dpr, where + ' segment')
-              .toBeLessThanOrEqual(24);
+            const dx = p1.x - p0.x, dh = p1.h - p0.h, len = Math.hypot(dx, dh);
+            expect(len / f.dpr, where + ' segment').toBeLessThanOrEqual(24);
             for (let k = 1; k < 16; k++) {
               const u = k / 16;
-              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, R, R, A, P, bow);
-              const cx = p0.x + (p1.x - p0.x) * u;
-              const ch = p0.h + (p1.h - p0.h) * u;
-              expect(Math.hypot(m.x - cx, m.h - ch) / f.dpr, where + ' chord')
-                .toBeLessThanOrEqual(0.5);
+              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, RL, RR, A, P, bow);
+              const perp = len > 0 ? Math.abs((m.x - p0.x) * dh - (m.h - p0.h) * dx) / len : Math.hypot(m.x - p0.x, m.h - p0.h);
+              expect(perp / f.dpr, where + ' chord (perpendicular)').toBeLessThanOrEqual(0.5);
+              if (fa === 0 && fb === 0) {
+                const cx = p0.x + dx * u;
+                const ch = p0.h + dh * u;
+                expect(Math.hypot(m.x - cx, m.h - ch) / f.dpr, where + ' chord (same parameter)')
+                  .toBeLessThanOrEqual(0.5);
+              }
             }
           }
         }

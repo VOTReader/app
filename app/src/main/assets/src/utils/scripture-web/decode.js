@@ -142,12 +142,18 @@ export function assignSlots(from, to, count, total) {
   const start = new Uint32Array(total + 1);
   for (let i = 0; i < count; i++) { start[from[i] + 1]++; start[to[i] + 1]++; }
   for (let v = 0; v < total; v++) start[v + 1] += start[v];
-  // one key per foot: (other end, position, side) packed so a numeric sort ranks them
+  // one key per foot: (other end, position, side) packed so a numeric sort
+  // ranks them. Float64 with a 2^24 stride, not Uint32 with 2^17: the old
+  // packing passed 2^32 at 32,768 verses and folded the position into the
+  // other end at 65,536 threads (the shipped asset is 31,102 / 63,418, a
+  // regen away from either) and would have mis-ranked SILENTLY; a double is
+  // exact to 2^53, so 65,535 x 2^24 + 2 x 8,388,607 + 1 is.
+  const STRIDE = 16777216;
   const fill = new Uint32Array(total);
-  const keys = new Uint32Array(2 * count);
+  const keys = new Float64Array(2 * count);
   for (let i = 0; i < count; i++) {
-    keys[start[from[i]] + fill[from[i]]++] = to[i] * 131072 + i * 2;
-    keys[start[to[i]] + fill[to[i]]++] = from[i] * 131072 + i * 2 + 1;
+    keys[start[from[i]] + fill[from[i]]++] = to[i] * STRIDE + i * 2;
+    keys[start[to[i]] + fill[to[i]]++] = from[i] * STRIDE + i * 2 + 1;
   }
   const slotA = new Float32Array(count), slotB = new Float32Array(count);
   for (let v = 0; v < total; v++) {
@@ -156,7 +162,7 @@ export function assignSlots(from, to, count, total) {
     if (n > 1) keys.subarray(s, s + n).sort();
     for (let k = 0; k < n; k++) {
       const key = keys[s + k];
-      const i = (key >>> 1) & 0xffff;
+      const i = Math.floor((key % STRIDE) / 2);
       const slot = (k + 1) / (n + 1);
       if (key & 1) slotB[i] = slot; else slotA[i] = slot;
     }

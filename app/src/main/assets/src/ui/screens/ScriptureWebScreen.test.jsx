@@ -55,7 +55,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
-        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density });
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -299,6 +299,57 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(updateSetting).toHaveBeenCalledWith('webDensity', 'essential');
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(lastDensity()).toBe('essential');
+    });
+  });
+
+  /* ── the camera gains y (w-sw-bent, 2026-09-20) ──
+     Corbin: "still cannot pan up". ArrowUp looks up (the picture moves down the frame, camY grows),
+     ArrowDown back; the sky is CLOSED at the overview (the dome fills the frame) and OPEN at the
+     ceiling once the graph has a thread whose crown rises past the frame. My Web's rails hold y at 0.
+     The renderer stub records the camY every draw was asked for. */
+  describe('the camera gains y: ArrowUp looks up at the ceiling, never at the overview, and My Web holds the baseline', () => {
+    const wide = () => Object.assign(graph(), {
+      count: 1,
+      from: new Uint16Array([100]), to: new Uint16Array([20100]), votes: new Int16Array([30]),
+      buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[100, 20100]] }],
+      chunkSize: 256,
+    });
+    const pressFrame = async (key) => {
+      fireEvent.keyDown(document.querySelector('.sw-root'), { key });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    };
+    const lastCamY = () => DRAWN[DRAWN.length - 1].camY;
+    const shownCamY = (container) => Number(container.querySelector('.sw-root').getAttribute('data-cam-y'));
+
+    it('CONTROL: at the overview the sky is closed — ten ArrowUps draw camY 0', async () => {
+      const { container } = await mount({}, wide);
+      expect(zoomText(container)).toBe('Overview');
+      for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
+      expect(lastCamY()).toBe(0);
+      expect(shownCamY(container)).toBe(0);
+    });
+
+    it('at the ceiling ArrowUp raises the camera (drawn AND published), ArrowDown brings it back to 0', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(zoomText(container)).toBe('1711x');
+      for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
+      // RED if the key handler drops its y frame, or the draw stops carrying camY
+      expect(lastCamY()).toBeGreaterThan(0);
+      expect(shownCamY(container)).toBeCloseTo(lastCamY(), 0);
+      for (let i = 0; i < 40; i++) await pressFrame('ArrowDown');
+      expect(lastCamY()).toBe(0);
+    });
+
+    it('switching to My Web with the camera raised draws it at the baseline: the rails have no sky', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
+      expect(lastCamY(), 'precondition: raised on the canon web').toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(lastCamY()).toBe(0);
+      expect(shownCamY(container)).toBe(0);
     });
   });
 });

@@ -25,7 +25,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat,
+  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat, spanLogOf,
   STROKE_MIN_CSS, STROKE_DEEP_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
@@ -402,7 +402,7 @@ export function createRenderer(canvas, graph, opts = {}) {
         if (count <= 0) continue;
         // Segments from what this bucket can put ON SCREEN, not from its span.
         const segments = segmentsFor(bucket.segments, v.localize,
-          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1);
+          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, spanLogOf(bucketMaxSpan[bi], graph.total));
         gl.uniform1f(U.uSegments, segments);
         const verts = 2 * (segments + 1);
         // Walk chunks, coalescing adjacent visible ones into single draws.
