@@ -815,8 +815,11 @@ function _start() {
   _lastTick = -1;
   _errorTime = 0;
   // A prewarm(…) already pointed the element at THIS url and buffered its
-  // head — reassigning src would throw that away and restart the fetch.
-  if (el.src !== track.url) el.src = track.url;
+  // head — reassigning src would throw that away and restart the fetch. A warm
+  // whose load FAILED (el.error set, NO_SOURCE) is re-pointed instead: nothing
+  // is buffered to lose, and the fresh load's error fires at status 'loading'
+  // where _onError can say so, not 20 s later from the stall watchdog (row 5).
+  if (el.src !== track.url || el.error) el.src = track.url;
   // AFTER src: the media load algorithm resets playbackRate to
   // defaultPlaybackRate, so a rate applied pre-assignment is silently lost.
   // Setting default too keeps any internal reload at the chosen speed.

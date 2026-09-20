@@ -2545,6 +2545,23 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
     expect(el().played).toBe(true);
   });
 
+  /* Row 5 (2026-09-13 measurement, row5-measurement.md): a prewarm whose load
+     FAILED (captive portal, DNS miss) left the element at NO_SOURCE with
+     `error` set; `_onError` said nothing because the status was still idle,
+     and the press then trusted the warmed src, so play() rejected in silence
+     and only the 20 s cold-start watchdog surfaced "Couldn't load this track."
+     — where an unwarmed Bible chapter said it at 0.3 s. A failed warm must be
+     re-pointed so the FIRST failure fires at status 'loading' and toasts. */
+  it('playLetter after a FAILED prewarm re-points src so the load (and its error) restart', () => {
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    el().error = { code: 4 };                              // MEDIA_ERR_SRC_NOT_SUPPORTED, as measured
+    el().dispatchEvent(new Event('error'));                // fired while idle: nothing to show, nothing recorded
+    const assignsBefore = el().srcHistory.length;
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    expect(el().srcHistory.length).toBe(assignsBefore + 1); // re-pointed: the failed warm is not trusted
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
   it('never disturbs active playback, offline, or a restored bar; repeats are no-ops', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     const src = el().src;
