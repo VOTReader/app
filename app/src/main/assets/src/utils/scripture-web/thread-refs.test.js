@@ -124,6 +124,15 @@ describe('threadEnds: where a thread\'s references are written', () => {
     expect(ends.to.at.angle).toBeLessThan(0);
   });
 
+  it('the chrome across the top is not sky: with view.inset the crossing is found at the inset line, not at the frame top (RED if the labels ignore it)', () => {
+    const g = makeGraph([[5, 35]]);
+    const view = Object.assign(viewOf(100), { inset: 40 });
+    const cam = camAt(g, 12);
+    const ends = pick.threadEnds(g, cam, view, 0);
+    expect(ends.to.at.y).toBeCloseTo(40, 0);
+    expect(heightAt(g, cam, view, 0, ends.to.at.x)).toBeCloseTo(view.base - 40, 0);
+  });
+
   it('a foot within the fly-over margin but off the frame is off-screen: its reference goes on the body, not on a ruler tick nobody sees', () => {
     const g = makeGraph([[5, 35]]);
     const view = viewOf(520);

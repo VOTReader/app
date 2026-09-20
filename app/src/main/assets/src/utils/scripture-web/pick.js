@@ -170,17 +170,20 @@ export function visibleArcs(g, cam, view, limit) {
  * the label sits on the ribbon and not beside where a flat arc would be.
  *
  * The frame a body point must fall in is the sky: x in [0, width], y in
- * [0, view.base] (the ruler below the baseline is not the web). A body that
- * climbs past the frame top is labelled where it crosses the top.
+ * [view.inset, view.base] — the ruler below the baseline is not the web, and
+ * the chrome across the top (view.inset, device px, 0 when hidden) covers
+ * whatever is written under it. A body that climbs past that line is
+ * labelled where it crosses it.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
- * @param {{width:number, base:number, ceil:number, squash:number, localize:number}} view
+ * @param {{width:number, base:number, ceil:number, squash:number, localize:number, inset?:number}} view
  * @param {number} i — instance index
  * @returns {{ from: ThreadEnd, to: ThreadEnd }}
  */
 export function threadEnds(g, cam, view, i) {
   const { width, ceil, squash, localize } = view;
+  const inset = view.inset > 0 ? view.inset : 0;
   const camY = cam.y > 0 ? cam.y : 0;
   const base = view.base + camY;
   const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
@@ -192,7 +195,7 @@ export function threadEnds(g, cam, view, i) {
   const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
   const bow = DOME * localize;
   const yAt = (x) => base - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
-  const inSky = (x) => { const y = yAt(x); return y >= 0 && y <= view.base; };
+  const inSky = (x) => { const y = yAt(x); return y >= inset && y <= view.base; };
   // the body's x range the frame holds; empty when the thread is wholly off it
   const xa = Math.max(0, x0), xb = Math.min(width, x1);
   const STEPS = 32;

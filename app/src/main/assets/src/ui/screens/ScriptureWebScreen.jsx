@@ -537,7 +537,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
-    const labels = drawThreadRefs(uiRef.current, g, cam, base, v, chrome, density, focusRef.current.arc);
+    // the sky the labels may use starts under the top chrome (layout metrics,
+    // so the rotated portrait root measures the same; 0 when the chrome is hidden)
+    const tb = topbarRef.current;
+    const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * v.DPR : 0;
+    const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
   }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow]);
 
@@ -1201,9 +1205,10 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
    foot. Zoomed close means the ruler's verse-numeral band (VERSE_LABELS_PPV);
    the chosen line is labelled at every zoom, its feet marked on the baseline,
    so a tapped line is followable from either end (item b).
-   Crowding: a label whose anchor sits within a line-height of one already
-   written is skipped, the chosen line's first — density handling only as far
-   as it is free. */
+   A label runs along the tangent while the line is shallower than 45 deg and
+   stands level beside a steep one (a near-vertical label is not readable).
+   Crowding: a label whose box meets one already written is skipped, the
+   chosen line's first — density handling only as far as it is free. */
 const VERSE_LABELS_PPV = 30;   // CSS px per verse: where the ruler numbers verses
 const LABEL_PASS_LIMIT = 400;  // drawn threads walked per frame at most
 
@@ -1217,10 +1222,10 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
   const gold = chrome.isLight ? '122,92,16' : '232,192,80';
   const fs = chrome.fsRuler * DPR;
-  const gap = fs * 1.3;
   const placed = [];
   let drawn = 0;
   const camY = cam.y > 0 ? cam.y : 0;
+  const skyTop = view.inset > 0 ? view.inset : 0;
   ctx.font = fs + 'px Georgia,serif';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
@@ -1236,25 +1241,35 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
       }
       if (!e.at) continue;
       const { x, y, angle } = e.at;
-      if (!chosen && placed.some((q) => Math.hypot(q.x - x, q.y - y) < gap)) continue;
-      placed.push({ x, y });
       const ref = refOfVerse(g, e.verse);
       const text = side === 'from'
         ? '\u2190 ' + ref.abbr + ' ' + ref.chapter + ':' + ref.verse
         : ref.abbr + ' ' + ref.chapter + ':' + ref.verse + ' \u2192';
+      const w = ctx.measureText(text).width;
+      const dir = side === 'from' ? 1 : -1;      // the text runs away from the foot
+      const steep = Math.abs(angle) > Math.PI / 4;
+      const rot = steep ? 0 : angle;
+      // the text's centre: along the (level or tangent) line from the anchor,
+      // and off it — above a shallow line, just under a steep one's crossing
+      const along = 4 * DPR + w / 2;
+      const off = steep ? fs * 0.9 : -fs * 0.7;
+      const cx = x + Math.cos(rot) * along * dir - Math.sin(rot) * off;
+      const cy = y + Math.sin(rot) * along * dir + Math.cos(rot) * off;
+      const hw = (Math.abs(Math.cos(rot)) * w + Math.abs(Math.sin(rot)) * fs) / 2;
+      const hh = (Math.abs(Math.sin(rot)) * w + Math.abs(Math.cos(rot)) * fs) / 2;
+      const box = { x0: cx - hw, x1: cx + hw, y0: cy - hh, y1: cy + hh };
+      if (box.y0 < skyTop - fs || box.y1 > view.base + fs) continue;
+      if (!chosen && placed.some((q) => box.x0 < q.x1 + 2 && box.x1 > q.x0 - 2 && box.y0 < q.y1 + 2 && box.y1 > q.y0 - 2)) continue;
+      placed.push(box);
       ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      // beside the line, not on it: above by default, below where the line
-      // leaves through the top and above would be clipped
-      ctx.translate(0, y < fs ? fs * 0.9 : -fs * 0.7);
-      ctx.textAlign = side === 'from' ? 'left' : 'right';
-      const inset = 4 * DPR * (side === 'from' ? 1 : -1);
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+      ctx.textAlign = 'center';
       ctx.lineWidth = 3 * DPR;
       ctx.strokeStyle = chrome.bg;
-      ctx.strokeText(text, inset, 0);
+      ctx.strokeText(text, 0, 0);
       ctx.fillStyle = 'rgba(' + (chosen ? gold : ink) + ',' + (chosen ? 1 : 0.8) + ')';
-      ctx.fillText(text, inset, 0);
+      ctx.fillText(text, 0, 0);
       ctx.restore();
       drawn++;
     }
