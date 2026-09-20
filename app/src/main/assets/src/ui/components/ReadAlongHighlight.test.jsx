@@ -110,7 +110,7 @@ const REAL_RANGE_RECT_FN = Range.prototype.getBoundingClientRect;
 
 let scroller;
 
-function Host({ readAlongOn = true, readAlongFollow = true }) {
+function Host({ readAlongOn = true, readAlongFollow = true, seekTo = null, seekOffset = null }) {
   const mainRef = React.useRef(null);
   return (
     <div className="screen-scroll">
@@ -125,6 +125,8 @@ function Host({ readAlongOn = true, readAlongFollow = true }) {
         hlKeyFn={letterHlKey}
         readAlongOn={readAlongOn}
         readAlongFollow={readAlongFollow}
+        seekTo={seekTo}
+        seekOffset={seekOffset}
       />
     </div>
   );
@@ -1229,5 +1231,32 @@ describe('ReadAlongHighlight — the lazy timings', () => {
       l.corpus.notify();                                      // …and the loader said so
     });
     expect(painted()).toBe('Sentence one. ');
+  });
+});
+
+/* A LANDING SEEKS TO THE CLAUSE, NOT JUST THE BLOCK (2026-09-20, after the live look on
+   "Chosen by God": a one-paragraph letter landed the voice on the paragraph's first
+   clause while the eye was on the searched words at its foot). `seekOffset` is where
+   in the block the landing text starts, in the rows' own domain; the fragment whose
+   span holds it (or the last one before it) is the seek target. Without an offset,
+   the block's first fragment — the verse case. */
+describe('seekTo + seekOffset — the landing seeks to the clause that holds the words', () => {
+  it('an offset inside the second clause of block 0 seeks to that clause, not the block start', () => {
+    const out = mount({ seekTo: null });
+    play(); clockTo(0.5);
+    act(() => { out.rerender(<Host seekTo={letterHlKey('letter-a', 0)} seekOffset={20} />); });
+    expect(AudioPlayer.getState().time).toBe(5);
+  });
+  it('no offset (a verse landing, or none known) seeks to the block\'s first fragment', () => {
+    const out = mount({ seekTo: null });
+    play(); clockTo(0.5);
+    act(() => { out.rerender(<Host seekTo={letterHlKey('letter-a', 0)} seekOffset={null} />); });
+    expect(AudioPlayer.getState().time).toBe(2);
+  });
+  it('an offset ahead of the block\'s first clause still lands on that first clause', () => {
+    const out = mount({ seekTo: null });
+    play(); clockTo(0.5);
+    act(() => { out.rerender(<Host seekTo={letterHlKey('letter-a', 1)} seekOffset={0} />); });
+    expect(AudioPlayer.getState().time).toBe(10);
   });
 });

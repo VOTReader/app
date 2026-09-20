@@ -24,6 +24,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
+  const [surpriseBlockOff, setSurpriseBlockOff] = React.useState(/** @type {number | null} */ (null)); // where in that block the landing text starts
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);
@@ -169,22 +170,25 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     const excerpt = _squash(surpriseAnchor.text);
     const blocks = letter.blocks || [];
     let found = -1;
+    let off = -1;
     for (const len of [40, 24, 12]) {
       const head = excerpt.slice(0, len);
       if (!head) break;
       for (let i = 0; i < blocks.length && found < 0; i++) {
-        if (_squash(_blockText(blocks[i])).includes(head)) found = i;
+        off = _squash(_blockText(blocks[i])).indexOf(head);
+        if (off >= 0) found = i;
       }
       if (found >= 0) break;
     }
     if (found < 0) return;
     const hlKey = letterHlKey(letter.id, found);
     setSurpriseBlockKey(hlKey);
+    setSurpriseBlockOff(off);   // the rows' domain is the block's text; the squash drifts by at most a few spaces
     const timer = setTimeout(() => {
       const el = mainRef.current && mainRef.current.querySelector(`[data-hl-key="${hlKey}"]`);
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
-    const fadeTimer = setTimeout(() => setSurpriseBlockKey(null), 4000);
+    const fadeTimer = setTimeout(() => { setSurpriseBlockKey(null); setSurpriseBlockOff(null); }, 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: letter.blocks is corpus data (read-only after boot); letter.id uniquely identifies the letter. Re-running when surpriseAnchor changes OR letter.id changes is the intent — letter.blocks changing without letter.id changing is impossible by design.
   }, [surpriseAnchor, letter.id]);
@@ -643,7 +647,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           ::highlight(vot-reading) registration, and must never write the
           live container's scrollTop. Both halves are separately gated in
           Settings → Reading. */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

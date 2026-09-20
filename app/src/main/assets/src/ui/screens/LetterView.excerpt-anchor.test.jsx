@@ -12,8 +12,9 @@ import { LibraryNav } from '../components/LibraryNav.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 
 const seekToSeen = [];
+const seekOffsetSeen = [];
 vi.mock('../components/ReadAlongHighlight.jsx', () => ({
-  ReadAlongHighlight: (props) => { seekToSeen.push(props.seekTo); return null; },
+  ReadAlongHighlight: (props) => { seekToSeen.push(props.seekTo); seekOffsetSeen.push(props.seekOffset); return null; },
 }));
 
 const GLOBALS = ['ReactDOM', 'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons',
@@ -24,7 +25,7 @@ const scrolled = [];
 
 beforeEach(() => {
   vi.useFakeTimers();
-  seekToSeen.length = 0; scrolled.length = 0;
+  seekToSeen.length = 0; seekOffsetSeen.length = 0; scrolled.length = 0;
   realAudio = { hasAudio: AudioPlayer.hasAudio, playLetter: AudioPlayer.playLetter, prewarm: AudioPlayer.prewarm };
   globalThis.ReactDOM = ReactDOM;
   globalThis.ScreenLayout = ({ children, navChildren }) => <div>{navChildren}{children}</div>;
@@ -72,6 +73,13 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     act(() => { vi.advanceTimersByTime(200); });
     expect(scrolled).toEqual(['letter:the-wide-path:2']);
     expect(seekToSeen.at(-1)).toBe('letter:the-wide-path:2');
+  });
+
+  it('hands the read-along WHERE in the block the words start (seekOffset), so the seek lands on the clause', () => {
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'spoke to him in the cave' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(seekToSeen.at(-1)).toBe('letter:the-wide-path:2');
+    expect(seekOffsetSeen.at(-1)).toBe('But the still small voice spoke to him in the cave, and he listened.'.indexOf('spoke'));
   });
 
   it('matches across the index whitespace domain (the index squashes runs of spaces; the block does not)', () => {

@@ -39,6 +39,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // ReadAlongHighlight as `seekTo` so a playing recording of THIS entry goes
   // there too. Shorter heads are tried: the excerpt may run past the paragraph.
   const [landedPara, setLandedPara] = React.useState(/** @type {number} */ (-1));
+  const [landedOff, setLandedOff] = React.useState(/** @type {number | null} */ (null));   // where in it the words start (corpus domain, ≈ the rows')
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
@@ -46,21 +47,24 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     const excerpt = squash(surpriseAnchor.text);
     const paras = entry.paragraphs || [];
     let found = -1;
+    let off = -1;
     for (const len of [40, 24, 12]) {
       const head = excerpt.slice(0, len);
       if (!head) break;
       for (let i = 0; i < paras.length && found < 0; i++) {
-        if (squash(paras[i] && paras[i].text).includes(head)) found = i;
+        off = squash(paras[i] && paras[i].text).indexOf(head);
+        if (off >= 0) found = i;
       }
       if (found >= 0) break;
     }
     if (found < 0) return;
     setLandedPara(found);
+    setLandedOff(off);
     const timer = setTimeout(() => {
       const el = wtlbMainRef.current && wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, found)}"]`);
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     }, 150);
-    const fadeTimer = setTimeout(() => setLandedPara(-1), 4000);
+    const fadeTimer = setTimeout(() => { setLandedPara(-1); setLandedOff(null); }, 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the refAnalysis memo above)
   }, [surpriseAnchor, entry.id]);
@@ -543,7 +547,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           offsetMapFn projects onto whatever is on screen right now, which is
           what lets these entries paint a line at a time instead of washing a
           whole paragraph. Both halves are separately gated in Settings.  */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} seekOffset={landedOff} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

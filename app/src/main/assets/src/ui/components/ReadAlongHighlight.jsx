@@ -600,10 +600,14 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  *   Format B only: projects a corpus offset onto the rendered one.
  * @param {string | null} [props.seekTo] - the hl-key of a block the reader has just
  *   been LANDED on (a search hit, a reference, a Scripture Web card — the screens'
- *   anchor flash). While this unit is the loaded track the audio seeks to that
- *   block's first shipped fragment, once per landing; otherwise nothing moves.
+ *   anchor flash). While this unit is the loaded track the audio seeks into that
+ *   block, once per landing; otherwise nothing moves.
+ * @param {number | null} [props.seekOffset] - where in that block the landing text
+ *   starts, in the rows' own offset domain (Format A: the block's text; Format B:
+ *   corpus offsets, unprojected). The fragment holding it, or the last one before
+ *   it, is the target; absent (a verse landing), the block's first fragment.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -862,14 +866,21 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   React.useEffect(() => {
     if (!seekTo) { seekServed.current = null; return; }
     if (!frags || seekServed.current === seekTo) return;
+    // The clause that holds the landing text: the last fragment of the block
+    // whose start is at or before seekOffset (rows are by start time, which for
+    // one block is text order), else the block's first. Offsets are compared in
+    // the rows' own domain (cs0, unprojected) — the screens hand one in kind.
+    let target = -1;
     for (let i = 0; i < frags.length; i++) {
-      if (hlKeyFn(letterId, frags[i][1]) === seekTo) {
-        seekServed.current = seekTo;
-        AudioPlayer.seek(frags[i][0]);
-        return;
-      }
+      if (hlKeyFn(letterId, frags[i][1]) !== seekTo) continue;
+      if (target < 0) { target = i; if (seekOffset == null) break; continue; }
+      const cs0 = frags[i][2];
+      if (typeof cs0 === 'number' && cs0 >= 0 && cs0 <= /** @type {number} */ (seekOffset)) target = i;
     }
-  }, [seekTo, frags, letterId, hlKeyFn]);
+    if (target < 0) return;
+    seekServed.current = seekTo;
+    AudioPlayer.seek(frags[target][0]);
+  }, [seekTo, seekOffset, frags, letterId, hlKeyFn]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {

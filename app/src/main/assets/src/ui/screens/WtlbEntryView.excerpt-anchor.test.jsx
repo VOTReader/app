@@ -10,8 +10,9 @@ import { WtlbEntryView } from './WtlbEntryView.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 
 const seekToSeen = [];
+const seekOffsetSeen = [];
 vi.mock('../components/ReadAlongHighlight.jsx', () => ({
-  ReadAlongHighlight: (props) => { seekToSeen.push(props.seekTo); return null; },
+  ReadAlongHighlight: (props) => { seekToSeen.push(props.seekTo); seekOffsetSeen.push(props.seekOffset); return null; },
 }));
 
 const GLOBALS = ['ReactDOM', 'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons', 'LibraryNav', 'useMarkAsRead',
@@ -20,7 +21,7 @@ const GLOBALS = ['ReactDOM', 'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'Nav
 const scrolled = [];
 beforeEach(() => {
   vi.useFakeTimers();
-  seekToSeen.length = 0; scrolled.length = 0;
+  seekToSeen.length = 0; seekOffsetSeen.length = 0; scrolled.length = 0;
   globalThis.ReactDOM = ReactDOM;
   globalThis.ScreenLayout = ({ children, navChildren }) => <div>{navChildren}{children}</div>;
   globalThis.StickyChapterNav = () => null;
@@ -62,6 +63,8 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(scrolled).toEqual(['wtlb:matters-of-the-heart:1']);
     expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:1"]').className).toContain('pulse');
     expect(seekToSeen.at(-1)).toBe('wtlb:matters-of-the-heart:1');
+    // Where the words start, in the index's domain of that paragraph ({{refs}} out, whitespace squashed).
+    expect(seekOffsetSeen.at(-1)).toBe('_**Come to Me,**_ All who are weary, And I will give you rest...'.indexOf('All who'));
   });
 
   it('matches in the index domain: the {{ref}} is gone from the doc text, so an excerpt spanning it still lands', () => {
