@@ -40,7 +40,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-95f25cc993';
+const CACHE_VERSION = 'v1.0.2-0bd915131b';
 const CORPUS_VERSION = 'c57'; // c56->c57 (2026-09-20): c56 put "My Anger Runs Deep" in date order at num 44 and reflowed nums 44-66, which broke a load-bearing invariant: for Volume Seven the corpus num IS the Drive file number (V7.044 Lost Sheep ... V7.066 The Last Trumpet), and Drive's own V7.045 is a different letter - the Anger recording is a Bonus Track in folder 7. Nums 44-66 are restored byte-for-byte and the letter is appended as num 67, last in the array so the index screen (which renders in array order and prints letter.num) and the number agree. Its id and audio key are unchanged: my-anger-runs-deep / seven:my-anger-runs-deep.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -285,7 +285,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '2baa3e77253ad293b9adb19f6420f61e7c0b85c8e4265d88049f85311924e268',
   './dist/bundle-b.js': '871850411a69c8ab43dad5e868e1d751bc472b3cd2661fa39918a231b8cdeb06',
   './dist/bundle-c.js': 'bff22d74a82a8fddf2da2c7a89dd47df02292646634d184870ba6486fca1547f',
-  './dist/bundle-d.js': '5bb3970d2e299e22973971308ad39b4bbafee09e5e32764024679ccfa9b9a002',
+  './dist/bundle-d.js': 'ee4773f0a18bc13fe63a719ce0d696cddd6f35b67888ff68abf8f56552aa4095',
   './dist/bundle-e.js': '153d3eec445d26e7a585ba7547788a633938090bfb1fc5d634513d14a66f4923',
   './dist/bundle-f.js': '7e0f0b43cab7c1783affb8e37e7fd615cf0a85019f187ed771cb90eb2f35bc59',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
