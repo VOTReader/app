@@ -31,9 +31,11 @@ function fakePlayer(queue, qi = 0) {
   };
 }
 
+const STUDY_CH = (id) => ({ key: 'study:' + id, title: id, sub: 'The Lamb of God', url: 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3', readerCode: 'V', partLabel: null });
+
 function mount(player, pane, enabled = true) {
   globalThis.AudioPlayer = player;
-  const setters = { setLetterId: vi.fn(), setBookId: vi.fn(), setChapterNum: vi.fn(), setScreen: vi.fn() };
+  const setters = { setLetterId: vi.fn(), setBookId: vi.fn(), setChapterNum: vi.fn(), setScreen: vi.fn(), setStudyId: vi.fn(), setStudyChapterId: vi.fn() };
   const hook = renderHook((p) => useAudioFollow(p), { initialProps: { enabled, ...pane, ...setters } });
   return { ...setters, hook };
 }
@@ -129,5 +131,45 @@ describe('the follower moves the live pane with the audio — and nothing else',
     expect(m.setScreen).not.toHaveBeenCalled();
     delete globalThis.AudioPlayer;
     expect(() => renderHook((p) => useAudioFollow(p), { initialProps: { enabled: true, screen: 'home', setScreen: vi.fn() } })).not.toThrow();
+  });
+});
+
+/* STUDIES FOLLOW TOO (2026-09-20). A study chapter is a third unit kind: its
+   track key is 'study:<chapterId>', its pane is 'bible-study-chapter' with that
+   studyChapterId, and opening the next chapter needs the STUDY that owns it
+   (BIBLE_STUDIES) as well as the chapter — the same live-pane rule throughout. */
+describe('study chapters — a third unit kind', () => {
+  beforeEach(() => {
+    globalThis.BIBLE_STUDIES = [{ id: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1' }, { id: 'lamb-ch2' }] }];
+  });
+  afterEach(() => { delete globalThis.BIBLE_STUDIES; });
+
+  it('a study boundary while the pane shows the ended chapter opens the next chapter of that study, in place', () => {
+    const player = fakePlayer([STUDY_CH('lamb-ch1'), STUDY_CH('lamb-ch2')]);
+    const m = mount(player, { screen: 'bible-study-chapter', studyId: 'lamb', studyChapterId: 'lamb-ch1', letterId: null, bookId: null, chapterNum: null });
+    act(() => player.advance());
+    expect(m.setStudyId).toHaveBeenCalledWith('lamb');
+    expect(m.setStudyChapterId).toHaveBeenCalledWith('lamb-ch2');
+    expect(m.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+    expect(suppressNextHistoryPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('the live-pane rule holds: a reader on another study chapter, or on Home, is not moved', () => {
+    const player = fakePlayer([STUDY_CH('lamb-ch1'), STUDY_CH('lamb-ch2')]);
+    const m = mount(player, { screen: 'bible-study-chapter', studyId: 'lamb', studyChapterId: 'lamb-ch2', letterId: null, bookId: null, chapterNum: null });
+    act(() => player.advance());
+    expect(m.setStudyChapterId).not.toHaveBeenCalled();
+    const player2 = fakePlayer([STUDY_CH('lamb-ch1'), STUDY_CH('lamb-ch2')]);
+    const m2 = mount(player2, { screen: 'home', studyId: null, studyChapterId: null, letterId: null, bookId: null, chapterNum: null });
+    act(() => player2.advance());
+    expect(m2.setScreen).not.toHaveBeenCalled();
+  });
+
+  it('a letter following a study (site order) opens the letter; a study following a letter opens the study', () => {
+    const player = fakePlayer([STUDY_CH('lamb-ch2'), LETTER('one', 'first', 'Volume One')]);
+    const m = mount(player, { screen: 'bible-study-chapter', studyId: 'lamb', studyChapterId: 'lamb-ch2', letterId: null, bookId: null, chapterNum: null });
+    act(() => player.advance());
+    expect(m.setLetterId).toHaveBeenCalledWith('first');
+    expect(m.setScreen).toHaveBeenCalledWith('vot-one-letter');
   });
 });

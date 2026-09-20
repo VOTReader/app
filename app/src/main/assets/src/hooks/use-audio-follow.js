@@ -53,7 +53,10 @@ import { suppressNextHistoryPush } from './use-history-sync.js';
 const DESK_ID = 'audio-manager-sheet';
 
 /**
- * @typedef {{ kind: 'letter', volKey: string, id: string } | { kind: 'bible', volKey: string, bookId: string, chapter: number }} Unit
+ * @typedef {{ kind: 'letter', volKey: string, id: string } | { kind: 'study', volKey: 'study', id: string } | { kind: 'bible', volKey: string, bookId: string, chapter: number }} Unit
+ *   'study' (2026-09-20): a Bible-study chapter — the key is "study:<chapterId>",
+ *   the pane is 'bible-study-chapter' on that studyChapterId, and opening the
+ *   next one needs the STUDY that owns it (BIBLE_STUDIES) as well as the chapter.
  */
 
 /**
@@ -75,13 +78,22 @@ function unitOf(player) {
     const chapter = typeof player.bibleChapterOfTrack === 'function' ? player.bibleChapterOfTrack(t) : 0;
     return { kind: 'bible', volKey, bookId: id, chapter: chapter > 0 ? chapter : 1 };
   }
+  if (volKey === 'study') return { kind: 'study', volKey: 'study', id };
   return { kind: 'letter', volKey, id };
+}
+
+/** The id of the study whose chapters hold this chapter id (bible-studies.js), or null. */
+function studyIdOf(chapterId) {
+  const studies = /** @type {any} */ (globalThis).BIBLE_STUDIES;
+  if (!Array.isArray(studies)) return null;
+  const st = studies.find((s) => s && Array.isArray(s.chapters) && s.chapters.some((c) => c && c.id === chapterId));
+  return st ? st.id : null;
 }
 
 /** @param {Unit | null} a @param {Unit | null} b @returns {boolean} */
 function sameUnit(a, b) {
   if (!a || !b || a.kind !== b.kind) return false;
-  return a.kind === 'letter'
+  return (a.kind === 'letter' || a.kind === 'study')
     ? a.volKey === b.volKey && a.id === /** @type {any} */ (b).id
     : a.bookId === /** @type {any} */ (b).bookId && a.chapter === /** @type {any} */ (b).chapter;
 }
@@ -105,6 +117,7 @@ function paneShows(pane, unit) {
     const col = colOf(unit.volKey);
     return !!col && pane.screen === col.letterScreen && pane.letterId === unit.id;
   }
+  if (unit.kind === 'study') return pane.screen === 'bible-study-chapter' && pane.studyChapterId === unit.id;
   return pane.screen === 'bible-ch' && pane.bookId === unit.bookId && Number(pane.chapterNum) === unit.chapter;
 }
 
@@ -123,6 +136,15 @@ function openReading(pane, unit) {
     if (typeof pane.setScreen === 'function') pane.setScreen(col.letterScreen);
     return;
   }
+  if (unit.kind === 'study') {
+    // BibleStudyChapterView's own recipe (selectStudyChapter): the study AND the chapter.
+    const sid = studyIdOf(unit.id);
+    if (!sid) return;
+    if (typeof pane.setStudyId === 'function') pane.setStudyId(sid);
+    if (typeof pane.setStudyChapterId === 'function') pane.setStudyChapterId(unit.id);
+    if (typeof pane.setScreen === 'function') pane.setScreen('bible-study-chapter');
+    return;
+  }
   if (typeof pane.setBookId === 'function') pane.setBookId(unit.bookId);
   if (typeof pane.setChapterNum === 'function') pane.setChapterNum(unit.chapter);
   if (typeof pane.setScreen === 'function') pane.setScreen('bible-ch');
@@ -135,7 +157,9 @@ function heldByOverlay() {
 
 /**
  * @param {{ enabled?: boolean, screen: string, letterId?: string | null, bookId?: string | null, chapterNum?: number | null,
- *   setLetterId?: Function, setBookId?: Function, setChapterNum?: Function, setScreen?: Function }} p
+ *   studyId?: string | null, studyChapterId?: string | null,
+ *   setLetterId?: Function, setBookId?: Function, setChapterNum?: Function, setScreen?: Function,
+ *   setStudyId?: Function, setStudyChapterId?: Function }} p
  * @returns {void}
  */
 export function useAudioFollow(p) {

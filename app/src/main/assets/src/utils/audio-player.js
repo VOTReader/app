@@ -953,8 +953,10 @@ function playBibleBook(opts) {
   if (_offline()) { _toast(OFFLINE_MSG); return; }
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
   // Queue scope is THE BOOK (owner directive 2026-08-10): a chapter tap
-  // queues that book's remaining chapters, never the rest of the Bible —
-  // auto-advance ends where the book ends.
+  // queues that book's remaining chapters, never the rest of the Bible up
+  // front. Since w-audio-continue (2026-09-11) the queue EXTENDS into the next
+  // book of the same edition as the last chapter ends (_extendQueue, _booksAfter)
+  // — the horizon is a book at a time, the walk is the whole edition.
   const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));
   if (!items.length) return;
   // Two edition SHAPES, and the branch is on the shape, not on the edition id
@@ -1837,15 +1839,41 @@ function _countPlay() {
 }
 
 /**
+ * The study that owns a chapter id, from the lazy studies corpus
+ * (bible-studies.js: BIBLE_STUDIES). Null until it lands or for an unknown id.
+ *
+ * @param {string | null | undefined} chapterId
+ * @returns {any}
+ */
+function _studyOfChapter(chapterId) {
+  const studies = _g().BIBLE_STUDIES;
+  if (!chapterId || !Array.isArray(studies)) return null;
+  return studies.find((st) => st && Array.isArray(st.chapters) && st.chapters.some((c) => c && c.id === chapterId)) || null;
+}
+
+/**
  * A collection's caller-ordered items (preface first where one exists), read
  * from the lazy VOT registry globals. Null when that registry has not landed —
  * every caller then falls back to the smaller queue it can build alone.
  *
+ * A STUDY'S CHAPTERS ARE ITS COLLECTION (2026-09-20). 'study' is no entry in
+ * COL_BY_KEY — its recordings ride AUDIO_MANIFEST under "study:<chapterId>" —
+ * so a study chapter's Listen built a queue of one and stop() dropped the bar
+ * at the chapter's end, where a Bible chapter runs on into the next. The study
+ * that owns the chapter is the collection; its chapters are the items
+ * (recordings only, playCollection skips the rest). Needs the chapter id to
+ * know WHICH study: without one there is nothing to answer.
+ *
  * @param {string} volKey
+ * @param {string} [itemId] the letter / chapter the caller holds (studies only)
  * @returns {Array<any> | null}
  */
-function _collectionItems(volKey) {
+function _collectionItems(volKey, itemId) {
   const g = _g();
+  if (volKey === 'study') {
+    const study = _studyOfChapter(itemId);
+    return study ? study.chapters : null;
+  }
   const col = typeof g.COL_BY_KEY !== 'undefined' && g.COL_BY_KEY ? g.COL_BY_KEY.get(volKey) : null;
   if (!col || typeof g.colLetterArr !== 'function') return null;
   const preface = typeof g.colPreface === 'function' ? g.colPreface(col) : null;
@@ -1908,7 +1936,7 @@ function playLetter(opts) {
   // neighboring letters and playback continues past the letter's end. The
   // registry globals live in index.html; when absent (tests, stripped
   // harnesses) the letter still plays alone.
-  const items = o.letter && o.letter.id ? _collectionItems(o.volKey) : null;
+  const items = o.letter && o.letter.id ? _collectionItems(o.volKey, o.letter.id) : null;
   if (items && items.some((item) => item && item.id === o.letter.id)) {
     playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader });
     return;
@@ -2074,7 +2102,7 @@ function playTrack(track) {
     return;
   }
   if (at) {
-    const items = _collectionItems(at.volKey);
+    const items = _collectionItems(at.volKey, at.id);
     if (items && items.some((item) => item && item.id === at.id)) {
       playCollection({
         volKey: at.volKey, items, collectionLabel: normalized.sub, startId: at.id,

@@ -51,6 +51,9 @@ const MANIFEST = {
   'vol1:letter-a': [['idA1', 'B', 'Part 1'], ['idA2', 'B', 'Part 2']],
   'vol1:letter-c': [['idC', 'T']],
   'vol2:solo': [['idSolo', 'M']],
+  // A study's chapters (volKey 'study', ids are chapter ids; ch3 has no recording).
+  'study:lamb-ch1': [['idLamb1', 'V']],
+  'study:lamb-ch2': [['idLamb2', 'V']],
 };
 
 /* Cross-reader alternates: a complete second reading of the same letter,
@@ -246,6 +249,35 @@ describe('audio-player — playLetter', () => {
       delete globalThis.colPreface;
       delete globalThis.colLetterArr;
     }
+  });
+
+  /* STUDIES CHAIN LIKE A BOOK (2026-09-20). A study chapter's Listen used to
+     build a queue of ONE: 'study' is no collection in COL_BY_KEY, so the album
+     branch never fired, next() found nothing and stop() dropped the bar at the
+     chapter's end — where a Bible chapter runs on into the next. The study that
+     owns the chapter (BIBLE_STUDIES, the lazy studies corpus) IS its collection:
+     its chapters from this one onward, recordings only, forward-only. */
+  it('a study chapter queues the REST OF ITS STUDY (recordings only), like a book', () => {
+    globalThis.BIBLE_STUDIES = [
+      { id: 'purity', title: 'Purity', chapters: [{ id: 'purity-ch1', title: 'P1' }] },
+      { id: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1', title: 'One' }, { id: 'lamb-ch2', title: 'Two' }, { id: 'lamb-ch3', title: 'Three (no recording)' }] },
+    ];
+    try {
+      AudioPlayer.playLetter({ volKey: 'study', letter: { id: 'lamb-ch1', title: 'One' }, collectionLabel: 'The Lamb of God' });
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idLamb1'), URL_OF('idLamb2')]);
+      expect(s.queue.map((t) => t.key)).toEqual(['study:lamb-ch1', 'study:lamb-ch2']);
+      AudioPlayer.next();
+      expect(el().src).toBe(URL_OF('idLamb2'));            // chapter 1 ended: chapter 2 plays by itself
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).mode).toBe('collection');
+    } finally {
+      delete globalThis.BIBLE_STUDIES;
+    }
+  });
+
+  it('a study chapter still plays alone when the studies corpus has not landed', () => {
+    AudioPlayer.playLetter({ volKey: 'study', letter: { id: 'lamb-ch1', title: 'One' }, collectionLabel: 'The Lamb of God' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idLamb1')]);
   });
 });
 
