@@ -28,7 +28,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching,
+  arcsTouching, visibleArcs, threadEnds,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -537,6 +537,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
+    const labels = drawThreadRefs(uiRef.current, g, cam, base, v, chrome, density, focusRef.current.arc);
+    if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
   }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
@@ -735,6 +737,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return {
         kind: 'arc', a, b, votes: found.hit.votes,
         span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
+        from: found.hit.from, to: found.hit.to,
         cards: [verseCard('From', a), verseCard('To', b)],
       };
     }
@@ -781,6 +784,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   const commitFound = React.useCallback((found) => {
     if (!found) return;
+    // the far foot is the one further from the camera: what Follow pans to
+    if (found.kind === 'arc' && camRef.current) {
+      const x = camRef.current.x;
+      found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
+    }
     focusRef.current = found.kind === 'arc' || found.kind === 'link'
       ? { arc: found.index, range: null }
       : { arc: -1, range: found.kind === 'chapter' ? [found.lo, found.hi]
@@ -936,6 +944,21 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
       emptyShown, dismissEmpty, zoomCapFor, yFrameFor]);
 
+  /** Follow the chosen line to its far foot: the camera centres on that
+   * verse at the same zoom, the line stays spotlit, and the control turns
+   * to the other end so the reader can walk it back (Corbin's brief,
+   * 2026-09-11: "every line followable end to end"). */
+  const followThread = React.useCallback((info) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!cam || !info || info.kind !== 'arc') return;
+    const toFar = info.far === 'to';
+    cam.x = toFar ? info.to : info.from;
+    clampCamera(cam, v.W, zoomCapFor(cam), yFrameFor(cam) || undefined);
+    setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
+    setAnnounce('Following the line to ' + (toFar ? info.b : info.a).label);
+    schedule();
+  }, [schedule, zoomCapFor, yFrameFor]);
+
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
     // meta.sourceLetterTitle is what the reader's back pill is labelled with,
@@ -1082,7 +1105,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {listOpen && <ConnectionList items={listItems} mode={mode}
         onChoose={commitFound} onClose={() => setListOpen(false)} />}
       {detail && (
-        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} />
+        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread} />
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
@@ -1148,21 +1171,101 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
   ctx.lineWidth = DPR;
   ctx.beginPath(); ctx.moveTo(0, base + 1.5 * DPR); ctx.lineTo(W, base + 1.5 * DPR); ctx.stroke();
 
-  // chapter numerals in the middle zoom band
-  if (cam.ppv > 2.4 * DPR && cam.ppv <= 30 * DPR) {
+  // chapter numerals from the middle zoom band up, each centred on the part
+  // of its chapter the frame holds: at close zoom one chapter is wider than
+  // the frame, and a foot's reference is book + chapter + verse, so the
+  // chapter must stay in view with the verse numerals (it used to stop at
+  // 30 px/verse, leaving "GENESIS ... 552" with no chapter to read).
+  if (cam.ppv > 2.4 * DPR) {
     ctx.font = chrome.fsRuler * DPR + 'px Georgia,serif';
     ctx.fillStyle = 'rgba(' + ink + ',0.55)';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     for (const c of g.chapters) {
-      const x = (X(c[2]) + X(c[2] + c[3])) / 2;
-      if (x < -20 || x > W + 20) continue;
-      if (X(c[2] + c[3]) - X(c[2]) < 22 * DPR) continue;
-      ctx.fillText(String(c[1]), x, base - 6 * DPR);
+      const x0 = Math.max(X(c[2]), 0), x1 = Math.min(X(c[2] + c[3]), W);
+      if (x1 - x0 < 22 * DPR) continue;
+      ctx.fillText(String(c[1]), (x0 + x1) / 2, base - 6 * DPR);
     }
   }
 
   // book names + separators
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
+}
+
+/* ── the references beside the lines ────────────────────────────────────
+   Corbin's brief (2026-09-11): "when zoomed close, each line shows its source
+   and target beside it — the verse refs at the two feet, or at the body when
+   the feet are off-screen." A foot the frame holds is read off the ruler
+   (book, chapter, verse numeral under its tick); a foot the frame does not
+   hold has its reference written ON the body at the body's nearest on-screen
+   point to it (pick.threadEnds), along the tangent, with an arrow toward the
+   foot. Zoomed close means the ruler's verse-numeral band (VERSE_LABELS_PPV);
+   the chosen line is labelled at every zoom, its feet marked on the baseline,
+   so a tapped line is followable from either end (item b).
+   Crowding: a label whose anchor sits within a line-height of one already
+   written is skipped, the chosen line's first — density handling only as far
+   as it is free. */
+const VERSE_LABELS_PPV = 30;   // CSS px per verse: where the ruler numbers verses
+const LABEL_PASS_LIMIT = 400;  // drawn threads walked per frame at most
+
+function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
+  if (!canvas || !g || !g.count) return 0;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 0;
+  const DPR = v.DPR;
+  const close = cam.ppv >= VERSE_LABELS_PPV * DPR;
+  if (!close && focusArc < 0) return 0;
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const fs = chrome.fsRuler * DPR;
+  const gap = fs * 1.3;
+  const placed = [];
+  let drawn = 0;
+  const camY = cam.y > 0 ? cam.y : 0;
+  ctx.font = fs + 'px Georgia,serif';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  const label = (index, chosen) => {
+    const ends = threadEnds(g, cam, view, index);
+    for (const side of ['from', 'to']) {
+      const e = ends[side];
+      if (chosen && e.onScreen) {
+        // the foot, marked on the baseline the line stands on
+        ctx.fillStyle = 'rgba(' + gold + ',0.95)';
+        ctx.beginPath(); ctx.arc(e.x, view.base + camY, 4 * DPR, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
+      if (!e.at) continue;
+      const { x, y, angle } = e.at;
+      if (!chosen && placed.some((q) => Math.hypot(q.x - x, q.y - y) < gap)) continue;
+      placed.push({ x, y });
+      const ref = refOfVerse(g, e.verse);
+      const text = side === 'from'
+        ? '\u2190 ' + ref.abbr + ' ' + ref.chapter + ':' + ref.verse
+        : ref.abbr + ' ' + ref.chapter + ':' + ref.verse + ' \u2192';
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      // beside the line, not on it: above by default, below where the line
+      // leaves through the top and above would be clipped
+      ctx.translate(0, y < fs ? fs * 0.9 : -fs * 0.7);
+      ctx.textAlign = side === 'from' ? 'left' : 'right';
+      const inset = 4 * DPR * (side === 'from' ? 1 : -1);
+      ctx.lineWidth = 3 * DPR;
+      ctx.strokeStyle = chrome.bg;
+      ctx.strokeText(text, inset, 0);
+      ctx.fillStyle = 'rgba(' + (chosen ? gold : ink) + ',' + (chosen ? 1 : 0.8) + ')';
+      ctx.fillText(text, inset, 0);
+      ctx.restore();
+      drawn++;
+    }
+  };
+  if (focusArc >= 0 && focusArc < g.count) label(focusArc, true);
+  if (close) {
+    for (const i of visibleArcs(g, cam, view, LABEL_PASS_LIMIT)) {
+      if (i !== focusArc) label(i, false);
+    }
+  }
+  return drawn;
 }
 
 /**
@@ -1383,7 +1486,7 @@ function ConnectionList({ items, mode, onChoose, onClose }) {
   );
 }
 
-function DetailSheet({ info, onClose, onOpen }) {
+function DetailSheet({ info, onClose, onOpen, onFollow }) {
   const closeRef = React.useRef(null);
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   const cards = info.cards || [];
@@ -1407,6 +1510,12 @@ function DetailSheet({ info, onClose, onOpen }) {
       </button>
       <div className="sw-sheet-eyebrow">{eyebrow}</div>
       <div className="sw-sheet-meta">{meta}</div>
+      {info.kind === 'arc' && onFollow && (
+        <button type="button" className="sw-sheet-follow" onClick={() => onFollow(info)}
+          aria-label={'Follow the line to ' + (info.far === 'to' ? info.b : info.a).label}>
+          Follow to {(info.far === 'to' ? info.b : info.a).label} &rsaquo;
+        </button>
+      )}
       <div className="sw-sheet-cards">
         {cards.map((card, i) => (
           <React.Fragment key={i}>

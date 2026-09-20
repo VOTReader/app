@@ -55,7 +55,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
-        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY });
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -299,6 +299,93 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(updateSetting).toHaveBeenCalledWith('webDensity', 'essential');
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(lastDensity()).toBe('essential');
+    });
+  });
+
+  /* ── every line followable end to end (Corbin's brief 2026-09-11, item 7; w-sw-refs 2026-09-20) ──
+     (b) tapping a line highlights it and its two feet, and a follow control pans the camera to
+     the far foot. The far foot is the one further from the camera; after the follow the control
+     names the other end, so a reader can walk a line back and forth. The line is chosen through
+     Nearby (the keyboard path to the same commitFound a tap reaches), at the ceiling, because at
+     the overview the whole canon fits the frame and the clamp holds x at the centre.
+     (a) at close zoom a line whose far foot is off-screen carries that foot's reference on its
+     body: witnessed through a recording 2D context, since jsdom has none. */
+  describe('following a line: the sheet names the far foot, the follow pans to it, the body carries its reference', () => {
+    const threaded = () => Object.assign(graph(), {
+      count: 1,
+      books: [{ id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' }],
+      chapters: [[0, 1, 0, 15000], [0, 2, 15000, CANON - 15000]],
+      chapterOfVerse: (() => { const c = new Uint16Array(CANON); c.fill(1, 15000); return c; })(),
+      from: new Uint16Array([15551]), to: new Uint16Array([20100]), votes: new Int16Array([30]),
+      buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[15551, 20100]] }],
+      chunkSize: 256,
+    });
+    const pressFrame = async (key) => {
+      fireEvent.keyDown(document.querySelector('.sw-root'), { key });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    };
+    const lastCamX = () => DRAWN[DRAWN.length - 1].camX;
+    const pickNearby = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      fireEvent.click(document.querySelector('.sw-choice-row'));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    };
+    /* a 2D context that records what is written; every other call is a no-op */
+    const TEXTS = [];
+    const ctx2d = new Proxy({}, {
+      get: (t, k) => k === 'measureText' ? (str) => ({ width: 6 * String(str).length })
+        : k === 'fillText' ? (str) => { TEXTS.push(String(str)); }
+        : k === 'canvas' ? null : (typeof k === 'string' ? (t[k] !== undefined ? t[k] : () => {}) : undefined),
+      set: (t, k, val) => { t[k] = val; return true; },
+    });
+    let realGetContext = null;
+    beforeEach(() => {
+      TEXTS.length = 0;
+      realGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (kind) { return kind === '2d' ? ctx2d : null; };
+    });
+    afterEach(() => { HTMLCanvasElement.prototype.getContext = realGetContext; });
+
+    it('the sheet offers Follow to the far foot; pressing it centres the camera there and the control turns to the other end', async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(zoomText(container)).toBe('1711x');
+      expect(lastCamX()).toBeCloseTo(CANON / 2, 0);
+      await pickNearby();
+      const sheet = container.querySelector('.sw-sheet');
+      expect(sheet, 'the connection sheet opened').toBeTruthy();
+      // the camera sits at 15551 = the from foot, so the far foot is `to`: Genesis 2:5101
+      const follow = screen.getByRole('button', { name: /follow the line to genesis 2:5101/i });
+      fireEvent.click(follow);
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(lastCamX()).toBeCloseTo(20100, 0);
+      // and back: the control now names the from foot
+      fireEvent.click(screen.getByRole('button', { name: /follow the line to genesis 2:552/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(lastCamX()).toBeCloseTo(15551, 0);
+      // the line stays chosen throughout: the sheet is still up
+      expect(container.querySelector('.sw-sheet')).toBeTruthy();
+    });
+
+    it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(zoomText(container)).toBe('1711x');
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      // the far foot, on the body: RED if no label pass exists
+      expect(TEXTS.some((t) => /Gen 2:5101/.test(t)), 'a body label naming the far foot; texts: ' + TEXTS.slice(-12).join(' | ')).toBe(true);
+      // the near foot, on the ruler: the verse numeral under its tick, the chapter numeral (sticky at close zoom: RED today, the chapter row stopped at 30 px/verse), the book
+      expect(TEXTS).toContain('552');
+      expect(TEXTS).toContain('2');
+      expect(TEXTS).toContain('GENESIS');
+      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'the count of body labels drawn is published for the walks').toBe('1');
+    });
+
+    it('CONTROL: at the overview no body label is written (the feet are on the ruler, the sky is closed)', async () => {
+      await mount({}, threaded);
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(TEXTS.some((t) => /Gen 2:5101|Gen 2:552/.test(t))).toBe(false);
     });
   });
 

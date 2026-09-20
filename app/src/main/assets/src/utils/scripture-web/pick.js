@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
+  arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 
@@ -108,6 +108,125 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
     }
   }
   return best;
+}
+
+/**
+ * The drawn threads whose span crosses the frame, in draw order: the set a
+ * label pass walks (Corbin's brief, 2026-09-11: "when zoomed close, each
+ * line shows its source and target beside it"). The same loop as pickArcs
+ * without the distance test — the density prefix, the chunk extents and the
+ * fly-over law — so a label is written for a line the reader can see and
+ * never for one the shader skipped.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, localize:number, density:import('./decode.js').Density}} view
+ * @param {number} limit — at most this many, so a dense screen bounds its own pass
+ * @returns {number[]} instance indices
+ */
+export function visibleArcs(g, cam, view, limit) {
+  const { width, localize, density } = view;
+  const half = width / 2;
+  const camX = cam.x, ppv = cam.ppv;
+  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
+  const out = [];
+  for (const bucket of g.buckets) {
+    const draw = bucketDrawCount(bucket, density);
+    const chunks = bucket.chunks || [];
+    const chunkSize = g.chunkSize || 256;
+    const chunkCount = Math.ceil(draw / chunkSize);
+    for (let c = 0; c < chunkCount; c++) {
+      const ext = chunks[c];
+      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
+      const start = bucket.off + c * chunkSize;
+      const end = Math.min(start + chunkSize, bucket.off + draw);
+      for (let i = start; i < end; i++) {
+        const x0 = (g.from[i] - camX) * ppv + half;
+        const x1 = (g.to[i] - camX) * ppv + half;
+        if (x1 < 0 || x0 > width) continue;
+        if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
+        out.push(i);
+        if (out.length >= limit) return out;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * @typedef {{ verse:number, x:number, onScreen:boolean,
+ *   at:({x:number, y:number, angle:number}|null) }} ThreadEnd
+ *   x: the foot's screen x, device px. at: for a foot the frame does not
+ *   hold, the body's nearest on-screen point to it (where its reference is
+ *   written) with the tangent's angle read left to right, screen radians;
+ *   null when the foot is on screen or nothing of the body is.
+ */
+
+/**
+ * The two ends of one thread as the reader sees them (the brief's "the
+ * verse refs at the two feet, or at the body when the feet are off-screen").
+ * The height is arcHeightAt — the analytic form of the curve the shader
+ * draws, with the same per-foot fans, dome and cam.y the picker uses — so
+ * the label sits on the ribbon and not beside where a flat arc would be.
+ *
+ * The frame a body point must fall in is the sky: x in [0, width], y in
+ * [0, view.base] (the ruler below the baseline is not the web). A body that
+ * climbs past the frame top is labelled where it crosses the top.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number, localize:number}} view
+ * @param {number} i — instance index
+ * @returns {{ from: ThreadEnd, to: ThreadEnd }}
+ */
+export function threadEnds(g, cam, view, i) {
+  const { width, ceil, squash, localize } = view;
+  const camY = cam.y > 0 ? cam.y : 0;
+  const base = view.base + camY;
+  const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
+  const x1 = (g.to[i] - cam.x) * cam.ppv + width / 2;
+  const rx = (x1 - x0) * 0.5;
+  const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
+  const { fanA, fanB } = fansOf(g);
+  const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
+  const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
+  const bow = DOME * localize;
+  const yAt = (x) => base - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const inSky = (x) => { const y = yAt(x); return y >= 0 && y <= view.base; };
+  // the body's x range the frame holds; empty when the thread is wholly off it
+  const xa = Math.max(0, x0), xb = Math.min(width, x1);
+  const STEPS = 32;
+  /** walk from the `from` side (dir 1) or the `to` side (dir -1) to the first on-screen point */
+  const nearest = (dir) => {
+    if (!(xb > xa)) return null;
+    let prev = dir > 0 ? xa : xb;
+    if (inSky(prev)) return point(prev, dir);
+    for (let k = 1; k <= STEPS; k++) {
+      const x = dir > 0 ? xa + ((xb - xa) * k) / STEPS : xb - ((xb - xa) * k) / STEPS;
+      if (inSky(x)) {
+        // bisect the crossing between the last off-screen sample and this one
+        let off = prev, on = x;
+        for (let b = 0; b < 8; b++) {
+          const mid = (off + on) / 2;
+          if (inSky(mid)) on = mid; else off = mid;
+        }
+        return point(on, dir);
+      }
+      prev = x;
+    }
+    return null;
+  };
+  const point = (x, dir) => {
+    // the tangent by a short difference toward the frame's inside, read left to right
+    const d = Math.max(1, (xb - xa) / 512) * dir;
+    const y = yAt(x), y2 = yAt(x + d);
+    return { x, y, angle: Math.atan2((y2 - y) * dir, Math.abs(d)) };
+  };
+  const end = (verse, x, dir) => ({
+    verse, x, onScreen: x >= 0 && x <= width,
+    at: x >= 0 && x <= width ? null : nearest(dir),
+  });
+  return { from: end(g.from[i], x0, 1), to: end(g.to[i], x1, -1) };
 }
 
 /**
