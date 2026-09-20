@@ -172,6 +172,14 @@ def asset_errors(keys, timeline, stats):
     return errs
 
 
+def skipped_keys(path):
+    """Letters a previous run found the reader skips (sidecar beside the belt), else empty."""
+    try:
+        return set(json.load(open(path + ".skipped.json", encoding="utf-8")))
+    except (OSError, ValueError):
+        return set()
+
+
 def belt_path(fid):
     return os.path.join(ha.HONE, f"sections__{fid}.large-v3.json")
 
@@ -198,18 +206,20 @@ def main():
             if only and fid not in only:
                 continue
             keys = candidates(vol, label, last_hi, manifest)
-            frags, owner = virtual_letter(keys)
             vkey = f"sections:{fid}"
+            path = belt_path(fid)
+            skipped = skipped_keys(path)               # letters the reader skips, from the last run
+            keys = [k for k in keys if k[0] not in skipped]
+            frags, owner = virtual_letter(keys)
             # ponytail: run_belt resolves fragments and tracks by KEY through two
             # module-level caches; a virtual key injected into both is the whole
             # adapter. A real hook in hone-align.py is the upgrade if a third
             # caller ever needs one.
             ha._FRAGS_ALL[vkey] = {"fragments": frags, "format": "B"}
             manifest[vkey] = [[fid, reader]]
-            path = belt_path(fid)
             frag_hash = ha.fragments_hash(frags)
             print(f"[{vol}] {label}  {fid}  {len(keys)} letters ({keys[0][0]} .. {keys[-1][0]}), "
-                  f"{len(frags)} fragments", flush=True)
+                  f"{len(frags)} fragments" + (f"  (skipped by the reader: {', '.join(sorted(skipped))})" if skipped else ""), flush=True)
             if not a.force and ba.is_current(path, want_hash, frag_hash):
                 d = json.load(open(path, encoding="utf-8"))
                 print("  current belt reused")
@@ -223,6 +233,28 @@ def main():
                     continue
                 al.release_caches()          # run_belt wrote belt_path(fid) itself (key -> sections__<fid>)
             lrows, stats = per_letter(d, owner, frags)
+            # A letter the reader SKIPS (unspoken share > 0.5) still fed leg A, whose forced
+            # alignment stretches its fragments over the neighbours' audio (WTLB II Section 1,
+            # 2026-09-20: ten letters piled onto 402.0 s). Drop it, remember it, belt again.
+            now_skipped = {k for k, _ in keys if stats.get(k, (0, 0, 0, 0))[1] > 0.5}
+            if now_skipped and not skipped:
+                skipped = now_skipped
+                print(f"  reader skips {', '.join(sorted(skipped))}: second belt without them", flush=True)
+                json.dump(sorted(skipped), open(path + ".skipped.json", "w", encoding="utf-8"))
+                keys = [k for k in keys if k[0] not in skipped]
+                frags, owner = virtual_letter(keys)
+                ha._FRAGS_ALL[vkey] = {"fragments": frags, "format": "B"}
+                try:
+                    d = ha.run_belt(vkey, dict(s), None)
+                except Exception as e:                                   # noqa: BLE001
+                    failures.append((fid, str(e).splitlines()[0][:110]))
+                    print(f"  ERROR {e}")
+                    al.release_caches()
+                    continue
+                al.release_caches()
+                lrows, stats = per_letter(d, owner, frags)
+            for k in sorted(skipped):
+                report.append((fid, label, k, 0.0, 0, 0, "SKIPPED", 1.0))
             timeline = {}
             for key, _ in keys:
                 cov, uns, shp, tot = stats.get(key, (0.0, 0.0, 0, 0))
