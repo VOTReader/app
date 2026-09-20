@@ -40,7 +40,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-0bd915131b';
+const CACHE_VERSION = 'v1.0.2-27959aa7c9';
 const CORPUS_VERSION = 'c57'; // c56->c57 (2026-09-20): c56 put "My Anger Runs Deep" in date order at num 44 and reflowed nums 44-66, which broke a load-bearing invariant: for Volume Seven the corpus num IS the Drive file number (V7.044 Lost Sheep ... V7.066 The Last Trumpet), and Drive's own V7.045 is a different letter - the Anger recording is a Bonus Track in folder 7. Nums 44-66 are restored byte-for-byte and the letter is appended as num 67, last in the array so the index screen (which renders in array order and prints letter.num) and the number agree. Its id and audio key are unchanged: my-anger-runs-deep / seven:my-anger-runs-deep.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -281,13 +281,13 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'd19be6f51585ea59ac09dbeda64c7df7672bd844bb7b86a85acd828c5202edb2',
-  './dist/app.min.css': '1be891d9b72ec30fa123b07b64c9b3c9f391e0a06670d408eefdf4b74b1d3728',
+  './dist/app.min.css': 'e0a1e2a0c90d3e7b520cdaef5a1ca4bea991a66cad1d876b5fe59ccd0399077e',
   './dist/bundle-a.js': '2baa3e77253ad293b9adb19f6420f61e7c0b85c8e4265d88049f85311924e268',
   './dist/bundle-b.js': '871850411a69c8ab43dad5e868e1d751bc472b3cd2661fa39918a231b8cdeb06',
   './dist/bundle-c.js': 'bff22d74a82a8fddf2da2c7a89dd47df02292646634d184870ba6486fca1547f',
   './dist/bundle-d.js': 'ee4773f0a18bc13fe63a719ce0d696cddd6f35b67888ff68abf8f56552aa4095',
   './dist/bundle-e.js': '153d3eec445d26e7a585ba7547788a633938090bfb1fc5d634513d14a66f4923',
-  './dist/bundle-f.js': '7e0f0b43cab7c1783affb8e37e7fd615cf0a85019f187ed771cb90eb2f35bc59',
+  './dist/bundle-f.js': 'e5af2d8218ef2cd4589b04783f458c4edd2ea5720bcb44e132b4138172195919',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'd19be6f51585ea59ac09dbeda64c7df7672bd844bb7b86a85acd828c5202edb2',
   './manifest.json': '5483690fc42f1d3738c0fbc96cd41b04eb3ce26ad15d9e5684a71c9e75745052',
