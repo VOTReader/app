@@ -10,8 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CEIL_SOFTNESS, LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
-  localizeFactor, squashFactor, arcDistance,
-  arcShape, arcShapeGLSL, arcHeight, spanLogOf, APEX_LIFT, FAN_FLOOR,
+  localizeFactor, squashFactor, arcDistance, arcHeightAt, DOME,
+  arcShape, arcShapeGLSL, spanLogOf, APEX_LIFT, FAN_FLOOR,
   arcAnchored, flyOverDim, flyOverGLSL, glslFloat,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
@@ -20,7 +20,7 @@ import {
   pickArc, pickArcs, arcsTouching, countTouching, pickChapter, pickVerse,
   refOfVerse, chapterRange, findWebReference,
 } from './pick.js';
-import { deltaRuns, bucketDrawCount, minVotesFor, base64ToBytes, decodeGraph } from './decode.js';
+import { deltaRuns, bucketDrawCount, minVotesFor, base64ToBytes, decodeGraph, fansOf } from './decode.js';
 
 // ── a small synthetic graph: 2 books, 4 chapters, 40 verses ─────────────────
 function makeGraph(pairs) {
@@ -67,11 +67,15 @@ function pointOnArc(g, cam, view, index, t) {
   const x0 = verseToX(cam, view.width, g.from[index]);
   const x1 = verseToX(cam, view.width, g.to[index]);
   const left = Math.min(x0, x1), right = Math.max(x0, x1);
-  const { R, A } = arcShape((x1 - x0) / 2, view.ceil, view.squash, view.localize,
-    spanLogOf(Math.abs(g.to[index] - g.from[index]), g.total));
+  // one shape per foot (its departure rank sets its quarter), as the shader
+  // and the picker both compute it; the run between is the dome
+  const { fanA, fanB } = fansOf(g);
+  const spanLog = spanLogOf(Math.abs(g.to[index] - g.from[index]), g.total);
+  const L = arcShape((x1 - x0) / 2, view.ceil, view.squash, view.localize, spanLog, fanA[index]);
+  const R = arcShape((x1 - x0) / 2, view.ceil, view.squash, view.localize, spanLog, fanB[index]);
   const lo = Math.max(left, 0), hi = Math.min(right, view.width);
   const x = lo + (hi - lo) * t;
-  return [x, view.base - arcHeight(Math.min(x - left, right - x), R, A)];
+  return [x, view.base + (cam.y || 0) - arcHeightAt(x, left, right, L.R, R.R, L.A, DOME * view.localize)];
 }
 
 describe('the curve law', () => {
@@ -253,18 +257,18 @@ describe('arcDistance', () => {
   it('is ~0 on the curve and grows away from it', () => {
     const base = 500, ry = 200;
     // apex of an arc spanning 200..600
-    expect(arcDistance(400, base - ry, 200, 600, base, 200, ry, 10)).toBeLessThan(0.01);
-    expect(arcDistance(400, base - ry + 5, 200, 600, base, 200, ry, 10)).toBeGreaterThan(3);
+    expect(arcDistance(400, base - ry, 200, 600, base, 200, 200, ry, 10)).toBeLessThan(0.01);
+    expect(arcDistance(400, base - ry + 5, 200, 600, base, 200, 200, ry, 10)).toBeGreaterThan(3);
   });
 
   it('rejects points outside the bounding box', () => {
-    expect(arcDistance(50, 400, 200, 600, 500, 200, 200, 6)).toBe(Infinity);   // left of span
-    expect(arcDistance(400, 900, 200, 600, 500, 200, 200, 6)).toBe(Infinity);  // below baseline
-    expect(arcDistance(400, 100, 200, 600, 500, 200, 200, 6)).toBe(Infinity);  // above apex
+    expect(arcDistance(50, 400, 200, 600, 500, 200, 200, 200, 6)).toBe(Infinity);   // left of span
+    expect(arcDistance(400, 900, 200, 600, 500, 200, 200, 200, 6)).toBe(Infinity);  // below baseline
+    expect(arcDistance(400, 100, 200, 600, 500, 200, 200, 200, 6)).toBe(Infinity);  // above apex
   });
 
   it('ignores degenerate zero-width arcs', () => {
-    expect(arcDistance(300, 500, 300, 300, 500, 0, 0, 6)).toBe(Infinity);
+    expect(arcDistance(300, 500, 300, 300, 500, 0, 0, 0, 6)).toBe(Infinity);
   });
 });
 

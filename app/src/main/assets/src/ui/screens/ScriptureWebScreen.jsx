@@ -20,7 +20,7 @@
    bundle-f carries only this feature's own code.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { decodeGraph } from '../../utils/scripture-web/decode.js';
+import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
@@ -372,6 +372,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       width: v.W, height: v.H, base: f.base, ceil: f.ceil,
       squash: squashFactor(f.ceil, v.W),
       localize: localizeFactor(cam.ppv / fitPPV(cam, v.W)),
+      // the camera's height, device px: the shader draws the baseline camY
+      // below base and the picker reads the same off the camera
+      camY: cam.y > 0 ? cam.y : 0,
       density, rulerDepth: f.ruler,
     };
   }, [density, frame]);
@@ -428,6 +431,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return maxZoomOf(graph, v);
   }, [graph]);
 
+  /** The widest thread's span, verses: the y camera's ceiling reads the law
+   * at it. Once per graph. */
+  const maxSpan = React.useMemo(() => (graph ? maxSpanOf(graph) : 0), [graph]);
+
+  /** The frame the canon camera moves its y inside (geometry.YFrame); null
+   * for a My Web rail, whose world is exactly the frame. Absence is the
+   * signal: clampCamera without a frame holds y at 0. */
+  const yFrameFor = React.useCallback((c) => {
+    if (modeRef.current === 'personal' || !c || c !== camRef.current) return null;
+    const v = viewRef.current;
+    const f = frame();
+    return { base: f.base, ceil: f.ceil, squash: squashFactor(f.ceil, v.W), maxSpan };
+  }, [frame, maxSpan]);
+
   /** The camera under a device-px y: above the gap's midline the Volumes
    * rail, below it the Bible rail; the canon web has one camera for all. */
   const camFor = React.useCallback((yDevice) => {
@@ -449,7 +466,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     /* The zoom's own input, published for the browser walks (the same line the
        scripture-web walk branch carries, so the two merge as one): a walk that
        reads pixels after "three zoom steps" must first know the steps took. */
-    if (wrapRef.current) wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+    if (wrapRef.current) {
+      wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+      // the camera's height, device px, for the walks (0 at the baseline)
+      wrapRef.current.setAttribute('data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
+    }
+    // My Web's world is exactly the frame: its camera has no y frame, so a
+    // height carried over from the canon web is dropped here, not drawn.
+    if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
     if (wrapRef.current && camV) wrapRef.current.setAttribute('data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
@@ -576,7 +600,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       glc.height = uic.height = H;
       const cam = camRef.current;
       if (!(cam.ppv > 0)) cam.ppv = fitPPV(cam, W);
-      clampCamera(cam, W, maxZoomOf(graph, viewRef.current));
+      // with the y frame: a frame that grew cannot leave y above the new ceiling
+      clampCamera(cam, W, maxZoomOf(graph, viewRef.current), yFrameFor(cam));
       schedule();
     };
     resize();
@@ -593,7 +618,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [graph, schedule, glRetry]);
+  }, [graph, schedule, glRetry, yFrameFor]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
@@ -623,8 +648,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current, live,
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
+      yFrame: yFrameFor,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
@@ -816,9 +842,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
-    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v));
+    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined);
     schedule();
-  }, [graph, schedule]);
+  }, [graph, schedule, yFrameFor]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
@@ -839,6 +865,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam) return;
     cam.ppv = fitPPV(cam, v.W);
     cam.x = cam.total / 2;
+    // explicit, though the frameless clamp below also holds y at 0: Reset
+    // MEANS the baseline, whatever clamp a later edit puts after it
+    cam.y = 0;
     clampCamera(cam, v.W, maxZoomOf(graph, v));
     if (camVRef.current) resetRail('top');
     focusRef.current = { arc: -1, range: null };
@@ -865,15 +894,22 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!cam || !v.W) return;
     const step = (v.W / cam.ppv) * 0.12;
     const ceiling = zoomCapFor(cam);
+    const yf = yFrameFor(cam);
     let atCeiling = false;
     if (e.key === 'ArrowLeft') { cam.x -= step; }
     else if (e.key === 'ArrowRight') { cam.x += step; }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      // 0.12 of the frame a press, like the x keys; a rail has no height.
+      // Up looks up: the picture moves down the frame, y grows.
+      if (!yf) return;
+      cam.y = (cam.y > 0 ? cam.y : 0) + (e.key === 'ArrowUp' ? 1 : -1) * 0.12 * yf.base;
+    }
     else if (e.key === '+' || e.key === '=') {
       const before = cam.ppv;
-      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling);
+      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, yf || undefined);
       atCeiling = cam.ppv === before;
     }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling); }
+    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, yf || undefined); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
       // The notice is an overlay like the five below and goes first for the
@@ -891,13 +927,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     } else return;
     e.preventDefault();
-    clampCamera(cam, v.W, ceiling);
+    clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
-      emptyShown, dismissEmpty, zoomCapFor]);
+      emptyShown, dismissEmpty, zoomCapFor, yFrameFor]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;

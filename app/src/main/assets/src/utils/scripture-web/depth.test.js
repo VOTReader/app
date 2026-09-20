@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   arcShape, arcHeight, spanLogOf, maxZoomFor, PPV_MAX_CSS,
   ribbonStyle, segmentsFor, visibleWindow, localizeFactor, squashFactor, CEIL_SOFTNESS,
-  ALPHA_DEEP, arcParamLength, arcTauOf, arcPointAt,
+  ALPHA_DEEP, arcParamLength, arcTauOf, arcPointAt, DOME,
 } from './geometry.js';
 
 // design-perf's phoneLand frame, in DEVICE px (the shader's frame).
@@ -318,21 +318,22 @@ describe('S3 — tessellation follows the screen, not the arc', () => {
           if (!(R > 0) || !(A > 0)) continue;
           const left = wPx / 2;             // a foot mid-screen: the reader's case
           const right = left + 2 * rx;
-          const P = arcParamLength(rx, R);
+          const P = arcParamLength(rx, R, R);
+          const bow = DOME * localize;
           const [lo, hi] = visibleWindow(left, right, wPx, localize);
-          const tA = arcTauOf(lo, left, right, R, P);
-          const tB = arcTauOf(hi, left, right, R, P);
+          const tA = arcTauOf(lo, left, right, R, R, P);
+          const tB = arcTauOf(hi, left, right, R, R, P);
           const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr);
           const where = `${f.name} z${Math.round(zoom)} span${span} n${n}`;
           for (let i = 0; i < n; i++) {
-            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, R, A, P);
-            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, R, A, P);
+            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, R, R, A, P, bow);
+            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, R, R, A, P, bow);
             if ((p0.h > ceilPx && p1.h > ceilPx) || (p0.x > wPx && p1.x > wPx)) continue;
             expect(Math.hypot(p1.x - p0.x, p1.h - p0.h) / f.dpr, where + ' segment')
               .toBeLessThanOrEqual(24);
             for (let k = 1; k < 16; k++) {
               const u = k / 16;
-              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, R, A, P);
+              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, R, R, A, P, bow);
               const cx = p0.x + (p1.x - p0.x) * u;
               const ch = p0.h + (p1.h - p0.h) * u;
               expect(Math.hypot(m.x - cx, m.h - ch) / f.dpr, where + ' chord')

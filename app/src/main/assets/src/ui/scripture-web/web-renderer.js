@@ -25,11 +25,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
+  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat,
   STROKE_MIN_CSS, STROKE_DEEP_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
-import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
+import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
 
 /** Colour modes, in the order the control cycles them. */
 export const COLOR_MODES = ['distance', 'testament', 'genre'];
@@ -61,6 +61,7 @@ const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uCeil, uSquash, uLocalize;
+uniform float uCamY;         // the picture's shift down the frame, device px
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
@@ -69,6 +70,7 @@ uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything els
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
+in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
@@ -82,11 +84,14 @@ void main(){
   float r = max(rx, 0.);
   float left = cx - r, right = cx + r;
   float spanLog = log(max(abs(b - a), 1.))/log(max(uTotal, 2.));
-  vec2 sh = arcShape(rx, uCeil, uSquash, uLocalize, spanLog);
-  float R = sh.x, A = sh.y;
-  // Parameter length: a quarter at each foot plus the level run between them,
-  // measured in units of R so the run is sampled at the quarter's own speed.
-  float P = 3.14159265 + (R > 0. ? max(0., (2.*r - 2.*R)/R) : 0.);
+  // one shape per FOOT: its rank sets its quarter; A is the same at both
+  vec2 shL = arcShape(rx, uCeil, uSquash, uLocalize, spanLog, aFanA);
+  vec2 shR = arcShape(rx, uCeil, uSquash, uLocalize, spanLog, aFanB);
+  float RL = shL.x, RR = shR.x, A = shL.y;
+  // parameter length, in units of the mean quarter: geometry.arcParamLength
+  float Rm = (RL + RR)*.5;
+  float P = 3.14159265 + (Rm > 0. ? max(0., (2.*r - RL - RR)/Rm) : 0.);
+  float bow = ${glslFloat(DOME)}*uLocalize;
 
   // The piece worth tessellating. At overview this is the whole arc, so the 1x
   // frame cannot move; as the reader localizes it closes onto the viewport,
@@ -102,10 +107,11 @@ void main(){
   int vid = gl_VertexID;
   float t = float(vid >> 1) / uSegments;
   float side = float(vid & 1)*2. - 1.;
-  float tau = mix(arcTau(lo, left, right, R, P), arcTau(hi, left, right, R, P), t);
+  float tau = mix(arcTau(lo, left, right, RL, RR, P), arcTau(hi, left, right, RL, RR, P), t);
   float px, hgt; vec2 tgv;
-  arcAt(tau, left, right, R, A, P, px, hgt, tgv);
-  vec2 p = vec2(px, uBase - hgt);
+  arcAt(tau, left, right, RL, RR, A, P, bow, px, hgt, tgv);
+  // the baseline draws uCamY below the frame's base; pick.js adds the same
+  vec2 p = vec2(px, uBase + uCamY - hgt);
   vec2 tg = normalize(tgv + vec2(1e-6, 0.));
 
   // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
@@ -228,7 +234,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.useProgram(program);
 
   const U = {};
-  for (const name of ['uRes', 'uCamX', 'uPPV', 'uBase', 'uCeil', 'uSquash',
+  for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uCeil', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase']) {
@@ -278,6 +284,10 @@ export function createRenderer(canvas, graph, opts = {}) {
   attrib(graph.to, 'aTo', gl.UNSIGNED_SHORT, true, 2);
   attrib(new Float32Array(graph.votes), 'aVotes', gl.FLOAT, false, 4);
   attrib(genre, 'aGenre', gl.FLOAT, false, 4);
+  // Each foot's departure rank, the table the hit test reads too.
+  const fans = fansOf(graph);
+  attrib(fans.fanA, 'aFanA', gl.FLOAT, false, 4);
+  attrib(fans.fanB, 'aFanB', gl.FLOAT, false, 4);
 
   /**
    * Point every instance attribute at `first`.
@@ -340,7 +350,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     /**
      * Draw one frame.
      * @param {{width:number, height:number, base:number, ceil:number,
-     *   squash:number, localize:number, camX:number, ppv:number,
+     *   squash:number, localize:number, camX:number, camY?:number, ppv:number,
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
@@ -362,6 +372,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.bindVertexArray(vao);
       gl.uniform2f(U.uRes, v.width, v.height);
       gl.uniform1f(U.uCamX, v.camX);
+      gl.uniform1f(U.uCamY, v.camY > 0 ? v.camY : 0);
       gl.uniform1f(U.uPPV, v.ppv);
       gl.uniform1f(U.uBase, v.base);
       gl.uniform1f(U.uCeil, v.ceil);

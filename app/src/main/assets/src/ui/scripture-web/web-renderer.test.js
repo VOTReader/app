@@ -21,12 +21,17 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.vertex).toContain(arcShapeGLSL);
   });
 
-  it('calls that law for the arc radii, and draws the curve it returns', () => {
+  it('calls that law for the arc radii, once per FOOT with its own departure rank, and draws the curve it returns', () => {
     expect(SHADER_SOURCE.vertex)
-      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog\)/);
+      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog,\s*aFanA\)/);
+    expect(SHADER_SOURCE.vertex)
+      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog,\s*aFanB\)/);
     // The point and its tangent come from the shared arcAt, not from a
-    // hand-written cos/sin pair beside it.
-    expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*R,\s*A,\s*P,/);
+    // hand-written cos/sin pair beside it; the dome rides DOME x uLocalize.
+    expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*RL,\s*RR,\s*A,\s*P,\s*bow,/);
+    expect(SHADER_SOURCE.vertex).toMatch(/float bow = 0\.25\*uLocalize;/);
+    // and the camera's y shifts the baseline the ribbon stands on
+    expect(SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
     expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(lo,/);
     expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(hi,/);
   });

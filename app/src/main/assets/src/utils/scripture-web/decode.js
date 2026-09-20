@@ -122,6 +122,84 @@ export function decodeGraph(data) {
 }
 
 /**
+ * Departure slots (phase 1's assignSlots, ported for the bent re-cut): at
+ * every verse the incident threads — arriving or leaving — are ranked by
+ * their OTHER end ascending, ties by position, and the k-th of N takes
+ * (k + 1) / (N + 1) of the cell. A lone thread stands in the middle (1/2,
+ * exactly: no byte rounding, so its quarter is today's to the bit), a
+ * leftward thread ranks before every rightward one. The bent law reads the
+ * rank as a FAN (fansOf): it sets the quarter the foot leaves on, so a
+ * verse's N threads leave in N quarters instead of one bundle (Corbin,
+ * 2026-09-11: at the ceiling "one foot per verse, bundles inseparable").
+ * The shipped asset's busiest verse carries 102 threads.
+ *
+ * @param {Uint16Array} from @param {Uint16Array} to
+ * @param {number} count @param {number} total
+ * @returns {{slotA:Float32Array, slotB:Float32Array}} slotA at `from`, slotB at `to`, 0..1
+ */
+export function assignSlots(from, to, count, total) {
+  // counting sort of the 2·count feet by verse
+  const start = new Uint32Array(total + 1);
+  for (let i = 0; i < count; i++) { start[from[i] + 1]++; start[to[i] + 1]++; }
+  for (let v = 0; v < total; v++) start[v + 1] += start[v];
+  // one key per foot: (other end, position, side) packed so a numeric sort ranks them
+  const fill = new Uint32Array(total);
+  const keys = new Uint32Array(2 * count);
+  for (let i = 0; i < count; i++) {
+    keys[start[from[i]] + fill[from[i]]++] = to[i] * 131072 + i * 2;
+    keys[start[to[i]] + fill[to[i]]++] = from[i] * 131072 + i * 2 + 1;
+  }
+  const slotA = new Float32Array(count), slotB = new Float32Array(count);
+  for (let v = 0; v < total; v++) {
+    const s = start[v], n = start[v + 1] - s;
+    if (n === 0) continue;
+    if (n > 1) keys.subarray(s, s + n).sort();
+    for (let k = 0; k < n; k++) {
+      const key = keys[s + k];
+      const i = (key >>> 1) & 0xffff;
+      const slot = (k + 1) / (n + 1);
+      if (key & 1) slotB[i] = slot; else slotA[i] = slot;
+    }
+  }
+  return { slotA, slotB };
+}
+
+/** One fan table per graph object, built on first use — the renderer and the hit test share it. */
+const FANS = new WeakMap();
+/**
+ * Each foot's departure rank, centred: slot − 1/2, so −0.5..0.5 with 0 for
+ * a lone thread (today's quarter exactly). Float32 so the renderer can hand
+ * it to the GPU as it is.
+ * @param {{from:Uint16Array, to:Uint16Array, count:number, total:number}} g
+ * @returns {{fanA:Float32Array, fanB:Float32Array}} fanA at `from`, fanB at `to`
+ */
+export function fansOf(g) {
+  let f = FANS.get(g);
+  if (!f) {
+    const { slotA, slotB } = assignSlots(g.from, g.to, g.count, g.total);
+    const fanA = new Float32Array(g.count), fanB = new Float32Array(g.count);
+    for (let i = 0; i < g.count; i++) { fanA[i] = slotA[i] - 0.5; fanB[i] = slotB[i] - 0.5; }
+    f = { fanA, fanB };
+    FANS.set(g, f);
+  }
+  return f;
+}
+
+/**
+ * The widest thread's span, verses — the y camera's ceiling reads the law at
+ * it (geometry.apexMaxPx). 0 for an empty graph.
+ * @param {{from:Uint16Array, to:Uint16Array, count:number}} g
+ */
+export function maxSpanOf(g) {
+  let m = 0;
+  for (let i = 0; i < g.count; i++) {
+    const s = Math.abs(g.to[i] - g.from[i]);
+    if (s > m) m = s;
+  }
+  return m;
+}
+
+/**
  * How many instances a bucket draws at a given density.
  * The layout is pre-sorted so each density is a PREFIX of the bucket — the
  * renderer just shortens its instance count; nothing is re-uploaded.

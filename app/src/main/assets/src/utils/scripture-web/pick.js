@@ -21,15 +21,15 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, spanLogOf, flyOverDim, verseToX, xToVerse,
+  arcAnchored, arcDistance, arcShape, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
 } from './geometry.js';
-import { bucketDrawCount } from './decode.js';
+import { bucketDrawCount, fansOf } from './decode.js';
 
 /**
  * Nearest arc to a screen point.
  *
  * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
  *   localize:number, density:import('./decode.js').Density,
  *   rulerDepth?:number}} view
@@ -47,7 +47,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  * crossings can be disambiguated instead of silently choosing one line.
  *
  * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
  *   localize:number, density:import('./decode.js').Density}} view
  * @param {number} px
@@ -57,7 +57,12 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
-  const { width, base, ceil, squash, localize, density } = view;
+  const { width, ceil, squash, localize, density } = view;
+  // The baseline as DRAWN: the camera's y shifts the whole picture down the
+  // frame, so the curve the finger meets stands cam.y below the frame's base.
+  const base = view.base + (cam.y > 0 ? cam.y : 0);
+  const bow = DOME * localize;
+  const { fanA, fanB } = fansOf(g);
   const half = width / 2;
   const camX = cam.x, ppv = cam.ppv;
   const cap = Math.max(1, Math.min(limit || 4, 8));
@@ -85,9 +90,13 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // exactly. Only a full zero is skipped: an arc still showing the
         // partial fly-over floor is dim, but it is there to be tapped.
         if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
-        const shape = arcShape((x1 - x0) * 0.5, ceil, squash, localize,
-          spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total));
-        const d = arcDistance(px, py, x0, x1, base, shape.R, shape.A, tol);
+        // One shape per FOOT: each foot's departure rank sets its quarter; the
+        // apex is the same at both. Exactly the two calls the shader makes.
+        const rx = (x1 - x0) * 0.5;
+        const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
+        const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
+        const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
+        const d = arcDistance(px, py, x0, x1, base, shapeL.R, shapeR.R, shapeL.A, tol, bow);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
         while (at > 0 && best[at - 1].distance > d) at--;

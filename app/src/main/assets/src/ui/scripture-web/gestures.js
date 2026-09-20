@@ -47,16 +47,17 @@ export function isChromeTarget(target) {
  * @param {{
  *   loc: (e: PointerEvent) => {x:number, y:number},
  *   dpr: () => number,
- *   cam: () => {x:number, ppv:number, total:number},
- *   camFor?: (yDevice:number) => {x:number, ppv:number, total:number},
+ *   cam: () => {x:number, y?:number, ppv:number, total:number},
+ *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
  *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
- *   clampCamera: (cam:object, width:number, maxZoom:number) => void,
- *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number) => void,
+ *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
+ *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number, yf?:object) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
+ *   yFrame?: (cam:object) => (object|null),
  * }} deps
  * @returns {() => void} detach
  */
@@ -67,6 +68,11 @@ export function attachWebGestures(el, deps) {
   // below); a surface without it (the canon web) has one camera for all.
   const camAt = (yCss) => (deps.camFor ? deps.camFor(yCss * dpr()) : cam());
   const zoomCap = (c) => maxZoom(c);
+  // The y axis: the frame a camera moves its y inside (geometry.YFrame) —
+  // the canon web's camera has one, a My Web rail has none and its y stays
+  // 0. A finger moving DOWN shows what is higher, as a page does: the
+  // picture follows the finger, so y (device px) grows with dy.
+  const yFrameOf = (c) => (deps.yFrame ? deps.yFrame(c) : null);
   const pointers = new Map();
   let drag = null, pinch = null, moved = false, lastTap = 0;
 
@@ -93,7 +99,7 @@ export function attachWebGestures(el, deps) {
       drag = null;
     } else {
       const dc = camAt(pt.y);
-      drag = { x: pt.x, y: pt.y, camx: dc.x, cam: dc };
+      drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc };
     }
   };
   const move = (e) => {
@@ -103,16 +109,18 @@ export function attachWebGestures(el, deps) {
     if (pinch && pointers.size === 2) {
       const c = pinch.cam;
       const [p, q] = Array.from(pointers.values());
+      const yf = yFrameOf(c);
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
-      clampCamera(c, W, zoomCap(c));
+      clampCamera(c, W, zoomCap(c), yf);
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
-      clampCamera(c, W, zoomCap(c));
+      clampCamera(c, W, zoomCap(c), yf);
       moved = true; if (deps.live) deps.live(); schedule(); return;
     }
     if (drag) {
       const c = drag.cam;
       // Motion on EITHER axis is a gesture, not a tap. The web pans along x
-      // only, but a finger that travelled 100 px across the canon did not
+      // (and along y once its camera has a y frame, below), but before that
+      // a finger that travelled 100 px across the canon did not
       // tap: read from x alone, that swipe ended in handlers().tap, opened
       // the thread chooser over the canvas, and every drag after it began on
       // the sheet and moved nothing (Corbin, 2026-09-11: "you can't grab the
@@ -122,7 +130,9 @@ export function attachWebGestures(el, deps) {
       // between the rails is likewise a gesture and not a tap.
       if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
       c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
-      clampCamera(c, W, zoomCap(c));
+      const yf = yFrameOf(c);
+      if (yf) c.y = drag.camy + (pt.y - drag.y) * dpr();
+      clampCamera(c, W, zoomCap(c), yf);
       if (deps.live) deps.live(); schedule(); return;
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
@@ -154,7 +164,7 @@ export function attachWebGestures(el, deps) {
     e.preventDefault();
     const pt = loc(e), W = view().W;
     const c = camAt(pt.y);
-    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c));
+    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c), yFrameOf(c) || undefined);
     if (deps.live) deps.live();
     schedule();
   };
