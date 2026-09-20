@@ -40,8 +40,8 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-db7cdf7e65';
-const CORPUS_VERSION = 'c56'; // c55->c56 (2026-09-20): Volume Seven gains the letter "My Anger Runs Deep" (4/3/10, spoken to Timothy, regarding abortion), which had a Timothy recording on Drive but no corpus text, so the app could not show it and the recording could not be aligned. The page is an orphan on thevolumesoftruth.com - real, canonical, but absent from the Volume Seven index, which is how the corpus builder missed it. It lands in date order between "I Alone Sit as Judge, Says The Lord" (4/2/10) and "Lost Sheep" (4/8/10); Volume Seven is now 67 letters and every num from 44 on shifts by one so num keeps meaning ordinal position.
+const CACHE_VERSION = 'v1.0.2-80c406ac62';
+const CORPUS_VERSION = 'c57'; // c56->c57 (2026-09-20): c56 put "My Anger Runs Deep" in date order at num 44 and reflowed nums 44-66, which broke a load-bearing invariant: for Volume Seven the corpus num IS the Drive file number (V7.044 Lost Sheep ... V7.066 The Last Trumpet), and Drive's own V7.045 is a different letter - the Anger recording is a Bonus Track in folder 7. Nums 44-66 are restored byte-for-byte and the letter is appended as num 67, last in the array so the index screen (which renders in array order and prints letter.num) and the number agree. Its id and audio key are unchanged: my-anger-runs-deep / seven:my-anger-runs-deep.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -286,7 +286,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-b.js': 'c5ea2e0ba67679d9ad2291cf1ac400c759d870b8d9fadb27a690a5ae4f789a13',
   './dist/bundle-c.js': 'bff22d74a82a8fddf2da2c7a89dd47df02292646634d184870ba6486fca1547f',
   './dist/bundle-d.js': '44c6ca2ec4764a5c4fb00693dc159dd9d4697753ac49d17bb3d040f1aa338191',
-  './dist/bundle-e.js': '8a3c4388de4eae03584c1c348d7c15c4f4cbf7f86205578b437b6bc720e1269e',
+  './dist/bundle-e.js': '153d3eec445d26e7a585ba7547788a633938090bfb1fc5d634513d14a66f4923',
   './dist/bundle-f.js': '7e0f0b43cab7c1783affb8e37e7fd615cf0a85019f187ed771cb90eb2f35bc59',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'd19be6f51585ea59ac09dbeda64c7df7672bd844bb7b86a85acd828c5202edb2',
