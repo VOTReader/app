@@ -10076,6 +10076,45 @@ var LETTERS_V7 = [
       "title": "The Voice of The Almighty God"
     },
     "nextLetter": {
+      "id": "my-anger-runs-deep",
+      "title": "My Anger Runs Deep"
+    }
+  },
+  {
+    "id": "my-anger-runs-deep",
+    "title": "My Anger Runs Deep",
+    "date": "4/3/10",
+    "from": "From The Lord, Our God and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding abortion, the slaying of the innocent)",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "bold-italic",
+            "v": "Thus says The Lord:"
+          },
+          {
+            "t": "text",
+            "v": "My anger runs deep, and is kindled against all who slay the little ones! Yet not over these only, for the sins of this people are piled to heaven, a whole nation without remorse! Thus I shall destroy the city and bring down My hand hard upon the people! For upon this city and upon this nation have I laid all the blood of the innocent, from the day it was brought forth as law even unto this day! Yet Dallas shall not be alone in the fire. For all cities and nations shall receive recompense in full for their evil deeds in the Day of The Lord’s Anger, coming to nothing when My wrath is fully satisfied! For I AM THE LORD, and that which has been stored up shall be poured out, full strength, upon this generation!..."
+          },
+          {
+            "t": "italic",
+            "v": "Until there is no more sin before My face! Until all this wickedness is wiped away! Until the whole breadth of the whole earth is burned up with unquenchable fire, and every trace of the kingdoms of men is gone from this place, never to rise again! Says The Lord God of Hosts, He whose face is filled with the heat of His hot displeasure, whose jealousy burns as a raging fire over His beloved little ones, whose countenance has changed and is set hard against the peoples of the earth!"
+          }
+        ]
+      }
+    ],
+    "footnotes": {},
+    "nkjv": {},
+    "num": 44,
+    "prevLetter": {
+      "id": "i-alone-sit-as-judge-says-the-lord",
+      "title": "I Alone Sit as Judge, Says The Lord"
+    },
+    "nextLetter": {
       "id": "lost-sheep",
       "title": "Lost Sheep"
     }
@@ -10210,10 +10249,10 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Gathering_Up_(Rapture)"
       }
     ],
-    "num": 44,
+    "num": 45,
     "prevLetter": {
-      "id": "i-alone-sit-as-judge-says-the-lord",
-      "title": "I Alone Sit as Judge, Says The Lord"
+      "id": "my-anger-runs-deep",
+      "title": "My Anger Runs Deep"
     },
     "nextLetter": {
       "id": "my-word-has-gone-forth-yet-who-has-embraced-it-who-has-cupped-their-ears-to-listen-says-the-lord",
@@ -10359,7 +10398,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_Scoffers"
       }
     ],
-    "num": 45,
+    "num": 46,
     "prevLetter": {
       "id": "lost-sheep",
       "title": "Lost Sheep"
@@ -10440,7 +10479,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_What_is_an_Abomination_to_The_Lord"
       }
     ],
-    "num": 46,
+    "num": 47,
     "prevLetter": {
       "id": "my-word-has-gone-forth-yet-who-has-embraced-it-who-has-cupped-their-ears-to-listen-says-the-lord",
       "title": "My Word Has Gone Forth, Yet Who Has Embraced It?... Who Has Cupped Their Ears to Listen?! Says The Lord"
@@ -10562,7 +10601,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/The_One_Who_Stays,_Lets"
       }
     ],
-    "num": 47,
+    "num": 48,
     "prevLetter": {
       "id": "thus-declares-the-lord-against-the-nation-once-called-of-itself-under-god",
       "title": "Thus Declares The Lord Against the Nation Once Called of Itself “Under God”"
@@ -10794,7 +10833,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       }
     ],
-    "num": 48,
+    "num": 49,
     "prevLetter": {
       "id": "the-one-who-stays-lets",
       "title": "The One Who Stays, Lets"
@@ -10939,7 +10978,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/The_Coming_of_The_Lord#I_Am_Coming_Quickly"
       }
     ],
-    "num": 49,
+    "num": 50,
     "prevLetter": {
       "id": "blow-the-trumpet-sound-the-alarm",
       "title": "Blow the Trumpet, Sound the Alarm"
@@ -11282,7 +11321,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_and_Hour_Unknown"
       }
     ],
-    "num": 50,
+    "num": 51,
     "prevLetter": {
       "id": "the-holy-one-of-israel-is-coming-down",
       "title": "The Holy One of Israel Is Coming Down"
@@ -11509,7 +11548,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/index.php?search=%225%2F19%2F10%22&title=Special%3ASearch&go=Go"
       }
     ],
-    "num": 51,
+    "num": 52,
     "prevLetter": {
       "id": "the-lord-gives-behold-the-lord-also-takes-away",
       "title": "The Lord Gives; Behold, The Lord Also Takes Away"
@@ -11643,7 +11682,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_Israel"
       }
     ],
-    "num": 52,
+    "num": 53,
     "prevLetter": {
       "id": "i-shall-remove-my-hand-and-my-spirit-shall-be-withdrawn-and-that-purposed-from-the-beginning-shall-be-done-it-shall-be-accomplished-swiftly",
       "title": "I Shall Remove My Hand and My Spirit Shall Be Withdrawn... And That Purposed from the Beginning Shall Be Done, It Shall Be Accomplished Swiftly"
@@ -11764,7 +11803,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       }
     ],
-    "num": 53,
+    "num": 54,
     "prevLetter": {
       "id": "the-sword-comes",
       "title": "The Sword Comes"
@@ -11835,7 +11874,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       }
     ],
-    "num": 54,
+    "num": 55,
     "prevLetter": {
       "id": "a-day-of-slaughter",
       "title": "A Day of Slaughter"
@@ -12242,7 +12281,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Thus_Says_The_Lord_Regarding_Abortion"
       }
     ],
-    "num": 55,
+    "num": 56,
     "prevLetter": {
       "id": "i-will-defend-my-people-israel",
       "title": "I Will Defend My People, Israel"
@@ -12431,7 +12470,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/False_Doctrines_Within_the_Churches_of_Men_Regarding..."
       }
     ],
-    "num": 56,
+    "num": 57,
     "prevLetter": {
       "id": "vengeance-is-mine-i-shall-repay",
       "title": "Vengeance Is Mine, I Shall Repay"
@@ -12567,7 +12606,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       }
     ],
-    "num": 57,
+    "num": 58,
     "prevLetter": {
       "id": "the-diviners-divine-false-visions-the-prophets-prophesy-lies-and-every-dreamer-shares-deceptive-dreams-brought-forth-from-their-own-imagination",
       "title": "The Diviners Divine False Visions, the Prophets Prophesy Lies, and Every Dreamer Shares Deceptive Dreams Brought Forth from Their Own Imagination"
@@ -12830,7 +12869,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Woe_to_Those_Who..."
       }
     ],
-    "num": 58,
+    "num": 59,
     "prevLetter": {
       "id": "churches-of-men-you-have-robbed-me-says-the-lord",
       "title": "Churches of Men, You Have Robbed Me! Says The Lord"
@@ -13009,7 +13048,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/THERE_IS_NO_OTHER"
       }
     ],
-    "num": 59,
+    "num": 60,
     "prevLetter": {
       "id": "the-alarm-of-war",
       "title": "The Alarm of War"
@@ -13212,7 +13251,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/The_One_Who_Stays,_Lets#.22My_Hand_is_Removed.22"
       }
     ],
-    "num": 60,
+    "num": 61,
     "prevLetter": {
       "id": "depart-from-me",
       "title": "Depart from Me"
@@ -13676,7 +13715,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_The_Kingdom_and_Heaven"
       }
     ],
-    "num": 61,
+    "num": 62,
     "prevLetter": {
       "id": "captive-children-a-lamentation",
       "title": "Captive Children (a Lamentation)"
@@ -14009,7 +14048,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       }
     ],
-    "num": 62,
+    "num": 63,
     "prevLetter": {
       "id": "proclaim-the-name-of-the-lord",
       "title": "Proclaim The Name of The Lord"
@@ -14166,7 +14205,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Holidays_of_Men"
       }
     ],
-    "num": 63,
+    "num": 64,
     "prevLetter": {
       "id": "my-word-is-fire",
       "title": "My Word Is Fire"
@@ -14722,7 +14761,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_The_Kingdom_and_Heaven"
       }
     ],
-    "num": 64,
+    "num": 65,
     "prevLetter": {
       "id": "dividing-the-spoils",
       "title": "Dividing the Spoils"
@@ -15411,7 +15450,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/Regarding_the_Days_of_Noah"
       }
     ],
-    "num": 65,
+    "num": 66,
     "prevLetter": {
       "id": "i-am-calling-you-out-part-1",
       "title": "I Am Calling You Out! (Part 1)"
@@ -16280,7 +16319,7 @@ var LETTERS_V7 = [
         "url": "https://answersonlygodcangive.com/THERE_IS_NO_OTHER"
       }
     ],
-    "num": 66,
+    "num": 67,
     "prevLetter": {
       "id": "i-am-calling-you-out-part-2-come-out-of-the-churches-of-men-and-i-will-receive-you-says-the-lord",
       "title": "I Am Calling You Out! (Part 2)... Come Out of the Churches of Men and I Will Receive You! Says The Lord"
