@@ -195,7 +195,21 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     const tick = () => {
       if (stopped) return;
       // getState(), not the `st` this effect closed over: `pressed` moves without re-running it.
-      const pressedNow = !!(ctl && ctl.getState().pressed);
+      let pressedNow = !!(ctl && ctl.getState().pressed);
+      /* THE PRESS ALREADY HAPPENED (`doneIf`, the listening stops): the sheet is open before the
+         player stop asks for it (the reader tapped the bar; Back from the next stop), or gone
+         before the back-to-words stop asks (‹, the backdrop, Android Back; Back from the closing
+         card). Read every frame, so the reader's own tap on the backdrop — no click on the ringed
+         ‹ for the listener below to hear — still moves the card to its after-words. Read BEFORE
+         this frame decides what is ringed: the press re-renders the card opened, and the opened dims
+         take the reading column's top from scrollerTopRef — measured below only on a frame that
+         rings nothing. Pressing after `ringed` was fixed left that frame ringing the gone ‹, so the
+         render carried the ‹'s own scroller (the sheet, top 0) and the top dim was 0 high for a
+         frame (tour1, the TourOverlay flake under a loaded CPU, 2026-09-22). */
+      if (step && step.doneIf && ctl && !pressedNow) {
+        const present = !!document.querySelector(step.doneIf.selector);
+        if (present === step.doneIf.present) { ctl.targetPressed(); pressedNow = !!ctl.getState().pressed; }
+      }
       /* What is ringed on this frame: the stop's target; once pressed, the `afterTarget` where the
          stop has one (the player stop: the voice row the press revealed), and NOTHING where the
          press's result is the words themselves — the reading column is the window then, found
@@ -203,15 +217,6 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
          sheet it lived in) and a gone target is not a missing one. */
       const ringed = !step ? null : pressedNow ? (step.afterTarget ? { target: step.afterTarget } : null) : (step.target ? step : null);
       const el = ringed && ctl ? ctl.findTarget(ringed) : null;
-      /* THE PRESS ALREADY HAPPENED (`doneIf`, the listening stops): the sheet is open before the
-         player stop asks for it (the reader tapped the bar; Back from the next stop), or gone
-         before the back-to-words stop asks (‹, the backdrop, Android Back; Back from the closing
-         card). Read every frame, so the reader's own tap on the backdrop — no click on the ringed
-         ‹ for the listener below to hear — still moves the card to its after-words. */
-      if (step && step.doneIf && ctl && !pressedNow) {
-        const present = !!document.querySelector(step.doneIf.selector);
-        if (present === step.doneIf.present) ctl.targetPressed();
-      }
       if (docked && !ringed && ctl) {
         // The reading column: what the dims leave open and what carries the card's scroll-padding.
         const col = ctl.findTarget({ target: { selector: '.screen-scroll' } });

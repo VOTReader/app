@@ -928,6 +928,32 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
     expect(d[2].width).toBe(0); expect(d[3].width).toBe(0);
   });
 
+  it('the frame that sees the sheet gone already opens the reading column from its own top (56): no frame of a 0-high dim', async () => {
+    /* THE FLAKE (tour1, 2026-09-22): the frame that found the sheet gone pressed the stop, and React
+       rendered the opened dims from scrollerTopRef BEFORE the next frame had measured .screen-scroll
+       — the ref still held the ‹'s own scroller (the sheet, top 0), so the top dim was 0 high for a
+       frame. Under a loaded CPU the test's 60 ms settle held fewer frames and read that frame. The
+       frames are stepped by hand here so the FIRST frame after the removal is the one asserted. */
+    const rafQ = [];
+    const realRaf = window.requestAnimationFrame, realCaf = window.cancelAnimationFrame;
+    window.requestAnimationFrame = (cb) => { rafQ.push(cb); return rafQ.length; };
+    window.cancelAnimationFrame = () => {};
+    const frame = () => act(() => { for (const cb of rafQ.splice(0)) cb(performance.now()); });
+    try {
+      bibleScreen({ sheet: true });
+      startAt('back-to-words');
+      render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+      await frame(); await frame(); await frame();
+      expect(TourController.getState().pressed).toBe(false);
+      expect(ringBox()).toEqual({ top: 64 - 8, left: 8 - 8, height: 44 + 16 });
+      document.querySelector('.audio-manager-sheet').remove();
+      await frame();   // ONE frame: it sees the sheet gone, presses, and must render the column open from 56
+      expect(TourController.getState().pressed).toBe(true);
+      const d = [...document.querySelectorAll('.tour-dim')].map((x) => ({ top: parseFloat(/** @type {HTMLElement} */ (x).style.top), height: parseFloat(/** @type {HTMLElement} */ (x).style.height), width: parseFloat(/** @type {HTMLElement} */ (x).style.width) }));
+      expect(d[0]).toEqual({ top: 0, height: 56, width: window.innerWidth });
+    } finally { window.requestAnimationFrame = realRaf; window.cancelAnimationFrame = realCaf; }
+  });
+
   it('no sheet when the back-to-words stop shows (Back from the closing card) counts as pressed at once, with no "could not find it"', async () => {
     bibleScreen();
     startAt('back-to-words');
