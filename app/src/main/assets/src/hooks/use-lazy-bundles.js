@@ -1,7 +1,7 @@
 /* useLazyBundles — subscribe App() to every lazily-loaded bundle's load signal
-   so its routes re-evaluate the moment a corpus or the lazy screen bundle (PF6)
+   so its routes re-evaluate the moment a corpus or a lazy screen bundle (PF6)
    arrives. Each is a __makeLazyLoader corpus object on window (the three
-   scripture corpora + screens-e); every access is typeof-guarded so the hook is
+   scripture corpora + every screens-* bundle); every access is typeof-guarded so the hook is
    inert when a loader isn't registered (e.g. unit tests, or before index.html's
    loader IIFE has run). Folds the three corpus subscriptions that used to live
    inline in App() and ADDS the bundle-e one — keeping App() under its 800-line
@@ -46,5 +46,22 @@ export function useLazyBundles() {
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__screensF !== 'undefined' ? window.__screensF.subscribe(cb) : () => {}), []),
     () => (typeof window.__screensF !== 'undefined' ? window.__screensF.getVersion() : 0)
+  );
+  // screens-g (the Personal Study screens, Bookmarks, Milestones, History and
+  // the journal) and screens-h (the Listening Library) were added by landings
+  // 21-24 and 28 and were NOT subscribed here until 2026-09-22 — the route
+  // kept rendering "Loading…" after the bundle had arrived, because nothing
+  // told App. It looked fine because opening those screens usually also kicks
+  // the VOT corpus, whose bump re-renders the tree; a reader who opens My
+  // Notes after the corpus has settled just sat there. One subscription per
+  // lazy bundle, and use-lazy-bundles.test.jsx reads index.html's loaders so a
+  // NEW bundle fails this file until it is taught here.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__screensG !== 'undefined' ? window.__screensG.subscribe(cb) : () => {}), []),
+    () => (typeof window.__screensG !== 'undefined' ? window.__screensG.getVersion() : 0)
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__screensH !== 'undefined' ? window.__screensH.subscribe(cb) : () => {}), []),
+    () => (typeof window.__screensH !== 'undefined' ? window.__screensH.getVersion() : 0)
   );
 }

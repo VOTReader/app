@@ -154,14 +154,25 @@ import { linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna } from '.
 import { votNoteVolLabel } from '../data/vot-note-label.js';
 
 // ── Journal UI (sheets) ─────────────────────────────────────────────────
-import { JournalRecordingSheet } from '../ui/sheets/JournalRecordingSheet.jsx';
-import { JournalInsertSheet } from '../ui/sheets/JournalInsertSheet.jsx';
+// Only the sheet the SHELL mounts stays here. AppShellSheets renders
+// JournalInboundSheet on every screen ("entries linked to this ref"), so it is
+// app-shell weight the way BookmarkPopover was in landing 22. The two sheets
+// the EDITOR alone renders — JournalInsertSheet and JournalRecordingSheet —
+// went to bundle-g with it (landing 28).
 import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 
 // ── Journal UI (screens) ────────────────────────────────────────────────
-import * as HubScreen from '../ui/screens/JournalHubScreen.jsx';
-import * as ViewerScreen from '../ui/screens/JournalViewerScreen.jsx';
-import * as EditorScreen from '../ui/screens/JournalEditorScreen.jsx';
+// The hub, the viewer and the editor left this cluster for the lazy bundle-g
+// on 2026-09-22 (landing 28, -76 KB off every launch): they are screens a
+// reader opens ON PURPOSE, the same shape as My Progress, Notes, Links,
+// Highlights, Bookmarks, Milestones and History before them. Their private
+// helpers (JournalCardMenu, jrnRenderInline, JournalBlockView, the image and
+// audio blocks, jrnPinIcon) are read by nothing outside those three files, so
+// they travelled too. What did NOT travel is the machinery underneath: the
+// journal STYLES (the renderer paints JournalChip into reading text, and the
+// chip wears jrn- CSS), JournalChip itself, JournalHelpers, and every journal
+// store — they register with CachedStore and HydrationGate waits on them at
+// boot. tools/bundle-g-journal.test.js pins all of that.
 
 // ── Renderer ────────────────────────────────────────────────────────────
 import {
@@ -267,18 +278,12 @@ Object.assign(window, {
   findEntryContext, lookupVersesFromBooks,
   linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna,
   votNoteVolLabel,
-  // Journal UI (sheets)
-  JournalRecordingSheet, JournalInsertSheet, JournalInboundSheet,
+  // Journal UI (sheets) — the shell's one; the editor's two are in bundle-g
+  JournalInboundSheet,
   // Renderer
   JournalChip,
   jrnRefKeyForLetter, jrnRefKeyForBookmark,
 });
-
-// Journal UI screens — wildcard imports above let us spread ALL exports
-// onto window without listing each symbol (and missing internal helpers
-// like JournalCardMenu, jrnRenderInline, JournalBlockView that other
-// modules in the cluster reference via bare name in the classic world).
-Object.assign(window, HubScreen, ViewerScreen, EditorScreen);
 
 // ── Service worker (W3) — web-only, gated by PlatformBridge ────────────
 registerServiceWorker();

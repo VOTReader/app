@@ -32,7 +32,11 @@ const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'Highlig
   'BookmarksScreen', 'MilestonesScreen', 'HistoryScreen'];
 /* AboutScreen is NOT in that list on purpose: use-tabs.js opens a fresh
    install on it, so it is boot-path weight however on-purpose it looks. */
-const defines = (bundle, name) => bundle.includes(name + ':');
+/* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
+   writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
+   — and that colon reads exactly like a definition. A definition is a KEY in
+   an object literal, so the character before it is `{` or `,`. */
+const defines = (bundle, name) => new RegExp('[{,]\s*' + name + ':').test(bundle);
 
 describe('bundle-g carries the Personal Study screens, and bundle-d no longer does', () => {
   it('the seven screens are defined in bundle-g', () => {

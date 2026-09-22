@@ -6,35 +6,33 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { downsampleWave, JournalRecordingSheet } from './JournalRecordingSheet.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
-import { PlatformBridge } from '../../utils/platform-bridge.js';
-
-vi.mock('../../utils/platform-bridge.js', () => ({
-  PlatformBridge: {
-    isAndroid: false,
-    requestMicPermission: () => {
-      setTimeout(() => { if (window.__onMicPermissionResult) window.__onMicPermissionResult(true); }, 0);
-    },
-    nativeRecordStart: vi.fn(() => 'ok'),
-    nativeRecordAmplitude: () => 8000,
-    nativeRecordStop: vi.fn(),
-    nativeRecordCancel: vi.fn(),
-    nativeRecordPause: vi.fn(() => 'ok'),
-    nativeRecordResume: vi.fn(() => 'ok'),
-    // journal-3 clause (d), 2a-web. Spies, not no-ops: the whole point of both
-    // verbs is the NAME they are handed, and a stub that ignored its arguments
-    // would pass whatever this code sent it.
-    nativeReadRecording: vi.fn(() => null),
-    nativeDeleteRecording: vi.fn(() => true),
-    // journal-3 2b. Returns a STRING always: a JSON array of rows, or the
-    // sentinel 'error:list_failed'. '[]' is the honest default for a test that
-    // has not planted a served file.
-    nativeListRecordings: vi.fn(() => '[]'),
-    startAudioSession: vi.fn(),
-    endAudioSession: vi.fn(),
+/* The sheet reads PlatformBridge as a free global (it rides the lazy
+   bundle-g and must not bundle a second copy of the bridge), so the double is
+   INSTALLED on globalThis here, the way ConfirmStrip already is below. */
+const MockBridge = /** @type {any} */ ({
+  isAndroid: false,
+  requestMicPermission: () => {
+    setTimeout(() => { if (window.__onMicPermissionResult) window.__onMicPermissionResult(true); }, 0);
   },
-}));
-
-const MockBridge = /** @type {any} */ (PlatformBridge);
+  nativeRecordStart: vi.fn(() => 'ok'),
+  nativeRecordAmplitude: () => 8000,
+  nativeRecordStop: vi.fn(),
+  nativeRecordCancel: vi.fn(),
+  nativeRecordPause: vi.fn(() => 'ok'),
+  nativeRecordResume: vi.fn(() => 'ok'),
+  // journal-3 clause (d), 2a-web. Spies, not no-ops: the whole point of both
+  // verbs is the NAME they are handed, and a stub that ignored its arguments
+  // would pass whatever this code sent it.
+  nativeReadRecording: vi.fn(() => null),
+  nativeDeleteRecording: vi.fn(() => true),
+  // journal-3 2b. Returns a STRING always: a JSON array of rows, or the
+  // sentinel 'error:list_failed'. '[]' is the honest default for a test that
+  // has not planted a served file.
+  nativeListRecordings: vi.fn(() => '[]'),
+  startAudioSession: vi.fn(),
+  endAudioSession: vi.fn(),
+});
+/** @type {any} */ (globalThis).PlatformBridge = MockBridge;
 
 describe('downsampleWave (JRNL-3)', () => {
   it('returns arrays at/under the bucket count unchanged', () => {
@@ -42,7 +40,7 @@ describe('downsampleWave (JRNL-3)', () => {
   });
 
   it('max-pools a large array down to `buckets` bars, preserving peaks', () => {
-    // A 1.0 peak at the start of every 8-wide window; 384 / 48 = 8 per bucket.
+  // A 1.0 peak at the start of every 8-wide window; 384 / 48 = 8 per bucket.
     const arr = Array.from({ length: 384 }, (_, i) => (i % 8 === 0 ? 1 : 0.1));
     const out = downsampleWave(arr, 48);
     expect(out.length).toBe(48);
@@ -107,7 +105,7 @@ describe('JournalRecordingSheet discard confirm', () => {
     const onClose = vi.fn();
     renderRecording(onClose);
     fireEvent.click(screen.getByText('Cancel'));
-    // The action row is REPLACED by the strip, so this is the strip's Cancel.
+  // The action row is REPLACED by the strip, so this is the strip's Cancel.
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText('Discard this recording?')).toBeNull();
     expect(screen.getByText('Recording')).toBeTruthy();
@@ -125,7 +123,7 @@ describe('JournalRecordingSheet discard confirm', () => {
   it('the empty requesting stage still closes instantly (nothing at risk)', () => {
     const onClose = vi.fn();
     render(<JournalRecordingSheet onSave={() => {}} onClose={onClose} />);
-    // Do NOT advance timers — permission unresolved, stage stays 'requesting'
+  // Do NOT advance timers — permission unresolved, stage stays 'requesting'
     fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalled();
     expect(screen.queryByText('Discard this recording?')).toBeNull();
@@ -189,10 +187,10 @@ describe('JournalRecordingSheet — durable before preview (journal-3)', () => {
     expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
     expect(puts[0].type).toBe('audio');
     expect(puts[0].blob.size).toBe(3);
-    // The marker is the whole point: until an entry references this record,
-    // the sweep must be able to tell "never linked" from "owner deleted".
+  // The marker is the whole point: until an entry references this record,
+  // the sweep must be able to tell "never linked" from "owner deleted".
     expect(puts[0].unlinked).toBe(true);
-    // And it happened BEFORE the user can see or discard anything.
+  // And it happened BEFORE the user can see or discard anything.
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
   });
 
@@ -248,15 +246,15 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     fireEvent.click(screen.getByLabelText('Pause'));
     expect(screen.getByText('Paused')).toBeTruthy();
 
-    // The bug: the tick kept firing here and the counter climbed. It must freeze.
+  // The bug: the tick kept firing here and the counter climbed. It must freeze.
     act(() => { vi.advanceTimersByTime(3000); });
     expect(timeText()).toBe(atPause);
 
     fireEvent.click(screen.getByLabelText('Resume'));
     expect(screen.getByText('Recording')).toBeTruthy();
 
-    // Resumed → the counter advances again (past the pre-pause value), and the
-    // 3s of paused time is NOT counted.
+  // Resumed → the counter advances again (past the pre-pause value), and the
+  // 3s of paused time is NOT counted.
     act(() => { vi.advanceTimersByTime(2000); });
     expect(timeText()).not.toBe(atPause);
   });
@@ -275,9 +273,9 @@ describe('JournalRecordingSheet audio-session lifecycle', () => {
     act(() => { vi.advanceTimersByTime(10); });
 
     expect(MockBridge.startAudioSession).toHaveBeenCalledTimes(1);
-    expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
+  expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
     expect(MockBridge.startAudioSession.mock.invocationCallOrder[0])
-      .toBeLessThan(MockBridge.nativeRecordStart.mock.invocationCallOrder[0]);
+    .toBeLessThan(MockBridge.nativeRecordStart.mock.invocationCallOrder[0]);
 
     fireEvent.click(screen.getByLabelText('Finish'));
     expect(MockBridge.endAudioSession).toHaveBeenCalledTimes(1);
@@ -289,11 +287,11 @@ describe('JournalRecordingSheet audio-session lifecycle', () => {
     act(() => { vi.advanceTimersByTime(10); });
 
     expect(MockBridge.startAudioSession).not.toHaveBeenCalled();
-    expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
+  expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
   });
 
   it('releases the audio session when capture fails to start', () => {
-    MockBridge.nativeRecordStart.mockReturnValueOnce('error:permission');
+  MockBridge.nativeRecordStart.mockReturnValueOnce('error:permission');
     render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
     act(() => { vi.advanceTimersByTime(10); });
 
@@ -325,7 +323,7 @@ describe('JournalRecordingSheet — registry dismiss routes through requestDisca
     expect(modalRegistry.openIds()).toContain('journal-recording-sheet');
     act(() => { modalRegistry.peek().dismiss(); }); // the dispatcher's Escape/back path
 
-    // The bug: the sheet was already gone here, take destroyed, no confirm.
+  // The bug: the sheet was already gone here, take destroyed, no confirm.
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText('Discard this recording?')).toBeTruthy();
 
@@ -336,7 +334,7 @@ describe('JournalRecordingSheet — registry dismiss routes through requestDisca
   it('back/Escape with nothing recorded still closes instantly (nothing at risk)', () => {
     const onClose = vi.fn();
     render(<JournalRecordingSheet onSave={() => {}} onClose={onClose} />);
-    // Do NOT advance timers — permission unresolved, stage stays 'requesting'.
+  // Do NOT advance timers — permission unresolved, stage stays 'requesting'.
     act(() => { modalRegistry.peek().dismiss(); });
     expect(onClose).toHaveBeenCalled();
     expect(screen.queryByText('Discard this recording?')).toBeNull();
@@ -391,7 +389,7 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
     });
 
     expect(attempts).toBeGreaterThan(1); // it actually retried, not one-and-done
-    // The recording must survive: no error stage, no lost take.
+  // The recording must survive: no error stage, no lost take.
     expect(screen.queryByText(/could not read the recording/i)).toBeNull();
   });
 
@@ -408,12 +406,12 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
 
     expect(attempts).toBeGreaterThan(1);  // it did retry
     expect(attempts).toBeLessThan(10);    // ...but bounded, not an infinite loop
-    // journal-3 reworded this: "Could not process the recording. Please try
-    // again." read as an instruction to RECORD IT AGAIN, which is the one
-    // thing the user must not do while the finished take is still on disk.
+  // journal-3 reworded this: "Could not process the recording. Please try
+  // again." read as an instruction to RECORD IT AGAIN, which is the one
+  // thing the user must not do while the finished take is still on disk.
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy(); // surfaced, not swallowed
 
-    // ...and the error stage now offers the real second chance.
+  // ...and the error stage now offers the real second chance.
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
@@ -460,7 +458,7 @@ describe('JournalRecordingSheet Android fetch-bridge retry (journal-3)', () => {
       it" in which a crash loses the recording outright.
 
    2. A FETCH THAT KEPT FAILING LOST THE TAKE while the bytes sat on disk.
-      `nativeReadRecording` also existed with no caller. It is the SECOND
+    `nativeReadRecording` also existed with no caller. It is the SECOND
       route: after the reader has taken the offered Try again and that failed
       too, read the same file by name off the device and commit that.
 
@@ -478,9 +476,9 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
   beforeEach(() => {
     vi.useFakeTimers();
     MockBridge.isAndroid = true;
-    MockBridge.nativeReadRecording.mockReset().mockReturnValue(null);
-    MockBridge.nativeDeleteRecording.mockReset().mockReturnValue(true);
-    MockBridge.nativeListRecordings.mockReset().mockReturnValue('[]');
+  MockBridge.nativeReadRecording.mockReset().mockReturnValue(null);
+  MockBridge.nativeDeleteRecording.mockReset().mockReturnValue(true);
+  MockBridge.nativeListRecordings.mockReset().mockReturnValue('[]');
     window.JournalMediaStore = {
       put: vi.fn(() => Promise.resolve('media-1')),
       delete: vi.fn(() => Promise.resolve()),
@@ -498,8 +496,8 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({
       ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })),
     })));
-    // A put we settle by hand, so "after the commit" is a measurement and not a
-    // reading of the source. With an already-resolved put both orders pass.
+  // A put we settle by hand, so "after the commit" is a measurement and not a
+  // reading of the source. With an already-resolved put both orders pass.
     let settlePut;
     window.JournalMediaStore.put = vi.fn(() => new Promise((res) => { settlePut = () => res('media-1'); }));
 
@@ -510,23 +508,23 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     });
 
     expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
-    // The name travels with the record: 2b diffs the files on disk against the
-    // sourceNames already in the store, and cannot do that if nothing stored it.
+  // The name travels with the record: 2b diffs the files on disk against the
+  // sourceNames already in the store, and cannot do that if nothing stored it.
     expect(window.JournalMediaStore.put).toHaveBeenCalledWith(
       expect.objectContaining({ sourceName: SERVED_NAME, unlinked: true }),
     );
-    // Native still holds the file: the commit has not landed.
-    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+  // Native still holds the file: the commit has not landed.
+  expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
 
     await act(async () => { settlePut(); await vi.advanceTimersByTimeAsync(100); });
-    expect(MockBridge.nativeDeleteRecording).toHaveBeenCalledWith(SERVED_NAME);
+  expect(MockBridge.nativeDeleteRecording).toHaveBeenCalledWith(SERVED_NAME);
   });
 
   it('after Try again fails too, it reads the file by name and commits those bytes', async () => {
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
-    // Two audible bytes, so the commit can be checked for THESE bytes rather
-    // than for any blob at all.
-    MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
+  // Two audible bytes, so the commit can be checked for THESE bytes rather
+  // than for any blob at all.
+  MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
 
     renderRecording(() => {});
     await act(async () => {
@@ -541,19 +539,19 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
       await vi.advanceTimersByTimeAsync(10000);
     });
 
-    expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
+  expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
     expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
     const rec = window.JournalMediaStore.put.mock.calls[0][0];
     expect(rec.blob.size).toBe(2);                                  // the recovered bytes
     expect(rec.sourceName).toBe(SERVED_NAME);
-    // Recovered, therefore not lost: the error stage is gone.
+  // Recovered, therefore not lost: the error stage is gone.
     expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
   });
 
   /* journal-3 2b — THE ZERO-BYTE CASE, ported from the parked RED fbf5e325 with
      one deliberate change to its mechanism, quoted in the commit.
 
-     The parked version made `nativeReadRecording` return the empty STRING,
+   The parked version made `nativeReadRecording` return the empty STRING,
      because that is what a zero-byte served file returns TODAY. The native half
      of this batch returns NULL for it instead — and null is also what JS gets for
      gone, refused and over-ceiling, so after that change the read cannot carry
@@ -581,15 +579,15 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
   };
 
   it('an empty served file is reported as EMPTY, not as a read that failed', async () => {
-    MockBridge.nativeReadRecording.mockReturnValue(null);            // native's answer for empty
-    MockBridge.nativeListRecordings.mockReturnValue(
+  MockBridge.nativeReadRecording.mockReturnValue(null);            // native's answer for empty
+  MockBridge.nativeListRecordings.mockReturnValue(
       listing([{ name: SERVED_NAME, size: 0, mtime: 1788000000000 }]));
     await drive();
 
-    expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
-    // Nothing empty is ever committed as a memo.
+  expect(MockBridge.nativeReadRecording).toHaveBeenCalledWith(SERVED_NAME);
+  // Nothing empty is ever committed as a memo.
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
-    // And the reason given is the true one.
+  // And the reason given is the true one.
     expect(screen.queryByText(/could not read the recording from the device/i)).toBeNull();
     expect(screen.getByText(/empty/i)).toBeTruthy();
   });
@@ -601,24 +599,24 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
      the listing can fail to be positive evidence. */
 
   it('CONTROL: a null read with the file ABSENT from the listing keeps the loud failure', async () => {
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue(listing([]));    // looked, nothing there
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue(listing([]));    // looked, nothing there
     await drive();
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
   });
 
   it('CONTROL: error:list_failed is NOT an empty file — could-not-enumerate is not nothing-to-recover', async () => {
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue('error:list_failed');
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue('error:list_failed');
     await drive();
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
   });
 
   it('CONTROL: a listed file WITH bytes that still reads null is a failure, not an empty memo', async () => {
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue(
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue(
       listing([{ name: SERVED_NAME, size: 91234, mtime: 1788000000000 }]));
     await drive();
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
@@ -633,24 +631,24 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
   it('CONTROL: a listing that parses to a NON-ARRAY is not evidence of anything', async () => {
     /* `JSON.parse('null')` returns null instead of throwing, so a try/catch alone
        lets it through — the same family as atob(null) returning three bytes. */
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue('null');
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue('null');
     await drive();
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
   });
 
   it('CONTROL: a row whose size is not the NUMBER 0 is not an empty file', async () => {
-    // A missing size, and the string "0", are both absent information rather than
-    // a measurement of nothing. `=== 0` is what keeps them out.
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue(
+  // A missing size, and the string "0", are both absent information rather than
+  // a measurement of nothing. `=== 0` is what keeps them out.
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue(
       listing([{ name: SERVED_NAME, mtime: 1788000000000 }]));
     await drive();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
 
     cleanup();
-    MockBridge.nativeListRecordings.mockReturnValue(
+  MockBridge.nativeListRecordings.mockReturnValue(
       listing([{ name: SERVED_NAME, size: '0', mtime: 1788000000000 }]));
     await drive();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
@@ -662,8 +660,8 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
        an unrelated zero-byte file left by another session would make THIS reader's
        missing recording report as empty — a wrong cause attached to a real loss,
        which is the exact defect this branch exists to fix, inverted. */
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockReturnValue(listing([
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockReturnValue(listing([
       { name: 'aaaaaaaa-1111-4aaa-8bbb-000000000000.m4a', size: 0, mtime: 1788000000000 },
       { name: 'bbbbbbbb-2222-4aaa-8bbb-000000000000.m4a', size: 5120, mtime: 1788000000000 },
     ]));
@@ -673,11 +671,11 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
   });
 
   it('CONTROL: a listing verb that THROWS is not evidence of an empty file', async () => {
-    // An APK without the verb at all: `undefined is not a function`. The reader
-    // gets the honest failure rather than being told their memo held nothing.
-    MockBridge.nativeReadRecording.mockReturnValue(null);
-    MockBridge.nativeListRecordings.mockImplementation(() => {
-      throw new TypeError('nativeListRecordings is not a function');
+  // An APK without the verb at all: `undefined is not a function`. The reader
+  // gets the honest failure rather than being told their memo held nothing.
+  MockBridge.nativeReadRecording.mockReturnValue(null);
+  MockBridge.nativeListRecordings.mockImplementation(() => {
+    throw new TypeError('nativeListRecordings is not a function');
     });
     await drive();
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
@@ -686,7 +684,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
 
   it('does NOT reach for the expensive read before the reader has taken Try again', async () => {
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
-    MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
+  MockBridge.nativeReadRecording.mockReturnValue(btoa('\x01\x02'));
 
     renderRecording(() => {});
     await act(async () => {
@@ -694,15 +692,15 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
       await vi.advanceTimersByTimeAsync(10000);
     });
 
-    // The first exhaustion offers the cheap second chance and nothing else. A
-    // ~7.9 MB base64 parse is not inflicted on a reader who has not asked for it.
-    expect(MockBridge.nativeReadRecording).not.toHaveBeenCalled();
+  // The first exhaustion offers the cheap second chance and nothing else. A
+  // ~7.9 MB base64 parse is not inflicted on a reader who has not asked for it.
+  expect(MockBridge.nativeReadRecording).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
   it('when the read comes back empty the recording is reported lost, not silently dropped', async () => {
     globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
-    MockBridge.nativeReadRecording.mockReturnValue(null);   // swept, or refused by native
+  MockBridge.nativeReadRecording.mockReturnValue(null);   // swept, or refused by native
 
     renderRecording(() => {});
     await act(async () => {
@@ -714,11 +712,11 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
       await vi.advanceTimersByTimeAsync(10000);
     });
 
-    expect(MockBridge.nativeReadRecording).toHaveBeenCalledTimes(1);
+  expect(MockBridge.nativeReadRecording).toHaveBeenCalledTimes(1);
     expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
     expect(screen.getByText(/could not read the recording from the device/i)).toBeTruthy();
-    // And native still holds the file: nothing committed, so nothing released.
-    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+  // And native still holds the file: nothing committed, so nothing released.
+  expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
 
   /* A url that is not a served-recording url yields no name, and no name means
@@ -737,6 +735,6 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     });
     expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
     expect(window.JournalMediaStore.put.mock.calls[0][0].sourceName).toBeUndefined();
-    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+  expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
 });

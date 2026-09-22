@@ -30,7 +30,11 @@ const read = (p) => readFileSync(p, 'utf-8');
    the identifier still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
 const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen'];
-const defines = (bundle, name) => bundle.includes(name + ':');
+/* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
+   writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
+   — and that colon reads exactly like a definition. A definition is a KEY in
+   an object literal, so the character before it is `{` or `,`. */
+const defines = (bundle, name) => new RegExp('[{,]\s*' + name + ':').test(bundle);
 
 describe('bundle-h carries the Listening Library, and bundle-d no longer does', () => {
   it('the four screens are defined in bundle-h', () => {

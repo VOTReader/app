@@ -43,7 +43,14 @@ const BUDGETS = [
   // collapse detector keeps its teeth: 155,404 x 1.15 = 178,714.6 -> the
   // hundred above.
   { file: 'bundle-a.js', measured: 155404, max: 178800 },   // react + react-dom + bible-audio-manifest
-  { file: 'bundle-b.js', measured: 318650, max: 367000 },   // stores/hooks/journal/bridge
+  // 2026-09-22, landing 28: the journal's three screens (hub, viewer, editor)
+  // and the two sheets only the editor renders LEFT this bundle for the lazy
+  // bundle-g, -78,341 B off every launch. What stayed is the machinery the
+  // shell and the renderer need at boot: journal-styles.js (JournalChip is
+  // painted into reading text and wears jrn- CSS), JournalInboundSheet,
+  // JournalChip, JournalHelpers and every journal store. Re-baselined DOWN by
+  // the c43 rule: 269,918 x 1.15 = 310,405.7 -> the hundred above.
+  { file: 'bundle-b.js', measured: 269918, max: 310500 },   // stores/hooks/journal machinery/bridge
   { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
   // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
   // Notes, Links, Highlights) LEFT this bundle for bundle-g, -46,043 B off the
@@ -107,7 +114,11 @@ const BUDGETS = [
   // 54,571 x 1.15 = 62,757 -> the hundred above.
   // Landing 23 added Milestones and History — the same law, two more screens:
   // 65,601 x 1.15 = 75,441 -> the hundred above.
-  { file: 'bundle-g.js', measured: 65601, max: 75500 },     // the screens you go TO, not through
+  // 2026-09-22, landing 28: the journal screens arrive (+78,397 B, almost
+  // exactly what bundle-b lost — platform-bridge.js is read as a free global
+  // by JournalRecordingSheet instead of imported, so no second copy of the
+  // bridge came with them). 143,998 x 1.15 = 165,597.7 -> the hundred above.
+  { file: 'bundle-g.js', measured: 143998, max: 165600 },   // Personal Study screens + the journal screens
   // The Listening Library, split out on 2026-09-22 (landing 24): the browsing
   // surface only. audio-player.js, AudioShelf, AudioSeekSlider and CoverageBadge
   // stay in bundle-d for the shell's player bar, so this stays SMALL - a jump

@@ -819,7 +819,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'journal-home': () => typeof JournalHubScreen !== 'undefined' && _kickVot(
+    'journal-home': () => typeof JournalHubScreen !== 'undefined' ? _kickVot(
       <JournalHubScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -832,13 +832,13 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     // backHint/tapThroughBack: the cross-screen pill. A note in a notebook, a
     // Links/Bookmarks/Highlights row whose source is a journal paragraph, or a
     // journal card from another entry all land HERE and used to have no way
     // back. The viewer renders exactly ONE pill — its private journal→journal
     // stack first, this one otherwise.
-    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' && _kickVot(
+    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' ? _kickVot(
       <JournalViewerScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -869,8 +869,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' && _kickVot(
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' ? _kickVot(
       <JournalEditorScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -881,7 +881,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'notes-index': () => typeof NotesIndexScreen !== 'undefined' ? _kickVot(
       <NotesIndexScreen
         onSettings={goSettings}
