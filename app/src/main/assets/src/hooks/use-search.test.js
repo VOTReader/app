@@ -683,15 +683,30 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
   });
   afterEach(() => { window.VotSearchMini = REAL_SM; });
 
-  it('a letter hit sets an excerpt anchor cut from the doc text by the query AND the engine terms', () => {
+  it("a letter hit sets an excerpt anchor cut from the doc text by the query's OWN terms", () => {
+    // The engine's per-hit terms are prefix expansions ('in' -> into, indeed;
+    // 'the' -> these, them, they...). Counted as equals, a window dense in
+    // "them/they/there" outscored the typed phrase and the reader landed on the
+    // wrong block (study find, 2026-09-22). The query's words cut the excerpt.
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect(
       { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'the still small voice spoke' }, terms: ['spoke'] },
       ['still', 'voice'],
     ); });
-    expect(calls).toEqual([['the still small voice spoke', ['still', 'voice', 'spoke']]]);
+    expect(calls).toEqual([['the still small voice spoke', ['still', 'voice']]]);
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'wide-path' });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
+  });
+
+  it("the engine's terms cut the excerpt only when the query's own words match nothing (a typo-corrected hit)", () => {
+    window.VotSearchMini = { matchExcerpt: (text, terms) => { calls.push([text, terms]); return terms.indexOf('spoke') >= 0 ? 'voice spoke' : ''; } };
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'the still small voice spoke' }, terms: ['spoke'] },
+      ['spoek'],
+    ); });
+    expect(calls).toEqual([['the still small voice spoke', ['spoek']], ['the still small voice spoke', ['spoek', 'spoke']]]);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'voice spoke', letterId: 'wide-path' });
   });
 
   it('a WTLB hit and a study hit take the same anchor', () => {

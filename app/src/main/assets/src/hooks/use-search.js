@@ -369,7 +369,14 @@ export function useSearch({
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
     const own = Array.isArray(terms) ? terms : [];
     const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
-    const text = sm.matchExcerpt(doc.text, own.concat(hit));
+    // The query's OWN words cut the excerpt. The engine's per-hit terms are
+    // prefix expansions ('in' -> into, indeed; 'the' -> these, them, they...),
+    // and matchExcerpt scores a window by DISTINCT terms, so merged in as equals
+    // a stretch dense in "them / they / there" outscored the phrase the reader
+    // typed and the landing missed its block (study find, 2026-09-22). They
+    // stay as the fallback for a hit the typed words cannot find at all — a
+    // typo the engine corrected.
+    const text = (own.length ? sm.matchExcerpt(doc.text, own) : '') || (hit.length ? sm.matchExcerpt(doc.text, own.concat(hit)) : '');
     return text ? { type: 'excerpt', text, letterId: letterId || null } : null;
   };
 
