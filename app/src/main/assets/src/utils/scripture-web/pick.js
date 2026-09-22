@@ -294,11 +294,12 @@ export function threadEnds(g, cam, view, i) {
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number, localize:number, inset?:number}} view
  * @param {number} i
+ * @param {number} [margin] - device px the point must clear the sky's top and the baseline by
  * @returns {{x:number, y:number}|null}
  */
-export function bodyMidpoint(g, cam, view, i) {
+export function bodyMidpoint(g, cam, view, i, margin = 0) {
   const { width, ceil, squash, localize } = view;
-  const inset = view.inset > 0 ? view.inset : 0;
+  const inset = (view.inset > 0 ? view.inset : 0) + margin;
   const camY = cam.y > 0 ? cam.y : 0;
   const base = view.base + camY;
   const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
@@ -318,7 +319,7 @@ export function bodyMidpoint(g, cam, view, i) {
     for (const dir of k === 0 ? [1] : [1, -1]) {
       const x = mid + (dir * (xb - xa) * k) / (2 * STEPS);
       const y = yAt(x);
-      if (y >= inset && y <= view.base) return { x, y };
+      if (y >= inset && y <= view.base - margin) return { x, y };
     }
   }
   return null;

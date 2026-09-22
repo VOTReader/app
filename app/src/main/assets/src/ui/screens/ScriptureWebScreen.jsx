@@ -1311,7 +1311,6 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   const fs = BADGE_FONT_CSS * DPR;
   const camY = cam.y > 0 ? cam.y : 0;
   const baseY = view.base + camY;
-  const skyTop = view.inset > 0 ? view.inset : 0;
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
   const gold = chrome.isLight ? '122,92,16' : '232,192,80';
   ctx.save();
@@ -1354,9 +1353,8 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   if (bundles.fly) {
     for (const b of bundles.fly.values()) {
       if (b.rep < 0 || b.count < 2) continue;
-      const at = bodyMidpoint(g, cam, view, b.rep);
+      const at = bodyMidpoint(g, cam, view, b.rep, fs * 2.2);
       if (!at) continue;
-      if (at.y < skyTop + fs || at.y > baseY - fs) continue;
       const text = '\u00d7' + fmtCount(b.count);
       const hw = (ctx.measureText(text).width + fs * 0.9) / 2 + 2 * DPR;
       const box = pill(text, Math.max(hw, Math.min(W - hw, at.x)), at.y - fs * 1.1, true);
