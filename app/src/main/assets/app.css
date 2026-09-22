@@ -7034,6 +7034,35 @@
       .sw-btn, .sw-seg-btn { transition: none; }
     }
 
+    /* How to read this web — the one-screen card (landing 13): open on the
+       first visit until Got it, back on the ? button. A box, unlike the
+       empty-web notice: it is read once as a page, then leaves. */
+    .sw-guide {
+      /* above the tip chip and the sheet: nothing floats over the card while it is read */
+      position: absolute; z-index: 9; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(520px, calc(100% - 32px)); max-height: calc(100% - 20px);
+      overflow: auto; box-sizing: border-box;
+      padding: 12px 18px 12px; border-radius: 14px;
+      background: var(--bg3); border: 1px solid var(--gold-border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+      font-family: var(--font-body); color: var(--cream);
+    }
+    .sw-guide-title {
+      font-family: var(--font-cinzel); font-size: var(--fs-16);
+      color: var(--gold); letter-spacing: 0.04em; margin-bottom: 6px;
+    }
+    .sw-guide-body { margin: 0 0 8px; padding-left: 16px; font-size: var(--fs-13); line-height: 1.4; }
+    .sw-guide-body li + li { margin-top: 3px; }
+    .sw-guide-body strong { color: var(--gold-bright); font-weight: 600; }
+    .sw-guide-close { display: block; margin-left: auto; }
+    .sw-guide-btn {
+      position: absolute; z-index: 5; right: 14px;
+      bottom: calc(60px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      font-family: var(--font-body); font-weight: 600;
+    }
+    .sw-root.sw-chrome-hidden .sw-guide-btn { display: none; }
+
     /* My Web — the empty state, shown until the reader's first link lands. */
     .sw-empty {
       position: absolute; z-index: 5; left: 50%; top: 42%;

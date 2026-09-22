@@ -24,7 +24,7 @@
  * to the phone, walks to the Scripture Web (Famous) and measures. Options:
  *   --devtools 9333   the forwarded DevTools port
  *   --serial <adb serial>   when more than one device is attached
- *   --allow-dirty     measure an uncommitted tree (the JSON then records sha "dirty")
+ *   --allow-dirty     measure an uncommitted tree (the JSON then records sha HEAD+)
  */
 import { resolve, dirname } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -45,7 +45,8 @@ if (dirty && !argv.includes('--allow-dirty')) {
   console.error('[s22] REFUSING: dirty tree (pass --allow-dirty to measure it anyway)\n' + dirty);
   process.exit(3);
 }
-const SHA = dirty ? 'dirty' : execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim();
+// a dirty tree is named HEAD+ (git's own spelling for 'with changes')
+const SHA = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim() + (dirty ? '+' : '');
 const puppeteer = createRequire(pathToFileURL(resolve(ROOT, 'package.json')))('puppeteer');
 const { serveOwnTree } = await import(pathToFileURL(resolve(ROOT, 'tools/e2e-read-serve.mjs')).href);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

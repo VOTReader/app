@@ -120,7 +120,7 @@ function readChromeHidden() {
  * @param {object} props
  * @param {(endpoint:object, meta?:object) => void} props.navigateToLink
  * @param {() => void} props.onBack
- * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean}} props.settings
+ * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean, swGuideSeen?:boolean}} props.settings
  * @param {(key:string, value:any) => void} props.updateSetting
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting }) {
@@ -169,6 +169,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // reader stays in the control they were using instead of at the document top.
   const myWebBtnRef = React.useRef(null);
   const [emptyDismissed, setEmptyDismissed] = React.useState(false);
+  /* The one-screen "how to read this web" card (landing 13). Open on the
+     first visit to the canon web until the reader closes it; the ? button
+     brings it back. The seen flag rides `settings` like swEmptyDismissed. */
+  const [guideOpen, setGuideOpen] = React.useState(() => !(settings && settings.swGuideSeen));
+  const closeGuide = React.useCallback(() => {
+    setGuideOpen(false);
+    if (typeof updateSetting === 'function') updateSetting('swGuideSeen', true);
+  }, [updateSetting]);
   // THE DENSITY IS THE READER'S CHOICE AND NOTHING ELSE MOVES IT. From 09-06
   // to 09-11 (9aa0cfa9) the web switched itself to Essential past 22 CSS px
   // per verse; Corbin, 2026-09-11: "verify that fully zoomed in, the full
@@ -1024,7 +1032,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // panel \u2014 a second handler closed the notice and let the keystroke
       // through to onBack(), so one press both dismissed the tip and threw the
       // reader out to the Library.
-      if (emptyShown) { dismissEmpty(); }
+      if (guideOpen) { closeGuide(); }
+      else if (emptyShown) { dismissEmpty(); }
       else if (listOpen || choices || detail || tip) {
         setListOpen(false); setChoices(null); setDetail(null); setTip(null);
         focusRef.current = { arc: -1, range: null }; schedule();
@@ -1039,7 +1048,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
-      emptyShown, dismissEmpty, zoomCapFor, yFrameFor]);
+      emptyShown, dismissEmpty, zoomCapFor, yFrameFor, guideOpen, closeGuide]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
@@ -1192,6 +1201,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </svg>
       </button>
 
+      {/* the how-to-read card's button: the corner above the hide-all
+          button, off the controls strip (which it overflowed on a phone) */}
+      <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideOpen ? ' is-on' : '')}
+        onClick={() => (guideOpen ? closeGuide() : setGuideOpen(true))}
+        aria-label="How to read this web" aria-expanded={guideOpen} aria-haspopup="dialog">?</button>
+      {guideOpen && (
+        <div className="sw-guide" role="dialog" aria-labelledby="sw-guide-title">
+          <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
+          <ul className="sw-guide-body">
+            <li>Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are.</li>
+            <li>Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom.</li>
+            <li>Pinch or press <strong>+</strong> to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back.</li>
+            <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
+            <li>Drag up to look into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
+            <li><strong>Reset</strong> brings you home.</li>
+          </ul>
+          <button type="button" className="sw-btn sw-guide-close" onClick={closeGuide}>Got it</button>
+        </div>
+      )}
       {emptyShown && (
         <div className="sw-empty">
           <div className="sw-empty-title">Your web is still being woven.</div>

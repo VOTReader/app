@@ -68,7 +68,9 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
 
 const baseProps = () => ({
-  navigateToLink: () => {}, onBack: () => {}, settings: {}, updateSetting: () => {},
+  // swGuideSeen: the how-to-read card (landing 13) opens on a first visit and
+  // would sit under every tap below; these readers have seen it
+  navigateToLink: () => {}, onBack: () => {}, settings: { swGuideSeen: true }, updateSetting: () => {},
 });
 
 const ORIG_W = window.innerWidth, ORIG_H = window.innerHeight;
@@ -547,6 +549,50 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
   });
 });
 
+describe('how to read this web (landing 13): one card, plain words, once', () => {
+  const mountGuide = async (props = {}) => {
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
+    // the root key handler returns early on an unsized canvas
+    for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 600]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+    }
+    const view = render(<ScriptureWebScreen {...baseProps()} {...props} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    return view;
+  };
+  afterEach(() => {
+    delete HTMLCanvasElement.prototype.clientWidth;
+    delete HTMLCanvasElement.prototype.clientHeight;
+  });
+
+  it('opens on a first visit and Got it closes it, recording swGuideSeen', async () => {
+    const updateSetting = vi.fn();
+    const { container } = await mountGuide({ settings: {}, updateSetting });
+    const card = container.querySelector('.sw-guide');
+    expect(card, 'the card is up for a reader who has not seen it').toBeTruthy();
+    expect(card.getAttribute('role')).toBe('dialog');
+    expect(card.textContent).toMatch(/How to read this web/);
+    expect(card.querySelectorAll('li').length).toBeGreaterThanOrEqual(5);
+    fireEvent.click(screen.getByRole('button', { name: /got it/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(updateSetting).toHaveBeenCalledWith('swGuideSeen', true);
+  });
+
+  it('stays closed for a reader who has seen it; the ? button brings it back and Escape closes it without leaving', async () => {
+    const onBack = vi.fn();
+    const { container } = await mountGuide({ onBack });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /how to read this web/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeTruthy();
+    fireEvent.keyDown(container.querySelector('.sw-root'), { key: 'Escape' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
+  });
+});
+
 describe('scripture-web-5 — Try again re-decodes the graph', () => {
   it('re-attempts the load instead of hanging on "Weaving the web…" forever', async () => {
     // Truthy (hits ensureScriptureWebData's fast path) but undecodable
@@ -699,6 +745,8 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
   const openMyWeb = async (props) => {
     window.SCRIPTURE_WEB_DATA = { count: 1, ok: true };
     sizeCanvas();
+    // an explicit settings object still describes a reader who has seen the how-to-read card
+    props = Object.assign({}, props, { settings: Object.assign({ swGuideSeen: true }, props && props.settings) });
     const r = render(<ScriptureWebScreen {...baseProps()} {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'My web' }));
     return r;
