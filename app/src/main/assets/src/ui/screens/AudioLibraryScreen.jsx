@@ -10,7 +10,9 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../../utils/audio-track.js';
+import { COVERAGE_READ_ALONG, bibleEditionCoverage } from '../../utils/audio-coverage.js';
 import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
   audioLibraryStore, hasTextDestination, trackMeta, trackName, useAudioPositions,
@@ -258,6 +260,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               <span className="audio-library-shelf-copy">
                 <strong>The Volumes of Truth</strong>
                 <small>{collections.length ? collections.length + (collections.length === 1 ? ' collection' : ' collections') + ' · the Letters read aloud' : 'The Letters read aloud'}</small>
+                {/* Every letter is timed (align's census 2026-09-22: 730 of 730). */}
+                <CoverageBadge state={COVERAGE_READ_ALONG} />
               </span>
               <span className="audio-library-shelf-tail"><ArrowIcon /></span>
             </button>
@@ -281,6 +285,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <span className="audio-library-shelf-copy">
                     <strong>{edition.label}</strong>
                     <small>{parts.join(' · ')}</small>
+                    <CoverageBadge state={bibleEditionCoverage(edition.volKey)} />
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>

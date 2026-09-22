@@ -3262,6 +3262,21 @@
     .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:var(--fs-14); }
+    /* Coverage badge (hub order 2026-09-22) — one word per work: can it be
+       read along with, only listened to, or is nothing recorded? It rides the
+       page's own tokens, so the light theme swaps with everything else, and it
+       never carries its meaning in colour alone (the word is the message; the
+       title is the sentence behind it). */
+    .coverage-badge-wrap { display:inline-flex; align-items:baseline; gap:0.45em; flex-wrap:wrap; margin-left:0.55em; vertical-align:middle; }
+    .coverage-badge { display:inline-block; padding:0.12em 0.6em; border:1px solid var(--gold-border,var(--gold-dim)); border-radius:999px; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; white-space:nowrap; color:var(--gold-dim); }
+    .coverage-badge-read-along { border-color:var(--gold); background:var(--gold-faint); color:var(--gold); }
+    .coverage-badge-listening-only { border-style:dashed; }
+    .coverage-badge-no-recording { opacity:0.72; }
+    .coverage-badge-detail { font-size:var(--fs-10); font-style:italic; color:var(--gold-dim); white-space:nowrap; }
+    /* In a study card, and on a shelf row, the badge sits on its own line
+       under the title rather than stretching the one-line ellipsis. */
+    .chapter-card-info .coverage-badge-wrap,
+    .audio-library-shelf-copy .coverage-badge-wrap { margin-left:0; margin-top:0.3rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* Estimated reading time — quiet, right-aligned, never wraps or

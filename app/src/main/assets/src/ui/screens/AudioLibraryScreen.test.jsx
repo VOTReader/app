@@ -237,3 +237,33 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(globalThis.AudioLibraryStore.clearRecent).not.toHaveBeenCalled();
   });
 });
+
+describe('AudioLibraryScreen -- the read-along badge', () => {
+  /* Hub order 2026-09-22: the shelf says which editions light their words.
+     The John film is the one listening-only edition (audio-track.js declares
+     `timed: false` — its narration is a translation this corpus does not
+     carry), and until now nothing on the way in said so. */
+  function badgeIn(name) {
+    const row = [...document.querySelectorAll('.audio-library-shelf-row')].find((b) => b.textContent.includes(name));
+    return row ? row.querySelector('.coverage-badge') : null;
+  }
+
+  it('marks a timed edition read-along and the film listening only', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:genesis': [['g', '']],
+      'bible-john-film:john': [['j', '']],
+    };
+    renderScreen();
+    const brm = badgeIn('Biblical Restoration Ministries');
+    expect(brm.textContent).toBe('Read-along');
+    expect(brm.className).toContain('coverage-badge-read-along');
+    const film = badgeIn('Gospel of John');
+    expect(film.textContent).toBe('Listening only');
+    expect(film.getAttribute('title')).toMatch(/not timed/i);
+  });
+
+  it('gives the Letters shelf its badge too -- every letter is timed', () => {
+    renderScreen();
+    expect(badgeIn('The Volumes of Truth').textContent).toBe('Read-along');
+  });
+});

@@ -2,6 +2,9 @@
    StudiesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { studyCoverage, studyCoverageDetail } from '../../utils/audio-coverage.js';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
+
 export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the
   // user picks a study from the list, the 618 KB corpus is already
@@ -61,6 +64,15 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
                 <div className="chapter-card-info">
                   <div className="chapter-card-label">{s.locked ? "Coming Soon" : partsLabel}</div>
                   <div className="chapter-card-title">{s.title}</div>
+                  {/* Hub order 2026-09-22: the row says whether it can be read
+                      along with BEFORE the tap. 52 study chapters have no
+                      recording at all (align's census), which nothing on the
+                      way in used to admit. A locked study promises nothing
+                      yet, so it carries no badge. */}
+                  {s.locked ? null : (() => {
+                    const coverage = studyCoverage(s);
+                    return <CoverageBadge state={coverage.state} detail={studyCoverageDetail(coverage)} />;
+                  })()}
                 </div>
               </button>
             );
