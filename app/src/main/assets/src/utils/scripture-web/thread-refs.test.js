@@ -55,7 +55,10 @@ function heightAt(g, cam, view, i, x) {
   const { fanA, fanB } = fansOf(g);
   const L = arcShape(rx, ceil, view.squash, view.localize, sl, fanA[i]);
   const R = arcShape(rx, ceil, view.squash, view.localize, sl, fanB[i]);
-  return arcHeightAt(x, x0, x1, L.R, R.R, L.A, DOME * view.localize);
+  // the strata (the density law, part 3): a thread whose feet have both left
+  // the frame is lifted into its band; the label sits on the LIFTED body
+  const lift = geo.strataLift(g.to[i] - g.from[i], g.total, x0, x1, width, ceil, view.localize);
+  return arcHeightAt(x, x0, x1, L.R, R.R, L.A, DOME * view.localize) + lift;
 }
 
 describe('threadEnds: where a thread\'s references are written', () => {

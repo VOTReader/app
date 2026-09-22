@@ -27,7 +27,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, lodGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat, spanLogOf,
+  arcShapeGLSL, flyOverGLSL, lodGLSL, strataGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat, spanLogOf,
   STROKE_MIN_CSS, STROKE_DEEP_CSS, LOD_OFF,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
@@ -81,6 +81,7 @@ out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
 ${lodGLSL}
+${strataGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -117,8 +118,11 @@ void main(){
   float tau = mix(arcTau(lo, left, right, RL, RR, P), arcTau(hi, left, right, RL, RR, P), t);
   float px, hgt; vec2 tgv;
   arcAt(tau, left, right, RL, RR, A, P, bow, px, hgt, tgv);
+  // the strata: a thread whose feet have both left the frame rises into its
+  // band as one piece (the density law, part 3); pick.js lifts the same
+  float lift = strataLift(abs(b - a), uTotal, x0, x1, uRes.x, uCeil, uLocalize);
   // the baseline draws uCamY below the frame's base; pick.js adds the same
-  vec2 p = vec2(px, uBase + uCamY - hgt);
+  vec2 p = vec2(px, uBase + uCamY - hgt - lift);
   vec2 tg = normalize(tgv + vec2(1e-6, 0.));
 
   // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so

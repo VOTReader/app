@@ -24,12 +24,14 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, levelOf,
+  maxZoomFor, ribbonStyle, levelOf, STRATA_BOUNDS,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
   arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers, bodyMidpoint,
+  strataCounts,
 } from '../../utils/scripture-web/pick.js';
+import { DISTANCE_RAMP } from '../../utils/scripture-web/palette.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
@@ -560,6 +562,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // what each fly-over representative stands for (part 2)
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles);
+    // the strata's legend, once the reader has panned up into them (part 3)
+    if (cam.y > 0) drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles);
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
@@ -1363,6 +1367,55 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   }
   ctx.restore();
   return boxes;
+}
+
+/* ── the strata legend (the density law, part 3) ─────────────────────────
+   Panned up, the sky is four bands - nearby, book-, testament-, canon-scale
+   - and the legend under the chrome names them top-down with the Canon
+   ramp's colour at each band's middle span, how many fly-over threads cross
+   the frame in that band and how many of them are drawn (their groups'
+   representatives). Drawn only while cam.y > 0: at the overview there is no
+   sky. */
+function rampColorAt(span, total) {
+  const t = Math.pow(Math.max(span, 1) / Math.max(total, 2), 0.4);
+  const n = DISTANCE_RAMP.length - 1;
+  const f = Math.max(0, Math.min(n, t * n));
+  const i = Math.floor(f), j = Math.min(n, i + 1), u = f - i;
+  const c = DISTANCE_RAMP[i].map((v, k) => v + (DISTANCE_RAMP[j][k] - v) * u);
+  return 'rgb(' + c.map((v) => Math.round(v * 255)).join(',') + ')';
+}
+
+function drawStrataLegend(canvas, g, cam, view, v, chrome, bundles) {
+  if (!canvas || !g || !g.count) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const DPR = v.DPR;
+  const fs = BADGE_FONT_CSS * DPR;
+  const rows = strataCounts(g, cam, view, bundles && bundles.fly);
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const x = 14 * DPR;
+  let y = (view.inset > 0 ? view.inset : 0) + fs * 1.4;
+  ctx.save();
+  ctx.font = fs + 'px Georgia,serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.lineJoin = 'round';
+  for (let k = rows.length - 1; k >= 0; k--) {
+    const r = rows[k];
+    const lo = k === 0 ? 1 : STRATA_BOUNDS[k - 1];
+    const hi = k === STRATA_BOUNDS.length ? g.total : STRATA_BOUNDS[k];
+    const mid = Math.sqrt(lo * hi);
+    ctx.fillStyle = rampColorAt(mid, g.total);
+    ctx.fillRect(x, y - fs * 0.22, fs * 1.6, fs * 0.44);
+    const text = r.name + ' \u00b7 ' + r.cross.toLocaleString() + ' cross here \u00b7 ' + r.shown.toLocaleString() + ' shown';
+    ctx.lineWidth = 3 * DPR;
+    ctx.strokeStyle = chrome.bg;
+    ctx.strokeText(text, x + fs * 2.2, y);
+    ctx.fillStyle = 'rgba(' + ink + ',0.85)';
+    ctx.fillText(text, x + fs * 2.2, y);
+    y += fs * 1.55;
+  }
+  ctx.restore();
 }
 
 /* ── the references beside the lines ────────────────────────────────────

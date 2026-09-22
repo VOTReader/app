@@ -25,7 +25,7 @@
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
-  lodShown, LOD_OFF, FLYOVER_MARGIN,
+  lodShown, LOD_OFF, FLYOVER_MARGIN, strataLift, stratumOf, STRATA_NAMES,
 } from './geometry.js';
 import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
 
@@ -142,7 +142,9 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
         const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
         const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
-        const d = arcDistance(px, py, x0, x1, base, shapeL.R, shapeR.R, shapeL.A, tol, bow);
+        // the strata lift the whole curve: the baseline it stands on, as drawn
+        const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
+        const d = arcDistance(px, py, x0, x1, base - lift, shapeL.R, shapeR.R, shapeL.A, tol, bow);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
         while (at > 0 && best[at - 1].distance > d) at--;
@@ -244,7 +246,8 @@ export function threadEnds(g, cam, view, i) {
   const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
   const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
   const bow = DOME * localize;
-  const yAt = (x) => base - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
+  const yAt = (x) => base - lift - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
   const inSky = (x) => { const y = yAt(x); return y >= inset && y <= view.base; };
   // the body's x range the frame holds; empty when the thread is wholly off it
   const xa = Math.max(0, x0), xb = Math.min(width, x1);
@@ -312,7 +315,8 @@ export function bodyMidpoint(g, cam, view, i, margin = 0) {
   const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
   const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
   const bow = DOME * localize;
-  const yAt = (x) => base - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
+  const yAt = (x) => base - lift - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
   const mid = (xa + xb) / 2;
   const STEPS = 16;
   for (let k = 0; k <= STEPS; k++) {
@@ -668,6 +672,40 @@ export function flyBundles(g, cam, view) {
     }
   }
   return out;
+}
+
+/**
+ * @typedef {{ k:number, name:string, cross:number, shown:number }} StratumRow
+ */
+
+/**
+ * The legend's rows: per stratum, how many fly-over threads cross the frame
+ * and how many of them are drawn (their groups' representatives).
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
+ * @param {Map<number, FlyBundle>} [bundles] - flyBundles(), when the caller has them
+ * @returns {StratumRow[]}
+ */
+export function strataCounts(g, cam, view, bundles) {
+  const rows = STRATA_NAMES.map((name, k) => ({ k, name, cross: 0, shown: 0 }));
+  const map = bundles || flyBundles(g, cam, view);
+  // a group's members share a span cell, so one member's stratum is the group's
+  const { groupOf } = lodOf(g);
+  const seen = new Map();
+  for (let i = 0; i < g.count && seen.size < map.size; i++) {
+    const key = groupOf[i];
+    if (!map.has(key) || seen.has(key)) continue;
+    seen.set(key, stratumOf(Math.abs(g.to[i] - g.from[i])));
+  }
+  for (const b of map.values()) {
+    const k = seen.get(b.key);
+    if (k === undefined) continue;
+    rows[k].cross += b.count;
+    if (b.rep >= 0) rows[k].shown++;
+  }
+  return rows;
 }
 
 /**

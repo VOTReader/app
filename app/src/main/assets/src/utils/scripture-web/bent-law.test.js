@@ -207,7 +207,9 @@ describe('(c) the camera gains y', () => {
     clampCamera(cam, W, zMax, yf);
     // RED on the base tree: the fourth argument is ignored and y stays 1e9.
     expect(cam.y).toBeGreaterThan(0);
-    expect(cam.y).toBeLessThan(CEIL);
+    // the sky: the domes' crowns (1.15 x 1.25 ceil) plus the top stratum
+    // (3.8 x 0.35 ceil, the density law part 3), less the frame
+    expect(cam.y).toBeLessThan(3 * CEIL);
     const top = geo.maxCamY(cam, W, yf);
     expect(cam.y).toBe(top);
     expect(top).toBeCloseTo(geo.apexMaxPx(cam, W, yf) - BASE, 6);
@@ -216,11 +218,12 @@ describe('(c) the camera gains y', () => {
     expect(cam.y).toBe(0);
   });
 
-  it('the sky is honest: at the ceiling the tallest apex is APEX_LIFT x (1 + DOME) x ceil', () => {
+  it('the sky is honest: at the ceiling the tallest apex is APEX_LIFT x (1 + DOME) x ceil plus the top stratum', () => {
     const cam = createCamera(TOTAL);
     clampCamera(cam, W, zMax);
     cam.ppv = fitPPV(cam, W) * zMax;
-    expect(geo.apexMaxPx(cam, W, yf)).toBeCloseTo(geo.APEX_LIFT * (1 + DOME) * CEIL, 0);
+    // + STRATA_LIFT_MAX x BAND x ceil: the density law, part 3 (strata-law.test.js)
+    expect(geo.apexMaxPx(cam, W, yf)).toBeCloseTo(geo.APEX_LIFT * (1 + DOME) * CEIL + geo.STRATA_LIFT_MAX * geo.BAND * CEIL, 0);
   });
 
   it('without a y frame the camera is 1-D: y is held at 0 whatever was written (a My Web rail cannot drift)', () => {

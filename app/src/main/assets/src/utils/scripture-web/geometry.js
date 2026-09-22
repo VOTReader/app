@@ -747,6 +747,88 @@ float lodShown(uint lod, float essential, float anchored, float level){
   return anchored > .5 ? step(reveal, level) : float(rep);
 }`;
 
+/* ── The density law, part 3: strata (density-law.md section 3, 2026-09-21) ──
+ *
+ * Corbin: "various 'atmospheres' and 'layers' when you're panned up so
+ * everything stays navigable". Panned up at the ceiling, the fly-over
+ * representatives all stood in one level band under the chrome: every long
+ * arc's run sits at APEX_LIFT x ceil, whatever its span. Now a thread whose
+ * feet have BOTH left the frame rises into its STRATUM - the asset's span
+ * buckets: nearby (< 50 verses), book-scale (< 500), testament-scale
+ * (< 5,000), canon-scale - by a lift of BAND x ceil per stratum, ordered by
+ * span inside the band, scaled by localize (6x and under untouched) and by
+ * how far the nearer foot is outside the frame (smooth over one frame's
+ * width, so a pan never snaps a line). A thread with a foot in the frame
+ * (or its margin) has NO lift: today's arch to the pixel, no reeds. The
+ * whole curve moves up as one, so its shape is untouched.
+ *
+ * The shader inlines strataGLSL; pick.js calls strataLift. Same law.
+ */
+
+/** Stratum bounds, verses: the asset's span buckets (tools/scripture-web-lib SPAN_BUCKETS). */
+export const STRATA_BOUNDS = [50, 500, 5000];
+
+/** The strata's names, for the legend. */
+export const STRATA_NAMES = ['nearby', 'book-scale', 'testament-scale', 'canon-scale'];
+
+/** THE taste number: one stratum's height, as a share of the ceiling. Corbin may move it. */
+export const BAND = 0.35;
+
+/** The top stratum's lift in BAND x ceil units: k = 3 plus the 0.8 in-band spread. */
+export const STRATA_LIFT_MAX = 3.8;
+
+/**
+ * Which stratum a span belongs to, 0..3.
+ * @param {number} span - |to - from|, verses
+ */
+export function stratumOf(span) {
+  for (let k = 0; k < STRATA_BOUNDS.length; k++) if (span < STRATA_BOUNDS[k]) return k;
+  return STRATA_BOUNDS.length;
+}
+
+/**
+ * How far a thread's drawn curve is lifted into its stratum, device px.
+ * MUST stay identical to strataGLSL below.
+ *
+ * @param {number} span - |to - from|, verses
+ * @param {number} total - verses in the canon
+ * @param {number} x0 @param {number} x1 - the feet, device px (x0 <= x1)
+ * @param {number} width - viewport width, device px
+ * @param {number} ceil - usable height above the baseline, device px
+ * @param {number} localize - localizeFactor()
+ * @returns {number} 0 when a foot is within FLYOVER_MARGIN of the frame
+ */
+export function strataLift(span, total, x0, x1, width, ceil, localize) {
+  if (!(localize > 0)) return 0;
+  const m = FLYOVER_MARGIN;
+  const dl = -x0 - m > 0 ? -x0 - m : 0;
+  const dr = x1 - width - m > 0 ? x1 - width - m : 0;
+  const dist = dl < dr ? dl : dr;
+  if (!(dist > 0)) return 0;
+  const s = smoothstep(0, width, dist);
+  const sp = span > 1 ? span : 1;
+  const k = stratumOf(sp);
+  const lo = k === 0 ? 1 : STRATA_BOUNDS[k - 1];
+  const hi = k === STRATA_BOUNDS.length ? (total > lo ? total : lo + 1) : STRATA_BOUNDS[k];
+  let f = (Math.log(sp) - Math.log(lo)) / (Math.log(hi) - Math.log(lo));
+  f = f < 0 ? 0 : (f > 1 ? 1 : f);
+  return BAND * ceil * (k + 0.8 * f) * localize * s;
+}
+
+/** The same lift as GLSL ES 3.00, for the vertex shader to inline. */
+export const strataGLSL = `
+float strataLift(float span, float total, float x0, float x1, float width, float ceil, float localize){
+  float m = ${glslFloat(FLYOVER_MARGIN)};
+  float dist = min(max(-x0 - m, 0.), max(x1 - width - m, 0.));
+  float s = smoothstep(0., width, dist);
+  float sp = max(span, 1.);
+  float k = step(${glslFloat(STRATA_BOUNDS[0])}, sp) + step(${glslFloat(STRATA_BOUNDS[1])}, sp) + step(${glslFloat(STRATA_BOUNDS[2])}, sp);
+  float lo = k < .5 ? 1. : (k < 1.5 ? ${glslFloat(STRATA_BOUNDS[0])} : (k < 2.5 ? ${glslFloat(STRATA_BOUNDS[1])} : ${glslFloat(STRATA_BOUNDS[2])}));
+  float hi = k < .5 ? ${glslFloat(STRATA_BOUNDS[0])} : (k < 1.5 ? ${glslFloat(STRATA_BOUNDS[1])} : (k < 2.5 ? ${glslFloat(STRATA_BOUNDS[2])} : max(total, lo + 1.)));
+  float f = clamp((log(sp) - log(lo))/(log(hi) - log(lo)), 0., 1.);
+  return ${glslFloat(BAND)}*ceil*(k + .8*f)*localize*s;
+}`;
+
 /**
  * Distance in device px from a point to an arc, or Infinity if the point is
  * outside the arc's bounding box.
@@ -845,7 +927,9 @@ export function apexMaxPx(cam, width, yf) {
   const localize = localizeFactor(cam.ppv / fitPPV(cam, width));
   const { A } = arcShape((yf.maxSpan * cam.ppv) / 2, yf.ceil, yf.squash, localize,
     spanLogOf(yf.maxSpan, cam.total));
-  return A * (1 + DOME * localize);
+  // plus the top stratum: a canon-scale thread whose feet have both left
+  // the frame stands STRATA_LIFT_MAX bands higher (the density law, part 3)
+  return A * (1 + DOME * localize) + STRATA_LIFT_MAX * BAND * yf.ceil * localize;
 }
 
 /**
