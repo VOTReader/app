@@ -1236,7 +1236,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             <li>Drag up to look into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
             <li><strong>Reset</strong> brings you home.</li>
           </ul>
-          <button type="button" className="sw-btn sw-guide-close" onClick={closeGuide}>Got it</button>
+          <button type="button" className="sw-sheet-follow sw-guide-close" onClick={closeGuide}>Got it</button>
         </div>
       )}
       {emptyShown && (

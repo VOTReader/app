@@ -7055,7 +7055,11 @@
     .sw-guide-body { margin: 0 0 8px; padding-left: 16px; font-size: var(--fs-13); line-height: 1.4; }
     .sw-guide-body li + li { margin-top: 3px; }
     .sw-guide-body strong { color: var(--gold-bright); font-weight: 600; }
-    .sw-guide-close { display: block; margin-left: auto; }
+    /* Got it follows the theme like the sheet's Follow (transparent, gold
+       border, gold ink): the pinned .sw-btn read as a grey blob on the
+       parchment card in the light theme (lanes/myweb/out/look-structure/
+       phoneLand-1-fit-l14lightcard-*). */
+    .sw-guide-close { display: flex; margin: 0 0 0 auto; }
     .sw-guide-btn {
       /* beside the hide-all button, on its left: above it the button sat on
          the ruler's last chapter numeral (the l14 sky picture) */
