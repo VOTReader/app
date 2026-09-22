@@ -38,6 +38,16 @@ describe('translateVerse (PERF-3)', () => {
     // back to John 3 — index rebuilt correctly
     expect(translateVerse('john', 3, { n: 17, text: 'x' }, 'kjv')).toBe('For God sent not his Son');
   });
+  it('a cached index answers only for the data it was built from (a replaced global is re-read)', () => {
+    // Keyed by translation:book:chapter alone, the index handed a NEW edition object
+    // the previous one's text. releaseTranslationsExcept purges by prefix, but any
+    // other replacement (and every test here that installs its own BIBLE_KJV) got
+    // the stale answer: the flake hunt caught 6 tests in this file reading another
+    // test's fixture, --sequence.shuffle --sequence.seed=888.
+    expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'kjv')).toBe('For God so loued the world');
+    globalThis.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'a second load' }] } };
+    expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'kjv')).toBe('a second load');
+  });
   it('PERF-3: repeated calls for the same chapter are consistent (cache hit)', () => {
     const a = translateVerse('john', 3, { n: 16, text: 'x' }, 'kjv');
     const b = translateVerse('john', 3, { n: 16, text: 'x' }, 'kjv');

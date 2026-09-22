@@ -146,16 +146,16 @@ const _xlateCacheMax = 8;
  *                   _translationPromises still holds one, so a global freed
  *                   with its promise left behind is permanently unloadable —
  *                   the promise resolves at once and the data never returns
- *   _xlateCache     keyed translation:book:chapter, and this one is a
- *                   CORRECTNESS requirement, not a memory one. Its declaration
- *                   promises "a cached index never goes stale because the data
- *                   never mutates after its script loads" - true until an
- *                   eviction makes a RE-load possible, and then a surviving
- *                   entry answers with the previous load's text.
- *                   MEASURED, because I wrote the memory reason first and
- *                   checked it afterwards: the cache is capped at
- *                   _xlateCacheMax = 8 chapters of extracted strings, which is
- *                   kilobytes. It was never the 32 MB.
+ *   _xlateCache     keyed translation:book:chapter. It began as a CORRECTNESS
+ *                   requirement: a surviving entry answered a RE-load with the
+ *                   previous load's text. _verseIndex now checks each entry
+ *                   against the edition object it was built from, so that
+ *                   answer can no longer come back - and the same change made
+ *                   the purge a MEMORY requirement after all: an entry holds
+ *                   its edition object, so one left behind pins the whole
+ *                   ~32 MB global this function exists to free. (Before that,
+ *                   entries held only extracted strings: kilobytes, never the
+ *                   32 MB.)
  *
  * And the BASE is not a nicety: KJV-R is a sparse overlay whose misses fall
  * through to KJV, so evicting KJV under a KJV-R reader does not fail loudly —
@@ -195,14 +195,19 @@ export function releaseTranslationsExcept(selected) {
 function _verseIndex(data, translation, bookId, chNum) {
   const key = translation + ':' + bookId + ':' + chNum;
   const hit = _xlateCache.get(key);
-  if (hit) {
+  // An entry answers only for the edition object it was built from. The prefix
+  // purge in releaseTranslationsExcept covers the one re-load path the app has;
+  // this makes the cache correct by construction for any other (the flake hunt
+  // found every test that installs its own BIBLE_KJV reading a previous one's).
+  if (hit && hit.data === data) {
     _xlateCache.delete(key); _xlateCache.set(key, hit); // refresh recency
-    return hit;
+    return hit.idx;
   }
   const verses = data[bookId] && data[bookId][chNum];
   const idx = Object.create(null);
   if (verses) { for (let i = 0; i < verses.length; i++) idx[verses[i].n] = verses[i].text; }
-  _xlateCache.set(key, idx);
+  _xlateCache.delete(key);
+  _xlateCache.set(key, { data, idx });
   if (_xlateCache.size > _xlateCacheMax) _xlateCache.delete(_xlateCache.keys().next().value);
   return idx;
 }
