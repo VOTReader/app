@@ -116,16 +116,17 @@ ARCHIVE = r"D:\VOT-Archive"
 MIN_PROVEN = 0.60          # below this the chapter ships nothing (owner policy)
 
 # Chapters PINNED to ship below the gate, by ruling, each with its reason -- a
-# hand-reviewed residue, never a knob. The whisper witness is deaf to a Hebrew
-# name list: Nehemiah 10's seal-list read 20 of 39 verses UNSPOKEN with the
-# other 19 proven (7 CONFIRMED, 12 PROBED), and the ruling (hub for Corbin,
-# 2026-09-20 02:1x) was twelve full chapters plus an honest gap over an absent
-# book. A pinned chapter ships its proven rows only; the rest stay 0 (dark),
-# never interpolated. validate-bible-sync.py FAILS a pin whose chapter clears
-# the gate on its own -- the register only shrinks -- so a name-tolerant
-# re-align retires the pin instead of hiding behind it.
+# hand-reviewed residue, never a knob. A pinned chapter ships its proven rows
+# only; the rest stay 0 (dark), never interpolated. validate-bible-sync.py FAILS
+# a pin whose chapter clears the gate on its own -- the register only shrinks.
+# History: the strict whisper witness is deaf to a Hebrew name list, and
+# Nehemiah 10's seal-list read 20 of 39 verses UNSPOKEN with the other 19 proven
+# (7 CONFIRMED, 12 PROBED); the ruling (hub for Corbin, 2026-09-20 02:1x) pinned
+# it as twelve full chapters plus an honest gap. The name-tolerant witness
+# (--name-tolerant, 2026-09-22) re-aligned it to 38/39 proven (7 CONFIRMED,
+# 31 PROBED, every earlier stamp unchanged; verse 12 stays UNSPOKEN under a
+# whisper loop), so the pin retired. The register is empty.
 GATE_PINS = {
-    ("wop-nkjv", "nehemiah", 10): "seal-list of names, 19/39 proven, witness-deaf not misaligned",
 }
 
 
@@ -209,7 +210,10 @@ def verses_json(ed, book_id, chapter, out_dir):
     return path
 
 
-def is_current(belt_path, want_settings, verses_path, audio_path):
+def is_current(belt_path, want_settings, verses_path, audio_path, witness="strict"):
+    """The resume key: settings, the reference text, the recording's bytes, and
+    the witness mode (strict or name-tolerant -- outside settings_hash by design,
+    see _alignlib.settings_hash; a belt written before the field exists is strict)."""
     if not os.path.exists(belt_path):
         return False
     try:
@@ -217,6 +221,8 @@ def is_current(belt_path, want_settings, verses_path, audio_path):
     except (OSError, ValueError):
         return False
     if d.get("settings_hash") != want_settings:
+        return False
+    if d.get("witness", "strict") != witness:
         return False
     if d.get("audioSize") != os.path.getsize(audio_path):
         return False
@@ -383,6 +389,9 @@ def main():
     ap.add_argument("--books", help="comma list of book ids — every chapter of each")
     ap.add_argument("--all", action="store_true", help="every chapter of the edition")
     ap.add_argument("--force", action="store_true", help="re-align even when the belt is current")
+    ap.add_argument("--name-tolerant", action="store_true",
+                    help="witness may match a near hearing of the chapter's proper nouns "
+                         "(name lists the strict witness reads UNSPOKEN); stamped in the belt as witness")
     ap.add_argument("--no-ship", action="store_true", help="align only; do not write the data file")
     ap.add_argument("--limit", type=int, help="stop after N chapters (calibration runs)")
     ap.add_argument("--write-audio-index", action="store_true",
@@ -395,8 +404,9 @@ def main():
 
     ed = a.edition
     cfg = EDITIONS[ed]
-    s = al.settings_for(cfg["family"])
+    s = al.settings_for(cfg["family"], name_tolerant=True if a.name_tolerant else None)
     want_settings = al.settings_hash(s)
+    witness = "name-tolerant" if a.name_tolerant else "strict"
     belts = os.path.join(WORK, "bible", ed)
     verses_dir = os.path.join(belts, "verses")
     os.makedirs(belts, exist_ok=True)
@@ -418,7 +428,7 @@ def main():
     if a.limit:
         work = work[:a.limit]
     print(f"batch-align-bible {ed}: {len(work)} chapters  family {cfg['family']}  settings {want_settings}  "
-          f"started {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+          f"witness {witness}  started {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
     if a.min_free_vram_gb > 0:
         free = al.vram_free_gb()
         if free is not None and free < a.min_free_vram_gb:
@@ -495,7 +505,7 @@ def main():
             failed += 1
             note(book_id, "failed")
             continue
-        if not a.force and is_current(belt_path, want_settings, vpath, audio):
+        if not a.force and is_current(belt_path, want_settings, vpath, audio, witness):
             skipped += 1
             note(book_id, "skipped")
             continue

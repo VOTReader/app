@@ -280,5 +280,58 @@ class WebNumbersSparselyAndTheAppSlotsAreNkjvs(unittest.TestCase):
         self.assertEqual(self._diff("kjv"), {})
 
 
+
+class TheNameTolerantWitnessIsOptInAndNameGuarded(unittest.TestCase):
+    """2026-09-22: the strict witness read 20 of Nehemiah 10's 39 verses UNSPOKEN
+    with the recording plainly speaking the names ("pashur amariah malkijah" for
+    "Pashhur, Amariah, Malchijah"). The tolerant witness lets a proper noun match a
+    near hearing -- and ONLY a proper noun: scripture's formulaic lines would
+    false-confirm on "there"/"three". It is a per-chapter witness mode outside
+    settings_hash (the shipper keys every belt on the family hash), so the belt's
+    own `witness` field is what the resume key compares."""
+
+    def setUp(self):
+        self.al = bab.al
+
+    def test_only_a_capitalised_name_earns_the_tolerant_match(self):
+        al = self.al
+        names = al.name_tokens("Pashhur, Amariah, Malchijah, Hattush, Shebaniah, Malluch. "
+                               "There were three. Then The Lord said unto Baruch:")
+        self.assertEqual(names, {"pashhur", "amariah", "malchijah", "hattush", "shebaniah", "malluch", "baruch"},
+                         "short names, sentence openers and the stoplist stay out")
+        for heard, want in (("pashur", "pashhur"), ("malak", "malluch"), ("hattish", "hattush"),
+                            ("beyrouk", "baruch"), ("miramoth", "meremoth")):
+            self.assertEqual(al.tok_match(heard, want, names | {"meremoth"}), "name", (heard, want))
+            self.assertIsNone(al.tok_match(heard, want), "strict stays strict")
+        self.assertTrue(al.name_alike("there", "three"), "the sounds alike -- which is exactly the danger")
+        self.assertIsNone(al.tok_match("there", "three", names), "not a name: no tolerance")
+        self.assertIsNone(al.tok_match("zechariah", "zaccur", names | {"zaccur"}), "a real mishearing stays a miss")
+        self.assertEqual(al.tok_match("amariah", "amariah", names), "exact", "the strict kinds come first")
+
+    def test_the_mode_lives_in_the_belt_not_the_settings_hash(self):
+        al = self.al
+        strict = al.settings_for("bible-wop-nkjv")
+        tolerant = al.settings_for("bible-wop-nkjv", name_tolerant=True)
+        self.assertEqual(al.settings_hash(strict), al.settings_hash(tolerant),
+                         "one family hash: the shipper must keep taking the other 1,188 belts")
+        with tempfile.TemporaryDirectory() as td:
+            audio = os.path.join(td, "a.mp3")
+            open(audio, "wb").write(b"x" * 10)
+            verses = os.path.join(td, "v.json")
+            json.dump({"verses": [{"n": 1, "text": "In the beginning"}]}, open(verses, "w"))
+            want = al.settings_hash(strict)
+            vh = al.sha10(json.dumps([[1, "In the beginning"]], ensure_ascii=False, separators=(",", ":")))
+            belt_path = os.path.join(td, "b.json")
+            base = {"settings_hash": want, "audioSize": 10, "versesHash": vh, "verses": [{"n": 1, "t": 0.5}]}
+            json.dump(base, open(belt_path, "w"))
+            self.assertTrue(bab.is_current(belt_path, want, verses, audio), "a belt before the field is strict")
+            self.assertFalse(bab.is_current(belt_path, want, verses, audio, "name-tolerant"),
+                             "asking for the tolerant witness re-aligns a strict belt")
+            json.dump({**base, "witness": "name-tolerant"}, open(belt_path, "w"))
+            self.assertTrue(bab.is_current(belt_path, want, verses, audio, "name-tolerant"))
+            self.assertFalse(bab.is_current(belt_path, want, verses, audio),
+                             "and a strict run does not keep a tolerant belt")
+
+
 if __name__ == "__main__":
     unittest.main()

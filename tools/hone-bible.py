@@ -114,11 +114,19 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
         for t in u["tokens"]:
             cols.append(nrm(t))
             owners.append(u["owner"])
-    B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
+    # The name-tolerant witness (opt-in per chapter, --name-tolerant): the
+    # chapter's proper nouns may match a near hearing in the transcript and in
+    # every probe. Nehemiah 10's seal-list read 20 of 39 verses UNSPOKEN under
+    # the strict witness with the recording plainly speaking the names.
+    names = set()
+    if s.get("name_tolerant"):
+        for v in verses:
+            names |= al.name_tokens(v["text"], nrm)
+    B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s, names or None))
     say(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
 
     snap = al.make_snap(al.silence_intervals(wav, stamp=stamp))
-    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl),
+    rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl, names or None),
                    snap_fn=snap, end_t=tx.get("dur"))
     n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
     n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
@@ -135,6 +143,8 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
            "versesHash": al.sha10(json.dumps([[v["n"], v["text"]] for v in verses],
                                              ensure_ascii=False, separators=(",", ":"))),
            "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
+           "witness": "name-tolerant" if s.get("name_tolerant") else "strict",
+           "names": sorted(names),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
            "verses": rows}
     path = os.path.join(out_dir, out_tag + ".json")

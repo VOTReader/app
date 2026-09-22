@@ -29,6 +29,7 @@ DETERMINISM CONTRACT
   argmax path. settings_hash() stamps outputs so a settings change is visible and
   (in the batch shipper) invalidates belts without invalidating transcripts.
 """
+import difflib
 import hashlib
 import json
 import os
@@ -115,20 +116,80 @@ def is_digit_token(tok):
 
 # ----------------------------------------------------------------- matcher --
 
-def tok_match(a, b):
-    """'exact' | 'prefix' | None. Prefix = stem match, guarded against short words."""
+def tok_match(a, b, names=None):
+    """'exact' | 'prefix' | 'name' | None. Prefix = stem match, guarded against short words.
+
+    `a` is the SPOKEN token (transcript / probe), `b` the REFERENCE token -- every
+    caller keeps that order, and the third kind depends on it: 'name' is the
+    name-tolerant witness (2026-09-22), granted only when `b` is in `names`, the
+    chapter's proper nouns (name_tokens), and the two sound alike (name_alike).
+    Ordinary words never get it: "there"/"three" share a consonant skeleton and
+    would false-confirm a stamp on scripture's formulaic lines."""
     if a == b:
         return "exact"
     if len(a) > 4 and len(b) > 2 and (a.startswith(b) or b.startswith(a)):
         return "prefix"
+    if names and b in names and name_alike(a, b):
+        return "name"
     return None
 
 
-def nw_align(words, cols, s):
+# Capitalised words that are not names. A sentence opener ("Then", "There") is
+# capitalised too, and the stoplist is what keeps it out of the tolerant set.
+NAME_STOP = frozenset("""
+the and then now but for lord god he she they thus says said this that these those there
+their them when who whom what why how yes no o yea nay behold also all every some none
+each which while with unto into from upon after before because therefore wherefore
+""".split())
+
+
+def name_tokens(text, nrm=None):
+    """The proper-noun tokens of `text`, in the matcher's domain: words the text
+    capitalises, five letters or more, not on NAME_STOP. Derived from the reference
+    text only (already covered by the belt's versesHash), so it adds no input the
+    cache key does not know."""
+    nrm = nrm or norm_token
+    out = set()
+    for w in re.findall(r"[A-Z][A-Za-z']+", ascii_fold(text)):
+        t = nrm(w)
+        if len(t) >= 5 and t not in NAME_STOP:
+            out.add(t)
+    return out
+
+
+def _name_fold(w):
+    """One spelling for the sounds a transcriber renders many ways: ch/ck/c -> k,
+    ph -> f, y/j -> i, doubled letters collapsed ("Malchijah" -> "malkiiah")."""
+    w = w.replace("ch", "k").replace("ck", "k").replace("ph", "f").replace("c", "k")
+    w = w.replace("y", "i").replace("j", "i")
+    return re.sub(r"(.)\1+", r"\1", w)
+
+
+def _name_skel(w):
+    f = _name_fold(w)
+    return f[0] + re.sub(r"[aeiou']", "", f[1:])
+
+
+def name_alike(a, b):
+    """True when a spoken token is a plausible hearing of the name `b`: same
+    consonant skeleton after folding ("pashur"/"pashhur", "malak"/"malluch"), or
+    the folded spellings agree on 80 % of their characters ("hattish"/"hattush").
+    Both sides five characters or more -- short names have too few consonants
+    to be told apart."""
+    if len(a) < 5 or len(b) < 5:
+        return False
+    if _name_skel(a) == _name_skel(b):
+        return True
+    return difflib.SequenceMatcher(None, _name_fold(a), _name_fold(b)).ratio() >= 0.8
+
+
+def nw_align(words, cols, s, names=None):
     """Global Needleman-Wunsch: transcript words (rows) x reference tokens (cols).
 
     words: [[token, start, end], ...] (WhisperLeg output)
     cols:  [token, ...]              (reference text, same normalizer as `words`)
+    names: the chapter's proper nouns (name_tokens) when the run is name-tolerant;
+           a 'name' hit earns the prefix reward -- a near hearing, not an identity.
     Returns {col_index: word_index} for the matched columns of the optimal path.
     Monotone by construction — a short unit anchors off the GLOBAL path, not off
     its own two-word luck."""
@@ -145,9 +206,9 @@ def nw_align(words, cols, s):
         row = bp[i]
         row[0] = 1
         for j in range(1, m + 1):
-            kind = tok_match(wi, cols[j - 1])
+            kind = tok_match(wi, cols[j - 1], names)
             diag = prev[j - 1] + (s["match_exact"] if kind == "exact"
-                                  else s["match_prefix"] if kind == "prefix" else NEG)
+                                  else s["match_prefix"] if kind in ("prefix", "name") else NEG)
             up = prev[j] + s["gap_transcript"]
             left = cur[j - 1] + s["gap_fragment"]
             best = max(diag, up, left)
@@ -547,7 +608,7 @@ class MMSLeg:
 
 # ------------------------------------------------------------------- belt ---
 
-def probe(wav_path, t, expect_text, s, whisper_leg):
+def probe(wav_path, t, expect_text, s, whisper_leg, names=None):
     """Transcribe probe_len seconds at t; True if it OPENS with expect_text's words.
 
     The window is deliberately long: a dramatised reading pauses mid-verse
@@ -576,7 +637,7 @@ def probe(wav_path, t, expect_text, s, whisper_leg):
     hi = matched = content_matched = 0
     for w in want:                       # in-order fuzzy match, NON-CONSUMING on a miss:
         j = hi                           # one misheard word ("yet"->"get") must cost one
-        while j < len(heard) and not tok_match(heard[j], w):
+        while j < len(heard) and not tok_match(heard[j], w, names):
             j += 1                       # token, not exhaust the scan for all that follow
         if j < len(heard):
             matched += 1
@@ -1047,8 +1108,14 @@ def sha10(blob):
 
 
 def settings_hash(sdict):
-    """10-char sha1 of the effective settings — stamped into every output."""
-    blob = json.dumps(sdict, sort_keys=True, default=str, ensure_ascii=False)
+    """10-char sha1 of the effective settings — stamped into every output.
+
+    `name_tolerant` is left OUT on purpose: it is a per-chapter witness mode, not
+    a family setting, and the shipper keys on the family hash. The belt records
+    it as `witness` instead, and batch-align-bible.is_current compares that, so
+    the input is still covered by the resume key -- just not by this one."""
+    blob = json.dumps({k: v for k, v in sdict.items() if k != "name_tolerant"},
+                      sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:10]
 
 
