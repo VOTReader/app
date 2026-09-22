@@ -38,7 +38,7 @@ const REAL_EDITIONS = {
   'brm-kjv': { label: 'KJV · Biblical Restoration Ministries', short: 'KJV · BRM', translation: 'kjv', volKey: 'bible-brm-kjv', assetPrefix: 'brm', books: 'all' },
   'wop-nkjv': { label: 'NKJV · The Word of Promise (Dramatized)', short: 'NKJV · Dramatized', translation: 'nkjv', volKey: 'bible-wop-nkjv', assetPrefix: 'wop', books: 'all' },
   'web-ebible': { label: 'WEB · World English Bible', short: 'WEB', translation: 'web', volKey: 'bible-web', assetPrefix: 'web', books: 'all' },
-  'tsot-matthew': { label: 'Matthew · The Sword of Truth (read by Benjamin)', short: 'Matthew · TSOT', translation: 'vot-matthew', volKey: 'bible-tsot-matthew', books: ['matthew'] },
+  'tsot-matthew': { label: 'Matthew · The Scriptures of Truth (read by Benjamin)', short: 'Matthew · TSOT', translation: 'vot-matthew', volKey: 'bible-tsot-matthew', books: ['matthew'], description: 'Corrected Version by Timothy, with The Lord' },
 };
 
 /* The registry the app ships. Only the codes in here may reach the reader as
@@ -127,17 +127,20 @@ describe('the Bible Audio picker never shows a reader an internal id', () => {
       'KJV · Biblical Restoration Ministries',
       'NKJV · The Word of Promise (Dramatized)',
       'WEB · World English Bible',
-      'Matthew · The Sword of Truth (read by Benjamin)',
+      'Matthew · The Scriptures of Truth (read by Benjamin)',
       'Off',
     ]);
   });
 
   it('THE READER-FACING CONSEQUENCE: Matthew is not described as VOT-MATTHEW', async () => {
     mount(REAL_EDITIONS);
-    const desc = descOf(await options(), 'Matthew · The Sword of Truth (read by Benjamin)');
+    const desc = descOf(await options(), 'Matthew · The Scriptures of Truth (read by Benjamin)');
     expect(desc).not.toContain('VOT-MATTHEW');
     expect(desc).not.toContain('vot-matthew');
-    expect(desc).toBe('Per-chapter audiobook');
+    // mt1 (Corbin 2026-09-21): TSOT = The Scriptures of Truth; the recording is the
+    // Matthew Study Bible, Corrected Version, by Timothy with The Lord — the
+    // registry's one-line description rides the picker.
+    expect(desc).toBe('Per-chapter audiobook · Corrected Version by Timothy, with The Lord');
   });
 
   it('CONTROL: an edition whose code the app KNOWS keeps its clause', async () => {

@@ -9,7 +9,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../../utils/audio-track.js';
 import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
@@ -57,6 +57,17 @@ function bibleBookCount(volKey) {
     if (key.lastIndexOf(prefix, 0) === 0) count++;
   }
   return count;
+}
+
+/** The reader code the manifest carries for this edition's first row, or ''
+ *  when it names none (the KJV/NKJV/WEB editions carry no code). */
+function bibleReaderCode(volKey) {
+  if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return '';
+  const prefix = volKey + ':';
+  for (const key in BIBLE_AUDIO_MANIFEST) {
+    if (key.lastIndexOf(prefix, 0) === 0) { const row = BIBLE_AUDIO_MANIFEST[key][0]; return row && row[1] ? String(row[1]) : ''; }
+  }
+  return '';
 }
 
 /**
@@ -246,18 +257,27 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
               <span className="audio-library-shelf-copy">
                 <strong>The Volumes of Truth</strong>
-                <small>{collections.length ? collections.length + ' collections · the Letters read aloud' : 'The Letters read aloud'}</small>
+                <small>{collections.length ? collections.length + (collections.length === 1 ? ' collection' : ' collections') + ' · the Letters read aloud' : 'The Letters read aloud'}</small>
               </span>
               <span className="audio-library-shelf-tail"><ArrowIcon /></span>
             </button>
             {editions.map((edition) => {
               const books = bibleBookCount(edition.volKey);
+              // mt1 (2026-09-21): a true second line — a noun that agrees with
+              // its count, the registry's description where the edition has
+              // one, and the reader when the manifest names one (only TSOT's
+              // rows carry a reader code today; the others say how they read).
+              const parts = [books ? books + (books === 1 ? ' book' : ' books') : 'Read chapter by chapter'];
+              if (edition.description) parts.push(edition.description);
+              const reader = audioReaderLabel(bibleReaderCode(edition.volKey));
+              if (reader) parts.push(reader);
+              else if (!edition.description && books) parts.push('chapter by chapter');
               return (
                 <button key={edition.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(edition.volKey)}>
                   <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
                   <span className="audio-library-shelf-copy">
                     <strong>{edition.label}</strong>
-                    <small>{books ? books + ' books · chapter by chapter' : 'Read chapter by chapter'}</small>
+                    <small>{parts.join(' · ')}</small>
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>

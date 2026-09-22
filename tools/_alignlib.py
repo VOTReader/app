@@ -988,7 +988,7 @@ FAMILIES = {
     # you" -- the names the model otherwise mangles, so they lead the prompt. No music bed,
     # no superscriptions (carried key kept for the family shape).
     "bible-tsot-matthew": {
-        "initial_prompt": ("The Gospel of Matthew, The Sword of Truth, read aloud. "
+        "initial_prompt": ("The Gospel of Matthew, The Scriptures of Truth, read aloud. "
                            "YahuShua The Messiah, The Son of David. The Kingdom of Heaven. "
                            "Assuredly, I say to you."),
         "unit": "verse",

@@ -2054,7 +2054,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     && TRANSLATION_OPTIONS.some((o) => o && o.id === code);
                   return {
                     id, label: /** @type {any} */ (ed).label,
-                    desc: 'Per-chapter audiobook' + (known ? ' · ' + code.toUpperCase() + ' text' : ''),
+                    // mt1: an edition's own one-line description (what the
+                    // recording IS) rides between the form and the text clause.
+                    desc: 'Per-chapter audiobook'
+                      + (/** @type {any} */ (ed).description ? ' · ' + /** @type {any} */ (ed).description : '')
+                      + (known ? ' · ' + code.toUpperCase() + ' text' : ''),
                   };
                 }),
                 { id: "off", label: "Off", desc: "Hide the Bible Listen button" },

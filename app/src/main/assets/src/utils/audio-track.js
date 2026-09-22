@@ -120,8 +120,14 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     books: 'all',
   }),
   'tsot-matthew': Object.freeze({
-    label: 'Matthew · The Sword of Truth (read by Benjamin)',
+    // TSOT = The Scriptures of Truth (Corbin 2026-09-21; "Sword" was an
+    // expansion invented in cad47afb). The recording is the Matthew Study
+    // Bible, Corrected Version, by Timothy with The Lord, read by Benjamin
+    // (Drive: "18. TSOT New Testament (read by "Bejamin")", Drive's spelling).
+    label: 'Matthew · The Scriptures of Truth (read by Benjamin)',
     short: 'Matthew · TSOT',
+    /** One line the Browse row and the Settings picker show under the label. */
+    description: 'Corrected Version by Timothy, with The Lord',
     translation: 'vot-matthew',
     volKey: 'bible-tsot-matthew',
     // No assetPrefix: this edition's assets are the archive's Drive ids, not a
@@ -144,6 +150,7 @@ export const BIBLE_AUDIO_EDITIONS = Object.freeze({
     // painting nothing, so it ships with audio and no timings.
     label: 'John · The Gospel of John (film audio, no read-along)',
     short: 'John · Film',
+    description: 'Film audio, listening only',
     volKey: 'bible-john-film',
     assetPrefix: 'gjn',
     // gjn2_ is deliberately NOT in BIBLE_ASSET_STAMPS, and this edition must

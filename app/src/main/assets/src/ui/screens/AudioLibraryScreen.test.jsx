@@ -129,7 +129,7 @@ describe('AudioLibraryScreen -- the hub', () => {
     // one doorway carries them all, like the Scriptures'.
     expect(screen.queryByRole('button', { name: /^♪?\s*Volume One/ })).toBeNull();
     const volumesRow = screen.getByRole('button', { name: /The Volumes of Truth/ });
-    expect(volumesRow.textContent).toContain('1 collections');    // the fixture registry has one
+    expect(volumesRow.textContent).toContain('1 collection');     // the fixture registry has one (and it agrees)
     fireEvent.click(volumesRow);
     expect(onOpenVolumes).toHaveBeenCalledTimes(1);
     expect(onOpenCollection).not.toHaveBeenCalled();
@@ -138,6 +138,23 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(bibleRow.textContent).toContain('2 books');            // counted off its own manifest
     fireEvent.click(bibleRow);
     expect(onOpenCollection).toHaveBeenCalledWith('bible-brm-kjv');
+  });
+
+  /* mt1 (Corbin 2026-09-21, S22 screenshot of this shelf): "1 books · chapter
+     by chapter" under Matthew and John. Every source row gets a true second
+     line: a counted noun that agrees, the registry's one-line description
+     where it has one, and the reader when the manifest knows it. */
+  it('every Browse row has a true second line: agreeing plurals, the edition description, the reader the manifest knows', () => {
+    installGlobals({ votManifest: false });
+    globalThis.BIBLE_AUDIO_MANIFEST['bible-tsot-matthew:matthew'] = [['tsot-1', 'B']];
+    globalThis.BIBLE_AUDIO_MANIFEST['bible-john-film:john'] = [['gjn-1', '']];
+    renderScreen();
+    const lineUnder = (re) => screen.getByRole('button', { name: re }).querySelector('small').textContent;
+    expect(lineUnder(/Biblical Restoration Ministries/)).toBe('2 books · chapter by chapter');
+    expect(lineUnder(/The Scriptures of Truth/)).toBe('1 book · Corrected Version by Timothy, with The Lord · Read by Benjamin');
+    expect(lineUnder(/The Gospel of John/)).toBe('1 book · Film audio, listening only');
+    expect(lineUnder(/The Volumes of Truth/)).toBe('1 collection · the Letters read aloud');
+    expect(document.querySelector('.audio-library-browse').textContent).not.toMatch(/1 (books|collections)/);
   });
 
   /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
