@@ -540,6 +540,45 @@ export function apexMaxPx(cam, yf) {
 }
 
 /**
+ * THE SKY (structure-law.md, landing 9). As the reader rises off the
+ * baseline, the fly-over law lets go: a thread whose feet are both out of
+ * frame is what the sky is made of, so at the ceiling's height it keeps its
+ * full alpha. Linear in the camera's height over the frame's ceiling; only
+ * the fly-over dim reads this - the clip of the samples onto the viewport
+ * and the ribbon's alpha law keep the zoom's own localize, or the sky would
+ * draw a visible piece as one chord.
+ * @param {number} localize - localizeFactor(zoom)
+ * @param {number} camY - the camera's height, device px (0 at the baseline)
+ * @param {number} ceil - the frame's ceiling, device px
+ */
+export function skyLocalize(localize, camY, ceil) {
+  const rise = camY > 0 && ceil > 0 ? Math.min(1, camY / ceil) : 0;
+  return localize * (1 - rise);
+}
+
+/**
+ * The altitude ruler's marks: the heights the reader can name, in verses of
+ * span, each drawn where a thread of that span would crown.
+ */
+export const ALTITUDE_MARKS = [
+  { span: 30, name: 'a chapter' },
+  { span: 1000, name: 'a book' },
+  { span: 15000, name: 'a testament' },
+  { span: 31102, name: 'the canon' },
+];
+
+/**
+ * The span (verses) whose apex stands h device px above the baseline: the
+ * inverse of arcShape, A = rx * squash with rx = span * ppv / 2. 0 for a
+ * height at or below the baseline.
+ * @param {number} h @param {number} ppv @param {number} squash
+ */
+export function spanAtHeight(h, ppv, squash) {
+  if (!(h > 0) || !(ppv > 0) || !(squash > 0)) return 0;
+  return (2 * h) / (ppv * squash);
+}
+
+/**
  * The highest the camera may go: the tallest apex just reaches the frame's
  * top. At the overview the dome fills the frame and this is 0 - nothing to
  * pan, honestly, like a map at its bounds; at zoom z the sky is about z

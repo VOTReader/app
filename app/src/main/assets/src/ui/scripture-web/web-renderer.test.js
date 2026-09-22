@@ -94,7 +94,7 @@ describe('deep-zoom declutter', () => {
   it('calls that law for the fly-over fade, in the viewport frame', () => {
     // uRes.x is device px, the same frame pick.js measures its feet in.
     expect(SHADER_SOURCE.vertex).toMatch(
-      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uLocalize\);/);
+      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uFlyLocalize\);/);
   });
 
   /* A RIBBON FADED TO ZERO IS STILL RASTERISED, AND THAT IS THE COST.
@@ -124,7 +124,7 @@ describe('deep-zoom declutter', () => {
     // fly-over fade would test the focus dim (floor .05, never 0) and cull
     // nothing at all, while looking exactly like this one.
     expect(SHADER_SOURCE.vertex).toMatch(
-      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uLocalize\);\s*(?:\/\/[^\n]*\n\s*)*if \(dim <= 0\.\)/);
+      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uFlyLocalize\);\s*(?:\/\/[^\n]*\n\s*)*if \(dim <= 0\.\)/);
   });
 
   it('sends the collapsed vertex outside the clip volume and still writes its varyings', () => {

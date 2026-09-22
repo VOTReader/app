@@ -36,6 +36,20 @@ export const DISTANCE_RAMP = [
   [0.33, 0.76, 0.37],
 ];
 
+/**
+ * distanceRamp's JS twin, for Canvas2D chrome that must match the shader's
+ * colour of a span (the altitude ruler): the same stops, the same linear
+ * mix, 0..255 integers.
+ * @param {number} t 0..1 (clamped)
+ * @returns {number[]} [r, g, b]
+ */
+export function distanceRampRGB(t) {
+  const n = DISTANCE_RAMP.length - 1;
+  const s = Math.min(1, Math.max(0, t)) * n;
+  const i = Math.floor(s), j = Math.min(i + 1, n), f = s - i;
+  return [0, 1, 2].map((k) => Math.round((DISTANCE_RAMP[i][k] + (DISTANCE_RAMP[j][k] - DISTANCE_RAMP[i][k]) * f) * 255));
+}
+
 /** Old↔Old, the prophecy bridge, New↔New. */
 export const TESTAMENT_COLORS = {
   ot: [0.816, 0.659, 0.220],      // gold — the app's own accent family

@@ -24,7 +24,7 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle,
+  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -33,7 +33,7 @@ import {
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
-import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
+import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS, distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
@@ -220,6 +220,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // which the tap test reads before it reaches the lines
   const bundleRef = React.useRef({ key: '', cells: [] });
   const badgeBoxesRef = React.useRef([]);
+  // the elevator's track (device px box + the height its top stands for),
+  // null when there is no sky to climb; the tap test reads it first
+  const elevatorRef = React.useRef(null);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
@@ -564,13 +567,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // the labels and badges keep off the ruler's chapter numerals (the hub,
     // 2026-09-21: "106" over "Ps 104:10")
     const reserved = (numerals || []).slice();
+    // the sky's chrome (landing 9): the altitude ruler on the left, only
+    // above the baseline, and the elevator on the right, once there is a sky
+    // to climb. Both reserve their boxes first, so the thread labels keep off.
+    const marks = drawAltitude(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome);
+    if (wrapRef.current) wrapRef.current.setAttribute('data-altitude', marks.join(','));
+    elevatorRef.current = drawElevator(uiRef.current, cam, Object.assign({}, base, { inset, reserved }), v, chrome, yFrameFor(cam));
+    if (wrapRef.current) wrapRef.current.setAttribute('data-elevator', elevatorRef.current ? elevatorRef.current.at.toFixed(4) : '');
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
     badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, bundles);
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
-  }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow]);
+  }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow, yFrameFor]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -899,6 +909,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, []);
 
   const tap = React.useCallback((cx, cy) => {
+    // the elevator (landing 9): a tap on the track sets the camera's height -
+    // the top of the track is the tallest apex, the bottom the baseline
+    const lift = elevatorRef.current;
+    if (lift) {
+      const v = viewRef.current, px = cx * v.DPR, py = cy * v.DPR;
+      if (px >= lift.x0 && px <= lift.x1 && py >= lift.y0 && py <= lift.y1) {
+        const cam = camRef.current;
+        const f = lift.y1 > lift.y0 ? (lift.y1 - py) / (lift.y1 - lift.y0) : 0;
+        cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
+        schedule();
+        return;
+      }
+    }
     const candidates = hitCandidatesAt(cx, cy);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
@@ -1302,6 +1325,97 @@ function bundlesFor(cache, g, cam, view, v, density) {
     cache.cells = footBundles(g, cam, view, v.DPR);
   }
   return cache;
+}
+
+/**
+ * The altitude ruler (landing 9): only while the camera is above the
+ * baseline. Each mark stands where a thread of that span would crown -
+ * y = base + camY - arcShape(span * ppv / 2, squash).A - in the canon
+ * ramp's colour for that span, so the height reads in the web's own key: a
+ * chapter, a book, a testament, the canon. The marks in view are returned
+ * (and published as data-altitude) whether or not there is a 2D context;
+ * the labels reserve their boxes so the thread labels keep off them.
+ * @returns {number[]} the spans in view, bottom to top
+ */
+function drawAltitude(canvas, g, cam, view, v, chrome) {
+  const shown = [];
+  const camY = cam.y > 0 ? cam.y : 0;
+  if (!(camY > 0) || !g || !(g.total > 0)) return shown;
+  const DPR = v.DPR, base = view.base, top = view.inset > 0 ? view.inset : 0;
+  const fs = chrome.fsRuler * DPR;
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  if (ctx) {
+    ctx.save();
+    ctx.font = fs + 'px Georgia,serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.lineWidth = DPR;
+  }
+  for (const m of ALTITUDE_MARKS) {
+    const y = base + camY - arcShape((m.span * cam.ppv) / 2, view.squash).A;
+    if (y < top + fs || y > base - fs) continue;
+    shown.push(m.span);
+    if (!ctx) continue;
+    const rgb = distanceRampRGB(Math.pow(m.span / g.total, 0.40)).join(',');
+    const text = m.span.toLocaleString('en-US') + ' · ' + m.name;
+    ctx.strokeStyle = 'rgba(' + rgb + ',0.85)';
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(14 * DPR, y); ctx.stroke();
+    const w = ctx.measureText(text).width;
+    const box = { x0: 18 * DPR, x1: 18 * DPR + w, y0: y - fs * 0.7, y1: y + fs * 0.7 };
+    ctx.lineWidth = 3 * DPR;
+    ctx.strokeStyle = chrome.bg;
+    ctx.strokeText(text, box.x0, y);
+    ctx.lineWidth = DPR;
+    ctx.fillStyle = 'rgba(' + rgb + ',0.95)';
+    ctx.fillText(text, box.x0, y);
+    if (view.reserved) view.reserved.push(box);
+  }
+  if (ctx) ctx.restore();
+  return shown;
+}
+
+/** The elevator's tap zone, CSS px in from the right edge. */
+const ELEVATOR_ZONE_CSS = 24;
+
+/**
+ * The elevator (landing 9): a thin track down the right edge from the top
+ * chrome to the baseline, its thumb at camY / maxCamY - the top is the
+ * tallest apex, the bottom the baseline. Drawn only on the canon web once
+ * there is a sky to climb (maxCamY > 0: past the overview). Returns the
+ * track's tap box (the right ELEVATOR_ZONE_CSS px), the height its top
+ * stands for and the thumb's fraction, or null; the tap callback reads it.
+ * @returns {{x0:number, x1:number, y0:number, y1:number, maxY:number, at:number}|null}
+ */
+function drawElevator(canvas, cam, view, v, chrome, yf) {
+  if (!yf) return null;
+  const maxY = maxCamY(cam, yf);
+  if (!(maxY > 0)) return null;
+  const DPR = v.DPR, W = v.W, base = view.base, top = view.inset > 0 ? view.inset : 0;
+  const y0 = top + 8 * DPR, y1 = base - 8 * DPR;
+  if (!(y1 > y0)) return null;
+  const camY = cam.y > 0 ? cam.y : 0;
+  const at = Math.min(1, camY / maxY);
+  const box = { x0: W - ELEVATOR_ZONE_CSS * DPR, x1: W, y0, y1, maxY, at };
+  if (view.reserved) view.reserved.push({ x0: box.x0, x1: box.x1, y0, y1 });
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  if (!ctx) return box;
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const x = W - 10 * DPR;
+  ctx.save();
+  ctx.lineWidth = 1.5 * DPR;
+  ctx.strokeStyle = 'rgba(' + ink + ',0.28)';
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+  // the thumb: a short rounded bar, gold once the reader has left the baseline
+  const th = 18 * DPR, tw = 6 * DPR, cy = y1 - at * (y1 - y0);
+  const ty0 = Math.max(y0, Math.min(y1 - th, cy - th / 2)), r = tw / 2;
+  ctx.beginPath();
+  ctx.moveTo(x - r, ty0 + r); ctx.arc(x, ty0 + r, r, Math.PI, 0);
+  ctx.lineTo(x + r, ty0 + th - r); ctx.arc(x, ty0 + th - r, r, 0, Math.PI); ctx.closePath();
+  ctx.fillStyle = 'rgba(' + (camY > 0 ? gold : ink) + ',' + (camY > 0 ? 0.95 : 0.6) + ')';
+  ctx.fill();
+  ctx.restore();
+  return box;
 }
 
 function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {

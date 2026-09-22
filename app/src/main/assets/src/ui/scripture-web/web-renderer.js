@@ -28,7 +28,7 @@
 
 import {
   arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT, skyLocalize,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
@@ -63,6 +63,7 @@ const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
+uniform float uFlyLocalize;  // the fly-over law's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
@@ -155,7 +156,7 @@ void main(){
   // passage.
   // The law lives in geometry.js, inlined above, because pick.js applies the
   // same test — an arc faded to nothing here must not win a tap there.
-  dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
+  dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uFlyLocalize);
   // zero-alpha cull: why, and why exactly zero, above this shader
   if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
@@ -246,7 +247,7 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
-    'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
+    'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim']) {
     U[name] = gl.getUniformLocation(program, name);
@@ -390,6 +391,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uBase, v.base);
       gl.uniform1f(U.uSquash, v.squash);
       gl.uniform1f(U.uLocalize, v.localize);
+      gl.uniform1f(U.uFlyLocalize, skyLocalize(v.localize, v.camY > 0 ? v.camY : 0, v.ceil));
       gl.uniform1f(U.uWidth, v.strokeWidth);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);

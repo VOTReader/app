@@ -25,7 +25,7 @@
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
-  FLYOVER_MARGIN, LOCALIZE_START,
+  FLYOVER_MARGIN, LOCALIZE_START, skyLocalize,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 
@@ -95,7 +95,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // exactly. Only a full zero is skipped: an arc still showing the
         // partial fly-over floor is dim, but it is there to be tapped.
         const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, localize) === 0) continue;
+        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
         // the curve as the shader draws it: the half-ellipse of its own span
         const { A } = arcShape((x1 - x0) * 0.5, squash);
         const d = arcDistance(px, py, x0, x1, base, A, tol);
@@ -121,8 +121,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  * never for one the shader skipped.
  *
  * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, localize:number, density:import('./decode.js').Density}} view
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, localize:number, density:import('./decode.js').Density, ceil?:number}} view
  * @param {number} limit — at most this many, so a dense screen bounds its own pass
  * @returns {number[]} instance indices
  */
@@ -148,7 +148,7 @@ export function visibleArcs(g, cam, view, limit) {
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
         const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, localize) === 0) continue;
+        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
         out.push(i);
         if (out.length >= limit) return out;
       }

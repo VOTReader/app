@@ -485,6 +485,62 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
     });
   });
+
+  describe('sky navigation (landing 9): the altitude ruler names the height, the elevator jumps it', () => {
+    const wide = () => Object.assign(graph(), {
+      count: 1,
+      from: new Uint16Array([100]), to: new Uint16Array([20100]), votes: new Int16Array([30]),
+      buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[100, 20100]] }],
+      chunkSize: 256,
+    });
+    const pressFrame = async (key) => {
+      fireEvent.keyDown(document.querySelector('.sw-root'), { key });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    };
+    const attr = (container, name) => container.querySelector('.sw-root').getAttribute(name);
+    const tapAt = async (container, x, y) => {
+      const root = container.querySelector('.sw-root');
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: x, clientY: y });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'touch', clientX: x, clientY: y });
+      await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
+    };
+
+    it('CONTROL: at the baseline there is no altitude ruler; at the overview no elevator either', async () => {
+      const { container } = await mount({}, wide);
+      expect(attr(container, 'data-altitude')).toBe('');
+      expect(attr(container, 'data-elevator')).toBe('');
+      // a tap on the right edge at the overview falls through to the web: the camera stays down
+      await tapAt(container, FRAME_CSS - 12, 130);
+      expect(attr(container, 'data-cam-y')).toBe('0.0');
+    });
+
+    it('risen at the ceiling, the ruler names a chapter (30 verses of span crown 422 px up; ten ArrowUps lift 312)', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(attr(container, 'data-elevator'), 'precondition: a sky to climb').toBe('0.0000');
+      expect(attr(container, 'data-altitude')).toBe('');
+      for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
+      expect(Number(attr(container, 'data-cam-y'))).toBeGreaterThan(0);
+      expect(attr(container, 'data-altitude').split(',')).toContain('30');
+      expect(Number(attr(container, 'data-elevator'))).toBeGreaterThan(0);
+    });
+
+    it('a tap on the elevator track sets the height: half way up the track is half the sky', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(attr(container, 'data-cam-y')).toBe('0.0');
+      // the track runs from 8 to base - 8 = 252 CSS px (no top chrome height in jsdom): 130 is its middle
+      await tapAt(container, FRAME_CSS - 12, 130);
+      expect(Number(attr(container, 'data-cam-y'))).toBeGreaterThan(0);
+      expect(Number(attr(container, 'data-elevator'))).toBeCloseTo(0.5, 1);
+      expect(DRAWN[DRAWN.length - 1].camY).toBeCloseTo(Number(attr(container, 'data-cam-y')), 0);
+      // a tap at the track's foot brings the camera back to the baseline (past
+      // the 300 ms double-tap window, or the second tap would zoom instead)
+      await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+      await tapAt(container, FRAME_CSS - 12, 252);
+      expect(attr(container, 'data-cam-y')).toBe('0.0');
+    });
+  });
 });
 
 describe('scripture-web-5 — Try again re-decodes the graph', () => {
