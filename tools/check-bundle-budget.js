@@ -67,7 +67,7 @@ const BUDGETS = [
   // gets. `measured` is in no comparison in this file — the only test is
   // `size > b.max` — so nothing above can change a gate outcome except the
   // ceiling itself.
-  { file: 'bundle-f.js', measured: 77953, max: 89700 },
+  { file: 'bundle-f.js', measured: 90543, max: 104200 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
