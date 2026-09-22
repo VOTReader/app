@@ -23,14 +23,17 @@
    outside those files reads them (verified at split time, and pinned by
    tools/bundle-g-membership.test.js).
 
-   BookmarksScreen deliberately STAYS in bundle-d: its file also exports
+   BookmarksScreen joined them in a second step: its file also defined
    BookmarkPopover, which AppShellSheets mounts in the always-present app
-   shell, so splitting the file would leave the shell reaching for a symbol
-   that may not have loaded. Freeing it means moving the popover to its own
-   module first — a later step, not a silent breakage.
+   shell, and the two hlKey derivations five other files read as free
+   globals. Those moved to ui/sheets/BookmarkPopover.jsx and
+   utils/bookmark-source.js, where they stay eager; only the screen, its row
+   and the row's action sheet — which nothing outside that file reads — came
+   across.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
+import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import {
   _linkEndpointCategory, _endpointResolves, _epSearchText,
@@ -46,6 +49,7 @@ import { composeNotesExport, notesExportFilename, shareNotesExport } from '../ut
 
 Object.assign(window, {
   MyProgressScreen,
+  BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

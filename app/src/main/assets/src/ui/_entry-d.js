@@ -183,10 +183,10 @@ import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
 import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
-import {
-  _bookmarkSourceLabel, _bookmarkSourceEndpoint,
-  BookmarkRow, BookmarkRowActionSheet, BookmarkPopover, BookmarksScreen,
-} from './screens/BookmarksScreen.jsx';
+// BookmarksScreen itself now rides in bundle-g; these two are what the
+// always-present app shell mounts and must never be lazy.
+import { _bookmarkSourceLabel, _bookmarkSourceEndpoint } from '../utils/bookmark-source.js';
+import { BookmarkPopover } from './sheets/BookmarkPopover.jsx';
 
 // ── Sheets ──────────────────────────────────────────────────────────────
 import { TabsOverview } from './sheets/TabsOverview.jsx';
@@ -279,8 +279,7 @@ Object.assign(window, {
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,
-  _bookmarkSourceLabel, _bookmarkSourceEndpoint,
-  BookmarkRow, BookmarkRowActionSheet, BookmarkPopover, BookmarksScreen,
+  _bookmarkSourceLabel, _bookmarkSourceEndpoint, BookmarkPopover,
   // Sheets
   TabsOverview, TabActionSheet, MultiNotePopover,
   NotebookPickerSheet, NoteSheet,

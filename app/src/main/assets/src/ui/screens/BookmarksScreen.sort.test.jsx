@@ -15,9 +15,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { BookmarksScreen } from './BookmarksScreen.jsx';
+/* The screen reads the source label as a free global now that it is lazy and
+   the derivation stayed in bundle-d — so the stub here is the REAL law, which
+   is what makes a source-az pass mean what it says. */
+import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'BookmarkStore', 'relativeDate',
-  'ConfirmStrip', '_bookTitle'];
+  'ConfirmStrip', '_bookTitle', '_bookmarkSourceLabel', '_bookmarkSourceEndpoint'];
 
 /* hlKey 'bible:<book>:<ch>' renders as "<Book title> <ch>" — the SOURCE label.
    `label` is the reader's own name for the bookmark. The two orders differ on
@@ -36,6 +40,7 @@ beforeEach(() => {
   globalThis.ConfirmStrip = () => null;
   globalThis.relativeDate = () => '';
   globalThis._bookTitle = (id) => id.charAt(0).toUpperCase() + id.slice(1);
+  globalThis._bookmarkSourceLabel = _bookmarkSourceLabel;
   globalThis.BookmarkStore = {
     subscribe: () => () => {}, getVersion: () => 0,
     all: () => BOOKMARKS.slice(), remove: () => {}, update: () => {},

@@ -28,11 +28,11 @@ const read = (p) => readFileSync(p, 'utf-8');
    the identifier itself still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof MyProgressScreen !== 'undefined'`).
    The key is the definition; the bare name is only a question about it. */
-const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'HighlightsScreen'];
+const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'HighlightsScreen', 'BookmarksScreen'];
 const defines = (bundle, name) => bundle.includes(name + ':');
 
 describe('bundle-g carries the Personal Study screens, and bundle-d no longer does', () => {
-  it('the four screens are defined in bundle-g', () => {
+  it('the five screens are defined in bundle-g', () => {
     const g = read(resolve(DIST, 'bundle-g.js'));
     for (const name of MARKERS) {
       expect(defines(g, name), `bundle-g.js lacks ${name}`).toBe(true);
@@ -60,6 +60,26 @@ describe('bundle-g carries the Personal Study screens, and bundle-d no longer do
     const pkg = JSON.parse(read(resolve(HERE, '..', 'package.json')));
     expect(typeof pkg.scripts['build:g'], 'package.json has no build:g').toBe('string');
     expect(pkg.scripts.build.includes('build:g'), 'npm run build does not run build:g').toBe(true);
+  });
+
+  it('the pieces the always-present shell mounts stay behind in bundle-d', () => {
+    // BookmarksScreen was the one Personal Study screen that could not travel
+    // in landing 21: its file also defined BookmarkPopover, which
+    // AppShellSheets mounts in the app shell on EVERY screen, and the two
+    // hlKey derivations that SelectionToolbar, JournalInsertSheet,
+    // journal-helpers and HighlightsScreen read as free globals. A lazy
+    // bundle-g copy of those would leave the shell reaching for a symbol that
+    // may never have loaded. They now live in their own bundle-d modules, and
+    // this pins that: the screen is lazy, the shell's pieces are not.
+    const d = read(resolve(DIST, 'bundle-d.js'));
+    const g = read(resolve(DIST, 'bundle-g.js'));
+    for (const name of ['BookmarkPopover', '_bookmarkSourceLabel', '_bookmarkSourceEndpoint']) {
+      expect(defines(d, name), `bundle-d.js no longer defines ${name} for the shell`).toBe(true);
+      expect(defines(g, name), `bundle-g.js ships its own ${name} — the shell would get two`).toBe(false);
+    }
+    // The row and its action sheet have no reader outside the screen, so they
+    // ride with it.
+    expect(defines(g, 'BookmarkRow'), 'bundle-g.js lacks BookmarkRow').toBe(true);
   });
 
   it('bundle-g leans on bundle-d\'s globals rather than shipping a second copy of them', () => {

@@ -44,7 +44,12 @@ const BUDGETS = [
   // cold-boot parse path. Re-baselined DOWN (510,376 x 1.15 = 586,932 -> the
   // hundred above) so the collapse detector keeps its teeth, exactly as c43 did
   // when matthew-nkjv.js left bundle-a.
-  { file: 'bundle-d.js', measured: 510376, max: 587000 },   // most screens/sheets/utils
+  // Landing 22 (same night) freed the fifth: BookmarksScreen could not travel in
+  // 21 because its file also held BookmarkPopover, which the app shell mounts on
+  // every screen; the popover and the two hlKey derivations moved to their own
+  // bundle-d modules and the screen followed the other four. -7,698 B more, and
+  // the ceiling comes down again (502,678 x 1.15 = 578,079 -> the hundred above).
+  { file: 'bundle-d.js', measured: 502678, max: 578000 },   // most screens/sheets/utils
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
@@ -82,8 +87,10 @@ const BUDGETS = [
   { file: 'bundle-f.js', measured: 87985, max: 101200 },
   // The Personal Study screens, split out of bundle-d on 2026-09-22 (landing
   // 21): opened on purpose, never on the way to a chapter, so they are fetched
-  // and parsed only when one is. 46,586 x 1.15 = 53,573 -> the hundred above.
-  { file: 'bundle-g.js', measured: 46586, max: 53600 },     // My Progress / Notes / Links / Highlights
+  // and parsed only when one is. Landing 22 added the fifth, My Bookmarks
+  // (+7,985 B), which is the whole point of the bundle rather than a collapse:
+  // 54,571 x 1.15 = 62,757 -> the hundred above.
+  { file: 'bundle-g.js', measured: 54571, max: 62800 },     // My Progress / Notes / Links / Highlights / Bookmarks
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

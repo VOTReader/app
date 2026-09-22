@@ -12,7 +12,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { BookmarkCreateSheet } from './BookmarkCreateSheet.jsx';
-import { BookmarkPopover, BookmarkRowActionSheet } from '../screens/BookmarksScreen.jsx';
+import { BookmarkPopover } from './BookmarkPopover.jsx';
+import { BookmarkRowActionSheet } from '../screens/BookmarksScreen.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 
 /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;

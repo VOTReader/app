@@ -925,7 +925,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'bookmarks-index': () => _kickVot(
+    'bookmarks-index': () => typeof BookmarksScreen !== 'undefined' ? _kickVot(
       <BookmarksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -940,7 +940,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'scriptures-home': () => (
       <ScripturesHome
         onSelect={handleScriptureSelect}

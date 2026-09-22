@@ -1,73 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BookmarksScreen — Cluster D (esbuild bundle-d.js)
+   BookmarksScreen — Cluster G (esbuild bundle-g.js, lazy)
+   ═══════════════════════════════════════════════════════════════════════
+   My Bookmarks is a screen a reader opens on purpose, never on boot, so it
+   travels with the other Personal Study screens in bundle-g rather than
+   costing every launch its parse (lanes/myweb/out/perf-report-2026-09-22.md
+   §6). Two pieces of this file could not come along and now live in
+   bundle-d, where the always-present app shell can always reach them:
+   BookmarkPopover (ui/sheets/BookmarkPopover.jsx) and the two hlKey
+   derivations (utils/bookmark-source.js).
+
+   Which is why the screen asks for those derivations the way every lazy
+   bundle asks bundle-d for a shared law — as a free global at call time,
+   through the two guards below. BookmarkRow and its action sheet have no
+   reader outside this file, so they ride with the screen.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Source label for a bookmark ─────────────────────────────── */
-export function _bookmarkSourceLabel(hlKey) {
-  if (!hlKey) return 'Bookmark';
-  var parts = hlKey.split(':');
-  var kind = parts[0];
-
-  if (kind === 'bible') {
-    var bookId = parts[1];
-    var chap = parts[2];
-    var verse = parts[3];
-    let title = (typeof _bookTitle === 'function') ? _bookTitle(bookId) : bookId;
-    return verse ? (title + ' ' + chap + ':' + verse) : (title + ' ' + chap);
-  }
-
-  if (kind === 'study') {
-    var raw = parts[1] || '';
-    var m = raw.match(/^(.+)-(\d+)$/);
-    var bookName = m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : raw;
-    var chapNum = m ? m[2] : '';
-    var vs = parts[2] || '';
-    return vs ? (bookName + ' ' + chapNum + ':' + vs) : bookName;
-  }
-
-  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
-    var id = parts[1];
-    if (typeof findEntryContext === 'function') {
-      var ctx = findEntryContext(id, kind === 'letter' ? 'letter' : kind);
-      if (ctx && ctx.title) return ctx.title;
-    }
-    return id;
-  }
-  if (kind === 'journal') {
-    var eid = parts[1];
-    var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
-    if (je) {
-      let title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle)
-        ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled')
-        : (je.title || 'Untitled');
-      return 'Journal · ' + title;
-    }
-    return 'Journal Entry';
-  }
-
-  return hlKey;
+/* The bundle-d slots, guarded so that rendering this screen alone (a test,
+   or a bundle-g that somehow arrived first) degrades to the raw key rather
+   than throwing. */
+function srcLabel(hlKey) {
+  return (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(hlKey) : String(hlKey || 'Bookmark');
 }
-
-export function _bookmarkSourceEndpoint(hlKey) {
-  if (!hlKey) return null;
-  var parts = hlKey.split(':');
-  var kind = parts[0];
-
-  if (kind === 'bible') {
-    return { type: 'bible', key: hlKey, bookId: parts[1], chapter: parseInt(parts[2] || '0', 10), verse: parseInt(parts[3] || '0', 10) };
-  }
-  if (kind === 'study') {
-    var m = (parts[1] || '').match(/^(.+)-(\d+)$/);
-    if (m) return { type: 'study', key: hlKey, bookId: m[1], chapter: parseInt(m[2], 10), verse: parseInt(parts[2] || '0', 10) };
-  }
-  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
-    var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], kind) : null;
-    return { type: kind, key: hlKey, letterId: parts[1], entryId: parts[1], screen: ctx ? ctx.screen : null };
-  }
-  if (kind === 'journal') {
-    return { type: 'journal', key: hlKey, entryId: parts[1], screen: 'journal-viewer' };
-  }
-  return null;
+function srcEndpoint(hlKey) {
+  return (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(hlKey) : null;
 }
 
 /* ── BookmarkRow component ───────────────────────────────────── */
@@ -86,7 +41,7 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
   var setEditValue = _editState[1];
 
   var isEditing = editingId === bkm.id;
-  var sourceLabel = _bookmarkSourceLabel(bkm.hlKey);
+  var sourceLabel = srcLabel(bkm.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
   var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
 
@@ -238,77 +193,6 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
   );
 }
 
-/* ── BookmarkPopover ─────────────────────────────────────────── */
-export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
-  var useState = React.useState;
-  var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
-
-  var bookmarks = (bkmIds || []).map(function(id) { return BookmarkStore.get(id); }).filter(Boolean);
-  var popoverOpen = !!(bkmIds && bkmIds.length && bookmarks.length);
-  var trapRef = useFocusTrap(popoverOpen);
-  React.useEffect(function() {
-    if (bkmIds && bkmIds.length && bookmarks.length === 0) onClose();
-  }, [bkmIds, bookmarks.length, onClose]);
-  if (!popoverOpen) return null;
-
-  function doDelete(bkm) {
-    BookmarkStore.remove(bkm.id);
-    onDeleteDone && onDeleteDone();
-    if (bookmarks.length <= 1) onClose();
-    else setConfirmingId(null);
-  }
-
-  var popX = Math.max(8, Math.min(x - 80, window.innerWidth - 320));
-  var popY = Math.max(8, y);
-
-  return (
-    <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 8800 }} aria-hidden="true" onClick={onClose} />
-      <div
-        className="bkm-popover"
-        ref={trapRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Bookmark actions"
-        style={{ left: popX, top: popY, zIndex: 8801 }}
-        onClick={function(e) { e.stopPropagation(); }}
-      >
-        {bookmarks.map(function(bkm) {
-          var isConfirming = confirmingId === bkm.id;
-          var dateStr = (typeof relativeDate === 'function') ? relativeDate(bkm.created) : '';
-          var hasThought = !!(bkm.thought && bkm.thought.trim().length);
-
-          return (
-            <div key={bkm.id} className="bkm-popover-item">
-              {!isConfirming && (
-                <>
-                  <div className="bkm-popover-label">{bkm.label || '(no label)'}</div>
-                  {dateStr && <div className="bkm-popover-date">{dateStr}</div>}
-                  {/* Legacy records may still carry a saved thought — keep
-                      DISPLAYING user data; only the add/edit affordance was
-                      removed (owner call, 2026-07-12). */}
-                  {hasThought && <div className="bkm-popover-thought">{bkm.thought}</div>}
-                  <div className="bkm-popover-actions">
-                    <button className="bkm-popover-btn" onClick={function() { onNavigate(bkm); onClose(); }}>Open</button>
-                    <button className="bkm-popover-btn bkm-popover-btn-danger" onClick={function() { setConfirmingId(bkm.id); }}>Delete</button>
-                  </div>
-                </>
-              )}
-              {isConfirming && (
-                <ConfirmStrip
-                  style={{ padding: '8px 10px' }}
-                  question="Delete this bookmark?"
-                  onCancel={function() { setConfirmingId(null); }}
-                  onConfirm={function() { doDelete(bkm); }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
 
 /* The sort cycle, in the order the one button steps through it. Each `mode`
    IS a branch of displayBookmarks' comparator; adding a mode to one without
@@ -387,17 +271,17 @@ export function BookmarksScreen(props) {
     var q = searchQuery.trim().toLowerCase();
     var filtered = q
       ? allBookmarks.filter(function(bkm) {
-          var srcLabel = _bookmarkSourceLabel(bkm.hlKey).toLowerCase();
+          var source = srcLabel(bkm.hlKey).toLowerCase();
           var label = (bkm.label || '').toLowerCase();
-          return label.includes(q) || srcLabel.includes(q);
+          return label.includes(q) || source.includes(q);
         })
       : allBookmarks.slice();
 
     filtered.sort(function(a, b) {
       if (sortMode === 'oldest') return (a.created || 0) - (b.created || 0);
       if (sortMode === 'source-az') {
-        var la = _bookmarkSourceLabel(a.hlKey).toLowerCase();
-        var lb = _bookmarkSourceLabel(b.hlKey).toLowerCase();
+        var la = srcLabel(a.hlKey).toLowerCase();
+        var lb = srcLabel(b.hlKey).toLowerCase();
         return la < lb ? -1 : la > lb ? 1 : 0;
       }
       if (sortMode === 'label-az') {
@@ -413,7 +297,7 @@ export function BookmarksScreen(props) {
   // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
   var navigateToBookmark = function(bkm) {
-    var endpoint = _bookmarkSourceEndpoint(bkm.hlKey);
+    var endpoint = srcEndpoint(bkm.hlKey);
     if (!endpoint) return;
     if (typeof onNavigateToSource === 'function') {
       onNavigateToSource(endpoint, { sourceLetterTitle: 'My Bookmarks' });
