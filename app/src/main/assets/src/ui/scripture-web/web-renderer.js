@@ -17,21 +17,21 @@
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
-   Neither the height law nor the fly-over cull is written here, nor the
-   density law (which threads are drawn at all at this zoom: a reveal level
-   per anchored thread, one representative per fly-over group, decode.lodOf).
-   All three are imported from utils/scripture-web/geometry.js as GLSL and
-   inlined, because the CPU hit test applies the same laws — if any drifts,
+   Neither the height law (the structure law: every thread the half-ellipse
+   of its own span, every thread drawn at every zoom) nor the fly-over cull
+   is written here. Both are imported from utils/scripture-web/geometry.js
+   as GLSL and inlined, because the CPU hit test applies the same laws — if
+   either drifts,
    arcs stop being tappable where they look tappable, or start being tappable
    where nothing is drawn. Tests assert this shader contains them.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, lodGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, LOD_OFF, STANDIN_MAX,
+  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
-import { bucketDrawCount, fansOf, lodOf } from '../../utils/scripture-web/decode.js';
+import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
 
 /** Colour modes, in the order the control cycles them. */
 export const COLOR_MODES = ['distance', 'testament', 'genre'];
@@ -72,17 +72,11 @@ uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
-uniform float uLevel;        // the zoom as a level (geometry.levelOf), or LOD_OFF
-uniform float uEssential;    // 1 = the Essential density's table, 0 = Famous
-uniform float uStandIn[${STANDIN_MAX}]; // this frame's stand-ins (pick.standInsFor), -1 = none
-uniform float uStandIns;     // how many of uStandIn are set
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
-in uint aLod;                   // decode.lodOf: reveal levels + representative bits
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
-${lodGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -132,8 +126,8 @@ void main(){
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
   float inRange = (uFocusRange.x <= uFocusRange.y && max(a1, b1) > .5) ? 1. : 0.;
-  // a chosen group: a foot in each range. Lit, and DRAWN whatever the
-  // density law says - the bundle the reader opened is what they asked for.
+  // a chosen group: a foot in each range, lit - the bundle the reader
+  // opened is what they asked for.
   float a2 = step(uFocusRange2.x, a)*step(a, uFocusRange2.y);
   float b2 = step(uFocusRange2.x, b)*step(b, uFocusRange2.y);
   float pair = (uFocusRange2.x <= uFocusRange2.y && max(a1*b2, b1*a2) > .5) ? 1. : 0.;
@@ -145,21 +139,6 @@ void main(){
   float dim = mix(1., mix(.05, 1., lit), focusing);
   float bright = max(spot, hovered);
 
-  // The density law: is this thread drawn at this zoom at all? The table
-  // (aLod) says; the tapped thread and a chosen group always are. NOT the
-  // hovered one: a hidden thread cannot be hovered into existence, and a
-  // hover that outlived a wheel zoom-out kept a line the picker could not
-  // see (the refuter, 2026-09-21: thread #89 at 12x). pick.drawnTest agrees.
-  float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(spot, pair));
-  // ... and this frame's stand-ins: a fly-over group whose representative
-  // is off the frame is drawn by its strongest crossing member (pick.standInsFor)
-  float standIn = 0.;
-  for (int k = 0; k < ${STANDIN_MAX}; k++) {
-    if (float(k) >= uStandIns) break;
-    if (abs(id - uStandIn[k]) < .5) { standIn = 1.; break; }
-  }
-  shown = max(shown, standIn);
-
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
   // overhead recede (to FLYOVER_FLOOR, never to nothing) so the local weave
   // is legible instead of fogged; under the structure law a fly-over's body
@@ -170,8 +149,6 @@ void main(){
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
   // zero-alpha cull: why, and why exactly zero, above this shader
   if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
-  // the density law's hidden threads leave by the same door: not drawn is not drawn
-  if (shown < .5) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
   vec3 col;
   if (uColorMode < .5) {
@@ -262,11 +239,9 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential', 'uFocusRange2', 'uStandIns']) {
+    'uHoverArc', 'uInstanceBase', 'uFocusRange2']) {
     U[name] = gl.getUniformLocation(program, name);
   }
-  U.uStandIn = gl.getUniformLocation(program, 'uStandIn[0]');
-  const standInBuf = new Float32Array(STANDIN_MAX).fill(-1);
 
   // Widest arc in each bucket, once. Tessellation is chosen per draw from the
   // camera, and a bucket of 3-verse arcs must not be given 96 segments because
@@ -315,8 +290,6 @@ export function createRenderer(canvas, graph, opts = {}) {
   const fans = fansOf(graph);
   attrib(fans.fanA, 'aFanA', gl.FLOAT, false, 4);
   attrib(fans.fanB, 'aFanB', gl.FLOAT, false, 4);
-  // The density law's table, the one the hit test reads too.
-  attrib(lodOf(graph).lod, 'aLod', gl.UNSIGNED_INT, true, 4);
 
   /**
    * Point every instance attribute at `first`.
@@ -383,10 +356,8 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
-     *   light:boolean, bg:string, level?:number,
-     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
-     *   standIns?:ArrayLike<number>}} v
-     *   level: geometry.levelOf(); absent = the density law off, every thread drawn
+     *   light:boolean, bg:string,
+     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number}} v
      */
     draw(v) {
       if (lost) return lastStats;
@@ -417,16 +388,6 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
-      gl.uniform1f(U.uLevel, typeof v.level === 'number' ? v.level : LOD_OFF);
-      gl.uniform1f(U.uEssential, v.density === 'essential' ? 1 : 0);
-      {
-        const list = v.standIns || [];
-        const n = Math.min(list.length, STANDIN_MAX);
-        standInBuf.fill(-1);
-        for (let k = 0; k < n; k++) standInBuf[k] = list[k];
-        gl.uniform1fv(U.uStandIn, standInBuf);
-        gl.uniform1f(U.uStandIns, n);
-      }
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
       if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);

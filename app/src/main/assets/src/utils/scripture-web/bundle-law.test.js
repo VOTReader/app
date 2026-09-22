@@ -27,7 +27,6 @@ const graph = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SC
 const W_CSS = 800, DPR = 2, W = W_CSS * DPR;
 const psalm107 = graph.chapters.find((ch) => graph.books[ch[0]].id.startsWith('psalms') && ch[1] === 107);
 const CENTRE = psalm107[2] + psalm107[3] / 2;
-const { fanA, fanB } = dec.fansOf(graph);   // the feet as drawn (geometry.footX)
 function camAt(zoom) {
   const cam = geo.createCamera(graph.total);
   cam.ppv = geo.fitPPV(cam, W) * zoom;
@@ -37,15 +36,12 @@ function camAt(zoom) {
 const viewAt = (cam, extra) => Object.assign({
   width: W, base: 500, ceil: 480, squash: geo.squashFactor(480, W),
   localize: geo.localizeFactor(cam.ppv / geo.fitPPV(cam, W)), density: 'famous',
-  level: geo.levelOf(cam.ppv / DPR, graph.total),
 }, extra);
 
 describe('foot bundles: what the law hides at each cell, counted once per foot', () => {
   it('exports exist', () => {
     expect(typeof pick.footBundles).toBe('function');
-    expect(typeof pick.flyBundles).toBe('function');
     expect(typeof pick.bundleGroups).toBe('function');
-    expect(typeof pick.groupMembers).toBe('function');
   });
 
   it('at 12x on Psalm 107 the cells are chapter runs at least BUNDLE_MIN_CSS wide; since landing 6 they hide nothing and count every anchored thread', () => {
@@ -74,23 +70,22 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
     expect(cells.reduce((n, c) => n + c.hidden, 0)).toBe(0);
   });
 
-  it('a cell counts exactly the hidden anchored threads with a foot in it', () => {
+  it('a cell counts exactly the anchored threads with a foot in it, once each; nothing is hidden', () => {
     const cam = camAt(30);
     const view = viewAt(cam);
     const cells = pick.footBundles(graph, cam, view, DPR);
-    const cell = cells.reduce((a, b) => (b.hidden > a.hidden ? b : a));
-    const drawn = pick.drawnTest(graph, view);
-    let hidden = 0, shown = 0;
+    const cell = cells.reduce((a, b) => (b.drawn > a.drawn ? b : a));
+    let want = 0;
     for (let i = 0; i < graph.count; i++) {
       const a = graph.from[i], b = graph.to[i];
       if (!((a >= cell.lo && a <= cell.hi) || (b >= cell.lo && b <= cell.hi))) continue;
-      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
-      const anchored = geo.arcAnchored(x0, x1, W);
-      if (!anchored) continue;
-      if (drawn(i, anchored)) shown++; else hidden++;
+      const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      if (!geo.arcAnchored(x0, x1, W)) continue;
+      want++;
     }
-    expect(cell.hidden).toBe(hidden);
-    expect(cell.drawn).toBe(shown);
+    expect(cell.drawn).toBe(want);
+    expect(cell.hidden).toBe(0);
+    expect(want).toBeGreaterThan(20);
   });
 
   it('a cell opens into its threads grouped by the other end\'s chapter, biggest first', () => {
@@ -113,106 +108,35 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
   });
 });
 
-describe('fly-over bundles: one representative, one count', () => {
-  it('at 12x the crossing fly-overs group under a few dozen keys whose counts sum to all of them', () => {
-    const cam = camAt(12);
-    const view = viewAt(cam);
-    const bundles = pick.flyBundles(graph, cam, view);
-    let crossing = 0;
-    for (let i = 0; i < graph.count; i++) {
-      const x0 = geo.footX(cam, W, graph.from[i], fanA[i]), x1 = geo.footX(cam, W, graph.to[i], fanB[i]);
-      if (x1 < 0 || x0 > W || geo.arcAnchored(x0, x1, W)) continue;
-      crossing++;
-    }
-    expect(crossing).toBeGreaterThan(5000);
-    let sum = 0, withRep = 0;
-    for (const b of bundles.values()) { sum += b.count; if (b.rep >= 0) withRep++; }
-    expect(sum).toBe(crossing);
-    expect(bundles.size).toBeGreaterThan(10);
-    expect(bundles.size).toBeLessThan(400);
-    // a group whose representative crosses the frame is what the eye sees; most do
-    expect(withRep).toBeGreaterThan(bundles.size / 2);
-    // the drawn fly-overs are exactly the representatives with a group here
-    const drawnFly = pick.visibleArcs(graph, cam, view, 1e9)
-      .filter((i) => !geo.arcAnchored(geo.footX(cam, W, graph.from[i], fanA[i]), geo.footX(cam, W, graph.to[i], fanB[i]), W));
-    expect(new Set(drawnFly)).toEqual(new Set([...bundles.values()].filter((b) => b.rep >= 0).map((b) => b.rep)));
-  });
-
-  it('a representative lists its group, strongest first, itself included', () => {
-    const cam = camAt(12);
-    const bundles = pick.flyBundles(graph, cam, viewAt(cam));
-    const big = [...bundles.values()].filter((b) => b.rep >= 0).reduce((a, b) => (b.count > a.count ? b : a));
-    const members = pick.groupMembers(graph, big.rep, 'famous');
-    expect(members[0]).toBe(big.rep);
-    expect(members.length).toBeGreaterThanOrEqual(big.count);
-    for (let i = 1; i < members.length; i++) expect(graph.votes[members[i]]).toBeLessThanOrEqual(graph.votes[members[i - 1]]);
-    expect(pick.groupMembers(graph, big.rep, 'essential').every((i) => graph.votes[i] >= 20)).toBe(true);
-  });
-});
-
 describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader and the picker', () => {
   it('the shader carries the second range and lights a thread only with a foot in each', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/uniform vec2\s+uFocusRange2/);
     expect(SHADER_SOURCE.vertex).toMatch(/uFocusRange2\.x <= uFocusRange2\.y/);
   });
 
-  it('the picker: a plain focus range no longer forces hidden threads to draw; a pair does (the hidden ones are fly-overs in the sky since landing 6)', () => {
-    const cam = camAt(12);
-    const view = viewAt(cam);
-    // a chapter just off the frame's left: its threads crossing the frame are fly-overs, hidden but for the representatives
-    const leftVerse = Math.floor(geo.xToVerse(cam, W, -2 * W));
-    const ci = graph.chapterOfVerse[leftVerse];
-    const [lo, hi] = pick.chapterRange(graph, ci);
-    const bare = pick.drawnTest(graph, view);
-    const plain = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [lo, hi] }));
-    // the target chapter of the first hidden crossing thread
-    let grpLo = -1, grpHi = -1;
-    for (let i = 0; i < graph.count && grpLo < 0; i++) {
-      const a = graph.from[i], b = graph.to[i];
-      if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
-      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
-      if (x1 < 0 || x0 > W) continue;
-      if (bare(i, geo.arcAnchored(x0, x1, W))) continue;
-      [grpLo, grpHi] = pick.chapterRange(graph, graph.chapterOfVerse[(a >= lo && a <= hi) ? b : a]);
-    }
-    expect(grpLo).toBeGreaterThanOrEqual(0);
-    const pair = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [lo, hi], focusRange2: [grpLo, grpHi] }));
-    let hiddenInGroup = 0, hiddenOutside = 0;
-    for (let i = 0; i < graph.count; i++) {
-      const a = graph.from[i], b = graph.to[i];
-      if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
-      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
-      if (x1 < 0 || x0 > W) continue;
-      const anchored = geo.arcAnchored(x0, x1, W);
-      if (bare(i, anchored)) continue;                       // drawn anyway
-      expect(plain(i, anchored)).toBe(false);                 // a chapter tap does not make a wall
-      const other = (a >= lo && a <= hi) ? b : a;
-      const inGroup = other >= grpLo && other <= grpHi;
-      expect(pair(i, anchored)).toBe(inGroup);
-      if (inGroup) hiddenInGroup++; else hiddenOutside++;
-    }
-    expect(hiddenInGroup).toBeGreaterThan(0);
-    expect(hiddenOutside).toBeGreaterThan(0);
-  });
 });
 
-describe('a representative badge sits on the body, mid-frame, never at the clipped edge', () => {
+describe('a body label sits on the body, mid-frame, never at the clipped edge', () => {
   it('bodyMidpoint returns a point in the sky near the centre of the visible run, or null', () => {
     const cam = camAt(12);
     const view = viewAt(cam, { inset: 40 });
-    const bundles = pick.flyBundles(graph, cam, view);
+    // the fly-overs crossing the frame at 12x: their bodies are up in the sky
+    // at their spans' heights, so the reader has panned up to meet some
+    cam.y = 4 * view.ceil;
+    const flying = pick.visibleArcs(graph, cam, view, 1e9)
+      .filter((i) => !geo.arcAnchored(geo.verseToX(cam, W, graph.from[i]), geo.verseToX(cam, W, graph.to[i]), W));
+    expect(flying.length).toBeGreaterThan(100);
     let found = 0;
-    for (const b of bundles.values()) {
-      if (b.rep < 0) continue;
-      const at = pick.bodyMidpoint(graph, cam, view, b.rep);
+    for (const i of flying) {
+      const at = pick.bodyMidpoint(graph, cam, view, i);
       if (!at) continue;
       found++;
       expect(at.x).toBeGreaterThanOrEqual(0);
       expect(at.x).toBeLessThanOrEqual(W);
       expect(at.y).toBeGreaterThanOrEqual(40);
       expect(at.y).toBeLessThanOrEqual(view.base);
+      if (found > 200) break;
     }
     expect(found).toBeGreaterThan(0);
-    expect(pick.bodyMidpoint(graph, camAt(12), view, 0) === null || true).toBe(true);
   });
 });

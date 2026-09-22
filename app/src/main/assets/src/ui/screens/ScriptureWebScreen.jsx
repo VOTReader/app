@@ -24,12 +24,11 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, LOD_OFF,
+  maxZoomFor, ribbonStyle,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers, bodyMidpoint,
-  standInsFor,
+  arcsTouching, visibleArcs, threadEnds, footBundles, bundleGroups,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -89,8 +88,8 @@ function anchoredDensity(cache, g, cam, v, density) {
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
   if (moved) {
     cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
-    // every anchored thread is drawn (LOD_ANCHORED_ALWAYS), so the crowding
-    // law counts them all, as before the density law
+    // every anchored thread is drawn (the structure law), so the crowding
+    // law counts them all
     cache.value = countAnchored(g, cam, v.W, density);
   }
   return cache.value / ((v.W || 1) / (v.DPR || 1));
@@ -216,10 +215,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
   const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
-  // the density law's badges (part 2): the counted cells, cached across
-  // frames while the camera barely moves, and the boxes drawn last frame,
+  // the convergence pills: the counted cells, cached across frames while
+  // the camera barely moves, and the boxes drawn last frame,
   // which the tap test reads before it reaches the lines
-  const bundleRef = React.useRef({ key: '', cells: [], fly: null });
+  const bundleRef = React.useRef({ key: '', cells: [] });
   const badgeBoxesRef = React.useRef([]);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
@@ -384,15 +383,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // below base and the picker reads the same off the camera
       camY: cam.y > 0 ? cam.y : 0,
       density, rulerDepth: f.ruler,
-      // the density law is OFF at every camera (the structure law, 2026-09-21:
-      // every line is drawn, the sky is sparse by geometry); the shader and
-      // the hit test both read LOD_OFF
-      level: LOD_OFF,
       focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
       focusRange2: focusRef.current.range2 || null,
-      // this frame's stand-ins (the bundle pass names them; the shader and the
-      // picker both draw them)
-      standIns: bundleRef.current.standIns || [],
     };
   }, [density, frame]);
 
@@ -533,17 +525,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // The alpha and stroke law lives in geometry.js, not here: it used to be
     // written inline where no harness could import it, so every probe re-typed
     // it and would have measured the old law against a new screen.
-    // the alpha law as before the density law: thin at the overview, the
-    // deep value past 12x divided by the crowd - every line is drawn again,
-    // and that law was tuned for it (Corbin, 2026-09-21 21:21)
+    // the alpha law: thin at the overview, the deep value past 12x divided
+    // by the crowd - every line is drawn, and the law was tuned for that
+    // (Corbin, 2026-09-21 21:21)
     const perCssPx = base.localize > 0
       ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
     const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
-    // the density law's badges: what the law hides at each foot cell, and
-    // what each fly-over representative stands for (part 2); the pass also
-    // names this frame's STAND-INS, which the GL draw below must carry
+    // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
-    base.standIns = bundles.standIns;
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
@@ -787,9 +776,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
         from: found.hit.from, to: found.hit.to,
         cards: [verseCard('From', a), verseCard('To', b)],
-        // the density law: how many threads of like span and place this one
-        // stands for when it flies over (part 2's "n more like this one")
-        likeIt: groupMembers(g, found.hit.index, density).length - 1,
       };
     }
     if (found.kind === 'bundle') {
@@ -1046,7 +1032,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [navigateToLink]);
 
   // A bundle's group, chosen in its sheet: the pair of ranges the shader and
-  // the picker draw and spotlight (drawnTest / uFocusRange2). Choosing the
+  // the picker draw and spotlight (uFocusRange2). Choosing the
   // same group again lets go of it.
   const chooseGroup = React.useCallback((info, grp) => {
     const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
@@ -1055,19 +1041,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setAnnounce(same || !grp ? 'Showing the strongest again.' : grp.count + ' threads to ' + grp.label + ' shown.');
     schedule();
   }, [schedule]);
-  // "n more like this one": a representative's group, strongest first, as a chooser
-  const showLikeIt = React.useCallback((info) => {
-    const g = graph;
-    if (!g) return;
-    const members = groupMembers(g, info.index, density, 36).filter((i) => i !== info.index);
-    const described = members.map((index) => describe({ kind: 'arc', hit: {
-      index, from: g.from[index], to: g.to[index], votes: g.votes[index],
-    } })).filter(Boolean);
-    setChoices(described.length ? { title: 'Like this one', meta: members.length + ' threads of like span and place, strongest first.', items: described } : null);
-    setDetail(null);
-    setAnnounce(described.length + ' threads like this one. Choose one.');
-  }, [describe, density, graph]);
-
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) {
     return (
@@ -1208,7 +1181,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         onChoose={commitFound} onClose={() => setListOpen(false)} />}
       {detail && (
         <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread}
-          onGroup={chooseGroup} onLikeIt={showLikeIt} />
+          onGroup={chooseGroup} />
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
@@ -1302,33 +1275,25 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
   return numerals;
 }
 
-/* ── the density law's badges (part 2) ──────────────────────────────────
-   What the law hides is counted where it converges. At each in-view foot
-   cell (pick.footBundles: a verse at depth, a chapter or a run of narrow
-   chapters otherwise) a "+n" pill under the baseline says how many anchored
-   threads are not drawn at this zoom; tapping it opens the bundle by target
-   chapter, and a chosen chapter's threads are drawn and spotlit. Each
-   fly-over representative carries "x n", its group's count across the
-   frame, on its body; tapping it opens the thread with "n more like this
-   one". The counts are cached while the camera moves less than a few
+/* ── the convergence pills ──────────────────────────────────────────────
+   Every thread is drawn (the structure law); what converges is counted
+   where it lands. At each in-view foot cell (pick.footBundles: a verse at
+   depth, a chapter or a run of narrow chapters otherwise) a "+n" pill under
+   the baseline says how many anchored threads have a foot there; tapping it
+   opens the bundle by target chapter, and a chosen chapter's threads are
+   spotlit. The counts are cached while the camera moves less than a few
    percent; the pills' x follow the camera every frame. */
 const BADGE_FONT_CSS = 11;
 const fmtCount = (n) => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n));
 
 function bundlesFor(cache, g, cam, view, v, density) {
-  const focus = (view.focusRange ? view.focusRange.join(':') : '') + '/' + (view.focusRange2 ? view.focusRange2.join(':') : '') + '/' + view.focusArc;
-  const key = [v.W, density, view.level.toFixed(2), focus].join('|');
+  const key = [v.W, density].join('|');
   const moved = cache.key !== key
     || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.02
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.02;
   if (moved) {
     cache.key = key; cache.ppv = cam.ppv; cache.x = cam.x;
-    // the cells and groups are counted WITHOUT the stand-ins (they are what
-    // decides them); the stand-ins then join the drawn set for this frame
-    const bare = Object.assign({}, view, { standIns: [] });
-    cache.cells = footBundles(g, cam, bare, v.DPR);
-    cache.fly = flyBundles(g, cam, bare);
-    cache.standIns = standInsFor(cache.fly);
+    cache.cells = footBundles(g, cam, view, v.DPR);
   }
   return cache;
 }
@@ -1370,39 +1335,20 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     ctx.fillText(text, cx, cy + fs * 0.05);
     return box;
   };
-  // foot bundles: under the baseline's feet, above the ruler's numerals.
-  // While the law hides threads the pill says "+n" (n not drawn); at rest,
-  // with every line drawn (landing 6), it says how many converge here -
-  // Corbin (2026-09-21 21:21): "a count for how many lines are converging
-  // on a single spot" is kept. Past the overview only (6x, localize > 0),
-  // and only where two or more meet.
-  const lawOn = view.level > LOD_OFF + 1;
+  // the pills: under the baseline's feet, above the ruler's numerals, how
+  // many threads converge on each cell - Corbin (2026-09-21 21:21): "a count
+  // for how many lines are converging on a single spot". Past the overview
+  // only (6x, localize > 0), and only where two or more meet.
   const cy = baseY + fs * 0.95;
   for (const cell of bundles.cells) {
-    const n = lawOn ? cell.hidden : (view.localize > 0 ? cell.drawn + cell.hidden : 0);
-    if (!(lawOn ? n > 0 : n > 1)) continue;
+    const n = view.localize > 0 ? cell.drawn + cell.hidden : 0;
+    if (!(n > 1)) continue;
     const cx = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
     const wCell = (cell.hi - cell.lo + 1) * ppv;
-    const text = (lawOn ? '+' : '') + fmtCount(n);
+    const text = fmtCount(n);
     if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
     const box = pill(text, cx, cy, false);
     if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
-  }
-  // fly-over representatives: "x n" on the body, where the body is in the sky
-  // - only while the law is on (the panned-up sky); at rest every fly-over is drawn
-  if (bundles.fly && view.level > LOD_OFF + 1) {
-    const standing = new Set(bundles.standIns || []);
-    for (const b of bundles.fly.values()) {
-      // the line that carries the badge: the representative, or this frame's stand-in
-      const carrier = b.rep >= 0 ? b.rep : (standing.has(b.standIn) ? b.standIn : -1);
-      if (carrier < 0 || b.count < 2) continue;
-      const at = bodyMidpoint(g, cam, view, carrier, fs * 2.2);
-      if (!at) continue;
-      const text = '\u00d7' + fmtCount(b.count);
-      const hw = (ctx.measureText(text).width + fs * 0.9) / 2 + 2 * DPR;
-      const box = pill(text, Math.max(hw, Math.min(W - hw, at.x)), at.y - fs * 1.1, true);
-      if (box) boxes.push(Object.assign(box, { cell: null, rep: carrier }));
-    }
   }
   ctx.restore();
   return boxes;
@@ -1726,7 +1672,7 @@ function ConnectionList({ items, mode, onChoose, onClose }) {
   );
 }
 
-function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
+function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
   const closeRef = React.useRef(null);
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   const cards = info.cards || [];
@@ -1760,12 +1706,6 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
         <button type="button" className="sw-sheet-follow" onClick={() => onFollow(info)}
           aria-label={'Follow the line to ' + (info.far === 'to' ? info.b : info.a).label}>
           Follow to {(info.far === 'to' ? info.b : info.a).label} &rsaquo;
-        </button>
-      )}
-      {info.kind === 'arc' && onLikeIt && info.likeIt > 0 && (
-        <button type="button" className="sw-sheet-follow sw-sheet-likeit" onClick={() => onLikeIt(info)}
-          aria-label={info.likeIt + ' more threads like this one'}>
-          {info.likeIt.toLocaleString()} more like this one &rsaquo;
         </button>
       )}
       {(info.kind === 'bundle' || (info.kind === 'chapter' && info.groups && info.groups.length > 0)) && onGroup && (

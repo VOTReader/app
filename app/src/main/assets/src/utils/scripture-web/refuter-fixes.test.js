@@ -12,7 +12,6 @@ import { resolve, dirname } from 'node:path';
 import * as geo from './geometry.js';
 import * as dec from './decode.js';
 import * as pick from './pick.js';
-import { SHADER_SOURCE } from '../../ui/scripture-web/web-renderer.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const graph = dec.decodeGraph(runInNewContext(readFileSync(resolve(here, '../../data/scripture-web-data.js'), 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
@@ -28,16 +27,6 @@ function camAt(zoom) {
 const viewAt = (cam) => ({
   width: W, base: 520, ceil: 512, squash: geo.squashFactor(512, W),
   localize: geo.localizeFactor(cam.ppv / geo.fitPPV(cam, W)), density: 'famous',
-  level: geo.levelOf(cam.ppv / DPR, graph.total),
-});
-
-describe('refuter bullet 1: the hover override', () => {
-  it('a hovered thread is not drawn into existence: the shader shows lodShown | spot | pair, nothing the picker cannot see', () => {
-    // thread #89 at 12x is anchored and law-hidden (p3-repro.mjs); a hover that
-    // outlived a wheel zoom-out kept it on screen while pickArcs could not see it
-    expect(SHADER_SOURCE.vertex).toMatch(/float shown = max\(lodShown\(.*\), max\(spot, pair\)\);/);
-    expect(SHADER_SOURCE.vertex).not.toMatch(/max\(max\(spot, pair\), hovered\)/);
-  });
 });
 
 describe('refuter bullet 3a: a badge and the sheet it opens agree, at the frame edge too', () => {

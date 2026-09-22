@@ -148,28 +148,18 @@ export const STROKE_MIN_CSS = 1.4;
  * harness could import it, so every instrument re-typed it and would have
  * silently measured the old law against a new screen.
  *
- * Under the density law (`lod` true; geometry.js "The density law, part 1")
- * the overview alpha ramp no longer applies: it was written for sixty
- * thousand ribbons summing into a dome, and the law now draws a few hundred
- * at the overview and a few dozen at 12x, each of which must be seen alone.
- * So every drawn ribbon takes the deep alpha divided by the crowding of what
- * is DRAWN (countAnchored with the level), and votes drive width at every
- * zoom; the stroke still grows with zoom as before. Measured before this:
- * the 12x picture on Psalm 107 was eighty separable lines at alpha 0.175 -
- * a ghost of a web (lanes/myweb/out/look-density, 2026-09-21).
  *
  * @param {number} zoom - multiple of fit-to-width
  * @param {number} localize - localizeFactor()
  * @param {boolean} light - parchment theme
  * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
- * @param {boolean} [lod] - the density law is on: the deep law at every zoom
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, light, anchoredPerCssPx, lod = false) {
+export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
   const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
   const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
-  const t = lod ? 1 : smoothstep(0.55, 1, localize);
+  const t = smoothstep(0.55, 1, localize);
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
   // Crowding, not zoom, is what decides whether the deep value washes: at the
   // ceiling ~0.17 anchored arcs share each CSS px of width and almost nothing
@@ -180,9 +170,7 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx, lod = false
   const deep = ALPHA_DEEP / crowd;
   return {
     alpha: alpha + (deep - alpha) * t,
-    // under the law the stroke keeps its zoom ramp: 2.4 px hairlines at the
-    // overview would be a wall of their own
-    strokeWidthCss: lod ? strokeWidthCss : strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
+    strokeWidthCss: strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
     voteMix: t,
   };
 }
@@ -467,133 +455,6 @@ float arcAnchored(float x0, float x1, float width){
 float flyOverDim(float anchored, float localize){
   float flyFloor = ${glslFloat(FLYOVER_FLOOR)};
   return mix(1., mix(flyFloor, 1., anchored), localize);
-}`;
-
-/* ── The density law, part 1: level of detail (density-law.md section 1, 2026-09-21) ──
- *
- * Corbin, on a Psalm 107 screenshot at mid zoom: "I don't want any smear.
- * Fully granular, zoom all the way in". At 12x on that chapter 13,295
- * anchored threads and 8,635 fly-overs crossed the phone frame and every one
- * was drawn: overlapping ribbons summed into a wall. This law decides, per
- * thread and per zoom, whether it is DRAWN AT ALL; nothing about alpha
- * changes, and what is not drawn is not drawn.
- *
- * The zoom is read as a LEVEL: L = log2(ppvCss * total / LOD_REF_CSS), the
- * octaves above a reference frame LOD_REF_CSS wide showing the whole canon.
- * The ceiling is one level on every frame (maxZoomFor puts a verse at
- * PPV_MAX_CSS everywhere): log2(44 * 31102 / 800) = 10.74.
- *
- * ANCHORED threads (a foot within FLYOVER_MARGIN of the frame) each carry a
- * REVEAL level r, and draw iff L >= r. decode.lodOf computes r by a greedy
- * per FOOT CELL: at level L a cell is total / 2^(L+1) verses (half a
- * reference view); walking the threads in vote order, a thread is accepted
- * once a cell holding one of its feet still has ink budget for its
- * on-screen length, and every thread accepted at a lower level is charged
- * first, so the drawn set only grows with zoom (the 09-10 rule: a line
- * crossing the viewport never vanishes as zoom increases). Every thread is
- * revealed by the ceiling at the latest: fully granular there.
- *
- * FLY-OVER threads (both feet out) draw iff they are their group's
- * REPRESENTATIVE - the strongest thread among those of like span and like
- * centre (decode.lodOf's group key) - so a sky of eight thousand crossings
- * reads as a few dozen lines, each standing for a bundle the badge names.
- *
- * The tapped, hovered and focus-range threads are always drawn, whatever the
- * table says: the line being chased must not vanish on arrival.
- *
- * The shader inlines lodGLSL; pick.js calls lodShown. Same table, same test.
- */
-
-/** Reference frame width, CSS px: level 0 is the whole canon across it. */
-export const LOD_REF_CSS = 800;
-
-/** Reference frame height, CSS px, for the ink budget (phone landscape's dome). */
-export const LOD_REF_HEIGHT_CSS = 260;
-
-/**
- * THE taste number: the share of the reference frame's area the drawn
- * anchored ribbons may cover, at every level. Corbin may move it.
- */
-export const LOD_INK = 0.25;
-
-/** Stroke the budget is priced at, CSS px (ribbonStyle's mid-zoom width). */
-export const LOD_STROKE_CSS = 1.6;
-
-/** Longest on-screen length a thread is charged, px: a long arc shows two quarters at most. */
-export const LOD_LEN_CAP = 900;
-
-/** Shortest length a drawn thread is charged, px: a dot still takes ink. */
-export const LOD_LEN_MIN = 8;
-
-/** The greedy walks levels in these steps, from LOD_MIN_LEVEL to the ceiling. */
-export const LOD_STEP = 0.25;
-export const LOD_MIN_LEVEL = -2;
-
-/** Reveal levels are stored in sixteenths of an octave above LOD_MIN_LEVEL (8 bits). */
-export const LOD_QUANT = 16;
-
-/** The level that switches the law OFF (a view without one): every thread drawn. */
-export const LOD_OFF = -1000;
-
-/**
- * Corbin, 2026-09-21 21:21, on the live fit view: "This looks terrible, I
- * want to be able to see all the lines." Every ANCHORED thread (a foot on
- * the screen) is drawn at every zoom, whatever its reveal level says. The
- * tables are kept and still computed, so the budget can return as a
- * setting; only the fly-over law (one representative per group) still
- * hides anything, and the screen applies it only in the panned-up sky.
- */
-export const LOD_ANCHORED_ALWAYS = true;
-
-/** Fly-over groups: span cells across the log-span axis. */
-export const LOD_SPAN_CELLS = 48;
-
-/**
- * Stand-ins per frame, at most: a fly-over group whose representative does
- * not cross this frame while its members do would have no line and no
- * badge (the refuter, 2026-09-21: 18 of 73 groups at the ceiling), so the
- * screen names each such group's strongest crossing member and the shader
- * draws those too (uStandIn). Biggest groups first when there are more.
- */
-export const STANDIN_MAX = 32;
-
-/**
- * The zoom as a level: octaves above the reference frame.
- * @param {number} ppvCss - CSS px per verse
- * @param {number} total - verses in the canon
- */
-export function levelOf(ppvCss, total) {
-  const p = ppvCss > 0 ? ppvCss : 1e-9;
-  return Math.log2((p * (total > 0 ? total : 1)) / LOD_REF_CSS);
-}
-
-/**
- * The packed table entry decoded: is this thread drawn at this level?
- * bits 0-7 reveal (famous), 8-15 reveal (essential), 16 rep (famous), 17 rep
- * (essential). MUST stay identical to lodGLSL below.
- *
- * @param {number} lod - decode.lodOf(g).lod[i]
- * @param {boolean} essential - the Essential density
- * @param {0|1|boolean} anchored - arcAnchored()
- * @param {number} level - levelOf(), or LOD_OFF
- * @returns {0|1}
- */
-export function lodShown(lod, essential, anchored, level) {
-  if (!(level > LOD_OFF + 1)) return 1;
-  const rev = essential ? (lod >>> 8) & 255 : lod & 255;
-  const rep = essential ? (lod >>> 17) & 1 : (lod >>> 16) & 1;
-  if (anchored) return LOD_ANCHORED_ALWAYS || level >= rev / LOD_QUANT + LOD_MIN_LEVEL ? 1 : 0;
-  return /** @type {0|1} */ (rep);
-}
-
-/** The same test as GLSL ES 3.00, for the vertex shader to inline. */
-export const lodGLSL = `
-float lodShown(uint lod, float essential, float anchored, float level){
-  if (level <= ${glslFloat(LOD_OFF + 1)}) return 1.;
-  uint rev = essential > .5 ? ((lod >> 8u) & 255u) : (lod & 255u);
-  uint rep = essential > .5 ? ((lod >> 17u) & 1u) : ((lod >> 16u) & 1u);
-  float reveal = float(rev)/${glslFloat(LOD_QUANT)} + ${glslFloat(LOD_MIN_LEVEL)};
-  return anchored > .5 ? max(${glslFloat(LOD_ANCHORED_ALWAYS ? 1 : 0)}, step(reveal, level)) : float(rep);
 }`;
 
 /**

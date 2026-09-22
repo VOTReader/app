@@ -30,6 +30,11 @@ import * as pick from './pick.js';
 import { SHADER_SOURCE, createRenderer } from '../../ui/scripture-web/web-renderer.js';
 import { attachWebGestures } from '../../ui/scripture-web/gestures.js';
 
+// the asset-wide sampling cases (every on-screen point of every crossing
+// thread at three zooms) run ~5 s bare and past 20 s under v8 coverage in the
+// pre-commit hook: give the file the time they take instead of the default
+vi.setConfig({ testTimeout: 120000 });
+
 const here = dirname(fileURLToPath(import.meta.url));
 const ASSET = resolve(here, '../../data/scripture-web-data.js');
 const graph = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
@@ -75,6 +80,30 @@ describe('the law exists in one form for both sides', () => {
       expect(geo[dead], dead).toBeUndefined();
     }
     expect(SHADER_SOURCE.vertex).not.toMatch(/tanh\(|strataLift\(|domeOf\(|uCeil/);
+  });
+
+  it('the density law is gone (landing 8): no LOD table, level, stand-in or fly-over group anywhere - nothing hidden means nothing to hide with', () => {
+    // structure-law.md, "what dies": under the structure law every thread is
+    // drawn at every zoom, so the law that chose which to hide, its table,
+    // its level uniform, its representatives and their "x n" badges all go
+    for (const dead of ['LOD_REF_CSS', 'LOD_REF_HEIGHT_CSS', 'LOD_INK', 'LOD_STROKE_CSS', 'LOD_LEN_CAP', 'LOD_LEN_MIN', 'LOD_STEP',
+      'LOD_MIN_LEVEL', 'LOD_QUANT', 'LOD_OFF', 'LOD_ANCHORED_ALWAYS', 'LOD_SPAN_CELLS', 'STANDIN_MAX', 'levelOf', 'lodShown', 'lodGLSL']) {
+      expect(geo[dead], 'geometry.' + dead).toBeUndefined();
+    }
+    expect(dec.lodOf, 'decode.lodOf').toBeUndefined();
+    for (const dead of ['drawnTest', 'flyBundles', 'standInsFor', 'groupMembers']) expect(pick[dead], 'pick.' + dead).toBeUndefined();
+    expect(SHADER_SOURCE.vertex).not.toMatch(/uLevel|uEssential|aLod|uStandIn|lodShown/);
+    const screen = readFileSync(resolve(here, '../../ui/screens/ScriptureWebScreen.jsx'), 'utf8');
+    expect(screen).not.toMatch(/likeIt|LikeIt|flyBundles|standInsFor|groupMembers|LOD_OFF|level:/);
+    // and every thread anchored in the frame is counted as drawn: the pills
+    // hide nothing, at the ceiling and at 12x
+    for (const zoom of [12, zMax]) {
+      const cam = camAt(zoom, CENTRE + 0.37);
+      let hidden = 0, drawn = 0;
+      for (const c of pick.footBundles(graph, cam, viewAt(cam), DPR)) { hidden += c.hidden; drawn += c.drawn; }
+      expect(hidden, `zoom ${zoom}: hidden`).toBe(0);
+      expect(drawn, `zoom ${zoom}: drawn`).toBeGreaterThan(0);
+    }
   });
 });
 

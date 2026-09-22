@@ -18,60 +18,16 @@
    look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
    the reverse: at full localize an arc with neither foot near the viewport
    paints alpha 0, and picking it silently focuses a line nobody can see.
-   Density (geometry.lodShown over decode.lodOf's table, when the view
-   carries a `level`) — the thread the law did not draw at this zoom is not
-   there to tap; the tapped one (view.focusArc) and the focus range always
-   are, as in the shader. Visible equals pickable, in both directions.
+   Nothing is hidden (the structure law, 2026-09-21): every thread crossing
+   the frame is drawn and pickable, so there is no third law. Visible equals
+   pickable, in both directions.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
-  lodShown, LOD_OFF, FLYOVER_MARGIN, STANDIN_MAX,
+  FLYOVER_MARGIN,
 } from './geometry.js';
-import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
-
-/**
- * The density law as the picker applies it: a closure over the view that
- * answers "is thread i drawn?" exactly as the shader's lodShown + its focus
- * override do. A view without a level switches the law off (every thread).
- *
- * The overrides: the tapped thread (focusArc) is always drawn, and so is a
- * chosen GROUP - a thread with a foot in focusRange and its other foot in
- * focusRange2 (a bundle badge's cell and one target chapter). A plain
- * focusRange (a chapter tap) spotlights what is drawn and reveals nothing:
- * lighting a chapter's thousand hidden threads would be the wall again.
- *
- * The stand-ins (view.standIns, standInsFor) are drawn too: the same list the
- * screen hands the shader as uStandIn this frame.
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {{level?:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null),
- *   standIns?:ArrayLike<number>}} view
- * @returns {(i:number, anchored:(0|1)) => boolean}
- */
-export function drawnTest(g, view) {
-  const level = typeof view.level === 'number' ? view.level : LOD_OFF;
-  if (!(level > LOD_OFF + 1)) return () => true;
-  const { lod } = lodOf(g);
-  const essential = view.density === 'essential';
-  const focusArc = typeof view.focusArc === 'number' ? view.focusArc : -1;
-  const standIns = view.standIns && view.standIns.length ? new Set(Array.from(view.standIns)) : null;
-  const r1 = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
-  const r2 = r1 && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
-  return (i, anchored) => {
-    if (lodShown(lod[i], essential, anchored, level)) return true;
-    if (i === focusArc) return true;
-    if (standIns && standIns.has(i)) return true;
-    if (r2) {
-      const a = g.from[i], b = g.to[i];
-      const a1 = a >= r1[0] && a <= r1[1], b1 = b >= r1[0] && b <= r1[1];
-      const a2 = a >= r2[0] && a <= r2[1], b2 = b >= r2[0] && b <= r2[1];
-      return (a1 && b2) || (b1 && a2);
-    }
-    return false;
-  };
-}
+import { bucketDrawCount, fansOf } from './decode.js';
 
 /**
  * Nearest arc to a screen point.
@@ -97,7 +53,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
- *   localize:number, density:import('./decode.js').Density, level?:number,
+ *   localize:number, density:import('./decode.js').Density,
  *   focusArc?:number, focusRange?:(number[]|null)}} view
  * @param {number} px
  * @param {number} py
@@ -107,7 +63,6 @@ export function pickArc(g, cam, view, px, py, tol) {
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
   const { width, squash, localize, density } = view;
-  const drawn = drawnTest(g, view);
   // The baseline as DRAWN: the camera's y shifts the whole picture down the
   // frame, so the curve the finger meets stands cam.y below the frame's base.
   const base = view.base + (cam.y > 0 ? cam.y : 0);
@@ -141,8 +96,6 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // partial fly-over floor is dim, but it is there to be tapped.
         const anchored = arcAnchored(x0, x1, width);
         if (flyOverDim(anchored, localize) === 0) continue;
-        // ... and the density law drew it at this zoom.
-        if (!drawn(i, anchored)) continue;
         // the curve as the shader draws it: the half-ellipse of its own span
         const { A } = arcShape((x1 - x0) * 0.5, squash);
         const d = arcDistance(px, py, x0, x1, base, A, tol);
@@ -169,14 +122,12 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, localize:number, density:import('./decode.js').Density,
- *   level?:number, focusArc?:number, focusRange?:(number[]|null)}} view
+ * @param {{width:number, localize:number, density:import('./decode.js').Density}} view
  * @param {number} limit — at most this many, so a dense screen bounds its own pass
  * @returns {number[]} instance indices
  */
 export function visibleArcs(g, cam, view, limit) {
   const { width, localize, density } = view;
-  const drawn = drawnTest(g, view);
   const { fanA, fanB } = fansOf(g);
   // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
   const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
@@ -198,7 +149,6 @@ export function visibleArcs(g, cam, view, limit) {
         if (x1 < 0 || x0 > width) continue;
         const anchored = arcAnchored(x0, x1, width);
         if (flyOverDim(anchored, localize) === 0) continue;
-        if (!drawn(i, anchored)) continue;
         out.push(i);
         if (out.length >= limit) return out;
       }
@@ -334,20 +284,16 @@ export function bodyMidpoint(g, cam, view, i, margin = 0) {
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {number} width — viewport width, device px
  * @param {import('./decode.js').Density} density
- * @param {number} [level] - geometry.levelOf(): count only what the density
- *   law draws at this zoom, so the crowding law sees what the eye sees;
- *   absent = every anchored thread
  * @returns {number}
  */
-export function countAnchored(g, cam, width, density, level) {
+export function countAnchored(g, cam, width, density) {
   let n = 0;
-  const drawn = drawnTest(g, { level, density });
   const { fanA, fanB } = fansOf(g);
   for (const bucket of g.buckets) {
     const end = bucket.off + bucketDrawCount(bucket, density);
     for (let i = bucket.off; i < end; i++) {
       // the feet as drawn (geometry.footX), so the count is the shader's
-      if (arcAnchored(footX(cam, width, g.from[i], fanA[i]), footX(cam, width, g.to[i], fanB[i]), width) && drawn(i, 1)) n++;
+      if (arcAnchored(footX(cam, width, g.from[i], fanA[i]), footX(cam, width, g.to[i], fanB[i]), width)) n++;
     }
   }
   return n;
@@ -513,14 +459,13 @@ export function focusChapter(g, cam, width, chapterIndex, ppv) {
 }
 
 /** Screen x of a verse — re-exported so callers need only this module. */
-/* ── The density law, part 2: convergence (density-law.md section 2) ──────
+/* ── Convergence (structure-law.md; density-law.md section 2 before it) ──
  *
- * What the law hides is not gone: at each in-view FOOT CELL the hidden
- * anchored threads are a bundle with a count badge, and each fly-over
- * REPRESENTATIVE stands for its group with a count. These passes produce
- * those numbers for the badge layer, over the same visible chunks and the
- * same drawn test the shader uses, so a badge never counts a drawn line and
- * never misses a hidden one.
+ * Every thread is drawn; what converges is counted: at each in-view FOOT
+ * CELL the anchored threads with a foot there are a bundle with a count
+ * pill. These passes produce those numbers for the badge layer, over the
+ * same visible chunks and the same feet (geometry.footX) the shader uses,
+ * so a pill counts exactly what is drawn there.
  */
 
 /** Narrowest badge cell, CSS px: chapters narrower than this merge into runs. */
@@ -533,22 +478,21 @@ export const BUNDLE_VERSE_PPV_CSS = 26;
  * @typedef {{ lo:number, hi:number, x:number, hidden:number, drawn:number,
  *   chapterLo:number, chapterHi:number, verse:boolean }} FootBundle
  *   lo..hi: the cell's verse range (inclusive); x: its centre, device px;
- *   hidden: anchored threads with a foot here that the law did not draw;
- *   drawn: those it did; chapterLo..chapterHi: the chapters the cell spans;
- *   verse: the cell is a single verse.
+ *   drawn: anchored threads with a foot here (every one is drawn: hidden is
+ *   0, kept so the sheet's wording has one field to read); chapterLo..
+ *   chapterHi: the chapters the cell spans; verse: the cell is a single verse.
  */
 
 /**
- * The badge cells across the frame and what each hides. Cells are verses
- * once a verse is BUNDLE_VERSE_PPV_CSS wide, else chapters, adjacent
- * chapters merged left to right until a cell is BUNDLE_MIN_CSS wide (a
- * badge must be readable and tappable). A thread counts once per cell that
- * holds a foot of it.
+ * The badge cells across the frame and how many threads converge on each.
+ * Cells are verses once a verse is BUNDLE_VERSE_PPV_CSS wide, else chapters,
+ * adjacent chapters merged left to right until a cell is BUNDLE_MIN_CSS wide
+ * (a badge must be readable and tappable). A thread counts once per cell
+ * that holds a foot of it.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density, level?:number,
- *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null)}} view
+ * @param {{width:number, density:import('./decode.js').Density}} view
  * @param {number} dpr
  * @returns {FootBundle[]}
  */
@@ -585,7 +529,6 @@ export function footBundles(g, cam, view, dpr) {
   for (let c = 0; c < cells.length; c++) {
     for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
   }
-  const drawn = drawnTest(g, view);
   const { fanA, fanB } = fansOf(g);
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
   const chunkSize = g.chunkSize || 256;
@@ -604,12 +547,9 @@ export function footBundles(g, cam, view, dpr) {
         const cb = b - first >= 0 && b - first < span ? cellOf[b - first] : -1;
         if (ca < 0 && cb < 0) continue;
         // the feet as drawn (geometry.footX): anchored is the shader's word
-        const x0 = footX(cam, width, a, fanA[i]), x1 = footX(cam, width, b, fanB[i]);
-        const anchored = arcAnchored(x0, x1, width);
-        if (!anchored) continue;
-        const shown = drawn(i, anchored);
-        if (ca >= 0) { if (shown) cells[ca].drawn++; else cells[ca].hidden++; }
-        if (cb >= 0 && cb !== ca) { if (shown) cells[cb].drawn++; else cells[cb].hidden++; }
+        if (!arcAnchored(footX(cam, width, a, fanA[i]), footX(cam, width, b, fanB[i]), width)) continue;
+        if (ca >= 0) cells[ca].drawn++;
+        if (cb >= 0 && cb !== ca) cells[cb].drawn++;
       }
     }
   }
@@ -618,104 +558,10 @@ export function footBundles(g, cam, view, dpr) {
 }
 
 /**
- * @typedef {{ key:number, rep:number, count:number, standIn:number }} FlyBundle
- *   rep: the representative's index (-1 when the group's representative does
- *   not cross the frame); count: the group's threads crossing the frame;
- *   standIn: when rep is -1, the strongest crossing member (ties by index),
- *   the line that stands for the group in this frame; else -1.
- */
-
-/**
- * The fly-over groups crossing the frame and their counts, keyed by
- * decode.lodOf's group key. The representative is the one thread of each
- * the shader draws (its badge carries the count).
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
- * @returns {Map<number, FlyBundle>}
- */
-export function flyBundles(g, cam, view) {
-  const { width, density } = view;
-  const { lod, groupOf } = lodOf(g);
-  const essential = density === 'essential';
-  const { fanA, fanB } = fansOf(g);
-  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
-  const chunkSize = g.chunkSize || 256;
-  /** @type {Map<number, FlyBundle>} */
-  const out = new Map();
-  for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
-      for (let i = start; i < end; i++) {
-        const x0 = footX(cam, width, g.from[i], fanA[i]);
-        const x1 = footX(cam, width, g.to[i], fanB[i]);
-        if (x1 < 0 || x0 > width) continue;
-        if (arcAnchored(x0, x1, width)) continue;
-        const key = groupOf[i];
-        let b = out.get(key);
-        if (!b) { b = { key, rep: -1, count: 0, standIn: -1 }; out.set(key, b); }
-        b.count++;
-        if (lodShown(lod[i], essential, 0, 0)) b.rep = i;
-        else if (b.standIn < 0 || g.votes[i] > g.votes[b.standIn]) b.standIn = i;
-      }
-    }
-  }
-  for (const b of out.values()) if (b.rep >= 0) b.standIn = -1;
-  return out;
-}
-
-/**
- * The stand-ins this frame: for each group whose representative does not
- * cross the frame, its strongest crossing member - biggest groups first, at
- * most STANDIN_MAX (the shader's uniform array). The screen hands this list
- * to the shader (uStandIn) and to the picker (view.standIns), so the line
- * that carries a badge is a line that is drawn and tappable.
- *
- * @param {Map<number, FlyBundle>} bundles - flyBundles()
- * @returns {number[]}
- */
-export function standInsFor(bundles) {
-  const out = [];
-  for (const b of bundles.values()) if (b.rep < 0 && b.standIn >= 0) out.push(b);
-  out.sort((p, q) => q.count - p.count || p.standIn - q.standIn);
-  return out.slice(0, STANDIN_MAX).map((b) => b.standIn);
-}
-
-/**
- * @typedef {{ k:number, name:string, cross:number, shown:number }} StratumRow
- */
-
-/**
- * The members of one thread's fly-over group, strongest first: the list
- * behind a representative's "n more like it".
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {number} index - any member
- * @param {import('./decode.js').Density} density
- * @param {number} [limit]
- * @returns {number[]}
- */
-export function groupMembers(g, index, density, limit) {
-  const { groupOf } = lodOf(g);
-  const key = groupOf[index];
-  const min = minVotesFor(density, g.densityTiers);
-  const out = [];
-  for (let i = 0; i < g.count; i++) if (groupOf[i] === key && g.votes[i] >= min) out.push(i);
-  out.sort((a, b) => g.votes[b] - g.votes[a] || a - b);
-  return limit ? out.slice(0, limit) : out;
-}
-
-/**
  * @typedef {{ chapterIndex:number, lo:number, hi:number, count:number, hidden:number, votes:number }} BundleGroup
- *   one target chapter of a foot cell's threads: how many, how many of them
- *   the law hides here, and the strongest's votes.
+ *   one target chapter of a foot cell's threads: how many, hidden (always 0:
+ *   every thread is drawn; the sheet still reads the field), and the
+ *   strongest's votes.
  */
 
 /**
@@ -735,7 +581,6 @@ export function groupMembers(g, index, density, limit) {
  */
 export function bundleGroups(g, cam, view, lo, hi, limit) {
   const { width, density } = view;
-  const drawn = drawnTest(g, view);
   const { fanA, fanB } = fansOf(g);
   /** @type {Map<number, BundleGroup>} */
   const groups = new Map();
@@ -758,7 +603,6 @@ export function bundleGroups(g, cam, view, lo, hi, limit) {
       }
       grp.count++;
       if (g.votes[i] > grp.votes) grp.votes = g.votes[i];
-      if (!drawn(i, anchored)) grp.hidden++;
     }
   }
   const out = [...groups.values()].sort((p, q) => q.count - p.count || q.votes - p.votes || p.chapterIndex - q.chapterIndex);
