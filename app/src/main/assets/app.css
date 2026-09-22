@@ -7057,11 +7057,16 @@
     .sw-guide-body strong { color: var(--gold-bright); font-weight: 600; }
     .sw-guide-close { display: block; margin-left: auto; }
     .sw-guide-btn {
-      position: absolute; z-index: 5; right: 14px;
-      bottom: calc(60px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      /* beside the hide-all button, on its left: above it the button sat on
+         the ruler's last chapter numeral (the l14 sky picture) */
+      position: absolute; z-index: 5; right: 76px;
+      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
       font-family: var(--font-body); font-weight: 600;
     }
     .sw-root.sw-chrome-hidden .sw-guide-btn { display: none; }
+    /* a narrow root parks the controls bottom-left and keeps the right 76 px
+       column free: the ? stacks above hide-all there instead */
+    .sw-root.sw-narrow .sw-guide-btn { right: 14px; bottom: calc(60px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
 
     /* My Web — the empty state, shown until the reader's first link lands. */
     .sw-empty {
