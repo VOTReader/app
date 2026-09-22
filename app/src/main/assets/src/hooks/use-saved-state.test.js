@@ -547,7 +547,19 @@ describe('_validateTabState — 13 coercion rules', () => {
    through the same validation as any persisted state, and is cleared so a second boot
    never replays it. The mount write in usePersistedState then makes it durable. */
 describe('useSavedState — the update reload record is read first, applied, and cleared', () => {
-  beforeEach(() => { sessionStorage.clear(); });
+  beforeEach(() => {
+    // The same reset as the load suite above, not sessionStorage alone: these tests
+    // used to inherit localStorage and the StateStore from whatever ran before, and
+    // 'a fresh record wins' passed only when an earlier test had already set the
+    // scroll-heal flag (--sequence.shuffle --sequence.seed=1234 ran it first, and the
+    // one-time heal wiped the record's scroll positions).
+    localStorage.clear();
+    sessionStorage.clear();
+    StateStore._resetForTests({ forceLoaded: true });
+    // Stated, not inherited: an install that can hold an update record ran the
+    // June one-time heal long ago. The heal itself has its own tests above.
+    localStorage.setItem('vot-scrollheal-1', '1');
+  });
 
   it('a fresh record wins over the store and is consumed', () => {
     StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'home' }], activeTabIdx: 0, theme: 'dark' });
