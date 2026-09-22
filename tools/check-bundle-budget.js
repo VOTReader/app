@@ -36,7 +36,13 @@ const BUDGETS = [
   // ── cold-boot blocking path (parsed before first paint, every launch) ──
   // c43 (2026-09-03): matthew-nkjv.js LEFT this bundle for bundle-a-matthew
   // (-53,976 B raw). Re-baselined DOWN so the collapse detector keeps its teeth.
-  { file: 'bundle-a.js', measured: 196619, max: 226000 },   // react + bible-audio-manifest + search-data
+  // 2026-09-22, landing 27: search-data.js LEFT this bundle for bundle-e
+  // (-42,903 B off EVERY cold start). The window.VotSearchData tables are read
+  // only by src/search/* and SearchScreen, all of which are reachable only from
+  // _entry-e.js, which is lazy. Re-baselined DOWN by the c43 rule so the
+  // collapse detector keeps its teeth: 155,404 x 1.15 = 178,714.6 -> the
+  // hundred above.
+  { file: 'bundle-a.js', measured: 155404, max: 178800 },   // react + react-dom + bible-audio-manifest
   { file: 'bundle-b.js', measured: 318650, max: 367000 },   // stores/hooks/journal/bridge
   { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
   // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
@@ -60,7 +66,11 @@ const BUDGETS = [
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
   // Settings/Search work since the last baseline had eaten the margin down to 973 bytes,
   // and a ceiling that fails the next honest change is a gate nobody can land under.
-  { file: 'bundle-e.js', measured: 131027, max: 150700 },   // Settings/Search/Garden
+  // 2026-09-22, landing 27: search-data.js ARRIVES here (+29,263 minified; it
+  // was 42,753 raw in bundle-a), with SearchScreen and the engine that read it.
+  // This is the deliberate other side of a cold-boot saving, not growth:
+  // 161,860 x 1.15 = 186,139 -> the hundred above.
+  { file: 'bundle-e.js', measured: 161860, max: 186200 },   // Settings/Search/Garden + the search tables
   // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.

@@ -82,12 +82,15 @@ A = [
     # the Listen pill + boot resume must work on matthew-idx (bundle-a-matthew)
     # and Settings (bundle-e) without forcing the 5 MB a-bible load.
     'src/data/bible-audio-manifest.js',
-    # search-data.js = the SHARED window.VotSearchData index source (books/
-    # display names/synonyms) consumed by the MiniSearch engine (bundle-e) +
-    # SearchScreen. The Classic engine (search.js) + its flexsearch.min.js
-    # vendor were RETIRED 2026-07-02 (owner A/B kept MiniSearch) — ~97 KB off
-    # the cold-boot critical path.
-    'search-data.js',
+    # search-data.js LEFT this list 2026-09-22 (landing 27, −42,753 B off every
+    # cold start). It is the window.VotSearchData tables — stop words, synonyms,
+    # book abbreviations, named passages, slash-commands — and every consumer
+    # (src/search/engine.js, ref-parser.js, index-builder.js, SearchScreen) is
+    # reachable only from src/ui/_entry-e.js, which is lazy behind
+    # __loadScreensE. It is now a side-effect import there, so it is parsed by
+    # the reader who opens Search and by nobody else. The Classic engine
+    # (search.js) + its flexsearch.min.js vendor were RETIRED 2026-07-02 (owner
+    # A/B kept MiniSearch) — ~97 KB off the cold-boot critical path then.
 ]
 
 # PF2 — the pure-corpus-DATA members of bundle-a (`var X = {…}`, no top-level

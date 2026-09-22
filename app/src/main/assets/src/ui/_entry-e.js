@@ -14,6 +14,16 @@
    (nothing else reads them; verified at split time).
    ═══════════════════════════════════════════════════════════════════════ */
 
+// The search TABLES (stop words, synonyms, book abbreviations, named passages,
+// slash-commands — 42,753 B) used to be concatenated into bundle-a, i.e. parsed
+// on every cold start by every reader. Everything that reads them —
+// src/search/engine.js, ref-parser.js, index-builder.js and SearchScreen — is
+// reachable only from THIS entry, so they belong here, behind the same trigger.
+// A side-effect import, not an ES module: the file is a classic IIFE that ends
+// in `window.VotSearchData = {…}`, and every consumer reads it off window at
+// call time, so nothing on the other side had to change.
+import '../../search-data.js';
+
 import { SettingsScreen } from './screens/SettingsScreen.jsx';
 import { SearchScreen } from './screens/SearchScreen.jsx';
 import {
