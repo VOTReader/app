@@ -24,7 +24,7 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS,
+  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -570,8 +570,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // the sky's chrome (landing 9): the altitude ruler on the left, only
     // above the baseline, and the elevator on the right, once there is a sky
     // to climb. Both reserve their boxes first, so the thread labels keep off.
-    const marks = drawAltitude(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome);
-    if (wrapRef.current) wrapRef.current.setAttribute('data-altitude', marks.join(','));
+    const altitude = { span: 0 };
+    const marks = drawAltitude(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, altitude);
+    if (wrapRef.current) {
+      wrapRef.current.setAttribute('data-altitude', marks.join(','));
+      wrapRef.current.setAttribute('data-altitude-span', altitude.span > 0 ? String(altitude.span) : '');
+    }
     elevatorRef.current = drawElevator(uiRef.current, cam, Object.assign({}, base, { inset, reserved }), v, chrome, yFrameFor(cam));
     if (wrapRef.current) wrapRef.current.setAttribute('data-elevator', elevatorRef.current ? elevatorRef.current.at.toFixed(4) : '');
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
@@ -1335,11 +1339,19 @@ function bundlesFor(cache, g, cam, view, v, density) {
  * chapter, a book, a testament, the canon. The marks in view are returned
  * (and published as data-altitude) whether or not there is a 2D context;
  * the labels reserve their boxes so the thread labels keep off them.
- * @returns {number[]} the spans in view, bottom to top
+ *
+ * The named marks are a chapter, a book, a testament and the canon - a
+ * factor of 30 apart, so most heights have none in view (at the ceiling
+ * a chapter crowns 422 px up; a book 14,000). The frame's middle row
+ * therefore always carries a live readout of its own span ("~150
+ * verses"), published as data-altitude-span, so the height is never
+ * nameless.
+ * @returns {number[]} the marks' spans in view, bottom to top
  */
-function drawAltitude(canvas, g, cam, view, v, chrome) {
+function drawAltitude(canvas, g, cam, view, v, chrome, out) {
   const shown = [];
   const camY = cam.y > 0 ? cam.y : 0;
+  if (out) out.span = 0;
   if (!(camY > 0) || !g || !(g.total > 0)) return shown;
   const DPR = v.DPR, base = view.base, top = view.inset > 0 ? view.inset : 0;
   const fs = chrome.fsRuler * DPR;
@@ -1351,6 +1363,7 @@ function drawAltitude(canvas, g, cam, view, v, chrome) {
     ctx.textAlign = 'left';
     ctx.lineWidth = DPR;
   }
+  const marksY = [];
   for (const m of ALTITUDE_MARKS) {
     const y = base + camY - arcShape((m.span * cam.ppv) / 2, view.squash).A;
     if (y < top + fs || y > base - fs) continue;
@@ -1368,6 +1381,26 @@ function drawAltitude(canvas, g, cam, view, v, chrome) {
     ctx.lineWidth = DPR;
     ctx.fillStyle = 'rgba(' + rgb + ',0.95)';
     ctx.fillText(text, box.x0, y);
+    if (view.reserved) view.reserved.push(box);
+    marksY.push(y);
+  }
+  // the live readout at the frame's middle row
+  const yMid = (top + base) / 2;
+  const span = spanAtHeight(base + camY - yMid, cam.ppv, view.squash);
+  if (span >= 1 && out) out.span = Math.round(span);
+  if (ctx && span >= 1 && !marksY.some((y) => Math.abs(y - yMid) < fs * 1.6)) {
+    const rgb = distanceRampRGB(Math.pow(Math.min(span, g.total) / g.total, 0.40)).join(',');
+    const text = '~' + Math.round(span).toLocaleString('en-US') + ' verses';
+    ctx.strokeStyle = 'rgba(' + rgb + ',0.6)';
+    ctx.beginPath(); ctx.moveTo(0, yMid); ctx.lineTo(8 * DPR, yMid); ctx.stroke();
+    const w = ctx.measureText(text).width;
+    const box = { x0: 12 * DPR, x1: 12 * DPR + w, y0: yMid - fs * 0.7, y1: yMid + fs * 0.7 };
+    ctx.lineWidth = 3 * DPR;
+    ctx.strokeStyle = chrome.bg;
+    ctx.strokeText(text, box.x0, yMid);
+    ctx.lineWidth = DPR;
+    ctx.fillStyle = 'rgba(' + rgb + ',0.8)';
+    ctx.fillText(text, box.x0, yMid);
     if (view.reserved) view.reserved.push(box);
   }
   if (ctx) ctx.restore();

@@ -508,6 +508,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('CONTROL: at the baseline there is no altitude ruler; at the overview no elevator either', async () => {
       const { container } = await mount({}, wide);
       expect(attr(container, 'data-altitude')).toBe('');
+      expect(attr(container, 'data-altitude-span')).toBe('');
       expect(attr(container, 'data-elevator')).toBe('');
       // a tap on the right edge at the overview falls through to the web: the camera stays down
       await tapAt(container, FRAME_CSS - 12, 130);
@@ -523,6 +524,9 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(Number(attr(container, 'data-cam-y'))).toBeGreaterThan(0);
       expect(attr(container, 'data-altitude').split(',')).toContain('30');
       expect(Number(attr(container, 'data-elevator'))).toBeGreaterThan(0);
+      // the live readout at the frame's middle row (130): h = 260 + 312 - 130 = 442 px,
+      // span = 2 * 442 / (44 * 0.64) = 31.4 -> "31"
+      expect(attr(container, 'data-altitude-span')).toBe('31');
     });
 
     it('a tap on the elevator track sets the height: half way up the track is half the sky', async () => {
