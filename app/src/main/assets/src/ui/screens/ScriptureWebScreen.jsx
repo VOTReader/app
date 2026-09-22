@@ -1616,6 +1616,13 @@ function TipChip({ info, viewport }) {
           <div className="sw-tip-meta">{s.connections.toLocaleString()} connections</div>
         </React.Fragment>
       )}
+      {s.kind === 'bundle' && (
+        <React.Fragment>
+          <div className="sw-tip-eyebrow">Bundle</div>
+          <div className="sw-tip-ref">{s.label}</div>
+          <div className="sw-tip-meta">{s.hidden.toLocaleString()} of {s.connections.toLocaleString()} connections not drawn here · tap to open</div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
