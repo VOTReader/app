@@ -53,7 +53,8 @@ export const LENS_CONTEXT = 0.35;
  * @param {(number[]|null)} lens - pick.lensRange()
  */
 export function lensDimFor(lo, hi, lens) {
-  if (!lens) return 1;
+  // no lens, or the shader's own "off" spelling (lo > hi, uLens = (1, 0))
+  if (!lens || !(lens[0] <= lens[1])) return 1;
   return hi >= lens[0] && lo <= lens[1] ? 1 : LENS_CONTEXT;
 }
 

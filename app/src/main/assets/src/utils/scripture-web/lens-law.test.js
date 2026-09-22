@@ -63,6 +63,8 @@ describe('the count at each foot is information, lens-dimmed like everything els
     expect(geo.lensDimFor(lens[0] - 40, lens[0], lens)).toBe(1);
     expect(geo.lensDimFor(lens[0] - 40, lens[0] - 1, lens)).toBe(geo.LENS_CONTEXT);
     expect(geo.lensDimFor(lens[1] + 1, lens[1] + 3, lens)).toBe(geo.LENS_CONTEXT);
+    // the shader's own "off" spelling (lo > hi) is off here too (the l9-14 refuter's latent case)
+    expect(geo.lensDimFor(3, 5, [1, 0])).toBe(1);
   });
 
   it('the pills count every thread at a cell and hide none: at 12x the cells carry thousands of feet, hidden 0', () => {

@@ -560,6 +560,21 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       // the drag was the lift's, not the web's: the camera did not pan in x
       expect(DRAWN[DRAWN.length - 1].camX).toBeCloseTo(camXBefore, 6);
     });
+
+    it('the track dies with the switch to My Web: a drag in the right strip pans the rail (the l9-14 refuter\'s FAIL)', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(attr(container, 'data-elevator'), 'precondition: a track on the canon web').toBe('0.0000');
+      fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(attr(container, 'data-elevator')).toBe('');
+      const root = container.querySelector('.sw-root');
+      const camXBefore = DRAWN[DRAWN.length - 1].camX;
+      const ev = (type, x, y) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 12, pointerType: 'touch', clientX: x, clientY: y });
+      await act(async () => { root.dispatchEvent(ev('pointerdown', FRAME_CSS - 12, 130)); root.dispatchEvent(ev('pointermove', 400, 130)); root.dispatchEvent(ev('pointerup', 400, 130)); await new Promise((r) => setTimeout(r, 40)); });
+      expect(DRAWN[DRAWN.length - 1].camX).not.toBeCloseTo(camXBefore, 3);
+      expect(attr(container, 'data-cam-y')).toBe('0.0');
+    });
   });
 });
 

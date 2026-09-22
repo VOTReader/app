@@ -506,6 +506,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const chrome = chromeRef.current;
     const base = viewFor();
     if (mode === 'personal') {
+      // My Web has no sky and no elevator: the canon track's box must not
+      // survive the switch, or liftAt eats every tap and drag in the right
+      // 24 CSS px of the rails (the l9-14 refuter's one FAIL, 02:4x).
+      elevatorRef.current = null;
+      if (wrapRef.current) { wrapRef.current.setAttribute('data-elevator', ''); wrapRef.current.setAttribute('data-altitude', ''); wrapRef.current.setAttribute('data-altitude-span', ''); }
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
       // shader. The GL pass still runs to paint the ground colour.
