@@ -227,7 +227,11 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                           </button>
                         ) : null}
                         {canOpenText && hasTextDestination({ key }) ? (
-                          <button type="button" className="audio-library-icon-button" onClick={() => onOpenText({ key })} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
+                          // The reading under the clock when the player is inside THIS row: the
+                          // playing track carries the chapter ("Chapter N") and the part the opener
+                          // lands on. A bare key opened Nehemiah 1 under a Nehemiah 10 recording —
+                          // nothing lit, taps seeked nothing (myweb's walk, 2026-09-22).
+                          <button type="button" className="audio-library-icon-button" onClick={() => onOpenText(current && current.key === key ? current : { key })} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
                         ) : null}
                       </div>
                     </div>

@@ -226,6 +226,23 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
     expect(screen.queryByText('Chapter 3')).toBeNull();
   });
 
+  it('a book whose chapter is PLAYING opens its text at that chapter, not at chapter 1', () => {
+    // The walker (myweb W2, 2026-09-22) played Nehemiah 10 from the row, tapped the
+    // book's Text icon, and landed on Nehemiah 1: nothing lit, taps seeked nothing —
+    // the reading under the clock was ten chapters away. The row's Open text hands
+    // over the playing track (its "Chapter N" partLabel is what the opener reads)
+    // whenever the player is inside this book.
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    const onOpenText = vi.fn();
+    renderScreen('bible-brm-kjv', { onOpenText });
+    fireEvent.click(screen.getByRole('button', { name: '4 chapters of Jonah' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play Jonah 3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open text for Jonah' }));
+    expect(onOpenText).toHaveBeenCalledTimes(1);
+    expect(onOpenText.mock.calls[0][0]).toMatchObject({ key: 'bible-brm-kjv:jonah', partLabel: 'Chapter 3' });
+  });
+
   it('offers no chapter disclosure for a whole-book recording', () => {
     renderScreen('bible-brm-kjv');
     expect(screen.queryByRole('button', { name: /chapters of/ })).toBeNull();
