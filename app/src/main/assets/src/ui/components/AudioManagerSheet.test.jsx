@@ -380,6 +380,88 @@ describe('AudioManagerSheet — speed', () => {
   });
 });
 
+describe('AudioManagerSheet — fine speed (Corbin 2026-09-21: 1 % steps, not quarter jumps)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+  const slider = () => screen.getByRole('slider', { name: 'Playback speed' });
+  const readout = () => screen.getByRole('button', { name: 'Speed, tap to type a value' });
+
+  it('is a slider in 1 % steps over 0.50-3.00 with a spoken rate, and applies a drag', () => {
+    startCollection();
+    openSheet();
+    const s = slider();
+    expect([s.min, s.max, s.step]).toEqual(['50', '300', '1']);
+    expect(s.value).toBe('100');
+    expect(s.getAttribute('aria-valuetext')).toBe('1×');
+
+    fireEvent.change(s, { target: { value: '137' } });
+    expect(AudioPlayer.getState().rate).toBe(1.37);
+    expect(el().playbackRate).toBe(1.37);
+    expect(el().defaultPlaybackRate).toBe(1.37);
+    expect(library.setPlaybackRate).toHaveBeenCalledWith(1.37);
+    expect(speedValue()).toBe('1.37×');
+    expect(slider().getAttribute('aria-valuetext')).toBe('1.37×');
+    // No chip claims a rate that is not its own.
+    expect(screen.getAllByRole('radio').every((b) => b.getAttribute('aria-checked') === 'false')).toBe(true);
+  });
+
+  it('steps 1 % per press and repeats while held; Shift+arrow on the slider is 5 %', () => {
+    startCollection();
+    openSheet();
+    const plus = screen.getByRole('button', { name: 'Faster by 1 %' });
+    const minus = screen.getByRole('button', { name: 'Slower by 1 %' });
+
+    fireEvent.pointerDown(plus);
+    expect(AudioPlayer.getState().rate).toBe(1.01);       // the press itself is one step
+    act(() => { vi.advanceTimersByTime(400 + 80 * 3 + 1); });
+    fireEvent.pointerUp(plus);
+    expect(AudioPlayer.getState().rate).toBe(1.04);       // held: three more, then released
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(AudioPlayer.getState().rate).toBe(1.04);       // …and nothing after the release
+
+    fireEvent.click(minus, { detail: 0 });                // keyboard activation = one step
+    expect(AudioPlayer.getState().rate).toBe(1.03);
+
+    fireEvent.keyDown(slider(), { key: 'ArrowUp', shiftKey: true });
+    expect(AudioPlayer.getState().rate).toBe(1.08);
+    fireEvent.keyDown(slider(), { key: 'ArrowLeft', shiftKey: true });
+    expect(AudioPlayer.getState().rate).toBe(1.03);
+
+    drive(() => AudioPlayer.setPlaybackRate(2.99));
+    fireEvent.pointerDown(plus); fireEvent.pointerUp(plus);
+    fireEvent.pointerDown(plus); fireEvent.pointerUp(plus);
+    expect(AudioPlayer.getState().rate).toBe(3);          // the ceiling holds
+    expect(screen.getByRole('button', { name: 'Faster by 1 %' }).disabled).toBe(true);
+  });
+
+  it('tapping the readout takes a typed value; Enter commits, Escape cancels, garbage is ignored', () => {
+    startCollection();
+    openSheet();
+    fireEvent.click(readout());
+    const box = screen.getByRole('spinbutton', { name: 'Playback speed' });
+    fireEvent.change(box, { target: { value: '1.37' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(AudioPlayer.getState().rate).toBe(1.37);
+    expect(speedValue()).toBe('1.37×');
+    expect(screen.queryByRole('spinbutton')).toBeNull();  // back to the readout
+
+    fireEvent.click(readout());
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2.5' } });
+    fireEvent.keyDown(screen.getByRole('spinbutton'), { key: 'Escape' });
+    expect(AudioPlayer.getState().rate).toBe(1.37);       // cancelled
+
+    fireEvent.click(readout());
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: 'abc' } });
+    fireEvent.blur(screen.getByRole('spinbutton'));
+    expect(AudioPlayer.getState().rate).toBe(1.37);       // nothing honest to apply
+
+    // The chips are still shortcuts out of a fine value.
+    fireEvent.click(screen.getByRole('radio', { name: '1×' }));
+    expect(AudioPlayer.getState().rate).toBe(1);
+    expect(slider().value).toBe('100');
+  });
+});
+
 describe('AudioManagerSheet — sleep timer', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });

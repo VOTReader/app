@@ -590,11 +590,16 @@ export const AUDIO_RESUME_END_FRACTION = 0.97;
 /** Rewind on resume — a few words of context beat an exact splice. */
 export const AUDIO_RESUME_REWIND_SEC = 5;
 
-/** Standard rates intentionally offered by the listening UI. This closed set IS
- *  the trust boundary for playback speed: the desk's radiogroup renders from it
- *  and `normalizeAudioRate` snaps every imported value onto it, so adding a step
- *  is a one-line change and nothing may pin the array's LENGTH. */
+/** Quick-chip rates the listening desk offers as SHORTCUTS. Since 2026-09-21
+ *  (Corbin: "should be by 1% increments") this is no longer the domain: any
+ *  1 % step in [AUDIO_RATE_MIN, AUDIO_RATE_MAX] persists. Nothing may pin the
+ *  array's LENGTH. */
 export const AUDIO_PLAYBACK_RATES = Object.freeze([0.75, 1, 1.25, 1.5, 1.75, 2]);
+/** The product range. Chromium accepts 0.0625..16 and THROWS NotSupportedError
+ *  outside it; below 0.5 speech is mush and above 3 it is noise, so the store
+ *  clamps here and the element never sees an out-of-range value. */
+export const AUDIO_RATE_MIN = 0.5;
+export const AUDIO_RATE_MAX = 3;
 
 /* Published for the classic-globals Settings screen (Listening → Default
    Speed), the same bridge BIBLE_AUDIO_EDITIONS / AUDIO_READERS use above.
@@ -605,14 +610,21 @@ if (typeof globalThis !== 'undefined') {
 }
 
 /**
- * Imported values must land on a tested, comprehensible rate. A nearby
- * floating-point representation (for example 1.2500000001) still resolves to
- * its intended preset.
+ * Any value lands on a 1 % step inside the product range: float noise
+ * (1.2500000001) resolves to its step, out-of-range clamps, garbage is normal
+ * speed. Old persisted presets (0.75..2) pass through unchanged.
  *
  * @param {unknown} value
  * @returns {number}
  */
 export function normalizeAudioRate(value) {
   const number = Number(value);
-  return AUDIO_PLAYBACK_RATES.find((rate) => Math.abs(rate - number) < 0.001) || 1;
+  if (!Number.isFinite(number) || number <= 0) return 1;
+  return Math.min(AUDIO_RATE_MAX, Math.max(AUDIO_RATE_MIN, Math.round(number * 100) / 100));
+}
+
+/** "1×", "1.5×", "1.37×" — the one spelling every readout, chip and
+ *  valuetext uses, so a screen reader and the eye agree. */
+export function formatAudioRate(rate) {
+  return String(Math.round(rate * 100) / 100) + '×';
 }

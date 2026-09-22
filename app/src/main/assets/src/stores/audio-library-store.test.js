@@ -92,11 +92,17 @@ describe('AudioLibraryStore — normalized metadata', () => {
     expect(recent[0].playedAt).toBe(Date.now());
   });
 
-  it('persists only documented playback-rate presets', () => {
+  it('persists any 1 % rate in 0.50-3.00 and clamps the rest', () => {
     expect(AudioLibraryStore.setPlaybackRate(1.5)).toBe(1.5);
     expect(AudioLibraryStore.getPlaybackRate()).toBe(1.5);
-    expect(AudioLibraryStore.setPlaybackRate(1.37)).toBe(1);
-    expect(AudioLibraryStore.getPlaybackRate()).toBe(1);
+    // Corbin 2026-09-21: speed is continuous in 1 % steps, not quarter jumps.
+    expect(AudioLibraryStore.setPlaybackRate(1.37)).toBe(1.37);
+    expect(AudioLibraryStore.getPlaybackRate()).toBe(1.37);
+    expect(AudioLibraryStore.setPlaybackRate(1.2500000001)).toBe(1.25);  // float noise still lands on the step
+    expect(AudioLibraryStore.setPlaybackRate(0.2)).toBe(0.5);            // below the floor
+    expect(AudioLibraryStore.setPlaybackRate(9)).toBe(3);                // above the ceiling (Chromium throws past 16)
+    expect(AudioLibraryStore.setPlaybackRate('fast')).toBe(1);           // garbage = normal
+    expect(AudioLibraryStore.setPlaybackRate(0.75)).toBe(0.75);          // an old preset migrates unchanged
   });
 
   it('removeRecent drops exactly one row, by its immutable release URL', () => {

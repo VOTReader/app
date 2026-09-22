@@ -286,8 +286,8 @@ function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hid
    The one settings row with NO settings key. Playback speed has been owned
    by AudioLibraryStore.rate since the listening desk shipped: the desk
    writes it, the player rehydrates from it at every track start, backup
-   carries it, and normalizeAudioRate snaps imported values onto the closed
-   AUDIO_PLAYBACK_RATES set. A settings.audioRate twin would be a second
+   carries it, and normalizeAudioRate clamps imported values into the 1 %
+   domain (AUDIO_RATE_MIN..AUDIO_RATE_MAX). A settings.audioRate twin would be a second
    truth needing a sync rule in both directions — so this row reads and
    writes the store itself.
 
@@ -309,6 +309,9 @@ function AudioRateRow() {
   // No store (or no rate registry) = nothing honest to show or write.
   if (!store || typeof store.getPlaybackRate !== 'function' || rates.length === 0) return null;
   const current = store.getPlaybackRate();
+  // The desk sets any 1 % rate (2026-09-21); a fine value the presets don't
+  // carry is listed once as the current choice rather than rounded away.
+  const listed = rates.some((rate) => Math.abs(rate - current) < 0.005) ? rates : [...rates, current].sort((a, b) => a - b);
   return (
     <SelectField
       eyebrow="Listening"
@@ -316,7 +319,7 @@ function AudioRateRow() {
       label="Default Speed"
       desc="How fast recordings play when you start one. The listening desk can still change speed for what is playing; whatever you leave it on becomes this setting, because both are the same preference."
       value={String(current)}
-      options={rates.map((rate) => ({
+      options={listed.map((rate) => ({
         id: String(rate),
         label: rate + '×',
         desc: rate === 1 ? 'Normal speed' : rate < 1 ? 'Slower than recorded' : 'Faster than recorded',

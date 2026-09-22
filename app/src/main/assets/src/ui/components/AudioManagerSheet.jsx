@@ -7,7 +7,8 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AUDIO_PLAYBACK_RATES, BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel } from '../../utils/audio-track.js';
+import { AudioSpeedControl } from './AudioSpeedControl.jsx';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -422,21 +423,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
         </div>
 
         <div className="audio-manager-tools">
-          <div className="audio-manager-tool">
-            <div className="audio-manager-tool-head"><span>Speed</span><strong>{state.rate}×</strong></div>
-            <div className="audio-manager-segment" role="radiogroup" aria-label="Playback speed">
-              {AUDIO_PLAYBACK_RATES.map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  role="radio"
-                  aria-checked={state.rate === rate}
-                  className={state.rate === rate ? 'is-active' : ''}
-                  onClick={() => AudioPlayer.setPlaybackRate(rate)}
-                >{rate}×</button>
-              ))}
-            </div>
-          </div>
+          <AudioSpeedControl rate={state.rate} />
           <div className="audio-manager-tool">
             <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
             <div className="audio-manager-segment" role="group" aria-label="Sleep timer">

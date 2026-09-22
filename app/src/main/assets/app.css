@@ -1175,6 +1175,20 @@
       .audio-manager-tool-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--cream-dim); font-size: var(--fs-11); }
       .audio-manager-tool-head strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-11); font-weight: 500; white-space: nowrap; }
       .audio-manager-segment { display: flex; flex-wrap: wrap; gap: 0.28rem; }
+      /* Speed tool (AudioSpeedControl): −/+ are the transport's 44px rounds, the
+         slider is the desk's seek slider by class (same --seek-pct fill), the
+         readout is a button that swaps for a number box on tap. */
+      .audio-speed-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem; }
+      .audio-speed-row .audio-speed-slider { flex: 1 1 auto; min-width: 0; }
+      .audio-speed-step { width: 40px; height: 40px; font-size: var(--fs-14); }
+      .audio-speed-readout button, .audio-speed-readout input {
+        margin: 0; padding: 0.1rem 0.35rem; border: 1px solid transparent; border-radius: 4px; background: transparent;
+        color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; min-height: 28px;
+      }
+      .audio-speed-readout button { border-bottom: 1px dotted var(--gold-border); }
+      .audio-speed-readout button:focus-visible, .audio-speed-readout input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .audio-speed-readout input { width: 4.5em; border-color: var(--gold-border); cursor: text; -moz-appearance: textfield; }
+      .audio-speed-readout input::-webkit-outer-spin-button, .audio-speed-readout input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       /* 44px both dimensions — these speed/sleep chips were the last sub-44px
          touch targets in the listening UI (32×38). The row wraps rather than
          overflowing, and the grid above stacks before it has to. */

@@ -2449,8 +2449,8 @@ function skip(seconds) {
 }
 
 /**
- * Set the selected playback-rate preset and persist it in the Listening
- * Library. Playback itself never depends on the metadata store succeeding.
+ * Set the playback rate (any 1 % step in the product range) and persist it in
+ * the Listening Library. Playback itself never depends on the metadata store succeeding.
  *
  * @param {unknown} rate
  * @returns {number}

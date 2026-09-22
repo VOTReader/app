@@ -286,6 +286,16 @@ describe('Listening group', () => {
     expect(library.getPlaybackRate()).toBe(2);
   });
 
+  it('shows a fine rate the desk left (1.37×) as the current choice beside the presets', () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({ AudioLibraryStore: fakeAudioLibrary(1.37) });
+    renderSettings();
+    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1\.37×/ }));
+    // Presets still offered; the odd value is listed once, not lost or rounded away.
+    expect(screen.getAllByText('1.37×').length).toBeGreaterThan(0);
+    expect(screen.getByText('1.25×')).toBeTruthy();
+  });
+
   it('hides the speed row entirely when the library store is absent', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ AudioLibraryStore: undefined });

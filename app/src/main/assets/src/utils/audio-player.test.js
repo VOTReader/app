@@ -501,6 +501,15 @@ describe('audio-player — listening controls + arbitration', () => {
     expect(el().defaultPlaybackRate).toBe(1.25);
     expect(library.setPlaybackRate).toHaveBeenCalledWith(1.25);
 
+    // A fine rate (2026-09-21) reaches the element unrounded, and the
+    // read-along clock is the element's own currentTime with NO rate term:
+    // at 1.37x the wash asks for where the audio IS, never time x rate.
+    AudioPlayer.setPlaybackRate(1.37);
+    expect(el().playbackRate).toBe(1.37);
+    expect(library.setPlaybackRate).toHaveBeenCalledWith(1.37);
+    el().readyState = 1; el().currentTime = 42.5;
+    expect(AudioPlayer.getPreciseTime()).toBe(42.5);
+
     AudioPlayer.stop();
     AudioPlayer.playTrack({ ...direct, url: 'https://example.test/not-vot.mp3' });
     expect(AudioPlayer.getState().status).toBe('idle');
