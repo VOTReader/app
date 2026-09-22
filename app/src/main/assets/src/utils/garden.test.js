@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   GARDEN_TOTAL,
   GARDEN_DEFAULT_TIER,
@@ -12,6 +12,15 @@ import {
   gardenTierLimits,
   gardenClearCache,
 } from './garden.js';
+
+// The decoded-image cache, its LRU and the crawled set are MODULE state, shared
+// by every test in this file. Each test starts from an empty Garden and arranges
+// the pages it asserts on; none may lean on what an earlier test preloaded (a
+// shuffled run, --sequence.shuffle --sequence.seed=11, caught three that did).
+beforeEach(() => {
+  gardenClearCache();
+  gardenCrawled.clear();
+});
 
 describe('getGardenTier', () => {
   it('resolves a known tier id', () => {
@@ -82,6 +91,7 @@ describe('gardenPreload LRU + crawled set (PF5)', () => {
   });
   it('records EVERY fetched page in gardenCrawled even after its bitmap is evicted', () => {
     const N = GARDEN_CACHE_MAX + 6;
+    for (let p = 1; p <= N; p++) gardenPreload(p, 'standard');
     for (let p = 1; p <= N; p++) {
       expect(gardenCrawled.has(gardenCacheKey(p, 'standard'))).toBe(true); // crawl won't re-fetch
     }
@@ -91,6 +101,7 @@ describe('gardenPreload LRU + crawled set (PF5)', () => {
     expect(gardenCrawled.has(gardenCacheKey(1, 'standard'))).toBe(true);
   });
   it('re-touching a resident page does not grow the cache', () => {
+    for (let p = 1; p <= 3; p++) gardenPreload(p, 'standard');
     const residentKey = Object.keys(gardenImageCache)[0];
     const before = Object.keys(gardenImageCache).length;
     const [tierId, pageStr] = residentKey.split(':');
