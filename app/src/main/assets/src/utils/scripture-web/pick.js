@@ -711,7 +711,7 @@ export function standInsFor(bundles) {
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
+ * @param {{width:number, density:import('./decode.js').Density, level?:number, standIns?:ArrayLike<number>}} view
  * @returns {StratumRow[]}
  */
 export function strataCounts(g, cam, view) {
@@ -728,6 +728,8 @@ export function strataCounts(g, cam, view) {
   const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
   const chunkSize = g.chunkSize || 256;
   const level = typeof view.level === 'number' ? view.level : LOD_OFF;
+  // this frame's stand-ins are shown too (view.standIns, the shader's uStandIn)
+  const standIns = view.standIns && view.standIns.length ? new Set(Array.from(view.standIns)) : null;
   for (const bucket of g.buckets) {
     const draw = bucketDrawCount(bucket, density);
     const chunks = bucket.chunks || [];
@@ -744,7 +746,7 @@ export function strataCounts(g, cam, view) {
         if (arcAnchored(x0, x1, width)) continue;
         const k = stratumOf(Math.abs(g.to[i] - g.from[i]));
         rows[k].cross++;
-        if (lodShown(lod[i], essential, 0, level)) rows[k].shown++;
+        if (lodShown(lod[i], essential, 0, level) || (standIns && standIns.has(i))) rows[k].shown++;
       }
     }
   }
