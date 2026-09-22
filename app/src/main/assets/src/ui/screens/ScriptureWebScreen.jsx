@@ -523,9 +523,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // The alpha and stroke law lives in geometry.js, not here: it used to be
     // written inline where no harness could import it, so every probe re-typed
     // it and would have measured the old law against a new screen.
-    const perCssPx = base.localize > 0
-      ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
-    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
+    // under the density law the crowding is what is DRAWN, at every zoom
+    const perCssPx = anchoredDensity(anchoredRef.current, g, cam, v, density);
+    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx, true);
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,

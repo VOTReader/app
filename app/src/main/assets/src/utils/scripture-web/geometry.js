@@ -155,17 +155,28 @@ export const STROKE_MIN_CSS = 1.4;
  * harness could import it, so every instrument re-typed it and would have
  * silently measured the old law against a new screen.
  *
+ * Under the density law (`lod` true; geometry.js "The density law, part 1")
+ * the overview alpha ramp no longer applies: it was written for sixty
+ * thousand ribbons summing into a dome, and the law now draws a few hundred
+ * at the overview and a few dozen at 12x, each of which must be seen alone.
+ * So every drawn ribbon takes the deep alpha divided by the crowding of what
+ * is DRAWN (countAnchored with the level), and votes drive width at every
+ * zoom; the stroke still grows with zoom as before. Measured before this:
+ * the 12x picture on Psalm 107 was eighty separable lines at alpha 0.175 -
+ * a ghost of a web (lanes/myweb/out/look-density, 2026-09-21).
+ *
  * @param {number} zoom - multiple of fit-to-width
  * @param {number} localize - localizeFactor()
  * @param {boolean} light - parchment theme
  * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
+ * @param {boolean} [lod] - the density law is on: the deep law at every zoom
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
+export function ribbonStyle(zoom, localize, light, anchoredPerCssPx, lod = false) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
   const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
   const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
-  const t = smoothstep(0.55, 1, localize);
+  const t = lod ? 1 : smoothstep(0.55, 1, localize);
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
   // Crowding, not zoom, is what decides whether the deep value washes: at the
   // ceiling ~0.17 anchored arcs share each CSS px of width and almost nothing
@@ -176,7 +187,9 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   const deep = ALPHA_DEEP / crowd;
   return {
     alpha: alpha + (deep - alpha) * t,
-    strokeWidthCss: strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
+    // under the law the stroke keeps its zoom ramp: 2.4 px hairlines at the
+    // overview would be a wall of their own
+    strokeWidthCss: lod ? strokeWidthCss : strokeWidthCss + (STROKE_DEEP_CSS - strokeWidthCss) * t,
     voteMix: t,
   };
 }

@@ -257,3 +257,21 @@ describe('visible equals pickable', () => {
     expect(drawn).toBeLessThan(600);
   });
 });
+
+describe('the ribbon style under the law', () => {
+  it('a drawn ribbon takes the deep alpha at every zoom, divided by the DRAWN crowd, stroke on its zoom ramp', () => {
+    // before: the 12x picture was eighty separable lines at alpha 0.175 (a ghost)
+    const off = geo.ribbonStyle(12, geo.localizeFactor(12), false, 80 / 800);
+    const on = geo.ribbonStyle(12, geo.localizeFactor(12), false, 80 / 800, true);
+    expect(off.alpha).toBeLessThan(0.2);
+    expect(on.alpha).toBeCloseTo(geo.ALPHA_DEEP, 6);           // 0.1 per px is under DENSITY_K: crowd 1
+    expect(on.voteMix).toBe(1);
+    expect(on.strokeWidthCss).toBeCloseTo(off.strokeWidthCss, 6);
+    const fit = geo.ribbonStyle(1, 0, false, 310 / 800, true);
+    expect(fit.alpha).toBeGreaterThan(0.5);                    // 310 lines at the overview: seen
+    expect(fit.alpha).toBeLessThan(geo.ALPHA_DEEP);            // and crowd-divided a little
+    expect(fit.strokeWidthCss).toBeCloseTo(0.9, 6);
+    // the parameter defaults off: every caller before the law reads the same numbers
+    expect(geo.ribbonStyle(1, 0, false, 0.3)).toEqual(geo.ribbonStyle(1, 0, false, 0.3, false));
+  });
+});
