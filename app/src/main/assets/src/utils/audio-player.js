@@ -1668,9 +1668,31 @@ function _applySnapshot(s) {
     _state.time = _pendingRestore.time;
     _state.duration = 0;
     _state.status = 'paused';
+    _followLibraryRate();
     _notify();
     return true;
   } catch (_e) { _setPendingRestore(null); return false; }
+}
+
+/* A paused restore puts the desk up before any track loads, and _load is where
+   the rate is pulled from the library — so the readout said 1× over a store
+   holding 1.37 (item 5 look, 2026-09-21; ra3). While the restore is pending the
+   player follows the store instead: bundle-b hydrates IDB after this module
+   evaluates, so the pull repeats on each store notify. Once a track is live
+   the store is written BY the player and never drives it from behind. */
+let _libraryWatched = false;
+function _followLibraryRate() {
+  const pull = () => {
+    if (!_pendingRestore) return;
+    const library = _library();
+    if (!library || typeof library.getPlaybackRate !== 'function') return;
+    const next = normalizeAudioRate(library.getPlaybackRate());
+    if (next !== _state.rate) { _state.rate = next; _notify(); }
+  };
+  pull();
+  if (_libraryWatched) return;
+  const library = _library();
+  if (library && typeof library.subscribe === 'function') { _libraryWatched = true; library.subscribe(pull); }
 }
 
 /**
@@ -2667,6 +2689,7 @@ function pauseIfPlaying() {
  * @returns {() => void} unsubscribe
  */
 function subscribe(callback) {
+  if (_pendingRestore && !_libraryWatched) _followLibraryRate();   // ra3: the store may not exist at module eval
   _listeners.add(callback);
   return () => { _listeners.delete(callback); };
 }

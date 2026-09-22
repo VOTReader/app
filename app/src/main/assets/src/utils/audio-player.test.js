@@ -1793,6 +1793,42 @@ describe('audio-player — queue shape the desk can read', () => {
     expect(AudioPlayer.getState().sourceMode).toBe('custom');
   });
 
+  it('a paused restore shows the library speed, including one that hydrates later (ra3)', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+      track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+    }));
+    // bundle-b's store is present at eval but IDB has not answered: it still reads the default.
+    const listeners = new Set();
+    let rate = 1;
+    globalThis.AudioLibraryStore = {
+      getPlaybackRate: () => rate,
+      setPlaybackRate: vi.fn((r) => { rate = r; }),
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+      recordPlayed: vi.fn(),
+    };
+    try {
+      await load();
+      expect(AudioPlayer.getState().restoring).toBe(true);
+      const seen = vi.fn();
+      AudioPlayer.subscribe(seen);
+      const v0 = AudioPlayer.getVersion();
+      // Hydration lands 1.37 and notifies — the desk over a paused bar must say 1.37x, not 1x.
+      rate = 1.37;
+      for (const cb of listeners) cb();
+      expect(AudioPlayer.getState().rate).toBe(1.37);
+      expect(AudioPlayer.getVersion()).toBeGreaterThan(v0);
+      expect(seen).toHaveBeenCalled();
+      // …and once a track is live the store no longer drives the player from behind.
+      AudioPlayer.playTrack({ key: 'vol2:solo', title: 'Solo', sub: 'Volume Two', url: URL_OF('idSolo'), readerCode: 'M', partLabel: null });
+      rate = 2;
+      for (const cb of listeners) cb();
+      expect(AudioPlayer.getState().rate).toBe(1.37);
+    } finally {
+      delete globalThis.AudioLibraryStore;
+    }
+  });
+
   it('flags a restore placeholder until the real queue is rebuilt', async () => {
     localStorage.setItem('vot-audio-pos', JSON.stringify({
       v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
