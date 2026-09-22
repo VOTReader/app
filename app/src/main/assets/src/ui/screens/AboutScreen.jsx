@@ -73,7 +73,9 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
               </>
             )}
           </div>
-          <div className="about-page-dots" aria-label={`Page ${page} of 2`}>
+          {/* a live region with a role: aria-label on a bare div is prohibited
+              (Lighthouse a11y on the live PWA, 2026-09-22: aria-prohibited-attr) */}
+          <div className="about-page-dots" role="status" aria-label={`Page ${page} of 2`}>
             <span className={`about-page-dot${page === 1 ? ' active' : ''}`} />
             <span className={`about-page-dot${page === 2 ? ' active' : ''}`} />
           </div>
