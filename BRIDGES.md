@@ -242,7 +242,7 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 ### `__votResourceErrs`
 - **Setter:** `index.html:45` — `window.__votResourceErrs = []` at startup
 - **Mutator:** an inline `addEventListener('error', ...)` that pushes failed `<script>` / `<link>` / `<img>` URLs into the array
-- **Consumer:** `tools/smoke.js` reads it during the harness run (`report.resource404`)
+- **Consumer:** `tools/smoke.js` reads it during the harness run (`report.resourceErrors.total`)
 
 ### `__homeAnimShown`
 - **Setter:** `src/ui/screens/HomeScreen.js:281` — set to `true` on first HomeScreen mount
@@ -267,6 +267,56 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 - **Cleanup:** `if (window.__flushPersistState === flush) window.__flushPersistState = null` on hook teardown (only clears if still mine — the identity-guarded-cleanup pattern).
 - **Consumer:** `src/ui/screens/SettingsScreen.jsx` (`_exportV3Web` / `_exportV3Android`) — guarded `if (typeof window.__flushPersistState === 'function') window.__flushPersistState();` immediately before `buildV3Manifest(...)`.
 - **Why it exists (U1 + persist-debounce race):** the v3/v2 export reads vot-state STRAIGHT FROM IDB after a `whenSaved()` barrier, but a union still inside the 250 ms persist debounce window has not initiated a `StateStore.set`, so the barrier cannot cover it — a change made within 250 ms of tapping Export would be missing from the ONLY backup. Flushing synchronously first lets the existing barrier await the flushed write. A window bridge (not a module import) because bundle-b (hook) and bundle-d (SettingsScreen) are separate esbuild IIFEs — module-scope registrations do not cross the boundary (same rationale as `navHandoff`). No-op when nothing is pending; clears the pending timer so no duplicate trailing write follows.
+
+---
+
+## 12. Lazy corpus/screen bundle loaders (data-shadow pattern, mirrors §8)
+
+`index.html`'s dynamic-import IIFEs install one `{corpus, load}` pair per lazy
+chunk on `window`; every consumer checks `typeof window.__xCorpus !== 'undefined'`
+before touching it (undefined until the chunk resolves) and calls
+`__loadXCorpus()` to kick the fetch. No cleanup — page-lifetime globals, same
+lifetime rule as §8.
+
+- `__votCorpus` / `__loadVotCorpus` — `index.html:268-269`. Consumers:
+  `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
+  `progress-stats.js`, and every VOT-rendering `*Home.jsx`/`*Screen.jsx`.
+- `__matthewCorpus` / `__loadMatthewCorpus` — `index.html:265-266`. Consumers:
+  `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
+  `ScripturesHome.jsx`, `StudiesHome.jsx`, `MyProgressScreen.jsx`.
+- `__bibleCorpus` / `__loadBibleCorpus` — `index.html:262` (same IIFE).
+  Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`,
+  `use-dom-annotation-sync.js`, `ScripturesHome.jsx`, `SettingsScreen.jsx`,
+  `MyProgressScreen.jsx`.
+- `__screensE` / `__loadScreensE` — `index.html:274-275` (Settings/Search/Garden).
+  Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`, `tour-controller.js`,
+  `HomeScreen.jsx`.
+- `__screensF` / `__loadScreensF` — `index.html:281-282` (Scripture Web).
+  Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`, `_entry-f.js`.
+- `__loadBibleSync(<key>)` — per-edition audio-sync loader, called from each
+  `data/bible-sync-*.js` header the first time that edition's recording
+  plays. A function bridge only, not a data shadow.
+
+## 13. Known gaps (swept 2026-09-22, not yet at this file's usual depth)
+
+A registry sweep this pass (grep `window\.__` across `src/` + `index.html`,
+non-test) found bridges outside the sections above. Listed here — setter
+location only — so this file stays honest about what it hasn't fully
+catalogued yet, rather than silently incomplete:
+
+- `__votController0`, `__votSwTookOver` — `index.html:110`, `sw-register.js:70` (service-worker takeover flag)
+- `__historyReady` — `use-history-sync.js:171` (back-nav gate)
+- `__scrollPositions`, `__scrollEl`, `__scrollLiftPending` — `use-scroll-memory.js:474`, `ScreenLayout.jsx` (per-tab scroll restore)
+- `__nativeTapAnnotation` — `SelectionToolbar.jsx:653` (Android native-tap routing)
+- `__votAudioListened` — `useMarkAsRead.js:243` (audio completion → read credit)
+- `__votMediaCommand` — `audio-player.js:416` (system transport taps back in)
+- `__votUpdateToastResume` — `audio-player.js:2774`, `update-toast.js` (SW-update prompt resume ordering)
+- `__onTrimMemory` — `stores/_entry-b.js:307` (Android memory-pressure signal)
+- `__onExportComplete`, `__onV3ExportReady`, `__onV3ImportReady` — `SettingsScreen.jsx` (export/import completion callbacks)
+- `__annHintDismissed` — `AnnotationHint.jsx:118`
+- `__NAV_INDEX_SIG` — `nav-index.js:217` (cache-invalidation sibling of `__NAV_INDEX`, §8)
+
+Next docs pass: give each the full Setter/Cleanup/Consumers treatment used above.
 
 ---
 

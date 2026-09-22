@@ -87,7 +87,8 @@ Verifies that `onRenderProcessGone` rebuilds the WebView, and that the
    no more than ~20s apart).
 7. **Expected after the third crash:** a centered TextView appears
    reading "The page stopped responding. Tap to reload." Logcat
-   shows `Renderer crashed 3 times in 60s. Showing retry view.`
+   shows `Renderer crashed 3 times in 60s. Showing retry view; webView
+   is live but detached until user taps.`
 8. Tap the retry text.
 9. **Expected:** counters reset to 0; WebView attaches and loads
    index.html successfully.

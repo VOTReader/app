@@ -49,6 +49,8 @@ nearly all of that in seconds, deterministically.
 
 `report.ok === true` means safe to proceed. Key fields:
 
+- `appMounted.ok` — the root React tree actually mounted (checked before
+  anything else; every other field is meaningless if this is false).
 - `globals.missing` — **the #1 modularization tell.** Any entry here =
   a module didn't load or loaded before its dependency. Format
   `group:Name`.
@@ -65,12 +67,18 @@ nearly all of that in seconds, deterministically.
   the class of bug fixed in `2db70f5`). It snapshots and **always
   restores** `vot-annotations`/`vot-notes` in-session, so it never
   corrupts real data — never add a page reload to that section.
+- `wtlbAnnotation.ok` — the same round-trip against WTLB content, a
+  second corpus with its own annotation path; same snapshot/restore rule.
 - `tabs.ok` — the multi-tab round-trip (only when `tabsOn:true`). Sub-
   fields: `tabXLanded` / `tabYFreshHome` / `tabXHeldAfterWalk` (the
   per-tab isolation assertion) and `walkInTabY.crashed` (screens that
   tripped ErrorBoundary during the in-tab walk). Snapshots + restores
   `vot-state`; see the **DESTRUCTIVE** note under Options.
 - `console.errorsSeen` — uncaught `console.error` during the run.
+- `resourceErrors.total` (summary line labels it `resource404`) — failed
+  `<script>`/`<link>`/`<img>` loads (404s), tracked separately from
+  `console.error` because a resource 404 only fires `window.error`. Any
+  total > 0 fails the run; `.samples` carries the last 8 as `tag:url`.
 
 ## Discipline
 
