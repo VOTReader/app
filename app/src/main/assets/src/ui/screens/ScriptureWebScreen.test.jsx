@@ -540,11 +540,24 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(Number(attr(container, 'data-cam-y'))).toBeGreaterThan(0);
       expect(Number(attr(container, 'data-elevator'))).toBeCloseTo(0.5, 1);
       expect(DRAWN[DRAWN.length - 1].camY).toBeCloseTo(Number(attr(container, 'data-cam-y')), 0);
-      // a tap at the track's foot brings the camera back to the baseline (past
-      // the 300 ms double-tap window, or the second tap would zoom instead)
-      await act(async () => { await new Promise((r) => setTimeout(r, 320)); });
+      // a tap at the track's foot brings the camera back to the baseline
       await tapAt(container, FRAME_CSS - 12, 252);
       expect(attr(container, 'data-cam-y')).toBe('0.0');
+    });
+
+    it('a drag on the track rides the finger: down at the middle, up to the top, the camera reaches the tallest apex', async () => {
+      const { container } = await mount({}, wide);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      const root = container.querySelector('.sw-root');
+      const camXBefore = DRAWN[DRAWN.length - 1].camX;
+      const ev = (type, y) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 11, pointerType: 'touch', clientX: FRAME_CSS - 12, clientY: y });
+      await act(async () => { root.dispatchEvent(ev('pointerdown', 130)); root.dispatchEvent(ev('pointermove', 100)); await new Promise((r) => setTimeout(r, 30)); });
+      const midway = Number(attr(container, 'data-elevator'));
+      expect(midway).toBeGreaterThan(0.5);
+      await act(async () => { root.dispatchEvent(ev('pointermove', 8)); root.dispatchEvent(ev('pointerup', 8)); await new Promise((r) => setTimeout(r, 30)); });
+      expect(attr(container, 'data-elevator')).toBe('1.0000');
+      // the drag was the lift's, not the web's: the camera did not pan in x
+      expect(DRAWN[DRAWN.length - 1].camX).toBeCloseTo(camXBefore, 6);
     });
   });
 });

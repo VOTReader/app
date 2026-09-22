@@ -584,7 +584,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       wrapRef.current.setAttribute('data-altitude', marks.join(','));
       wrapRef.current.setAttribute('data-altitude-span', altitude.span > 0 ? String(altitude.span) : '');
     }
-    elevatorRef.current = drawElevator(uiRef.current, cam, Object.assign({}, base, { inset, reserved }), v, chrome, yFrameFor(cam));
+    elevatorRef.current = drawElevator(uiRef.current, cam, Object.assign({}, base, { inset, reserved, total: g.total }), v, chrome, yFrameFor(cam));
     if (wrapRef.current) wrapRef.current.setAttribute('data-elevator', elevatorRef.current ? elevatorRef.current.at.toFixed(4) : '');
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
@@ -693,6 +693,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
   }, [graph, mode, linkVersion, studiesTick, schedule]);
 
+  /**
+   * The elevator's lift (landing 14): for a pointer going down on the track
+   * (device-px box in elevatorRef, kept by drawElevator), the function of a
+   * CSS y that sets the camera's height - the track's top is the tallest
+   * apex, its foot the baseline. Null off the track, so the web pans.
+   */
+  const liftAt = React.useCallback((cx, cy) => {
+    const lift = elevatorRef.current, v = viewRef.current;
+    if (!lift || !v.W) return null;
+    const px = cx * v.DPR, py = cy * v.DPR;
+    if (px < lift.x0 || px > lift.x1 || py < lift.y0 || py > lift.y1) return null;
+    return (yCss) => {
+      const cam = camRef.current;
+      if (!cam) return;
+      const f = lift.y1 > lift.y0 ? (lift.y1 - yCss * v.DPR) / (lift.y1 - lift.y0) : 0;
+      cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
+    };
+  }, []);
+
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
   // it can be exercised with real dispatched DOM events instead of only a
@@ -704,9 +723,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current, live,
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
-      yFrame: yFrameFor,
+      yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor, liftAt]);
 
   const hitCandidatesAt = React.useCallback((cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
@@ -923,17 +942,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const tap = React.useCallback((cx, cy) => {
     // the elevator (landing 9): a tap on the track sets the camera's height -
     // the top of the track is the tallest apex, the bottom the baseline
-    const lift = elevatorRef.current;
-    if (lift) {
-      const v = viewRef.current, px = cx * v.DPR, py = cy * v.DPR;
-      if (px >= lift.x0 && px <= lift.x1 && py >= lift.y0 && py <= lift.y1) {
-        const cam = camRef.current;
-        const f = lift.y1 > lift.y0 ? (lift.y1 - py) / (lift.y1 - lift.y0) : 0;
-        cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
-        schedule();
-        return;
-      }
-    }
+    const lift = liftAt(cx, cy);
+    if (lift) { lift(cy); schedule(); return; }
     const candidates = hitCandidatesAt(cx, cy);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
@@ -952,7 +962,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     }
     commitFound(described[0]);
-  }, [commitFound, describe, hitCandidatesAt, schedule]);
+  }, [commitFound, describe, hitCandidatesAt, schedule, liftAt]);
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
@@ -1467,6 +1477,18 @@ function drawElevator(canvas, cam, view, v, chrome, yf) {
   ctx.lineWidth = 1.5 * DPR;
   ctx.strokeStyle = 'rgba(' + ink + ',0.28)';
   ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+  // the altitude marks on the track, in the ramp's colour: where a chapter,
+  // a book, a testament and the canon crown, so the reader knows how far
+  // up each lies before going there (g.total for the ramp's scale)
+  if (view.total > 0) {
+    for (const m of ALTITUDE_MARKS) {
+      const f = arcShape((m.span * cam.ppv) / 2, view.squash).A / maxY;
+      if (!(f > 0.005) || f > 1) continue;
+      const my = y1 - f * (y1 - y0);
+      ctx.strokeStyle = 'rgba(' + distanceRampRGB(Math.pow(m.span / view.total, 0.40)).join(',') + ',0.9)';
+      ctx.beginPath(); ctx.moveTo(x - 5 * DPR, my); ctx.lineTo(x + 5 * DPR, my); ctx.stroke();
+    }
+  }
   // the thumb: a short rounded bar, gold once the reader has left the baseline
   const th = 18 * DPR, tw = 6 * DPR, cy = y1 - at * (y1 - y0);
   const ty0 = Math.max(y0, Math.min(y1 - th, cy - th / 2)), r = tw / 2;

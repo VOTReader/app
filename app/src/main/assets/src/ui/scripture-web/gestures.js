@@ -58,6 +58,7 @@ export function isChromeTarget(target) {
  *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number, yf?:object, anchorY?:number) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
  *   yFrame?: (cam:object) => (object|null),
+ *   lift?: (xCss:number, yCss:number) => (((yCss:number) => void)|null),
  * }} deps
  * @returns {() => void} detach
  */
@@ -73,6 +74,11 @@ export function attachWebGestures(el, deps) {
   // 0. A finger moving DOWN shows what is higher, as a page does: the
   // picture follows the finger, so y (device px) grows with dy.
   const yFrameOf = (c) => (deps.yFrame ? deps.yFrame(c) : null);
+  // The elevator (landing 14): deps.lift(xCss, yCss) answers a function of
+  // yCss when the pointer went down on the track, and that function, not the
+  // pan, follows the finger until it lifts; a tap on the track is the same
+  // function called once. Absent, or null, the pointer is the web's.
+  const liftAt = (x, y) => (deps.lift ? deps.lift(x, y) : null);
   const pointers = new Map();
   let drag = null, pinch = null, moved = false, lastTap = 0;
 
@@ -99,7 +105,7 @@ export function attachWebGestures(el, deps) {
       drag = null;
     } else {
       const dc = camAt(pt.y);
-      drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc };
+      drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: liftAt(pt.x, pt.y) };
     }
   };
   const move = (e) => {
@@ -123,6 +129,11 @@ export function attachWebGestures(el, deps) {
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
       clampCamera(c, W, zoomCap(c), yf);
       moved = true; if (deps.live) deps.live(); schedule(); return;
+    }
+    if (drag && drag.lift) {
+      if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
+      drag.lift(pt.y);
+      if (deps.live) deps.live(); schedule(); return;
     }
     if (drag) {
       const c = drag.cam;
@@ -148,7 +159,11 @@ export function attachWebGestures(el, deps) {
   const up = (e) => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = null;
-    if (drag && !moved) {
+    if (drag && drag.lift) {
+      // a tap on the track jumps there; never a web tap, never a double-tap zoom
+      if (!moved) { drag.lift(loc(e).y); schedule(); }
+      lastTap = 0;
+    } else if (drag && !moved) {
       const pt = loc(e);
       const now = Date.now();
       if (now - lastTap < 300) { handlers().doubleTap(pt.x); lastTap = 0; }

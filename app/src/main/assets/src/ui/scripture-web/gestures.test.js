@@ -41,7 +41,7 @@ function pointerEvent(type, opts) {
 
 /** Wires attachWebGestures onto `el` with a real, zoomed-in camera (fit-to-
  * width leaves no room to pan, so panning tests need to be zoomed past it). */
-function attach(el) {
+function attach(el, extra = {}) {
   const cam = createCamera(1000);
   clampCamera(cam, 1000, 4000);   // seeds ppv at fit-to-width
   cam.ppv = 10;                   // zoom in — now there is room to pan
@@ -53,10 +53,62 @@ function attach(el) {
     loc: (e) => ({ x: e.clientX, y: e.clientY }),
     dpr: () => view.DPR, cam: () => cam, view: () => view,
     handlers: () => handlers, schedule, maxZoom: () => 4000,
-    clampCamera, zoomAbout, xToVerse,
+    clampCamera, zoomAbout, xToVerse, ...extra,
   });
   return { detach, cam, view, handlers, schedule };
 }
+
+describe('the elevator (landing 14): a pointer down on the track drives the lift, not the pan, and never taps the web', () => {
+  // deps.lift answers a function of y for x >= 976 (the right 24 px), null elsewhere
+  const lifted = [];
+  const lift = (x, _y) => (x >= 976 ? (yy) => { lifted.push(yy); } : null);
+
+  it('a drag that starts on the track lifts at every move and does not pan x; the finger lifting is not a tap', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    lifted.length = 0;
+    const { cam, handlers } = attach(root, { lift });
+    const before = cam.x;
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 990, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 990, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 900, clientY: 100 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 900, clientY: 100 }));
+    expect(lifted).toEqual([200, 100]);
+    expect(cam.x).toBe(before);
+    expect(handlers.tap).not.toHaveBeenCalled();
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+  });
+
+  it('a tap on the track lifts once, and a second tap on it is not a double-tap zoom', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    lifted.length = 0;
+    const { handlers } = attach(root, { lift });
+    for (let i = 0; i < 2; i++) {
+      root.dispatchEvent(pointerEvent('pointerdown', { clientX: 990, clientY: 150 }));
+      root.dispatchEvent(pointerEvent('pointerup', { clientX: 990, clientY: 150 }));
+    }
+    expect(lifted).toEqual([150, 150]);
+    expect(handlers.tap).not.toHaveBeenCalled();
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL: off the track the web pans and taps as before', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    lifted.length = 0;
+    const { cam, handlers } = attach(root, { lift });
+    const before = cam.x;
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 40, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 140, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 140, clientY: 300 }));
+    expect(cam.x).not.toBe(before);
+    expect(lifted).toEqual([]);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 400, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 400, clientY: 300 }));
+    expect(handlers.tap).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('SW_CHROME_SELECTOR / isChromeTarget', () => {
   it('matches every declared chrome surface, including nested controls', () => {
