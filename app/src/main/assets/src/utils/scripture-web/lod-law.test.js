@@ -314,7 +314,7 @@ describe('landing 6 (Corbin, 2026-09-21 21:21: "I want to be able to see all the
     expect(drawn.length).toBeLessThan(anchored.length + 200);
   });
 
-  it('nothing hidden at a foot: the badge cells count 0 hidden at every zoom (the pills vanish)', () => {
+  it('nothing hidden at a foot: the badge cells count 0 hidden at every zoom (the pill shows the convergence count instead, past 6x)', () => {
     for (const zoom of [1, 12, 400]) {
       const cam = camAt(zoom);
       const view = { width: W, density: 'famous', level: levelAt(cam) };

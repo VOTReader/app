@@ -1374,13 +1374,20 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     ctx.fillText(text, cx, cy + fs * 0.05);
     return box;
   };
-  // foot bundles: under the baseline's feet, above the ruler's numerals
+  // foot bundles: under the baseline's feet, above the ruler's numerals.
+  // While the law hides threads the pill says "+n" (n not drawn); at rest,
+  // with every line drawn (landing 6), it says how many converge here -
+  // Corbin (2026-09-21 21:21): "a count for how many lines are converging
+  // on a single spot" is kept. Past the overview only (6x, localize > 0),
+  // and only where two or more meet.
+  const lawOn = view.level > LOD_OFF + 1;
   const cy = baseY + fs * 0.95;
   for (const cell of bundles.cells) {
-    if (!(cell.hidden > 0)) continue;
+    const n = lawOn ? cell.hidden : (view.localize > 0 ? cell.drawn + cell.hidden : 0);
+    if (!(lawOn ? n > 0 : n > 1)) continue;
     const cx = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
     const wCell = (cell.hi - cell.lo + 1) * ppv;
-    const text = '+' + fmtCount(cell.hidden);
+    const text = (lawOn ? '+' : '') + fmtCount(n);
     if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
     const box = pill(text, cx, cy, false);
     if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
@@ -1713,7 +1720,9 @@ function TipChip({ info, viewport }) {
         <React.Fragment>
           <div className="sw-tip-eyebrow">Bundle</div>
           <div className="sw-tip-ref">{s.label}</div>
-          <div className="sw-tip-meta">{s.hidden.toLocaleString()} of {s.connections.toLocaleString()} connections not drawn here · tap to open</div>
+          <div className="sw-tip-meta">{s.hidden > 0
+            ? s.hidden.toLocaleString() + ' of ' + s.connections.toLocaleString() + ' connections not drawn here'
+            : s.connections.toLocaleString() + ' connections converge here'} · tap to open</div>
         </React.Fragment>
       )}
     </div>
@@ -1788,8 +1797,10 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' \u00b7 ' + info.joins : info.joins)
     : info.kind === 'bundle'
-      ? info.connections.toLocaleString() + ' connections here, ' + info.hidden.toLocaleString()
-        + ' not drawn at this zoom. Choose where they go to see them.'
+      ? (info.hidden > 0
+        ? info.connections.toLocaleString() + ' connections here, ' + info.hidden.toLocaleString()
+          + ' not drawn at this zoom. Choose where they go to see them.'
+        : info.connections.toLocaleString() + ' connections converge here. Choose where they go to follow them.')
     : info.kind === 'chapter'
       ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
       : info.connections.toLocaleString() + ' connections';
@@ -2029,7 +2040,10 @@ function summaryOf(found) {
   }
   if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
   if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
-  if (found.kind === 'bundle') return found.label + ', ' + found.hidden + ' connections not drawn here.';
+  if (found.kind === 'bundle') {
+    return found.label + ', ' + (found.hidden > 0
+      ? found.hidden + ' connections not drawn here.' : found.connections + ' connections converge here.');
+  }
   return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
 }
 
