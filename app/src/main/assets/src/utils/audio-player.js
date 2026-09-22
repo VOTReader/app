@@ -2465,6 +2465,25 @@ function seek(seconds) {
     return;
   }
   const max = _state.duration || _el.duration || 0;
+  if (!(max > 0) && _state.queue[_state.qi] && seconds > 0) {
+    /* A TRACK WITH NO METADATA YET HAS NO CEILING, and 0 is not one. Every new
+       src leaves duration NaN until loadedmetadata, so a seek in that window —
+       a search landing whose reader pressed Listen inside the flash, the
+       read-along seekTo firing as the chapter's timings arrive — used to clamp
+       to Math.min(seconds, 0) and play the chapter from its top: the same
+       wrong-answer-for-no-answer the no-element branch above refuses. The
+       deferred seek is _seekOnMetadata's job (the clock carries the intent now,
+       the element takes it when metadata lands, a later start voids it); the
+       element applies the real ceiling itself. Found by the flake hunt: the
+       read-along test for this passed only on a stale duration an earlier test
+       left on the shared element. */
+    _seekOnMetadata(seconds);
+    _syncMediaSessionPosition();
+    _syncNative();
+    _lastPersistSec = _lastTick;
+    _persist();
+    return;
+  }
   const t = Math.max(0, Math.min(seconds || 0, max || 0));
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }
   _state.time = t;

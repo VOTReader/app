@@ -30,7 +30,12 @@ class FakeAudio extends EventTarget {
     this.preload = ''; this.error = null; this.defaultPlaybackRate = 1; this.playbackRate = 1;
   }
   get src() { return this._src; }
-  set src(v) { this._src = v; this.currentTime = 0; this.readyState = 0; this.playbackRate = this.defaultPlaybackRate; }
+  // A new src forgets the old recording's length, as a real element does: duration
+  // is NaN until loadedmetadata. The fake used to keep the last test's 600 s, so
+  // every test after the first seeked against a ceiling the new track never had
+  // (the flake hunt: 'a landing set BEFORE the recording loads' failed whenever
+  // it ran FIRST, --sequence.shuffle --sequence.seed=1, and passed on leftovers).
+  set src(v) { this._src = v; this.currentTime = 0; this.duration = NaN; this.readyState = 0; this.playbackRate = this.defaultPlaybackRate; }
   play() { this.paused = false; this.readyState = 4; return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() {}
@@ -105,6 +110,9 @@ describe('seekTo — a landing seeks the loaded recording to the landing place',
     render(<BibleHost bookId="genesis" chapter={1} verses={VERSES} seekTo="bible:genesis:1:3" />);
     playChapter('genesis', 1);
     expect(AudioPlayer.getState().time).toBe(WOP.genesis[1][2] / 100);
+    // No metadata yet, so no ceiling: the element takes the landing when it arrives.
+    act(() => { const el = FakeAudio.last; el.duration = 600; el.readyState = 1; el.dispatchEvent(new Event('loadedmetadata')); });
+    expect(FakeAudio.last.currentTime).toBe(WOP.genesis[1][2] / 100);
   });
 
   it('a landing on a chapter that is NOT the loaded track moves no clock', () => {
