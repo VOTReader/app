@@ -33,6 +33,17 @@
    picker applies the same test (`flyOverGLSL`; arcAnchored + flyOverDim).
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * THE LENS (structure-law.md, landing 10; Corbin 2026-09-21: every line
+ * drawn, and "someway somehow navigate them and understand them"). Past
+ * LOCALIZE_START, with nothing tapped, the chapter under the frame's centre
+ * is at full ink and every other thread at this share of its alpha: still
+ * drawn, still tappable, still counted, never summed into a wall. Panning
+ * slides the lens; a tap takes over (the tap's own 0.05 dim); Reset clears.
+ * The one taste number of the lens; 1 turns it off.
+ */
+export const LENS_CONTEXT = 0.35;
+
 /** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
 export const LOCALIZE_START = 6;
 export const LOCALIZE_END = 24;

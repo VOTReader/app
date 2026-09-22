@@ -28,7 +28,7 @@
 
 import {
   arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
@@ -70,6 +70,8 @@ uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (dep
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
+uniform vec2  uLens;         // the lens: the chapter under the frame's centre (lo > hi = none)
+uniform float uLensDim;      // what the rest of the web keeps of its alpha under the lens
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
@@ -137,6 +139,13 @@ void main(){
   // the dome must not blank the picture the reader is looking at.
   float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
   float dim = mix(1., mix(.05, 1., lit), focusing);
+  // the lens (structure-law.md, landing 10): with nothing tapped, past the
+  // overview the chapter under the frame's centre is at full ink and the
+  // rest at uLensDim - still drawn, still tappable, never summed into a wall
+  float la = step(uLens.x, a)*step(a, uLens.y);
+  float lb = step(uLens.x, b)*step(b, uLens.y);
+  float lensOn = (uLens.x <= uLens.y) ? 1. : 0.;
+  dim *= mix(1., mix(uLensDim, 1., max(la, lb)), lensOn*(1. - focusing));
   float bright = max(spot, hovered);
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
@@ -239,7 +248,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uFocusRange2']) {
+    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -357,7 +366,9 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string,
-     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number}} v
+     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
+     *   lens?:(number[]|null)}} v
+     *   lens: pick.lensRange(); the chapter under the frame's centre, lit while nothing is tapped
      */
     draw(v) {
       if (lost) return lastStats;
@@ -387,6 +398,9 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uLightness, v.light ? 0.72 : 1);
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
+      if (v.lens) gl.uniform2f(U.uLens, v.lens[0], v.lens[1]);
+      else gl.uniform2f(U.uLens, 1, 0);
+      gl.uniform1f(U.uLensDim, LENS_CONTEXT);
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);

@@ -55,7 +55,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
-        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX });
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -450,6 +450,39 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(lastCamY()).toBe(0);
       expect(shownCamY(container)).toBe(0);
+    });
+  });
+
+  describe('the lens (landing 10): past the overview the chapter under the centre is published and handed to the renderer', () => {
+    const pressFrame = async (key) => {
+      fireEvent.keyDown(document.querySelector('.sw-root'), { key });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    };
+    const shownLens = (container) => container.querySelector('.sw-root').getAttribute('data-lens');
+
+    it('CONTROL: at the overview there is no lens - data-lens empty, the draw carries null', async () => {
+      const { container } = await mount();
+      expect(zoomText(container)).toBe('Overview');
+      expect(shownLens(container)).toBe('');
+      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
+    });
+
+    it('at the ceiling the lens is the chapter under the centre (the one chapter here): published as "lo-hi" and drawn', async () => {
+      const { container } = await mount();
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(zoomText(container)).toBe('1711x');
+      expect(shownLens(container)).toBe('0-' + (CANON - 1));
+      expect(DRAWN[DRAWN.length - 1].lens).toEqual([0, CANON - 1]);
+    });
+
+    it('My Web has no lens: switching at the ceiling clears data-lens and the draw carries null', async () => {
+      const { container } = await mount();
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(shownLens(container), 'precondition: lit on the canon web').toBe('0-' + (CANON - 1));
+      fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(shownLens(container)).toBe('');
+      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
     });
   });
 });

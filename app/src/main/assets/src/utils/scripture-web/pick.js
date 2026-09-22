@@ -25,7 +25,7 @@
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
-  FLYOVER_MARGIN,
+  FLYOVER_MARGIN, LOCALIZE_START,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 
@@ -398,6 +398,28 @@ export function refOfVerse(g, verseId) {
     chapterIndex: ci,
     label: `${book.title} ${ch[1]}:${verse}`,
   };
+}
+
+/**
+ * The lens: the chapter under the frame's centre, as a verse range, once the
+ * reader is past the overview (LOCALIZE_START x fit); null at the overview,
+ * where the dome is the picture. The shader lights this range at full ink
+ * and dims the rest to LENS_CONTEXT while nothing is tapped.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {number} width - device px
+ * @returns {[number, number]|null}
+ */
+export function lensRange(g, cam, width) {
+  if (!g || !g.chapters || !g.chapters.length || !g.chapterOfVerse || !(width > 0) || !(cam.ppv > 0)) return null;
+  const zoom = cam.ppv / (width / cam.total);
+  if (!(zoom >= LOCALIZE_START)) return null;
+  const v = Math.floor(xToVerse(cam, width, width / 2));
+  if (!(v >= 0) || v >= g.total) return null;
+  const ci = g.chapterOfVerse[v];
+  if (!(ci >= 0) || ci >= g.chapters.length) return null;
+  return chapterRange(g, ci);
 }
 
 /**

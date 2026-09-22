@@ -28,7 +28,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, visibleArcs, threadEnds, footBundles, bundleGroups,
+  arcsTouching, visibleArcs, threadEnds, footBundles, bundleGroups, lensRange,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -479,10 +479,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // height carried over from the canon web is dropped here, not drawn —
     // before the attribute below, so the published height is the drawn one.
     if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
+    // the lens (landing 10): the chapter under the frame's centre, lit at
+    // full ink past the overview while nothing is tapped; the rest keeps
+    // LENS_CONTEXT of its alpha (drawn, tappable, counted). My Web has none.
+    const lens = mode === 'personal' ? null : lensRange(g, cam, v.W);
     if (wrapRef.current) {
       wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
       // the camera's height, device px, for the walks (0 at the baseline)
       wrapRef.current.setAttribute('data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
+      wrapRef.current.setAttribute('data-lens', lens ? lens[0] + '-' + lens[1] : '');
     }
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
@@ -496,7 +501,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       r.draw(Object.assign({}, base, {
         camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
         colorMode: 'distance', density: 'essential', light: chrome.isLight, bg: chrome.bg,
-        focusRange: null, focusArc: -1, hoverArc: -1,
+        focusRange: null, focusArc: -1, hoverArc: -1, lens: null,
       }));
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
@@ -534,6 +539,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     r.draw(Object.assign({}, base, {
+      lens,
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,
