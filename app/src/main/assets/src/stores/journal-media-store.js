@@ -194,6 +194,15 @@ export var JournalMediaStore = (function() {
       try { URL.revokeObjectURL(victim); } catch (_e) { /* best-effort */ }
     }
   }
+  /** Revoke every cached URL and empty the cache; returns how many it held. */
+  function _dropUrls() {
+    var n = _urlCache.size;
+    _urlCache.forEach(function(url) {
+      try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
+    });
+    _urlCache.clear();
+    return n;
+  }
   function _touchUrl(id) {
     var url = _urlCache.get(id);
     _urlCache.delete(id);
@@ -227,6 +236,11 @@ export var JournalMediaStore = (function() {
         db.onversionchange = function() {
           try { db.close(); } catch (_e) { /* best-effort close */ }
           if (_dbPromise === p) _dbPromise = null;
+          // Clear All deletes this database under us. The cached URLs go with it:
+          // each pins a blob that no longer exists and objectUrl() would keep
+          // handing it out for an id that is gone. An upgrade loses nothing by
+          // this either; objectUrl() re-creates on the next miss.
+          _dropUrls();
         };
         resolve(db);
       };
@@ -303,10 +317,7 @@ export var JournalMediaStore = (function() {
           cursor.continue();
         };
         transaction.addEventListener('complete', function() {
-          _urlCache.forEach(function(url) {
-            try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
-          });
-          _urlCache.clear();
+          _dropUrls();
           resolve();
         });
         guardTx(live, reject);
@@ -614,12 +625,7 @@ export var JournalMediaStore = (function() {
      * @returns {number}
      */
     releaseObjectUrls: function() {
-      var n = _urlCache.size;
-      _urlCache.forEach(function(url) {
-        try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
-      });
-      _urlCache.clear();
-      return n;
+      return _dropUrls();
     },
 
     /**

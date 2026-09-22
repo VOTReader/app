@@ -853,6 +853,10 @@ describe('JournalMediaStore connection lifecycle', () => {
 
     await JournalMediaStore.put({ id: 'after-clear', type: 'audio', blob: makeBlob(4, 'audio/webm') });
     expect(await JournalMediaStore.get('before-clear')).toBeNull();
+    // The URL cache goes with the database: a URL cached before Clear All pins a
+    // blob that no longer exists and would be handed out for an id that is gone
+    // (and outlive every per-test reset, which deletes only ids still stored).
+    expect(await JournalMediaStore.objectUrl('before-clear')).toBeNull();
     expect((await JournalMediaStore.get('after-clear')).type).toBe('audio');
   });
 });
