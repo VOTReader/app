@@ -267,11 +267,12 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               // its count, the registry's description where the edition has
               // one, and the reader when the manifest names one (only TSOT's
               // rows carry a reader code today; the others say how they read).
+              const description = /** @type {{ description?: string }} */ (edition).description || '';
               const parts = [books ? books + (books === 1 ? ' book' : ' books') : 'Read chapter by chapter'];
-              if (edition.description) parts.push(edition.description);
+              if (description) parts.push(description);
               const reader = audioReaderLabel(bibleReaderCode(edition.volKey));
               if (reader) parts.push(reader);
-              else if (!edition.description && books) parts.push('chapter by chapter');
+              else if (!description && books) parts.push('chapter by chapter');
               return (
                 <button key={edition.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(edition.volKey)}>
                   <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
