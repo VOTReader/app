@@ -535,11 +535,12 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
 
   it('a cached study doc without studyChapterId resolves the chapter by number through the loaded studies', () => {
     const { result, props } = setup();
-    const prev = globalThis.BIBLE_STUDIES;
-    globalThis.BIBLE_STUDIES = [{ id: 'purity', slug: 'purity', chapters: [{ id: 'purity-ch1', num: 1 }, { id: 'purity-ch2', num: 2 }] }];
+    const g = /** @type {any} */ (globalThis);
+    const prev = g.BIBLE_STUDIES;
+    g.BIBLE_STUDIES = [{ id: 'purity', slug: 'purity', chapters: [{ id: 'purity-ch1', num: 1 }, { id: 'purity-ch2', num: 2 }] }];
     try {
       act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 2 } }); });
-    } finally { if (prev === undefined) delete globalThis.BIBLE_STUDIES; else globalThis.BIBLE_STUDIES = prev; }
+    } finally { if (prev === undefined) delete g.BIBLE_STUDIES; else g.BIBLE_STUDIES = prev; }
     expect(props.setStudyChapterId).toHaveBeenCalledWith('purity-ch2');
     expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
   });
