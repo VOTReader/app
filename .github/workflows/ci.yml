@@ -387,6 +387,14 @@ jobs:
         # Runs after `npm run build` so it measures freshly-built output.
         run: npm run check:bundle-budget
 
+      - name: Verify the Scripture Web frame-time budget is measured and met (S22)
+        # tools/perf/s22-frame-time.json is the phone's own measurement
+        # (median / p90 rAF gap at fit, ~12x, the ceiling, panned up) with a
+        # hash of the Scripture Web source it speaks for. CI has no phone: this
+        # fails when the source moved without a fresh `npm run measure:s22`,
+        # or when a scene is over budget (median 17 / p90 20 ms).
+        run: npm run check:s22
+
       - name: Verify the type scale (one ladder, no literal font-sizes)
         # Every font-size must name a --fs-N / --fsc-N token defined once in
         # app.css :root, so Settings -> Text Size moves ALL type together and

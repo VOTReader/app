@@ -37,6 +37,8 @@
     "check:type-scale": "node tools/check-type-scale.js",
     "check:css-tokens": "node tools/check-css-tokens.js",
     "check:bundle-budget": "node tools/check-bundle-budget.js",
+    "check:s22": "node tools/check-s22-frame-time.js",
+    "measure:s22": "node tools/measure-s22-frame-time.mjs",
     "check:runtime-assets": "node tools/list-runtime-src-assets.js --check",
     "check:live": "node tools/check-live-version.js",
     "check:search-index": "node tools/check-search-index-version.js --check",
