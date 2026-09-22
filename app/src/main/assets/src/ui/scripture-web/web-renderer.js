@@ -27,7 +27,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, lodGLSL, strataGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat, spanLogOf,
+  arcShapeGLSL, flyOverGLSL, lodGLSL, segmentsFor, CLIP_MARGIN,
   STROKE_MIN_CSS, STROKE_DEEP_CSS, LOD_OFF, STANDIN_MAX,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
@@ -62,7 +62,7 @@ export const DENSITY_STEPS = ['essential', 'famous'];
 const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
-uniform float uCamX, uPPV, uBase, uCeil, uSquash, uLocalize;
+uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
 uniform float uCamY;         // the picture's shift down the frame, device px
 uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
@@ -83,25 +83,17 @@ out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
 ${lodGLSL}
-${strataGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
-  float x0 = (a - uCamX)*uPPV + uRes.x*.5;
-  float x1 = (b - uCamX)*uPPV + uRes.x*.5;
+  // each foot stands in its verse's own cell, in the order of its far end
+  // (geometry.footX; the picker computes the same)
+  float x0 = (a + .5 + aFanA - uCamX)*uPPV + uRes.x*.5;
+  float x1 = (b + .5 + aFanB - uCamX)*uPPV + uRes.x*.5;
   float rx = (x1 - x0)*.5;
-  float cx = x0 + rx;
-  float r = max(rx, 0.);
-  float left = cx - r, right = cx + r;
-  float spanLog = log(max(abs(b - a), 1.))/log(max(uTotal, 2.));
-  // one shape per FOOT: its rank sets its quarter; A is the same at both
-  vec2 shL = arcShape(rx, uCeil, uSquash, uLocalize, spanLog, aFanA);
-  vec2 shR = arcShape(rx, uCeil, uSquash, uLocalize, spanLog, aFanB);
-  float RL = shL.x, RR = shR.x, A = shL.y;
-  // parameter length, in units of the mean quarter: geometry.arcParamLength
-  float Rm = (RL + RR)*.5;
-  float P = 3.14159265 + (Rm > 0. ? max(0., (2.*r - RL - RR)/Rm) : 0.);
-  float bow = ${glslFloat(DOME)}*uLocalize;
+  float left = x0, right = x0 + 2.*max(rx, 0.);
+  // the structure law: the half-ellipse of its own span, at every zoom
+  float A = arcShape(rx, uSquash).y;
 
   // The piece worth tessellating. At overview this is the whole arc, so the 1x
   // frame cannot move; as the reader localizes it closes onto the viewport,
@@ -117,14 +109,11 @@ void main(){
   int vid = gl_VertexID;
   float t = float(vid >> 1) / uSegments;
   float side = float(vid & 1)*2. - 1.;
-  float tau = mix(arcTau(lo, left, right, RL, RR, P), arcTau(hi, left, right, RL, RR, P), t);
+  float tau = mix(arcTau(lo, left, right), arcTau(hi, left, right), t);
   float px, hgt; vec2 tgv;
-  arcAt(tau, left, right, RL, RR, A, P, bow, px, hgt, tgv);
-  // the strata: a thread whose feet have both left the frame rises into its
-  // band as one piece (the density law, part 3); pick.js lifts the same
-  float lift = strataLift(abs(b - a), uTotal, x0, x1, uRes.x, uCeil, uLocalize);
+  arcAt(tau, left, right, A, px, hgt, tgv);
   // the baseline draws uCamY below the frame's base; pick.js adds the same
-  vec2 p = vec2(px, uBase + uCamY - hgt - lift);
+  vec2 p = vec2(px, uBase + uCamY - hgt);
   vec2 tg = normalize(tgv + vec2(1e-6, 0.));
 
   // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
@@ -172,10 +161,10 @@ void main(){
   shown = max(shown, standIn);
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
-  // overhead recede so the local weave is legible instead of fogged. At FULL
-  // depth they are culled outright — the tanh ceiling flattens every big
-  // arc's apex to the same height, so hundreds of fly-overs otherwise stack
-  // into horizontal smears across the view (the on-device report).
+  // overhead recede (to FLYOVER_FLOOR, never to nothing) so the local weave
+  // is legible instead of fogged; under the structure law a fly-over's body
+  // is up in the sky at its own span's height, never a level run over the
+  // passage.
   // The law lives in geometry.js, inlined above, because pick.js applies the
   // same test — an arc faded to nothing here must not win a tap there.
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uLocalize);
@@ -270,7 +259,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.useProgram(program);
 
   const U = {};
-  for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uCeil', 'uSquash',
+  for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential', 'uFocusRange2', 'uStandIns']) {
@@ -417,7 +406,6 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uCamY, v.camY > 0 ? v.camY : 0);
       gl.uniform1f(U.uPPV, v.ppv);
       gl.uniform1f(U.uBase, v.base);
-      gl.uniform1f(U.uCeil, v.ceil);
       gl.uniform1f(U.uSquash, v.squash);
       gl.uniform1f(U.uLocalize, v.localize);
       gl.uniform1f(U.uWidth, v.strokeWidth);
@@ -456,7 +444,7 @@ export function createRenderer(canvas, graph, opts = {}) {
         if (count <= 0) continue;
         // Segments from what this bucket can put ON SCREEN, not from its span.
         const segments = segmentsFor(bucket.segments, v.localize,
-          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, spanLogOf(bucketMaxSpan[bi], graph.total));
+          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, v.squash);
         gl.uniform1f(U.uSegments, segments);
         const verts = 2 * (segments + 1);
         // Walk chunks, coalescing adjacent visible ones into single draws.

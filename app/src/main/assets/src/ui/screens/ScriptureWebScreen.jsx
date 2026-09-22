@@ -24,14 +24,13 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, levelOf, STRATA_BOUNDS, LOD_OFF,
+  maxZoomFor, ribbonStyle, LOD_OFF,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
   arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers, bodyMidpoint,
-  strataCounts, standInsFor,
+  standInsFor,
 } from '../../utils/scripture-web/pick.js';
-import { DISTANCE_RAMP } from '../../utils/scripture-web/palette.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
@@ -385,11 +384,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // below base and the picker reads the same off the camera
       camY: cam.y > 0 ? cam.y : 0,
       density, rulerDepth: f.ruler,
-      // the density law's level (geometry.levelOf): the shader and the hit
-      // test both read it. Corbin (2026-09-21 21:21): every line at rest;
-      // the fly-over representatives stand in only in the panned-up sky, so
-      // the level is LOD_OFF until the camera has a height
-      level: cam.y > 0 ? levelOf(cam.ppv / (v.DPR || 1), cam.total) : LOD_OFF,
+      // the density law is OFF at every camera (the structure law, 2026-09-21:
+      // every line is drawn, the sky is sparse by geometry); the shader and
+      // the hit test both read LOD_OFF
+      level: LOD_OFF,
       focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
       focusRange2: focusRef.current.range2 || null,
       // this frame's stand-ins (the bundle pass names them; the shader and the
@@ -568,11 +566,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
     const tb = topbarRef.current;
     const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * v.DPR : 0;
-    // the strata's legend, once the reader has panned up into them (part 3);
-    // drawn first so the labels and badges keep off its box - and off the
-    // ruler's chapter numerals (the hub, 2026-09-21: "106" over "Ps 104:10")
-    const legendBox = cam.y > 0 ? drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome) : null;
-    const reserved = (legendBox ? [legendBox] : []).concat(numerals || []);
+    // the labels and badges keep off the ruler's chapter numerals (the hub,
+    // 2026-09-21: "106" over "Ps 104:10")
+    const reserved = (numerals || []).slice();
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
     badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, bundles);
@@ -1412,59 +1408,6 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   return boxes;
 }
 
-/* ── the strata legend (the density law, part 3) ─────────────────────────
-   Panned up, the sky is four bands - nearby, book-, testament-, canon-scale
-   - and the legend under the chrome names them top-down with the Canon
-   ramp's colour at each band's middle span, how many fly-over threads cross
-   the frame in that band and how many of them are drawn (their groups'
-   representatives). Drawn only while cam.y > 0: at the overview there is no
-   sky. */
-function rampColorAt(span, total) {
-  const t = Math.pow(Math.max(span, 1) / Math.max(total, 2), 0.4);
-  const n = DISTANCE_RAMP.length - 1;
-  const f = Math.max(0, Math.min(n, t * n));
-  const i = Math.floor(f), j = Math.min(n, i + 1), u = f - i;
-  const c = DISTANCE_RAMP[i].map((v, k) => v + (DISTANCE_RAMP[j][k] - v) * u);
-  return 'rgb(' + c.map((v) => Math.round(v * 255)).join(',') + ')';
-}
-
-function drawStrataLegend(canvas, g, cam, view, v, chrome) {
-  if (!canvas || !g || !g.count) return null;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const DPR = v.DPR;
-  const fs = BADGE_FONT_CSS * DPR;
-  const rows = strataCounts(g, cam, view);
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const x = 14 * DPR;
-  let y = (view.inset > 0 ? view.inset : 0) + fs * 1.4;
-  ctx.save();
-  ctx.font = fs + 'px Georgia,serif';
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  ctx.lineJoin = 'round';
-  const y0 = y - fs * 0.8;
-  let widest = 0;
-  for (let k = rows.length - 1; k >= 0; k--) {
-    const r = rows[k];
-    const lo = k === 0 ? 1 : STRATA_BOUNDS[k - 1];
-    const hi = k === STRATA_BOUNDS.length ? g.total : STRATA_BOUNDS[k];
-    const mid = Math.sqrt(lo * hi);
-    ctx.fillStyle = rampColorAt(mid, g.total);
-    ctx.fillRect(x, y - fs * 0.22, fs * 1.6, fs * 0.44);
-    const text = r.name + ' \u00b7 ' + r.cross.toLocaleString() + ' cross here \u00b7 ' + r.shown.toLocaleString() + ' shown';
-    ctx.lineWidth = 3 * DPR;
-    ctx.strokeStyle = chrome.bg;
-    ctx.strokeText(text, x + fs * 2.2, y);
-    ctx.fillStyle = 'rgba(' + ink + ',0.85)';
-    ctx.fillText(text, x + fs * 2.2, y);
-    widest = Math.max(widest, ctx.measureText(text).width);
-    y += fs * 1.55;
-  }
-  ctx.restore();
-  return { x0: x - fs * 0.5, x1: x + fs * 2.2 + widest + fs * 0.5, y0, y1: y - fs * 0.6 };
-}
-
 /* ── the references beside the lines ────────────────────────────────────
    Corbin's brief (2026-09-11): "when zoomed close, each line shows its source
    and target beside it — the verse refs at the two feet, or at the body when
@@ -1492,7 +1435,7 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
   const gold = chrome.isLight ? '122,92,16' : '232,192,80';
   const fs = chrome.fsRuler * DPR;
-  // boxes already taken (the strata legend), so a label is never written over them
+  // boxes already taken (the ruler's numerals), so a label is never written over them
   const placed = view.reserved ? view.reserved.slice() : [];
   let drawn = 0;
   const camY = cam.y > 0 ? cam.y : 0;

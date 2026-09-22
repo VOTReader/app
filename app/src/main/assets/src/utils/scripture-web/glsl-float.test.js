@@ -99,9 +99,9 @@ describe('every constant interpolated into the GLSL templates routes through gls
     }
   });
 
-  it('is not reading an empty region: the six constants the shaders inline are all seen as sites', () => {
+  it('is not reading an empty region: the two constants the shaders inline are seen as sites (arcShapeGLSL carries none since the structure law)', () => {
     const seen = new Set(TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim())));
-    for (const want of ['FAN_FLOOR', '1 - FAN_FLOOR', 'APEX_LIFT', 'CEIL_SOFTNESS', 'FLYOVER_MARGIN', 'FLYOVER_FLOOR']) {
+    for (const want of ['FLYOVER_MARGIN', 'FLYOVER_FLOOR']) {
       expect([...seen]).toContain(want);
     }
   });

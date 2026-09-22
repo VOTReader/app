@@ -16,9 +16,9 @@
 */
 import { describe, it, expect } from 'vitest';
 import {
-  arcShape, arcHeight, spanLogOf, maxZoomFor, PPV_MAX_CSS,
-  ribbonStyle, segmentsFor, visibleWindow, localizeFactor, squashFactor, CEIL_SOFTNESS,
-  ALPHA_DEEP, arcParamLength, arcTauOf, arcPointAt, DOME,
+  arcShape, arcHeight, maxZoomFor, PPV_MAX_CSS,
+  ribbonStyle, segmentsFor, visibleWindow, localizeFactor, squashFactor,
+  ALPHA_DEEP, arcTauOf, arcPointAt, footX,
 } from './geometry.js';
 
 // design-perf's phoneLand frame, in DEVICE px (the shader's frame).
@@ -58,6 +58,8 @@ function flat10(R, A, ceilPx, widthPx) {
   return total > 0 ? flat / total : 0;
 }
 
+/** The tanh ceiling's softness: the law S1 replaced, kept only for the control below. */
+const CEIL_SOFTNESS = 1.9;
 /** The law this replaces, restated so the sampler above has a positive control. */
 const oldDeep = (rx, ceilPx) => ({
   R: rx, A: ceilPx * Math.tanh(rx / (ceilPx * CEIL_SOFTNESS)),
@@ -171,7 +173,7 @@ describe('S1 — arcs, not chords, at the ceiling', () => {
   // BEFORE on phoneLand at zoom 1,711: flat10 0.833, rise100 22 CSS px.
   const longSpan = 10000;
   const rx = rxOf(longSpan, 44);
-  const shape = () => arcShape(rx, CEIL, SQUASH, 1, spanLogOf(longSpan, TOTAL));
+  const shape = () => arcShape(rx, SQUASH);
 
   it('rises 100 CSS px within 100 CSS px of its foot (before: 22)', () => {
     const { R, A } = shape();
@@ -193,11 +195,10 @@ describe('S1 — arcs, not chords, at the ceiling', () => {
     expect(arcHeight(100 * DPR, old.R, old.A) / DPR).toBeLessThan(40);
   });
 
-  it('leaves the overview dome exactly where it was', () => {
-    // localize 0 is the whole of D2's identity claim, stated on the law.
+  it('leaves the overview dome exactly where it was: the law at depth IS the overview law (the structure law)', () => {
     for (const span of [3, 40, 900, 10000]) {
       const r = rxOf(span, 800 / TOTAL);
-      const { R, A } = arcShape(r, CEIL, SQUASH, 0, spanLogOf(span, TOTAL));
+      const { R, A } = arcShape(r, SQUASH);
       expect(R).toBe(r);
       expect(A).toBeCloseTo(r * SQUASH, 9);
     }
@@ -207,7 +208,7 @@ describe('S1 — arcs, not chords, at the ceiling', () => {
 describe('S2 — no apex smear', () => {
   it('puts a long arc apex ABOVE the frame, so nothing level is ever on screen', () => {
     const rx = rxOf(10000, 44);
-    const { A } = arcShape(rx, CEIL, SQUASH, 1, spanLogOf(10000, TOTAL));
+    const { A } = arcShape(rx, SQUASH);
     expect(A).toBeGreaterThan(CEIL);
   });
 
@@ -215,17 +216,17 @@ describe('S2 — no apex smear', () => {
     // A 3-verse arc at the ceiling is 132 CSS px wide. Its apex must stay
     // near the old law's, or every short arc leaves the frame as a needle.
     const rx = rxOf(3, 44);
-    const { A } = arcShape(rx, CEIL, SQUASH, 1, spanLogOf(3, TOTAL));
+    const { A } = arcShape(rx, SQUASH);
     const old = oldDeep(rx, CEIL).A;
     expect(A).toBeGreaterThan(old);
     expect(A).toBeLessThan(old * 1.35);
   });
 });
 
-describe('S4 — the departure fan: arcs from one foot leave at different angles', () => {
+describe('S4 — the departure fan: a verse\'s threads leave from their own slots in its cell, and spans separate by angle', () => {
   /** Slope of the drawn curve where it crosses half the frame height. */
   const slopeAtHalf = (span) => {
-    const { R, A } = arcShape(rxOf(span, 44), CEIL, SQUASH, 1, spanLogOf(span, TOTAL));
+    const { R, A } = arcShape(rxOf(span, 44), SQUASH);
     const target = CEIL / 2;
     let lo = 0;
     let hi = Math.max(R, 1);
@@ -239,124 +240,91 @@ describe('S4 — the departure fan: arcs from one foot leave at different angles
 
   it('leaves STEEPLY whatever the span, which is the half the old law lost', () => {
     // Corbin: "7 arcs per verse fan across a few pixels". Under the tanh
-    // ceiling every long arc departs at 2-8 degrees, so the fan is not that
-    // the angles are equal - it is that they are all flat. tan(30 deg) = 0.577.
+    // ceiling every long arc departed at 2-8 degrees. tan(30 deg) = 0.577.
     for (const span of [100, 3000, 30000]) {
-      expect(slopeAtHalf(span), 'span ' + span + ' slope at half height')
-        .toBeGreaterThan(0.577);
+      expect(slopeAtHalf(span), 'span ' + span + ' slope at half height').toBeGreaterThan(0.577);
     }
   });
 
-  // GUARDS THE FIX, CANNOT BE RED TODAY: the old law's R is rx, which already
-  // grows with span, so this passes on main for a reason that has nothing to
-  // do with a fan. It exists to stop a later version collapsing every long
-  // arc onto ONE quarter radius, which is the bite the spec names for S4.
-  it('and they are still DISTINGUISHABLE from each other, or there is no fan', () => {
-    const quarterFor = (span) =>
-      arcShape(rxOf(span, 44), CEIL, SQUASH, 1, spanLogOf(span, TOTAL)).R;
-    expect(quarterFor(100)).toBeLessThan(quarterFor(3000));
-    expect(quarterFor(3000)).toBeLessThan(quarterFor(30000));
-    expect(quarterFor(30000) / quarterFor(100)).toBeGreaterThan(1.5);
-    expect(slopeAtHalf(100)).toBeGreaterThan(slopeAtHalf(30000) * 1.4);
+  it('the longer the span the steeper the leg at half height, so spans separate by angle', () => {
+    expect(slopeAtHalf(100)).toBeLessThan(slopeAtHalf(3000));
+    expect(slopeAtHalf(3000)).toBeLessThan(slopeAtHalf(30000));
+  });
+
+  it('the feet: a verse\'s n threads take n slots across the verse\'s own width (footX), a lone thread its centre', () => {
+    const cam = { x: 500, ppv: 44 * DPR, total: TOTAL };
+    const lo = footX(cam, W, 500, -0.5), mid = footX(cam, W, 500, 0), hi = footX(cam, W, 500, 0.5);
+    expect(mid - lo).toBeCloseTo(cam.ppv / 2, 6);
+    expect(hi - lo).toBeCloseTo(cam.ppv, 6);
+    expect(footX(cam, W, 500, undefined)).toBe(mid);
   });
 });
 
 describe('S3 — tessellation follows the screen, not the arc', () => {
   it('is the bucket own count at overview, so 1x cannot move', () => {
-    expect(segmentsFor(48, 0, 1e9, CEIL, W, DPR)).toBe(48);
-    expect(segmentsFor(8, 0, 1e9, CEIL, W, DPR)).toBe(8);
+    expect(segmentsFor(48, 0, 1e9, CEIL, W, DPR, SQUASH)).toBe(48);
+    expect(segmentsFor(8, 0, 1e9, CEIL, W, DPR, SQUASH)).toBe(8);
     const [xa, xb] = visibleWindow(-9e5, 9e5, W, 0);
     expect(xa).toBe(-9e5);
     expect(xb).toBe(9e5);
   });
 
-  it('keeps every on-screen segment under 24 CSS px at the ceiling', () => {
-    // BEFORE: the parameter runs over the WHOLE arc, so a 10,000-verse arc at
-    // 44 px/verse spreads 48 segments over 440,000 CSS px and the piece that
-    // crosses the screen is one straight chord.
-    // Segments are spread evenly over the WINDOW, so the longest one on screen
-    // is bounded by the window's own run divided by the count - clipping the
-    // window IS what puts the samples where the reader is looking.
-    const rx = rxOf(10000, 44);
-    const [xa, xb] = visibleWindow(-rx, rx, W, 1);
-    const windowRunCss = (xb - xa + CEIL) / DPR;
-    const n = segmentsFor(48, 1, rx, CEIL, W, DPR, spanLogOf(10000, TOTAL));
-    expect(windowRunCss / n).toBeLessThanOrEqual(24);
-  });
-
   it('does not spend the whole cap on an arc 24 px wide', () => {
-    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W, DPR, spanLogOf(3, TOTAL))).toBeLessThan(24);
+    expect(segmentsFor(8, 1, rxOf(3, 44), CEIL, W, DPR, SQUASH)).toBeLessThan(24);
   });
 
-  /* The sweep. The two rules above are bounds on ONE arc on ONE frame; this
-     walks the drawn curve itself across twelve spans, three frames and three
-     zooms and measures what a reader would actually see. It is here rather
-     than in a scratch script because both numbers were MISSED at first and the
-     misses were invisible to the bounds: the 8-segment floor left 0.835 CSS px
-     of chord error on a 2-verse arc, and the old 96 cap left a 24.4 CSS px
-     segment at the desktop ceiling. Neither showed up on phoneLand. */
-  it('walks the drawn curve, with the departure fans at both extremes: no segment over 24 CSS px, no chord over 0.5', () => {
-    /* Two chord measures. The eye's is the PERPENDICULAR distance from a curve
-       point to the chord line: that is what a polyline gets wrong. The
-       same-parameter gap (curve at u against chord at u) is stricter and was
-       the only one here until the fans: with RL != RR the parameter runs at a
-       different speed on each side of a join, so a straddling segment reads
-       0.85 CSS px of "chord" on a curve that is 1 px from straight. It stays,
-       for fan 0 only, as the pin on sampling uniformity where the speed is
-       continuous. */
-    const fans = [[0, 0], [-0.5, 0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, -0.5]];
+  /* The sweep. The rules above are bounds on ONE arc on ONE frame; this walks
+     the drawn curve itself across twelve spans, three frames and three zooms
+     and measures what a reader would actually see: the PERPENDICULAR distance
+     from a curve point to its chord (what a polyline gets wrong), never over
+     CHORD_TOL_CSS on any on-screen segment; and on an arc the frame holds
+     whole, no segment over 24 CSS px. A leg steeper than the frame is straight
+     to within a pixel, so its segments may be long: only the chord bounds it. */
+  it('walks the drawn curve: no chord over 0.5 CSS px on screen at any zoom; no segment over 24 CSS px on an arc the frame holds whole', () => {
     const frames = [
       { name: 'phoneLand', wCss: 800, dpr: 2, ceilCss: 256 },
       { name: 'phone375', wCss: 375, dpr: 3, ceilCss: 413 },
       { name: 'desktop1920', wCss: 1920, dpr: 1, ceilCss: 950 },
     ];
     const spans = [1, 2, 3, 5, 10, 30, 100, 300, 1000, 3000, 10000, 31101];
+    let whole = 0, legs = 0;
     for (const f of frames) {
       const wPx = f.wCss * f.dpr;
       const ceilPx = f.ceilCss * f.dpr;
       const squash = squashFactor(ceilPx, wPx);
-      // S3 is stated "at every zoom >= 40". 1x is excluded on purpose: D2
-      // requires the overview frame to be pixel-identical, so its tessellation
-      // is today's by construction and reads 26-63 CSS px per segment.
       for (const zoom of [40, 400, maxZoomFor(TOTAL, f.wCss)]) {
         const localize = localizeFactor(zoom);
         const ppv = (wPx / TOTAL) * zoom;
-        for (const span of spans) for (const [fa, fb] of fans) {
+        for (const span of spans) {
           const rx = (span * ppv) / 2;
-          const sl = spanLogOf(span, TOTAL);
-          const { R: RL, A } = arcShape(rx, ceilPx, squash, localize, sl, fa);
-          const { R: RR } = arcShape(rx, ceilPx, squash, localize, sl, fb);
-          if (!(RL > 0) || !(A > 0)) continue;
+          const { A } = arcShape(rx, squash);
+          if (!(rx > 0) || !(A > 0)) continue;
           const left = wPx / 2;             // a foot mid-screen: the reader's case
           const right = left + 2 * rx;
-          const P = arcParamLength(rx, RL, RR);
-          const bow = DOME * localize;
           const [lo, hi] = visibleWindow(left, right, wPx, localize);
-          const tA = arcTauOf(lo, left, right, RL, RR, P);
-          const tB = arcTauOf(hi, left, right, RL, RR, P);
-          const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr, sl);
-          const where = `${f.name} z${Math.round(zoom)} span${span} fans ${fa}/${fb} n${n}`;
+          const tA = arcTauOf(lo, left, right);
+          const tB = arcTauOf(hi, left, right);
+          const n = segmentsFor(48, localize, rx, ceilPx, wPx, f.dpr, squash);
+          const held = A <= ceilPx && 2 * rx <= wPx;
+          if (held) whole++; else legs++;
+          const where = `${f.name} z${Math.round(zoom)} span${span} n${n}`;
           for (let i = 0; i < n; i++) {
-            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, RL, RR, A, P, bow);
-            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, RL, RR, A, P, bow);
+            const p0 = arcPointAt(tA + ((tB - tA) * i) / n, left, right, A);
+            const p1 = arcPointAt(tA + ((tB - tA) * (i + 1)) / n, left, right, A);
             if ((p0.h > ceilPx && p1.h > ceilPx) || (p0.x > wPx && p1.x > wPx)) continue;
             const dx = p1.x - p0.x, dh = p1.h - p0.h, len = Math.hypot(dx, dh);
-            expect(len / f.dpr, where + ' segment').toBeLessThanOrEqual(24);
+            if (held) expect(len / f.dpr, where + ' segment').toBeLessThanOrEqual(24);
             for (let k = 1; k < 16; k++) {
               const u = k / 16;
-              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, RL, RR, A, P, bow);
+              const m = arcPointAt(tA + ((tB - tA) * (i + u)) / n, left, right, A);
               const perp = len > 0 ? Math.abs((m.x - p0.x) * dh - (m.h - p0.h) * dx) / len : Math.hypot(m.x - p0.x, m.h - p0.h);
               expect(perp / f.dpr, where + ' chord (perpendicular)').toBeLessThanOrEqual(0.5);
-              if (fa === 0 && fb === 0) {
-                const cx = p0.x + dx * u;
-                const ch = p0.h + dh * u;
-                expect(Math.hypot(m.x - cx, m.h - ch) / f.dpr, where + ' chord (same parameter)')
-                  .toBeLessThanOrEqual(0.5);
-              }
             }
           }
         }
       }
     }
+    expect(whole).toBeGreaterThan(20);
+    expect(legs).toBeGreaterThan(20);
   });
 });

@@ -229,18 +229,10 @@ describe('visible equals pickable', () => {
     const hidden = fly.find((i) => !drawn.has(i) && pick.bodyMidpoint(graph, cam, Object.assign({}, v, { level: undefined }), i));
     expect(hidden).toBeDefined();
     const ends = pick.threadEnds(graph, cam, Object.assign({}, v, { level: undefined }), hidden);
-    // apex of the hidden thread, from the law itself (no LOD in this view)
-    const x0 = geo.verseToX(cam, W, graph.from[hidden]), x1 = geo.verseToX(cam, W, graph.to[hidden]);
-    const mid = (x0 + x1) / 2;
-    const { fanA, fanB } = dec.fansOf(graph);
-    const rx = (x1 - x0) / 2;
-    const sl = geo.spanLogOf(Math.abs(graph.to[hidden] - graph.from[hidden]), graph.total);
-    const sL = geo.arcShape(rx, v.ceil, v.squash, v.localize, sl, fanA[hidden]);
-    const sR = geo.arcShape(rx, v.ceil, v.squash, v.localize, sl, fanB[hidden]);
-    const h = geo.arcHeightAt(mid, Math.min(x0, x1), Math.max(x0, x1), sL.R, sR.R, sL.A, geo.DOME * v.localize);
-    const lift = geo.strataLift(Math.abs(graph.to[hidden] - graph.from[hidden]), graph.total, x0, x1, W, v.ceil, v.localize);
+    // a point on the hidden thread's body, from the law itself (no LOD in this view)
     const at = pick.bodyMidpoint(graph, cam, Object.assign({}, v, { level: undefined }), hidden);
-    const px = at ? at.x : mid, py = at ? at.y : v.base - h - lift;
+    expect(at).toBeTruthy();
+    const px = at.x, py = at.y;
     expect(ends).toBeTruthy();
     const without = pick.pickArcs(graph, cam, v, px, py, 6, 8).map((r) => r.index);
     expect(without).not.toContain(hidden);

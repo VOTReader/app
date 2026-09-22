@@ -58,23 +58,3 @@ describe('refuter bullet 3a: a badge and the sheet it opens agree, at the frame 
   });
 });
 
-describe('refuter bullet 3b: the legend counts each thread in ITS OWN stratum, the one the shader lifts it into', () => {
-  it('strataCounts equals a per-thread walk of the crossing fly-overs', () => {
-    for (const zoom of [12, geo.maxZoomFor(graph.total, W_CSS)]) {
-      const cam = camAt(zoom);
-      const view = viewAt(cam);
-      const rows = pick.strataCounts(graph, cam, view);
-      const { lod } = dec.lodOf(graph);
-      const cross = [0, 0, 0, 0], shown = [0, 0, 0, 0];
-      for (let i = 0; i < graph.count; i++) {
-        const x0 = geo.verseToX(cam, W, graph.from[i]), x1 = geo.verseToX(cam, W, graph.to[i]);
-        if (x1 < 0 || x0 > W || geo.arcAnchored(x0, x1, W)) continue;
-        const k = geo.stratumOf(Math.abs(graph.to[i] - graph.from[i]));
-        cross[k]++;
-        if (geo.lodShown(lod[i], false, 0, view.level)) shown[k]++;
-      }
-      expect(rows.map((r) => r.cross)).toEqual(cross);
-      expect(rows.map((r) => r.shown)).toEqual(shown);
-    }
-  });
-});

@@ -13,8 +13,9 @@
 
    The one invariant that matters: this must use the SAME laws the vertex
    shader draws with. There are THREE of them, and geometry.js owns all.
-   Height (geometry.arcShape) — or arcs become untappable exactly where
-   they look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
+   Height (geometry.arcShape, the half-ellipse of a thread's own span, its
+   feet at geometry.footX) — or arcs become untappable exactly where they
+   look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
    the reverse: at full localize an arc with neither foot near the viewport
    paints alpha 0, and picking it silently focuses a line nobody can see.
    Density (geometry.lodShown over decode.lodOf's table, when the view
@@ -24,8 +25,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
-  lodShown, LOD_OFF, FLYOVER_MARGIN, strataLift, stratumOf, STRATA_NAMES, STANDIN_MAX,
+  arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
+  lodShown, LOD_OFF, FLYOVER_MARGIN, STANDIN_MAX,
 } from './geometry.js';
 import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
 
@@ -105,15 +106,13 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
-  const { width, ceil, squash, localize, density } = view;
+  const { width, squash, localize, density } = view;
   const drawn = drawnTest(g, view);
   // The baseline as DRAWN: the camera's y shifts the whole picture down the
   // frame, so the curve the finger meets stands cam.y below the frame's base.
   const base = view.base + (cam.y > 0 ? cam.y : 0);
-  const bow = DOME * localize;
   const { fanA, fanB } = fansOf(g);
-  const half = width / 2;
-  const camX = cam.x, ppv = cam.ppv;
+  const ppv = cam.ppv;
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   const verseAtPoint = xToVerse(cam, width, px);
@@ -130,8 +129,9 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
       const start = bucket.off + c * chunkSize;
       const end = Math.min(start + chunkSize, bucket.off + draw);
       for (let i = start; i < end; i++) {
-        const x0 = (g.from[i] - camX) * ppv + half;
-        const x1 = (g.to[i] - camX) * ppv + half;
+        // the feet as drawn: in their verses' cells, by rank (geometry.footX)
+        const x0 = footX(cam, width, g.from[i], fanA[i]);
+        const x1 = footX(cam, width, g.to[i], fanB[i]);
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
         // Pickable iff painted. `width` is device px — the shader's uRes.x
@@ -142,15 +142,9 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         if (flyOverDim(anchored, localize) === 0) continue;
         // ... and the density law drew it at this zoom.
         if (!drawn(i, anchored)) continue;
-        // One shape per FOOT: each foot's departure rank sets its quarter; the
-        // apex is the same at both. Exactly the two calls the shader makes.
-        const rx = (x1 - x0) * 0.5;
-        const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
-        const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
-        const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
-        // the strata lift the whole curve: the baseline it stands on, as drawn
-        const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
-        const d = arcDistance(px, py, x0, x1, base - lift, shapeL.R, shapeR.R, shapeL.A, tol, bow);
+        // the curve as the shader draws it: the half-ellipse of its own span
+        const { A } = arcShape((x1 - x0) * 0.5, squash);
+        const d = arcDistance(px, py, x0, x1, base, A, tol);
         if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
         let at = best.length;
         while (at > 0 && best[at - 1].distance > d) at--;
@@ -224,8 +218,8 @@ export function visibleArcs(g, cam, view, limit) {
  * The two ends of one thread as the reader sees them (the brief's "the
  * verse refs at the two feet, or at the body when the feet are off-screen").
  * The height is arcHeightAt — the analytic form of the curve the shader
- * draws, with the same per-foot fans, dome and cam.y the picker uses — so
- * the label sits on the ribbon and not beside where a flat arc would be.
+ * draws, from the same feet (footX) and cam.y the picker uses — so the
+ * label sits on the ribbon and not beside where a flat arc would be.
  *
  * The frame a body point must fall in is the sky: x in [0, width], y in
  * [view.inset, view.base] — the ruler below the baseline is not the web, and
@@ -240,20 +234,15 @@ export function visibleArcs(g, cam, view, limit) {
  * @returns {{ from: ThreadEnd, to: ThreadEnd }}
  */
 export function threadEnds(g, cam, view, i) {
-  const { width, ceil, squash, localize } = view;
+  const { width, squash } = view;
   const inset = view.inset > 0 ? view.inset : 0;
   const camY = cam.y > 0 ? cam.y : 0;
   const base = view.base + camY;
-  const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
-  const x1 = (g.to[i] - cam.x) * cam.ppv + width / 2;
-  const rx = (x1 - x0) * 0.5;
-  const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
   const { fanA, fanB } = fansOf(g);
-  const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
-  const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
-  const bow = DOME * localize;
-  const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
-  const yAt = (x) => base - lift - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const x0 = footX(cam, width, g.from[i], fanA[i]);
+  const x1 = footX(cam, width, g.to[i], fanB[i]);
+  const { A } = arcShape((x1 - x0) * 0.5, squash);
+  const yAt = (x) => base - arcHeightAt(x, x0, x1, A);
   const inSky = (x) => { const y = yAt(x); return y >= inset && y <= view.base; };
   // the body's x range the frame holds; empty when the thread is wholly off it
   const xa = Math.max(0, x0), xb = Math.min(width, x1);
@@ -307,22 +296,17 @@ export function threadEnds(g, cam, view, i) {
  * @returns {{x:number, y:number}|null}
  */
 export function bodyMidpoint(g, cam, view, i, margin = 0) {
-  const { width, ceil, squash, localize } = view;
+  const { width, squash } = view;
   const inset = (view.inset > 0 ? view.inset : 0) + margin;
   const camY = cam.y > 0 ? cam.y : 0;
   const base = view.base + camY;
-  const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
-  const x1 = (g.to[i] - cam.x) * cam.ppv + width / 2;
+  const { fanA, fanB } = fansOf(g);
+  const x0 = footX(cam, width, g.from[i], fanA[i]);
+  const x1 = footX(cam, width, g.to[i], fanB[i]);
   const xa = Math.max(0, x0), xb = Math.min(width, x1);
   if (!(xb > xa)) return null;
-  const rx = (x1 - x0) * 0.5;
-  const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
-  const { fanA, fanB } = fansOf(g);
-  const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
-  const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
-  const bow = DOME * localize;
-  const lift = strataLift(Math.abs(g.to[i] - g.from[i]), g.total, x0, x1, width, ceil, localize);
-  const yAt = (x) => base - lift - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const { A } = arcShape((x1 - x0) * 0.5, squash);
+  const yAt = (x) => base - arcHeightAt(x, x0, x1, A);
   const mid = (xa + xb) / 2;
   const STEPS = 16;
   for (let k = 0; k <= STEPS; k++) {
@@ -704,54 +688,6 @@ export function standInsFor(bundles) {
 /**
  * @typedef {{ k:number, name:string, cross:number, shown:number }} StratumRow
  */
-
-/**
- * The legend's rows: per stratum, how many fly-over threads cross the frame
- * and how many of them are drawn (their groups' representatives).
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density, level?:number, standIns?:ArrayLike<number>}} view
- * @returns {StratumRow[]}
- */
-export function strataCounts(g, cam, view) {
-  const rows = STRATA_NAMES.map((name, k) => ({ k, name, cross: 0, shown: 0 }));
-  // per THREAD, by its own span: the shader lifts each thread by
-  // strataLift(|b - a|), and the 48 log span cells straddle every stratum
-  // bound, so a group's stratum is not one number (the refuter, 2026-09-21:
-  // 115 groups, e.g. Ps 33:11 -> Jer 29:11 drawn in the canon band, counted
-  // as testament-scale)
-  const { width, density } = view;
-  const { lod } = lodOf(g);
-  const essential = density === 'essential';
-  const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
-  const chunkSize = g.chunkSize || 256;
-  const level = typeof view.level === 'number' ? view.level : LOD_OFF;
-  // this frame's stand-ins are shown too (view.standIns, the shader's uStandIn)
-  const standIns = view.standIns && view.standIns.length ? new Set(Array.from(view.standIns)) : null;
-  for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
-      for (let i = start; i < end; i++) {
-        const x0 = (g.from[i] - camX) * ppv + half;
-        const x1 = (g.to[i] - camX) * ppv + half;
-        if (x1 < 0 || x0 > width) continue;
-        if (arcAnchored(x0, x1, width)) continue;
-        const k = stratumOf(Math.abs(g.to[i] - g.from[i]));
-        rows[k].cross++;
-        if (lodShown(lod[i], essential, 0, level) || (standIns && standIns.has(i))) rows[k].shown++;
-      }
-    }
-  }
-  return rows;
-}
 
 /**
  * The members of one thread's fly-over group, strongest first: the list

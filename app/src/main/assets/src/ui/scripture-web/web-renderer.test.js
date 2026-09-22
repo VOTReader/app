@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcShapeGLSL, CEIL_SOFTNESS, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
+  arcShapeGLSL, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
 } from '../../utils/scripture-web/geometry.js';
 import {
   DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -21,15 +21,17 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.vertex).toContain(arcShapeGLSL);
   });
 
-  it('calls that law for the arc radii, once per FOOT with its own departure rank, and draws the curve it returns', () => {
-    expect(SHADER_SOURCE.vertex)
-      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog,\s*aFanA\)/);
-    expect(SHADER_SOURCE.vertex)
-      .toMatch(/arcShape\(rx,\s*uCeil,\s*uSquash,\s*uLocalize,\s*spanLog,\s*aFanB\)/);
+  it("calls that law for the arc radii from the frame's squash alone, stands each foot in its verse's cell by rank, and draws the curve it returns", () => {
+    // the structure law: the half-ellipse of the span, nothing from the
+    // frame's height, the zoom or the span's log
+    expect(SHADER_SOURCE.vertex).toMatch(/float A = arcShape\(rx,\s*uSquash\)\.y;/);
+    expect(SHADER_SOURCE.vertex).not.toMatch(/uCeil/);
+    // the feet: geometry.footX in GLSL
+    expect(SHADER_SOURCE.vertex).toMatch(/float x0 = \(a \+ \.5 \+ aFanA - uCamX\)\*uPPV/);
+    expect(SHADER_SOURCE.vertex).toMatch(/float x1 = \(b \+ \.5 \+ aFanB - uCamX\)\*uPPV/);
     // The point and its tangent come from the shared arcAt, not from a
-    // hand-written cos/sin pair beside it; the dome rides DOME x uLocalize.
-    expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*RL,\s*RR,\s*A,\s*P,\s*bow,/);
-    expect(SHADER_SOURCE.vertex).toMatch(/float bow = 0\.25\*uLocalize;/);
+    // hand-written cos/sin pair beside it
+    expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*A,/);
     // and the camera's y shifts the baseline the ribbon stands on
     expect(SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
     expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(lo,/);
@@ -43,10 +45,10 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.fragment).not.toContain('uWidth');
   });
 
-  it('has exactly ONE definition of the softness constant in the vertex stage', () => {
+  it('has exactly ONE definition of the law in the vertex stage, and no ceiling, run, dome or lift beside it', () => {
     // Two occurrences would mean a second, hand-written copy of the law.
-    const hits = SHADER_SOURCE.vertex.split(String(CEIL_SOFTNESS)).length - 1;
-    expect(hits).toBe(1);
+    expect(SHADER_SOURCE.vertex.split('vec2 arcShape(').length - 1).toBe(1);
+    expect(SHADER_SOURCE.vertex).not.toMatch(/tanh\(|strataLift\(|float bow|float lift/);
   });
 
   it('inlines the generated colour ramps rather than hardcoding hexes', () => {

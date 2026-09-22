@@ -22,7 +22,7 @@ import * as pick from './pick.js';
 import * as geo from './geometry.js';
 import { fansOf } from './decode.js';
 
-const { arcShape, arcHeightAt, spanLogOf, squashFactor, createCamera, DOME } = geo;
+const { arcShape, arcHeightAt, squashFactor, createCamera } = geo;
 
 function makeGraph(pairs, total = 100) {
   const chapters = [[0, 1, 0, 50], [0, 2, 50, 50]];
@@ -48,17 +48,12 @@ const camAt = (g, x, y = 0) => {
   cam.ppv = 40; cam.x = x; cam.y = y;
   return cam;
 };
-/** the drawn height at screen x of thread i, by the law the shader uses */
+/** the drawn height at screen x of thread i, by the law the shader uses: the
+ * half-ellipse of its span between its feet (each in its verse's cell, by rank) */
 function heightAt(g, cam, view, i, x) {
-  const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2, x1 = (g.to[i] - cam.x) * cam.ppv + width / 2;
-  const rx = (x1 - x0) / 2, sl = spanLogOf(g.to[i] - g.from[i], g.total);
   const { fanA, fanB } = fansOf(g);
-  const L = arcShape(rx, ceil, view.squash, view.localize, sl, fanA[i]);
-  const R = arcShape(rx, ceil, view.squash, view.localize, sl, fanB[i]);
-  // the strata (the density law, part 3): a thread whose feet have both left
-  // the frame is lifted into its band; the label sits on the LIFTED body
-  const lift = geo.strataLift(g.to[i] - g.from[i], g.total, x0, x1, width, ceil, view.localize);
-  return arcHeightAt(x, x0, x1, L.R, R.R, L.A, DOME * view.localize) + lift;
+  const x0 = geo.footX(cam, width, g.from[i], fanA[i]), x1 = geo.footX(cam, width, g.to[i], fanB[i]);
+  return arcHeightAt(x, x0, x1, arcShape((x1 - x0) / 2, view.squash).A);
 }
 
 describe('threadEnds: where a thread\'s references are written', () => {
@@ -70,12 +65,12 @@ describe('threadEnds: where a thread\'s references are written', () => {
   it('a foot the frame holds is reported at its screen x with no body point; the other foot, off-screen right, gets the body\'s point at the frame\'s right edge', () => {
     const g = makeGraph([[5, 35]]);
     const view = viewOf(520);
-    const cam = camAt(g, 12);                       // from at x 220 (on screen), to at x 1420 (off)
+    const cam = camAt(g, 12);                       // from at x 240 (verse 5's centre, on screen), to at x 1440 (off)
     const ends = pick.threadEnds(g, cam, view, 0);
     expect(ends.from.verse).toBe(5);
     expect(ends.to.verse).toBe(35);
     expect(ends.from.onScreen).toBe(true);
-    expect(ends.from.x).toBeCloseTo(220, 6);
+    expect(ends.from.x).toBeCloseTo(240, 6);
     expect(ends.from.at).toBeNull();
     expect(ends.to.onScreen).toBe(false);
     expect(ends.to.at).not.toBeNull();
@@ -90,7 +85,7 @@ describe('threadEnds: where a thread\'s references are written', () => {
   it('both feet off-screen: the body enters at the left edge and leaves at the right, each end labelled at its own edge', () => {
     const g = makeGraph([[5, 35]]);
     const view = viewOf(520);
-    const cam = camAt(g, 20);                       // x0 = -100, x1 = 1100
+    const cam = camAt(g, 20);                       // x0 = -80, x1 = 1120
     const ends = pick.threadEnds(g, cam, view, 0);
     expect(ends.from.onScreen).toBe(false);
     expect(ends.to.onScreen).toBe(false);
@@ -113,13 +108,13 @@ describe('threadEnds: where a thread\'s references are written', () => {
   it('a body that climbs past the frame top from an on-screen foot is labelled where it crosses the top: the far foot has its nearest on-screen point on the near quarter', () => {
     const g = makeGraph([[5, 35]]);
     const view = viewOf(100);                       // a sky 100 px tall under a 240 px ceiling: the crown is above the frame
-    const cam = camAt(g, 12);                       // from at x 220 (on screen), to at 1420 (off)
+    const cam = camAt(g, 12);                       // from at x 240 (on screen), to at 1440 (off)
     expect(heightAt(g, cam, view, 0, width / 2), 'precondition: the crown is above the frame').toBeGreaterThan(view.base);
     expect(heightAt(g, cam, view, 0, width), 'precondition: the right edge is above the frame too').toBeGreaterThan(view.base);
     const ends = pick.threadEnds(g, cam, view, 0);
     expect(ends.from.at).toBeNull();
     expect(ends.to.at.y).toBeCloseTo(0, 0);
-    expect(ends.to.at.x).toBeGreaterThan(220);
+    expect(ends.to.at.x).toBeGreaterThan(240);
     expect(ends.to.at.x).toBeLessThan(width);
     // and it is the crossing, not a sample near it: the height there is the frame's own
     expect(heightAt(g, cam, view, 0, ends.to.at.x)).toBeCloseTo(view.base, 0);
@@ -139,7 +134,7 @@ describe('threadEnds: where a thread\'s references are written', () => {
   it('a foot within the fly-over margin but off the frame is off-screen: its reference goes on the body, not on a ruler tick nobody sees', () => {
     const g = makeGraph([[5, 35]]);
     const view = viewOf(520);
-    const cam = camAt(g, 17.75);                    // from at x -10 (10 px off the left edge, inside FLYOVER_MARGIN)
+    const cam = camAt(g, 18.25);                    // from at x -10 (10 px off the left edge, inside FLYOVER_MARGIN)
     const ends = pick.threadEnds(g, cam, view, 0);
     expect(ends.from.x).toBeCloseTo(-10, 6);
     expect(ends.from.onScreen).toBe(false);
@@ -147,20 +142,19 @@ describe('threadEnds: where a thread\'s references are written', () => {
     expect(ends.from.at.x).toBeCloseTo(0, 0);
   });
 
-  it('a fly-over labelled on its run sits on the DOME, not on a level run (RED if the label pass reads a flat arc)', () => {
+  it("a fly-over labelled at the frame's two edges sits on its ellipse in the sky: the two points differ in height (a curve, never a level run)", () => {
     const g = makeGraph([[0, 99]]);
     const view = viewOf(520);
-    const cam = camAt(g, 50);                       // x0 = -1500, x1 = 2460: both edges are on the run
+    // x0 = -1080, x1 = 2880: the crown (950 px) is above a frame at rest, so the
+    // reader has panned up 700 px into the sky to meet the body
+    const cam = camAt(g, 40, 700);
     const ends = pick.threadEnds(g, cam, view, 0);
     expect(ends.from.at.x).toBeCloseTo(0, 0);
-    const x0 = (0 - cam.x) * cam.ppv + width / 2, x1 = (99 - cam.x) * cam.ppv + width / 2;
-    const { R, A } = arcShape((x1 - x0) / 2, ceil, view.squash, 1, spanLogOf(99, g.total));
-    expect(x0 + R, 'precondition: the left edge is past the left quarter').toBeLessThan(0);
-    expect(x1 - R, 'precondition: the right edge is before the right quarter').toBeGreaterThan(width);
-    const level = view.base - A;
-    expect(Math.abs(ends.from.at.y - level), 'the dome lifts the run here by a visible amount').toBeGreaterThan(8);
-    expect(ends.from.at.y).toBeCloseTo(view.base - heightAt(g, cam, view, 0, ends.from.at.x), 0);
-    expect(ends.to.at.y).toBeCloseTo(view.base - heightAt(g, cam, view, 0, ends.to.at.x), 0);
+    expect(ends.to.at.x).toBeCloseTo(width, 0);
+    expect(ends.from.at.y).toBeCloseTo(view.base + cam.y - heightAt(g, cam, view, 0, ends.from.at.x), 0);
+    expect(ends.to.at.y).toBeCloseTo(view.base + cam.y - heightAt(g, cam, view, 0, ends.to.at.x), 0);
+    expect(Math.abs(ends.from.at.y - ends.to.at.y), 'the body has a slope across the frame').toBeGreaterThan(50);
+    expect(ends.from.at.angle).toBeLessThan(0);     // still climbing toward its crown, read left to right
   });
 
   it('a thread with nothing on screen has no body point at either end', () => {

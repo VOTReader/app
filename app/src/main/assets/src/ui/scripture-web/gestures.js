@@ -55,7 +55,7 @@ export function isChromeTarget(target) {
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
- *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number, yf?:object) => void,
+ *   zoomAbout: (cam:object, width:number, x:number, factor:number, maxZoom:number, yf?:object, anchorY?:number) => void,
  *   xToVerse: (cam:object, width:number, x:number) => number,
  *   yFrame?: (cam:object) => (object|null),
  * }} deps
@@ -94,8 +94,8 @@ export function attachWebGestures(el, deps) {
       const [p, q] = Array.from(pointers.values());
       const mid = (p.x + q.x) / 2;
       const pc = camAt((p.y + q.y) / 2);
-      pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, cam: pc,
-                mid, verse: xToVerse(pc, view().W, mid * dpr()) };
+      pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, y: pc.y > 0 ? pc.y : 0, cam: pc,
+                mid, midY: (p.y + q.y) / 2, verse: xToVerse(pc, view().W, mid * dpr()) };
       drag = null;
     } else {
       const dc = camAt(pt.y);
@@ -112,6 +112,14 @@ export function attachWebGestures(el, deps) {
       const yf = yFrameOf(c);
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
       clampCamera(c, W, zoomCap(c), yf);
+      // in the sky the world height under the pinch's centre stays under it
+      // (heights scale with the zoom, geometry.zoomAbout); at rest the
+      // baseline is sticky
+      if (yf && pinch.y > 0) {
+        const ay = pinch.midY * dpr();
+        const baseY = /** @type {{base:number}} */ (yf).base;
+        c.y = (c.ppv / pinch.ppv) * (baseY + pinch.y - ay) + ay - baseY;
+      }
       c.x = pinch.verse - (pinch.mid * dpr() - W / 2) / c.ppv;
       clampCamera(c, W, zoomCap(c), yf);
       moved = true; if (deps.live) deps.live(); schedule(); return;
@@ -164,7 +172,7 @@ export function attachWebGestures(el, deps) {
     e.preventDefault();
     const pt = loc(e), W = view().W;
     const c = camAt(pt.y);
-    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c), yFrameOf(c) || undefined);
+    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c), yFrameOf(c) || undefined, pt.y * dpr());
     if (deps.live) deps.live();
     schedule();
   };
