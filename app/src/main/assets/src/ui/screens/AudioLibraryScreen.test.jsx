@@ -154,7 +154,7 @@ describe('AudioLibraryScreen -- the hub', () => {
     expect(lineUnder(/The Scriptures of Truth/)).toBe('1 book · Corrected Version by Timothy, with The Lord · Read by Benjamin');
     expect(lineUnder(/The Gospel of John/)).toBe('1 book · Film audio, listening only');
     expect(lineUnder(/The Volumes of Truth/)).toBe('1 collection · the Letters read aloud');
-    expect(document.querySelector('.audio-library-browse').textContent).not.toMatch(/1 (books|collections)/);
+    expect(document.querySelector('.audio-library-browse').textContent).not.toMatch(/\b1 (books|collections)\b/);
   });
 
   /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
