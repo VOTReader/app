@@ -28,7 +28,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, visibleArcs, threadEnds, footBundles, bundleGroups, lensRange,
+  visibleArcs, threadEnds, footBundles, bundleGroups, lensRange, nearbyChapter, nearbyThreads,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -879,12 +879,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         for (let i = 0; i < Math.min(p.underlay.count, 36); i++) found.push({ kind: 'underlay', index: i });
       }
     } else {
-      const cam = camRef.current;
-      if (!cam) return [];
-      const centre = Math.max(0, Math.min(graph.total - 1, Math.round(cam.x)));
-      const chapterIndex = graph.chapterOfVerse[centre];
+      // the list reads the lens (landing 15): the lit chapter leads - its
+      // sheet says where its threads go, by chapter - then its threads,
+      // strongest first, so the sky is walked from a list as well as by eye
+      const cam = camRef.current, v = viewRef.current;
+      if (!cam || !v.W) return [];
+      const chapterIndex = nearbyChapter(graph, cam, v.W);
+      if (chapterIndex < 0) return [];
       const [lo, hi] = chapterRange(graph, chapterIndex);
-      for (const index of arcsTouching(graph, lo, hi, density, 36)) {
+      found.push({ kind: 'chapter', chapterIndex });
+      for (const index of nearbyThreads(graph, lo, hi, density, 36)) {
         found.push({ kind: 'arc', hit: {
           index, from: graph.from[index], to: graph.to[index], votes: graph.votes[index],
         } });
@@ -1249,6 +1253,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         title={Array.isArray(choices) ? undefined : choices.title} meta={Array.isArray(choices) ? undefined : choices.meta}
         onChoose={commitFound} onClose={() => { setChoices(null); schedule(); }} />}
       {listOpen && <ConnectionList items={listItems} mode={mode}
+        lensOn={mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
         onChoose={commitFound} onClose={() => setListOpen(false)} />}
       {detail && (
         <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread}
@@ -1826,12 +1831,17 @@ function TipChip({ info, viewport }) {
 
 function connectionTitle(info) {
   if (info.kind === 'arc') return info.a.label + ' ↕ ' + info.b.label;
+  if (info.kind === 'chapter') return info.book.title + ' ' + info.chapter + ' \u2014 where its threads go';
   if (info.kind === 'underlay') return info.source.label + ' ↕ ' + endpointLabel(info.target);
   return endpointLabel(info.source) + ' ↕ ' + endpointLabel(info.target);
 }
 
 function connectionMeta(info) {
   if (info.kind === 'arc') return info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
+  if (info.kind === 'chapter') {
+    return info.verses + ' verses \u00b7 ' + info.connections.toLocaleString() + ' connections'
+      + (info.groups && info.groups.length ? ' \u00b7 to ' + info.groups.length + (info.groups.length === 1 ? ' chapter' : ' chapters') : '');
+  }
   if (info.kind === 'underlay') return info.joins;
   return LINK_KIND_NAMES[info.joins] || 'Your link';
 }
@@ -1856,18 +1866,27 @@ function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
   );
 }
 
-function ConnectionList({ items, mode, onChoose, onClose }) {
+function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
   const closeRef = React.useRef(null);
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  // the canon list leads with the chapter it reads (landing 15)
+  const chapter = mode !== 'personal' && items[0] && items[0].kind === 'chapter' ? items[0] : null;
+  const eyebrow = mode === 'personal' ? 'Your nearby links'
+    : chapter ? (lensOn ? 'Under the lens \u00b7 ' : 'Nearby \u00b7 ') + chapter.book.title + ' ' + chapter.chapter
+    : 'Nearby connections';
+  const meta = chapter
+    ? chapter.connections.toLocaleString() + (chapter.connections === 1 ? ' connection' : ' connections')
+      + ' \u00b7 the strongest ' + (items.length - 1) + ' below; the chapter row lists where they all go.'
+    : 'Select a connection to focus it and open its passages.';
   return (
-    <div className="sw-list" role="dialog" aria-modal="false" aria-label="Nearby connections">
+    <div className="sw-list" role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
       <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
-      <div className="sw-sheet-eyebrow">{mode === 'personal' ? 'Your nearby links' : 'Nearby connections'}</div>
-      <div className="sw-sheet-meta">Select a connection to focus it and open its passages.</div>
+      <div className="sw-sheet-eyebrow">{eyebrow}</div>
+      <div className="sw-sheet-meta">{meta}</div>
       {items.length ? (
         <div className="sw-choice-list">
           {items.map((item, i) => (
-            <button type="button" className="sw-choice-row" key={i} onClick={() => onChoose(item)}>
+            <button type="button" className={'sw-choice-row' + (item.kind === 'chapter' ? ' sw-choice-chapter' : '')} key={i} onClick={() => onChoose(item)}>
               <span className="sw-choice-label">{connectionTitle(item)}</span>
               <span className="sw-choice-meta">{connectionMeta(item)}</span>
             </button>

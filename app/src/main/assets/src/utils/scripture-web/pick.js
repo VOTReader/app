@@ -423,6 +423,41 @@ export function lensRange(g, cam, width) {
 }
 
 /**
+ * The chapter the Nearby list reads (landing 15): the lens's chapter once
+ * the reader is past the overview, else the chapter under the frame's
+ * centre - the same verse either way (cam.x IS the centre), so the list and
+ * the lit chapter never disagree. -1 for an empty graph.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {number} width - device px
+ */
+export function nearbyChapter(g, cam, width) {
+  if (!g || !g.chapters || !g.chapters.length || !g.chapterOfVerse || !(g.total > 0)) return -1;
+  const lens = lensRange(g, cam, width);
+  const v = lens ? lens[0] : Math.max(0, Math.min(g.total - 1, Math.round(cam.x)));
+  const ci = g.chapterOfVerse[v];
+  return ci >= 0 && ci < g.chapters.length ? ci : -1;
+}
+
+/**
+ * The threads of a verse range for a list a reader walks: every thread
+ * touching [lo, hi] (arcsTouching, nothing hidden), the strongest first
+ * (votes descending), the shorter first among equals, cut to `limit`.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} lo @param {number} hi
+ * @param {import('./decode.js').Density} density
+ * @param {number} limit
+ * @returns {number[]} instance indices
+ */
+export function nearbyThreads(g, lo, hi, density, limit) {
+  const all = arcsTouching(g, lo, hi, density, 0);
+  all.sort((i, j) => (g.votes[j] - g.votes[i])
+    || (Math.abs(g.to[i] - g.from[i]) - Math.abs(g.to[j] - g.from[j]))
+    || (i - j));
+  return limit > 0 ? all.slice(0, limit) : all;
+}
+
+/**
  * First and last verse ids of a chapter, inclusive.
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {number} chapterIndex

@@ -76,6 +76,30 @@ describe('the count at each foot is information, lens-dimmed like everything els
   });
 });
 
+describe('the Nearby list reads the lens (landing 15)', () => {
+  it('nearbyChapter is the lens chapter past the overview and the centre chapter at fit; -1 for an empty graph', () => {
+    expect(pick.nearbyChapter(graph, camAt(12), W)).toBe(psalm107.ci);
+    // at fit there is no lens: the chapter under the centre verse (the camera's x), whatever it is
+    expect(pick.nearbyChapter(graph, camAt(1), W)).toBe(graph.chapterOfVerse[Math.round(camAt(1).x)]);
+    const next = graph.chapters[psalm107.ci + 1];
+    expect(pick.nearbyChapter(graph, camAt(1, next[2] + 1), W)).toBe(psalm107.ci + 1);
+    expect(pick.nearbyChapter({ count: 0 }, camAt(12), W)).toBe(-1);
+  });
+
+  it('nearbyThreads: every thread touches the chapter, the strongest lead, nothing is hidden by the cut but the tail', () => {
+    const [lo, hi] = pick.chapterRange(graph, psalm107.ci);
+    const all = pick.nearbyThreads(graph, lo, hi, 'famous', 0);
+    const top = pick.nearbyThreads(graph, lo, hi, 'famous', 36);
+    expect(all.length).toBe(pick.countTouching(graph, lo, hi, 'famous'));
+    expect(top).toEqual(all.slice(0, 36));
+    for (const i of top) {
+      const a = graph.from[i], b = graph.to[i];
+      expect((a >= lo && a <= hi) || (b >= lo && b <= hi)).toBe(true);
+    }
+    for (let k = 1; k < all.length; k++) expect(graph.votes[all[k - 1]]).toBeGreaterThanOrEqual(graph.votes[all[k]]);
+  });
+});
+
 describe('the lens is the chapter under the frame\'s centre, past the overview only', () => {
   it('is null at fit and below 6x; at 6x and past it is Psalm 107\'s own range when the frame is centred there', () => {
     expect(pick.lensRange(graph, camAt(1), W)).toBeNull();

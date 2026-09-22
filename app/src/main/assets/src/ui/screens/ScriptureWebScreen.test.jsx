@@ -330,7 +330,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     const pickNearby = async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-      fireEvent.click(document.querySelector('.sw-choice-row'));
+      // the first thread row: the list leads with the chapter row since landing 15
+      fireEvent.click(document.querySelector('.sw-choice-row:not(.sw-choice-chapter)'));
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     };
     /* a 2D context that records what is written; every other call is a no-op */
@@ -603,6 +604,71 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(container.querySelector('.sw-guide')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
+  });
+});
+
+describe('the Nearby list reads the lens (landing 15)', () => {
+  // one chapter (Genesis 1, the whole canon) with two threads: the stronger one must lead
+  const two = () => Object.assign({
+    total: 31102, count: 2, buckets: [{ off: 0, len: 2, off20: 2, off10: 2, segments: 8, chunks: [[100, 20100]] }],
+    books: [{ id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' }],
+    chapters: [[0, 1, 0, 31102]], chapterOfVerse: new Uint16Array(31102),
+    from: new Uint16Array([100, 200]), to: new Uint16Array([20100, 300]), votes: new Int16Array([7, 30]),
+    votEdges: [], prophecy: [], votLinks: [], chunkSize: 256,
+  });
+  const mountList = async () => {
+    for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 360]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 2 };
+    if (!prevDecode) prevDecode = vi.mocked(decodeGraph).getMockImplementation();
+    vi.mocked(decodeGraph).mockImplementation(() => two());
+    const view = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    return view;
+  };
+  let prevDecode = null;
+  afterEach(() => {
+    delete HTMLCanvasElement.prototype.clientWidth;
+    delete HTMLCanvasElement.prototype.clientHeight;
+    // the shared decode mock goes back the way it was, or the load test after this reads my graph
+    if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
+  });
+
+  it('leads with the chapter row (where its threads go), then the threads strongest first; at the overview the header says Nearby', async () => {
+    const { container } = await mountList();
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    const list = container.querySelector('.sw-list');
+    expect(list, 'the list opened').toBeTruthy();
+    expect(list.getAttribute('data-lens-on')).toBe('0');
+    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
+    const rows = [...list.querySelectorAll('.sw-choice-row')];
+    expect(rows.length).toBe(3);
+    expect(rows[0].className).toMatch(/sw-choice-chapter/);
+    expect(rows[0].textContent).toMatch(/Genesis 1 — where its threads go/);
+    expect(rows[1].textContent).toMatch(/30 votes/);
+    expect(rows[2].textContent).toMatch(/7 votes/);
+  });
+
+  it('past the overview the header says Under the lens, and choosing the chapter row opens its sheet', async () => {
+    const { container } = await mountList();
+    const root = container.querySelector('.sw-root');
+    for (let i = 0; i < 12; i++) {
+      fireEvent.keyDown(root, { key: '+' });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    const list = container.querySelector('.sw-list');
+    expect(list.getAttribute('data-lens-on')).toBe('1');
+    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Under the lens · Genesis 1/);
+    fireEvent.click(list.querySelector('.sw-choice-chapter'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(container.querySelector('.sw-list')).toBeNull();
+    const sheet = container.querySelector('.sw-sheet');
+    expect(sheet, 'the chapter sheet opened').toBeTruthy();
+    expect(sheet.textContent).toMatch(/Chapter/);
   });
 });
 
