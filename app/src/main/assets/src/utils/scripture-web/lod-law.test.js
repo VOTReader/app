@@ -70,6 +70,13 @@ function shown(cam, density, list, anchoredFlag) {
   const ess = density === 'essential';
   return list.filter((i) => geo.lodShown(lod[i], ess, anchoredFlag, level));
 }
+/** What the kept TABLE would reveal of an anchored set at this camera (the budget, for the day it returns as a setting). */
+function tabled(cam, density, list) {
+  const lod = dec.lodOf(graph).lod;
+  const level = levelAt(cam);
+  const ess = density === 'essential';
+  return list.filter((i) => level >= ((ess ? (lod[i] >>> 8) & 255 : lod[i] & 255) / geo.LOD_QUANT + geo.LOD_MIN_LEVEL));
+}
 
 describe('the LOD law exists and is one table for both sides', () => {
   it('exports the level, the table and the twin', () => {
@@ -104,22 +111,22 @@ describe('the LOD law exists and is one table for both sides', () => {
   });
 });
 
-describe('no smear: the anchored budget at every zoom', () => {
-  it('Psalm 107 at 12x draws a few dozen anchored threads, not thirteen thousand', () => {
+describe('the anchored budget TABLE at every zoom (kept; LOD_ANCHORED_ALWAYS overrides it on screen since landing 6)', () => {
+  it('Psalm 107 at 12x: the table would reveal a few dozen anchored threads of thirteen thousand', () => {
     const cam = camAt(12);
     const { anchored } = crossing(cam, 'famous');
-    expect(anchored.length).toBeGreaterThan(10000);          // the wall, before
-    const drawn = shown(cam, 'famous', anchored, 1);
-    expect(drawn.length).toBeGreaterThan(20);                // still a web
-    expect(drawn.length).toBeLessThan(600);                  // not a wall
+    expect(anchored.length).toBeGreaterThan(10000);
+    const would = tabled(cam, 'famous', anchored);
+    expect(would.length).toBeGreaterThan(20);
+    expect(would.length).toBeLessThan(600);
   });
 
-  it('at fit the overview is a legible dome of the strongest threads', () => {
+  it('at fit the table would reveal a legible dome of the strongest threads', () => {
     const cam = camAt(1);
     const { anchored } = crossing(cam, 'famous');
-    const drawn = shown(cam, 'famous', anchored, 1);
-    expect(drawn.length).toBeGreaterThan(150);
-    expect(drawn.length).toBeLessThan(4000);
+    const would = tabled(cam, 'famous', anchored);
+    expect(would.length).toBeGreaterThan(150);
+    expect(would.length).toBeLessThan(4000);
   });
 
   it('at the ceiling EVERY anchored thread draws - fully granular', () => {
@@ -132,38 +139,37 @@ describe('no smear: the anchored budget at every zoom', () => {
     }
   });
 
-  it('visibility never decreases with zoom: drawn(L) is a subset of drawn(L + step)', () => {
+  it('visibility never decreases with zoom: the table\'s reveal is one level per thread (and the screen draws all)', () => {
     const lod = dec.lodOf(graph).lod;
     const { anchored } = crossing(camAt(6), 'famous');
+    const reveal = (i) => (lod[i] & 255) / geo.LOD_QUANT + geo.LOD_MIN_LEVEL;
     for (let L = -2; L < 11; L += 0.5) {
-      const lo = new Set(anchored.filter((i) => geo.lodShown(lod[i], false, 1, L)));
-      const hi = anchored.filter((i) => geo.lodShown(lod[i], false, 1, L + 0.5));
+      const lo = new Set(anchored.filter((i) => L >= reveal(i)));
+      const hi = anchored.filter((i) => L + 0.5 >= reveal(i));
       for (const i of lo) expect(hi.includes(i)).toBe(true);
+      for (const i of anchored) expect(geo.lodShown(lod[i], false, 1, L)).toBe(1);
     }
   });
 
   it('Essential still means something: its table admits only >= 20-vote threads', () => {
     const lod = dec.lodOf(graph).lod;
     const ceiling = geo.levelOf(geo.PPV_MAX_CSS, graph.total);
+    const revealE = (i) => ((lod[i] >>> 8) & 255) / geo.LOD_QUANT + geo.LOD_MIN_LEVEL;
     let weak = 0, strongShown = 0;
     for (let i = 0; i < graph.count; i++) {
       if (graph.votes[i] < 20) {
         // a weak thread is revealed in the Essential table only AT the ceiling cap
-        if (geo.lodShown(lod[i], true, 1, ceiling - 0.2)) weak++;
-      } else if (geo.lodShown(lod[i], true, 1, 2)) strongShown++;
+        if (ceiling - 0.2 >= revealE(i)) weak++;
+      } else if (2 >= revealE(i)) strongShown++;
     }
     expect(weak).toBe(0);
     expect(strongShown).toBeGreaterThan(100);
   });
 
-  it('a vote-ordered fill: the first threads revealed at a foot cell are its strongest', () => {
-    // At level 0 the fit frame is two cells; every thread revealed at level 0
-    // must outrank (votes) any hidden thread of the same cell of a longer or
-    // equal length... approximated: the mean votes of the revealed set beats
-    // the mean of the hidden set by a wide margin.
+  it('a vote-ordered fill: the first threads the table reveals at a foot cell are its strongest', () => {
     const cam = camAt(1);
     const { anchored } = crossing(cam, 'famous');
-    const drawn = new Set(shown(cam, 'famous', anchored, 1));
+    const drawn = new Set(tabled(cam, 'famous', anchored));
     let sumIn = 0, nIn = 0, sumOut = 0, nOut = 0;
     for (const i of anchored) {
       if (drawn.has(i)) { sumIn += graph.votes[i]; nIn++; } else { sumOut += graph.votes[i]; nOut++; }
@@ -215,12 +221,12 @@ describe('visible equals pickable', () => {
     expect(new Set(got)).toEqual(want);
   });
 
-  it('a hidden thread is not picked at its own apex, but the tapped one always is', () => {
+  it('a hidden thread (a fly-over that is not its group\'s representative, in the sky) is not picked at its body, but the tapped one always is', () => {
     const cam = camAt(12);
     const v = view(cam, 'famous');
-    const { anchored } = crossing(cam, 'famous');
-    const drawn = new Set(shown(cam, 'famous', anchored, 1));
-    const hidden = anchored.find((i) => !drawn.has(i) && Math.abs(graph.to[i] - graph.from[i]) > 4);
+    const { fly } = crossing(cam, 'famous');
+    const drawn = new Set(shown(cam, 'famous', fly, 0));
+    const hidden = fly.find((i) => !drawn.has(i) && pick.bodyMidpoint(graph, cam, Object.assign({}, v, { level: undefined }), i));
     expect(hidden).toBeDefined();
     const ends = pick.threadEnds(graph, cam, Object.assign({}, v, { level: undefined }), hidden);
     // apex of the hidden thread, from the law itself (no LOD in this view)
@@ -232,19 +238,22 @@ describe('visible equals pickable', () => {
     const sL = geo.arcShape(rx, v.ceil, v.squash, v.localize, sl, fanA[hidden]);
     const sR = geo.arcShape(rx, v.ceil, v.squash, v.localize, sl, fanB[hidden]);
     const h = geo.arcHeightAt(mid, Math.min(x0, x1), Math.max(x0, x1), sL.R, sR.R, sL.A, geo.DOME * v.localize);
-    const py = v.base - h;
+    const lift = geo.strataLift(Math.abs(graph.to[hidden] - graph.from[hidden]), graph.total, x0, x1, W, v.ceil, v.localize);
+    const at = pick.bodyMidpoint(graph, cam, Object.assign({}, v, { level: undefined }), hidden);
+    const px = at ? at.x : mid, py = at ? at.y : v.base - h - lift;
     expect(ends).toBeTruthy();
-    const without = pick.pickArcs(graph, cam, v, mid, py, 6, 8).map((r) => r.index);
+    const without = pick.pickArcs(graph, cam, v, px, py, 6, 8).map((r) => r.index);
     expect(without).not.toContain(hidden);
-    const withFocus = pick.pickArcs(graph, cam, Object.assign({}, v, { focusArc: hidden }), mid, py, 6, 8).map((r) => r.index);
+    const withFocus = pick.pickArcs(graph, cam, Object.assign({}, v, { focusArc: hidden }), px, py, 6, 8).map((r) => r.index);
     expect(withFocus).toContain(hidden);
   });
 
-  it('countAnchored with a level counts the drawn anchored set, so the crowding law sees what the eye sees', () => {
+  it('countAnchored with a level counts the drawn anchored set - every anchored thread, since landing 6', () => {
     const cam = camAt(12);
     const all = pick.countAnchored(graph, cam, W, 'famous');
     const drawn = pick.countAnchored(graph, cam, W, 'famous', levelAt(cam));
     expect(all).toBeGreaterThan(10000);
+    expect(drawn).toBe(all);
     // the same population countAnchored walks: anchored by the margin law,
     // crossing the frame or not (a foot 24 px outside still anchors)
     const lod = dec.lodOf(graph).lod;
@@ -254,7 +263,6 @@ describe('visible equals pickable', () => {
       if (geo.arcAnchored(x0, x1, W) && geo.lodShown(lod[i], false, 1, levelAt(cam))) want++;
     }
     expect(drawn).toBe(want);
-    expect(drawn).toBeLessThan(600);
   });
 });
 
@@ -273,5 +281,45 @@ describe('the ribbon style under the law', () => {
     expect(fit.strokeWidthCss).toBeCloseTo(0.9, 6);
     // the parameter defaults off: every caller before the law reads the same numbers
     expect(geo.ribbonStyle(1, 0, false, 0.3)).toEqual(geo.ribbonStyle(1, 0, false, 0.3, false));
+  });
+});
+
+describe('landing 6 (Corbin, 2026-09-21 21:21: "I want to be able to see all the lines")', () => {
+  it('every anchored thread is drawn at every zoom: the reveal tables are kept but LOD_ANCHORED_ALWAYS overrides them', () => {
+    expect(geo.LOD_ANCHORED_ALWAYS).toBe(true);
+    const lod = dec.lodOf(graph).lod;
+    for (const L of [-2, 0, 3.58, 6, 9]) {
+      let hidden = 0;
+      for (let i = 0; i < graph.count; i++) {
+        if (!geo.lodShown(lod[i], false, 1, L)) hidden++;
+        if (graph.votes[i] >= 20 && !geo.lodShown(lod[i], true, 1, L)) hidden++;
+      }
+      expect(hidden, 'level ' + L).toBe(0);
+    }
+    // the table still knows the budget: a reveal above level 0 exists for later
+    let late = 0;
+    for (let i = 0; i < graph.count; i++) if (((lod[i] & 255) / geo.LOD_QUANT + geo.LOD_MIN_LEVEL) > 0) late++;
+    expect(late).toBeGreaterThan(50000);
+    expect(SHADER_SOURCE.vertex).toContain(geo.lodGLSL);
+  });
+
+  it('at rest (no sky) the law is off and every crossing thread is drawn; fly-over representatives only when panned up', () => {
+    const cam = camAt(12);
+    const { anchored, fly } = crossing(cam, 'famous');
+    const rest = { width: W, localize: geo.localizeFactor(12), density: 'famous', level: geo.LOD_OFF };
+    expect(pick.visibleArcs(graph, cam, rest, 1e9).length).toBe(anchored.length + fly.length);
+    const sky = Object.assign({}, rest, { level: levelAt(cam) });
+    const drawn = pick.visibleArcs(graph, cam, sky, 1e9);
+    expect(drawn.length).toBeGreaterThanOrEqual(anchored.length);
+    expect(drawn.length).toBeLessThan(anchored.length + 200);
+  });
+
+  it('nothing hidden at a foot: the badge cells count 0 hidden at every zoom (the pills vanish)', () => {
+    for (const zoom of [1, 12, 400]) {
+      const cam = camAt(zoom);
+      const view = { width: W, density: 'famous', level: levelAt(cam) };
+      const cells = pick.footBundles(graph, cam, view, DPR);
+      expect(cells.reduce((n, c) => n + c.hidden, 0)).toBe(0);
+    }
   });
 });

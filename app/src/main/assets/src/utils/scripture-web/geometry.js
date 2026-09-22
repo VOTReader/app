@@ -705,6 +705,16 @@ export const LOD_QUANT = 16;
 /** The level that switches the law OFF (a view without one): every thread drawn. */
 export const LOD_OFF = -1000;
 
+/**
+ * Corbin, 2026-09-21 21:21, on the live fit view: "This looks terrible, I
+ * want to be able to see all the lines." Every ANCHORED thread (a foot on
+ * the screen) is drawn at every zoom, whatever its reveal level says. The
+ * tables are kept and still computed, so the budget can return as a
+ * setting; only the fly-over law (one representative per group) still
+ * hides anything, and the screen applies it only in the panned-up sky.
+ */
+export const LOD_ANCHORED_ALWAYS = true;
+
 /** Fly-over groups: span cells across the log-span axis. */
 export const LOD_SPAN_CELLS = 48;
 
@@ -742,7 +752,7 @@ export function lodShown(lod, essential, anchored, level) {
   if (!(level > LOD_OFF + 1)) return 1;
   const rev = essential ? (lod >>> 8) & 255 : lod & 255;
   const rep = essential ? (lod >>> 17) & 1 : (lod >>> 16) & 1;
-  if (anchored) return level >= rev / LOD_QUANT + LOD_MIN_LEVEL ? 1 : 0;
+  if (anchored) return LOD_ANCHORED_ALWAYS || level >= rev / LOD_QUANT + LOD_MIN_LEVEL ? 1 : 0;
   return /** @type {0|1} */ (rep);
 }
 
@@ -753,7 +763,7 @@ float lodShown(uint lod, float essential, float anchored, float level){
   uint rev = essential > .5 ? ((lod >> 8u) & 255u) : (lod & 255u);
   uint rep = essential > .5 ? ((lod >> 17u) & 1u) : ((lod >> 16u) & 1u);
   float reveal = float(rev)/${glslFloat(LOD_QUANT)} + ${glslFloat(LOD_MIN_LEVEL)};
-  return anchored > .5 ? step(reveal, level) : float(rep);
+  return anchored > .5 ? max(${glslFloat(LOD_ANCHORED_ALWAYS ? 1 : 0)}, step(reveal, level)) : float(rep);
 }`;
 
 /* ── The density law, part 3: strata (density-law.md section 3, 2026-09-21) ──

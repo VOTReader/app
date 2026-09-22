@@ -24,7 +24,7 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, levelOf, STRATA_BOUNDS,
+  maxZoomFor, ribbonStyle, levelOf, STRATA_BOUNDS, LOD_OFF,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -90,9 +90,9 @@ function anchoredDensity(cache, g, cam, v, density) {
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
   if (moved) {
     cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
-    // only what the density law draws: the crowding law divides the deep
-    // alpha by what is on the screen, and hidden threads are not
-    cache.value = countAnchored(g, cam, v.W, density, levelOf(cam.ppv / (v.DPR || 1), cam.total));
+    // every anchored thread is drawn (LOD_ANCHORED_ALWAYS), so the crowding
+    // law counts them all, as before the density law
+    cache.value = countAnchored(g, cam, v.W, density);
   }
   return cache.value / ((v.W || 1) / (v.DPR || 1));
 }
@@ -386,9 +386,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       camY: cam.y > 0 ? cam.y : 0,
       density, rulerDepth: f.ruler,
       // the density law's level (geometry.levelOf): the shader and the hit
-      // test both read it, with the tapped thread and the focus range always
-      // drawn whatever the table says
-      level: levelOf(cam.ppv / (v.DPR || 1), cam.total),
+      // test both read it. Corbin (2026-09-21 21:21): every line at rest;
+      // the fly-over representatives stand in only in the panned-up sky, so
+      // the level is LOD_OFF until the camera has a height
+      level: cam.y > 0 ? levelOf(cam.ppv / (v.DPR || 1), cam.total) : LOD_OFF,
       focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
       focusRange2: focusRef.current.range2 || null,
       // this frame's stand-ins (the bundle pass names them; the shader and the
@@ -534,9 +535,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // The alpha and stroke law lives in geometry.js, not here: it used to be
     // written inline where no harness could import it, so every probe re-typed
     // it and would have measured the old law against a new screen.
-    // under the density law the crowding is what is DRAWN, at every zoom
-    const perCssPx = anchoredDensity(anchoredRef.current, g, cam, v, density);
-    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx, true);
+    // the alpha law as before the density law: thin at the overview, the
+    // deep value past 12x divided by the crowd - every line is drawn again,
+    // and that law was tuned for it (Corbin, 2026-09-21 21:21)
+    const perCssPx = base.localize > 0
+      ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
+    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
     // the density law's badges: what the law hides at each foot cell, and
     // what each fly-over representative stands for (part 2); the pass also
     // names this frame's STAND-INS, which the GL draw below must carry
@@ -821,9 +825,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const [lo, hi] = chapterRange(g, found.chapterIndex);
     const ch = g.chapters[found.chapterIndex];
     const first = refOfVerse(g, lo);
+    const camNow = camRef.current, vNow = viewRef.current;
     return { kind: 'chapter', chapterIndex: found.chapterIndex,
       book: g.books[ch[0]], chapter: ch[1], verses: ch[3], lo, hi,
       connections: countTouching(g, lo, hi, density),
+      // where this chapter's threads go, by the other end's chapter: the
+      // convergence entry point now that nothing is hidden at rest
+      groups: camNow && vNow.W ? bundleGroups(g, camNow, viewFor(), lo, hi, 40).map((grp) => {
+        const r = refOfVerse(g, grp.lo);
+        return Object.assign({ label: r.bookTitle + ' ' + r.chapter }, grp);
+      }) : [],
       // Opening a chapter highlights the WHOLE chapter on arrival.
       cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
   }, [graph, density, viewFor]);
@@ -1375,7 +1386,8 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
   }
   // fly-over representatives: "x n" on the body, where the body is in the sky
-  if (bundles.fly) {
+  // - only while the law is on (the panned-up sky); at rest every fly-over is drawn
+  if (bundles.fly && view.level > LOD_OFF + 1) {
     const standing = new Set(bundles.standIns || []);
     for (const b of bundles.fly.values()) {
       // the line that carries the badge: the representative, or this frame's stand-in
@@ -1802,7 +1814,7 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
           {info.likeIt.toLocaleString()} more like this one &rsaquo;
         </button>
       )}
-      {info.kind === 'bundle' && onGroup && (
+      {(info.kind === 'bundle' || (info.kind === 'chapter' && info.groups && info.groups.length > 0)) && onGroup && (
         <div className="sw-choice-list sw-bundle-groups" role="group" aria-label="Where this bundle goes">
           {info.groups.map((grp) => (
             <button type="button" className="sw-choice-row" key={grp.chapterIndex}
@@ -1810,7 +1822,7 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
               onClick={() => onGroup(info, grp)}>
               <span className="sw-choice-label">{grp.label}</span>
               <span className="sw-choice-meta">{grp.count} {grp.count === 1 ? 'thread' : 'threads'}
-                {grp.hidden > 0 ? ' · ' + grp.hidden + ' not drawn' : ' · all drawn'} · weight {grp.votes}</span>
+                {grp.hidden > 0 ? ' · ' + grp.hidden + ' not drawn' : ''} · weight {grp.votes}</span>
             </button>
           ))}
         </div>

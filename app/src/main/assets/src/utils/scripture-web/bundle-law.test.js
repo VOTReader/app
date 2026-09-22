@@ -47,7 +47,7 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
     expect(typeof pick.groupMembers).toBe('function');
   });
 
-  it('at 12x on Psalm 107 the cells are chapter runs at least BUNDLE_MIN_CSS wide and hide thousands', () => {
+  it('at 12x on Psalm 107 the cells are chapter runs at least BUNDLE_MIN_CSS wide; since landing 6 they hide nothing and count every anchored thread', () => {
     const cam = camAt(12);
     const cells = pick.footBundles(graph, cam, viewAt(cam), DPR);
     expect(cells.length).toBeGreaterThan(5);
@@ -59,9 +59,8 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
     }
     const hidden = cells.reduce((n, c) => n + c.hidden, 0);
     const drawn = cells.reduce((n, c) => n + c.drawn, 0);
-    expect(hidden).toBeGreaterThan(5000);
-    expect(drawn).toBeGreaterThan(20);
-    expect(drawn).toBeLessThan(400);
+    expect(hidden).toBe(0);
+    expect(drawn).toBeGreaterThan(10000);
     // cells tile the frame in order without overlap
     for (let i = 1; i < cells.length; i++) expect(cells[i].lo).toBe(cells[i - 1].hi + 1);
   });
@@ -156,32 +155,42 @@ describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader
     expect(SHADER_SOURCE.vertex).toMatch(/uFocusRange2\.x <= uFocusRange2\.y/);
   });
 
-  it('the picker: a plain focus range no longer forces hidden threads to draw; a pair does', () => {
+  it('the picker: a plain focus range no longer forces hidden threads to draw; a pair does (the hidden ones are fly-overs in the sky since landing 6)', () => {
     const cam = camAt(12);
     const view = viewAt(cam);
-    const cells = pick.footBundles(graph, cam, view, DPR);
-    const cell = cells.reduce((a, b) => (b.hidden > a.hidden ? b : a));
-    const groups = pick.bundleGroups(graph, cam, view, cell.lo, cell.hi);
-    const grp = groups.find((x) => x.hidden > 0);
-    expect(grp).toBeTruthy();
-    const plain = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [cell.lo, cell.hi] }));
-    const pair = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [cell.lo, cell.hi], focusRange2: [grp.lo, grp.hi] }));
+    // a chapter just off the frame's left: its threads crossing the frame are fly-overs, hidden but for the representatives
+    const leftVerse = Math.floor(geo.xToVerse(cam, W, -2 * W));
+    const ci = graph.chapterOfVerse[leftVerse];
+    const [lo, hi] = pick.chapterRange(graph, ci);
     const bare = pick.drawnTest(graph, view);
+    const plain = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [lo, hi] }));
+    // the target chapter of the first hidden crossing thread
+    let grpLo = -1, grpHi = -1;
+    for (let i = 0; i < graph.count && grpLo < 0; i++) {
+      const a = graph.from[i], b = graph.to[i];
+      if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
+      const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      if (x1 < 0 || x0 > W) continue;
+      if (bare(i, geo.arcAnchored(x0, x1, W))) continue;
+      [grpLo, grpHi] = pick.chapterRange(graph, graph.chapterOfVerse[(a >= lo && a <= hi) ? b : a]);
+    }
+    expect(grpLo).toBeGreaterThanOrEqual(0);
+    const pair = pick.drawnTest(graph, Object.assign({}, view, { focusRange: [lo, hi], focusRange2: [grpLo, grpHi] }));
     let hiddenInGroup = 0, hiddenOutside = 0;
     for (let i = 0; i < graph.count; i++) {
       const a = graph.from[i], b = graph.to[i];
-      const inCell = (a >= cell.lo && a <= cell.hi) || (b >= cell.lo && b <= cell.hi);
-      if (!inCell) continue;
+      if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
       const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      if (x1 < 0 || x0 > W) continue;
       const anchored = geo.arcAnchored(x0, x1, W);
       if (bare(i, anchored)) continue;                       // drawn anyway
       expect(plain(i, anchored)).toBe(false);                 // a chapter tap does not make a wall
-      const other = (a >= cell.lo && a <= cell.hi) ? b : a;
-      const inGroup = other >= grp.lo && other <= grp.hi;
+      const other = (a >= lo && a <= hi) ? b : a;
+      const inGroup = other >= grpLo && other <= grpHi;
       expect(pair(i, anchored)).toBe(inGroup);
       if (inGroup) hiddenInGroup++; else hiddenOutside++;
     }
-    expect(hiddenInGroup).toBe(grp.hidden);
+    expect(hiddenInGroup).toBeGreaterThan(0);
     expect(hiddenOutside).toBeGreaterThan(0);
   });
 });
