@@ -315,6 +315,77 @@
   // Best-effort — distinguishes "couldn't find the entry point" (reached
   // =false) from "navigated but the screen crashed" (crashed=true), which
   // is the signal that matters for a modularization regression.
+  /* ── The lazy screens must ARRIVE, not just load ──────────────────────
+     A lazy bundle that lands but never re-renders the app is a screen that
+     never appears. That shipped on 2026-09-22: useLazyBundles subscribed
+     App() to screens-e and screens-f only, so a screen from bundle-g or
+     bundle-h could sit on "Loading…" with its bundle on the page and its
+     component defined on window. The walk below never saw it, because the
+     run PRELOADS every lazy bundle before it starts — the screens are
+     already there by the time anything clicks.
+
+     So this leg runs FIRST, before any preload, and it settles every
+     scripture corpus before it opens anything: a corpus version bump
+     re-renders App, and that is precisely what masked the bug (opening a
+     personal-study screen usually also kicks the VOT corpus). After the
+     click it does not touch the page again — the screen has to appear on
+     its bundle's own signal, which is the thing being tested.
+
+     Reading a failure: a stuck leg strands the walker on a "Loading…" route
+     with no Home button, so every leg after it fails too. The FIRST bundle in
+     the FAIL list is the one to look at. Proved red against the real defect
+     on 2026-09-22 — with the two subscriptions removed the line reads
+     `lazyArrival FAIL:__screensG,__screensH,__screensE,__screensF`, and with
+     them back it reads `lazyArrival ok`. */
+  async function lazyArrival() {
+    var out = { ok: true, legs: [] };
+    var corpusLoaders = ['__loadVotCorpus', '__loadBibleCorpus', '__loadMatthewCorpus'];
+    for (var ci = 0; ci < corpusLoaders.length; ci++) {
+      if (typeof root[corpusLoaders[ci]] === 'function') {
+        try { await root[corpusLoaders[ci]](); } catch (_e) { /* best-effort */ }
+      }
+    }
+    await sleep(250);
+
+    var LEGS = [
+      { bundle: '__screensG', label: 'Personal Study → My Notes (bundle-g)',
+        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes/); },
+        there: function () { return /My Notes/.test(document.body.textContent || ''); } },
+      { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
+        open: async function () { await goHome(); return clickByText(/Audio Readings/); },
+        there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
+      { bundle: '__screensE', label: 'App Configuration → Settings (bundle-e)',
+        open: async function () { await goHome(); return clickByText(/App Configuration|^Settings/); },
+        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
+      { bundle: '__screensF', label: 'Personal Study → Scripture Web (bundle-f)',
+        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/Scripture Web/); },
+        there: function () { return !!document.querySelector('.sw-root'); } },
+    ];
+
+    for (var i = 0; i < LEGS.length; i++) {
+      var leg = LEGS[i];
+      var corpus = root[leg.bundle];
+      var preloaded = !!(corpus && corpus.loaded);
+      var opened = await leg.open();
+      var arrived = false;
+      var sawLoading = false;
+      var deadline = now() + 20000;
+      while (now() < deadline) {
+        if (/Loading/.test(document.body.textContent || '')) sawLoading = true;
+        if (leg.there()) { arrived = true; break; }
+        await sleep(150);
+      }
+      out.legs.push({
+        bundle: leg.bundle, label: leg.label,
+        preloaded: preloaded,      // true means this leg proved nothing this run
+        opened: opened, arrived: arrived, sawLoading: sawLoading,
+      });
+      if (!arrived) out.ok = false;
+    }
+    await goHome();
+    return out;
+  }
+
   async function walkScreens() {
     var out = [];
     // "reached" = we successfully navigated AWAY from home without
@@ -858,6 +929,9 @@
     var report = { startedAt: new Date().toISOString() };
     try {
       report.appMounted = appMounted();
+      // BEFORE any preload: every lazy screen must appear on its own bundle's
+      // signal, with the corpora already settled. See lazyArrival's header.
+      report.lazyArrival = walk ? await lazyArrival() : 'skipped';
       // PF6: Settings/Search/Garden are code-split into the lazy bundle-e; load
       // it so the globals audit + the screen walk below see those globals
       // (they're no longer defined at boot).
@@ -906,6 +980,7 @@
       (report.annotation === 'skipped' || report.annotation.ok) &&
       (report.wtlbAnnotation === 'skipped' || report.wtlbAnnotation.ok) &&
       (report.tabs === 'skipped' || report.tabs.ok) &&
+      (report.lazyArrival === 'skipped' || report.lazyArrival.ok) &&
       report.console.errorsSeen === 0 &&
       report.resourceErrors.total === 0;
     report.summary =
@@ -916,6 +991,10 @@
       ' | letterAnn ' + (report.annotation === 'skipped' ? 'skipped' : (report.annotation.ok ? 'ok' : 'FAIL')) +
       ' | wtlbAnn ' + (report.wtlbAnnotation === 'skipped' ? 'skipped' : (report.wtlbAnnotation.ok ? 'ok' : 'FAIL')) +
       ' | tabs ' + (report.tabs === 'skipped' ? 'skipped' : (report.tabs.ok ? 'ok' : 'FAIL')) +
+      ' | lazyArrival ' + (report.lazyArrival === 'skipped' ? 'skipped'
+        : (report.lazyArrival.ok ? 'ok'
+          : 'FAIL:' + report.lazyArrival.legs.filter(function (l) { return !l.arrived; })
+              .map(function (l) { return l.bundle; }).join(','))) +
       ' | console.error ' + report.console.errorsSeen +
       ' | resource404 ' + report.resourceErrors.total +
       ' | ' + Math.round(now() - t0) + 'ms';
