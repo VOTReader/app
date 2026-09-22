@@ -60,6 +60,9 @@ export function AudioSpeedControl({ rate }) {
     hold.current = h;
   };
 
+  // The number box opens EMPTY with the current rate as placeholder: Chrome
+  // refuses selection APIs on type=number, so a pre-filled "1.5" made a typed
+  // "3.5" read "1.535" (headless look, 2026-09-21). Empty = cancel.
   const commitTyped = () => {
     const n = Number(typed);
     if (typed !== '' && Number.isFinite(n) && n > 0) applyPct(Math.round(n * 100));
@@ -87,7 +90,7 @@ export function AudioSpeedControl({ rate }) {
         <span>Speed</span>
         <strong className="audio-speed-readout">
           {typed == null ? (
-            <button type="button" aria-label="Speed, tap to type a value" onClick={() => setTyped(String(Math.round(rate * 100) / 100))}>
+            <button type="button" aria-label="Speed, tap to type a value" onClick={() => setTyped('')}>
               {formatAudioRate(rate)}
             </button>
           ) : (
@@ -99,6 +102,7 @@ export function AudioSpeedControl({ rate }) {
               max={AUDIO_RATE_MAX}
               step={0.01}
               value={typed}
+              placeholder={String(Math.round(rate * 100) / 100)}
               autoFocus
               onChange={(event) => setTyped(event.target.value)}
               onBlur={commitTyped}
