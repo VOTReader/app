@@ -24,6 +24,8 @@
 */
 
 import * as React from 'react';
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
 import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker.js';
@@ -182,3 +184,14 @@ if (typeof navigator !== 'undefined' && navigator && !navigator.locks) {
     catch (_e2) { /* environment refuses — merge path falls back to blob write */ }
   }
 }
+
+// (7) Unmount what a test rendered, after EVERY test. Testing Library only
+// registers its own auto-cleanup when `afterEach` is a global, and this config
+// runs with globals off, so it never did: 113 files call cleanup() by hand and
+// the rest left every rendered tree MOUNTED into the next test, listeners,
+// timers, portals and body classes included. The flake hunt's shuffled runs
+// caught it through use-scroll-memory: a hook left mid-restore kept
+// body.scroll-restoring on, and the next file-order test saw it
+// (--sequence.shuffle --sequence.seed=11 / 2 / 3333). cleanup() is idempotent,
+// so the files that already call it are unaffected.
+afterEach(() => { cleanup(); });
