@@ -22,6 +22,11 @@ const { player, setPlayerState } = vi.hoisted(() => {
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
 import { AudioLibraryScreen } from './AudioLibraryScreen.jsx';
+import * as Shelf from '../components/AudioShelf.jsx';
+import * as AudioTrack from '../../utils/audio-track.js';
+import * as AudioCoverage from '../../utils/audio-coverage.js';
+import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import * as AT from '../../utils/audio-track.js';
 
 const savedTrack = {
@@ -46,6 +51,15 @@ function manyRecent(count) {
 function installGlobals({ saved = [savedTrack], recent = [recentTrack], activeSaved = true, votManifest = true } = {}) {
   globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
   globalThis.LibraryNav = () => null;
+  /* The bundle-d slots these screens read across the bundle boundary since
+     landing 24 (AudioShelf's rows and icons, the seek slider, the coverage
+     badge, the audio tables). They are installed from THIS file's graph, not
+     a shared setup: the vi.mock above only reaches modules imported here, and
+     a shelf row bound to the real player would call straight past the fake. */
+  Object.assign(globalThis, Shelf, AudioTrack, AudioCoverage, { AudioSeekSlider, CoverageBadge });
+  // The screen reads the player from its window slot now (bundle-h reaches
+  // across to bundle-d's one player); this is the same fake, installed there.
+  globalThis.AudioPlayer = player;
   globalThis.COLLECTIONS = [{ volKey: 'one', cardId: 'vot-one-index', label: 'Volume One' }];
   globalThis.COL_BY_KEY = new Map([['one', { letterScreen: 'vot-one-letter' }]]);
   delete globalThis.AUDIO_MANIFEST;
@@ -79,6 +93,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  delete globalThis.AudioPlayer;
   for (const key of ['ScreenLayout', 'LibraryNav', 'COLLECTIONS', 'COL_BY_KEY', 'AUDIO_MANIFEST', 'BIBLE_AUDIO_MANIFEST', 'AudioLibraryStore']) delete globalThis[key];
   localStorage.removeItem('vot-audio-recent-open');
 });

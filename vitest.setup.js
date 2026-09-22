@@ -30,9 +30,17 @@ import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker
 import { useRailMode } from './app/src/main/assets/src/hooks/use-rail-mode.js';
 import { suppressNextHistoryPush, clearSuppressNextHistoryPush } from './app/src/main/assets/src/hooks/use-history-sync.js';
 import { SheetHandle } from './app/src/main/assets/src/ui/components/SheetHandle.jsx';
+/* NOT here, deliberately: the audio machinery bundle-h's Listening Library
+   screens read as window slots (AudioShelf's rows and icons, the seek slider,
+   the coverage badge, the audio tables). A module imported in this setup file
+   is CACHED before any test file's vi.mock is registered, so the copies it
+   handed out were bound to the REAL audio-player — and three of the four
+   audio suites mock the player, so a row's Play reached the wrong object.
+   Each of those suites installs the slots from its own graph instead. */
 
 // (1) React as a global.
 globalThis.React = React;
+
 // (1b) W1.5(a.2) — useModalRegistry + modalRegistry as globals.
 //      ConfirmStrip (and any other component that participates in the
 //      Escape-key gate) references useModalRegistry as a free variable

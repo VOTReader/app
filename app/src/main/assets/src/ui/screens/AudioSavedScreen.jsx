@@ -6,8 +6,12 @@
    hub carries only the one row that leads to it.
 */
 
-import { AudioPlayer } from '../../utils/audio-player.js';
-import { AudioShelfRow, SearchIcon, audioLibraryStore, trackSearchText, useAudioPositions } from '../components/AudioShelf.jsx';
+/* Cluster H (esbuild bundle-h.js, lazy) since 2026-09-22, landing 24. The
+   player itself does NOT come along: AudioPlayer, the AudioShelf rows, icons
+   and position hook, AudioSeekSlider, CoverageBadge and the audio tables stay
+   in bundle-d, where AudioPlayerBar and AudioManagerSheet reach them on every
+   screen. This file reads them as free globals at call time — one player, one
+   shelf, one copy of each table. */
 
 /**
  * @param {{

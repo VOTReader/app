@@ -92,6 +92,21 @@ import { writeContainer, readContainer, isContainerMagic } from '../utils/backup
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
 import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
 import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js';
+/* The Listening Library screens went lazy (bundle-h, landing 24) while all of
+   this stayed here, because AudioPlayerBar and AudioManagerSheet are mounted in
+   the always-present shell and play on every screen. The library reads these
+   across the bundle boundary: a second bundled copy of audio-player.js would be
+   TWO players, and a second AudioShelf two module states of one row. */
+import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../utils/audio-track.js';
+import { COVERAGE_READ_ALONG, bibleEditionCoverage } from '../utils/audio-coverage.js';
+import { AudioSeekSlider } from './components/AudioSeekSlider.jsx';
+import { CoverageBadge } from './components/CoverageBadge.jsx';
+import {
+  ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
+  StarIcon, TextIcon, audioLibraryStore, audioPositionsStore, hasTextDestination,
+  relativePlayedAt, remainingLabel, renditionRemainingLabel, trackMeta, trackName,
+  trackSearchText, useAudioPositions,
+} from './components/AudioShelf.jsx';
 // Read-along timing loaders (c41). Published under the window names the old
 // index.html block used, so smoke/e2e keep a handle and any classic-script
 // caller still works; the component imports the module directly.
@@ -175,10 +190,6 @@ import { BibleChapterView } from './screens/BibleChapterView.jsx';
 import { ChapterView } from './screens/ChapterView.jsx';
 import { LibraryScreen } from './screens/LibraryScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
-import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
-import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
-import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
-import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 
 import { StudiesHome } from './screens/StudiesHome.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
@@ -251,6 +262,13 @@ Object.assign(window, {
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
   AudioPlayer, audioTrackUrl,
+  // …and the shelf parts + audio tables bundle-h reads as free globals.
+  BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
+  COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,
+  ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
+  StarIcon, TextIcon, audioLibraryStore, audioPositionsStore, hasTextDestination,
+  relativePlayedAt, remainingLabel, renditionRemainingLabel, trackMeta, trackName,
+  trackSearchText, useAudioPositions,
   __loadAudioSync, __audioSyncStore, __loadBibleSync, __bibleSyncStore,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
@@ -282,7 +300,7 @@ Object.assign(window, {
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen,
-  VolumesHome, AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, StudiesHome, AboutScreen,
+  VolumesHome, StudiesHome, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,

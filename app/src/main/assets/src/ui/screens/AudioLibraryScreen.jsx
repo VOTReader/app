@@ -8,16 +8,12 @@
    screen-routes remains the source of truth for text destinations.
 */
 
-import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../../utils/audio-track.js';
-import { COVERAGE_READ_ALONG, bibleEditionCoverage } from '../../utils/audio-coverage.js';
-import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
-import { CoverageBadge } from '../components/CoverageBadge.jsx';
-import {
-  ArrowIcon, AudioShelfRow, ChevronIcon, PauseIcon, PlayIcon, StarIcon, TextIcon,
-  audioLibraryStore, hasTextDestination, trackMeta, trackName, useAudioPositions,
-} from '../components/AudioShelf.jsx';
-import { scrollBehavior } from '../../utils/reduced-motion.js';
+/* Cluster H (esbuild bundle-h.js, lazy) since 2026-09-22, landing 24. The
+   player itself does NOT come along: AudioPlayer, the AudioShelf rows, icons
+   and position hook, AudioSeekSlider, CoverageBadge and the audio tables stay
+   in bundle-d, where AudioPlayerBar and AudioManagerSheet reach them on every
+   screen. This file reads them as free globals at call time — one player, one
+   shelf, one copy of each table. */
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */

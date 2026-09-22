@@ -46,7 +46,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-utbEdOw4glISIH3+3DSYyfPiDyzrc5MwVHtB2e8Om8s=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-OZZskKxH5d2nH7fpmheWhG0lWQwj2i4yj0e3WDqinZc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-Yvrny+W+BHt4tajyEyZv3n6TTjVrKRCEIMxdthWjShw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -286,6 +286,12 @@
     var screensG = window.__makeLazyLoader('screens-g', 'dist/bundle-g.js', null);
     window.__screensG = screensG.corpus;
     window.__loadScreensG = screensG.load;
+    // The Listening Library (hub, Volumes, a collection, saved) — the PLAYER
+    // stays in bundle-d and plays on every screen; only the browsing surface
+    // is lazy. Same no-finishFn contract as screens-e/-f/-g.
+    var screensH = window.__makeLazyLoader('screens-h', 'dist/bundle-h.js', null);
+    window.__screensH = screensH.corpus;
+    window.__loadScreensH = screensH.load;
     // The read-along timing files (src/data/audio-sync.js and the per-edition
     // bible-sync-<edition>.js) are lazy too, but their loaders live in
     // src/utils/sync-loaders.js (bundle-d), NOT here: the deploy and the APK

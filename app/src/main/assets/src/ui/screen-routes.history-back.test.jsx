@@ -54,6 +54,12 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).HomeScreen = () => null;
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
   /** @type {any} */ (globalThis).MilestonesScreen = () => null;
+  // The Listening Library went lazy in landing 24 — its routes render behind a
+  // typeof guard, so the origin chain these cases walk needs them defined.
+  /** @type {any} */ (globalThis).AudioLibraryScreen = () => null;
+  /** @type {any} */ (globalThis).AudioVolumesScreen = () => null;
+  /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
+  /** @type {any} */ (globalThis).AudioSavedScreen = () => null;
   // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
   // rendered unguarded by their routes, so they must exist as real globals.
   /** @type {any} */ (globalThis).NotesIndexScreen = () => null;
@@ -80,6 +86,10 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
   delete /** @type {any} */ (globalThis).MilestonesScreen;
+  delete /** @type {any} */ (globalThis).AudioLibraryScreen;
+  delete /** @type {any} */ (globalThis).AudioVolumesScreen;
+  delete /** @type {any} */ (globalThis).AudioCollectionScreen;
+  delete /** @type {any} */ (globalThis).AudioSavedScreen;
   delete /** @type {any} */ (globalThis).NotesIndexScreen;
   delete /** @type {any} */ (globalThis).LinksScreen;
   delete /** @type {any} */ (globalThis).BookmarksScreen;

@@ -42,10 +42,6 @@
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
-import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
-import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
-import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
-import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 
@@ -976,7 +972,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'audio-library': () => (
+    'audio-library': () => typeof AudioLibraryScreen !== 'undefined' ? (
       <AudioLibraryScreen
         onBack={goNavOrigin}
         backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library'
@@ -991,8 +987,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'audio-library-volumes': () => (
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    'audio-library-volumes': () => typeof AudioVolumesScreen !== 'undefined' ? (
       <AudioVolumesScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1006,8 +1002,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'audio-library-collection': () => (
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    'audio-library-collection': () => typeof AudioCollectionScreen !== 'undefined' ? (
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
@@ -1018,8 +1014,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'audio-library-saved': () => (
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    'audio-library-saved': () => typeof AudioSavedScreen !== 'undefined' ? (
       <AudioSavedScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1029,7 +1025,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     'matthew-idx': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');

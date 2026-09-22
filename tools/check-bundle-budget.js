@@ -51,8 +51,10 @@ const BUDGETS = [
   // the ceiling comes down again (502,678 x 1.15 = 578,079 -> the hundred above).
   // Landing 23: Milestones and History follow them (-10,660 B). About was tried
   // and sent back - use-tabs.js opens a FRESH INSTALL on it, so it is boot-path
-  // weight. Ceiling down again by the same rule (492,018 x 1.15 = 565,820).
-  { file: 'bundle-d.js', measured: 492018, max: 565800 },   // most screens/sheets/utils
+  // weight. Landing 24: the Listening Library's four screens (-22,732 B) - the
+  // PLAYER stayed, which is why bundle-h is only 24 KB. Ceiling down by the same
+  // rule (469,286 x 1.15 = 539,679 -> the hundred above).
+  { file: 'bundle-d.js', measured: 469286, max: 539700 },   // most screens/sheets/utils
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
@@ -96,6 +98,11 @@ const BUDGETS = [
   // Landing 23 added Milestones and History — the same law, two more screens:
   // 65,601 x 1.15 = 75,441 -> the hundred above.
   { file: 'bundle-g.js', measured: 65601, max: 75500 },     // the screens you go TO, not through
+  // The Listening Library, split out on 2026-09-22 (landing 24): the browsing
+  // surface only. audio-player.js, AudioShelf, AudioSeekSlider and CoverageBadge
+  // stay in bundle-d for the shell's player bar, so this stays SMALL - a jump
+  // here means the player came along. 24,353 x 1.15 = 28,006 -> the hundred above.
+  { file: 'bundle-h.js', measured: 24353, max: 28100 },     // Listening Library hub / Volumes / collection / saved
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

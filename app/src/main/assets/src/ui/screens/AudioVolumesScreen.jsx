@@ -8,8 +8,12 @@
    recordings screen.
 */
 
-import { AudioPlayer } from '../../utils/audio-player.js';
-import { ArrowIcon } from '../components/AudioShelf.jsx';
+/* Cluster H (esbuild bundle-h.js, lazy) since 2026-09-22, landing 24. The
+   player itself does NOT come along: AudioPlayer, the AudioShelf rows, icons
+   and position hook, AudioSeekSlider, CoverageBadge and the audio tables stay
+   in bundle-d, where AudioPlayerBar and AudioManagerSheet reach them on every
+   screen. This file reads them as free globals at call time — one player, one
+   shelf, one copy of each table. */
 
 /** The VOT audio manifest rides the lazy corpus — until it lands, no
  *  collection can honestly claim to have (or lack) recordings. */

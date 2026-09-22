@@ -866,6 +866,9 @@
       // of bundle-d on 2026-09-22): the audit and the walk below expect those
       // screens as globals, and they arrive with the bundle, not with boot.
       if (typeof root.__loadScreensG === 'function') { try { await root.__loadScreensG(); } catch (_e) {} }
+      // …and bundle-h (the Listening Library, split out on 2026-09-22): the
+      // screen walk below opens the library, which no longer exists at boot.
+      if (typeof root.__loadScreensH === 'function') { try { await root.__loadScreensH(); } catch (_e) {} }
       report.globals = auditGlobals();
       report.dataWiring = auditDataWiring();
       report.screens = walk ? await walkScreens() : 'skipped';

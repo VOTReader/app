@@ -5,6 +5,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioCollectionScreen } from './AudioCollectionScreen.jsx';
+import * as Shelf from '../components/AudioShelf.jsx';
+import * as AudioTrack from '../../utils/audio-track.js';
+import * as AudioCoverage from '../../utils/audio-coverage.js';
+import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
 
 /** The bits of HTMLAudioElement the player touches (audio-player.test.js pattern). */
 class FakeAudio extends EventTarget {
@@ -34,6 +39,15 @@ const LETTERS = [
 function installGlobals() {
   globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
   globalThis.LibraryNav = () => null;
+  /* The bundle-d slots these screens read across the bundle boundary since
+     landing 24 (AudioShelf's rows and icons, the seek slider, the coverage
+     badge, the audio tables). They are installed from THIS file's graph, not
+     a shared setup: the vi.mock above only reaches modules imported here, and
+     a shelf row bound to the real player would call straight past the fake. */
+  Object.assign(globalThis, Shelf, AudioTrack, AudioCoverage, { AudioSeekSlider, CoverageBadge });
+  // The screen reads the player from its window slot now (bundle-h reaches
+  // across to bundle-d's one player); this is the same fake, installed there.
+  globalThis.AudioPlayer = AudioPlayer;
   globalThis.COL_BY_KEY = new Map([['one', { volKey: 'one', label: 'Volume One', kind: 'letter', letterScreen: 'vot-one-letter' }]]);
   globalThis.colPreface = () => null;
   globalThis.colLetterArr = (col) => (col && col.volKey === 'one' ? LETTERS : []);
@@ -77,6 +91,7 @@ beforeEach(() => {
 afterEach(() => {
   AudioPlayer.stop();   // public reset — a second module instance would fork the singleton
   cleanup();
+  delete globalThis.AudioPlayer;
   for (const key of ['ScreenLayout', 'LibraryNav', 'COL_BY_KEY', 'colPreface', 'colLetterArr',
     'AUDIO_MANIFEST', 'AUDIO_ALTERNATES', 'AUDIO_SECTIONS', 'BIBLE_AUDIO_BOOKS', 'BIBLE_AUDIO_MANIFEST',
     'AudioPositionsStore', 'Audio']) delete globalThis[key];
