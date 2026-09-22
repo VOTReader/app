@@ -556,14 +556,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
     const tb = topbarRef.current;
     const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * v.DPR : 0;
-    const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, density, focusRef.current.arc);
-    if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
     // the density law's badges: what the law hides at each foot cell, and
     // what each fly-over representative stands for (part 2)
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
-    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles);
-    // the strata's legend, once the reader has panned up into them (part 3)
-    if (cam.y > 0) drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles);
+    // the strata's legend, once the reader has panned up into them (part 3);
+    // drawn first so the labels and badges keep off its box
+    const legendBox = cam.y > 0 ? drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles) : null;
+    const reserved = legendBox ? [legendBox] : [];
+    const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
+    if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
+    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, bundles);
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
@@ -1309,6 +1311,7 @@ function bundlesFor(cache, g, cam, view, v, density) {
 function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   const boxes = [];
   if (!canvas || !g || !g.count || !bundles) return boxes;
+  const taken = view.reserved ? view.reserved.slice() : [];
   const ctx = canvas.getContext('2d');
   if (!ctx) return boxes;
   const DPR = v.DPR, W = v.W;
@@ -1326,7 +1329,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     const w = ctx.measureText(text).width + fs * 0.9, h = fs * 1.35;
     const box = { x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 };
     if (box.x1 < 0 || box.x0 > W) return null;
-    for (const b of boxes) {
+    for (const b of boxes.concat(taken)) {
       if (box.x0 < b.x1 + 3 * DPR && box.x1 > b.x0 - 3 * DPR && box.y0 < b.y1 && box.y1 > b.y0) return null;
     }
     const r = h / 2;
@@ -1386,9 +1389,9 @@ function rampColorAt(span, total) {
 }
 
 function drawStrataLegend(canvas, g, cam, view, v, chrome, bundles) {
-  if (!canvas || !g || !g.count) return;
+  if (!canvas || !g || !g.count) return null;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return null;
   const DPR = v.DPR;
   const fs = BADGE_FONT_CSS * DPR;
   const rows = strataCounts(g, cam, view, bundles && bundles.fly);
@@ -1400,6 +1403,8 @@ function drawStrataLegend(canvas, g, cam, view, v, chrome, bundles) {
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.lineJoin = 'round';
+  const y0 = y - fs * 0.8;
+  let widest = 0;
   for (let k = rows.length - 1; k >= 0; k--) {
     const r = rows[k];
     const lo = k === 0 ? 1 : STRATA_BOUNDS[k - 1];
@@ -1413,9 +1418,11 @@ function drawStrataLegend(canvas, g, cam, view, v, chrome, bundles) {
     ctx.strokeText(text, x + fs * 2.2, y);
     ctx.fillStyle = 'rgba(' + ink + ',0.85)';
     ctx.fillText(text, x + fs * 2.2, y);
+    widest = Math.max(widest, ctx.measureText(text).width);
     y += fs * 1.55;
   }
   ctx.restore();
+  return { x0: x - fs * 0.5, x1: x + fs * 2.2 + widest + fs * 0.5, y0, y1: y - fs * 0.6 };
 }
 
 /* ── the references beside the lines ────────────────────────────────────
@@ -1445,7 +1452,8 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
   const gold = chrome.isLight ? '122,92,16' : '232,192,80';
   const fs = chrome.fsRuler * DPR;
-  const placed = [];
+  // boxes already taken (the strata legend), so a label is never written over them
+  const placed = view.reserved ? view.reserved.slice() : [];
   let drawn = 0;
   const camY = cam.y > 0 ? cam.y : 0;
   const skyTop = view.inset > 0 ? view.inset : 0;
