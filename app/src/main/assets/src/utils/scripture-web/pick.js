@@ -25,18 +25,24 @@
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
-  lodShown, LOD_OFF,
+  lodShown, LOD_OFF, FLYOVER_MARGIN,
 } from './geometry.js';
-import { bucketDrawCount, fansOf, lodOf } from './decode.js';
+import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
 
 /**
  * The density law as the picker applies it: a closure over the view that
  * answers "is thread i drawn?" exactly as the shader's lodShown + its focus
  * override do. A view without a level switches the law off (every thread).
  *
+ * The overrides: the tapped thread (focusArc) is always drawn, and so is a
+ * chosen GROUP - a thread with a foot in focusRange and its other foot in
+ * focusRange2 (a bundle badge's cell and one target chapter). A plain
+ * focusRange (a chapter tap) spotlights what is drawn and reveals nothing:
+ * lighting a chapter's thousand hidden threads would be the wall again.
+ *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{level?:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null)}} view
+ *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null)}} view
  * @returns {(i:number, anchored:(0|1)) => boolean}
  */
 export function drawnTest(g, view) {
@@ -45,13 +51,16 @@ export function drawnTest(g, view) {
   const { lod } = lodOf(g);
   const essential = view.density === 'essential';
   const focusArc = typeof view.focusArc === 'number' ? view.focusArc : -1;
-  const range = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
+  const r1 = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
+  const r2 = r1 && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
   return (i, anchored) => {
     if (lodShown(lod[i], essential, anchored, level)) return true;
     if (i === focusArc) return true;
-    if (range) {
+    if (r2) {
       const a = g.from[i], b = g.to[i];
-      return (a >= range[0] && a <= range[1]) || (b >= range[0] && b <= range[1]);
+      const a1 = a >= r1[0] && a <= r1[1], b1 = b >= r1[0] && b <= r1[1];
+      const a2 = a >= r2[0] && a <= r2[1], b2 = b >= r2[0] && b <= r2[1];
+      return (a1 && b2) || (b1 && a2);
     }
     return false;
   };
@@ -466,4 +475,224 @@ export function focusChapter(g, cam, width, chapterIndex, ppv) {
 }
 
 /** Screen x of a verse — re-exported so callers need only this module. */
+/* ── The density law, part 2: convergence (density-law.md section 2) ──────
+ *
+ * What the law hides is not gone: at each in-view FOOT CELL the hidden
+ * anchored threads are a bundle with a count badge, and each fly-over
+ * REPRESENTATIVE stands for its group with a count. These passes produce
+ * those numbers for the badge layer, over the same visible chunks and the
+ * same drawn test the shader uses, so a badge never counts a drawn line and
+ * never misses a hidden one.
+ */
+
+/** Narrowest badge cell, CSS px: chapters narrower than this merge into runs. */
+export const BUNDLE_MIN_CSS = 34;
+
+/** CSS px per verse from which a badge cell is one VERSE, not a chapter (the tap law's threshold). */
+export const BUNDLE_VERSE_PPV_CSS = 26;
+
+/**
+ * @typedef {{ lo:number, hi:number, x:number, hidden:number, drawn:number,
+ *   chapterLo:number, chapterHi:number, verse:boolean }} FootBundle
+ *   lo..hi: the cell's verse range (inclusive); x: its centre, device px;
+ *   hidden: anchored threads with a foot here that the law did not draw;
+ *   drawn: those it did; chapterLo..chapterHi: the chapters the cell spans;
+ *   verse: the cell is a single verse.
+ */
+
+/**
+ * The badge cells across the frame and what each hides. Cells are verses
+ * once a verse is BUNDLE_VERSE_PPV_CSS wide, else chapters, adjacent
+ * chapters merged left to right until a cell is BUNDLE_MIN_CSS wide (a
+ * badge must be readable and tappable). A thread counts once per cell that
+ * holds a foot of it.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, density:import('./decode.js').Density, level?:number,
+ *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null)}} view
+ * @param {number} dpr
+ * @returns {FootBundle[]}
+ */
+export function footBundles(g, cam, view, dpr) {
+  const { width, density } = view;
+  const ppvCss = cam.ppv / (dpr || 1);
+  const minVerses = (BUNDLE_MIN_CSS * (dpr || 1)) / cam.ppv;
+  const lo = Math.max(0, Math.floor(xToVerse(cam, width, -FLYOVER_MARGIN)));
+  const hi = Math.min(g.total - 1, Math.ceil(xToVerse(cam, width, width + FLYOVER_MARGIN)));
+  if (hi < lo) return [];
+  /** @type {FootBundle[]} */
+  const cells = [];
+  if (ppvCss >= BUNDLE_VERSE_PPV_CSS) {
+    for (let v = lo; v <= hi; v++) {
+      const ci = g.chapterOfVerse[v];
+      cells.push({ lo: v, hi: v, x: 0, hidden: 0, drawn: 0, chapterLo: ci, chapterHi: ci, verse: true });
+    }
+  } else {
+    let ci = g.chapterOfVerse[lo];
+    while (ci < g.chapters.length && g.chapters[ci][2] <= hi) {
+      const start = g.chapters[ci][2];
+      let end = ci;
+      // merge chapters until the run is wide enough
+      while (g.chapters[end][2] + g.chapters[end][3] - start < minVerses && end + 1 < g.chapters.length) end++;
+      const last = g.chapters[end][2] + g.chapters[end][3] - 1;
+      cells.push({ lo: start, hi: last, x: 0, hidden: 0, drawn: 0, chapterLo: ci, chapterHi: end, verse: false });
+      ci = end + 1;
+    }
+  }
+  if (!cells.length) return cells;
+  // verse -> cell index over the covered range, for the counting pass
+  const first = cells[0].lo, span = cells[cells.length - 1].hi - first + 1;
+  const cellOf = new Int32Array(span).fill(-1);
+  for (let c = 0; c < cells.length; c++) {
+    for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
+  }
+  const drawn = drawnTest(g, view);
+  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  const chunkSize = g.chunkSize || 256;
+  for (const bucket of g.buckets) {
+    const draw = bucketDrawCount(bucket, density);
+    const chunks = bucket.chunks || [];
+    const chunkCount = Math.ceil(draw / chunkSize);
+    for (let c = 0; c < chunkCount; c++) {
+      const ext = chunks[c];
+      if (ext && (ext[1] < first || ext[0] > first + span - 1)) continue;
+      const start = bucket.off + c * chunkSize;
+      const end = Math.min(start + chunkSize, bucket.off + draw);
+      for (let i = start; i < end; i++) {
+        const a = g.from[i], b = g.to[i];
+        const ca = a - first >= 0 && a - first < span ? cellOf[a - first] : -1;
+        const cb = b - first >= 0 && b - first < span ? cellOf[b - first] : -1;
+        if (ca < 0 && cb < 0) continue;
+        const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
+        const anchored = arcAnchored(x0, x1, width);
+        if (!anchored) continue;
+        const shown = drawn(i, anchored);
+        if (ca >= 0) { if (shown) cells[ca].drawn++; else cells[ca].hidden++; }
+        if (cb >= 0 && cb !== ca) { if (shown) cells[cb].drawn++; else cells[cb].hidden++; }
+      }
+    }
+  }
+  for (const cell of cells) cell.x = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
+  return cells;
+}
+
+/**
+ * @typedef {{ key:number, rep:number, count:number }} FlyBundle
+ *   rep: the representative's index (-1 when the group's representative does
+ *   not cross the frame); count: the group's threads crossing the frame.
+ */
+
+/**
+ * The fly-over groups crossing the frame and their counts, keyed by
+ * decode.lodOf's group key. The representative is the one thread of each
+ * the shader draws (its badge carries the count).
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
+ * @returns {Map<number, FlyBundle>}
+ */
+export function flyBundles(g, cam, view) {
+  const { width, density } = view;
+  const { lod, groupOf } = lodOf(g);
+  const essential = density === 'essential';
+  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
+  const chunkSize = g.chunkSize || 256;
+  /** @type {Map<number, FlyBundle>} */
+  const out = new Map();
+  for (const bucket of g.buckets) {
+    const draw = bucketDrawCount(bucket, density);
+    const chunks = bucket.chunks || [];
+    const chunkCount = Math.ceil(draw / chunkSize);
+    for (let c = 0; c < chunkCount; c++) {
+      const ext = chunks[c];
+      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
+      const start = bucket.off + c * chunkSize;
+      const end = Math.min(start + chunkSize, bucket.off + draw);
+      for (let i = start; i < end; i++) {
+        const x0 = (g.from[i] - camX) * ppv + half;
+        const x1 = (g.to[i] - camX) * ppv + half;
+        if (x1 < 0 || x0 > width) continue;
+        if (arcAnchored(x0, x1, width)) continue;
+        const key = groupOf[i];
+        let b = out.get(key);
+        if (!b) { b = { key, rep: -1, count: 0 }; out.set(key, b); }
+        b.count++;
+        if (lodShown(lod[i], essential, 0, 0)) b.rep = i;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The members of one thread's fly-over group, strongest first: the list
+ * behind a representative's "n more like it".
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {number} index - any member
+ * @param {import('./decode.js').Density} density
+ * @param {number} [limit]
+ * @returns {number[]}
+ */
+export function groupMembers(g, index, density, limit) {
+  const { groupOf } = lodOf(g);
+  const key = groupOf[index];
+  const min = minVotesFor(density, g.densityTiers);
+  const out = [];
+  for (let i = 0; i < g.count; i++) if (groupOf[i] === key && g.votes[i] >= min) out.push(i);
+  out.sort((a, b) => g.votes[b] - g.votes[a] || a - b);
+  return limit ? out.slice(0, limit) : out;
+}
+
+/**
+ * @typedef {{ chapterIndex:number, lo:number, hi:number, count:number, hidden:number, votes:number }} BundleGroup
+ *   one target chapter of a foot cell's threads: how many, how many of them
+ *   the law hides here, and the strongest's votes.
+ */
+
+/**
+ * A foot cell's threads grouped by the chapter at the OTHER end - the list
+ * behind a "+n" badge. Threads with both feet in the cell group under their
+ * own chapter. Sorted by count, then votes.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, ppv:number, total:number}} cam
+ * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
+ * @param {number} lo @param {number} hi - the cell's verse range
+ * @param {number} [limit]
+ * @returns {BundleGroup[]}
+ */
+export function bundleGroups(g, cam, view, lo, hi, limit) {
+  const { width, density } = view;
+  const drawn = drawnTest(g, view);
+  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  /** @type {Map<number, BundleGroup>} */
+  const groups = new Map();
+  for (const bucket of g.buckets) {
+    const end = bucket.off + bucketDrawCount(bucket, density);
+    for (let i = bucket.off; i < end; i++) {
+      const a = g.from[i], b = g.to[i];
+      const aIn = a >= lo && a <= hi, bIn = b >= lo && b <= hi;
+      if (!aIn && !bIn) continue;
+      const other = aIn ? b : a;
+      const ci = g.chapterOfVerse[other];
+      let grp = groups.get(ci);
+      if (!grp) {
+        const ch = g.chapters[ci];
+        grp = { chapterIndex: ci, lo: ch[2], hi: ch[2] + ch[3] - 1, count: 0, hidden: 0, votes: 0 };
+        groups.set(ci, grp);
+      }
+      grp.count++;
+      if (g.votes[i] > grp.votes) grp.votes = g.votes[i];
+      const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
+      if (!drawn(i, arcAnchored(x0, x1, width))) grp.hidden++;
+    }
+  }
+  const out = [...groups.values()].sort((p, q) => q.count - p.count || q.votes - p.votes || p.chapterIndex - q.chapterIndex);
+  return limit ? out.slice(0, limit) : out;
+}
+
 export { verseToX, xToVerse };

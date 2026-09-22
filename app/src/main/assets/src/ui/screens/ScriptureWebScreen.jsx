@@ -28,7 +28,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, visibleArcs, threadEnds,
+  arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -215,6 +215,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const focusRef = React.useRef({ arc: -1, range: null });
   const topbarRef = React.useRef(null);
   const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
+  // the density law's badges (part 2): the counted cells, cached across
+  // frames while the camera barely moves, and the boxes drawn last frame,
+  // which the tap test reads before it reaches the lines
+  const bundleRef = React.useRef({ key: '', cells: [], fly: null });
+  const badgeBoxesRef = React.useRef([]);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
@@ -383,6 +388,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // drawn whatever the table says
       level: levelOf(cam.ppv / (v.DPR || 1), cam.total),
       focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
+      focusRange2: focusRef.current.range2 || null,
     };
   }, [density, frame]);
 
@@ -550,6 +556,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * v.DPR : 0;
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
+    // the density law's badges: what the law hides at each foot cell, and
+    // what each fly-over representative stands for (part 2)
+    const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
+    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles);
+    if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
+    // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
+    if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
@@ -671,6 +684,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!g || !cam || !v.W) return [];
     const px = cx * v.DPR, py = cy * v.DPR;
     const view = viewFor();
+    if (mode !== 'personal') {
+      // a badge is a real target: the bundle it counts, or the representative it rides
+      for (const box of badgeBoxesRef.current) {
+        if (px < box.x0 || px > box.x1 || py < box.y0 || py > box.y1) continue;
+        if (box.cell) return [{ kind: 'bundle', cell: box.cell, distance: 0 }];
+        if (box.rep >= 0) {
+          return [{ kind: 'arc', distance: 0, hit: {
+            index: box.rep, distance: 0, from: g.from[box.rep], to: g.to[box.rep], votes: g.votes[box.rep],
+          } }];
+        }
+      }
+    }
     if (mode === 'personal') {
       const p = personalRef.current;
       const opts = railOpts();
@@ -750,7 +775,30 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
         from: found.hit.from, to: found.hit.to,
         cards: [verseCard('From', a), verseCard('To', b)],
+        // the density law: how many threads of like span and place this one
+        // stands for when it flies over (part 2's "n more like this one")
+        likeIt: groupMembers(g, found.hit.index, density).length - 1,
       };
+    }
+    if (found.kind === 'bundle') {
+      const cell = found.cell;
+      const cam = camRef.current, v = viewRef.current;
+      const view = viewFor();
+      const first = refOfVerse(g, cell.lo), last = refOfVerse(g, cell.hi);
+      const label = cell.verse ? first.label
+        : cell.chapterLo === cell.chapterHi ? first.bookTitle + ' ' + first.chapter
+        : first.bookTitle + ' ' + first.chapter + ' \u2013 ' + (last.bookTitle === first.bookTitle ? '' : last.bookTitle + ' ') + last.chapter;
+      const groups = cam && v.W ? bundleGroups(g, cam, view, cell.lo, cell.hi, 40) : [];
+      const chapter = g.chapters[cell.chapterLo];
+      return { kind: 'bundle', cell, label, lo: cell.lo, hi: cell.hi,
+        hidden: cell.hidden, drawn: cell.drawn,
+        connections: countTouching(g, cell.lo, cell.hi, density),
+        groups: groups.map((grp) => {
+          const r = refOfVerse(g, grp.lo);
+          return Object.assign({ label: r.bookTitle + ' ' + r.chapter }, grp);
+        }),
+        cards: cell.verse ? [verseCard('Verse', first)]
+          : [chapterCard(g.books[chapter[0]], chapter[1], chapter[3], first)] };
     }
     if (found.kind === 'verse') {
       const r = refOfVerse(g, found.verse);
@@ -766,7 +814,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       connections: countTouching(g, lo, hi, density),
       // Opening a chapter highlights the WHOLE chapter on arrival.
       cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
-  }, [graph, density]);
+  }, [graph, density, viewFor]);
 
   const listItems = React.useMemo(() => {
     if (!graph || !listOpen) return [];
@@ -802,7 +850,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     focusRef.current = found.kind === 'arc' || found.kind === 'link'
       ? { arc: found.index, range: null }
-      : { arc: -1, range: found.kind === 'chapter' ? [found.lo, found.hi]
+      : { arc: -1, range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
         : found.kind === 'verse' ? [found.verse, found.verse] : null };
     hoverRef.current = -1;
     setTip(null);
@@ -978,6 +1026,29 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
   }, [navigateToLink]);
 
+  // A bundle's group, chosen in its sheet: the pair of ranges the shader and
+  // the picker draw and spotlight (drawnTest / uFocusRange2). Choosing the
+  // same group again lets go of it.
+  const chooseGroup = React.useCallback((info, grp) => {
+    const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
+    focusRef.current = { arc: -1, range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi] };
+    setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
+    setAnnounce(same || !grp ? 'Showing the strongest again.' : grp.count + ' threads to ' + grp.label + ' shown.');
+    schedule();
+  }, [schedule]);
+  // "n more like this one": a representative's group, strongest first, as a chooser
+  const showLikeIt = React.useCallback((info) => {
+    const g = graph;
+    if (!g) return;
+    const members = groupMembers(g, info.index, density, 36).filter((i) => i !== info.index);
+    const described = members.map((index) => describe({ kind: 'arc', hit: {
+      index, from: g.from[index], to: g.to[index], votes: g.votes[index],
+    } })).filter(Boolean);
+    setChoices(described.length ? { title: 'Like this one', meta: members.length + ' threads of like span and place, strongest first.', items: described } : null);
+    setDetail(null);
+    setAnnounce(described.length + ' threads like this one. Choose one.');
+  }, [describe, density, graph]);
+
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) {
     return (
@@ -1111,12 +1182,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </div>
       )}
       {tip && <TipChip info={tip} viewport={viewRef.current} />}
-      {choices && <ConnectionChooser choices={choices} onChoose={commitFound}
-        onClose={() => { setChoices(null); schedule(); }} />}
+      {choices && <ConnectionChooser choices={Array.isArray(choices) ? choices : choices.items}
+        title={Array.isArray(choices) ? undefined : choices.title} meta={Array.isArray(choices) ? undefined : choices.meta}
+        onChoose={commitFound} onClose={() => { setChoices(null); schedule(); }} />}
       {listOpen && <ConnectionList items={listItems} mode={mode}
         onChoose={commitFound} onClose={() => setListOpen(false)} />}
       {detail && (
-        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread} />
+        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread}
+          onGroup={chooseGroup} onLikeIt={showLikeIt} />
       )}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
@@ -1200,6 +1273,97 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
 
   // book names + separators
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
+}
+
+/* ── the density law's badges (part 2) ──────────────────────────────────
+   What the law hides is counted where it converges. At each in-view foot
+   cell (pick.footBundles: a verse at depth, a chapter or a run of narrow
+   chapters otherwise) a "+n" pill under the baseline says how many anchored
+   threads are not drawn at this zoom; tapping it opens the bundle by target
+   chapter, and a chosen chapter's threads are drawn and spotlit. Each
+   fly-over representative carries "x n", its group's count across the
+   frame, on its body; tapping it opens the thread with "n more like this
+   one". The counts are cached while the camera moves less than a few
+   percent; the pills' x follow the camera every frame. */
+const BADGE_FONT_CSS = 11;
+const fmtCount = (n) => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n));
+
+function bundlesFor(cache, g, cam, view, v, density) {
+  const focus = (view.focusRange ? view.focusRange.join(':') : '') + '/' + (view.focusRange2 ? view.focusRange2.join(':') : '') + '/' + view.focusArc;
+  const key = [v.W, density, view.level.toFixed(2), focus].join('|');
+  const moved = cache.key !== key
+    || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.02
+    || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.02;
+  if (moved) {
+    cache.key = key; cache.ppv = cam.ppv; cache.x = cam.x;
+    cache.cells = footBundles(g, cam, view, v.DPR);
+    cache.fly = flyBundles(g, cam, view);
+  }
+  return cache;
+}
+
+function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
+  const boxes = [];
+  if (!canvas || !g || !g.count || !bundles) return boxes;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return boxes;
+  const DPR = v.DPR, W = v.W;
+  const fs = BADGE_FONT_CSS * DPR;
+  const camY = cam.y > 0 ? cam.y : 0;
+  const baseY = view.base + camY;
+  const skyTop = view.inset > 0 ? view.inset : 0;
+  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
+  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  ctx.save();
+  ctx.font = '600 ' + fs + 'px Georgia,serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  const half = W / 2, camX = cam.x, ppv = cam.ppv;
+  const pill = (text, cx, cy, strong) => {
+    const w = ctx.measureText(text).width + fs * 0.9, h = fs * 1.35;
+    const box = { x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 };
+    if (box.x1 < 0 || box.x0 > W) return null;
+    for (const b of boxes) {
+      if (box.x0 < b.x1 + 3 * DPR && box.x1 > b.x0 - 3 * DPR && box.y0 < b.y1 && box.y1 > b.y0) return null;
+    }
+    const r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(box.x0 + r, box.y0); ctx.lineTo(box.x1 - r, box.y0); ctx.arc(box.x1 - r, cy, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(box.x0 + r, box.y1); ctx.arc(box.x0 + r, cy, r, Math.PI / 2, Math.PI * 1.5); ctx.closePath();
+    ctx.fillStyle = chrome.isLight ? 'rgba(248,242,228,0.92)' : 'rgba(14,12,10,0.88)';
+    ctx.fill();
+    ctx.lineWidth = 1 * DPR;
+    ctx.strokeStyle = 'rgba(' + gold + ',' + (strong ? 0.9 : 0.55) + ')';
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(' + (strong ? gold : ink) + ',0.95)';
+    ctx.fillText(text, cx, cy + fs * 0.05);
+    return box;
+  };
+  // foot bundles: under the baseline's feet, above the ruler's numerals
+  const cy = baseY + fs * 0.95;
+  for (const cell of bundles.cells) {
+    if (!(cell.hidden > 0)) continue;
+    const cx = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
+    const wCell = (cell.hi - cell.lo + 1) * ppv;
+    const text = '+' + fmtCount(cell.hidden);
+    if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
+    const box = pill(text, cx, cy, false);
+    if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
+  }
+  // fly-over representatives: "x n" on the body, where the body is in the sky
+  if (bundles.fly) {
+    for (const b of bundles.fly.values()) {
+      if (b.rep < 0 || b.count < 2) continue;
+      const ends = threadEnds(g, cam, view, b.rep);
+      const at = (ends.from && ends.from.at) || (ends.to && ends.to.at);
+      if (!at) continue;
+      if (at.y < skyTop + fs || at.y > baseY - fs) continue;
+      const box = pill('\u00d7' + fmtCount(b.count), at.x, at.y - fs * 1.1, true);
+      if (box) boxes.push(Object.assign(box, { cell: null, rep: b.rep }));
+    }
+  }
+  ctx.restore();
+  return boxes;
 }
 
 /* ── the references beside the lines ────────────────────────────────────
@@ -1468,14 +1632,14 @@ function connectionMeta(info) {
   return LINK_KIND_NAMES[info.joins] || 'Your link';
 }
 
-function ConnectionChooser({ choices, onChoose, onClose }) {
+function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
   const closeRef = React.useRef(null);
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   return (
-    <div className="sw-choice" role="dialog" aria-modal="false" aria-label="Connections here">
+    <div className="sw-choice" role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
       <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
-      <div className="sw-sheet-eyebrow">Connections here</div>
-      <div className="sw-sheet-meta">Several threads are close together. Choose the one you meant.</div>
+      <div className="sw-sheet-eyebrow">{title || 'Connections here'}</div>
+      <div className="sw-sheet-meta">{meta || 'Several threads are close together. Choose the one you meant.'}</div>
       <div className="sw-choice-list">
         {choices.map((choice, i) => (
           <button type="button" className="sw-choice-row" key={i} onClick={() => onChoose(choice)}>
@@ -1510,18 +1674,22 @@ function ConnectionList({ items, mode, onChoose, onClose }) {
   );
 }
 
-function DetailSheet({ info, onClose, onOpen, onFollow }) {
+function DetailSheet({ info, onClose, onOpen, onFollow, onGroup, onLikeIt }) {
   const closeRef = React.useRef(null);
   React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
   const cards = info.cards || [];
   const eyebrow = info.kind === 'link' ? 'Your link'
     : info.kind === 'underlay' ? 'Timothy\u2019s thread'
     : info.kind === 'arc' ? 'Connection'
+    : info.kind === 'bundle' ? 'Bundle · ' + info.label
     : info.kind === 'chapter' ? 'Chapter' : 'Verse';
   const meta = info.kind === 'arc'
     ? info.span.toLocaleString() + ' verses apart · weight ' + info.votes
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' \u00b7 ' + info.joins : info.joins)
+    : info.kind === 'bundle'
+      ? info.connections.toLocaleString() + ' connections here, ' + info.hidden.toLocaleString()
+        + ' not drawn at this zoom. Choose where they go to see them.'
     : info.kind === 'chapter'
       ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
       : info.connections.toLocaleString() + ' connections';
@@ -1539,6 +1707,25 @@ function DetailSheet({ info, onClose, onOpen, onFollow }) {
           aria-label={'Follow the line to ' + (info.far === 'to' ? info.b : info.a).label}>
           Follow to {(info.far === 'to' ? info.b : info.a).label} &rsaquo;
         </button>
+      )}
+      {info.kind === 'arc' && onLikeIt && info.likeIt > 0 && (
+        <button type="button" className="sw-sheet-follow sw-sheet-likeit" onClick={() => onLikeIt(info)}
+          aria-label={info.likeIt + ' more threads like this one'}>
+          {info.likeIt.toLocaleString()} more like this one &rsaquo;
+        </button>
+      )}
+      {info.kind === 'bundle' && onGroup && (
+        <div className="sw-choice-list sw-bundle-groups" role="group" aria-label="Where this bundle goes">
+          {info.groups.map((grp) => (
+            <button type="button" className="sw-choice-row" key={grp.chapterIndex}
+              aria-pressed={info.chosenGroup === grp.chapterIndex}
+              onClick={() => onGroup(info, grp)}>
+              <span className="sw-choice-label">{grp.label}</span>
+              <span className="sw-choice-meta">{grp.count} {grp.count === 1 ? 'thread' : 'threads'}
+                {grp.hidden > 0 ? ' · ' + grp.hidden + ' not drawn' : ' · all drawn'} · weight {grp.votes}</span>
+            </button>
+          ))}
+        </div>
       )}
       <div className="sw-sheet-cards">
         {cards.map((card, i) => (
@@ -1742,6 +1929,7 @@ function summaryOf(found) {
   }
   if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
   if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
+  if (found.kind === 'bundle') return found.label + ', ' + found.hidden + ' connections not drawn here.';
   return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
 }
 

@@ -68,6 +68,7 @@ uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
 uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
+uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
@@ -133,10 +134,16 @@ void main(){
   float id = float(gl_InstanceID) + uInstanceBase;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
   float hovered = (uHoverArc >= 0. && abs(id - uHoverArc) < .5) ? 1. : 0.;
-  float inRange = (uFocusRange.x <= uFocusRange.y &&
-      ((a >= uFocusRange.x && a <= uFocusRange.y) ||
-       (b >= uFocusRange.x && b <= uFocusRange.y))) ? 1. : 0.;
-  float lit = max(spot, inRange);
+  float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
+  float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
+  float inRange = (uFocusRange.x <= uFocusRange.y && max(a1, b1) > .5) ? 1. : 0.;
+  // a chosen group: a foot in each range. Lit, and DRAWN whatever the
+  // density law says - the bundle the reader opened is what they asked for.
+  float a2 = step(uFocusRange2.x, a)*step(a, uFocusRange2.y);
+  float b2 = step(uFocusRange2.x, b)*step(b, uFocusRange2.y);
+  float pair = (uFocusRange2.x <= uFocusRange2.y && max(a1*b2, b1*a2) > .5) ? 1. : 0.;
+  float grouped = (uFocusRange2.x <= uFocusRange2.y) ? 1. : 0.;
+  float lit = max(spot, mix(inRange, pair, grouped));
   // Only a TAP darkens the rest of the web. Merely moving the mouse across
   // the dome must not blank the picture the reader is looking at.
   float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
@@ -145,7 +152,7 @@ void main(){
 
   // The density law: is this thread drawn at this zoom at all? The table
   // (aLod) says; the tapped, hovered and focus-range threads always are.
-  float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(lit, hovered));
+  float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(max(spot, pair), hovered));
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
   // overhead recede so the local weave is legible instead of fogged. At FULL
@@ -249,7 +256,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uCeil', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential']) {
+    'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential', 'uFocusRange2']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -369,7 +376,7 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string, level?:number,
-     *   focusRange:(number[]|null), focusArc:number, hoverArc?:number}} v
+     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number}} v
      *   level: geometry.levelOf(); absent = the density law off, every thread drawn
      */
     draw(v) {
@@ -406,6 +413,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uEssential, v.density === 'essential' ? 1 : 0);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
+      if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);
+      else gl.uniform2f(U.uFocusRange2, 1, 0);
 
       // Viewport verse range, for chunk culling.
       const viewLo = v.camX - (v.width / 2) / v.ppv;
