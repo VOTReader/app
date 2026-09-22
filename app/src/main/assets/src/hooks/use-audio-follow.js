@@ -29,7 +29,7 @@
    follower's move is different in kind: IN PLACE. openReading() below is the
    tour's own recipe (use-tour.js attachNav: letters setLetterId +
    setScreen(col.letterScreen); Bible setBookId + setChapterNum +
-   setScreen('bible-ch')), no pill, and wrapped in suppressNextHistoryPush()
+   setScreen('bible-ch', or 'matthew-ch' for Matthew)), no pill, and wrapped in suppressNextHistoryPush()
    (use-history-sync.js, the handshake use-android-back uses) so no history
    entry is pushed per reading the audio walks: one Back from the followed
    reading goes where one Back from the original would have gone, never back
@@ -125,7 +125,21 @@ function paneShows(pane, unit) {
     return !!col && pane.screen === col.letterScreen && pane.letterId === unit.id;
   }
   if (unit.kind === 'study') return pane.screen === 'bible-study-chapter' && pane.studyChapterId === unit.id;
-  return pane.screen === 'bible-ch' && pane.bookId === unit.bookId && Number(pane.chapterNum) === unit.chapter;
+  return pane.screen === bibleScreenFor(unit.bookId) && pane.bookId === unit.bookId && Number(pane.chapterNum) === unit.chapter;
+}
+
+/**
+ * The screen a Bible book reads on. Matthew (The Scriptures of Truth) has its
+ * own view — MatthewChapterView on 'matthew-ch', the same door navigateToLink
+ * and the search dispatcher use — and its chapters carry verses directly, so
+ * landing it on 'bible-ch' (BibleChapterView walks chapter.sections) threw in
+ * render every time a Bible pane followed the clock into TSOT Matthew
+ * (read-along class look, 2026-09-22).
+ * @param {string} bookId
+ * @returns {'bible-ch' | 'matthew-ch'}
+ */
+function bibleScreenFor(bookId) {
+  return bookId === 'matthew' ? 'matthew-ch' : 'bible-ch';
 }
 
 /**
@@ -152,9 +166,11 @@ function openReading(pane, unit) {
     if (typeof pane.setScreen === 'function') pane.setScreen('bible-study-chapter');
     return;
   }
+  // Matthew's corpus is its own lazy bundle (navigateToLink kicks it the same way).
+  if (unit.bookId === 'matthew' && typeof /** @type {any} */ (globalThis).__loadMatthewCorpus === 'function') /** @type {any} */ (globalThis).__loadMatthewCorpus();
   if (typeof pane.setBookId === 'function') pane.setBookId(unit.bookId);
   if (typeof pane.setChapterNum === 'function') pane.setChapterNum(unit.chapter);
-  if (typeof pane.setScreen === 'function') pane.setScreen('bible-ch');
+  if (typeof pane.setScreen === 'function') pane.setScreen(bibleScreenFor(unit.bookId));
 }
 
 /** @returns {boolean} a sheet other than the listening desk is open */

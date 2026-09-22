@@ -76,6 +76,27 @@ describe('the follower moves the live pane with the audio — and nothing else',
     expect(suppressNextHistoryPush).not.toHaveBeenCalled();
   });
 
+  it("Matthew (The Scriptures of Truth) lives on its OWN screen: the follower opens matthew-ch, never bible-ch", () => {
+    // BibleChapterView renders chapter.sections; Matthew's chapters carry verses
+    // directly, so landing Matthew on 'bible-ch' threw in render (React logged
+    // "Cannot read properties of undefined (reading 'map')" every time a Bible
+    // pane followed the clock into TSOT Matthew — read-along class look, 2026-09-22).
+    const TSOT = (n) => ({ key: 'bible-tsot-matthew:matthew', title: 'Matthew ' + n, sub: 'The Scriptures of Truth', url: 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/1-HnSHH-1lZyFlXx-0hzmKo6qKAPSd3vT.mp3', readerCode: 'B', partLabel: 'Chapter ' + n });
+    const player = fakePlayer([CHAPTER('psalms', 23), TSOT(5)]);
+    const m = mount(player, { screen: 'bible-ch', letterId: null, bookId: 'psalms', chapterNum: 23 });
+    act(() => player.advance());
+    expect(m.setBookId).toHaveBeenCalledWith('matthew');
+    expect(m.setChapterNum).toHaveBeenCalledWith(5);
+    expect(m.setScreen).toHaveBeenCalledWith('matthew-ch');
+    expect(m.setScreen).not.toHaveBeenCalledWith('bible-ch');
+    // and a pane already on matthew-ch counts as showing the unit: chapter 5 -> 6 follows there
+    const p2 = fakePlayer([TSOT(5), TSOT(6)]);
+    const m2 = mount(p2, { screen: 'matthew-ch', letterId: null, bookId: 'matthew', chapterNum: 5 });
+    act(() => p2.advance());
+    expect(m2.setChapterNum).toHaveBeenCalledWith(6);
+    expect(m2.setScreen).toHaveBeenCalledWith('matthew-ch');
+  });
+
   it('a Bible chapter boundary inside a book follows too (today the wash goes dark there), and a book boundary lands on chapter 1', () => {
     const player = fakePlayer([CHAPTER('jonah', 4), CHAPTER('micah', 1)]);
     const m = mount(player, { screen: 'bible-ch', letterId: null, bookId: 'jonah', chapterNum: 4 });
