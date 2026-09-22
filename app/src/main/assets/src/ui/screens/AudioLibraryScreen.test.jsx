@@ -151,7 +151,13 @@ describe('AudioLibraryScreen -- the hub', () => {
     renderScreen();
     const lineUnder = (re) => screen.getByRole('button', { name: re }).querySelector('small').textContent;
     expect(lineUnder(/Biblical Restoration Ministries/)).toBe('2 books · chapter by chapter');
-    expect(lineUnder(/The Scriptures of Truth/)).toBe('1 book · Corrected Version by Timothy, with The Lord · Read by Benjamin');
+    // The reader rides the second line only when the label does not already
+    // name one: Matthew's label says "(read by Benjamin)", and at 360 px the
+    // repeat pushed "· R…" off the end of the line (headless look, 21:2x).
+    expect(lineUnder(/The Scriptures of Truth/)).toBe('1 book · Corrected Version by Timothy, with The Lord');
+    globalThis.BIBLE_AUDIO_MANIFEST['bible-brm-kjv:genesis'] = [['g', 'T']];   // a reader the label does not carry
+    cleanup(); renderScreen();
+    expect(lineUnder(/Biblical Restoration Ministries/)).toBe('2 books · Read by Timothy');
     expect(lineUnder(/The Gospel of John/)).toBe('1 book · Film audio, listening only');
     expect(lineUnder(/The Volumes of Truth/)).toBe('1 collection · the Letters read aloud');
     expect(document.querySelector('.audio-library-browse').textContent).not.toMatch(/\b1 (books|collections)\b/);

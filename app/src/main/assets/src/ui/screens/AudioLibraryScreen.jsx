@@ -270,7 +270,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               const description = /** @type {{ description?: string }} */ (edition).description || '';
               const parts = [books ? books + (books === 1 ? ' book' : ' books') : 'Read chapter by chapter'];
               if (description) parts.push(description);
-              const reader = audioReaderLabel(bibleReaderCode(edition.volKey));
+              // …unless the label already names the reader ("(read by Benjamin)"):
+              // at 360 px the repeat pushed the line past its ellipsis.
+              const reader = /read by/i.test(edition.label) ? null : audioReaderLabel(bibleReaderCode(edition.volKey));
               if (reader) parts.push(reader);
               else if (!description && books) parts.push('chapter by chapter');
               return (
