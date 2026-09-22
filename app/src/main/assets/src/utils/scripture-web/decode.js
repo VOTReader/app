@@ -15,6 +15,11 @@
    (Chrome ~140) — see Permanent Rule 6.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import {
+  levelOf, PPV_MAX_CSS, LOD_INK, LOD_REF_CSS, LOD_REF_HEIGHT_CSS, LOD_STROKE_CSS, LOD_LEN_CAP,
+  LOD_LEN_MIN, LOD_STEP, LOD_MIN_LEVEL, LOD_QUANT, LOD_SPAN_CELLS,
+} from './geometry.js';
+
 /**
  * One span bucket of the baked layout.
  * @typedef {{ off:number, len:number, off20:number, off10:number,
@@ -189,6 +194,151 @@ export function fansOf(g) {
     FANS.set(g, f);
   }
   return f;
+}
+
+/** One LOD table per graph object, built on first use — the renderer and the hit test share it. */
+const LOD = new WeakMap();
+
+/**
+ * The density law's table (geometry.js, "The density law, part 1"): per
+ * thread, the REVEAL level at which it is drawn while anchored, for each
+ * density, and whether it is its fly-over group's REPRESENTATIVE, for each
+ * density - packed into one Uint32 the shader reads as `aLod` and the hit
+ * test reads through geometry.lodShown.
+ *
+ * Reveal, per density: the levels LOD_MIN_LEVEL..ceiling in LOD_STEP steps;
+ * at each, the canon is cut into cells of total / 2^(L+1) verses with an ink
+ * budget of LOD_INK x the reference frame's area / stroke / 2 px of thread
+ * length each. Threads already revealed charge their on-screen length (a
+ * half-ellipse's, capped and floored) to the cell of each foot first; then
+ * the rest are walked in vote order (ties by index, the draw order) and a
+ * thread is revealed at this level when either foot's cell still has room,
+ * charging both. Essential admits only threads at or above the Essential
+ * tier. A thread no cell ever took is revealed at the ceiling: every
+ * anchored thread draws there.
+ *
+ * Representatives, per density: a group is (span cell, centre cell) - span
+ * on the log axis in LOD_SPAN_CELLS cells, the centre in cells half the
+ * group's shortest span wide - and its representative is the first of its
+ * members in vote order. `groupOf` is that key per thread (the badge pass
+ * counts a representative's members with it).
+ *
+ * @param {{from:Uint16Array, to:Uint16Array, votes:Int16Array, count:number,
+ *   total:number, densityTiers?:number[]}} g
+ * @returns {{lod:Uint32Array, groupOf:Uint32Array}}
+ */
+export function lodOf(g) {
+  let t = LOD.get(g);
+  if (!t) {
+    t = buildLod(g);
+    LOD.set(g, t);
+  }
+  return t;
+}
+
+/**
+ * Threads in vote order, strongest first, ties by index. The order both
+ * fills of lodOf walk.
+ * @param {{votes:Int16Array, count:number}} g
+ * @returns {Uint32Array}
+ */
+export function voteOrder(g) {
+  const order = new Uint32Array(g.count);
+  for (let i = 0; i < g.count; i++) order[i] = i;
+  // a stable sort on votes descending: JS sort is stable, so equal votes keep index order
+  return order.sort((a, b) => g.votes[b] - g.votes[a] || a - b);
+}
+
+function buildLod(g) {
+  const N = g.count, T = g.total > 1 ? g.total : 2;
+  const tiers = g.densityTiers || [20, 7];
+  const order = voteOrder(g);
+  const ceiling = levelOf(PPV_MAX_CSS, T);
+  const budgetPerCell = (LOD_INK * LOD_REF_CSS * LOD_REF_HEIGHT_CSS) / LOD_STROKE_CSS / 2;
+  const span = new Float64Array(N);
+  for (let i = 0; i < N; i++) span[i] = Math.abs(g.to[i] - g.from[i]);
+
+  /** @param {number} minVotes @returns {Uint8Array} quantized reveal per thread */
+  const reveal = (minVotes) => {
+    const rev = new Float32Array(N).fill(ceiling);
+    const accepted = new Uint8Array(N);
+    let budget = new Float32Array(0);
+    for (let L = LOD_MIN_LEVEL; L < ceiling; L += LOD_STEP) {
+      const cellW = T / Math.pow(2, L + 1);            // verses per cell
+      const cells = Math.ceil(T / cellW) + 1;
+      if (budget.length < cells) budget = new Float32Array(cells);
+      budget.fill(budgetPerCell, 0, cells);
+      const ppv = (LOD_REF_CSS * Math.pow(2, L)) / T;   // CSS px per verse at this level
+      const lenOf = (i) => {
+        const l = 1.57 * span[i] * ppv;
+        return l < LOD_LEN_MIN ? LOD_LEN_MIN : (l > LOD_LEN_CAP ? LOD_LEN_CAP : l);
+      };
+      // what is already drawn pays first
+      for (let k = 0; k < N; k++) {
+        const i = order[k];
+        if (!accepted[i]) continue;
+        const l = lenOf(i);
+        const ca = (g.from[i] / cellW) | 0, cb = (g.to[i] / cellW) | 0;
+        budget[ca] -= l;
+        if (cb !== ca) budget[cb] -= l;
+      }
+      // then the strongest of the rest, while a foot's cell has room
+      for (let k = 0; k < N; k++) {
+        const i = order[k];
+        if (accepted[i] || g.votes[i] < minVotes) continue;
+        const l = lenOf(i);
+        const ca = (g.from[i] / cellW) | 0, cb = (g.to[i] / cellW) | 0;
+        if (budget[ca] >= l || budget[cb] >= l) {
+          accepted[i] = 1;
+          rev[i] = L;
+          budget[ca] -= l;
+          if (cb !== ca) budget[cb] -= l;
+        }
+      }
+    }
+    const q = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      // floored: a thread is never drawn later than the level that accepted it
+      const v = Math.floor((rev[i] - LOD_MIN_LEVEL) * LOD_QUANT);
+      q[i] = v < 0 ? 0 : (v > 255 ? 255 : v);
+    }
+    return q;
+  };
+
+  // fly-over groups: (span cell, centre cell)
+  const groupOf = new Uint32Array(N);
+  const logT = Math.log(T);
+  for (let i = 0; i < N; i++) {
+    const s = span[i] > 1 ? span[i] : 1;
+    let sc = Math.floor((Math.log(s) / logT) * LOD_SPAN_CELLS);
+    if (sc >= LOD_SPAN_CELLS) sc = LOD_SPAN_CELLS - 1;
+    if (sc < 0) sc = 0;
+    const spanLo = Math.pow(T, sc / LOD_SPAN_CELLS);
+    const cc = Math.floor((g.from[i] + g.to[i]) / spanLo);   // centre / (spanLo / 2)
+    groupOf[i] = sc * 1048576 + cc;
+  }
+  /** @param {number} minVotes @returns {Uint8Array} 1 for the group's representative */
+  const reps = (minVotes) => {
+    const seen = new Set();
+    const rep = new Uint8Array(N);
+    for (let k = 0; k < N; k++) {
+      const i = order[k];
+      if (g.votes[i] < minVotes) continue;
+      const key = groupOf[i];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rep[i] = 1;
+    }
+    return rep;
+  };
+
+  const revF = reveal(-32768), revE = reveal(tiers[0]);
+  const repF = reps(-32768), repE = reps(tiers[0]);
+  const lod = new Uint32Array(N);
+  for (let i = 0; i < N; i++) {
+    lod[i] = (revF[i] | (revE[i] << 8) | (repF[i] << 16) | (repE[i] << 17)) >>> 0;
+  }
+  return { lod, groupOf };
 }
 
 /**

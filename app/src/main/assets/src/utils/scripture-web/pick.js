@@ -12,18 +12,50 @@
    and the bucket loop bound it.
 
    The one invariant that matters: this must use the SAME laws the vertex
-   shader draws with. There are TWO of them, and geometry.js owns both.
+   shader draws with. There are THREE of them, and geometry.js owns all.
    Height (geometry.arcShape) — or arcs become untappable exactly where
    they look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
    the reverse: at full localize an arc with neither foot near the viewport
    paints alpha 0, and picking it silently focuses a line nobody can see.
-   Visible equals pickable, in both directions.
+   Density (geometry.lodShown over decode.lodOf's table, when the view
+   carries a `level`) — the thread the law did not draw at this zoom is not
+   there to tap; the tapped one (view.focusArc) and the focus range always
+   are, as in the shader. Visible equals pickable, in both directions.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
+  lodShown, LOD_OFF,
 } from './geometry.js';
-import { bucketDrawCount, fansOf } from './decode.js';
+import { bucketDrawCount, fansOf, lodOf } from './decode.js';
+
+/**
+ * The density law as the picker applies it: a closure over the view that
+ * answers "is thread i drawn?" exactly as the shader's lodShown + its focus
+ * override do. A view without a level switches the law off (every thread).
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{level?:number, density:import('./decode.js').Density,
+ *   focusArc?:number, focusRange?:(number[]|null)}} view
+ * @returns {(i:number, anchored:(0|1)) => boolean}
+ */
+export function drawnTest(g, view) {
+  const level = typeof view.level === 'number' ? view.level : LOD_OFF;
+  if (!(level > LOD_OFF + 1)) return () => true;
+  const { lod } = lodOf(g);
+  const essential = view.density === 'essential';
+  const focusArc = typeof view.focusArc === 'number' ? view.focusArc : -1;
+  const range = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
+  return (i, anchored) => {
+    if (lodShown(lod[i], essential, anchored, level)) return true;
+    if (i === focusArc) return true;
+    if (range) {
+      const a = g.from[i], b = g.to[i];
+      return (a >= range[0] && a <= range[1]) || (b >= range[0] && b <= range[1]);
+    }
+    return false;
+  };
+}
 
 /**
  * Nearest arc to a screen point.
@@ -49,7 +81,8 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
- *   localize:number, density:import('./decode.js').Density}} view
+ *   localize:number, density:import('./decode.js').Density, level?:number,
+ *   focusArc?:number, focusRange?:(number[]|null)}} view
  * @param {number} px
  * @param {number} py
  * @param {number} tol
@@ -58,6 +91,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
   const { width, ceil, squash, localize, density } = view;
+  const drawn = drawnTest(g, view);
   // The baseline as DRAWN: the camera's y shifts the whole picture down the
   // frame, so the curve the finger meets stands cam.y below the frame's base.
   const base = view.base + (cam.y > 0 ? cam.y : 0);
@@ -89,7 +123,10 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         // frame — so this is the fly-over fade the GPU applies, evaluated
         // exactly. Only a full zero is skipped: an arc still showing the
         // partial fly-over floor is dim, but it is there to be tapped.
-        if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
+        const anchored = arcAnchored(x0, x1, width);
+        if (flyOverDim(anchored, localize) === 0) continue;
+        // ... and the density law drew it at this zoom.
+        if (!drawn(i, anchored)) continue;
         // One shape per FOOT: each foot's departure rank sets its quarter; the
         // apex is the same at both. Exactly the two calls the shader makes.
         const rx = (x1 - x0) * 0.5;
@@ -120,12 +157,14 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, localize:number, density:import('./decode.js').Density}} view
+ * @param {{width:number, localize:number, density:import('./decode.js').Density,
+ *   level?:number, focusArc?:number, focusRange?:(number[]|null)}} view
  * @param {number} limit — at most this many, so a dense screen bounds its own pass
  * @returns {number[]} instance indices
  */
 export function visibleArcs(g, cam, view, limit) {
   const { width, localize, density } = view;
+  const drawn = drawnTest(g, view);
   const half = width / 2;
   const camX = cam.x, ppv = cam.ppv;
   const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
@@ -144,7 +183,9 @@ export function visibleArcs(g, cam, view, limit) {
         const x0 = (g.from[i] - camX) * ppv + half;
         const x1 = (g.to[i] - camX) * ppv + half;
         if (x1 < 0 || x0 > width) continue;
-        if (flyOverDim(arcAnchored(x0, x1, width), localize) === 0) continue;
+        const anchored = arcAnchored(x0, x1, width);
+        if (flyOverDim(anchored, localize) === 0) continue;
+        if (!drawn(i, anchored)) continue;
         out.push(i);
         if (out.length >= limit) return out;
       }
@@ -245,17 +286,21 @@ export function threadEnds(g, cam, view, i) {
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {number} width — viewport width, device px
  * @param {import('./decode.js').Density} density
+ * @param {number} [level] - geometry.levelOf(): count only what the density
+ *   law draws at this zoom, so the crowding law sees what the eye sees;
+ *   absent = every anchored thread
  * @returns {number}
  */
-export function countAnchored(g, cam, width, density) {
+export function countAnchored(g, cam, width, density, level) {
   let n = 0;
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  const drawn = drawnTest(g, { level, density });
   for (const bucket of g.buckets) {
     const end = bucket.off + bucketDrawCount(bucket, density);
     for (let i = bucket.off; i < end; i++) {
       const x0 = (g.from[i] - camX) * ppv + half;
       const x1 = (g.to[i] - camX) * ppv + half;
-      if (arcAnchored(x0, x1, width)) n++;
+      if (arcAnchored(x0, x1, width) && drawn(i, 1)) n++;
     }
   }
   return n;

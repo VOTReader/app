@@ -626,6 +626,114 @@ float flyOverDim(float anchored, float localize){
   return mix(1., mix(flyFloor, 1., anchored), localize);
 }`;
 
+/* ── The density law, part 1: level of detail (density-law.md section 1, 2026-09-21) ──
+ *
+ * Corbin, on a Psalm 107 screenshot at mid zoom: "I don't want any smear.
+ * Fully granular, zoom all the way in". At 12x on that chapter 13,295
+ * anchored threads and 8,635 fly-overs crossed the phone frame and every one
+ * was drawn: overlapping ribbons summed into a wall. This law decides, per
+ * thread and per zoom, whether it is DRAWN AT ALL; nothing about alpha
+ * changes, and what is not drawn is not drawn.
+ *
+ * The zoom is read as a LEVEL: L = log2(ppvCss * total / LOD_REF_CSS), the
+ * octaves above a reference frame LOD_REF_CSS wide showing the whole canon.
+ * The ceiling is one level on every frame (maxZoomFor puts a verse at
+ * PPV_MAX_CSS everywhere): log2(44 * 31102 / 800) = 10.74.
+ *
+ * ANCHORED threads (a foot within FLYOVER_MARGIN of the frame) each carry a
+ * REVEAL level r, and draw iff L >= r. decode.lodOf computes r by a greedy
+ * per FOOT CELL: at level L a cell is total / 2^(L+1) verses (half a
+ * reference view); walking the threads in vote order, a thread is accepted
+ * once a cell holding one of its feet still has ink budget for its
+ * on-screen length, and every thread accepted at a lower level is charged
+ * first, so the drawn set only grows with zoom (the 09-10 rule: a line
+ * crossing the viewport never vanishes as zoom increases). Every thread is
+ * revealed by the ceiling at the latest: fully granular there.
+ *
+ * FLY-OVER threads (both feet out) draw iff they are their group's
+ * REPRESENTATIVE - the strongest thread among those of like span and like
+ * centre (decode.lodOf's group key) - so a sky of eight thousand crossings
+ * reads as a few dozen lines, each standing for a bundle the badge names.
+ *
+ * The tapped, hovered and focus-range threads are always drawn, whatever the
+ * table says: the line being chased must not vanish on arrival.
+ *
+ * The shader inlines lodGLSL; pick.js calls lodShown. Same table, same test.
+ */
+
+/** Reference frame width, CSS px: level 0 is the whole canon across it. */
+export const LOD_REF_CSS = 800;
+
+/** Reference frame height, CSS px, for the ink budget (phone landscape's dome). */
+export const LOD_REF_HEIGHT_CSS = 260;
+
+/**
+ * THE taste number: the share of the reference frame's area the drawn
+ * anchored ribbons may cover, at every level. Corbin may move it.
+ */
+export const LOD_INK = 0.25;
+
+/** Stroke the budget is priced at, CSS px (ribbonStyle's mid-zoom width). */
+export const LOD_STROKE_CSS = 1.6;
+
+/** Longest on-screen length a thread is charged, px: a long arc shows two quarters at most. */
+export const LOD_LEN_CAP = 900;
+
+/** Shortest length a drawn thread is charged, px: a dot still takes ink. */
+export const LOD_LEN_MIN = 8;
+
+/** The greedy walks levels in these steps, from LOD_MIN_LEVEL to the ceiling. */
+export const LOD_STEP = 0.25;
+export const LOD_MIN_LEVEL = -2;
+
+/** Reveal levels are stored in sixteenths of an octave above LOD_MIN_LEVEL (8 bits). */
+export const LOD_QUANT = 16;
+
+/** The level that switches the law OFF (a view without one): every thread drawn. */
+export const LOD_OFF = -1000;
+
+/** Fly-over groups: span cells across the log-span axis. */
+export const LOD_SPAN_CELLS = 48;
+
+/**
+ * The zoom as a level: octaves above the reference frame.
+ * @param {number} ppvCss - CSS px per verse
+ * @param {number} total - verses in the canon
+ */
+export function levelOf(ppvCss, total) {
+  const p = ppvCss > 0 ? ppvCss : 1e-9;
+  return Math.log2((p * (total > 0 ? total : 1)) / LOD_REF_CSS);
+}
+
+/**
+ * The packed table entry decoded: is this thread drawn at this level?
+ * bits 0-7 reveal (famous), 8-15 reveal (essential), 16 rep (famous), 17 rep
+ * (essential). MUST stay identical to lodGLSL below.
+ *
+ * @param {number} lod - decode.lodOf(g).lod[i]
+ * @param {boolean} essential - the Essential density
+ * @param {0|1|boolean} anchored - arcAnchored()
+ * @param {number} level - levelOf(), or LOD_OFF
+ * @returns {0|1}
+ */
+export function lodShown(lod, essential, anchored, level) {
+  if (!(level > LOD_OFF + 1)) return 1;
+  const rev = essential ? (lod >>> 8) & 255 : lod & 255;
+  const rep = essential ? (lod >>> 17) & 1 : (lod >>> 16) & 1;
+  if (anchored) return level >= rev / LOD_QUANT + LOD_MIN_LEVEL ? 1 : 0;
+  return /** @type {0|1} */ (rep);
+}
+
+/** The same test as GLSL ES 3.00, for the vertex shader to inline. */
+export const lodGLSL = `
+float lodShown(uint lod, float essential, float anchored, float level){
+  if (level <= ${glslFloat(LOD_OFF + 1)}) return 1.;
+  uint rev = essential > .5 ? ((lod >> 8u) & 255u) : (lod & 255u);
+  uint rep = essential > .5 ? ((lod >> 17u) & 1u) : ((lod >> 16u) & 1u);
+  float reveal = float(rev)/${glslFloat(LOD_QUANT)} + ${glslFloat(LOD_MIN_LEVEL)};
+  return anchored > .5 ? step(reveal, level) : float(rep);
+}`;
+
 /**
  * Distance in device px from a point to an arc, or Infinity if the point is
  * outside the arc's bounding box.

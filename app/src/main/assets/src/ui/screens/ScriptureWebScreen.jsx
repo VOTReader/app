@@ -24,7 +24,7 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle,
+  maxZoomFor, ribbonStyle, levelOf,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -88,7 +88,9 @@ function anchoredDensity(cache, g, cam, v, density) {
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
   if (moved) {
     cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
-    cache.value = countAnchored(g, cam, v.W, density);
+    // only what the density law draws: the crowding law divides the deep
+    // alpha by what is on the screen, and hidden threads are not
+    cache.value = countAnchored(g, cam, v.W, density, levelOf(cam.ppv / (v.DPR || 1), cam.total));
   }
   return cache.value / ((v.W || 1) / (v.DPR || 1));
 }
@@ -376,6 +378,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // below base and the picker reads the same off the camera
       camY: cam.y > 0 ? cam.y : 0,
       density, rulerDepth: f.ruler,
+      // the density law's level (geometry.levelOf): the shader and the hit
+      // test both read it, with the tapped thread and the focus range always
+      // drawn whatever the table says
+      level: levelOf(cam.ppv / (v.DPR || 1), cam.total),
+      focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
     };
   }, [density, frame]);
 
