@@ -10,7 +10,7 @@ describe('search-config', () => {
   });
 
   it('stores every routing/display field the engine contract needs', () => {
-    for (const f of ['kind', 'bookId', 'chapterNum', 'verseNum', 'letterId', 'volumeId', 'translation', 'ref', 'heading', 'text', 'corpus']) {
+    for (const f of ['kind', 'bookId', 'chapterNum', 'verseNum', 'letterId', 'studyChapterId', 'volumeId', 'translation', 'ref', 'heading', 'text', 'corpus']) {
       expect(MS_STORE_FIELDS).toContain(f);
     }
     expect(opts.storeFields).toEqual(MS_STORE_FIELDS);

@@ -73,6 +73,17 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(scrolled).toEqual(['wtlb:matters-of-the-heart:0']);
   });
 
+  it('an excerpt cut across a paragraph boundary lands on the paragraph that holds its TAIL', () => {
+    // Same rule as LetterView (study find, 2026-09-22): the engine's cut can open
+    // with the previous paragraph's last words; the shortest head then matched
+    // THAT paragraph. The tail is tried at every length before the head shrinks.
+    renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'by every word. _**Come to Me,**_ All who are weary, And' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['wtlb:matters-of-the-heart:1']);
+    // the 40-char tail is the whole of "_**Come to Me,**_ All who are weary, And": the seek starts there
+    expect(seekOffsetSeen.at(-1)).toBe(0);
+  });
+
   it('an anchor made for ANOTHER entry is ignored', () => {
     renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'All who are weary', letterId: 'some-other-entry' } });
     act(() => { vi.advanceTimersByTime(200); });

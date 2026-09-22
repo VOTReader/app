@@ -4,6 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
@@ -167,19 +168,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // shorter heads are tried before giving up, in the index's whitespace
     // domain. (Until 2026-09-20 this looked up `#letter-block-<i>`, an id
     // nothing renders — the anchor never scrolled; blocks carry data-hl-key.)
+    // (excerptLanding: head then TAIL at every length — the engine's cut can
+    // open with the previous block's last words, read-along find 2026-09-22.)
     const excerpt = _squash(surpriseAnchor.text);
     const blocks = letter.blocks || [];
-    let found = -1;
-    let off = -1;
-    for (const len of [40, 24, 12]) {
-      const head = excerpt.slice(0, len);
-      if (!head) break;
-      for (let i = 0; i < blocks.length && found < 0; i++) {
-        off = _squash(_blockText(blocks[i])).indexOf(head);
-        if (off >= 0) found = i;
-      }
-      if (found >= 0) break;
-    }
+    const { index: found, off } = excerptLanding(excerpt, blocks.map((b) => _squash(_blockText(b))));
     if (found < 0) return;
     const hlKey = letterHlKey(letter.id, found);
     setSurpriseBlockKey(hlKey);

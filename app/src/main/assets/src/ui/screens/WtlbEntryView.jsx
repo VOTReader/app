@@ -6,6 +6,7 @@ import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../compo
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
 import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
@@ -44,19 +45,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
     const squash = (s) => String(s || '').replace(/\{\{[^}]+\}\}/g, ' ').replace(/\s+/g, ' ').trim();
+    // (excerptLanding: head then TAIL at every length — the engine's cut can
+    // open with the previous paragraph's last words, read-along find 2026-09-22.)
     const excerpt = squash(surpriseAnchor.text);
     const paras = entry.paragraphs || [];
-    let found = -1;
-    let off = -1;
-    for (const len of [40, 24, 12]) {
-      const head = excerpt.slice(0, len);
-      if (!head) break;
-      for (let i = 0; i < paras.length && found < 0; i++) {
-        off = squash(paras[i] && paras[i].text).indexOf(head);
-        if (off >= 0) found = i;
-      }
-      if (found >= 0) break;
-    }
+    const { index: found, off } = excerptLanding(excerpt, paras.map((p) => squash(p && p.text)));
     if (found < 0) return;
     setLandedPara(found);
     setLandedOff(off);

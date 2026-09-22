@@ -82,6 +82,19 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     expect(seekOffsetSeen.at(-1)).toBe('But the still small voice spoke to him in the cave, and he listened.'.indexOf('spoke'));
   });
 
+  it('an excerpt cut across a block boundary lands on the block that holds its TAIL, not the one its first words trail out of', () => {
+    // The engine cuts 48 chars from the FIRST occurrence that still fits every
+    // term, so "written in The Law" came back as "The Passover. For as it is
+    // written in The Law, a" — its head is the previous block's last words, and
+    // the shortest head ("The Passover") matched THAT block (study find,
+    // 2026-09-22). The tail is tried at every length before the head shrinks.
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'gate is broad. But the still small voice spoke to him' } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['letter:the-wide-path:2']);
+    expect(seekToSeen.at(-1)).toBe('letter:the-wide-path:2');
+    expect(seekOffsetSeen.at(-1)).toBe('But the still small voice spoke to him in the cave, and he listened.'.indexOf('small voice spoke to him'));
+  });
+
   it('matches across the index whitespace domain (the index squashes runs of spaces; the block does not)', () => {
     renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'wide path is crowded and its gate' } });
     act(() => { vi.advanceTimersByTime(200); });

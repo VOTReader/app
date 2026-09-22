@@ -29,6 +29,7 @@ export const MS_FIELDS = ['text', 'title'];
 export const MS_STORE_FIELDS = [
   'kind', 'bookId', 'chapterNum', 'verseNum', 'letterId', 'letterNum',
   'volumeId', 'translation', 'testament', 'genre', 'title', 'heading', 'text', 'ref', 'corpus',
+  'studyChapterId',   // a study hit opens its chapter by ID (use-search.js, index m4)
 ];
 
 /** Default per-search options. The engine overrides prefix/fuzzy per unit
