@@ -24,7 +24,7 @@ import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
   localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight,
+  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -580,7 +580,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (wrapRef.current) wrapRef.current.setAttribute('data-elevator', elevatorRef.current ? elevatorRef.current.at.toFixed(4) : '');
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
-    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, bundles);
+    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved, lens }), v, chrome, bundles);
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
@@ -1468,7 +1468,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   const half = W / 2, camX = cam.x, ppv = cam.ppv;
-  const pill = (text, cx, cy, strong) => {
+  const pill = (text, cx, cy, strong, dim = 1) => {
     const w = ctx.measureText(text).width + fs * 0.9, h = fs * 1.35;
     const box = { x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 };
     if (box.x1 < 0 || box.x0 > W) return null;
@@ -1482,16 +1482,19 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     ctx.fillStyle = chrome.isLight ? 'rgba(248,242,228,0.92)' : 'rgba(14,12,10,0.88)';
     ctx.fill();
     ctx.lineWidth = 1 * DPR;
-    ctx.strokeStyle = 'rgba(' + gold + ',' + (strong ? 0.9 : 0.55) + ')';
+    ctx.strokeStyle = 'rgba(' + gold + ',' + ((strong ? 0.9 : 0.55) * dim).toFixed(3) + ')';
     ctx.stroke();
-    ctx.fillStyle = 'rgba(' + (strong ? gold : ink) + ',0.95)';
+    ctx.fillStyle = 'rgba(' + (strong ? gold : ink) + ',' + (0.95 * dim).toFixed(3) + ')';
     ctx.fillText(text, cx, cy + fs * 0.05);
     return box;
   };
   // the pills: under the baseline's feet, above the ruler's numerals, how
   // many threads converge on each cell - Corbin (2026-09-21 21:21): "a count
   // for how many lines are converging on a single spot". Past the overview
-  // only (6x, localize > 0), and only where two or more meet.
+  // only (6x, localize > 0, where a foot cell is a chapter or a verse), and
+  // only where two or more meet. Information, never grouping: every thread
+  // counted is drawn. Lens-dimmed like the threads (landing 11): the cells
+  // outside the chapter under the centre keep LENS_CONTEXT of their ink.
   const cy = baseY + fs * 0.95;
   for (const cell of bundles.cells) {
     const n = view.localize > 0 ? cell.drawn + cell.hidden : 0;
@@ -1500,7 +1503,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     const wCell = (cell.hi - cell.lo + 1) * ppv;
     const text = fmtCount(n);
     if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
-    const box = pill(text, cx, cy, false);
+    const box = pill(text, cx, cy, false, lensDimFor(cell.lo, cell.hi, view.lens || null));
     if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
   }
   ctx.restore();

@@ -53,6 +53,29 @@ describe('the lens exists: one taste number, one range, one shader uniform', () 
   });
 });
 
+describe('the count at each foot is information, lens-dimmed like everything else (landing 11)', () => {
+  it('geometry.lensDimFor: 1 with no lens, 1 for a cell touching the lens, LENS_CONTEXT for a cell outside it', () => {
+    expect(typeof geo.lensDimFor).toBe('function');
+    const lens = pick.chapterRange(graph, psalm107.ci);
+    expect(geo.lensDimFor(lens[0] - 10, lens[0] - 1, null)).toBe(1);
+    expect(geo.lensDimFor(lens[0], lens[1], lens)).toBe(1);
+    expect(geo.lensDimFor(lens[1], lens[1] + 40, lens)).toBe(1);
+    expect(geo.lensDimFor(lens[0] - 40, lens[0], lens)).toBe(1);
+    expect(geo.lensDimFor(lens[0] - 40, lens[0] - 1, lens)).toBe(geo.LENS_CONTEXT);
+    expect(geo.lensDimFor(lens[1] + 1, lens[1] + 3, lens)).toBe(geo.LENS_CONTEXT);
+  });
+
+  it('the pills count every thread at a cell and hide none: at 12x the cells carry thousands of feet, hidden 0', () => {
+    const cam = camAt(12);
+    const view = { width: W, density: 'famous' };
+    const cells = pick.footBundles(graph, cam, view, DPR);
+    expect(cells.length).toBeGreaterThan(3);
+    for (const c of cells) expect(c.hidden).toBe(0);
+    const total = cells.reduce((s, c) => s + c.drawn, 0);
+    expect(total).toBeGreaterThan(1000);
+  });
+});
+
 describe('the lens is the chapter under the frame\'s centre, past the overview only', () => {
   it('is null at fit and below 6x; at 6x and past it is Psalm 107\'s own range when the frame is centred there', () => {
     expect(pick.lensRange(graph, camAt(1), W)).toBeNull();

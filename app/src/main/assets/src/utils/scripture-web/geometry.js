@@ -44,6 +44,19 @@
  */
 export const LENS_CONTEXT = 0.35;
 
+/**
+ * The lens applied to a verse range (a foot cell's count, a label): 1 with
+ * no lens or when the range touches it, else LENS_CONTEXT - the same share
+ * the shader leaves a thread outside the lens. The counts at the feet are
+ * information about every thread, so they dim with the web, never vanish.
+ * @param {number} lo @param {number} hi - inclusive verse range
+ * @param {(number[]|null)} lens - pick.lensRange()
+ */
+export function lensDimFor(lo, hi, lens) {
+  if (!lens) return 1;
+  return hi >= lens[0] && lo <= lens[1] ? 1 : LENS_CONTEXT;
+}
+
 /** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
 export const LOCALIZE_START = 6;
 export const LOCALIZE_END = 24;
