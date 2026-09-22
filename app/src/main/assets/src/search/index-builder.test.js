@@ -44,7 +44,11 @@ const GLOBALS = {
   THE_BLESSED: [{ id: 'blessed-1', num: 1, title: 'The Blessed One', paragraphs: [{ text: 'Blessed are they that mourn.' }] }],
   HOLY_DAYS: [{ id: 'hd-1', num: 1, title: 'Passover', paragraphs: [{ text: 'Remember the passover forever.' }] }],
   HIDDEN_MANNA: [{ id: 'woe-dallas', num: 1, title: 'Woe to Dallas', blocks: [{ segments: [{ v: 'Woe to the great city.' }] }] }],
-  BIBLE_STUDIES: [{ slug: 'study-faith', title: 'On Faith', chapters: [{ num: 1, title: 'Beginnings', content: [{ text: 'Faith is the substance of things hoped for.' }] }] }],
+  // PRODUCTION SHAPE (2026-09-22): a study chapter carries `id` + `blocks` (para
+  // segments with `v`), never `content`. The old `content: [{ text }]` fixture
+  // was a shape bible-studies.js never had, so every study doc's body was EMPTY
+  // in the real index (title-only hits) while this suite stayed green.
+  BIBLE_STUDIES: [{ id: 'study-faith', slug: 'study-faith', title: 'On Faith', chapters: [{ id: 'study-faith-ch1', num: 1, title: 'Beginnings', blocks: [{ type: 'para', segments: [{ t: 'text', v: 'Faith is the substance of things hoped for.' }] }] }] }],
 };
 
 describe('buildDocs (narrow index scope)', () => {
@@ -138,6 +142,10 @@ describe('buildDocs (narrow index scope)', () => {
     expect(study).toMatchObject({ letterId: 'study-faith', chapterNum: 1, volumeId: 'bible-studies' });
     expect(study.title).toBe('On Faith — Beginnings');
     expect(study.text).toContain('Faith is the substance');
+    // The chapter ID rides the doc: BibleStudyChapterView looks chapters up by
+    // `id` ('study-faith-ch1'), not by number — a hit dispatched on `chapterNum`
+    // alone opened nothing (read-along find, 2026-09-22).
+    expect(study.studyChapterId).toBe('study-faith-ch1');
   });
 });
 

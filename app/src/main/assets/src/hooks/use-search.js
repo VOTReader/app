@@ -212,6 +212,22 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   handleSearchCommand: (action: string) => void
  * }}
  */
+/**
+ * The chapter id of study `studyId` at chapter number `num`, from the loaded
+ * BIBLE_STUDIES (lazy — null until a Studies screen or the index has pulled
+ * it in; a study hit exists only when it had). Null when nothing resolves.
+ * @param {string} studyId  the study's slug (=== id for every shipped study)
+ * @param {number} num
+ * @returns {string | null}
+ */
+export function studyChapterIdByNum(studyId, num) {
+  const all = /** @type {any} */ (globalThis).BIBLE_STUDIES;
+  if (!Array.isArray(all) || !studyId) return null;
+  const study = all.find((s) => s && (s.slug === studyId || s.id === studyId));
+  const ch = study && Array.isArray(study.chapters) ? study.chapters.find((c) => c && c.num === num) : null;
+  return ch && ch.id ? ch.id : null;
+}
+
 export function useSearch({
   tabField,
   screen, bookId, chapterNum, letterId,
@@ -442,10 +458,15 @@ export function useSearch({
       return;
     }
     if (k === 'bible-study') {
-      // Open the study at the given chapter
+      // Open the study at the given chapter — by the chapter's ID, which is what
+      // BibleStudyChapterView (getStudyChapter) and LetterView's excerpt anchor
+      // key on. The doc carries it since index m4; an older cached doc has only
+      // chapterNum (a NUMBER — dispatching that as the id opened nothing), so it
+      // is resolved through the loaded studies by number.
+      const chId = doc.studyChapterId || studyChapterIdByNum(doc.letterId, doc.chapterNum);
       setStudyId(doc.letterId || null);
-      setStudyChapterId(doc.chapterNum || null);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.chapterNum));
+      setStudyChapterId(chId || null);
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId));
       setScreen('bible-study-chapter');
       return;
     }

@@ -522,11 +522,25 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
     expect(props.setLetterId).not.toHaveBeenCalled();
   });
 
-  it('routes bible-study doc to bible-study-chapter', () => {
+  it('routes bible-study doc to bible-study-chapter by the chapter ID the doc carries', () => {
+    // The builder emits chapterNum as a NUMBER (schap.num) and, since 2026-09-22,
+    // studyChapterId (schap.id). BibleStudyChapterView finds chapters by id, so
+    // the number alone opened nothing (getStudyChapter(study, 1) === null).
     const { result, props } = setup();
-    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 'ch1' } }); });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 1, studyChapterId: 'purity-ch1' } }); });
     expect(props.setStudyId).toHaveBeenCalledWith('purity');
-    expect(props.setStudyChapterId).toHaveBeenCalledWith('ch1');
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('purity-ch1');
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+  });
+
+  it('a cached study doc without studyChapterId resolves the chapter by number through the loaded studies', () => {
+    const { result, props } = setup();
+    const prev = globalThis.BIBLE_STUDIES;
+    globalThis.BIBLE_STUDIES = [{ id: 'purity', slug: 'purity', chapters: [{ id: 'purity-ch1', num: 1 }, { id: 'purity-ch2', num: 2 }] }];
+    try {
+      act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 2 } }); });
+    } finally { if (prev === undefined) delete globalThis.BIBLE_STUDIES; else globalThis.BIBLE_STUDIES = prev; }
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('purity-ch2');
     expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
   });
 
@@ -683,9 +697,9 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'wtlb1', letterId: 'e1', text: 'body' } }, ['body']); });
     expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'e1' });
-    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 'ch1', text: 'body' } }, ['body']); });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 1, studyChapterId: 'purity-ch1', text: 'body' } }, ['body']); });
     // A study doc's letterId is the STUDY; the chapter LetterView renders has the chapter id.
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'ch1' });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'purity-ch1' });
     expect(props.setScreen).toHaveBeenLastCalledWith('bible-study-chapter');
   });
 

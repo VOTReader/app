@@ -37,7 +37,7 @@ const KEY = 'index';
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
    installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm3';
+export const MS_INDEX_VERSION = 'm4';   // m4: study docs carry their body + studyChapterId (2026-09-22)
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */

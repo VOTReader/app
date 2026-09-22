@@ -270,7 +270,12 @@ export function buildDocs(options) {
         const schap = studyChaps[sci];
         if (!schap) continue;
         const bodyBits = [];
-        collectStudyText(schap.content, bodyBits);
+        // A study chapter's body is `blocks` (para/segments/v — the same shape a
+        // letter carries), never `content`. Until 2026-09-22 this read a key the
+        // corpus does not have, so every study doc indexed its TITLE alone and a
+        // study's words were unsearchable (a chapter that reprints a letter
+        // surfaced as the letter, never as the study).
+        collectStudyText(schap.blocks || schap.content, bodyBits);
         const bodyStr = bodyBits.join(' ').replace(/\s+/g, ' ').trim();
         docs.push({
           id: nextId(),
@@ -280,6 +285,10 @@ export function buildDocs(options) {
           chapterNum: schap.num || 0,
           verseNum: 0,
           letterId: study.slug || '',
+          // The chapter's own id ('lamb-of-god-ch1'): what BibleStudyChapterView
+          // and the read-along anchor key on. chapterNum is a number, and a
+          // number never matched a chapter id, so a study hit opened nothing.
+          studyChapterId: schap.id || '',
           letterNum: schap.num || 0,
           volumeId: 'bible-studies',
           translation: 'nkjv',
