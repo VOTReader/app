@@ -1,15 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   MilestonesScreen — Cluster D (esbuild bundle-d.js)
+   MilestonesScreen — Cluster G (esbuild bundle-g.js, lazy)
    ═══════════════════════════════════════════════════════════════════════
    The full achievements surface (owner directive 2026-08-09). Definitions
    and computation live in utils/achievements.js — this screen renders the
    categorized result and subscribes to every contributing store so counts
    move live. It persists nothing: earned-ness is a fact about the data.
    My Progress keeps its compact 10-row strip; this is the fleshed-out view
-   reachable from Library. */
+   reachable from Library.
 
-import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
-import { scrollBehavior } from '../../utils/reduced-motion.js';
+   Lazy since 2026-09-22 (landing 23): a reader opens this on purpose, never
+   on the way to a chapter. Like the other bundle-g screens it reads the laws
+   it shares with bundle-d — ACHIEVEMENT_STORE_NAMES, buildAchievements,
+   collectAchievementSnapshot, scrollBehavior — from the window slots
+   _entry-d.js fills, because a second bundled copy of achievements.js would
+   be two module states of one table. */
 
 /** Subscribe to one cross-bundle store by name (absent store = inert).
  *  RETURNS the version so the caller can key work on it. */

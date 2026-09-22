@@ -53,6 +53,7 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).LibraryScreen = () => null;
   /** @type {any} */ (globalThis).HomeScreen = () => null;
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
+  /** @type {any} */ (globalThis).MilestonesScreen = () => null;
   // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
   // rendered unguarded by their routes, so they must exist as real globals.
   /** @type {any} */ (globalThis).NotesIndexScreen = () => null;
@@ -78,6 +79,7 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).LibraryScreen;
   delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
+  delete /** @type {any} */ (globalThis).MilestonesScreen;
   delete /** @type {any} */ (globalThis).NotesIndexScreen;
   delete /** @type {any} */ (globalThis).LinksScreen;
   delete /** @type {any} */ (globalThis).BookmarksScreen;

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   _entry-g.js — esbuild entry for bundle-g.js (the Personal Study screens)
+   _entry-g.js — esbuild entry for bundle-g.js (the screens you go TO)
    ═══════════════════════════════════════════════════════════════════════
    My Progress, Notes, Links and Highlights are screens a reader opens ON
    PURPOSE — never on boot, never on the way to a chapter — yet they were
@@ -34,6 +34,12 @@
 
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
+// Landing 23: the same law, two more screens — Milestones, the full
+// achievements surface, and History, the reading log. About was tried here too
+// and sent back: use-tabs.js opens a FRESH INSTALL on About, so lazy would have
+// put a bundle fetch in front of a new reader's very first paint.
+import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import {
   _linkEndpointCategory, _endpointResolves, _epSearchText,
@@ -50,6 +56,7 @@ import { composeNotesExport, notesExportFilename, shareNotesExport } from '../ut
 Object.assign(window, {
   MyProgressScreen,
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
+  MilestonesScreen, HistoryScreen,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

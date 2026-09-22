@@ -7,9 +7,10 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 548 distinct identifiers.
+// Total: 552 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
+declare const ACHIEVEMENT_STORE_NAMES: any;
 declare const ARROW_LAYOUT_OPTIONS: any;
 declare const AUDIO_ALTERNATES: any;
 declare const AUDIO_MANIFEST: any;
@@ -467,8 +468,10 @@ declare const parseScriptureRef: any;
 declare const persistLink: any;
 declare const progressCorporaReady: any;
 declare const readContainer: any;
+declare const readingChipWpm: any;
 declare const readingFontById: any;
 declare const readingFontCss: any;
+declare const readingMinChip: any;
 declare const readingMinutes: any;
 declare const recordUserDataSample: any;
 declare const relativeDate: any;
@@ -480,6 +483,7 @@ declare const resolveVerseText: any;
 declare const resolveVotLetter: any;
 declare const root: any;
 declare const runV3AndroidExport: any;
+declare const scrollBehavior: any;
 declare const scrollKeyForTab: any;
 declare const searchNavIndex: any;
 declare const segmentRenderText: any;

@@ -47,7 +47,6 @@ import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { textKeyOf } from './components/AudioShelf.jsx';
-import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
@@ -699,7 +698,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'history': () => (
+    'history': () => typeof HistoryScreen !== 'undefined' ? (
       <HistoryScreen
         history={readHistory}
         onBack={goNavOrigin}
@@ -745,7 +744,7 @@ export function buildScreenRoutes({
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'library': () => _kickVot(
         <LibraryScreen
           onBack={goHome}
@@ -772,7 +771,7 @@ export function buildScreenRoutes({
           theme={theme} onThemeChange={setTheme}
         />
     ),
-    'milestones': () => (
+    'milestones': () => typeof MilestonesScreen !== 'undefined' ? (
       <MilestonesScreen
         onBack={goNavOrigin}
         backLabel={navOrigin && navOrigin.screen === 'my-progress' ? 'Progress' : 'Library'}
@@ -782,8 +781,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    // The four Personal Study screens live in bundle-g (lazy, PF6 contract):
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    // The Personal Study screens live in bundle-g (lazy, PF6 contract):
     // until its IIFE has defined them, the route shows _corpusView's loader and
     // asks for the bundle, exactly as Settings/Search do for bundle-e.
     'my-progress': () => typeof MyProgressScreen !== 'undefined' ? _kickVot(

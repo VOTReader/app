@@ -1,5 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AboutScreen — Cluster D (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════
+   Eager on purpose, and it must stay that way: use-tabs.js opens a fresh
+   install ON this screen (screen = !AboutSeenFlagStore.is() ? 'about' :
+   'home'), so a lazy About would put a bundle fetch in front of the very
+   first paint a new reader ever sees. Landing 23 tried it and the browser
+   look caught it.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {

@@ -28,11 +28,14 @@ const read = (p) => readFileSync(p, 'utf-8');
    the identifier itself still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof MyProgressScreen !== 'undefined'`).
    The key is the definition; the bare name is only a question about it. */
-const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'HighlightsScreen', 'BookmarksScreen'];
+const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'HighlightsScreen',
+  'BookmarksScreen', 'MilestonesScreen', 'HistoryScreen'];
+/* AboutScreen is NOT in that list on purpose: use-tabs.js opens a fresh
+   install on it, so it is boot-path weight however on-purpose it looks. */
 const defines = (bundle, name) => bundle.includes(name + ':');
 
 describe('bundle-g carries the Personal Study screens, and bundle-d no longer does', () => {
-  it('the five screens are defined in bundle-g', () => {
+  it('the seven screens are defined in bundle-g', () => {
     const g = read(resolve(DIST, 'bundle-g.js'));
     for (const name of MARKERS) {
       expect(defines(g, name), `bundle-g.js lacks ${name}`).toBe(true);
@@ -89,9 +92,21 @@ describe('bundle-g carries the Personal Study screens, and bundle-d no longer do
     // cross-bundle contract bundle-e keeps. A duplicated copy would be two
     // module states of one law, and bytes paid twice.
     const g = read(resolve(DIST, 'bundle-g.js'));
-    expect(/FEATURED_UNLOCK_DEFS|ACHIEVEMENT_STORE_NAMES/.test(g), 'bundle-g.js ships its own copy of achievements.js').toBe(false);
+    // The marker is a STRING LITERAL from achievements.js, not an identifier:
+    // esbuild minifies the module's own names away, and since landing 23
+    // MilestonesScreen READS ACHIEVEMENT_STORE_NAMES as a free global, so the
+    // identifier appears in bundle-g exactly when the contract is being kept.
+    // A literal only survives where the module itself was bundled.
+    expect(g.includes('One million words read'), 'bundle-g.js ships its own copy of achievements.js').toBe(false);
+    // Landing 23's two: reduced-motion's scroll law is imported by nine
+    // reading-path modules that stay, and ReadingMinChip is rendered by
+    // HistoryEntryCard / VolumeLetterIndex / ChapterIndex — so History and
+    // Milestones read both across the boundary rather than carrying a copy.
+    expect(/prefers-reduced-motion/.test(g), 'bundle-g.js ships its own copy of reduced-motion.js').toBe(false);
+    expect(/readingChipWpm:|readingMinChip:/.test(g), 'bundle-g.js ships its own ReadingMinChip').toBe(false);
     const entryD = read(resolve(ASSETS, 'src', 'ui', '_entry-d.js'));
-    for (const name of ['buildAchievements', 'collectAchievementSnapshot', 'onIdle', 'normalizeExcerptDisplay']) {
+    for (const name of ['buildAchievements', 'collectAchievementSnapshot', 'onIdle', 'normalizeExcerptDisplay',
+      'ACHIEVEMENT_STORE_NAMES', 'scrollBehavior', 'readingChipWpm', 'readingMinChip']) {
       expect(new RegExp('\\b' + name + '\\b').test(entryD), `_entry-d.js does not expose ${name} for bundle-g`).toBe(true);
     }
   });

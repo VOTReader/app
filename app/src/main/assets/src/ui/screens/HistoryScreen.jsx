@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   HistoryScreen — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
-
-import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
+   HistoryScreen — Cluster G (esbuild bundle-g.js, lazy)
+   ═══════════════════════════════════════════════════════════════════════
+   Lazy since 2026-09-22 (landing 23). ReadingMinChip stays in bundle-d —
+   HistoryEntryCard, VolumeLetterIndex and ChapterIndex all render it on the
+   reading path — so this screen reads its two helpers from the window slots,
+   the cross-bundle contract every lazy bundle keeps. */
 
 /**
  * Everything about one entry a reader might type to find it again, lowercased

@@ -24,11 +24,17 @@ import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { countItemWords, readingMinutes } from '../../utils/word-count.js';
 import { bookItemsFor, READ_VERSION_ID } from '../../utils/progress-stats.js';
 import { timeAgo } from '../../utils/dates.js';
+/* The screen went lazy (bundle-g, landing 23) while ReadingMinChip stayed in
+   bundle-d, so these two arrive as window slots. Stubbing them with the REAL
+   helpers is what keeps the row and the index card from drifting apart — the
+   whole point of the shared chip. */
+import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'HistoryEntryCard', 'ConfirmStrip',
   'timeAgo', 'WEEKDAY_NAMES', 'MONTH_NAMES', 'MONTH_ABBR', 'COL_BY_INDEX_SC',
   'countItemWords', 'readingMinutes', 'bookItemsFor', 'READ_VERSION_ID',
-  'ReadingStatsStore', 'BOOKS', 'LETTERS_V1', 'studyAbbrev'];
+  'ReadingStatsStore', 'BOOKS', 'LETTERS_V1', 'studyAbbrev',
+  'readingChipWpm', 'readingMinChip'];
 
 /** A 3-chapter book whose chapters have real, countable verse text. */
 const BOOK = {
@@ -70,6 +76,8 @@ function setupGlobals(over = {}) {
   globalThis.readingMinutes = readingMinutes;
   globalThis.bookItemsFor = over.bookItemsFor || bookItemsFor;
   globalThis.READ_VERSION_ID = READ_VERSION_ID;
+  globalThis.readingChipWpm = readingChipWpm;
+  globalThis.readingMinChip = readingMinChip;
   globalThis.BOOKS = { psalms: BOOK };
   globalThis.LETTERS_V1 = V1_LETTERS;
   // index.html's one-liner: the abbrev table, else a shortened title.

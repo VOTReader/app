@@ -50,7 +50,14 @@ import { bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey } from '../utils/hl-keys
 import { relativeDate, timeAgo } from '../utils/dates.js';
 // Shared with the lazy Personal Study screens (bundle-g), which resolve them as
 // free globals at call time rather than bundling a second copy — see _entry-g.js.
-import { buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
+// ACHIEVEMENT_STORE_NAMES joins the two builders on window for bundle-g's
+// MilestonesScreen — one copy of the table, read across the bundle boundary.
+import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
+// Shared with bundle-g the same way: reduced-motion's scroll law (every
+// reading-path screen imports it here) and the reading-minute chip
+// (HistoryEntryCard / VolumeLetterIndex / ChapterIndex render it here).
+import { scrollBehavior } from '../utils/reduced-motion.js';
+import { readingChipWpm, readingMinChip } from './components/ReadingMinChip.jsx';
 import { onIdle } from '../utils/on-idle.js';
 import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
 import {
@@ -172,9 +179,8 @@ import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
-import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+
 import { StudiesHome } from './screens/StudiesHome.jsx';
-import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
 import { HomeScreen } from './screens/HomeScreen.jsx';
 import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
@@ -218,7 +224,8 @@ Object.assign(window, {
   // Utilities
   bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey,
   relativeDate, timeAgo,
-  buildAchievements, collectAchievementSnapshot, onIdle, normalizeExcerptDisplay,
+  ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot,
+  scrollBehavior, readingChipWpm, readingMinChip, onIdle, normalizeExcerptDisplay,
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
@@ -275,7 +282,7 @@ Object.assign(window, {
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen,
-  VolumesHome, AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, MilestonesScreen, StudiesHome, HistoryScreen, AboutScreen,
+  VolumesHome, AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, StudiesHome, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,

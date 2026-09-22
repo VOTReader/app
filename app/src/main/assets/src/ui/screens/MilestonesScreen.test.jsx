@@ -25,8 +25,13 @@ import {
   ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_STORE_NAMES, ACHIEVEMENT_TOTAL,
   FEATURED_ACHIEVEMENTS, buildAchievements, collectAchievementSnapshot,
 } from '../../utils/achievements.js';
+/* Lazy since landing 23: achievements.js and reduced-motion.js stay in
+   bundle-d (one copy of the table, one scroll law), so the screen reads them
+   from the window slots — and the stubs here are the real ones. */
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
-const GLOBALS = ['ScreenLayout', 'LibraryNav', ...ACHIEVEMENT_STORE_NAMES];
+const GLOBALS = ['ScreenLayout', 'LibraryNav', ...ACHIEVEMENT_STORE_NAMES,
+  'ACHIEVEMENT_STORE_NAMES', 'buildAchievements', 'collectAchievementSnapshot', 'scrollBehavior'];
 
 /** A store nobody has written to: subscribable, version 0, answers nothing. */
 const idleStore = () => ({ subscribe: () => () => {}, getVersion: () => 0 });
@@ -59,6 +64,10 @@ function setupGlobals(over = {}) {
     <div data-testid="screen-layout">{navChildren}{children}</div>
   );
   globalThis.LibraryNav = () => null;
+  globalThis.ACHIEVEMENT_STORE_NAMES = ACHIEVEMENT_STORE_NAMES;
+  globalThis.buildAchievements = buildAchievements;
+  globalThis.collectAchievementSnapshot = collectAchievementSnapshot;
+  globalThis.scrollBehavior = scrollBehavior;
   for (const name of ACHIEVEMENT_STORE_NAMES) globalThis[name] = over[name] || idleStore();
 }
 
