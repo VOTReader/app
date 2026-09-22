@@ -90,7 +90,11 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  for (const k of ['__makeLazyLoader', '__bibleCorpus', '__loadBibleCorpus', '__matthewCorpus', '__loadMatthewCorpus', '__votCorpus', '__loadVotCorpus', '__screensE', '__loadScreensE', '__screensF', '__loadScreensF']) delete window[k];
+  for (const k of ['__makeLazyLoader', '__bibleCorpus', '__loadBibleCorpus', '__matthewCorpus', '__loadMatthewCorpus', '__votCorpus', '__loadVotCorpus', '__screensE', '__loadScreensE', '__screensF', '__loadScreensF',
+    // sw-register's takeover flag: left set, the next test's loader believes a
+    // new worker already claimed the page and refuses every lazy load (the
+    // CONTROL test failed whenever the RED test ran first, --sequence.seed=11).
+    '__votSwTookOver']) delete window[k];
   if (saved.sw) Object.defineProperty(navigator, 'serviceWorker', saved.sw); else delete navigator.serviceWorker;
   if (saved.location) Object.defineProperty(window, 'location', saved.location);
   if (saved.vis) Object.defineProperty(document, 'visibilityState', saved.vis); else delete document.visibilityState;
