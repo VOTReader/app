@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 539 distinct identifiers.
+// Total: 548 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -310,11 +310,13 @@ export const projectGlobals = {
   __loadMatthewCorpus: "readonly",
   __loadScreensE: "readonly",
   __loadScreensF: "readonly",
+  __loadScreensG: "readonly",
   __loadVotCorpus: "readonly",
   __makeLazyLoader: "readonly",
   __matthewCorpus: "readonly",
   __screensE: "readonly",
   __screensF: "readonly",
+  __screensG: "readonly",
   __scrollEl: "readonly",
   __votController0: "readonly",
   __votCorpus: "readonly",
@@ -358,6 +360,7 @@ export const projectGlobals = {
   blockBoundaryOffsets: "readonly",
   bookCategory: "readonly",
   bookItemsFor: "readonly",
+  buildAchievements: "readonly",
   buildExportPayload: "readonly",
   buildNavIndex: "readonly",
   buildNavTree: "readonly",
@@ -374,7 +377,9 @@ export const projectGlobals = {
   colLetterArr: "readonly",
   colLetters: "readonly",
   colPreface: "readonly",
+  collectAchievementSnapshot: "readonly",
   commitReadingNav: "readonly",
+  composeNotesExport: "readonly",
   computeEndTarget: "readonly",
   contentDocToNavItem: "readonly",
   countItemWords: "readonly",
@@ -446,10 +451,13 @@ export const projectGlobals = {
   navHandoff: "readonly",
   navItemPreview: "readonly",
   navItemToEndpoint: "readonly",
+  normalizeExcerptDisplay: "readonly",
   normalizeForHighlight: "readonly",
   noteSourceLabel: "readonly",
   noteSourceNav: "readonly",
   noteSourceSegments: "readonly",
+  notesExportFilename: "readonly",
+  onIdle: "readonly",
   openThumbDB: "readonly",
   parseRefRange: "readonly",
   parseRefRanges: "readonly",
@@ -475,6 +483,7 @@ export const projectGlobals = {
   searchNavIndex: "readonly",
   segmentRenderText: "readonly",
   segmentsDomText: "readonly",
+  shareNotesExport: "readonly",
   showToast: "readonly",
   snapRangeToWords: "readonly",
   snapSelectionRange: "readonly",

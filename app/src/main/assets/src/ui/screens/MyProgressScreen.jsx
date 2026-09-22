@@ -22,8 +22,9 @@
    set, not a second table. See that module's FEATURED block.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
-import { onIdle } from '../../utils/on-idle.js';
+/* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
+   Study bundle) and reads buildAchievements / collectAchievementSnapshot / onIdle from the window slots
+   bundle-d fills — one copy of each law, and no second module state. */
 
 /**
  * Compact count for the hero cells: exact with separators below 10k

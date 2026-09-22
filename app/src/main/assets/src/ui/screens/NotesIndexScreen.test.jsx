@@ -10,6 +10,7 @@
    so we stub them; NoteRow is the REAL component. */
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
@@ -48,6 +49,9 @@ function setupGlobals() {
   };
   window.ScreenLayout = ({ children }) => <div>{children}</div>;
   window.LibraryNav = () => null;
+  // Cross-bundle: the screen ships in bundle-g and reads this from bundle-d's
+  // window slot (src/ui/_entry-g.js) rather than importing a second copy.
+  window.normalizeExcerptDisplay = normalizeExcerptDisplay;
   window.NoteRow = NoteRow;
 }
 

@@ -39,7 +39,12 @@ const BUDGETS = [
   { file: 'bundle-a.js', measured: 196619, max: 226000 },   // react + bible-audio-manifest + search-data
   { file: 'bundle-b.js', measured: 318650, max: 367000 },   // stores/hooks/journal/bridge
   { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
-  { file: 'bundle-d.js', measured: 522971, max: 602000 },   // most screens/sheets/utils
+  // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
+  // Notes, Links, Highlights) LEFT this bundle for bundle-g, -46,043 B off the
+  // cold-boot parse path. Re-baselined DOWN (510,376 x 1.15 = 586,932 -> the
+  // hundred above) so the collapse detector keeps its teeth, exactly as c43 did
+  // when matthew-nkjv.js left bundle-a.
+  { file: 'bundle-d.js', measured: 510376, max: 587000 },   // most screens/sheets/utils
   { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
@@ -75,6 +80,10 @@ const BUDGETS = [
   // 101,182.75 -> 101,200). Lazy bundle, not cold boot; the 16-day trend of every bundle is in
   // D:\Swarm\lanes\myweb\out\perf-bundle-trend-2026-09-22.md (cold-boot path +1.8 % in 16 days).
   { file: 'bundle-f.js', measured: 87985, max: 101200 },
+  // The Personal Study screens, split out of bundle-d on 2026-09-22 (landing
+  // 21): opened on purpose, never on the way to a chapter, so they are fetched
+  // and parsed only when one is. 46,586 x 1.15 = 53,573 -> the hundred above.
+  { file: 'bundle-g.js', measured: 46586, max: 53600 },     // My Progress / Notes / Links / Highlights
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

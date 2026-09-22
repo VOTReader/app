@@ -783,7 +783,10 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'my-progress': () => typeof MyProgressScreen !== 'undefined' && _kickVot(
+    // The four Personal Study screens live in bundle-g (lazy, PF6 contract):
+    // until its IIFE has defined them, the route shows _corpusView's loader and
+    // asks for the bundle, exactly as Settings/Search do for bundle-e.
+    'my-progress': () => typeof MyProgressScreen !== 'undefined' ? _kickVot(
       <MyProgressScreen
         onBack={goNavOrigin}
         onSearch={goSearch}
@@ -796,7 +799,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     // Link-outs from the index / viewer / web screens do NOT write navOrigin.
     // These screens' own Back IS goNavOrigin, and goHighlightsIndex & friends
     // already snapshotted the reading position there when the index opened —
@@ -805,7 +808,7 @@ export function buildScreenRoutes({
     // press, then Home). navigateToLink owns the destination's return path
     // through the fromLetter entry it pushes (the pill / tapThroughBack /
     // handleAndroidBack), so there is nothing here for navOrigin to carry.
-    'highlights-index': () => typeof HighlightsScreen !== 'undefined' && _kickVot(
+    'highlights-index': () => typeof HighlightsScreen !== 'undefined' ? _kickVot(
       <HighlightsScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -820,7 +823,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'journal-home': () => typeof JournalHubScreen !== 'undefined' && _kickVot(
       <JournalHubScreen
         onSettings={goSettings}
@@ -884,7 +887,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'notes-index': () => _kickVot(
+    'notes-index': () => typeof NotesIndexScreen !== 'undefined' ? _kickVot(
       <NotesIndexScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -900,8 +903,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'links-index': () => _kickVot(
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    'links-index': () => typeof LinksScreen !== 'undefined' ? _kickVot(
       <LinksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -921,7 +924,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'bookmarks-index': () => _kickVot(
       <BookmarksScreen
         onSettings={goSettings}

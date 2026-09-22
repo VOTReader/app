@@ -15,6 +15,7 @@ import { MyProgressScreen, _fmtWords } from './MyProgressScreen.jsx';
 import { tallyGroup, countReadFor, mostAnnotatedSources } from '../../utils/progress-stats.js';
 import { countTextWords } from '../../utils/word-count.js';
 import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
+import { onIdle } from '../../utils/on-idle.js';
 
 const STUBBED = [
   'ScreenLayout', 'LibraryNav',
@@ -23,6 +24,10 @@ const STUBBED = [
   'ReadingStatsStore', 'JournalMediaStore', 'countTextWords',
   'buildProgressGroups', 'tallyGroup', 'countReadFor', 'mostAnnotatedSources',
   'findEntryContext', 'BIBLE_BOOK_LIST', 'AudioLibraryStore',
+  // Cross-bundle now: the screen ships in bundle-g and reads these from the
+  // window slots bundle-d fills (see src/ui/_entry-g.js), so the test installs
+  // the REAL implementations as globals rather than importing them for it.
+  'buildAchievements', 'collectAchievementSnapshot', 'onIdle',
 ];
 
 const mkStore = (over = {}) => ({ subscribe: () => () => {}, getVersion: () => 0, ...over });
@@ -30,6 +35,9 @@ const mkStore = (over = {}) => ({ subscribe: () => () => {}, getVersion: () => 0
 function setupGlobals(over = {}) {
   globalThis.ScreenLayout = ({ children }) => <div data-testid="layout">{children}</div>;
   globalThis.LibraryNav = () => null;
+  globalThis.buildAchievements = buildAchievements;
+  globalThis.collectAchievementSnapshot = collectAchievementSnapshot;
+  globalThis.onIdle = onIdle;
   globalThis.NoteStore = mkStore({ count: () => over.notes || 0 });
   globalThis.LinkStore = mkStore({ all: () => new Array(over.links || 0).fill({}) });
   globalThis.BookmarkStore = mkStore({ count: () => over.bookmarks || 0 });

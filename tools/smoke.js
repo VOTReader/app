@@ -862,6 +862,10 @@
       // it so the globals audit + the screen walk below see those globals
       // (they're no longer defined at boot).
       if (typeof root.__loadScreensE === 'function') { try { await root.__loadScreensE(); } catch (_e) {} }
+      // Same for bundle-g (My Progress / Notes / Links / Highlights, split out
+      // of bundle-d on 2026-09-22): the audit and the walk below expect those
+      // screens as globals, and they arrive with the bundle, not with boot.
+      if (typeof root.__loadScreensG === 'function') { try { await root.__loadScreensG(); } catch (_e) {} }
       report.globals = auditGlobals();
       report.dataWiring = auditDataWiring();
       report.screens = walk ? await walkScreens() : 'skipped';

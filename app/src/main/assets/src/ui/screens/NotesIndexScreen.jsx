@@ -2,7 +2,9 @@
    NotesIndexScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+/* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
+   Study bundle) and reads normalizeExcerptDisplay from the window slots
+   bundle-d fills — one copy of each law, and no second module state. */
 import { composeNotesExport, notesExportFilename, shareNotesExport } from '../../utils/notes-export.js';
 
 /**

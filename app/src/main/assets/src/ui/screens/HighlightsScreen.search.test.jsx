@@ -16,6 +16,7 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { HighlightsScreen } from './HighlightsScreen.jsx';
 
@@ -37,6 +38,9 @@ beforeEach(() => {
   );
   globalThis.LibraryNav = () => null;
   globalThis.relativeDate = () => '';
+  // Cross-bundle: the screen ships in bundle-g (src/ui/_entry-g.js) and reads
+  // this from the window slot bundle-d fills.
+  globalThis.normalizeExcerptDisplay = normalizeExcerptDisplay;
   globalThis._bookmarkSourceLabel = (hlKey) => hlKey;
   globalThis.AnnotationStore = {
     subscribe: () => () => {}, getVersion: () => 0, all: () => MARKS,

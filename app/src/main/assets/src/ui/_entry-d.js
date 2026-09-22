@@ -48,6 +48,11 @@
 // ── Utilities ───────────────────────────────────────────────────────────
 import { bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey } from '../utils/hl-keys.js';
 import { relativeDate, timeAgo } from '../utils/dates.js';
+// Shared with the lazy Personal Study screens (bundle-g), which resolve them as
+// free globals at call time rather than bundling a second copy — see _entry-g.js.
+import { buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
+import { onIdle } from '../utils/on-idle.js';
+import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
 import {
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
@@ -162,8 +167,6 @@ import { WtlbEntryView } from './screens/WtlbEntryView.jsx';
 import { BibleChapterView } from './screens/BibleChapterView.jsx';
 import { ChapterView } from './screens/ChapterView.jsx';
 import { LibraryScreen } from './screens/LibraryScreen.jsx';
-import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
-import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
 import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
 import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
@@ -181,17 +184,9 @@ import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
 import {
-  _linkEndpointCategory, _endpointResolves, _epSearchText,
-  LinkRow, LinkRowActionSheet, LinksScreen,
-} from './screens/LinksScreen.jsx';
-import {
   _bookmarkSourceLabel, _bookmarkSourceEndpoint,
   BookmarkRow, BookmarkRowActionSheet, BookmarkPopover, BookmarksScreen,
 } from './screens/BookmarksScreen.jsx';
-import {
-  _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
-  _collectMarks, HighlightRow, HighlightsScreen,
-} from './screens/HighlightsScreen.jsx';
 
 // ── Sheets ──────────────────────────────────────────────────────────────
 import { TabsOverview } from './sheets/TabsOverview.jsx';
@@ -223,6 +218,7 @@ Object.assign(window, {
   // Utilities
   bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey,
   relativeDate, timeAgo,
+  buildAchievements, collectAchievementSnapshot, onIdle, normalizeExcerptDisplay,
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
@@ -278,17 +274,13 @@ Object.assign(window, {
   buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
-  LibraryScreen, MyProgressScreen, NotesIndexScreen,
+  LibraryScreen,
   VolumesHome, AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, MilestonesScreen, StudiesHome, HistoryScreen, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
   ScriptureGenre, ScripturesHome,
-  _linkEndpointCategory, _endpointResolves, _epSearchText,
-  LinkRow, LinkRowActionSheet, LinksScreen,
   _bookmarkSourceLabel, _bookmarkSourceEndpoint,
   BookmarkRow, BookmarkRowActionSheet, BookmarkPopover, BookmarksScreen,
-  _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
-  _collectMarks, HighlightRow, HighlightsScreen,
   // Sheets
   TabsOverview, TabActionSheet, MultiNotePopover,
   NotebookPickerSheet, NoteSheet,

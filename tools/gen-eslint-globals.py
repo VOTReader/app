@@ -50,6 +50,9 @@ ENTRY_FILES = [
     ROOT / 'app/src/main/assets/src/ui/_entry-e.js',
     # bundle-f — The Scripture Web, same typeof-guarded route call site.
     ROOT / 'app/src/main/assets/src/ui/_entry-f.js',
+    # bundle-g — the Personal Study screens (My Progress / Notes / Links /
+    # Highlights), same typeof-guarded route call site.
+    ROOT / 'app/src/main/assets/src/ui/_entry-g.js',
 ]
 INDEX_HTML = ROOT / 'app/src/main/assets/index.html'
 DATA_DIR = ROOT / 'app/src/main/assets/src/data'

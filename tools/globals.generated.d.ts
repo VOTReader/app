@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 539 distinct identifiers.
+// Total: 548 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -311,11 +311,13 @@ declare const __loadBibleSync: any;
 declare const __loadMatthewCorpus: any;
 declare const __loadScreensE: any;
 declare const __loadScreensF: any;
+declare const __loadScreensG: any;
 declare const __loadVotCorpus: any;
 declare const __makeLazyLoader: any;
 declare const __matthewCorpus: any;
 declare const __screensE: any;
 declare const __screensF: any;
+declare const __screensG: any;
 declare const __scrollEl: any;
 declare const __votController0: any;
 declare const __votCorpus: any;
@@ -359,6 +361,7 @@ declare const bkmId: any;
 declare const blockBoundaryOffsets: any;
 declare const bookCategory: any;
 declare const bookItemsFor: any;
+declare const buildAchievements: any;
 declare const buildExportPayload: any;
 declare const buildNavIndex: any;
 declare const buildNavTree: any;
@@ -375,7 +378,9 @@ declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
 declare const colPreface: any;
+declare const collectAchievementSnapshot: any;
 declare const commitReadingNav: any;
+declare const composeNotesExport: any;
 declare const computeEndTarget: any;
 declare const contentDocToNavItem: any;
 declare const countItemWords: any;
@@ -447,10 +452,13 @@ declare const mostAnnotatedSources: any;
 declare const navHandoff: any;
 declare const navItemPreview: any;
 declare const navItemToEndpoint: any;
+declare const normalizeExcerptDisplay: any;
 declare const normalizeForHighlight: any;
 declare const noteSourceLabel: any;
 declare const noteSourceNav: any;
 declare const noteSourceSegments: any;
+declare const notesExportFilename: any;
+declare const onIdle: any;
 declare const openThumbDB: any;
 declare const parseRefRange: any;
 declare const parseRefRanges: any;
@@ -476,6 +484,7 @@ declare const scrollKeyForTab: any;
 declare const searchNavIndex: any;
 declare const segmentRenderText: any;
 declare const segmentsDomText: any;
+declare const shareNotesExport: any;
 declare const showToast: any;
 declare const snapRangeToWords: any;
 declare const snapSelectionRange: any;
