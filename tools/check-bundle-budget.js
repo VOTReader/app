@@ -68,7 +68,13 @@ const BUDGETS = [
   // `size > b.max` — so nothing above can change a gate outcome except the
   // ceiling itself.
   // l8 (2026-09-22): the density law's table, level, stand-ins and "x n" badges deleted under the structure law; ceiling re-set to ~+15%.
-  { file: 'bundle-f.js', measured: 79704, max: 91700 },
+  // l18 (2026-09-22 03:1x): 91,700 -> 101,200 with 3,715 B (4 %) left after landings 9-17 - the lens,
+  // sky navigation (ruler + elevator), the counts under the lens, the how-to-read card, the Nearby
+  // list - added 8,322 B in one night: the landing-70 rule (a ceiling that fails the next honest change
+  // is a gate nobody can land under; measured x 1.15 rounded up to the hundred: 87,985 x 1.15 =
+  // 101,182.75 -> 101,200). Lazy bundle, not cold boot; the 16-day trend of every bundle is in
+  // D:\Swarm\lanes\myweb\out\perf-bundle-trend-2026-09-22.md (cold-boot path +1.8 % in 16 days).
+  { file: 'bundle-f.js', measured: 87985, max: 101200 },
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
