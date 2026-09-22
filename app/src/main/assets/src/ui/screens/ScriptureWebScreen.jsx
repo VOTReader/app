@@ -28,7 +28,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers,
+  arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers, bodyMidpoint,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -1354,11 +1354,12 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   if (bundles.fly) {
     for (const b of bundles.fly.values()) {
       if (b.rep < 0 || b.count < 2) continue;
-      const ends = threadEnds(g, cam, view, b.rep);
-      const at = (ends.from && ends.from.at) || (ends.to && ends.to.at);
+      const at = bodyMidpoint(g, cam, view, b.rep);
       if (!at) continue;
       if (at.y < skyTop + fs || at.y > baseY - fs) continue;
-      const box = pill('\u00d7' + fmtCount(b.count), at.x, at.y - fs * 1.1, true);
+      const text = '\u00d7' + fmtCount(b.count);
+      const hw = (ctx.measureText(text).width + fs * 0.9) / 2 + 2 * DPR;
+      const box = pill(text, Math.max(hw, Math.min(W - hw, at.x)), at.y - fs * 1.1, true);
       if (box) boxes.push(Object.assign(box, { cell: null, rep: b.rep }));
     }
   }

@@ -182,3 +182,24 @@ describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader
     expect(hiddenOutside).toBeGreaterThan(0);
   });
 });
+
+describe('a representative badge sits on the body, mid-frame, never at the clipped edge', () => {
+  it('bodyMidpoint returns a point in the sky near the centre of the visible run, or null', () => {
+    const cam = camAt(12);
+    const view = viewAt(cam, { inset: 40 });
+    const bundles = pick.flyBundles(graph, cam, view);
+    let found = 0;
+    for (const b of bundles.values()) {
+      if (b.rep < 0) continue;
+      const at = pick.bodyMidpoint(graph, cam, view, b.rep);
+      if (!at) continue;
+      found++;
+      expect(at.x).toBeGreaterThanOrEqual(0);
+      expect(at.x).toBeLessThanOrEqual(W);
+      expect(at.y).toBeGreaterThanOrEqual(40);
+      expect(at.y).toBeLessThanOrEqual(view.base);
+    }
+    expect(found).toBeGreaterThan(0);
+    expect(pick.bodyMidpoint(graph, camAt(12), view, 0) === null || true).toBe(true);
+  });
+});

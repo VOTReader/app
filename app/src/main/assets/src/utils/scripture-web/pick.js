@@ -283,6 +283,48 @@ export function threadEnds(g, cam, view, i) {
 }
 
 /**
+ * Where a thread's body is best labelled from the middle: the on-screen
+ * point of its drawn curve nearest the centre of the x range the frame
+ * holds, walking outward in both directions, or null when no point of the
+ * body is in the sky. A fly-over representative's badge goes here - its
+ * feet are both off the frame, so threadEnds' nearest points sit at the
+ * frame's edges, where a badge is clipped.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number, localize:number, inset?:number}} view
+ * @param {number} i
+ * @returns {{x:number, y:number}|null}
+ */
+export function bodyMidpoint(g, cam, view, i) {
+  const { width, ceil, squash, localize } = view;
+  const inset = view.inset > 0 ? view.inset : 0;
+  const camY = cam.y > 0 ? cam.y : 0;
+  const base = view.base + camY;
+  const x0 = (g.from[i] - cam.x) * cam.ppv + width / 2;
+  const x1 = (g.to[i] - cam.x) * cam.ppv + width / 2;
+  const xa = Math.max(0, x0), xb = Math.min(width, x1);
+  if (!(xb > xa)) return null;
+  const rx = (x1 - x0) * 0.5;
+  const spanLog = spanLogOf(Math.abs(g.to[i] - g.from[i]), g.total);
+  const { fanA, fanB } = fansOf(g);
+  const shapeL = arcShape(rx, ceil, squash, localize, spanLog, fanA[i]);
+  const shapeR = arcShape(rx, ceil, squash, localize, spanLog, fanB[i]);
+  const bow = DOME * localize;
+  const yAt = (x) => base - arcHeightAt(x, x0, x1, shapeL.R, shapeR.R, shapeL.A, bow);
+  const mid = (xa + xb) / 2;
+  const STEPS = 16;
+  for (let k = 0; k <= STEPS; k++) {
+    for (const dir of k === 0 ? [1] : [1, -1]) {
+      const x = mid + (dir * (xb - xa) * k) / (2 * STEPS);
+      const y = yAt(x);
+      if (y >= inset && y <= view.base) return { x, y };
+    }
+  }
+  return null;
+}
+
+/**
  * How many DRAWN arcs are anchored to the passage on screen.
  *
  * Not `stats.instances`, which counts what was submitted to the GPU: chunk
