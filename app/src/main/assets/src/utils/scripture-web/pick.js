@@ -685,25 +685,41 @@ export function flyBundles(g, cam, view) {
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {{width:number, density:import('./decode.js').Density, level?:number}} view
- * @param {Map<number, FlyBundle>} [bundles] - flyBundles(), when the caller has them
  * @returns {StratumRow[]}
  */
-export function strataCounts(g, cam, view, bundles) {
+export function strataCounts(g, cam, view) {
   const rows = STRATA_NAMES.map((name, k) => ({ k, name, cross: 0, shown: 0 }));
-  const map = bundles || flyBundles(g, cam, view);
-  // a group's members share a span cell, so one member's stratum is the group's
-  const { groupOf } = lodOf(g);
-  const seen = new Map();
-  for (let i = 0; i < g.count && seen.size < map.size; i++) {
-    const key = groupOf[i];
-    if (!map.has(key) || seen.has(key)) continue;
-    seen.set(key, stratumOf(Math.abs(g.to[i] - g.from[i])));
-  }
-  for (const b of map.values()) {
-    const k = seen.get(b.key);
-    if (k === undefined) continue;
-    rows[k].cross += b.count;
-    if (b.rep >= 0) rows[k].shown++;
+  // per THREAD, by its own span: the shader lifts each thread by
+  // strataLift(|b - a|), and the 48 log span cells straddle every stratum
+  // bound, so a group's stratum is not one number (the refuter, 2026-09-21:
+  // 115 groups, e.g. Ps 33:11 -> Jer 29:11 drawn in the canon band, counted
+  // as testament-scale)
+  const { width, density } = view;
+  const { lod } = lodOf(g);
+  const essential = density === 'essential';
+  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
+  const chunkSize = g.chunkSize || 256;
+  const level = typeof view.level === 'number' ? view.level : LOD_OFF;
+  for (const bucket of g.buckets) {
+    const draw = bucketDrawCount(bucket, density);
+    const chunks = bucket.chunks || [];
+    const chunkCount = Math.ceil(draw / chunkSize);
+    for (let c = 0; c < chunkCount; c++) {
+      const ext = chunks[c];
+      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
+      const start = bucket.off + c * chunkSize;
+      const end = Math.min(start + chunkSize, bucket.off + draw);
+      for (let i = start; i < end; i++) {
+        const x0 = (g.from[i] - camX) * ppv + half;
+        const x1 = (g.to[i] - camX) * ppv + half;
+        if (x1 < 0 || x0 > width) continue;
+        if (arcAnchored(x0, x1, width)) continue;
+        const k = stratumOf(Math.abs(g.to[i] - g.from[i]));
+        rows[k].cross++;
+        if (lodShown(lod[i], essential, 0, level)) rows[k].shown++;
+      }
+    }
   }
   return rows;
 }
@@ -737,7 +753,10 @@ export function groupMembers(g, index, density, limit) {
 /**
  * A foot cell's threads grouped by the chapter at the OTHER end - the list
  * behind a "+n" badge. Threads with both feet in the cell group under their
- * own chapter. Sorted by count, then votes.
+ * own chapter. Sorted by count, then votes. Counts exactly what footBundles
+ * counted: a thread ANCHORED to the frame with a foot in the cell (a cell at
+ * the frame's edge runs off screen, and the badge does not count the
+ * threads out there - the refuter, 2026-09-21: badge +50, sheet 157).
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
@@ -758,6 +777,9 @@ export function bundleGroups(g, cam, view, lo, hi, limit) {
       const a = g.from[i], b = g.to[i];
       const aIn = a >= lo && a <= hi, bIn = b >= lo && b <= hi;
       if (!aIn && !bIn) continue;
+      const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
+      const anchored = arcAnchored(x0, x1, width);
+      if (!anchored) continue;
       const other = aIn ? b : a;
       const ci = g.chapterOfVerse[other];
       let grp = groups.get(ci);
@@ -768,8 +790,7 @@ export function bundleGroups(g, cam, view, lo, hi, limit) {
       }
       grp.count++;
       if (g.votes[i] > grp.votes) grp.votes = g.votes[i];
-      const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
-      if (!drawn(i, arcAnchored(x0, x1, width))) grp.hidden++;
+      if (!drawn(i, anchored)) grp.hidden++;
     }
   }
   const out = [...groups.values()].sort((p, q) => q.count - p.count || q.votes - p.votes || p.chapterIndex - q.chapterIndex);

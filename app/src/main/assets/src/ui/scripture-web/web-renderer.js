@@ -155,8 +155,11 @@ void main(){
   float bright = max(spot, hovered);
 
   // The density law: is this thread drawn at this zoom at all? The table
-  // (aLod) says; the tapped, hovered and focus-range threads always are.
-  float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(max(spot, pair), hovered));
+  // (aLod) says; the tapped thread and a chosen group always are. NOT the
+  // hovered one: a hidden thread cannot be hovered into existence, and a
+  // hover that outlived a wheel zoom-out kept a line the picker could not
+  // see (the refuter, 2026-09-21: thread #89 at 12x). pick.drawnTest agrees.
+  float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(spot, pair));
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
   // overhead recede so the local weave is legible instead of fogged. At FULL

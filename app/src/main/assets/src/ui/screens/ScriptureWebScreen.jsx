@@ -561,7 +561,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     // the strata's legend, once the reader has panned up into them (part 3);
     // drawn first so the labels and badges keep off its box
-    const legendBox = cam.y > 0 ? drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome, bundles) : null;
+    const legendBox = cam.y > 0 ? drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome) : null;
     const reserved = legendBox ? [legendBox] : [];
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
@@ -1388,13 +1388,13 @@ function rampColorAt(span, total) {
   return 'rgb(' + c.map((v) => Math.round(v * 255)).join(',') + ')';
 }
 
-function drawStrataLegend(canvas, g, cam, view, v, chrome, bundles) {
+function drawStrataLegend(canvas, g, cam, view, v, chrome) {
   if (!canvas || !g || !g.count) return null;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   const DPR = v.DPR;
   const fs = BADGE_FONT_CSS * DPR;
-  const rows = strataCounts(g, cam, view, bundles && bundles.fly);
+  const rows = strataCounts(g, cam, view);
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
   const x = 14 * DPR;
   let y = (view.inset > 0 ? view.inset : 0) + fs * 1.4;

@@ -101,8 +101,11 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
     const groups = pick.bundleGroups(graph, cam, view, cell.lo, cell.hi);
     expect(groups.length).toBeGreaterThan(3);
     for (let i = 1; i < groups.length; i++) expect(groups[i].count).toBeLessThanOrEqual(groups[i - 1].count);
+    // the sheet counts what the badge counted: anchored threads with a foot
+    // here (countTouching would also count the threads off the frame's edge -
+    // the refuter's finding 3a)
     const total = groups.reduce((n, grp) => n + grp.count, 0);
-    expect(total).toBe(pick.countTouching(graph, cell.lo, cell.hi, 'famous'));
+    expect(total).toBe(cell.hidden + cell.drawn);
     for (const grp of groups) {
       expect(grp.hidden).toBeLessThanOrEqual(grp.count);
       expect(grp.votes).toBeGreaterThanOrEqual(7);
