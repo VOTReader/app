@@ -384,7 +384,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         )}
 
         <div className="content-layout">
-          <main className="letter-body" ref={mainRef}>
+          <div className="letter-body" ref={mainRef}>
             {letter.blocks.map((block, bi) => {
               if (block.type === "intro") return (
                 <p key={letter.id + ":" + bi} className="letter-intro" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
@@ -631,7 +631,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
               )}
             </div>
-          </main>
+          </div>
         </div>
       </div>
 

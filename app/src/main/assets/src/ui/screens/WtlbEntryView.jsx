@@ -446,7 +446,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
       <div className="page-wrapper">
         <div className="content-layout">
-          <main className="letter-body" ref={wtlbMainRef}>
+          <div className="letter-body" ref={wtlbMainRef}>
             {entry.paragraphs.map((p, pi) => {
               const paraRefs = refAnalysis.perParagraph[pi] || [];
               let refCursor = 0;
@@ -529,7 +529,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                 </div>
               )}
             </div>
-          </main>
+          </div>
         </div>
       </div>
 

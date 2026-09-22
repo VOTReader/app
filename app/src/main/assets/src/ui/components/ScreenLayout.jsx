@@ -271,6 +271,13 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
     return <div className="screen-scroll" style={{ height: '100%' }} ref={inertScrollRef}>{children}</div>;
   }
 
+  // THE ONE LANDMARK. This live `.screen-scroll` is the document's single
+  // <main>: it wraps every screen's content, so no screen has to remember one
+  // (before this, only LetterView and WtlbEntryView carried a <main> and a
+  // fresh install's first paint — the About screen — had none at all, which is
+  // what Lighthouse's landmark-one-main was reporting). The inert peek branch
+  // above stays a <div>: a swipe preview is aria-hidden + inert, and a second
+  // main element is exactly the duplicate the audit fails on next.
   return (
     <div className="screen-layout">
       <nav className="top-nav">
@@ -280,16 +287,16 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       </nav>
       {pager ? (
         <div className="pager-viewport">
-          <div className="screen-scroll" ref={ref}>
+          <main className="screen-scroll" ref={ref}>
             <div className="pager-track" ref={trackRef}>{children}</div>
-          </div>
+          </main>
           {prevDesc && <PagerPeek side="prev" desc={prevDesc} peekRef={peekPrevRef} />}
           {nextDesc && <PagerPeek side="next" desc={nextDesc} peekRef={peekNextRef} />}
         </div>
       ) : (
-        <div className="screen-scroll" ref={ref}>
+        <main className="screen-scroll" ref={ref}>
           {children}
-        </div>
+        </main>
       )}
       {stickyNav}
       {/* First-run annotation tip — reading screens only (`pager` is passed
