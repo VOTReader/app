@@ -29,7 +29,7 @@ import {
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
   arcsTouching, visibleArcs, threadEnds, footBundles, flyBundles, bundleGroups, groupMembers, bodyMidpoint,
-  strataCounts,
+  strataCounts, standInsFor,
 } from '../../utils/scripture-web/pick.js';
 import { DISTANCE_RAMP } from '../../utils/scripture-web/palette.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
@@ -391,6 +391,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       level: levelOf(cam.ppv / (v.DPR || 1), cam.total),
       focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
       focusRange2: focusRef.current.range2 || null,
+      // this frame's stand-ins (the bundle pass names them; the shader and the
+      // picker both draw them)
+      standIns: bundleRef.current.standIns || [],
     };
   }, [density, frame]);
 
@@ -534,6 +537,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // under the density law the crowding is what is DRAWN, at every zoom
     const perCssPx = anchoredDensity(anchoredRef.current, g, cam, v, density);
     const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx, true);
+    // the density law's badges: what the law hides at each foot cell, and
+    // what each fly-over representative stands for (part 2); the pass also
+    // names this frame's STAND-INS, which the GL draw below must carry
+    const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
+    base.standIns = bundles.standIns;
     r.draw(Object.assign({}, base, {
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
@@ -549,20 +557,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // are how the reader knows where in scripture the web is (Corbin,
     // 2026-09-11: "keep the web legend (the books at the bottom, etc)"). It
     // used to be cleared here as "chrome too".
-    drawRuler(uiRef.current, g, cam,
+    const numerals = drawRuler(uiRef.current, g, cam,
       Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
       v, chrome);
     // the sky the labels may use starts under the top chrome (layout metrics,
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
     const tb = topbarRef.current;
     const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * v.DPR : 0;
-    // the density law's badges: what the law hides at each foot cell, and
-    // what each fly-over representative stands for (part 2)
-    const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     // the strata's legend, once the reader has panned up into them (part 3);
-    // drawn first so the labels and badges keep off its box
+    // drawn first so the labels and badges keep off its box - and off the
+    // ruler's chapter numerals (the hub, 2026-09-21: "106" over "Ps 104:10")
     const legendBox = cam.y > 0 ? drawStrataLegend(uiRef.current, g, cam, Object.assign({}, base, { inset }), v, chrome) : null;
-    const reserved = legendBox ? [legendBox] : [];
+    const reserved = (legendBox ? [legendBox] : []).concat(numerals || []);
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
     badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, bundles);
@@ -1223,9 +1229,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
    baseline, its depth proportional to verse count — Psalm 119 reaching
    furthest down, exactly as in the visualization this descends from. */
 function drawRuler(canvas, g, cam, view, v, chrome) {
-  if (!canvas) return;
+  /** the chapter numerals' boxes, device px: the label pass keeps off them */
+  const numerals = [];
+  if (!canvas) return numerals;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return numerals;
   const W = v.W, DPR = v.DPR, base = view.base;
   ctx.clearRect(0, 0, W, canvas.height);
   const ink = chrome.isLight ? '58,37,16' : '235,231,222';
@@ -1273,12 +1281,18 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
     for (const c of g.chapters) {
       const x0 = Math.max(X(c[2]), 0), x1 = Math.min(X(c[2] + c[3]), W);
       if (x1 - x0 < 22 * DPR) continue;
-      ctx.fillText(String(c[1]), (x0 + x1) / 2, base - 6 * DPR);
+      const text = String(c[1]);
+      ctx.fillText(text, (x0 + x1) / 2, base - 6 * DPR);
+      // the numeral's box, for the label pass to keep off (the chapter
+      // numeral sits on the baseline where a foot label lands)
+      const w = ctx.measureText(text).width, cx = (x0 + x1) / 2;
+      numerals.push({ x0: cx - w / 2, x1: cx + w / 2, y0: base - 6 * DPR - chrome.fsRuler * DPR, y1: base - 6 * DPR });
     }
   }
 
   // book names + separators
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
+  return numerals;
 }
 
 /* ── the density law's badges (part 2) ──────────────────────────────────
@@ -1302,8 +1316,12 @@ function bundlesFor(cache, g, cam, view, v, density) {
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.02;
   if (moved) {
     cache.key = key; cache.ppv = cam.ppv; cache.x = cam.x;
-    cache.cells = footBundles(g, cam, view, v.DPR);
-    cache.fly = flyBundles(g, cam, view);
+    // the cells and groups are counted WITHOUT the stand-ins (they are what
+    // decides them); the stand-ins then join the drawn set for this frame
+    const bare = Object.assign({}, view, { standIns: [] });
+    cache.cells = footBundles(g, cam, bare, v.DPR);
+    cache.fly = flyBundles(g, cam, bare);
+    cache.standIns = standInsFor(cache.fly);
   }
   return cache;
 }
@@ -1358,14 +1376,17 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   }
   // fly-over representatives: "x n" on the body, where the body is in the sky
   if (bundles.fly) {
+    const standing = new Set(bundles.standIns || []);
     for (const b of bundles.fly.values()) {
-      if (b.rep < 0 || b.count < 2) continue;
-      const at = bodyMidpoint(g, cam, view, b.rep, fs * 2.2);
+      // the line that carries the badge: the representative, or this frame's stand-in
+      const carrier = b.rep >= 0 ? b.rep : (standing.has(b.standIn) ? b.standIn : -1);
+      if (carrier < 0 || b.count < 2) continue;
+      const at = bodyMidpoint(g, cam, view, carrier, fs * 2.2);
       if (!at) continue;
       const text = '\u00d7' + fmtCount(b.count);
       const hw = (ctx.measureText(text).width + fs * 0.9) / 2 + 2 * DPR;
       const box = pill(text, Math.max(hw, Math.min(W - hw, at.x)), at.y - fs * 1.1, true);
-      if (box) boxes.push(Object.assign(box, { cell: null, rep: b.rep }));
+      if (box) boxes.push(Object.assign(box, { cell: null, rep: carrier }));
     }
   }
   ctx.restore();

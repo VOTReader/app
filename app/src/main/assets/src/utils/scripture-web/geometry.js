@@ -709,6 +709,15 @@ export const LOD_OFF = -1000;
 export const LOD_SPAN_CELLS = 48;
 
 /**
+ * Stand-ins per frame, at most: a fly-over group whose representative does
+ * not cross this frame while its members do would have no line and no
+ * badge (the refuter, 2026-09-21: 18 of 73 groups at the ceiling), so the
+ * screen names each such group's strongest crossing member and the shader
+ * draws those too (uStandIn). Biggest groups first when there are more.
+ */
+export const STANDIN_MAX = 32;
+
+/**
  * The zoom as a level: octaves above the reference frame.
  * @param {number} ppvCss - CSS px per verse
  * @param {number} total - verses in the canon

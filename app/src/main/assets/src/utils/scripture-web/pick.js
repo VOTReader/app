@@ -25,7 +25,7 @@
 
 import {
   arcAnchored, arcDistance, arcShape, arcHeightAt, spanLogOf, flyOverDim, verseToX, xToVerse, DOME,
-  lodShown, LOD_OFF, FLYOVER_MARGIN, strataLift, stratumOf, STRATA_NAMES,
+  lodShown, LOD_OFF, FLYOVER_MARGIN, strataLift, stratumOf, STRATA_NAMES, STANDIN_MAX,
 } from './geometry.js';
 import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
 
@@ -40,9 +40,13 @@ import { bucketDrawCount, fansOf, lodOf, minVotesFor } from './decode.js';
  * focusRange (a chapter tap) spotlights what is drawn and reveals nothing:
  * lighting a chapter's thousand hidden threads would be the wall again.
  *
+ * The stand-ins (view.standIns, standInsFor) are drawn too: the same list the
+ * screen hands the shader as uStandIn this frame.
+ *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{level?:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null)}} view
+ *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null),
+ *   standIns?:ArrayLike<number>}} view
  * @returns {(i:number, anchored:(0|1)) => boolean}
  */
 export function drawnTest(g, view) {
@@ -51,11 +55,13 @@ export function drawnTest(g, view) {
   const { lod } = lodOf(g);
   const essential = view.density === 'essential';
   const focusArc = typeof view.focusArc === 'number' ? view.focusArc : -1;
+  const standIns = view.standIns && view.standIns.length ? new Set(Array.from(view.standIns)) : null;
   const r1 = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
   const r2 = r1 && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
   return (i, anchored) => {
     if (lodShown(lod[i], essential, anchored, level)) return true;
     if (i === focusArc) return true;
+    if (standIns && standIns.has(i)) return true;
     if (r2) {
       const a = g.from[i], b = g.to[i];
       const a1 = a >= r1[0] && a <= r1[1], b1 = b >= r1[0] && b <= r1[1];
@@ -625,9 +631,11 @@ export function footBundles(g, cam, view, dpr) {
 }
 
 /**
- * @typedef {{ key:number, rep:number, count:number }} FlyBundle
+ * @typedef {{ key:number, rep:number, count:number, standIn:number }} FlyBundle
  *   rep: the representative's index (-1 when the group's representative does
- *   not cross the frame); count: the group's threads crossing the frame.
+ *   not cross the frame); count: the group's threads crossing the frame;
+ *   standIn: when rep is -1, the strongest crossing member (ties by index),
+ *   the line that stands for the group in this frame; else -1.
  */
 
 /**
@@ -665,13 +673,32 @@ export function flyBundles(g, cam, view) {
         if (arcAnchored(x0, x1, width)) continue;
         const key = groupOf[i];
         let b = out.get(key);
-        if (!b) { b = { key, rep: -1, count: 0 }; out.set(key, b); }
+        if (!b) { b = { key, rep: -1, count: 0, standIn: -1 }; out.set(key, b); }
         b.count++;
         if (lodShown(lod[i], essential, 0, 0)) b.rep = i;
+        else if (b.standIn < 0 || g.votes[i] > g.votes[b.standIn]) b.standIn = i;
       }
     }
   }
+  for (const b of out.values()) if (b.rep >= 0) b.standIn = -1;
   return out;
+}
+
+/**
+ * The stand-ins this frame: for each group whose representative does not
+ * cross the frame, its strongest crossing member - biggest groups first, at
+ * most STANDIN_MAX (the shader's uniform array). The screen hands this list
+ * to the shader (uStandIn) and to the picker (view.standIns), so the line
+ * that carries a badge is a line that is drawn and tappable.
+ *
+ * @param {Map<number, FlyBundle>} bundles - flyBundles()
+ * @returns {number[]}
+ */
+export function standInsFor(bundles) {
+  const out = [];
+  for (const b of bundles.values()) if (b.rep < 0 && b.standIn >= 0) out.push(b);
+  out.sort((p, q) => q.count - p.count || p.standIn - q.standIn);
+  return out.slice(0, STANDIN_MAX).map((b) => b.standIn);
 }
 
 /**

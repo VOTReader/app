@@ -28,7 +28,7 @@
 
 import {
   arcShapeGLSL, flyOverGLSL, lodGLSL, strataGLSL, segmentsFor, CLIP_MARGIN, DOME, glslFloat, spanLogOf,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, LOD_OFF,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, LOD_OFF, STANDIN_MAX,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf, lodOf } from '../../utils/scripture-web/decode.js';
@@ -74,6 +74,8 @@ uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 uniform float uLevel;        // the zoom as a level (geometry.levelOf), or LOD_OFF
 uniform float uEssential;    // 1 = the Essential density's table, 0 = Famous
+uniform float uStandIn[${STANDIN_MAX}]; // this frame's stand-ins (pick.standInsFor), -1 = none
+uniform float uStandIns;     // how many of uStandIn are set
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 in uint aLod;                   // decode.lodOf: reveal levels + representative bits
@@ -160,6 +162,14 @@ void main(){
   // hover that outlived a wheel zoom-out kept a line the picker could not
   // see (the refuter, 2026-09-21: thread #89 at 12x). pick.drawnTest agrees.
   float shown = max(lodShown(aLod, uEssential, arcAnchored(x0, x1, uRes.x), uLevel), max(spot, pair));
+  // ... and this frame's stand-ins: a fly-over group whose representative
+  // is off the frame is drawn by its strongest crossing member (pick.standInsFor)
+  float standIn = 0.;
+  for (int k = 0; k < ${STANDIN_MAX}; k++) {
+    if (float(k) >= uStandIns) break;
+    if (abs(id - uStandIn[k]) < .5) { standIn = 1.; break; }
+  }
+  shown = max(shown, standIn);
 
   // Semantic zoom: once the reader is inside a passage, arcs merely passing
   // overhead recede so the local weave is legible instead of fogged. At FULL
@@ -263,9 +273,11 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uCeil', 'uSquash',
     'uLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential', 'uFocusRange2']) {
+    'uHoverArc', 'uInstanceBase', 'uLevel', 'uEssential', 'uFocusRange2', 'uStandIns']) {
     U[name] = gl.getUniformLocation(program, name);
   }
+  U.uStandIn = gl.getUniformLocation(program, 'uStandIn[0]');
+  const standInBuf = new Float32Array(STANDIN_MAX).fill(-1);
 
   // Widest arc in each bucket, once. Tessellation is chosen per draw from the
   // camera, and a bucket of 3-verse arcs must not be given 96 segments because
@@ -383,7 +395,8 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string, level?:number,
-     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number}} v
+     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
+     *   standIns?:ArrayLike<number>}} v
      *   level: geometry.levelOf(); absent = the density law off, every thread drawn
      */
     draw(v) {
@@ -418,6 +431,14 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       gl.uniform1f(U.uLevel, typeof v.level === 'number' ? v.level : LOD_OFF);
       gl.uniform1f(U.uEssential, v.density === 'essential' ? 1 : 0);
+      {
+        const list = v.standIns || [];
+        const n = Math.min(list.length, STANDIN_MAX);
+        standInBuf.fill(-1);
+        for (let k = 0; k < n; k++) standInBuf[k] = list[k];
+        gl.uniform1fv(U.uStandIn, standInBuf);
+        gl.uniform1f(U.uStandIns, n);
+      }
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
       if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);
