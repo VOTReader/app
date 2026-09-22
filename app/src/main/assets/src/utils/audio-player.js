@@ -2309,6 +2309,23 @@ function _collectionsAfter(volKey) {
 }
 
 /**
+ * The studies after the one owning `chapterId`, in BIBLE_STUDIES order, each a unit of its own
+ * chapters (ra1, 2026-09-21: Lamb of God 14 -> Purity 1, the way a book runs into the next book).
+ * A study with no recording is passed over by _extendQueue's empty-tracks rule.
+ *
+ * @param {string} chapterId
+ * @returns {{ volKey: string, label: string | null, items: any[] }[]}
+ */
+function _studiesAfter(chapterId) {
+  const studies = Array.isArray(_g().BIBLE_STUDIES) ? _g().BIBLE_STUDIES : [];
+  const at = studies.indexOf(_studyOfChapter(chapterId));
+  if (at < 0) return [];
+  return studies.slice(at + 1)
+    .filter((st) => st && Array.isArray(st.chapters))
+    .map((st) => ({ volKey: 'study', label: st.title || null, items: st.chapters }));
+}
+
+/**
  * The books after `bookId` that this edition recorded, in canonical order, as one-item units.
  *
  * @param {string} volKey
@@ -2343,7 +2360,9 @@ function _extendQueue() {
   if (!volKey) return false;
   const units = _isBibleVol(volKey)
     ? _booksAfter(volKey, /** @type {string} */ (last.key).slice(volKey.length + 1))
-    : _collectionsAfter(volKey);
+    : volKey === 'study'
+      ? _studiesAfter(/** @type {string} */ (last.key).slice(volKey.length + 1))
+      : _collectionsAfter(volKey);
   for (const unit of units) {
     /** @type {Track[]} */
     const tracks = [];

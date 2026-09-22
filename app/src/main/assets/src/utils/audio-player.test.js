@@ -54,6 +54,7 @@ const MANIFEST = {
   // A study's chapters (volKey 'study', ids are chapter ids; ch3 has no recording).
   'study:lamb-ch1': [['idLamb1', 'V']],
   'study:lamb-ch2': [['idLamb2', 'V']],
+  'study:purity-ch1': [['idPurity1', 'V']],
 };
 
 /* Cross-reader alternates: a complete second reading of the same letter,
@@ -270,6 +271,32 @@ describe('audio-player — playLetter', () => {
       AudioPlayer.next();
       expect(el().src).toBe(URL_OF('idLamb2'));            // chapter 1 ended: chapter 2 plays by itself
       expect(JSON.parse(localStorage.getItem('vot-audio-pos')).mode).toBe('collection');
+    } finally {
+      delete globalThis.BIBLE_STUDIES;
+    }
+  });
+
+  /* ra1 (2026-09-21): the site order runs on PAST a study's last chapter, the
+     way a book runs into the next book. The next study in BIBLE_STUDIES order
+     that has any recording is the next unit; a study with no recordings is
+     passed over; the last study ends the order. */
+  it('a study runs on into the next recorded study in site order (Lamb of God -> Purity)', () => {
+    globalThis.BIBLE_STUDIES = [
+      { id: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1', title: 'One' }, { id: 'lamb-ch2', title: 'Two' }] },
+      { id: 'trinity', title: 'Trinity Exposed', chapters: [{ id: 'trinity-ch1', title: 'T1 (no recording)' }] },
+      { id: 'purity', title: 'Purity', chapters: [{ id: 'purity-ch1', title: 'P1' }] },
+    ];
+    try {
+      AudioPlayer.playLetter({ volKey: 'study', letter: { id: 'lamb-ch1', title: 'One' }, collectionLabel: 'The Lamb of God' });
+      AudioPlayer.next();                                   // the study's LAST chapter starts: the order is appended now
+      const s = AudioPlayer.getState();
+      expect(s.queue.map((t) => t.key)).toEqual(['study:lamb-ch1', 'study:lamb-ch2', 'study:purity-ch1']);
+      expect(s.queue[2].sub).toBe('Purity');                // the next study's own name, not the Lamb's
+      AudioPlayer.next();
+      expect(el().src).toBe(URL_OF('idPurity1'));
+      expect(AudioPlayer.getState().status).not.toBe('idle');
+      AudioPlayer.next();                                   // the last study ends the order
+      expect(AudioPlayer.getState().status).toBe('idle');
     } finally {
       delete globalThis.BIBLE_STUDIES;
     }
