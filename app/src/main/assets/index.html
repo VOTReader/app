@@ -149,7 +149,18 @@
 </head>
 <body>
   <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||!s.settings.fontStyle||s.settings.fontStyle==="classic"))cf.disabled=true;var fsc=parseFloat(s.settings&&s.settings.fontScale);if(isFinite(fsc)&&fsc!==1){fsc=Math.min(3,Math.max(0.8,fsc));document.documentElement.style.setProperty("--font-scale",String(fsc));}}catch(e){}</script>
-  <div id="root"></div>
+  <!-- THE FIRST PIXEL. This is the same splash HydrationGate renders, written
+       statically so the browser has something to paint the moment
+       dist/app.min.css (in <head>) lands — before a byte of bundle-a..d has
+       been parsed. Shipping #root empty meant the first paint waited on 300+
+       KB of JS download AND parse, then React's mount: on a cold phone, a
+       blank screen for seconds (Lighthouse, 2026-09-22: FCP 2.9 s, Speed
+       Index 4.4 s). React's createRoot() replaces these children on its first
+       commit with markup that is identical, so nothing flashes — the reader
+       sees one splash that arrives sooner. Keep it in sync with
+       HydrationGate.jsx; HydrationGate.boot-splash.test.jsx fails if it
+       drifts. -->
+  <div id="root"><div class="hydration-loading" role="status" aria-live="polite"><div class="hydration-loading-text">VOTReader</div></div></div>
   <!-- Cluster A: vendor + (most) corpus + search engine (26 files, ~4.6 MB).
        Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand.
        books.js (6.9 MB NKJV Bible) was SPLIT OUT into bundle-a-bible.js (Q8),
