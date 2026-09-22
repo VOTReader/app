@@ -116,7 +116,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   const verseAtPoint = xToVerse(cam, width, px);
-  const verseTolerance = tol / ppv;
+  // a verse of slack for the chunk cull: a foot stands anywhere in its verse's cell (footX)
+  const verseTolerance = tol / ppv + 1;
 
   for (const bucket of g.buckets) {
     const draw = bucketDrawCount(bucket, density);
@@ -176,9 +177,9 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
 export function visibleArcs(g, cam, view, limit) {
   const { width, localize, density } = view;
   const drawn = drawnTest(g, view);
-  const half = width / 2;
-  const camX = cam.x, ppv = cam.ppv;
-  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
+  const { fanA, fanB } = fansOf(g);
+  // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
+  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
   const out = [];
   for (const bucket of g.buckets) {
     const draw = bucketDrawCount(bucket, density);
@@ -191,8 +192,9 @@ export function visibleArcs(g, cam, view, limit) {
       const start = bucket.off + c * chunkSize;
       const end = Math.min(start + chunkSize, bucket.off + draw);
       for (let i = start; i < end; i++) {
-        const x0 = (g.from[i] - camX) * ppv + half;
-        const x1 = (g.to[i] - camX) * ppv + half;
+        // the feet as drawn (geometry.footX): the shader's own anchoring test
+        const x0 = footX(cam, width, g.from[i], fanA[i]);
+        const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
         const anchored = arcAnchored(x0, x1, width);
         if (flyOverDim(anchored, localize) === 0) continue;
@@ -339,14 +341,13 @@ export function bodyMidpoint(g, cam, view, i, margin = 0) {
  */
 export function countAnchored(g, cam, width, density, level) {
   let n = 0;
-  const half = width / 2, camX = cam.x, ppv = cam.ppv;
   const drawn = drawnTest(g, { level, density });
+  const { fanA, fanB } = fansOf(g);
   for (const bucket of g.buckets) {
     const end = bucket.off + bucketDrawCount(bucket, density);
     for (let i = bucket.off; i < end; i++) {
-      const x0 = (g.from[i] - camX) * ppv + half;
-      const x1 = (g.to[i] - camX) * ppv + half;
-      if (arcAnchored(x0, x1, width) && drawn(i, 1)) n++;
+      // the feet as drawn (geometry.footX), so the count is the shader's
+      if (arcAnchored(footX(cam, width, g.from[i], fanA[i]), footX(cam, width, g.to[i], fanB[i]), width) && drawn(i, 1)) n++;
     }
   }
   return n;
@@ -585,6 +586,7 @@ export function footBundles(g, cam, view, dpr) {
     for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
   }
   const drawn = drawnTest(g, view);
+  const { fanA, fanB } = fansOf(g);
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
   const chunkSize = g.chunkSize || 256;
   for (const bucket of g.buckets) {
@@ -601,7 +603,8 @@ export function footBundles(g, cam, view, dpr) {
         const ca = a - first >= 0 && a - first < span ? cellOf[a - first] : -1;
         const cb = b - first >= 0 && b - first < span ? cellOf[b - first] : -1;
         if (ca < 0 && cb < 0) continue;
-        const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
+        // the feet as drawn (geometry.footX): anchored is the shader's word
+        const x0 = footX(cam, width, a, fanA[i]), x1 = footX(cam, width, b, fanB[i]);
         const anchored = arcAnchored(x0, x1, width);
         if (!anchored) continue;
         const shown = drawn(i, anchored);
@@ -636,8 +639,8 @@ export function flyBundles(g, cam, view) {
   const { width, density } = view;
   const { lod, groupOf } = lodOf(g);
   const essential = density === 'essential';
-  const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  const lo = xToVerse(cam, width, 0), hi = xToVerse(cam, width, width);
+  const { fanA, fanB } = fansOf(g);
+  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
   const chunkSize = g.chunkSize || 256;
   /** @type {Map<number, FlyBundle>} */
   const out = new Map();
@@ -651,8 +654,8 @@ export function flyBundles(g, cam, view) {
       const start = bucket.off + c * chunkSize;
       const end = Math.min(start + chunkSize, bucket.off + draw);
       for (let i = start; i < end; i++) {
-        const x0 = (g.from[i] - camX) * ppv + half;
-        const x1 = (g.to[i] - camX) * ppv + half;
+        const x0 = footX(cam, width, g.from[i], fanA[i]);
+        const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
         if (arcAnchored(x0, x1, width)) continue;
         const key = groupOf[i];
@@ -733,7 +736,7 @@ export function groupMembers(g, index, density, limit) {
 export function bundleGroups(g, cam, view, lo, hi, limit) {
   const { width, density } = view;
   const drawn = drawnTest(g, view);
-  const half = width / 2, camX = cam.x, ppv = cam.ppv;
+  const { fanA, fanB } = fansOf(g);
   /** @type {Map<number, BundleGroup>} */
   const groups = new Map();
   for (const bucket of g.buckets) {
@@ -742,7 +745,7 @@ export function bundleGroups(g, cam, view, lo, hi, limit) {
       const a = g.from[i], b = g.to[i];
       const aIn = a >= lo && a <= hi, bIn = b >= lo && b <= hi;
       if (!aIn && !bIn) continue;
-      const x0 = (a - camX) * ppv + half, x1 = (b - camX) * ppv + half;
+      const x0 = footX(cam, width, a, fanA[i]), x1 = footX(cam, width, b, fanB[i]);
       const anchored = arcAnchored(x0, x1, width);
       if (!anchored) continue;
       const other = aIn ? b : a;

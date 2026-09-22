@@ -27,7 +27,7 @@ import { resolve, dirname } from 'node:path';
 import * as geo from './geometry.js';
 import * as dec from './decode.js';
 import * as pick from './pick.js';
-import { SHADER_SOURCE } from '../../ui/scripture-web/web-renderer.js';
+import { SHADER_SOURCE, createRenderer } from '../../ui/scripture-web/web-renderer.js';
 import { attachWebGestures } from '../../ui/scripture-web/gestures.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -246,6 +246,38 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
     }
   });
 
+  it('the picker\'s crossing set is the shader\'s: anchoring and the frame test read the same spread feet (footX) at the ceiling and at 12x', () => {
+    // a foot stands anywhere in its verse's cell, so at the frame's edges the
+    // old verse-edge feet and the drawn feet disagree by up to a verse; the
+    // shader's arcAnchored reads the drawn ones and so must every walk here
+    for (const zoom of [12, zMax]) {
+      const cam = camAt(zoom, CENTRE + 0.37);
+      const view = viewAt(cam);
+      const got = new Set(pick.visibleArcs(graph, cam, view, 1e9));
+      const want = new Set();
+      let anchoredWant = 0;
+      for (const b of graph.buckets) {
+        const end = b.off + dec.bucketDrawCount(b, 'famous');
+        for (let i = b.off; i < end; i++) {
+          const x0 = geo.footX(cam, W, graph.from[i], fanA[i]), x1 = geo.footX(cam, W, graph.to[i], fanB[i]);
+          // anchored: a foot within the margin, crossing or not (a foot just
+          // outside the frame with its other foot further out still anchors)
+          if (geo.arcAnchored(x0, x1, W)) anchoredWant++;
+          if (x1 < 0 || x0 > W) continue;
+          want.add(i);
+        }
+      }
+      expect(got, `zoom ${zoom}`).toEqual(want);
+      expect(pick.countAnchored(graph, cam, W, 'famous'), `zoom ${zoom}: countAnchored`).toBe(anchoredWant);
+      const cells = pick.footBundles(graph, cam, Object.assign({}, view, { level: undefined }), DPR);
+      let cellSum = 0;
+      for (const c of cells) cellSum += c.drawn + c.hidden;
+      // a thread counts once per cell holding a foot: the cells cover the frame
+      // plus the margin, so their sum is at least the anchored count
+      expect(cellSum, `zoom ${zoom}: the pills`).toBeGreaterThanOrEqual(anchoredWant);
+    }
+  });
+
   it('in the sky at 12x: three ceilings up, a testament-scale thread\'s body is drawn as a curve (not level) and picked there', () => {
     const cam = camAt(12);
     cam.y = 3 * CEIL;
@@ -380,6 +412,65 @@ describe('gestures: a drag moves y with a y frame; a wheel zoom in the sky holds
   });
 });
 
+describe('a foot at the frame\'s edge: the chunk culls carry a verse of slack, because a foot stands anywhere in its cell', () => {
+  // one thread, 100 -> 101, in a chunk whose extent is [100, 101]; the frame's
+  // left edge at verse 101.3, so the verse-edge foot of 101 is outside it
+  // while the drawn foot (101.5) is inside: the shader draws it, so the
+  // picker must find it and the renderer must not cull its chunk
+  function edgeGraph(withChunks) {
+    const total = 200;
+    const chapters = [[0, 1, 0, 100], [0, 2, 100, 100]];
+    const chapterOfVerse = new Uint16Array(total);
+    for (let v = 100; v < 200; v++) chapterOfVerse[v] = 1;
+    return {
+      total, count: 1, from: new Uint16Array([100]), to: new Uint16Array([101]), votes: new Int16Array([30]),
+      buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: withChunks ? [[100, 101]] : [] }],
+      chunkSize: 256, books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 }],
+      chapters, chapterOfVerse, densityTiers: [20, 7], attribution: '', votEdges: [], prophecy: [], votLinks: [],
+    };
+  }
+  const width = 800, base = 260, ceil = 240;
+  const edgeCam = { x: 101.3 + 400 / 44, y: 0, ppv: 44, total: 200 };
+  const view = { width, height: 360, base, ceil, squash: geo.squashFactor(ceil, width), localize: 1, density: 'famous', rulerDepth: 40 };
+  const footPoint = (g) => {
+    const { fanA, fanB } = dec.fansOf(g);
+    const x0 = geo.footX(edgeCam, width, g.from[0], fanA[0]), x1 = geo.footX(edgeCam, width, g.to[0], fanB[0]);
+    expect(x1, 'precondition: the drawn foot is inside the frame').toBeGreaterThan(0);
+    expect(geo.verseToX(edgeCam, width, g.to[0]), 'precondition: the verse edge is outside it').toBeLessThan(0);
+    const px = 5;
+    return { px, py: base - geo.arcHeightAt(px, x0, x1, geo.arcShape((x1 - x0) / 2, view.squash).A) };
+  };
+
+  it('visibleArcs and pickArc see the thread, with and without chunk extents', () => {
+    for (const chunks of [false, true]) {
+      const g = edgeGraph(chunks);
+      const { px, py } = footPoint(g);
+      expect(pick.visibleArcs(g, edgeCam, view, 100), `chunks ${chunks}`).toContain(0);
+      expect(pick.pickArc(g, edgeCam, view, px, py, 3), `chunks ${chunks}`).toMatchObject({ index: 0 });
+    }
+  });
+
+  it('the renderer draws the chunk (one instance), reading the same slack', () => {
+    const calls = [];
+    const gl = new Proxy({}, { get(_, key) {
+      if (key === 'drawArraysInstanced') return (mode, first, count, instances) => { calls.push(instances); };
+      if (key === 'getShaderParameter' || key === 'getProgramParameter') return () => true;
+      if (key === 'getUniformLocation' || key === 'getAttribLocation') return (_p, name) => name;
+      if (key === 'getExtension') return () => null;
+      if (typeof key === 'string' && key.startsWith('create')) return () => ({});
+      if (typeof key === 'string' && /^[A-Z_0-9]+$/.test(key)) return 1;
+      return () => {};
+    } });
+    const canvas = { getContext: () => gl, addEventListener() {}, removeEventListener() {} };
+    const renderer = createRenderer(canvas, edgeGraph(true));
+    expect(renderer).toBeTruthy();
+    const stats = renderer.draw(Object.assign({}, view, { camX: edgeCam.x, camY: 0, ppv: 44, strokeWidth: 2, alpha: 0.5, dpr: 1,
+      colorMode: 'distance', light: false, bg: '#000', focusRange: null, focusArc: -1 }));
+    expect(stats.instances).toBe(1);
+    expect(calls.reduce((a, b) => a + b, 0)).toBe(1);
+  });
+});
+
 /* ── the GLSL twin: transliterated and run against the JS ── */
 describe('the GLSL arcShape / arcTau / arcAt ARE the JS: the twin transliterated and run', () => {
   function twinOf(glsl) {
@@ -429,6 +520,31 @@ describe('the GLSL arcShape / arcTau / arcAt ARE the JS: the twin transliterated
         near(got.tg[1] / ng, want.ty / nw, `ty tau=${tau}`);
       }
     }
+  });
+
+  it('the tangent is the SCREEN curve\'s (y down): the ribbon\'s normal is perpendicular to the drawn line at every slope, so the ribbon never thins', () => {
+    // the curve on screen is (x(tau), base - h(tau)); its tangent by a finite
+    // difference must be parallel to the (tx, ty) the ribbon offsets from -
+    // read in height space instead the two cross at 45 degrees and the
+    // ribbon's width there collapses (the refuter, 2026-09-22)
+    let s = 5;
+    const r = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    for (let i = 0; i < 300; i++) {
+      const rx = 20 + r() * 5000, squash = 0.3 + r() * 1.9;
+      const left = 100, right = left + 2 * rx;
+      const { A } = geo.arcShape(rx, squash);
+      for (let k = 1; k < 32; k++) {
+        const tau = (Math.PI * k) / 32;
+        const p = geo.arcPointAt(tau, left, right, A);
+        const d = 1e-4;
+        const q = geo.arcPointAt(tau + d, left, right, A), o = geo.arcPointAt(tau - d, left, right, A);
+        const sx = (q.x - o.x) / (2 * d), sy = -(q.h - o.h) / (2 * d);      // screen tangent, y down
+        const cross = Math.abs(sx * p.ty - sy * p.tx) / (Math.hypot(sx, sy) * Math.hypot(p.tx, p.ty));
+        expect(cross, `arc ${i} tau ${tau}`).toBeLessThan(1e-4);
+      }
+    }
+    // and the GLSL twin offsets along the same screen tangent
+    expect(geo.arcShapeGLSL).toContain('tg = vec2(r*sin(tau), -A*cos(tau));');
   });
 
   it('BITES: forcing the twin\'s apex to the ceiling makes it disagree with the JS on a tall arc', () => {

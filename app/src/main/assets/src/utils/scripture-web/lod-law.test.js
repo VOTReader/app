@@ -49,13 +49,14 @@ const levelAt = (cam) => geo.levelOf(cam.ppv / DPR, graph.total);
 
 /** Threads the shader's OWN anchoring test calls anchored / fly-over for this camera, split. */
 function crossing(cam, density) {
-  const half = W / 2;
   const anchored = [], fly = [];
+  const { fanA, fanB } = dec.fansOf(graph);
   for (const b of graph.buckets) {
     const end = b.off + dec.bucketDrawCount(b, density);
     for (let i = b.off; i < end; i++) {
-      const x0 = (graph.from[i] - cam.x) * cam.ppv + half;
-      const x1 = (graph.to[i] - cam.x) * cam.ppv + half;
+      // the feet as drawn (geometry.footX)
+      const x0 = geo.footX(cam, W, graph.from[i], fanA[i]);
+      const x1 = geo.footX(cam, W, graph.to[i], fanB[i]);
       if (x1 < 0 || x0 > W) continue;
       (geo.arcAnchored(x0, x1, W) ? anchored : fly).push(i);
     }
@@ -251,7 +252,8 @@ describe('visible equals pickable', () => {
     const lod = dec.lodOf(graph).lod;
     let want = 0;
     for (let i = 0; i < graph.count; i++) {
-      const x0 = geo.verseToX(cam, W, graph.from[i]), x1 = geo.verseToX(cam, W, graph.to[i]);
+      const { fanA, fanB } = dec.fansOf(graph);
+      const x0 = geo.footX(cam, W, graph.from[i], fanA[i]), x1 = geo.footX(cam, W, graph.to[i], fanB[i]);
       if (geo.arcAnchored(x0, x1, W) && geo.lodShown(lod[i], false, 1, levelAt(cam))) want++;
     }
     expect(drawn).toBe(want);

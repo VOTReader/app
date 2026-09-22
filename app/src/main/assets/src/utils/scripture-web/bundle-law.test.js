@@ -27,6 +27,7 @@ const graph = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SC
 const W_CSS = 800, DPR = 2, W = W_CSS * DPR;
 const psalm107 = graph.chapters.find((ch) => graph.books[ch[0]].id.startsWith('psalms') && ch[1] === 107);
 const CENTRE = psalm107[2] + psalm107[3] / 2;
+const { fanA, fanB } = dec.fansOf(graph);   // the feet as drawn (geometry.footX)
 function camAt(zoom) {
   const cam = geo.createCamera(graph.total);
   cam.ppv = geo.fitPPV(cam, W) * zoom;
@@ -83,7 +84,7 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
     for (let i = 0; i < graph.count; i++) {
       const a = graph.from[i], b = graph.to[i];
       if (!((a >= cell.lo && a <= cell.hi) || (b >= cell.lo && b <= cell.hi))) continue;
-      const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
       const anchored = geo.arcAnchored(x0, x1, W);
       if (!anchored) continue;
       if (drawn(i, anchored)) shown++; else hidden++;
@@ -119,7 +120,7 @@ describe('fly-over bundles: one representative, one count', () => {
     const bundles = pick.flyBundles(graph, cam, view);
     let crossing = 0;
     for (let i = 0; i < graph.count; i++) {
-      const x0 = geo.verseToX(cam, W, graph.from[i]), x1 = geo.verseToX(cam, W, graph.to[i]);
+      const x0 = geo.footX(cam, W, graph.from[i], fanA[i]), x1 = geo.footX(cam, W, graph.to[i], fanB[i]);
       if (x1 < 0 || x0 > W || geo.arcAnchored(x0, x1, W)) continue;
       crossing++;
     }
@@ -133,7 +134,7 @@ describe('fly-over bundles: one representative, one count', () => {
     expect(withRep).toBeGreaterThan(bundles.size / 2);
     // the drawn fly-overs are exactly the representatives with a group here
     const drawnFly = pick.visibleArcs(graph, cam, view, 1e9)
-      .filter((i) => !geo.arcAnchored(geo.verseToX(cam, W, graph.from[i]), geo.verseToX(cam, W, graph.to[i]), W));
+      .filter((i) => !geo.arcAnchored(geo.footX(cam, W, graph.from[i], fanA[i]), geo.footX(cam, W, graph.to[i], fanB[i]), W));
     expect(new Set(drawnFly)).toEqual(new Set([...bundles.values()].filter((b) => b.rep >= 0).map((b) => b.rep)));
   });
 
@@ -169,7 +170,7 @@ describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader
     for (let i = 0; i < graph.count && grpLo < 0; i++) {
       const a = graph.from[i], b = graph.to[i];
       if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
-      const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
       if (x1 < 0 || x0 > W) continue;
       if (bare(i, geo.arcAnchored(x0, x1, W))) continue;
       [grpLo, grpHi] = pick.chapterRange(graph, graph.chapterOfVerse[(a >= lo && a <= hi) ? b : a]);
@@ -180,7 +181,7 @@ describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader
     for (let i = 0; i < graph.count; i++) {
       const a = graph.from[i], b = graph.to[i];
       if (!((a >= lo && a <= hi) || (b >= lo && b <= hi))) continue;
-      const x0 = geo.verseToX(cam, W, a), x1 = geo.verseToX(cam, W, b);
+      const x0 = geo.footX(cam, W, a, fanA[i]), x1 = geo.footX(cam, W, b, fanB[i]);
       if (x1 < 0 || x0 > W) continue;
       const anchored = geo.arcAnchored(x0, x1, W);
       if (bare(i, anchored)) continue;                       // drawn anyway

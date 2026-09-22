@@ -432,9 +432,12 @@ export function createRenderer(canvas, graph, opts = {}) {
       if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);
       else gl.uniform2f(U.uFocusRange2, 1, 0);
 
-      // Viewport verse range, for chunk culling.
-      const viewLo = v.camX - (v.width / 2) / v.ppv;
-      const viewHi = v.camX + (v.width / 2) / v.ppv;
+      // Viewport verse range, for chunk culling - with a verse of slack each
+      // side: a foot stands anywhere in its verse's cell (geometry.footX), so
+      // a chunk whose last verse is just left of the frame can still put a
+      // foot inside it (the refuter, 2026-09-22).
+      const viewLo = v.camX - (v.width / 2) / v.ppv - 1;
+      const viewHi = v.camX + (v.width / 2) / v.ppv + 1;
       const chunkSize = graph.chunkSize || 256;
 
       let instances = 0, draws = 0;

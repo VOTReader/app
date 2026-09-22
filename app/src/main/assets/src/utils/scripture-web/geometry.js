@@ -296,12 +296,17 @@ export function arcTauOf(x, left, right) {
 
 /**
  * The point on the curve at parameter tau and the tangent the ribbon
- * offsets along. MUST stay identical to arcAt in arcShapeGLSL.
- * @returns {{x:number, h:number, tx:number, ty:number}} x, height above the baseline, tangent
+ * offsets along - in SCREEN space, where y runs down: the curve is
+ * (x, base - h), so its tangent is (dx, -dh). The ribbon's normal is that
+ * turned a quarter, and a tangent read in height space instead (dx, +dh)
+ * is off by twice the slope's angle: the ribbon thins to nothing where the
+ * curve runs at 45 degrees (the refuter, 2026-09-22 00:1x). MUST stay
+ * identical to arcAt in arcShapeGLSL.
+ * @returns {{x:number, h:number, tx:number, ty:number}} x, height above the baseline, the screen tangent
  */
 export function arcPointAt(tau, left, right, A) {
   const r = right - left > 0 ? (right - left) / 2 : 0;
-  return { x: left + r * (1 - Math.cos(tau)), h: A * Math.sin(tau), tx: r * Math.sin(tau), ty: A * Math.cos(tau) };
+  return { x: left + r * (1 - Math.cos(tau)), h: A * Math.sin(tau), tx: r * Math.sin(tau), ty: -A * Math.cos(tau) };
 }
 
 /**
@@ -364,7 +369,7 @@ void arcAt(float tau, float left, float right, float A, out float x, out float h
   float r = max((right - left)*.5, 0.);
   x = left + r*(1. - cos(tau));
   h = A*sin(tau);
-  tg = vec2(r*sin(tau), A*cos(tau));
+  tg = vec2(r*sin(tau), -A*cos(tau));
 }`;
 /**
  * Height of a QUARTER above the baseline, `d` px in from its foot: the
