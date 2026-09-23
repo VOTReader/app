@@ -4,7 +4,7 @@
 
 What every agent needs in 30 seconds. For landed work history, see **HISTORY.md**. For deep system reference (annotation engine, COLLECTIONS registry, navigation, audit findings), see **ARCHITECTURE.md**.
 
-**Working dir:** `D:\VOTReader-studio`. The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is a Junction → `D:\VOTReader-studio\app`. Always edit D: files.
+**Working dir:** `D:\VOTReader-studio` is the owner's own checkout; lanes and new contributors work in their own worktree under `.claude\worktrees\` (CONTRIBUTING.md §1). The old C: OneDrive junction is gone (checked 2026-09-22).
 
 ---
 
@@ -28,7 +28,7 @@ The letters batch resumes where it stopped with `py -3.13 tools/batch-align.py -
 **Architecture quick-facts.** `function App()` in `src/app.jsx` (≤800-line canary gate — the one line count worth trusting, because it's enforced). ~200 ES modules spread across `hooks/`, `ui/components/`, `ui/screens/`, `ui/sheets/` — **don't trust an exact module/line/file count quoted in any doc; they drift every commit, so `ls`/`wc` the tree when you need a number** (CQ3). All 59 screens dispatch from `buildScreenRoutes(deps)` in `src/ui/screen-routes.jsx`. **9 bundles** in `dist/` (sizes re-measured 2026-09-01 — `ls -l dist/`, decimal KB; `check-bundle-budget` holds ceilings but re-measure rather than quote): `bundle-a` 251 KB raw (react/react-dom + matthew-nkjv + the shared `search-data.js` index source — critical path; books-restored/matthew-plain moved to a-bible 2026-08-02, −353 KB); `bundle-a-bible` 5.0 MB / `bundle-a-matthew` 492 KB / `bundle-a-vot` 2.26 MB (lazy corpora via `__load*Corpus()`, minified; the read-along timings left a-vot 2026-09-01, −402 KB, and are a lazy `src/data/audio-sync.js` of 498 KB fetched only while a letter recording plays); `bundle-b` 321 KB (stores/hooks/journal/scripture-resolution/platform-bridge/StorageHealth/SW/DiagnosticLog); `bundle-c` 19 KB (renderer); `bundle-d` 533 KB (most screens/sheets/utils incl. backup.js/App/AppShell + the read-along timing loaders); `bundle-e` 116 KB (lazy Settings/Search/Garden screens via `__loadScreensE()`, precached for offline); `bundle-f` 59 KB (the Scripture Web). b/c/d/e + corpora minified; **`--target=chrome108` is mandatory** (Permanent Rule 6). Cold-boot blocking path (a+b+c+d) ≈ 1.12 MB of JS — plus **`dist/app.min.css` 268 KB, which is RENDER-BLOCKING** (a plain `<link rel="stylesheet">` in `index.html`'s head, index.html:93), so the true first-paint budget is ≈ 1.39 MB. Bundle growth is now WATCHED: `tools/check-bundle-budget.js` (pre-commit + CI, C2-D) holds per-file byte ceilings ≈15% over their measurements (14 rows on 2026-09-01, including the raw `src/data` timing files) — re-baselining is a deliberate edit to the tool, not drift. MiniSearch (bundle-e, `window.VotSearchMini`) is THE search engine — Classic/FlexSearch retired 2026-07-02. `.screen-scroll`'s scrollTop has exactly **five sanctioned writers** (the finger, scroll-restore, the pager settle, the autoscroll transport, read-along's follow) and at most one may write at a time — read the lease block in `hooks/use-autoscroll.js`'s header before adding a sixth.
 
 **Operational facts (load-bearing).**
-- **Debug APK** at `D:\VOTReader-build\<checkout>\app\outputs\apk\debug\app-debug.apk` — for the primary checkout, `D:\VOTReader-build\VOTReader-studio\app\outputs\apk\debug\app-debug.apk`. Relocated off the OneDrive junction via `vot.buildDir`; NOT `app/build/...`. The `<checkout>` segment is derived from the checkout directory name, because every git worktree copies the same gitignored `local.properties` and would otherwise share one build directory (test XML and lint reports included). **Never** `Remove-Item -Recurse` the C: junction — it follows into D: and deletes real files. The owner tests on the INSTALLED APK — a JS fix reaches his phone only via `npm run build` → `:app:assembleDebug` → `adb install -r -d`, not via git push. **Install from the path your own build just wrote**, never from a remembered one: an `adb install` against a path some other checkout wrote is the failure that installs the wrong code and still succeeds.
+- **Debug APK** at `D:\VOTReader-build\<checkout>\app\outputs\apk\debug\app-debug.apk` — for the primary checkout, `D:\VOTReader-build\VOTReader-studio\app\outputs\apk\debug\app-debug.apk`. Relocated off the OneDrive junction via `vot.buildDir`; NOT `app/build/...`. The `<checkout>` segment is derived from the checkout directory name, because every git worktree copies the same gitignored `local.properties` and would otherwise share one build directory (test XML and lint reports included). The owner tests on the INSTALLED APK — a JS fix reaches his phone only via `npm run build` → `:app:assembleDebug` → `adb install -r -d`, not via git push. **Install from the path your own build just wrote**, never from a remembered one: an `adb install` against a path some other checkout wrote is the failure that installs the wrong code and still succeeds.
 - **CORPUS_VERSION** needs a manual bump on any `books.js` / `matthew.js` / VOT-corpus edit, or web PWAs keep stale cache (`tools/check-corpus-version.js` enforces).
 - **CSP script-src is sha256-hash-locked** — after editing any inline `<script>` in index.html, `npm run build` (build:csp) re-hashes, or the pre-commit auto-fixes; NEVER hand-edit the `'sha256-…'` tokens (drift = black screen on the live PWA + WebView).
 - **adb** at `C:/Users/corbi/AppData/Local/Android/Sdk/platform-tools/`; test device `51071FDAP000C8`; emulators: `vot_api34` (WebView 113) = the verification floor, `vot_api28` (WebView 69) black-screens BY DESIGN since the chrome108 lift. **gh** at `C:\Program Files\GitHub CLI\gh.exe` (authed as VOTReader).
@@ -92,7 +92,7 @@ Reverse-chronological; each landed CI-green + deployed.
 - **Blank footnotes killed** (07-19) — chapter-only refs resolve whole chapters with gold verse sups; validate-schemas gained a corpus-wide Bible-ref resolution pass (1,466 refs proven; c14).
 - **Five-item batch** (07-18) — reading streak (IDB v5), GardenPosStore (v6), boundary instantCommit, press-drag-parity swipe hardening (document-capture + zombie watchdog), PC thumbnail robustness (captureTargetEl).
 - **UX batch sessions 1–5 + follow-ups** (07-12..20) — Go-to-Scripture on every ref sheet, link-picker overhaul (Search/Browse/Recent + full-text scope), journal editor redesign (grid autosize, per-entry scroll keys, insert-below-never-split), text-size slider (80–160 %, chrome pinned in px), unselectable chrome, icon-only back nav, reading dot rehomed into the nav, dual-theme tab thumbnails, honest Save on note/notebook sheets, dead-UI sweep.
-- **Restored-name NT editions** (07-12) — NKJV-R + KJV-R sparse overlays via the deterministic generator `tools/gen-restored-nt.mjs` (never hand-edit outputs); tracker `RESTORED-NAMES-PLAN.txt`.
+- **Restored-name NT editions** (07-12) — NKJV-R + KJV-R sparse overlays via the deterministic generator `tools/gen-restored-nt.mjs` (never hand-edit outputs); tracker `docs/archive/RESTORED-NAMES-PLAN.txt`.
 - **Selection-toolbar placement** (07-11) — near-top selections auto-scroll the exact deficit; pure `computeToolbarPlacement`.
 - **Fleet session** (07-03) — the tabs-drag lock-up root-caused ON-DEVICE (capture-phase listeners + zombie self-heal; the CDP-over-adb workflow), journal block reorder, then all four drag surfaces rebased onto one shared `createPressDrag` engine; 6 backlog items (notes search + export, My Progress dashboard, backup reminder, smoke search assert).
 - **Classic search retired** (07-02) — MiniSearch is THE engine (−96 KB off bundle-a's cold path); first-run annotation hint; `FABLE5-BACKLOG.txt` written.
@@ -105,7 +105,7 @@ Reverse-chronological; each landed CI-green + deployed.
 - **WebView floor lift → chrome108 + R8 + W10-lite a11y** (06-03) — retired the chrome69 floor (boot polyfills removed, Permanent Rule 6 rewritten, verification floor → `vot_api34`/WV113); release R8 + `isShrinkResources` ON (closes N6; APK 27.7→19.98 MB); GitHub Actions → Node-24; W10-lite a11y — `prefers-reduced-motion`, a WCAG-AA contrast fix (light-theme link-blue), **a global Text Size control** (`--font-scale` root multiplier + px→rem in the injected-CSS screens, `da050c8`), forced-colors highlight preservation + a touch-target audit (`0cd9075`). HISTORY.md landmark.
 - **AUDIT-PLAN — fully resolved (PILE B)** (06-03) — N4/N6/N7/N8 native robustness (emulator-verified) + PF3 dropped + UX9 adjudicated; every P0–P3 item now DONE or adjudicated-with-reason.
 - **N2** (06-01) — 2nd native-review: proguard keep-rule fix + oversize-import message; 10 dispositioned.
-- **U0–U22 UPLIFT** (06-01, Waves 1–5) — 7→8/10: import durability, export fail-loud, minify, search-load, App() re-render, html2canvas-lazy, Garden allowlist, CSP hash-lock, coverage/CI-smoke/contract/PWA. Canonical: **UPLIFT-PLAN.txt**.
+- **U0–U22 UPLIFT** (06-01, Waves 1–5) — 7→8/10: import durability, export fail-loud, minify, search-load, App() re-render, html2canvas-lazy, Garden allowlist, CSP hash-lock, coverage/CI-smoke/contract/PWA. Canonical: **docs/archive/UPLIFT-PLAN.txt**.
 - **Android 8/9 black-screen + SAF export** (06-01) — `--target=chrome69` + boot polyfills; SAF export on every device; emulator-verified.
 - **index.html ghost-comment purge** (06-01) — 1001→522 lines.
 - **Garden** (05-31) — CSS-transform zoom + native per-page disk cache (device-verified) + CSP redirect fix.
@@ -128,7 +128,7 @@ Reverse-chronological; each landed CI-green + deployed.
 ---
 ### Roadmap
 
-**`FABLE5-BACKLOG.txt`** (repo root) is the CURRENT working queue — a 20-item prioritized menu written 2026-07-02 for the owner's remaining Fable 5 window (session protocol + constraints inside; add DONE-log one-liners as items land). **`PLAN.txt`** + **`UPLIFT-PLAN.txt`** are historical strategic memory. The W0–W9 PWA/quality sequence and U0–U22 uplift are all closed; the only other remaining tracks are optional **W10 deep accessibility** and the owed manual device walks (`tools/n1-smoke-walk.md`). **HISTORY.md** is the complete landed-work log; **ARCHITECTURE.md** is the deep system reference; CLAUDE.md is the 30-second briefing.
+Live work is assigned through `D:\Swarm` (lane briefs + TODO lines on `BOARD.md`; CONTRIBUTING.md §7). **`FABLE5-BACKLOG.txt`** (repo root, 2026-07-02) was worked through in the 07-28 backlog run (Closed phases above); **`docs/archive/PLAN.txt`** + **`docs/archive/UPLIFT-PLAN.txt`** are historical strategic memory. The W0–W9 PWA/quality sequence and U0–U22 uplift are all closed; the only other remaining tracks are optional **W10 deep accessibility** and the owed manual device walks (`tools/n1-smoke-walk.md`). **HISTORY.md** is the complete landed-work log; **ARCHITECTURE.md** is the deep system reference; CLAUDE.md is the 30-second briefing.
 
 ---
 
@@ -153,8 +153,8 @@ D:/VOTReader-studio/
 ├── CLAUDE.md                          # this briefing
 ├── HISTORY.md                         # landed work log
 ├── ARCHITECTURE.md                    # system reference
-├── PLAN.txt                           # live strategic working memory
-├── UPLIFT-PLAN.txt                    # 7→8/10 remediation — canonical home (U0–U22, all closed)
+├── README.md, CONTRIBUTING.md         # front door; build / test / land / coordinate
+├── docs/                              # subsystem docs; docs/archive/ = closed plans (PLAN.txt, UPLIFT-PLAN.txt, …)
 ├── package.json, package-lock.json    # esbuild + eslint + puppeteer (smoke-ci) deps
 ├── .githooks/pre-commit               # versioned; activate: git config core.hooksPath .githooks
 ├── tools/
@@ -205,7 +205,7 @@ D:/VOTReader-studio/
 └── _ocr_out/, check_balance.py, etc.  # OCR pipeline + data validators
 ```
 
-**CRITICAL:** Only edit files in `app/src/main/`. Never touch `app/build/`. Always edit D: files, never the C: junction or the `app.OLD-*` backup.
+**CRITICAL:** Only edit files in `app/src/main/`. Never touch `app/build/`. Never edit an `app.OLD-*` backup.
 
 ---
 

@@ -1,384 +1,258 @@
-# Contributing to VOTReader/app
+# Contributing to VOTReader
 
-> Last updated: 2026-07-22 (corrected — rewritten against the current tree;
-> the pre-modularization description that lived here since 2026-05-10 was
-> badly stale). See **PLAN.txt** for the live working plan and **CLAUDE.md**
-> for stable project knowledge.
+> Last updated 2026-09-22. Read README.md first; it has the quick start, the bundle map and the doc map. CLAUDE.md
+> is the agent briefing (current state, product rules, permanent data rules, data formats).
 
----
-
-## Working directory
-
-**Primary:** `D:\VOTReader-studio\` — all edits go here.
-
-**Legacy:** `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\` — the
-`/app` subfolder is a Windows Junction pointing at `D:\VOTReader-studio\app`.
-**Never edit through the C: path.** Read it if you need to (it's the same
-files), but only edit on D:.
+The order here is the order of a change: where you work, how you build and test, what the gates check, how a
+commit lands, and how you stay out of the way of the other sessions working on the same repo.
 
 ---
 
-## Running the app
+## 1. Where to work
 
-### PC (development)
+**`D:\VOTReader-studio` is the owner's own checkout.** Never edit files in it and never run a git command that
+changes it (checkout, switch, stash, reset, pull, rebase). It may be dirty, and that work is the owner's.
 
-The app is a modular ES-module build, not a single file — `index.html` loads
-prebuilt `dist/bundle-*.js` files, so you must build before previewing:
+Work in your own git worktree, on your own branch, cut from `origin/main`:
 
-```bash
-git config core.hooksPath .githooks   # one-time: activate the pre-commit hook
-npm install                           # node_modules/ is gitignored
-npm run build                         # bundle-a (tools/build.py) + esbuild b/c/d/e/css + CSP + SW sync
+```sh
+git -C D:/VOTReader-studio fetch origin
+git -C D:/VOTReader-studio worktree add .claude/worktrees/<name> -b <branch> origin/main
 ```
 
-Then serve with the project's preview server and open `index.html`:
-
-```bash
-python tools/preview-server.py
-```
-
-**Do not use plain `python -m http.server`** — it caches `dist/bundle-*.js`
-heuristically and serves stale bundles after a rebuild. `preview-server.py`
-sends `Cache-Control: no-store` so reloads always fetch fresh bundles, and it
-listens on 127.0.0.1 only (`test_preview_server.py` proves it in pre-commit
-and CI) — a dev server that can LAN-expose the tree is a defect.
-
-To verify a boot, paste `tools/smoke.js` into the page console and call
-`votSmoke()` — expect the PASS line (globals ok, data ok, screens 0 crashed,
-console.error 0, resource404 0). `npm run smoke:ci` runs the same walk
-headless (puppeteer).
-
-`npm run e2e:read` and `npm run e2e:readalong` each **start their own server**
-on an OS-assigned port. Nothing has to be running first, and two of them can run
-at the same time without colliding.
-
-This section used to say the opposite — start `python tools/preview-server.py
-8097 app/src/main/assets` first and leave it running. That was already false for
-`e2e:readalong`, which has always bound its own ephemeral port, and it is what
-made `e2e:read` dangerous: with a hardcoded 8097, four concurrent servers all
-bound successfully (Python's `http.server` sets `allow_reuse_address`) and the
-gate reported PASS while serving a different worktree's tree. Fixed 2026-09-04.
-Never give an e2e harness a fixed port.
-
-### Android APK
-
-Build with Gradle:
-
-```bash
-./gradlew assembleDebug
-# APK at: app/build/outputs/apk/debug/app-debug.apk
-```
-
-The Android shell is a thin WebView (`MainActivity.kt`) that loads
-`index.html` from assets. All UI lives in the JS bundles — there is no
-native Kotlin rendering.
+- **Never check out `main` in a worktree.** Git lets one worktree hold a branch, so a worktree parked on `main`
+  makes `git checkout main` fail everywhere else. You never need a local `main`: you land with
+  `git push origin HEAD:main` (section 5).
+- **Gradle needs `local.properties`** (gitignored, so a new worktree has none). Copy
+  `D:\VOTReader-studio\local.properties`; it carries `sdk.dir` and `vot.buildDir`. The build directory is derived
+  per checkout (`<vot.buildDir>/<checkout-name>/app`), so copies never share one. Typing a value by hand? Escape
+  the drive colon (`vot.buildDir=D\:/VOTReader-build`), then re-run lint with `--rerun-tasks`, because
+  `local.properties` is not a declared input of the lint task and a cached result will lie to you.
+- **The hook path is shared by every worktree.** On this machine `core.hooksPath` is the absolute
+  `D:\VOTReader-studio\.githooks`, so your commits run the primary checkout's copy of the hook. If you change
+  `.githooks/pre-commit`, test your version directly with `sh .githooks/pre-commit`.
 
 ---
 
-## Validating data
+## 2. Build and preview
 
-Run this after any corpus data edit:
-
-```bash
-python check_balance.py
+```sh
+git config core.hooksPath || git config core.hooksPath .githooks   # the pre-commit gate: shows it, or turns it on
+npm ci                        # Node 20+ (.nvmrc pins 24), exact lockfile, as CI does
+npm run build
+python tools/preview-server.py 8090 app/src/main/assets    # then open http://127.0.0.1:8090/
 ```
 
-This catches three classes of bugs that ALL cause a black-screen failure:
+`npm run build` runs, in order: `tools/build.py` (bundle-a and the three corpus bundles), esbuild for bundles
+b, c, d, e, f, g, h and the CSS (`--format=iife --target=chrome108 --minify`), `tools/sync-csp-hashes.js` (the CSP
+`script-src` hashes of index.html's inline scripts) and `tools/sync-sw-version.js` (the service worker's
+`CACHE_VERSION` and its `ASSET_INTEGRITY` hashes). The bundles in `dist/` are committed: CI rebuilds and fails if the
+committed bytes differ from what the source builds.
 
-1. **JS parse errors** (esprima-validated) — unbalanced braces/brackets/parens
-2. **Smart quotes used as JSON delimiters** (`"` instead of `"`)
-3. **Unicode dashes in verse ranges** (`12:18–20` instead of `12:18-20`)
+- Preview only with `tools/preview-server.py` (no-store caching, 127.0.0.1 only). `python -m http.server` serves
+  stale bundles after a rebuild. A dev server that can expose the tree on the LAN is a defect.
+- The service worker caches aggressively. For a clean slate in the preview, run the snippet under "Preview
+  clean-slate" in CLAUDE.md.
+- `npm run e2e:read` and `npm run e2e:readalong` start their own servers on OS-assigned ports. Nothing needs to be
+  running first. Never give an e2e harness a fixed port: a reused port once let a gate pass while serving another
+  worktree's files.
+- On Windows, run npm from Git Bash (PowerShell blocks `npm.ps1`).
 
-Other validators:
+**Rules that break the build in silence if you forget them:**
 
-```bash
-npm run validate:data             # Format A/B/C/D/E schema validator (tools/validate-schemas.js --strict)
-npm run check:footnotes           # footnote-render audit gate
-python misattribution_check.py    # MTAM letter-link audit
-python excerpt_audit.py           # verify excerpt source titles exist
-python ocr_gap_check.py           # OCR coverage check (only if you ran OCR)
-```
-
-See **CLAUDE.md** "Quick start" section for the full black-screen bug
-taxonomy.
+- `--target=chrome108` is the floor. esbuild lowers new syntax to it, but it cannot polyfill a runtime API newer
+  than Chromium 108; such an API needs a feature-detected guard.
+- Never hand-edit the `'sha256-…'` tokens in index.html. `npm run build` re-derives them; `npm run check:csp`
+  verifies. A drifted hash is a black screen on the live PWA and in the WebView.
+- `src/app.jsx` has an 800-line ceiling (`npm run check:app-size`). A new App()-level concern goes in a hook under
+  `src/hooks/`.
+- A new or renamed `window.__*` bridge goes into BRIDGES.md in the same commit.
 
 ---
 
-## Architecture overview
+## 3. The bundle map in practice
 
-Modularization (Phase 3 in the old plan) has long since landed. The app is
-~240 ES modules (non-test `.js`/`.jsx`, verified 2026-07-22) under
-`app/src/main/assets/src/`, built into classic-script IIFE bundles under
-`dist/`. `index.html` (619 lines) is boot infrastructure + data constants +
-the bundle load sequence; the `App()` composition root lives in
-`src/app.jsx` and is held at **≤800 lines** by the `tools/check-app-size.js`
-canary (currently 798).
+README.md has the table. What follows is what you do with it.
 
-**Key files:**
+**Adding a screen that readers open on purpose** (it should cost nothing at boot):
 
-```
-app/src/main/assets/
-├── index.html                boot infra + data constants + bundle load sequence
-├── app.css                   static CSS → esbuild → dist/app.min.css
-├── react.min.js, react-dom.min.js, search-data.js
-│                             build inputs, concatenated into bundle-a
-│                             (excluded from the APK — see VENDORED-LIBS.md)
-├── html2canvas.min.js        shipped standalone, lazy-loaded for web thumbnails
-├── manifest.json, service-worker.js, offline.html, icons/   PWA layer
-├── dist/                     8 bundles + app.min.css, regenerated by npm run build
-│   ├── bundle-a.js           vendor (react/react-dom raw) + small corpus + search data
-│   ├── bundle-a-bible.js     lazy NKJV corpus (loaded via __loadBibleCorpus)
-│   ├── bundle-a-matthew.js   lazy Matthew Study Bible corpus
-│   ├── bundle-a-vot.js       lazy VOT collections corpus (volumes, letters, WTLB, …)
-│   ├── bundle-b.js           stores (esbuild, src/stores/_entry-b.js)
-│   ├── bundle-c.js           renderer/annotation engine (src/renderer/_entry.js)
-│   ├── bundle-d.js           UI screens/components/sheets (src/ui/_entry-d.js)
-│   └── bundle-e.js           search UI + MiniSearch engine (src/ui/_entry-e.js)
-└── src/
-    ├── app.jsx               function App() — composition root (≤800-line canary)
-    ├── data/                 scripture-resolution.js (COLLECTIONS registry) + corpus files
-    ├── stores/               localStorage/IndexedDB-backed stores
-    ├── renderer/             annotation-engine, dom-links, dom-bookmarks, dom-journal-chip
-    ├── hooks/                App()-level hooks (sheet orchestration, pager, autoscroll, …)
-    ├── ui/
-    │   ├── screen-routes.jsx buildScreenRoutes factory — the ROUTES table
-    │   ├── screens/          reading + index + hub screens
-    │   ├── components/       shared components
-    │   └── sheets/           sheets/pickers
-    ├── search/               MiniSearch engine (search-config.js is the single index shape)
-    ├── utils/                helper modules (platform-bridge, storage-health, backup, …)
-    ├── components/           ExpandableText, ErrorBoundary
-    └── styles/               journal-styles
-```
+1. Write it under `src/ui/screens/`, with a colocated `*.test.jsx`.
+2. Import it in the lazy entry that fits (`src/ui/_entry-g.js` for Personal Study, `_entry-h.js` for the
+   Listening Library, `_entry-e.js` for settings and search) and add it to that file's `Object.assign(window, {...})`.
+3. Route it in `src/ui/screen-routes.jsx` through `_corpusView(window.__screensG, window.__loadScreensG, 'Loading…')`,
+   which shows a loader until the bundle has defined the screen.
+4. Read shared helpers as free globals from bundle-d, as the other lazy screens do. Never import an eager module
+   into a lazy entry: esbuild would bundle a second copy, and two copies of a module are two states of one table.
+5. Pin it in that bundle's membership test (`tools/bundle-g-membership.test.js`, `tools/bundle-h-membership.test.js`):
+   the lazy bundle defines it and bundle-d only asks for it. These tests read the built bytes, so `npm run build`
+   before you run them.
+6. Re-measure: `npm run check:bundle-budget`. Raising a ceiling is a deliberate edit to
+   `tools/check-bundle-budget.js`, justified in the commit.
 
-**Build pipeline** (`npm run build`): `tools/build.py` concatenates bundle-a
-(raw vendor + PF2-minified data members) and the three lazy corpus bundles
-(esbuild-minified); esbuild (`--format=iife --target=chrome108 --minify`)
-builds bundles b/c/d/e and `app.min.css`; then `tools/sync-csp-hashes.js`
-syncs CSP `script-src` sha256 hashes and `tools/sync-sw-version.js` bumps
-the service-worker content-hash version.
+**Adding a whole new lazy bundle** touches every place that knows the list (bundle-g's first commit is the worked
+example: `git log --reverse -- app/src/main/assets/src/ui/_entry-g.js`):
+an esbuild script in `package.json` plus a step in its `build` chain; a `__makeLazyLoader` call and the two window
+slots in `index.html`; `ENTRY_FILES` in `tools/gen-eslint-globals.py`; the lazy preload in `tools/smoke.js`; the
+precache list in `service-worker.js`; a row in `tools/check-bundle-budget.js`; the re-stage list in
+`.githooks/pre-commit`; and a membership test.
 
-**Central registry:** the `COLLECTIONS` array in
-`src/data/scripture-resolution.js` is the source of truth for the 15 content
-collections. Lookup maps (`COL_BY_KEY`, `COL_BY_CARD`, `COL_BY_LETTER_SC`,
-etc.) derive from it. When adding/removing/renaming a collection, edit
-COLLECTIONS first. Corpus content edits must bump `CORPUS_VERSION` — the
-`npm run check:corpus` gate enforces the lock.
-
-**window.\_\_ bridges:** imperative escape hatches between bundles are
-registered in **BRIDGES.md** — add/remove/rename entries in the same commit
-as the code change.
+**The corpora** load through `__loadBibleCorpus()`, `__loadMatthewCorpus()` and `__loadVotCorpus()`. Screens wait
+on them through the same corpus objects. The contract and its one race class are in ARCHITECTURE.md, "Lazy corpora".
 
 ---
 
-## Editing principles
+## 4. Tests
 
-1. **Edit before Write.** Use the targeted Edit tool for surgical changes;
-   reserve Write for new files.
-2. **Read before Edit.** Always read the target region first.
-3. **No regex at file scope.** Local string replacements only.
-4. **Preserve other entries.** When editing letter N in a multi-letter file,
-   only touch letter N.
-5. **Verify after every batch.** Run the gates, preview the affected screen.
-6. **Format-preserving.** Volume Two uses unquoted JS keys (`id: "..."`);
-   other volumes use JSON-quoted (`"id": "..."`). Match the file's
-   existing format.
-7. **New App()-level concerns go in a hook** under `src/hooks/`, not inline
-   in `app.jsx` — the size canary fails the commit otherwise.
+| What | Command |
+|---|---|
+| all JS tests | `npm run test` (vitest; jsdom, fake-indexeddb, Testing Library) |
+| one file | `npx vitest run app/src/main/assets/src/stores/note-store.test.js` |
+| with the coverage floors the hook enforces | `npm run test:coverage` |
+| the gate scripts' own tests | `npx vitest run tools/` |
+| types | `npm run typecheck` |
+| lint | `npm run lint -- --max-warnings 0` (regenerates the cross-bundle globals, then eslint; this is CI's form) |
+| Kotlin unit tests | `./gradlew :app:testDebugUnitTest` (JDK 21) |
+| headless smoke walk | `npm run smoke:ci` |
+| end-to-end read detectors | `npm run e2e:read`, `npm run e2e:readalong` |
 
----
-
-## Gates, tests, and commit flow
-
-The versioned pre-commit hook (`.githooks/pre-commit`; activate with
-`git config core.hooksPath .githooks`) runs, gated on what's staged:
-
-- `check_balance.py` + `validate-schemas.js --strict` when corpus data changes
-- `eslint --max-warnings 0` on staged source files (lint-staged)
-- `tsc --noEmit` (checkJs; zero-tolerance) on source changes
-- `vitest run` — the full suite — on source changes
-- `npm run build` + re-stage when bundle sources change (bundles always land
-  in sync with source)
-
-CI mirrors these plus `check:csp`, `check:corpus`, `check:app-size`,
-`validate:data`, `check:footnotes`, and the headless smoke walk.
-
-**Test stack:** vitest + jsdom + `fake-indexeddb` +
-`@testing-library/react`; React-as-global and `window.__*` bridge stubs live
-in `vitest.setup.js`. Run with `npm run test` (or
-`./node_modules/.bin/vitest run`). **Test culture is RED-first:** a fix
-lands with a test that fails against the pre-fix code, then passes — say so
-in the commit. Counts drift; don't copy a test/file count from docs into
-commit messages without re-running.
-
-**Commit flow:** solo project — work commits directly to `main`, no PR
-process. Conventional-commit style subjects (`feat(scope): …`, `fix(…): …`,
-`test(…): …`, `docs: …`). Emergency hook bypass: `git commit --no-verify`
-(not recommended).
+- Tests sit next to their source as `*.test.js(x)`. Tests of gate scripts and of the built bundles live in `tools/`.
+  React-as-global and the `window.__*` stubs are in `vitest.setup.js`.
+- **RED first.** A fix lands with a test that fails on the pre-fix code and passes after it. Say so in the commit.
+- **Never quote a number you did not just produce.** Test counts, bundle sizes and report totals drift with every
+  landing, and a report directory another session also writes to holds whoever finished last. Run it yourself,
+  then quote it.
 
 ---
 
-## Coordinating with parallel work
+## 5. Gates and landing
 
-This project may have multiple agent sessions running concurrently. The
-authoritative coordination document is **PLAN.txt** at the project root.
-Before making non-trivial changes:
+### The pre-commit hook
 
-1. Re-read **PLAN.txt** for the current priorities and claimed work areas.
-2. Check **CLAUDE.md** "Current state" for what just landed, and its
-   "Permanent rules" / "Editing principles" for conventions.
-3. If you're starting a new feature or refactor, note the work area in
-   PLAN.txt before starting.
+`.githooks/pre-commit` runs only what the staged files need, in this order:
 
-Notebooks, journals, and the `NoteStore` data model all shipped long ago —
-they are production code now, so normal editing discipline applies (there is
-no "do not touch" embargo). The historical Phase 0–5 plan in PLAN.txt is
-closed; treat phase references as history.
+1. data files: `check_balance.py`, `tools/validate-schemas.js --strict`, the read-along offset and Bible-timing
+   checks, the audio manifest check;
+2. source files: eslint on the staged files (after regenerating the globals), `tsc --noEmit`, then **the full vitest
+   suite with coverage floors**; a staged `tools/` script runs `vitest run tools/`;
+3. bundle sources, `index.html`, `app.css`, `manifest.json`, `offline.html`, `service-worker.js`:
+   **`npm run build`, then re-stage** what it regenerated; then the type-scale, CSS-token, byte-budget,
+   CORPUS_VERSION, search-index-version and runtime-asset gates;
+4. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check;
+5. `.kt` or `app/build.gradle.kts`: the Kotlin unit tests.
 
-### A test count read from a shared directory is a guess
+A docs-only commit runs step 4 and nothing else.
 
-`local.properties` is gitignored, so every git worktree needs its own copy —
-Gradle fails with "SDK location not found" without one, and the usual way to get
-it is to copy the file from the main checkout. That copy carries `vot.buildDir`
-with it, so before 2026-09-04 every worktree on a machine pointed at the SAME
-build directory. Two sessions running `:app:testDebugUnitTest` in different
-worktrees then overwrote each other's `test-results/` XML and lint reports, and a
-count read back was whoever finished last. It put wrong test totals into three
-commit messages on 2026-09-04 before anyone noticed — nothing was broken, but the
-evidence was somebody else's.
+**The order trap.** Step 2 (vitest) runs before step 3 (the rebuild). So when you edit `index.html`, or any file
+the service worker hashes directly (`manifest.json`, `offline.html`), `service-worker.test.js` fails on the stale
+`ASSET_INTEGRITY` hash (`'./'` is index.html) before the hook gets to rebuild it. Build and stage first:
 
-`app/build.gradle.kts` now derives the build directory from the checkout
-(`<vot.buildDir>/<checkout-name>/app`), so a copied `local.properties` cannot
-collide however carelessly it is copied. Two concurrent runs were used to prove
-it: separate report directories, independent counts, both green.
-
-The habit outlives the fix, because it is not really about Gradle:
-
-- **Never quote a number from a mutable location you did not just write.** Clear
-  the report directory, or run the suite yourself, before putting a count in a
-  commit message or a report.
-- The same class of mistake is reading a gate's green from a server you did not
-  start, or a log file you did not watch get written.
-- If you have already published a wrong number, re-run and correct it in place.
-  A quietly wrong count is worse than a missing one, because the next person
-  builds on it.
-
-#### If you hand-edit `local.properties`, escape the drive colon
-
-Copying the file from the main checkout gets this right for free. Typing a value
-yourself does not: `vot.buildDir=D:/VOTReader-build` fails `:app:lintDebug` with
-`PropertyEscape`, because a drive-letter colon in a `.properties` value has to be
-escaped. Both of these pass, and mean the same thing to Gradle:
-
-```properties
-vot.buildDir=D\:/VOTReader-build
-vot.buildDir=D\:\\VOTReader-build
+```sh
+npm run build
+git add app/src/main/assets/index.html app/src/main/assets/service-worker.js app/src/main/assets/dist
+git commit
 ```
 
-A lone backslash before a letter is a different trap: `.properties` drops unknown
-escapes, so `D\:\VOTReader-build` silently becomes `D:VOTReader-build`, which
-Gradle then reads as a path relative to the checkout — measured, and it surfaces as
-`Illegal char <:> at index 59` from `:app:generateDebugBuildConfig`, nowhere near
-the file that caused it. Double the separators or use forward slashes.
+Also stage `dist/` yourself after any change that lands in bundle-g or bundle-h: the hook's re-stage list names
+bundle-a through bundle-f only.
 
-**And `local.properties` is not a declared input to the lint task**, so editing it
-does not invalidate the cached analysis. Measured on 2026-09-04, four runs, one
-variable at a time: a deliberately broken value passes when lint does not re-run,
-and a value you have already fixed keeps failing with the stale message until it
-does. Re-run with `--rerun-tasks` after touching this file, or you are reading the
-cache. Which is the section heading again, one directory over: a green from a place
-you did not just cause to run is not a green.
+`git commit --no-verify` skips all of this. CI runs the same gates on every push anyway, so skipping only moves
+the failure to after your push, on `main`.
 
-### One checkout is `main`, and it is the primary one
+### CI and Deploy
 
-`D:\VOTReader-studio` itself is the canonical `main` checkout. Everything else —
-every `.claude/worktrees/*` — is scratch. Two reasons, and the second is the one
-that bites:
+- `.github/workflows/ci.yml` runs on every push: lint, the data validators, typecheck, vitest with coverage,
+  build plus "committed bundles, SW version and CSP hashes match source", CORPUS_VERSION, ASSET_INTEGRITY, the
+  budgets, the type scale, the smoke walk and the read detector; and a Kotlin job (unit tests, Android lint,
+  the JaCoCo floor).
+- `.github/workflows/deploy-web.yml` publishes every push to `main` to GitHub Pages, with no path filter.
 
-**The scheduled jobs run there.** `vot-audio-app-sync` (Sunday 19:30) and
-`vot-weekly-sync` (Sunday 18:00) drive `tools/flock-audio-sync.py` against the
-primary checkout, and it refuses to run on a dirty tree — deliberately, so it
-never tramples a session mid-work. A primary checkout left on a feature branch,
-or left dirty, silently costs a week of audio ingestion; three Sundays were lost
-that way in August 2026 before anyone looked at the log.
+### Landing a change
 
-**Git lets exactly one worktree hold a branch.** A scratch worktree parked *on*
-`main` makes `git checkout main` in the primary fail with
+`main` is linear and there are no pull requests. You rebase, never merge, and push straight to `main`:
 
-```
-fatal: 'main' is already used by worktree at D:/VOTReader-studio/.claude/worktrees/<name>
+```sh
+git fetch origin
+git rebase origin/main            # linear history; never a merge commit
+# if the rebase brought in source changes near yours: npm run build && npm run test
+git push origin HEAD:main
 ```
 
-which is a confusing error to meet when you are trying to put the repository back
-the way you found it.
+1. The push prints `Bypassed rule violations ... Required status check "build + syntax-check" is expected`. You
+   pushed past the required check, so the CI run after the push is the check. Watch **both** runs to the end:
+   `gh run list --commit $(git rev-parse HEAD)`, then `gh run watch <run-id> --exit-status` for CI and for
+   Deploy Web.
+2. Confirm the deploy: `npm run check:live` compares the live service worker with HEAD and prints
+   `LIVE AND CURRENT` when they match (`--wait` polls up to 10 minutes; `--strict` exits 1 unless HEAD is live).
+   It also prints `(HEAD on <branch>)` and exits 0 on a wrong branch, so read the branch name.
+3. Rejected because `main` moved? Fetch, rebase, re-run what the new commits could disturb, push again.
+4. Commit subjects follow conventional commits: `feat(scope): …`, `fix(scope): …`, `test(…)`, `docs: …`,
+   `chore(build): …`. One logical change per commit.
 
-So: **a scratch worktree used for landing keeps a detached HEAD, never the `main`
-ref.** `git worktree add --detach <path> main` to make one, or
-`git -C <path> checkout --detach` to release a branch it already holds. Landing
-from a worktree at all is the exception — it exists for when the primary checkout
-is occupied by another session's work — and when that work is done, the primary
-goes back to `main` and the worktree goes back to detached.
+### Getting it onto the phone
 
-Two things claiming to be `main` is the same failure as two worktrees claiming
-one build directory, one step up: whichever you read is a coin flip, and the tool
-that tells you is not the tool you happen to be running. `npm run check:live`
-prints `(HEAD on <branch>)` — that line is the only place it says which checkout
-answered, and it exits 0 either way.
+A push does not reach the owner's phone: the owner tests the installed APK. Build and install it yourself:
 
----
+```sh
+npm run build
+./gradlew :app:assembleDebug
+adb install -r -d "D:/VOTReader-build/<checkout-name>/app/outputs/apk/debug/app-debug.apk"
+```
 
-## Common bug patterns to avoid
-
-The data-quality bug taxonomy (**D1 through D10**) lives in
-**ARCHITECTURE.md §6.6**. Most common:
-
-- **D3** — orphaned `[N]` brackets in body text (legacy footnote markers
-  not converted to `{t:'fn',v:'N'}` segments)
-- **D8** — glued text near refs (`"verse{{ref:Matt 4:4}}"` with no space)
-- **D9** — compound refs not split with `" | "` separator
-- **D4** — translation-tagged ref (e.g., `"John 14:6 (CJB)"`) missing
-  from the entry's `nkjv` dict (must use that translation's text, not NKJV)
-
-When fixing data bugs, fix the SOURCE, not the renderer. The renderer
-should serve clean data; defensive renderer guardrails are bandaids that
-hide future regressions.
+The APK lands outside the repo, under `D:\VOTReader-build\<checkout-name>\` (from `vot.buildDir`). Install the
+file your own build just wrote, never one from a remembered path: an APK another checkout built installs the wrong
+code and still succeeds.
 
 ---
 
-## Getting started checklist
+## 6. Editing corpus data
 
-1. Read **CLAUDE.md** end-to-end — the 30-second briefing, permanent rules,
-   and current state.
-2. Read **PLAN.txt** — live priorities and claimed work areas (the Phase
-   0–5 sections are closed history).
-3. Run the health check: `git config core.hooksPath .githooks`,
-   `npm install`, `npm run build`.
-4. Run `npm run test` — confirm the suite is green on your machine.
-5. Preview via `python tools/preview-server.py`, run `votSmoke()` from
-   `tools/smoke.js`, and explore the app from a user perspective.
-6. Pick a task from PLAN.txt (smallest scope) — execute RED-first, run the
-   gates, verify, commit.
+- After any edit to a file in `src/data/`: `python check_balance.py` (needs `pip install esprima`) catches the
+  three black-screen classes (JS parse errors, smart quotes used as delimiters, non-ASCII dashes in verse ranges);
+  `npm run validate:data` catches schema errors (missing fields, orphaned footnotes, broken prev/next chains).
+- Bump `CORPUS_VERSION` in `app/src/main/assets/service-worker.js` on any corpus content change, or installed PWAs
+  keep serving the old text. `npm run check:corpus` enforces it against `tools/corpus-version.lock`.
+- Fix the source, not the renderer. Match the file's existing format (Volume Two uses unquoted keys, the other
+  volumes quoted keys). Verse ranges use an ASCII hyphen. The full rules and the data formats are in CLAUDE.md
+  ("Permanent rules", "Data formats").
 
 ---
 
-## Where to put new code
+## 7. Coordinating with parallel work
 
-The modular layout is the reality described in the Architecture overview
-above. Follow the layer rules: pure logic before atoms, atoms before sheets,
-sheets before screens. Concretely:
+Several agent sessions work on this repo at once. Since 2026-09-20 they coordinate through **`D:\Swarm`**, a folder
+of plain files. If you are new to this machine, read **`D:\AgentMemory\START-HERE.md`** first: twelve documents
+in order, from the owner and the machine to this network and the live board. Before you claim, post or land
+anything, read **`D:\Swarm\PROTOCOL.md`**: the claim, board and landing rules below are its rules.
 
-- **New App()-level concern** (state + effects) → a hook under
-  `src/hooks/`, called from `app.jsx`. The composition root must stay
-  ≤800 lines (`npm run check:app-size`).
-- **New UI** → `src/ui/components/` (shared), `src/ui/sheets/`
-  (sheets/pickers), or `src/ui/screens/` (screens); register screens in
-  `src/ui/screen-routes.jsx`.
-- **New persisted state** → a store under `src/stores/`.
-- **New pure logic** → `src/utils/` (or `src/data/` for corpus/registry
-  concerns), with a colocated `*.test.js(x)`.
-- **New `window.__*` bridge** → register it in **BRIDGES.md** in the same
-  commit.
+| Where | What |
+|---|---|
+| `D:\Swarm\PROTOCOL.md` | the rules, one screen (33 of them) |
+| `D:\Swarm\tiering.md` | which model and effort for which work, and how much checking a change needs: T1 gates only, T2 plus one device look, T3 plus one independent refuter |
+| `D:\Swarm\BOARD.md` | the board, append-only, one line per event: `HH:MM <lane> -> <target>: <text>`. Its tail (`tail -60 D:/Swarm/BOARD.md`) is the last hour or so. Verbs: TODO, DONE, PASS, FAIL, NEEDS |
+| `D:\Swarm\lanes\<lane>\` | one folder per lane: `brief.md` (its assignment), `state.md` (line 1 is `NOW:`; the lane's current truth), `inbox.md`, `out\` |
+| `D:\Swarm\claims\` | open claims. `D:/Swarm/claim.sh <id>` takes a TODO atomically (one open claim per lane); `D:/Swarm/done.sh <id> "<result>"` finishes it and posts DONE |
 
-After any source change, `npm run build` regenerates the bundles — the
-pre-commit hook does this automatically and stages the output, so a commit
-never lands with bundles out of sync with source.
+- **The hub** is the one session the owner talks to; BOARD.md's header names it. It writes the lane briefs and
+  posts loose work as TODO lines.
+- **Post** with `D:/Swarm/post.sh <target> "<text>"`, or bash:
+  `echo "$(date +%H:%M) <lane> -> all: <text>" >> D:/Swarm/BOARD.md`. Never edit or rewrite the board. PowerShell
+  `Add-Content` is blocked: on this machine it loses lines when several processes append at once.
+- **One lane, one worktree** (`.claude\worktrees\<lane>`). **One writer per output path**: a file another lane owns
+  is not yours to edit, even for a one-line fix. Post a TODO for it.
+- **Land your own work** (section 5), then post one DONE line with the commit hash.
+
+The old coordination file is closed history: `docs/archive/PLAN.txt`.
+
+---
+
+## 8. Keeping the docs true
+
+- **CLAUDE.md "Current state (date)"** is one screen. Rewrite it when the picture changes; never append a log to it.
+  It loads into every agent session, so every line costs something.
+- **HISTORY.md**: prepend a dated narrative entry for each landed piece of work, and add a one-liner to CLAUDE.md's
+  Closed-phases index.
+- **BRIDGES.md**: same commit as any `window.__*` bridge change.
+- **docs/**: subsystem docs. A finished plan or tracker moves to `docs/archive/` with a line in
+  `docs/archive/README.md`.
+- No counts in docs (tests, modules, bytes, lines). They drift, and a stale number reads as a fact. Name the command
+  that measures it instead.
