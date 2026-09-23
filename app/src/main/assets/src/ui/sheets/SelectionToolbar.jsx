@@ -3,6 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
+import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 
 /** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
     bookmark decoration chrome (marker digit or icon glyph), not reading text.
@@ -138,6 +140,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // when the ✕ is pressed — so the confirm can disclose that removing also deletes
   // the note text (removeHighlight calls NoteStore.remove per group).
   const [removeNoteCount, setRemoveNoteCount] = React.useState(0);
+  // A15: the passage a Copy / Share could not deliver ({ text, verb }), kept
+  // on screen by CopyFallbackSheet after the toolbar itself has closed.
+  const [copyFallback, setCopyFallback] = React.useState(/** @type {{ text: string, verb: 'copy' | 'share' } | null} */ (null));
   React.useEffect(() => { setConfirmingRemove(false); }, [selInfo]);
 
   // W1.5(a.2) — register with the central modal registry while the toolbar
@@ -806,12 +811,24 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     setTimeout(() => { suppressRef.current = false; }, 300);
   }, [selInfo, selectionGroups]);
 
+  // A15: a Copy / Share outcome is always reported. showToast is bundle-b's,
+  // resolved from window at call time (the AppShellSheets pattern).
+  const confirmCopied = React.useCallback((/** @type {string} */ message) => {
+    if (typeof showToast === 'function') {
+      showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: message });
+    }
+  }, []);
+
   const copyText = React.useCallback(() => {
     if (!selInfo) return;
-    navigator.clipboard.writeText(selInfo.copyText || selInfo.text).catch(() => {});
+    const text = selInfo.copyText || selInfo.text;
     window.getSelection().removeAllRanges();
     setVisible(false);
-  }, [selInfo]);
+    copyToClipboard(text).then((outcome) => {
+      if (outcome === 'copied') confirmCopied('Copied');
+      else setCopyFallback({ text, verb: 'copy' });
+    });
+  }, [selInfo, confirmCopied]);
 
   const handleLink = React.useCallback(() => {
     if (!selInfo) return;
@@ -945,14 +962,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const handleShare = React.useCallback(() => {
     if (!selInfo) return;
     const text = selInfo.text;
-    if (navigator.share) {
-      navigator.share({ text }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text).catch(() => {});
-    }
     window.getSelection().removeAllRanges();
     setVisible(false);
-  }, [selInfo]);
+    // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,
+    // and closing it on purpose is not an error.
+    shareText(text).then((outcome) => {
+      if (outcome === 'copied-instead') confirmCopied('Copied instead. Paste the passage where you want to share it.');
+      else if (outcome === 'failed') setCopyFallback({ text, verb: 'share' });
+    });
+  }, [selInfo, confirmCopied]);
 
   const handleSearch = React.useCallback(() => {
     if (!selInfo) return;
@@ -1066,6 +1084,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
   }, [selInfo, onBookmarkRequest]);
 
+  if (copyFallback) {
+    return (
+      <CopyFallbackSheet
+        text={copyFallback.text}
+        verb={copyFallback.verb}
+        onClose={() => setCopyFallback(null)}
+        onCopied={() => { setCopyFallback(null); confirmCopied('Copied'); }}
+      />
+    );
+  }
   if (!visible || !selInfo) return null;
 
   // (Pre-Q3.3f-dead a styleAClass(color) helper lived here; no caller.)

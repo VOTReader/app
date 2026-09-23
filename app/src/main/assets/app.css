@@ -104,6 +104,53 @@
       .vot-toast-action .vot-escape-btn { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
       body.light .vot-toast-action .vot-escape-btn { color:var(--gold-strong,#9a7b2e); }
 
+      /* copy-fallback (A15) — the passage a Copy / Share could not deliver,
+         kept on screen in a bottom sheet with a retry (CopyFallbackSheet.jsx;
+         design: Codex mockup 2A, 2026-09-22). Above the selection toolbar
+         (9000), under the toasts (9998), so its "Copied" can follow it. */
+      .copy-fallback-overlay {
+        position: fixed; inset: 0; z-index: 9100;
+        display: flex; align-items: flex-end; justify-content: center;
+        background: rgba(0,0,0,0.61);
+      }
+      body.light .copy-fallback-overlay { background: rgba(36,27,12,0.42); }
+      .copy-fallback {
+        box-sizing: border-box; width: 100%; max-width: 32rem;
+        padding: 10px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+        border-top: 1px solid var(--gold-border); border-radius: 18px 18px 0 0;
+        background: var(--bg3); box-shadow: 0 -12px 30px rgba(0,0,0,0.38);
+      }
+      body.light .copy-fallback { background: #faf8f4; }
+      .copy-fallback-handle { width: 40px; height: 4px; margin: 0 auto 18px; border-radius: 4px; background: var(--gold-border); }
+      .copy-fallback-title {
+        margin: 0 0 7px; color: var(--gold); font-family: var(--font-cinzel);
+        font-size: var(--fs-18); font-weight: 600; line-height: 1.3;
+      }
+      .copy-fallback-help { margin: 0 0 13px; color: var(--cream-muted); font-size: var(--fs-15); line-height: 1.45; }
+      .copy-fallback-text {
+        display: block; box-sizing: border-box; width: 100%; max-height: 172px; resize: none;
+        overflow: auto; overscroll-behavior: contain;
+        padding: 12px 14px; border: 1px solid var(--gold-border); border-radius: 8px;
+        background: var(--bg); color: var(--cream);
+        font-family: var(--font-body); font-size: var(--fs-16); line-height: 1.5;
+        user-select: text; -webkit-user-select: text;
+      }
+      body.light .copy-fallback-text { background: #f7f2e8; }
+      /* The box opens focused (its text pre-selected), so the browser's default
+         ring would sit on it the whole time: a themed 2 px gold edge instead. */
+      .copy-fallback-text:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+      .copy-fallback-actions { display: flex; gap: 10px; margin-top: 16px; }
+      .copy-fallback-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 44px; min-height: 44px; padding: 8px 15px;
+        border: 1px solid var(--gold-border); border-radius: 8px;
+        background: transparent; color: var(--cream-muted);
+        font-family: var(--font-cinzel); font-size: var(--fs-14); cursor: pointer;
+      }
+      .copy-fallback-btn.primary { flex: 1; background: rgba(176,142,87,0.15); color: var(--gold); font-weight: 600; }
+      body.light .copy-fallback-btn { color: #5a5040; border-color: rgba(90,69,32,0.3); }
+      body.light .copy-fallback-btn.primary { background: rgba(90,69,32,0.1); color: #5a4520; }
+
       /* StorageHealthBanner — fixed strip above the nav (z-index 101 > nav 100).
          Three severity styles: gold (soft), amber (warning), danger (critical). */
       .sh-banner {

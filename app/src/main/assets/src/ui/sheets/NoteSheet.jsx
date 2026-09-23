@@ -4,6 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { shareText } from '../../utils/copy-share.js';
 
 /**
  * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props
@@ -139,11 +140,20 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     onClose();
   };
 
+  // A15: the outcome is reported, never swallowed. The note stays open on
+  // screen, so a refusal points the reader at its text rather than at a
+  // second sheet; a cancelled native share stays quiet.
   const share = () => {
     const text = anchor + (note.body ? '\n\n' + note.body : '');
-    if (navigator.share) navigator.share({ text }).catch(() => {});
-    else navigator.clipboard.writeText(text).catch(() => {});
     setMenuOpen(false);
+    shareText(text).then((outcome) => {
+      if (typeof showToast !== 'function') return;
+      if (outcome === 'copied-instead') {
+        showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: 'Copied instead. Paste the note where you want to share it.' });
+      } else if (outcome === 'failed') {
+        showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: 'Couldn’t share or copy. Select the note’s text to copy it by hand.', durationMs: 6000, ariaLive: 'assertive' });
+      }
+    });
   };
 
   // Blank notes are allowed — the body can be empty. (Pre-Q3.3f-dead a

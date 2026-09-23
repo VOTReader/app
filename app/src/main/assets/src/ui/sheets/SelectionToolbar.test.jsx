@@ -33,6 +33,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll } from './SelectionToolbar.jsx';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
+import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
 
 let _origGetSelection;
 
@@ -967,5 +968,152 @@ describe('SelectionToolbar — the ▲/▼ nudge row is retired', () => {
     act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
     expect(document.querySelector('.sel-toolbar')).not.toBeNull();
     expect(document.querySelector('.sel-nudge-btn')).toBeNull();
+  });
+});
+
+/* A15 — Copy / Share outcomes are reported, never swallowed.
+   Before: copyText and handleShare fired the promise, `.catch(() => {})`'d
+   it, and cleared the selection in the same tick, so a browser that denied
+   clipboard access lost the reader's quote in silence. The contract now:
+   success says so, an intentional native-share cancel stays quiet, and any
+   failure leaves the quote on screen, selectable, with a retry. */
+describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => {
+  const QUOTE = 'In the beginning was the Word';
+  /** @type {PropertyDescriptor | undefined} */ let origClipboard;
+  /** @type {PropertyDescriptor | undefined} */ let origShare;
+
+  beforeEach(() => {
+    origClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    /** @type {any} */ (globalThis).showToast = realShowToast;
+  });
+
+  afterEach(() => {
+    _resetToasts();
+    delete /** @type {any} */ (globalThis).showToast;
+    if (origClipboard) Object.defineProperty(navigator, 'clipboard', origClipboard);
+    else delete /** @type {any} */ (navigator).clipboard;
+    if (origShare) Object.defineProperty(navigator, 'share', origShare);
+    else delete /** @type {any} */ (navigator).share;
+  });
+
+  /** @param {((t: string) => Promise<void>) | null} writeText */
+  function setClipboard(writeText) {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: writeText ? { writeText } : undefined, writable: true, configurable: true,
+    });
+  }
+  /** @param {((d: any) => Promise<void>) | undefined} fn */
+  function setShare(fn) {
+    Object.defineProperty(navigator, 'share', { value: fn, writable: true, configurable: true });
+  }
+  function denied() {
+    return Promise.reject(Object.assign(new Error('Write permission denied.'), { name: 'NotAllowedError' }));
+  }
+  function raiseToolbar() {
+    const c = readingContainer('bible:test:1:1', QUOTE);
+    mount();
+    stubSelection(rangeOver(c, 0, QUOTE.length));
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+  }
+  /** @param {string} label */
+  function tapAction(label) {
+    const btn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+      .find((s) => s.textContent === label)?.closest('.sel-action-btn'));
+    expect(btn).toBeTruthy();
+    act(() => { fire(btn, 'click'); });
+  }
+  async function settle() {
+    await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+  }
+  function recovery() { return document.querySelector('[role="dialog"].copy-fallback, [role="alertdialog"].copy-fallback'); }
+  function toastText() { const t = document.querySelector('.vot-toast.show'); return t ? t.textContent : ''; }
+
+  it('Copy denied by the browser keeps the quote on screen, selectable, with a retry', async () => {
+    setClipboard(denied);
+    raiseToolbar();
+    tapAction('Copy');
+    await settle();
+    const dlg = recovery();
+    expect(dlg).not.toBeNull();
+    const box = /** @type {HTMLTextAreaElement|null} */ (dlg && dlg.querySelector('textarea'));
+    expect(box && box.value).toContain(QUOTE);
+    expect(box && box.readOnly).toBe(true);
+    expect([...(dlg ? dlg.querySelectorAll('button') : [])].map((b) => b.textContent)).toContain('Try again');
+    expect(dlg && dlg.textContent).toMatch(/copy/i);
+    expect(toastText()).not.toMatch(/Copied/);
+  });
+
+  it('Copy with no clipboard API at all (an insecure page) is reported, not thrown', async () => {
+    setClipboard(null);
+    raiseToolbar();
+    tapAction('Copy');
+    await settle();
+    expect(recovery()).not.toBeNull();
+  });
+
+  it('a successful Copy confirms with a "Copied" toast and no dialog', async () => {
+    const written = /** @type {string[]} */ ([]);
+    setClipboard((t) => { written.push(t); return Promise.resolve(); });
+    raiseToolbar();
+    tapAction('Copy');
+    await settle();
+    expect(written.length).toBe(1);
+    expect(written[0]).toContain(QUOTE);
+    expect(toastText()).toMatch(/^Copied/);
+    expect(recovery()).toBeNull();
+  });
+
+  it('Share cancelled by the reader stays quiet: no toast, no dialog, nothing copied', async () => {
+    const written = /** @type {string[]} */ ([]);
+    setClipboard((t) => { written.push(t); return Promise.resolve(); });
+    setShare(() => Promise.reject(Object.assign(new Error('Share canceled'), { name: 'AbortError' })));
+    raiseToolbar();
+    tapAction('Share');
+    await settle();
+    expect(written.length).toBe(0);
+    expect(toastText()).toBe('');
+    expect(recovery()).toBeNull();
+  });
+
+  it('Share unavailable copies instead and tells the reader to paste it', async () => {
+    setShare(undefined);
+    setClipboard(() => Promise.resolve());
+    raiseToolbar();
+    tapAction('Share');
+    await settle();
+    expect(toastText()).toMatch(/Copied/);
+    expect(toastText()).toMatch(/paste/i);
+    expect(recovery()).toBeNull();
+  });
+
+  it('Share failing for another reason, with copy denied too, keeps the quote recoverable', async () => {
+    setShare(() => Promise.reject(Object.assign(new Error('not allowed'), { name: 'NotAllowedError' })));
+    setClipboard(denied);
+    raiseToolbar();
+    tapAction('Share');
+    await settle();
+    const dlg = recovery();
+    expect(dlg).not.toBeNull();
+    const box = /** @type {HTMLTextAreaElement|null} */ (dlg && dlg.querySelector('textarea'));
+    expect(box && box.value).toContain(QUOTE);
+  });
+
+  it('Try again copies from a fresh tap, closes the dialog and confirms "Copied"', async () => {
+    let allow = false;
+    setClipboard(() => (allow ? Promise.resolve() : denied()));
+    raiseToolbar();
+    tapAction('Copy');
+    await settle();
+    const dlg = recovery();
+    expect(dlg).not.toBeNull();
+    allow = true;
+    const retry = /** @type {any} */ ([...(dlg ? dlg.querySelectorAll('button') : [])]
+      .find((b) => b.textContent === 'Try again'));
+    act(() => { fire(retry, 'click'); });
+    await settle();
+    expect(recovery()).toBeNull();
+    expect(toastText()).toMatch(/^Copied/);
   });
 });

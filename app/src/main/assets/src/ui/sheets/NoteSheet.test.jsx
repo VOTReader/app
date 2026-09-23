@@ -202,3 +202,56 @@ describe('NoteSheet honest-Save close semantics (2026-07-12)', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+/* A15 — the note's Share reports its outcome instead of swallowing it. */
+describe('NoteSheet Share outcome (A15)', () => {
+  /** @type {PropertyDescriptor | undefined} */ let origClipboard;
+  /** @type {PropertyDescriptor | undefined} */ let origShare;
+  beforeEach(() => {
+    origClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    /** @type {any} */ (globalThis).showToast = vi.fn();
+  });
+  afterEach(() => {
+    delete /** @type {any} */ (globalThis).showToast;
+    if (origClipboard) Object.defineProperty(navigator, 'clipboard', origClipboard);
+    else delete /** @type {any} */ (navigator).clipboard;
+    if (origShare) Object.defineProperty(navigator, 'share', origShare);
+    else delete /** @type {any} */ (navigator).share;
+  });
+  /** @param {string} prop @param {any} value */
+  function setNav(prop, value) {
+    Object.defineProperty(navigator, prop, { value, writable: true, configurable: true });
+  }
+  async function shareFromMenu() {
+    setupStores({ body: 'Saved note' });
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
+    fireEvent.click(screen.getByText('Share'));
+    await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+  }
+
+  it('a refused share AND a refused copy tell the reader, instead of doing nothing', async () => {
+    setNav('share', undefined);
+    setNav('clipboard', { writeText: () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })) });
+    await shareFromMenu();
+    const calls = /** @type {any} */ (globalThis).showToast.mock.calls;
+    expect(calls.length).toBe(1);
+    expect(calls[0][0].text).toMatch(/Couldn.t share or copy/);
+  });
+
+  it('no share sheet: copies instead and says to paste it', async () => {
+    setNav('share', undefined);
+    setNav('clipboard', { writeText: () => Promise.resolve() });
+    await shareFromMenu();
+    const calls = /** @type {any} */ (globalThis).showToast.mock.calls;
+    expect(calls.length).toBe(1);
+    expect(calls[0][0].text).toMatch(/Copied instead/);
+  });
+
+  it('a share the reader cancels stays quiet', async () => {
+    setNav('share', () => Promise.reject(Object.assign(new Error('Share canceled'), { name: 'AbortError' })));
+    await shareFromMenu();
+    expect(/** @type {any} */ (globalThis).showToast).not.toHaveBeenCalled();
+  });
+});
