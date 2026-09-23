@@ -434,13 +434,23 @@ jobs:
         # allow_reuse_address) and the gate reported PASS while serving another
         # worktree's tree. Nothing to start means nothing to collide with.
         #
-        # Its sibling `npm run e2e:readalong` is deliberately NOT here. It needs
-        # locally cached audio (tools/hone-sample.mjs downloads it) and on a clean
-        # machine exits 2 with "no keys with locally cached audio — nothing to
-        # check". In CI that is a step that can only ever skip, and a gate that
-        # always skips is worse than an absent one — it reads green. It stays a
-        # local gate until CI has audio to run it against.
+        # Its sibling `npm run e2e:readalong` runs in the next step, on synthetic
+        # audio (2026-09-22).
         run: npm run e2e:read
+
+      - name: End-to-end read-along (synthetic audio)
+        # tools/e2e-readalong.mjs is the only check that compares the text the
+        # browser RENDERS with the offsets the alignment was cut against, then
+        # seeks to each timed row and reads what the wash painted (block, words,
+        # whole-word edges) and proves it shows in pixels. It used to be absent
+        # here: it served cached recordings, a clean runner has none, and the
+        # run exited 2 having checked nothing. Nothing it asserts depends on how
+        # the recording SOUNDS (the wash follows the element's clock), so
+        # --synth serves a silent WAV long enough to hold every row under the
+        # release URL. One unit per shape: a Format-A letter, a Format-B WTLB
+        # entry, a study chapter, a Bible chapter. A run that checks nothing
+        # FAILS (NOTHING-CHECKED), so this step cannot read green on an empty run.
+        run: npm run e2e:readalong -- --synth --pixel-proof --keys one:regarding-the-celebration-of-christmas,wtlb1:a-heavy-stone,study:purity-ch1 --bible brm-kjv/psalms:23
 
   kotlin-tests:
     name: Kotlin unit tests (NK1)

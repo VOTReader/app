@@ -8,6 +8,7 @@
  *   node tools/e2e-readalong.mjs --bible john:1       # a Bible chapter
  *   node tools/e2e-readalong.mjs --keys study:purity-ch1   # a Bible/Letter Study chapter
  *   node tools/e2e-readalong.mjs --pixel-proof        # also prove it RENDERS
+ *   node tools/e2e-readalong.mjs --synth --keys ...   # no cached audio needed (CI): silent audio of the right length
  *
  * THE HEADLINE ASSERTION is not the one you would guess. `rangeIn` walks the
  * same textContent the offsets index, so "the painted text equals
@@ -104,7 +105,37 @@ const BIBLE_INDEX = (() => {
 
 const MIME_BY_EXT = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.opus': 'audio/ogg' };
 
+/* SYNTHETIC AUDIO (--synth, 2026-09-22). CI used to leave this whole check out:
+   a clean runner has no cached recordings, so the run exited 2 having checked
+   nothing (ci.yml, the e2e:read step's note). But nothing this harness asserts
+   depends on what the recording SOUNDS like - the wash is driven by the
+   element's clock, and every check seeks to a row's onset and reads the paint.
+   A silent WAV long enough to hold every row therefore exercises the whole
+   paint path: the rendered domain against the model, the block, the words, the
+   whole-word edges. It is served under the release URL exactly like a cached
+   recording (CSP media-src and isVotAudioUrl judge the URL, never the bytes),
+   with Range support. 8-bit mono at 4 kHz: 4 KB per second of clock. */
+const SYNTH = flag('synth');
+const SYNTH_RATE = 4000;
+/** Longer than the latest timed position anywhere (a letter at 2,043 s, a Bible chapter at 1,223 s). */
+const SYNTH_SECONDS = Number(opt('synth-seconds', '2100'));
+let _synthBody = /** @type {Buffer | null} */ (null);
+
+/** A silent 8-bit PCM WAV of SYNTH_SECONDS, built once. */
+function synthWav() {
+  if (_synthBody) return _synthBody;
+  const n = Math.ceil(SYNTH_SECONDS * SYNTH_RATE);
+  const buf = Buffer.alloc(44 + n, 128);            // unsigned 8-bit PCM: 128 is silence
+  buf.write('RIFF', 0, 'ascii'); buf.writeUInt32LE(36 + n, 4); buf.write('WAVE', 8, 'ascii');
+  buf.write('fmt ', 12, 'ascii'); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(SYNTH_RATE, 24); buf.writeUInt32LE(SYNTH_RATE, 28); buf.writeUInt16LE(1, 32); buf.writeUInt16LE(8, 34);
+  buf.write('data', 36, 'ascii'); buf.writeUInt32LE(n, 40);
+  _synthBody = buf;
+  return buf;
+}
+
 function localAudio(assetId) {
+  if (SYNTH) return { path: null, mime: 'audio/wav', synth: true };
   for (const dir of AUDIO_DIRS) {
     for (const [ext, mime] of Object.entries(MIME_BY_EXT)) {
       const p = join(dir, assetId + ext);
@@ -160,7 +191,7 @@ function interceptAudio(page, misses) {
         else req.respond({ status: 404, body: 'not cached' }).catch(() => {});
         return;
       }
-      const body = readFileSync(file.path);
+      const body = file.synth ? synthWav() : readFileSync(file.path);
       const range = req.headers().range;
       // Chrome sends `Range: bytes=0-` for media. A plain 200 leaves the
       // element unable to seek, and every seek then silently collapses.
@@ -580,6 +611,21 @@ async function checkBible(page, spec, failures, report, ctx, syncHits) {
  * — so this needs no image dependency.
  */
 async function pixelProof(page, label, shotDir) {
+  // The follow-scroll may still be gliding to the clause the seek just lit; a
+  // rect read mid-glide puts the screenshot clip beside the wash, not on it
+  // (seen as a negative dR on the second key of a run). Wait for scrollTop to
+  // hold still for three reads 50 ms apart, 2 s at most.
+  await page.evaluate(async () => {
+    const sc = document.querySelector('.screen-scroll');
+    if (!sc) return;
+    let last = -1, still = 0;
+    for (let i = 0; i < 40 && still < 3; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      const now = sc.scrollTop;
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  });
   const box = await page.evaluate(() => {
     const H = CSS.highlights && CSS.highlights.get('vot-reading');
     const r = H && [...H][0];
@@ -907,6 +953,9 @@ async function run() {
   }
 
   writeFileSync(resolve(OUT, 'report.json'), JSON.stringify({ report, failures }, null, 2));
+  // A run that checked nothing proved nothing: in CI that is exactly the green
+  // this step exists to stop reading as a pass.
+  if (!report.length) failures.push({ kind: 'NOTHING-CHECKED', detail: 'no key or chapter reached its rows' });
   if (!failures.length) {
     console.log(`\n[e2e-readalong] OK — ${report.length} key(s), the rendered domain matches the model and every sampled row painted its own words.`);
     process.exit(0);
