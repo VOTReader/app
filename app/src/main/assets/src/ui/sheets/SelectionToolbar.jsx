@@ -24,6 +24,26 @@ function isAnnotationChrome(n, container) {
   return false;
 }
 
+/** The text of a cloned selection with a line break wherever it crosses from
+    one block (DIV / P) into another. cg1 (2026-09-22): Copy used
+    frag.textContent, which runs a poem's lines together ("punishmentsWritten
+    in this Book") because each line is its own <div>. Only a change BETWEEN
+    two blocks breaks the line: text outside any block (a verse number beside
+    the verse) joins as it always did. */
+function blockAwareText(frag) {
+  var walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT);
+  var parts = [], prevBlock = null;
+  while (walker.nextNode()) {
+    var n = walker.currentNode;
+    var block = n.parentElement;
+    while (block && block.tagName !== 'DIV' && block.tagName !== 'P') block = block.parentElement;
+    if (block && prevBlock && block !== prevBlock) parts.push('\n');
+    if (block) prevBlock = block;
+    parts.push(n.textContent);
+  }
+  return parts.join('');
+}
+
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -463,7 +483,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         try {
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
-          return frag.textContent.trim();
+          return blockAwareText(frag).trim();
         } catch (_e) {
           return text;
         }

@@ -63,7 +63,7 @@ export function CopyFallbackSheet({ text, verb, onClose, onCopied }) {
         <p id="copy-fallback-help" className="copy-fallback-help">
           {stillBlocked
             ? 'Still blocked. Press and hold the passage, choose Select all, then Copy.'
-            : 'Select the passage below and copy it, or try again.'}
+            : 'Copy the selected passage below, or try again.'}
         </p>
         <textarea
           ref={fieldRef}

@@ -1149,3 +1149,37 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     expect(toastText()).toMatch(/^Copied/);
   });
 });
+
+/* cg1 — a poem's lines are separate <div>s; Copy must keep them as lines. */
+describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1)', () => {
+  /** @type {PropertyDescriptor | undefined} */ let origClipboard;
+  beforeEach(() => { origClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard'); });
+  afterEach(() => {
+    if (origClipboard) Object.defineProperty(navigator, 'clipboard', origClipboard);
+    else delete /** @type {any} */ (navigator).clipboard;
+  });
+
+  it('copies two poetry lines as two lines, not glued together', () => {
+    // A DIV container (a <div> inside the harness's <p> would be re-parented by the HTML parser).
+    const c = document.createElement('div');
+    c.setAttribute('data-hl-key', 'letter:test:3');
+    c.innerHTML = '<div class="poem-line">If anyone adds to these words,</div><div class="poem-line">I will add to them the punishments</div>';
+    document.body.appendChild(c);
+    const written = /** @type {string[]} */ ([]);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t) => { written.push(t); return Promise.resolve(); } }, writable: true, configurable: true,
+    });
+    mount();
+    const lines = c.querySelectorAll('.poem-line');
+    const r = document.createRange();
+    r.setStart(/** @type {any} */ (lines[0].firstChild), 0);
+    r.setEnd(/** @type {any} */ (lines[1].firstChild), 34);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(r);
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    const copyBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+      .find((s) => s.textContent === 'Copy')?.closest('.sel-action-btn'));
+    act(() => { fire(copyBtn, 'click'); });
+    expect(written[0]).toBe('If anyone adds to these words,\nI will add to them the punishments');
+  });
+});
