@@ -10,6 +10,9 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
+  /* "Book · Chapter N" is what the narrator announces before verse 1: the
+     read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
+  const leadRef = React.useRef(null);
   // The verse-number key builder read-along paints through. useCallback is NOT
   // cosmetic here: hlKeyFn sits in the dependency array of the rAF loop, the
   // safety-net repaint and the tap-to-seek listener. LetterView and
@@ -158,7 +161,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           <header className="hero">
             <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
-              <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
+              <div className="hero-eyebrow" ref={leadRef}>{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
               <h1 className="hero-title">
                 {titleIsTappable ? (
                   <button
@@ -323,6 +326,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           letterId={book.id}
           chapter={chapter.num}
           mainRef={bodyRef}
+          leadRef={leadRef}
           hlKeyFn={bibleKeyFn}
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}
