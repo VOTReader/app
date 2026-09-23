@@ -534,6 +534,18 @@ describe('service-worker offline library — status and repair (B5)', () => {
     expect(refetched).toEqual(['./dist/bundle-a-bible.js', './dist/bundle-g.js']);
   });
 
+  it('two repairs at once share one download (refuter LOW, 2026-09-22): each missing file is fetched once', async () => {
+    const fail = ['./dist/bundle-a-bible.js'];
+    const sw = bootSW({ fail });
+    await install(sw);
+    const before = sw.attempts.get('./dist/bundle-a-bible.js') || 0;
+    fail.length = 0;
+    const [a, b] = await Promise.all([ask(sw, 'REPAIR_OFFLINE'), ask(sw, 'REPAIR_OFFLINE')]);
+    expect(a.complete).toBe(true);
+    expect(b.complete).toBe(true);
+    expect((sw.attempts.get('./dist/bundle-a-bible.js') || 0) - before).toBe(1);
+  });
+
   it('a repair that fails again stays incomplete: never a false "complete"', async () => {
     const sw = bootSW({ fail: ['./src/data/scripture-web-data.js'] });
     await install(sw);

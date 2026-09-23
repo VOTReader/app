@@ -65,6 +65,25 @@ describe('OfflineLibraryBanner (B5)', () => {
     expect(getByText('Retry')).toBeTruthy();
   });
 
+  it('while retrying it can still be dismissed (refuter critique: a 3-minute strip with no close)', async () => {
+    /** @type {(v: any) => void} */ let release = () => {};
+    const w = {
+      postMessage(msg, ports) {
+        if (msg.type === 'CHECK_OFFLINE') ports[0].postMessage(status(['a']));
+        else release = (v) => ports[0].postMessage(v);   // the repair answers later
+      },
+    };
+    const { container, getByText, getByLabelText } = render(<OfflineLibraryBanner />);
+    await act(async () => { await OfflineLibrary.check(() => w, 1000); });
+    fireEvent.click(getByText('Retry'));
+    await settle();
+    expect(container.textContent).toContain('Downloading 1 missing file');
+    fireEvent.click(getByLabelText('Dismiss'));
+    expect(container.querySelector('.offline-library-banner')).toBeNull();
+    await act(async () => { release(status([])); for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+    expect(container.textContent).toContain('Offline library complete.');
+  });
+
   it('dismiss hides it for this session', async () => {
     const { container, getByLabelText } = render(<OfflineLibraryBanner />);
     await act(async () => { await OfflineLibrary.check(() => fakeWorker({ CHECK_OFFLINE: status(['a']) }), 1000); });

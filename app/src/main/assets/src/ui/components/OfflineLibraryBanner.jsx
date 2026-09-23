@@ -22,19 +22,20 @@ export function OfflineLibraryBanner() {
   React.useEffect(() => { OfflineLibrary.start(); }, []);
   const { phase, missing } = OfflineLibrary.getState();
 
-  /** @type {{ lead: string, detail: string, actions: boolean } | null} */
+  /** @type {{ lead: string, detail: string, retry: boolean, close: boolean } | null} */
   let view = null;
   if (phase === 'incomplete') {
-    view = { lead: 'Offline library incomplete.', detail: count(missing, 'file did not download.', 'files did not download.'), actions: true };
+    view = { lead: 'Offline library incomplete.', detail: count(missing, 'file did not download.', 'files did not download.'), retry: true, close: true };
   } else if (phase === 'retrying') {
-    view = { lead: 'Downloading ' + count(missing, 'missing file', 'missing files') + '…', detail: '', actions: false };
+    view = { lead: 'Downloading ' + count(missing, 'missing file', 'missing files') + '…', detail: '', retry: false, close: true };
   } else if (phase === 'fixed') {
-    view = { lead: 'Offline library complete.', detail: '', actions: false };
+    view = { lead: 'Offline library complete.', detail: '', retry: false, close: false };
   } else if (phase === 'still') {
     view = {
       lead: 'Offline library incomplete.',
       detail: count(missing, 'file is still missing.', 'files are still missing.') + ' Connect to the internet, then retry.',
-      actions: true,
+      retry: true,
+      close: true,
     };
   }
   if (!view) return null;
@@ -44,14 +45,18 @@ export function OfflineLibraryBanner() {
       <div className="sh-banner-text">
         <strong>{view.lead}</strong>{view.detail ? ' ' + view.detail : ''}
       </div>
-      {view.actions && (
+      {(view.retry || view.close) && (
         <div className="sh-banner-actions">
-          <button type="button" className="sh-banner-btn sh-banner-btn-primary" onClick={() => { OfflineLibrary.retry(); }}>
-            Retry
-          </button>
-          <button type="button" className="sh-banner-dismiss" onClick={() => OfflineLibrary.dismiss()} aria-label="Dismiss">
-            {'✕'}
-          </button>
+          {view.retry && (
+            <button type="button" className="sh-banner-btn sh-banner-btn-primary" onClick={() => { OfflineLibrary.retry(); }}>
+              Retry
+            </button>
+          )}
+          {view.close && (
+            <button type="button" className="sh-banner-dismiss" onClick={() => OfflineLibrary.dismiss()} aria-label="Dismiss">
+              {'✕'}
+            </button>
+          )}
         </div>
       )}
     </div>

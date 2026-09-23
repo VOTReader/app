@@ -40,6 +40,12 @@ describe('askWorker', () => {
     const w = fakeWorker({ CHECK_OFFLINE: { type: 'OFFLINE_STATUS', total: 0, missing: [], complete: false, error: 'boom' } });
     expect(await askWorker(w, 'CHECK_OFFLINE', 200)).toBeNull();
   });
+  it('resolves null for a reply claiming complete with a nonsense total (refuter probe, 2026-09-22)', async () => {
+    const w = fakeWorker({ CHECK_OFFLINE: { type: 'OFFLINE_STATUS', total: -1, missing: [], complete: true } });
+    expect(await askWorker(w, 'CHECK_OFFLINE', 200)).toBeNull();
+    const w2 = fakeWorker({ CHECK_OFFLINE: { type: 'OFFLINE_STATUS', total: 1, missing: ['a', 'b'], complete: false } });
+    expect(await askWorker(w2, 'CHECK_OFFLINE', 200)).toBeNull();
+  });
   it('resolves null for a self-contradicting reply (incomplete with nothing missing)', async () => {
     const w = fakeWorker({ CHECK_OFFLINE: { type: 'OFFLINE_STATUS', total: 60, missing: [], complete: false } });
     expect(await askWorker(w, 'CHECK_OFFLINE', 200)).toBeNull();

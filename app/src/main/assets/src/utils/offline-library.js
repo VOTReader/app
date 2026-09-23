@@ -67,7 +67,8 @@ export function askWorker(worker, type, timeoutMs) {
       // Trust only a well-formed, self-consistent reply. A worker that could not
       // read its caches answers with `error` set: that is "unknown", not a status.
       const ok = d && d.type === 'OFFLINE_STATUS' && !d.error && Array.isArray(d.missing)
-        && typeof d.complete === 'boolean' && d.complete === (d.missing.length === 0);
+        && typeof d.complete === 'boolean' && d.complete === (d.missing.length === 0)
+        && Number.isInteger(d.total) && d.total > 0 && d.missing.length <= d.total;
       resolve(ok ? d : null);
     };
     try {
@@ -85,7 +86,7 @@ export const OfflineLibrary = {
   getVersion() { return _version; },
   /** @returns {OfflineState} what the banner should show ('dismissed' hides it) */
   getState() {
-    if (_dismissed && (_state.phase === 'incomplete' || _state.phase === 'still')) {
+    if (_dismissed && (_state.phase === 'incomplete' || _state.phase === 'still' || _state.phase === 'retrying')) {
       return { phase: 'dismissed', missing: _state.missing };
     }
     return _state;
