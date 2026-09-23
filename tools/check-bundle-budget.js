@@ -68,7 +68,9 @@ const BUDGETS = [
   // PLAYER stayed, which is why bundle-h is only 24 KB. Ceiling down by the same
   // rule (469,286 x 1.15 = 539,679 -> the hundred above).
   { file: 'bundle-d.js', measured: 469286, max: 539700 },   // most screens/sheets/utils
-  { file: 'app.min.css', measured: 253510, max: 292000 },   // render-blocking <link> in index.html
+  // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
+  // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
+  { file: 'app.min.css', measured: 292190, max: 336000 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
   // Settings/Search work since the last baseline had eaten the margin down to 973 bytes,
