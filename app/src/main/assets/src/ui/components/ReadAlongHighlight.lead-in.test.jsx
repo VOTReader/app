@@ -85,7 +85,7 @@ function BibleHost({ bookId, chapter, verses }) {
   const leadRef = React.useRef(null);
   return (
     <div className="screen-scroll">
-      <header className="hero"><div className="hero-eyebrow" ref={leadRef}>{`Psalms  ·  Chapter ${chapter}`}</div></header>
+      <header className="hero"><div className="hero-eyebrow" ref={leadRef}>{`Psalms \u00a0·\u00a0 Chapter ${chapter}`}</div></header>
       <div className="chapter-body" ref={mainRef}>
         {verses.map((n) => <span key={n} data-hl-key={`bible:${bookId}:${chapter}:${n}`}>{`Verse ${n} of ${bookId} ${chapter}.`}</span>)}
       </div>
@@ -183,7 +183,7 @@ describe('the lead-in: the heading is washed until the first timed row', () => {
     render(<BibleHost bookId="psalms" chapter={23} verses={[1, 2, 3]} />);
     act(() => { AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'psalms', label: 'NKJV · Dramatized', chapterNum: 23 }); });
     clockTo(first - 1);
-    expect(painted()).toBe('Psalms  ·  Chapter 23');
+    expect(painted()).toBe('Psalms \u00a0·\u00a0 Chapter 23');
     clockTo(first + 0.5);
     expect(painted()).toBe('Verse 1 of psalms 23.');
   });
