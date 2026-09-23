@@ -182,6 +182,47 @@ function _clearSleepTimer(notify = true) {
     _state.sleepAtTrackEnd = false;
     if (notify) _notify();
   }
+  _syncSleepVolume();   // a fade in progress ends with the timer: full voice again
+}
+
+/* ── THE SLEEP FADE (2026-09-22) ──────────────────────────────────────────
+   Both sleep modes used to cut the voice off mid-word with a bare pause(), at
+   bedtime — the one moment a listener most wants nothing sudden. The last
+   SLEEP_FADE_S seconds now ramp the element's volume down, the pause lands
+   exactly when it always did, and the volume returns to 1 once the mode is
+   over. The wanted volume is a pure function of the state, re-applied on every
+   timeupdate and wherever a sleep mode ends, so no single missed path can
+   leave the player quiet. The countdown's remaining time is the clock's;
+   "end of track" uses the recording's own remaining time at the playing rate. */
+
+/** Seconds of wall time over which a sleep mode fades the voice to silence. */
+const SLEEP_FADE_S = 20;
+
+/**
+ * The volume a sleep fade wants now: 1 unless a sleep mode is armed and inside
+ * its last SLEEP_FADE_S seconds; then linear in the time left.
+ * @returns {number}
+ */
+function _sleepFadeVolume() {
+  let left = Infinity;
+  if (_state.sleepEndsAt) {
+    left = (_state.sleepEndsAt - Date.now()) / 1000;
+  } else if (_state.sleepAtTrackEnd) {
+    const d = Number(_state.duration) || 0;
+    if (d > 0) left = Math.max(0, d - (Number(_state.time) || 0)) / (Number(_state.rate) || 1);
+  }
+  if (!(left < SLEEP_FADE_S)) return 1;
+  return Math.max(0, Math.min(1, left / SLEEP_FADE_S));
+}
+
+/** Put the element at the volume the sleep state wants (no write when it already is). @returns {void} */
+function _syncSleepVolume() {
+  if (!_el) return;
+  const want = _sleepFadeVolume();
+  try {
+    const now = typeof _el.volume === 'number' ? _el.volume : 1;
+    if (Math.abs(now - want) > 0.001) _el.volume = want;
+  } catch (_e) { /* a host without a settable volume keeps the old hard stop */ }
 }
 
 function _notify() {
@@ -546,6 +587,7 @@ function _ensureEl() {
   el.addEventListener('timeupdate', () => {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
+    _syncSleepVolume();       // the sleep fade (a no-op unless a sleep mode is in its last stretch)
     _followSectionLetter();   // a compilation: name the letter, credit the one heard (cheap: ~30 keys)
     // timeupdate fires ~4x/second. Only re-render subscribers when the
     // displayed (whole-second) clock actually changes.
@@ -603,6 +645,7 @@ function _sleepAtTrackEndFire() {
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
   if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
   _markPaused();
+  _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
   if (!wasLive) _notify();
   if (wasLive) _toast('Sleep timer ended. Playback paused.');
 }
@@ -2733,9 +2776,11 @@ function setSleepTimer(minutes) {
     const wasLive = _state.status === 'playing' || _state.status === 'loading';
     if (wasLive && _el) _el.pause();
     _markPaused();
+    _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
     if (!wasLive) _notify();
     if (wasLive) _toast('Sleep timer ended. Playback paused.');
   }, mins * 60000);
+  _syncSleepVolume();     // a re-arm in the middle of a fade: full voice until the new last stretch
   _notify();
   return true;
 }
@@ -2755,6 +2800,7 @@ function setSleepAtTrackEnd() {
   _state.sleepEndsAt = 0;
   _state.sleepMinutes = 0;
   _state.sleepAtTrackEnd = true;
+  _syncSleepVolume();
   _notify();
   return true;
 }
