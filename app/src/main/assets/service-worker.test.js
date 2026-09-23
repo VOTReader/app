@@ -13,10 +13,17 @@ const swPath = resolve(dirname(fileURLToPath(import.meta.url)), 'service-worker.
 const SW_SRC = readFileSync(swPath, 'utf8');
 
 class FakeCache {
-  constructor(fetchFn) { this.store = new Map(); this._fetch = fetchFn; }
+  constructor(fetchFn, resolveKeys) { this.store = new Map(); this._fetch = fetchFn; this._resolve = !!resolveKeys; }
   // Real Cache keys by the request URL whether you pass a string or a Request;
   // normalize both so install (string urls) and fetch (Request objects) align.
-  _key(k) { return typeof k === 'string' ? k : k.url; }
+  // resolveKeys (B5, opt-in): a real Cache also resolves './x' against the
+  // worker's location, so an install-stored './dist/x' and a page fetch of
+  // https://app.test/dist/x are ONE key. Off by default: the older tests below
+  // address the store by the raw strings they put in.
+  _key(k) {
+    const u = typeof k === 'string' ? k : k.url;
+    return this._resolve && u.startsWith('./') ? 'https://app.test/' + u.slice(2) : u;
+  }
   async add(url) {
     const r = await this._fetch(url);
     if (!r || !r.ok) throw new TypeError('Request failed: ' + url); // mirrors Cache.add
@@ -35,8 +42,8 @@ class FakeCache {
   async put(req, res) { this.store.set(this._key(req), res); }
 }
 class FakeCaches {
-  constructor(fetchFn) { this.map = new Map(); this._fetch = fetchFn; }
-  async open(name) { if (!this.map.has(name)) this.map.set(name, new FakeCache(this._fetch)); return this.map.get(name); }
+  constructor(fetchFn, resolveKeys) { this.map = new Map(); this._fetch = fetchFn; this._resolve = !!resolveKeys; }
+  async open(name) { if (!this.map.has(name)) this.map.set(name, new FakeCache(this._fetch, this._resolve)); return this.map.get(name); }
   async keys() { return [...this.map.keys()]; }
   async delete(name) { return this.map.delete(name); }
   // Global caches.match — search every open cache (the SW uses this in coreFirst/corpusFirst).
@@ -78,7 +85,7 @@ function realBytes(url) {
   try { return new Uint8Array(readFileSync(fp)); } catch { return null; }
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1 } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
@@ -104,7 +111,7 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   // The SW's runtime `fetch` (coreFirst/corpusFirst) can be overridden per-test;
   // the FakeCaches' own fetch (for install cache.add) stays the install one.
   const fetchFn = fetchImpl || installFetch;
-  const caches = new FakeCaches(installFetch);
+  const caches = new FakeCaches(installFetch, resolveKeys);
   const claimed = { count: 0 };
   // service-worker-4: fake connected clients, so install's PRECACHE_INCOMPLETE
   // broadcast (self.clients.matchAll) has somewhere to land.
@@ -466,5 +473,99 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     // keeps the old controller while its old core cache is deleted above —
     // sw-register's reload never happens and the tab 503s offline.
     expect(sw.claimed.count).toBe(1);
+  });
+});
+
+/* B5 (2026-09-22): an incomplete offline install is visible and repairable.
+   The page asks CHECK_OFFLINE and gets the truth read back from the caches;
+   REPAIR_OFFLINE refetches ONLY what is missing and reports complete only when
+   the caches really hold every file. */
+describe('service-worker offline library — status and repair (B5)', () => {
+  /** Send a message the way a page does (MessageChannel port) and await the reply. */
+  async function ask(sw, type) {
+    let reply;
+    let work;
+    sw.handlers.message({
+      data: { type },
+      ports: [{ postMessage: (m) => { reply = m; } }],
+      waitUntil: (p) => { work = p; },
+    });
+    expect(work, type + ' must keep the worker alive with waitUntil').toBeTruthy();
+    await work;
+    return reply;
+  }
+
+  it('a clean install reports the offline library complete', async () => {
+    const sw = bootSW();
+    await install(sw);
+    const status = await ask(sw, 'CHECK_OFFLINE');
+    expect(status.type).toBe('OFFLINE_STATUS');
+    expect(status.complete).toBe(true);
+    expect(status.missing).toEqual([]);
+    expect(status.total).toBeGreaterThan(10);
+  });
+
+  it('reports exactly the files a failed install left out, read from the caches', async () => {
+    const sw = bootSW({ fail: ['./dist/bundle-a-bible.js', './src/data/bible-studies.js'] });
+    await install(sw);
+    const status = await ask(sw, 'CHECK_OFFLINE');
+    expect(status.complete).toBe(false);
+    expect([...status.missing].sort()).toEqual(['./dist/bundle-a-bible.js', './src/data/bible-studies.js']);
+  });
+
+  it('counts a best-effort CORE asset the install skipped as missing too', async () => {
+    const skipped = './dist/bundle-g.js';
+    const sw = bootSW({ fail: [skipped] });
+    await install(sw);
+    const status = await ask(sw, 'CHECK_OFFLINE');
+    expect(status.missing).toEqual([skipped]);
+  });
+
+  it('REPAIR_OFFLINE refetches only the missing files, then reports complete', async () => {
+    const fail = ['./dist/bundle-a-bible.js', './dist/bundle-g.js'];
+    const sw = bootSW({ fail });
+    await install(sw);
+    const before = new Map(sw.attempts);
+    fail.length = 0;                     // the connection is back
+    const status = await ask(sw, 'REPAIR_OFFLINE');
+    expect(status.complete).toBe(true);
+    expect(status.missing).toEqual([]);
+    const refetched = [...sw.attempts].filter(([url, n]) => n !== (before.get(url) || 0)).map(([url]) => url).sort();
+    expect(refetched).toEqual(['./dist/bundle-a-bible.js', './dist/bundle-g.js']);
+  });
+
+  it('a repair that fails again stays incomplete: never a false "complete"', async () => {
+    const sw = bootSW({ fail: ['./src/data/scripture-web-data.js'] });
+    await install(sw);
+    const status = await ask(sw, 'REPAIR_OFFLINE');
+    expect(status.complete).toBe(false);
+    expect(status.missing).toEqual(['./src/data/scripture-web-data.js']);
+  });
+
+  it('after a repair, a passage never opened before opens offline (no 503)', async () => {
+    const fail = ['./dist/bundle-a-vot.js'];
+    let offline = false;
+    const sw = bootSW({
+      fail,
+      resolveKeys: true,   // a real Cache resolves './x' against the worker's origin
+      fetchImpl: async (req) => {
+        if (offline) throw new TypeError('Failed to fetch');
+        const url = typeof req === 'string' ? req : req.url;
+        if (fail.includes(url)) return { ok: false, status: 404 };
+        const bytes = realBytes(url);
+        const clone = bytes
+          ? { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) }
+          : { body: url };
+        return { ok: true, status: 200, body: url, clone: () => clone };
+      },
+    });
+    await install(sw);
+    expect((await ask(sw, 'CHECK_OFFLINE')).missing).toEqual(['./dist/bundle-a-vot.js']);
+    fail.length = 0;                     // the connection is back
+    expect((await ask(sw, 'REPAIR_OFFLINE')).complete).toBe(true);
+    offline = true;                      // and gone again, before the reader ever opened it
+    const res = await fetchEvent(sw, getReq('https://app.test/dist/bundle-a-vot.js'));
+    expect(res.status).not.toBe(503);
+    expect(res.body).toBe('./dist/bundle-a-vot.js');
   });
 });

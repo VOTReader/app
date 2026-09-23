@@ -21,6 +21,8 @@
      HEALTHY                              → null (nothing)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { OfflineLibraryBanner } from './OfflineLibraryBanner.jsx';
+
 /**
  * @returns {import('../../utils/storage-health.js').StorageHealthReport}
  */
@@ -33,7 +35,9 @@ export function StorageHealthBanner({ onNavigateSettings }) {
   const report = useStorageHealth();
 
   const scenario = _pickScenario(report);
-  if (!scenario) return null;
+  // B5: with no storage scenario, the strip is free for the offline library's
+  // notice (it renders nothing unless files are missing). Data danger wins.
+  if (!scenario) return <OfflineLibraryBanner />;
 
   return (
     <div className={`sh-banner sh-banner-${scenario.style}`} role="alert">

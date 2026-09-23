@@ -10,6 +10,7 @@ import { render, cleanup } from '@testing-library/react';
 import { StorageHealth } from '../../utils/storage-health.js';
 import { formatBytes } from '../../utils/format-bytes.js';
 import { StorageHealthBanner, useStorageHealth } from './StorageHealthBanner.jsx';
+import { OfflineLibrary } from '../../utils/offline-library.js';
 import { renderHook, act } from '@testing-library/react';
 
 beforeEach(() => {
@@ -302,5 +303,28 @@ describe('StorageHealthBanner — null remaining', () => {
   it('CRITICAL with null remaining shows "very little"', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.CRITICAL, remaining: null });
     expect(container.querySelector('.sh-banner').textContent).toContain('very little');
+  });
+});
+
+/* B5 — the strip is shared: the offline library's notice shows only when
+   there is no storage scenario (data danger always wins). */
+describe('StorageHealthBanner — shares the strip with the offline library (B5)', () => {
+  const incomplete = { type: 'OFFLINE_STATUS', total: 60, missing: ['./dist/bundle-a-bible.js'], complete: false };
+  const worker = { postMessage: (_m, ports) => ports[0].postMessage(incomplete) };
+  afterEach(() => { OfflineLibrary._reset(); });
+
+  it('healthy storage + an incomplete offline library -> the offline notice', async () => {
+    await OfflineLibrary.check(() => worker, 1000);
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY });
+    const strip = container.querySelector('.offline-library-banner');
+    expect(strip).not.toBeNull();
+    expect(strip && strip.textContent).toContain('Offline library incomplete.');
+  });
+
+  it('a storage scenario takes the strip even when the offline library is incomplete', async () => {
+    await OfflineLibrary.check(() => worker, 1000);
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true });
+    expect(container.querySelector('.offline-library-banner')).toBeNull();
+    expect(container.querySelector('.sh-banner')).not.toBeNull();
   });
 });

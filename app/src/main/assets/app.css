@@ -176,6 +176,14 @@
         border-bottom: 1.5px solid rgba(192,57,43,0.6);
       }
       .sh-banner-text { flex: 1 1 0%; min-width: 0; }
+      /* B5: the offline-library notice (OfflineLibraryBanner) is news, not an
+         alarm. It sits just UNDER the top nav, at .chapter-nav-sticky's offset,
+         so the nav stays usable while it shows; the storage banners keep the
+         very top. Design: Codex mockup variant B (b5-mockups.html). */
+      .sh-banner.offline-library-banner {
+        top: calc(var(--inset-top, 0px) + 44px + 1.4rem + 1px);
+        padding-top: 0.5rem;
+      }
       .sh-banner-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
       .sh-banner-btn {
         background: none; border: 1px solid var(--gold-border); border-radius: 6px;
