@@ -123,7 +123,12 @@ const BUDGETS = [
   // surface only. audio-player.js, AudioShelf, AudioSeekSlider and CoverageBadge
   // stay in bundle-d for the shell's player bar, so this stays SMALL - a jump
   // here means the player came along. 24,353 x 1.15 = 28,006 -> the hundred above.
-  { file: 'bundle-h.js', measured: 24353, max: 28100 },     // Listening Library hub / Volumes / collection / saved
+  // 2026-09-22 (readalong, listening item 4): +4,578 B for a FIFTH screen, the
+  // Bible/Letter Studies doorway (AudioStudiesScreen 3.0 KB minified) plus the hub
+  // row and the collection screen's 'study:<id>' source; `esbuild --analyze` shows
+  // the five screens and nothing else (the player did not come along).
+  // 28,931 x 1.15 = 33,270.65 -> the hundred above.
+  { file: 'bundle-h.js', measured: 28931, max: 33300 },     // Listening Library hub / Volumes / Studies / collection / saved
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
