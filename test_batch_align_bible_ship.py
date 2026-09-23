@@ -333,5 +333,81 @@ class TheNameTolerantWitnessIsOptInAndNameGuarded(unittest.TestCase):
                              "and a strict run does not keep a tolerant belt")
 
 
+class TheVersesCacheFollowsTheCorpus(unittest.TestCase):
+    """verses_json() caches one chapter's reference text for is_current() to hash. It used to trust a
+    cached file forever, so after a corpus text fix a belt compared its versesHash with the OLD text,
+    read as current, and was never re-run. Now a cached chapter older than the extractor or the corpus
+    file its translation reads is extracted again; nothing else invalidates it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = self.tmp.name
+        self.src = [os.path.join(self.d, "extract-bible-verses.mjs"), os.path.join(self.d, "bible-kjv.js")]
+        for p in self.src:
+            open(p, "w").close()
+        self.ran = []
+        self._saved = (bab.verses_sources, bab.subprocess)
+
+        def run(argv, **kw):                  # the extractor: writes the chapter file it is handed
+            self.ran.append(argv)
+            with open(argv[4], "w", encoding="utf-8") as f:
+                json.dump({"verses": [{"n": 1, "text": "v%d" % len(self.ran)}]}, f)
+            return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        bab.verses_sources = lambda translation: list(self.src)
+        bab.subprocess = type("S", (), {"run": staticmethod(run)})
+        bab._SOURCES_MTIME.clear()
+
+    def tearDown(self):
+        bab.verses_sources, bab.subprocess = self._saved
+        bab._SOURCES_MTIME.clear()
+        self.tmp.cleanup()
+
+    def age(self, path, seconds_ago):
+        t = os.path.getmtime(path) - seconds_ago
+        os.utime(path, (t, t))
+
+    def verses(self):
+        return bab.verses_json("brm-kjv", "genesis", 1, os.path.join(self.d, "verses"))
+
+    def test_a_fresh_cache_is_reused_and_a_moved_corpus_refreshes_it(self):
+        p = self.verses()
+        self.assertEqual(len(self.ran), 1)
+        for s in self.src:
+            self.age(s, 60)                   # the corpus predates the cache
+        bab._SOURCES_MTIME.clear()
+        self.assertEqual(self.verses(), p)
+        self.assertEqual(len(self.ran), 1, "a cache newer than its sources is reused")
+        self.age(p, 3600)                     # a corpus fix lands after the cache was written
+        bab._SOURCES_MTIME.clear()            # (a new run)
+        self.verses()
+        self.assertEqual(len(self.ran), 2, "a cache older than its corpus is extracted again")
+        self.assertEqual(json.load(open(p, encoding="utf-8"))["verses"][0]["text"], "v2")
+
+    def test_a_changed_extractor_refreshes_it_too(self):
+        p = self.verses()
+        self.age(self.src[1], 60)
+        self.age(p, 30)                       # newer than the corpus, older than the extractor
+        bab._SOURCES_MTIME.clear()
+        self.verses()
+        self.assertEqual(len(self.ran), 2)
+
+    def test_no_source_on_disk_never_trusts_a_cache(self):
+        for s in self.src:
+            os.remove(s)
+        bab._SOURCES_MTIME.clear()
+        self.verses()
+        self.verses()
+        self.assertEqual(len(self.ran), 2)
+
+    def test_the_sources_are_the_extractors_own_files_for_every_edition(self):
+        """Identity against the real tree: each edition's translation names files that exist, so the
+        cache watches what extract-bible-verses.mjs actually reads (its three branches)."""
+        for ed, cfg in bab.EDITIONS.items():
+            srcs = self._saved[0](cfg["translation"])
+            self.assertTrue(srcs[0].endswith("extract-bible-verses.mjs"), ed)
+            for p in srcs:
+                self.assertTrue(os.path.exists(p), f"{ed}: {p}")
+
+
 if __name__ == "__main__":
     unittest.main()

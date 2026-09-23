@@ -193,13 +193,42 @@ def audio_index(ed):
     return idx
 
 
+def verses_sources(translation):
+    """What one translation's reference text is made of: the extractor itself plus the corpus
+    file(s) its branch for that translation reads (extract-bible-verses.mjs: vot-matthew ->
+    matthew.js, nkjv -> books.js + matthew-plain.js, else bible-<translation>.js)."""
+    data = os.path.join(ROOT, "app", "src", "main", "assets", "src", "data")
+    files = (["matthew.js"] if translation == "vot-matthew"
+             else ["books.js", "matthew-plain.js"] if translation == "nkjv"
+             else [f"bible-{translation}.js"])
+    return [os.path.join(BASE, "extract-bible-verses.mjs")] + [os.path.join(data, f) for f in files]
+
+
+_SOURCES_MTIME = {}
+
+
+def sources_mtime(translation):
+    """The newest mtime among verses_sources(), once per run; +inf when none exists (never trust
+    a cache nothing can vouch for)."""
+    if translation not in _SOURCES_MTIME:
+        _SOURCES_MTIME[translation] = max((os.path.getmtime(p) for p in verses_sources(translation)
+                                           if os.path.exists(p)), default=float("inf"))
+    return _SOURCES_MTIME[translation]
+
+
 def verses_json(ed, book_id, chapter, out_dir):
     """One chapter's reference verses, cached. Shells out to the existing
     extractor rather than re-reading the corpus here — it already owns the
-    two corpus shapes and the matthew/matthew-plain book-id alias."""
+    two corpus shapes and the matthew/matthew-plain book-id alias.
+
+    The cache is refreshed when the corpus moves: a cached chapter older than
+    the extractor or the corpus file its translation reads is extracted again.
+    It used to be trusted forever, so after a text fix is_current() compared a
+    belt's versesHash with the OLD text, called the belt current, and the
+    chapter kept timings aligned against words the app no longer shows."""
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{book_id}_{chapter:03d}.json")
-    if os.path.exists(path):
+    if os.path.exists(path) and os.path.getmtime(path) >= sources_mtime(EDITIONS[ed]["translation"]):
         return path
     r = subprocess.run(
         ["node", os.path.join(BASE, "extract-bible-verses.mjs"), book_id, str(chapter),
