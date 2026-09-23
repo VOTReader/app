@@ -55,6 +55,14 @@
         transition: opacity 220ms ease-out;
       }
       .vot-toast.show { opacity: 1; }
+      /* ux3 (A15 critique, 2026-09-22): while the first-run tip pill
+         (.ann-hint-pill) is up, a toast sits ABOVE it instead of on its words
+         ("Copied" covered "Long-press any text..."). The pill starts at the
+         same base offset and is up to three lines tall on a 320 px phone;
+         7.5rem clears that. Not while autoscroll hides the pill. */
+      body:not(.autoscroll-on):has(.ann-hint-pill) .vot-toast {
+        bottom: calc(max(1.2rem, var(--inset-bottom, 0px)) + 7.5rem);
+      }
       body.light .vot-toast {
         background: rgba(247,242,232,0.96);
         color: #2a2018;
