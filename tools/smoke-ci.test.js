@@ -65,3 +65,84 @@ describe('smoke-ci: uncaught page errors are part of the verdict', () => {
     expect(report.summary).toMatch(/1 UNCAUGHT PAGE ERROR/);
   });
 });
+
+/* The tap-target probe (2026-09-22). jsdom has no layout, so each case builds
+   the geometry by hand: `drawn` is the box getBoundingClientRect() reports,
+   `hit` is the area elementFromPoint() answers with the element (a ::after ring
+   makes it larger than the drawing). The probe must judge the HIT area. */
+import { probeTapTargets, foldTapTargets, TAP_TARGET_MIN_PX } from './smoke-ci.js';
+
+function layout(boxes) {
+  // boxes: [{ el, drawn:{x,y,w,h}, hit:{x,y,w,h} }], later boxes paint on top
+  for (const b of boxes) {
+    const d = b.drawn;
+    b.el.getBoundingClientRect = () => ({ left: d.x, top: d.y, width: d.w, height: d.h, right: d.x + d.w, bottom: d.y + d.h });
+  }
+  document.elementFromPoint = (x, y) => {
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const h = boxes[i].hit || boxes[i].drawn;
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return boxes[i].el;
+    }
+    return document.body;
+  };
+}
+function el(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  const node = wrap.firstElementChild;
+  document.body.appendChild(node);
+  return node;
+}
+
+describe('smoke-ci: every control a phone reader taps is at least 24 px', () => {
+  it('flags an 18 x 18 footnote marker in running text (the 2026-09-22 measurement)', () => {
+    document.body.innerHTML = '';
+    const fn = el('<span role="button" class="fn-ref" style="display:inline-flex" aria-label="Footnote 1">1</span>');
+    layout([{ el: fn, drawn: { x: 200, y: 300, w: 18, h: 18 } }]);
+    const r = probeTapTargets(TAP_TARGET_MIN_PX);
+    expect(r.probed).toBe(1);
+    expect(r.offenders).toEqual([{ label: 'Footnote 1', w: 18, h: 18, missed: 4 }]); // the 4 axis points; the diagonals still fall inside the square
+  });
+
+  it('passes the same 18 px drawing once its HIT area is a 30 px ring', () => {
+    document.body.innerHTML = '';
+    const fn = el('<span role="button" style="display:inline-flex" aria-label="Footnote 1">1</span>');
+    layout([{ el: fn, drawn: { x: 200, y: 300, w: 18, h: 18 }, hit: { x: 194, y: 294, w: 30, h: 30 } }]);
+    expect(probeTapTargets(TAP_TARGET_MIN_PX)).toEqual({ probed: 1, offenders: [] });
+  });
+
+  it('flags a 22 px tall button and passes a 44 px one', () => {
+    document.body.innerHTML = '';
+    const low = el('<button aria-label="Sort verses in book order">Book order</button>');
+    const big = el('<button aria-label="Home">H</button>');
+    layout([{ el: low, drawn: { x: 20, y: 100, w: 80, h: 22 } }, { el: big, drawn: { x: 200, y: 100, w: 44, h: 44 } }]);
+    const r = probeTapTargets(TAP_TARGET_MIN_PX);
+    expect(r.probed).toBe(2);
+    expect(r.offenders.map((o) => o.label)).toEqual(['Sort verses in book order']);
+  });
+
+  it('exempts an inline link in a sentence, and skips a control covered at its centre', () => {
+    document.body.innerHTML = '';
+    const link = el('<a href="https://example.org" style="display:inline">thevolumesoftruth.com</a>');
+    const under = el('<button aria-label="Hidden under the sheet">x</button>');
+    const sheet = el('<div class="sheet"></div>');
+    layout([
+      { el: link, drawn: { x: 10, y: 10, w: 159, h: 17 } },
+      { el: under, drawn: { x: 100, y: 400, w: 18, h: 18 } },
+      { el: sheet, drawn: { x: 0, y: 380, w: 1024, h: 200 } },
+    ]);
+    expect(probeTapTargets(TAP_TARGET_MIN_PX)).toEqual({ probed: 0, offenders: [] });
+  });
+
+  it('folds offenders into a FAIL that names screen, label and size; a clean audit into ok', () => {
+    const bad = foldTapTargets(passingReport(), { probed: 9, offenders: [{ screen: 'letter', label: 'Footnote 1', w: 18, h: 18, missed: 8 }] });
+    expect(bad.ok).toBe(false);
+    expect(bad.summary).toContain('TAP TARGETS under 24px: letter:Footnote 1 18x18');
+    const good = foldTapTargets(passingReport(), { probed: 9, offenders: [] });
+    expect(good.ok).toBe(true);
+    expect(good.summary).toContain('tap targets ok (9 probed at 360x800)');
+    const broken = foldTapTargets(passingReport(), { error: 'no search box' });
+    expect(broken.ok).toBe(false);
+    expect(broken.summary).toContain('TAP TARGETS audit failed: no search box');
+  });
+});

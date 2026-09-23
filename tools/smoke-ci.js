@@ -125,6 +125,143 @@ async function auditCompactReadingNav(page) {
   });
 }
 
+// ── A finger, not a box: every control a phone reader taps is at least 24 px ──
+// WCAG 2.2 AA 2.5.8 asks for a 24 x 24 CSS px target. The reader audit of
+// 2026-09-22 measured every letter's footnote marker at 18 x 18 and Search's
+// BOOK ORDER toggle at 80 x 22 on a 412 px phone. The fix grows the HIT AREA
+// (a transparent ring), not the drawing, so the box the eye sees stays 18 px and
+// getBoundingClientRect() cannot tell a fixed marker from a broken one. This
+// probe asks what a finger actually hits: 8 points on a 24 px circle around the
+// control's centre must all land on the control (or inside it). Skipped, as the
+// rule allows or as a finger cannot reach: display:inline targets in running text
+// (the inline exception), disabled or inert controls, a control whose centre is
+// covered by something else (a sheet, the nav), and one whose circle leaves the
+// viewport. Runs IN THE PAGE (page.evaluate), so it may use only page globals.
+export const TAP_TARGET_MIN_PX = 24;
+export function probeTapTargets(minPx) {
+  var R = minPx / 2 - 0.5;
+  var sel = 'button, a[href], [role="button"], [role="link"], [role="tab"], [role="switch"], [role="checkbox"], ' +
+    'input:not([type="hidden"]), select, textarea';
+  var out = { probed: 0, offenders: [] };
+  function lands(el, x, y) { var h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); }
+  var els = document.querySelectorAll(sel);
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    if (el.disabled || (el.closest && el.closest('[inert], [aria-hidden="true"]'))) continue;
+    var s = getComputedStyle(el);
+    if (s.display === 'inline' || s.display === 'none' || s.visibility === 'hidden' || s.pointerEvents === 'none') continue;
+    var r = el.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) continue;
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (cx - R < 0 || cy - R < 0 || cx + R > innerWidth || cy + R > innerHeight) continue;
+    if (!lands(el, cx, cy)) continue;
+    out.probed++;
+    var missed = 0;
+    for (var k = 0; k < 8; k++) {
+      var a = k * Math.PI / 4;
+      if (!lands(el, cx + R * Math.cos(a), cy + R * Math.sin(a))) missed++;
+    }
+    if (missed) {
+      out.offenders.push({
+        label: String(el.getAttribute('aria-label') || el.textContent || el.className || el.tagName).trim().slice(0, 40),
+        w: Math.round(r.width), h: Math.round(r.height), missed: missed,
+      });
+    }
+  }
+  return out;
+}
+
+// Fold the tap-target audit into the verdict. Pure; pinned by tools/smoke-ci.test.js.
+export function foldTapTargets(report, audit) {
+  report.tapTargets = audit;
+  if (!audit || audit.error) {
+    report.ok = false;
+    report.summary += ` | TAP TARGETS audit failed: ${audit && audit.error}`;
+  } else if (audit.offenders.length) {
+    report.ok = false;
+    report.summary += ` | TAP TARGETS under ${TAP_TARGET_MIN_PX}px: ` +
+      audit.offenders.map((o) => `${o.screen}:${o.label} ${o.w}x${o.h}`).join('; ');
+  } else {
+    report.summary += ` | tap targets ok (${audit.probed} probed at 360x800)`;
+  }
+  return report;
+}
+
+// The screens a phone reader taps small things on: a letter with a footnote
+// marker, and Search with verse results (its sort toggle).
+async function auditPhoneTapTargets(page) {
+  await page.setViewport({ width: 360, height: 800 });
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clickText = async (pattern) => {
+    const ok = await page.evaluate((source) => {
+      const re = new RegExp(source, 'i');
+      const el = Array.from(document.querySelectorAll('button, [role="button"]')).find((b) => re.test((b.textContent || '').trim()));
+      if (!el) return false;
+      el.click();
+      return true;
+    }, pattern.source);
+    if (!ok) throw new Error(`tap-target walk: ${pattern} not found`);
+    await pause(600);
+  };
+  const goHome = async () => {
+    for (let i = 0; i < 5; i++) {
+      const home = await page.evaluate(() => !!document.querySelector('.home-shortcuts'));
+      if (home) return;
+      await page.evaluate(() => {
+        const b = document.querySelector('button[title="Home"]') ||
+          Array.from(document.querySelectorAll('button')).find((x) => /back/i.test(x.getAttribute('aria-label') || ''));
+        if (b) b.click(); else history.back();
+      });
+      await pause(550);
+    }
+    throw new Error('tap-target walk: could not return Home');
+  };
+  const audit = { probed: 0, offenders: [] };
+  const take = async (screen) => {
+    const r = await page.evaluate(probeTapTargets, TAP_TARGET_MIN_PX);
+    audit.probed += r.probed;
+    for (const o of r.offenders) audit.offenders.push({ screen, ...o });
+    return r;
+  };
+
+  await goHome();
+  await clickText(/Prophetic Letters/);
+  await clickText(/^Volume One/);
+  await clickText(/A Word of Warning/);
+  const fn = await page.evaluate(() => {
+    const el = document.querySelector('.fn-ref');
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center' });
+    return true;
+  });
+  if (!fn) throw new Error('tap-target walk: no footnote marker on A Word of Warning');
+  await pause(500);
+  const letter = await take('letter');
+  if (!letter.probed) throw new Error('tap-target walk: probed nothing on the letter');
+
+  await goHome();
+  await clickText(/^Search library/);
+  const typed = await page.evaluate(() => {
+    const box = document.querySelector('input[type="search"], .srch-input, input');
+    if (!box) return false;
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    set.call(box, 'love one another');
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  });
+  if (!typed) throw new Error('tap-target walk: no search box');
+  for (let i = 0; i < 40; i++) {
+    if (await page.evaluate(() => !!document.querySelector('.srch-sort-btn'))) break;
+    await pause(250);
+  }
+  if (!(await page.evaluate(() => !!document.querySelector('.srch-sort-btn')))) {
+    throw new Error('tap-target walk: the sort toggle never appeared');
+  }
+  await take('search');
+  await goHome();
+  return audit;
+}
+
 // Fold the page's uncaught errors into the walk's verdict. Exported for
 // tools/smoke-ci.test.js; pure, so the verdict rule is pinned without a browser.
 export function foldPageErrors(report, pageErrors) {
@@ -214,6 +351,13 @@ async function runAttempt(url) {
     } else {
       report.summary += ' | compact nav ok at 360x800';
     }
+    let tapTargets;
+    try {
+      tapTargets = await auditPhoneTapTargets(page);
+    } catch (error) {
+      tapTargets = { error: (error && error.message) || String(error) };
+    }
+    foldTapTargets(report, tapTargets);
     return { report, pageErrors };
   } finally {
     if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }

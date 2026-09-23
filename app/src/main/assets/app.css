@@ -2058,6 +2058,9 @@
     .italic-text { font-style:italic; color:var(--cream-dim); }
     /* ── FOOTNOTE BUBBLE ── */
     .fn-ref { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:50%; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
+    /* The marker is DRAWN 18 px but a finger needs 24 (WCAG 2.2 2.5.8): a transparent ring grows the HIT area to 30 px
+       and changes nothing the eye sees. tools/smoke-ci.js probes what a finger lands on at 360x800 (2026-09-22). */
+    .fn-ref::after { content:''; position:absolute; inset:-6px; border-radius:50%; }
     .fn-ref.active { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); }
     @media (hover: hover) { .fn-ref:hover { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); } }
     /* ── STUDY FN LINK — inline superscript dagger for Studies external refs ──
@@ -3122,6 +3125,8 @@
     .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
     .srch-filter-row::-webkit-scrollbar { display:none; }
     .srch-sort-btn { flex:0 0 auto; margin-left:auto; background:none; border:none; border-bottom:1px dashed var(--gold-border); padding:0.3rem 0.1rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; white-space:nowrap; }
+    .srch-sort-btn { position:relative; }
+    .srch-sort-btn::after { content:''; position:absolute; inset:-6px -4px; } /* 22 px tall drawn, 34 px to a finger (see .fn-ref::after) */
     .srch-sort-btn:active { color:var(--gold); }
 
     /* ── SEARCH v2 (Orama) ── */

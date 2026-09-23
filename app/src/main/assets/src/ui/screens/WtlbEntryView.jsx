@@ -345,6 +345,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               data-fn-num={n}
               role="button"
               tabIndex={0}
+              aria-label={`Footnote ${n}`}
               onClick={() => handleBubbleClick(ref, n)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
