@@ -7022,6 +7022,61 @@
     .sw-fallback-title { color: var(--cream-dim); font-size: var(--fs-20); font-family: var(--font-cinzel); }
     .sw-fallback-body { max-width: 34em; line-height: 1.6; }
 
+    /* ── The Scripture Web read as a list (A7, 2026-09-22) ──────────────────
+       WebFallbackList.jsx: what a device that cannot draw the web gets instead
+       of a dead end. Cards per verse of the chapter, from the Codex mockups
+       (lanes/myweb/out/mockups/round3-imagegen/fallback-3.png). */
+    .sw-fallback-list {
+      position: absolute; inset: 0; z-index: 5; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      background: var(--bg); color: var(--cream-dim); font-family: var(--font-body);
+      padding: 18px 16px calc(24px + var(--inset-bottom, 0px)); text-align: left;
+    }
+    .sw-fallback-list > * { max-width: 640px; margin-left: auto; margin-right: auto; }
+    .swf-title { margin: 0; font-family: var(--font-body); font-size: var(--fs-30); font-weight: 600; color: var(--cream); line-height: 1.15; }
+    .swf-sub { margin-top: 4px; font-size: var(--fs-18); color: var(--cream-dim); }
+    .swf-stepper {
+      display: flex; align-items: stretch; margin-top: 16px;
+      border: 1px solid var(--gold-border); border-radius: 14px; overflow: hidden;
+    }
+    .swf-step {
+      flex: 0 0 56px; min-height: 52px; background: none; border: none; color: var(--gold);
+      font-size: var(--fs-24); cursor: pointer;
+    }
+    .swf-step:first-child { border-right: 1px solid var(--gold-border); }
+    .swf-step:last-child { border-left: 1px solid var(--gold-border); }
+    .swf-step:disabled { color: var(--gold-border); cursor: default; }
+    .swf-step:focus-visible, .swf-retry:focus-visible, .swf-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .swf-step-label { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: var(--fs-24); font-weight: 600; color: var(--gold); }
+    .swf-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: var(--fs-15); color: var(--cream-muted); }
+    .swf-retry {
+      flex: 0 0 auto; min-height: 44px; padding: 0 16px; border-radius: 999px;
+      background: none; border: 1px solid var(--gold-border); color: var(--gold);
+      font-family: var(--font-body); font-size: var(--fs-16); cursor: pointer;
+    }
+    .swf-count-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 22px; margin-bottom: 10px; }
+    .swf-h2 { margin: 0; font-size: var(--fs-24); font-weight: 600; color: var(--gold); }
+    .swf-count { font-size: var(--fs-16); color: var(--gold-dim); white-space: nowrap; }
+    .swf-card { border: 1px solid var(--gold-border); border-radius: 14px; padding: 4px 16px 6px; margin-bottom: 14px; background: var(--bg3); }
+    .swf-card-head { padding: 12px 0 10px; border-bottom: 1px solid var(--gold-border); font-size: var(--fs-18); }
+    .swf-card-verse { color: var(--gold); font-weight: 600; }
+    .swf-card-count { color: var(--cream-dim); }
+    .swf-rows { list-style: none; margin: 0; padding: 0; }
+    .swf-rows li + li { border-top: 1px solid var(--gold-faint); }
+    .swf-row {
+      display: block; width: 100%; min-height: 44px; padding: 12px 0; text-align: left;
+      background: none; border: none; color: inherit; font-family: var(--font-body); cursor: pointer;
+    }
+    .swf-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .swf-ref { font-size: var(--fs-20); font-weight: 600; color: var(--gold); }
+    .swf-tier { flex: 0 0 auto; font-family: var(--font-cinzel); font-size: var(--fs-11); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
+    .swf-snip { display: block; margin-top: 4px; font-size: var(--fs-16); color: var(--cream-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .swf-empty { padding: 18px 0; color: var(--cream-muted); font-size: var(--fs-16); }
+    .swf-back {
+      display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 12px 0 0; margin-bottom: 4px;
+      background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-18); cursor: pointer;
+    }
+    .swf-back:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
     .sw-tip {
       position: absolute; z-index: 6; pointer-events: none; max-width: 300px;
       background: var(--bg3); border: 1px solid var(--gold-border);

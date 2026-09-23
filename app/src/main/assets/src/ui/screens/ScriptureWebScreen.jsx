@@ -32,6 +32,8 @@ import {
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
+import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
+import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS, distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
@@ -1110,6 +1112,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-fallback-body">{loadError}</div>
         <button type="button" className="sw-btn" onClick={() => { setLoadError(null); setDataRetry((n) => n + 1); }}>Try again</button>
       </div>
+    );
+  }
+  if (noWebGL && graph) {
+    // A7: the web read as a list instead of a dead end (WebFallbackList.jsx).
+    // It opens on the reader's last Bible chapter (HistoryStore, newest first).
+    const hist = typeof HistoryStore !== 'undefined' ? HistoryStore.list() : [];
+    const lastCh = (hist || []).find((h) => h && h.type === 'chapter' && h.bookId && h.chapterNum);
+    return (
+      <WebFallbackList graph={graph}
+        initialChapter={startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
+        onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
+        onRetry={() => { setNoWebGL(false); setGlRetry((n) => n + 1); }}
+        onBack={onBack} verseText={verseTextFor} />
     );
   }
   if (noWebGL) {

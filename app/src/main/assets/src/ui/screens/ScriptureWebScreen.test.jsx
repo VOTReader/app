@@ -770,10 +770,10 @@ describe('scripture-web-7 — a WebGL context loss with no restore falls back', 
     act(() => { opts.onContextLost(); });
 
     act(() => { vi.advanceTimersByTime(2999); });
-    expect(screen.queryByText('The web can’t be drawn right now.')).toBeNull();
+    expect(screen.queryByText('The map can’t be drawn on this device right now.')).toBeNull();
 
     act(() => { vi.advanceTimersByTime(1); });
-    expect(screen.getByText('The web can’t be drawn right now.')).toBeTruthy();
+    expect(screen.getByText('The map can’t be drawn on this device right now.')).toBeTruthy();
   });
 
   it('does NOT fall back when a restore arrives before the ~3s timer', async () => {
@@ -783,7 +783,7 @@ describe('scripture-web-7 — a WebGL context loss with no restore falls back', 
     act(() => { opts.onContextRestored(); });
     act(() => { vi.advanceTimersByTime(3000); });
 
-    expect(screen.queryByText('The web can’t be drawn right now.')).toBeNull();
+    expect(screen.queryByText('The map can’t be drawn on this device right now.')).toBeNull();
   });
 });
 
