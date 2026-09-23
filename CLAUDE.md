@@ -135,7 +135,7 @@ Reverse-chronological; each landed CI-green + deployed.
 ## User policies (durable directives, override defaults)
 
 - **App name is "VOTReader"** (personal app; multi-user-shaped but no auth, no organization).
-- **NO AI / NO API KEYS / NO LLM** — deferred indefinitely per user 2026-05-11: *"no ai no nothing, no api keys, etc, those are security risks anyway, we'll defer a.i feature."* The LiteLLM nim-proxy is decommissioned. Do not reintroduce.
+- **AI features are ALLOWED (2026-09-22).** Corbin retired the 2026-05-11 "NO AI / NO API KEYS / NO LLM" deferral: *"No AI features rule must drop"* (confirmed to the hub the same evening: "Drop the AI rule"). What stays, on security grounds: no credentials, login or auth in the app; personal data stays on the device; **no API key ever ships inside the PWA or the APK** — the PWA is public, so a key in it is a leak (Corbin's 2026-09-02 rule: keys stay out of VOTReader). The retired LiteLLM nim-proxy stays retired; any AI feature needs a design that keeps all three.
 - **NO credentials / login / auth anywhere.** All personal data stays local on device.
 - **NO security risks** — anything that could leak personal data or LAN-expose a service is a defect, not a polish item.
 - `android:allowBackup="false"` — Export/Import in Settings → "Your Data" is the only backup mechanism. JSON file, user-owned, no credentials.
