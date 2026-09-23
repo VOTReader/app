@@ -187,7 +187,8 @@ const VALID_SEGMENT_TYPES = new Set([
 const VALID_FOOTNOTE_TYPES = new Set(['scripture', 'note']);
 
 // Format B paragraph alignment
-const VALID_ALIGN = new Set(['center', 'justify', 'left']);
+// 'right': an Answers attribution line ("~ [From …]"), set right as the site sets it.
+const VALID_ALIGN = new Set(['center', 'justify', 'left', 'right']);
 
 // Holy Days entry types — the album is hybrid: each entry is either a
 // Format A letter (type="letter") or a Format B entry (type="wtlb").
@@ -641,7 +642,7 @@ function validateFormatBEntry(entry, prefix, errors, warnings, scriptures) {
       continue;
     }
     if (!VALID_ALIGN.has(para.align)) {
-      errors.push(`${pp}: invalid align "${para.align}" (expected center|justify|left)`);
+      errors.push(`${pp}: invalid align "${para.align}" (expected center|justify|left|right)`);
     }
     if (typeof para.text !== 'string') {
       errors.push(`${pp}: missing "text" (string)`);
@@ -1978,6 +1979,9 @@ const FORMAT_B_FILES = [
   { file: 'wtlb-one.js',    arrayVar: 'WTLB_ONE',    scripturesFile: 'wtlb-scriptures.js', scripturesVar: 'WTLB_SCRIPTURES' },
   { file: 'wtlb-two.js',    arrayVar: 'WTLB_TWO',    scripturesFile: 'wtlb-scriptures.js', scripturesVar: 'WTLB_SCRIPTURES' },
   { file: 'the-blessed.js', arrayVar: 'THE_BLESSED', scripturesFile: 'the-blessed.js',     scripturesVar: 'THE_BLESSED_SCRIPTURES' },
+  // Answers Only God Can Give — the same paragraph shape; its refs resolve
+  // against the Bible books (no scriptures dict of its own).
+  { file: 'answers.js',     arrayVar: 'ANSWERS' },
 ];
 
 const HOLY_DAYS_FILE = { file: 'holy-days.js', arrayVar: 'HOLY_DAYS' };

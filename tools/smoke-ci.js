@@ -357,7 +357,7 @@ async function runAttempt(url) {
     // walk records them as unreached). Each loader is idempotent + returns a
     // promise; tolerate any being absent.
     await page.evaluate(async () => {
-      const loaders = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus'];
+      const loaders = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus', '__loadAnswersCorpus'];
       await Promise.all(loaders.map((n) => (typeof window[n] === 'function' ? window[n]() : null)));
     });
 

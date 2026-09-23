@@ -37,7 +37,7 @@ const KEY = 'index';
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
    installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm4';   // m4: study docs carry their body + studyChapterId (2026-09-22)
+export const MS_INDEX_VERSION = 'm5';   // m5: Answers Only God Can Give joins the index as its own kind (2026-09-22)
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
@@ -89,6 +89,9 @@ export function dataSignature(translation) {
     // No 'hm:' component — Hidden Manna is not indexed, so its length can no
     // longer shape the index and must not invalidate the cache.
     'hd:' + ln(g('HOLY_DAYS')), 'bs:' + ln(g('BIBLE_STUDIES')),
+    // Answers is its own lazy file: an index built while it could not load
+    // (offline, first visit) must not be served once it can.
+    'an:' + ln(g('ANSWERS')),
   ].join('|');
 }
 

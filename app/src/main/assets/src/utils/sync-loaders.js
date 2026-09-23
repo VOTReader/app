@@ -221,10 +221,56 @@ export const audioSyncSectionsStore = {
   },
 };
 
+/* ── Answers Only God Can Give — src/data/answers.js (ANSWERS, ~2.5 MB) ──
+   Not a timing file, but the same shape for the same reasons: one raw
+   src/data file, fetched the first time a reader opens Answers, shipped by
+   the gates only because its path is a literal below. Its finish hook is
+   index.html's __finishVotInit, which links the entries' prev/next and
+   rebuilds VOT_LETTER_REGISTRY from every corpus now on the page — the
+   registry openInAppLetter resolves "Answers Only God Can Give" links by.
+
+   ONE loader per page, published on window: screen-routes gates the Answers
+   routes on window.__answersCorpus, and useLazyBundles (bundle-b) subscribes
+   App to it, so the routes re-render the moment the topics land. It is
+   created as this module evaluates — creating fetches nothing — so the
+   corpus object is already there when App first subscribes. */
+/** @type {LazyLoader | null} */
+let _answers = null;
+
+/** @returns {LazyLoader | null} */
+function _answersLoader() {
+  if (_answers) return _answers;
+  const g = /** @type {any} */ (globalThis);
+  if (g.__answersLoader) { _answers = g.__answersLoader; return _answers; }
+  if (!_hasFactory()) return null;
+  _answers = g.__makeLazyLoader('answers', 'src/data/answers.js', '__finishVotInit');
+  g.__answersLoader = _answers;
+  g.__answersCorpus = /** @type {LazyLoader} */ (_answers).corpus;
+  g.__loadAnswersCorpus = () => /** @type {LazyLoader} */ (_answers).load();
+  return _answers;
+}
+_answersLoader();
+
+/**
+ * Fetch the Answers corpus (ANSWERS), once per page. Resolves on failure and
+ * where no loader exists; the corpus object keeps the error for a retry.
+ * @returns {Promise<void>}
+ */
+export function loadAnswers() {
+  const l = _answersLoader();
+  if (!l) return Promise.resolve();
+  return l.load().catch(() => undefined);
+}
+
 /** Test-only: forget every loader so a suite can install a fresh factory. */
 export function resetSyncLoadersForTests() {
   _audio = null;
   _sections = null;
+  _answers = null;
+  const g = /** @type {any} */ (globalThis);
+  delete g.__answersLoader;
+  delete g.__answersCorpus;
+  delete g.__loadAnswersCorpus;
   _bible.clear();
   _bibleVersion = 0;
   _bibleListeners.clear();

@@ -87,7 +87,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     // kicked before the 5 MB Bible lands produces — and persists — a
     // scripture-less index. The Scriptures corpus scope would be honestly,
     // silently empty. SearchScreen has always awaited them; so does this now.
-    const loaders = ['__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus'].map((f) => {
+    const loaders = ['__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus', '__loadAnswersCorpus'].map((f) => {
       const fn = (/** @type {any} */ (window))[f];
       return (typeof fn === 'function') ? Promise.resolve(fn()).catch(() => {}) : Promise.resolve();
     });

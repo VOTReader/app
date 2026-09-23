@@ -63,6 +63,10 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
     if (typeof window.__loadMatthewCorpus === 'function') {
       window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load failed', e));
     }
+    // "Most annotated" counts an Answers topic's words from its entry.
+    if (typeof window.__loadAnswersCorpus === 'function') {
+      window.__loadAnswersCorpus().catch((e) => console.warn('Answers corpus pre-load failed', e));
+    }
   }, []);
   const [, setStudiesTick] = React.useState(0);
   React.useEffect(() => {

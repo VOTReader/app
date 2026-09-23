@@ -279,7 +279,13 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
   });
   it('the hero pads in rem up to a px ceiling, never past it', () => {
     const hero = ruleBlock(CSS, '.hero {');
-    expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+1\.8rem\s+min\(4rem,\s*\d+px\)/);
+    // Sides too (2026-09-22): 1.8rem, capped at the phone size (29 px, or 7vw
+    // where that is wider) — 86 px a side at Text Size 3 left a 187 px title.
+    expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+min\(1\.8rem,\s*max\(\d+px,\s*\d+vw\)\)\s+min\(4rem,\s*\d+px\)/);
+  });
+  it('the reading column pads in rem up to the phone size, never past it', () => {
+    const wrap = ruleBlock(CSS, '.page-wrapper {');
+    expect(wrap).toMatch(/padding:\s*2rem\s+min\(1\.5rem,\s*max\(24px,\s*7vw\)\)\s+6rem/);
   });
   it('the hero pill owns a 44 px hit band around its paint', () => {
     const pill = ruleBlock(CSS, '.hero-play-pill {');

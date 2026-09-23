@@ -88,7 +88,7 @@ describe('_validateTabState — 13 coercion rules', () => {
 
   // ── Rule 5: wtlb / blessed / holy-days entries require letterId ──
   describe('Rule 5: wtlb-one/two-entry / blessed-entry / holy-days-entry + no letterId → home', () => {
-    const screens = ['wtlb-one-entry', 'wtlb-two-entry', 'blessed-entry', 'holy-days-entry'];
+    const screens = ['wtlb-one-entry', 'wtlb-two-entry', 'blessed-entry', 'holy-days-entry', 'answers-entry'];
     for (const screen of screens) {
       it(`coerces ${screen} without letterId to home`, () => {
         expect(validate({ screen }).screen).toBe('home');
@@ -97,6 +97,16 @@ describe('_validateTabState — 13 coercion rules', () => {
         expect(validate({ screen, letterId: 'matters-of-the-heart' }).screen).toBe(screen);
       });
     }
+  });
+
+  // ── Answers: a subject tab needs its subject id (it rides letterId) ──
+  describe('answers-subject + no letterId → the Answers landing', () => {
+    it('coerces a subject tab that lost its id to the landing, not Home', () => {
+      expect(validate({ screen: 'answers-subject' }).screen).toBe('answers-home');
+    });
+    it('passes a subject tab with its id through unchanged', () => {
+      expect(validate({ screen: 'answers-subject', letterId: 'walking-with-god' }).screen).toBe('answers-subject');
+    });
   });
 
   // ── Rule 6: garden-view requires gardenPage ──────────────────────

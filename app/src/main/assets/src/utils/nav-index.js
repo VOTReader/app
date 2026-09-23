@@ -111,7 +111,8 @@ export function buildNavIndex() {
     wtlb1:   ['wtlb1', 'wtlb 1', 'wtlb part one', 'words to live by 1', 'wtlb one'],
     wtlb2:   ['wtlb2', 'wtlb 2', 'wtlb part two', 'words to live by 2', 'wtlb two'],
     blessed: ['blessed', 'the blessed'],
-    holydays:['holy days', 'hd']
+    holydays:['holy days', 'hd'],
+    answers: ['answers', 'aogcg', 'answers only god can give']
   };
 
   for (const col of COLLECTIONS) {
@@ -254,7 +255,7 @@ export function contentDocToNavItem(doc) {
     };
   }
   const items = buildNavIndex();
-  const ENTRY_KIND = { wtlb: 'wtlb-entry', blessed: 'blessed-entry', 'holy-day': 'holy-days-entry' };
+  const ENTRY_KIND = { wtlb: 'wtlb-entry', blessed: 'blessed-entry', 'holy-day': 'holy-days-entry', answers: 'wtlb-entry' };
   if (doc.kind === 'letter') {
     const matches = items.filter((i) => i.kind === 'letter' && i.letterId === doc.letterId);
     return matches.find((i) => i.collection === doc.heading) || matches[0] || null;

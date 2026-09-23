@@ -2,6 +2,8 @@
    HomeScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { resetAnswersLanding } from './AnswersHome.jsx';
+
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
 function _homeDragTrace(msg) {
@@ -32,6 +34,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const ITEMS_BY_ID = {
     volumes: { id: "volumes", eyebrow: "Prophetic Letters", title: "The Volumes of Truth", detail: "Letters from The Lord, Our God and Savior" },
     scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: `Genesis to Revelation · ${translationLabel(translation)}` },
+    answers: { id: "answers", eyebrow: "Topics & Doctrines", title: "Answers Only God Can Give", detail: "The Lord sets the record straight" },
     studies: { id: "studies", eyebrow: "Study Editions", title: "Studies", detail: "Letter Studies · Matthew Study Bible" },
     listening: { id: "listening", eyebrow: "Audio Readings", title: "Listening Library", detail: "The Letters & Scriptures, read aloud" },
     library: { id: "library", eyebrow: "Personal Study", title: "Library", detail: "Notes, journal & bookmarks" },
@@ -66,6 +69,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const warmDestination = (id) => {
     const load = id === 'scriptures' ? window.__loadBibleCorpus
       : id === 'settings' ? window.__loadScreensE
+      : id === 'answers' ? window.__loadAnswersCorpus
       : ['volumes', 'studies', 'library', 'listening'].includes(id) ? window.__loadVotCorpus : null;
     if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));
   };
@@ -239,6 +243,9 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     // Like settings/history, the Listening Library needs origin-aware Back,
     // so it takes its own capture-and-switch callback rather than onSelect.
     if (id === "listening") {if (onOpenAudio) onOpenAudio();return;}
+    // The Home card is a fresh visit: the landing forgets a query or an open
+    // commandment left from before (Back from a topic keeps them).
+    if (id === "answers") resetAnswersLanding();
     onSelect(id);
   };
 

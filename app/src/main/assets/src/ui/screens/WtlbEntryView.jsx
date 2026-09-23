@@ -11,6 +11,7 @@ import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { answersFiledUnder } from '../../utils/answers-shelves.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -126,7 +127,9 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
   const lookupVerse = (ref) => {
     const perEntry = entry.scriptures || {};
-    const dict = scripturesDict || WTLB_SCRIPTURES;
+    // WTLB_SCRIPTURES rides the VOT corpus. A WTLB-family entry from another
+    // corpus (Answers) can render before it lands, so read it guarded.
+    const dict = scripturesDict || (typeof WTLB_SCRIPTURES !== 'undefined' ? WTLB_SCRIPTURES : {});
     // SC6: fall back to the global BOOKS corpus when neither the per-entry nor
     // the WTLB scripture dict carries the ref, so a dict-miss resolves instead
     // of rendering "not available" (the SC1 fix pre-loads BOOKS on the WTLB
@@ -276,6 +279,14 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     if (NUMS[s]) return 'Volume ' + NUMS[s];
     const WORDS = ['one','two','three','four','five','six','seven'];
     if (WORDS.includes(s)) return 'Volume ' + s.charAt(0).toUpperCase() + s.slice(1);
+    const vm = s.match(/^volume\s+(\d|[a-z]+)$/);
+    if (vm) return _attrCollectionLabel(vm[1]);
+    // Answers attributions also cite Rebuke / Flock / Timothy / WTLB / Holy Days
+    // excerpts, by the collection's label or registryLabel.
+    if (typeof COLLECTIONS !== 'undefined') {
+      const col = COLLECTIONS.find((c) => c.registryLabel && (c.registryLabel.toLowerCase() === s || (c.label || '').toLowerCase() === s));
+      if (col) return col.registryLabel;
+    }
     return null;
   };
 
@@ -302,7 +313,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       if (!seg) return null;
       if (seg.startsWith('**') && seg.endsWith('**')) return <strong key={si}>{renderLine(seg.slice(2, -2), consumeRef)}</strong>;
       if (seg.startsWith('_') && seg.endsWith('_')) return <em key={si}>{renderLine(seg.slice(1, -1), consumeRef)}</em>;
-      const attrMatch = seg.match(/^\[From ["“”](.+?)["“”]\s*~\s*Volume\s+(\d+|[A-Za-z]+)\]$/);
+      const attrMatch = seg.match(/^\[From ["“”](.+?)["“”]\s*~\s*(.+?)\]$/);
       if (attrMatch && onInAppLink) {
         const title = attrMatch[1];
         const collection = _attrCollectionLabel(attrMatch[2]);
@@ -421,7 +432,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onBack} aria-label="Back to source letter">
-            <span className="back-hint-arrow">‹</span>Back to{' '}
+            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
             <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
           </button>
         </div>
@@ -430,7 +441,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       <header className="hero">
         <div className="hero-bg vol" />
         <div className="hero-content">
-          <div className="hero-eyebrow">{partLabel} {"\xA0\xB7\xA0"} {entry.num}</div>
+          {/* An Answers topic's num is only its place on the site's page list;
+              the reader is told where it is filed instead. */}
+          <div className="hero-eyebrow">{volKey === 'answers'
+            ? ['Answers', answersFiledUnder(entry)].filter(Boolean).join(' · ')
+            : <>{partLabel} {" · "} {entry.num}</>}</div>
           <h1 className="hero-title" ref={leadRef}>{entry.title}</h1>
           <div className="hero-ornament">
             <div className="hero-ornament-line" />
@@ -489,6 +504,26 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Answers topics: the site's own Related Topics, then its source.
+                A related topic opens as a tap-through, so Back returns here. */}
+            {entry.related && entry.related.length > 0 && (
+              <div className="related-card">
+                <div className="related-card-title">Related Topics</div>
+                {entry.related.map((r) => (
+                  <a key={r.id} className="related-link" href="#" onClick={(e) => {
+                    e.preventDefault();
+                    if (onInAppLink && r.title) onInAppLink({ collection: 'Answers Only God Can Give', letterTitle: r.title }, { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null });
+                    else onNavigate(r.id);
+                  }}>{r.title}</a>
+                ))}
+              </div>
+            )}
+            {entry.siteUrl && (
+              <div className="wtlb-source-line">
+                <a href={entry.siteUrl} target="_blank" rel="noopener noreferrer">View on answersonlygodcangive.com</a>
               </div>
             )}
 

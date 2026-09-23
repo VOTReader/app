@@ -43,6 +43,7 @@ const GLOBALS = {
   WTLB_ONE: [{ id: 'wtlb-1', num: 1, title: 'Matters of the Heart', paragraphs: [{ text: 'The wailing of the penitent {{ref:Matthew 4:4}} brings forth healing.' }] }],
   THE_BLESSED: [{ id: 'blessed-1', num: 1, title: 'The Blessed One', paragraphs: [{ text: 'Blessed are they that mourn.' }] }],
   HOLY_DAYS: [{ id: 'hd-1', num: 1, title: 'Passover', paragraphs: [{ text: 'Remember the passover forever.' }] }],
+  ANSWERS: [{ id: 'regarding-pride', num: 105, title: 'Regarding Pride', paragraphs: [{ text: 'The pride of man {{ref:Proverbs 16:18}} goes before destruction.' }, { text: '~ [From “Pride” ~ Words To Live By: Part One]' }] }],
   HIDDEN_MANNA: [{ id: 'woe-dallas', num: 1, title: 'Woe to Dallas', blocks: [{ segments: [{ v: 'Woe to the great city.' }] }] }],
   // PRODUCTION SHAPE (2026-09-22): a study chapter carries `id` + `blocks` (para
   // segments with `v`), never `content`. The old `content: [{ text }]` fixture
@@ -67,11 +68,19 @@ describe('buildDocs (narrow index scope)', () => {
 
   it('emits ONLY the six allowed kinds — never footnote/heading/chapter-title/study-note/cross-ref/letter-title', () => {
     const kinds = new Set(docs.map((d) => d.kind));
-    const allowed = new Set(['verse', 'letter', 'wtlb', 'blessed', 'holy-day', 'bible-study']);
+    const allowed = new Set(['verse', 'letter', 'wtlb', 'blessed', 'holy-day', 'answers', 'bible-study']);
     for (const k of kinds) expect(allowed.has(k)).toBe(true);
     for (const banned of ['footnote', 'heading', 'chapter-title', 'study-note', 'cross-ref', 'letter-title']) {
       expect([...kinds]).not.toContain(banned);
     }
+  });
+
+  it('folds each Answers topic into one doc of its own kind, in its own volume', () => {
+    const ans = docs.filter((d) => d.kind === 'answers');
+    expect(ans.length).toBe(1);
+    expect(ans[0]).toMatchObject({ letterId: 'regarding-pride', volumeId: 'answers', corpus: 'volumes', title: 'Regarding Pride' });
+    expect(ans[0].text).toContain('pride of man');
+    expect(ans[0].text).not.toContain('{{ref');
   });
 
   it('every doc carries an id, a corpus discriminator, and a kind', () => {

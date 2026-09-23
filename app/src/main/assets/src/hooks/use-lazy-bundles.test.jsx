@@ -30,7 +30,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { useLazyBundles } from './use-lazy-bundles.js';
 
-const CORPORA = ['__bibleCorpus', '__matthewCorpus', '__votCorpus'];
+// __answersCorpus is published by utils/sync-loaders.js, not index.html.
+const CORPORA = ['__bibleCorpus', '__matthewCorpus', '__votCorpus', '__answersCorpus'];
 /* READ FROM index.html, not typed here: every `window.__screensX =` the loader
    IIFE registers. A new lazy bundle therefore fails this file on the day it is
    created, until useLazyBundles subscribes to it — which is the only thing
@@ -81,6 +82,13 @@ describe('useLazyBundles (PF6)', () => {
     const before = renders;
     act(() => { corpora[name].bump(); });
     expect(renders, name + ' bumped and App did not re-render').toBeGreaterThan(before);
+  });
+
+  it('re-renders when the Answers topics land — the Answers routes wait on them', () => {
+    render(<Probe />);
+    const before = renders;
+    act(() => { corpora.__answersCorpus.bump(); });
+    expect(renders).toBeGreaterThan(before);
   });
 
   it('still re-renders when a scripture corpus bumps (folded-in behavior preserved)', () => {

@@ -44,6 +44,8 @@ import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
+import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
+import { answersSubjectById } from '../utils/answers-shelves.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -538,6 +540,38 @@ export function buildScreenRoutes({
   // + async-notify-only); useLazyBundles re-renders App when it lands and the
   // labels upgrade in place.
   const _kickVot = (jsx) => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); return jsx; };
+
+  // Answers Only God Can Give — its own lazy corpus (utils/sync-loaders.js),
+  // gated like the VOT routes. Every Answers route ALSO kicks the VOT corpus in
+  // the background: a topic's attributions open letters, and the registry that
+  // resolves them (__finishVotInit) only knows letters whose corpus has landed.
+  const _answersCorpus = typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus : null;
+  const _answersReady = !!(_answersCorpus && _answersCorpus.loaded) && typeof ANSWERS !== 'undefined';
+  const _wrapAnswers = (render) => {
+    if (!_answersReady) return _corpusView(_answersCorpus, window.__loadAnswersCorpus, 'Loading…');
+    return _kickVot(render(ANSWERS));
+  };
+  // Open a topic from the Answers landing / a subject / A–Z / a commandment.
+  // It goes through the tap-through stack, so the topic shows "‹ Back to …"
+  // and Back returns to the exact list (a subject's id rides letterId). A
+  // search hit carries the paragraph it matched, and the topic lands on it.
+  const _openAnswersTopic = (id, anchorText, fromTitle) => {
+    pushFromLetter({
+      sourceScreen: screen, sourceLetterId: letterId,
+      sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
+      sourceLetterTitle: fromTitle || 'Answers', sourceVolumeLabel: null,
+      destSnapshot: { screen: 'answers-entry', bookId: null, chapterNum: null, letterId: id, studyId: null, studyChapterId: null },
+    });
+    window.navHandoff.clear('pendingHighlight');
+    setSurpriseAnchor(anchorText ? { type: 'excerpt', text: anchorText, letterId: id } : null);
+    setLetterId(id);
+    setActiveReadKey('vol:answers', () => setLastReadForVol('answers', id));
+    setScreen('answers-entry');
+  };
+  const _answersNavProps = {
+    onSearch: goSearch, onHistory: goHistory, onSettings: goSettings,
+    theme, onThemeChange: setTheme, onOpenTopic: _openAnswersTopic,
+  };
 
   return {
     // ── Volume index screens (13) ──
@@ -1298,6 +1332,41 @@ export function buildScreenRoutes({
       const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
       return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={letterShim} volumeLabel="Regarding The Holy Days" />;
     },
+
+    // ── Answers Only God Can Give ──
+    'answers-home': () => _wrapAnswers((entries) => (
+      <AnswersHome
+        {..._answersNavProps}
+        entries={entries}
+        onBack={goHome}
+        onOpenSubject={(subjectId) => { setLetterId(subjectId); setScreen('answers-subject'); }}
+        onOpenAZ={() => setScreen('answers-az')}
+        onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+        onGoToRef={(ref) => {
+          const m = /^Exodus 20:(\d+)$/.exec(ref);
+          if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
+        }}
+      />
+    )),
+    'answers-subject': () => _wrapAnswers((entries) => (answersSubjectById(letterId)
+      ? <AnswersSubject {..._answersNavProps} entries={entries} subjectId={letterId} onBack={() => setScreen('answers-home')} />
+      : <AnswersHome {..._answersNavProps} entries={entries} onBack={goHome} onOpenSubject={(subjectId) => { setLetterId(subjectId); setScreen('answers-subject'); }} onOpenAZ={() => setScreen('answers-az')} />)),
+    'answers-az': () => _wrapAnswers((entries) => (
+      <AnswersAZ {..._answersNavProps} entries={entries} onBack={() => setScreen('answers-home')} />
+    )),
+    'answers-entry': () => (_kickVot(null), _wrapAnswers(() => {
+      // A topic also waits for the letters: its attributions open them (the
+      // registry that resolves a tap knows only letters that have landed), and
+      // a restored tab can reopen straight onto a topic after a reload.
+      if (!_votReady) return _wrapVot(null);
+      // Its footnotes quote the Bible (lookupVersesFromBooks): start that corpus
+      // in the background, as the WTLB index does (idempotent, async-notify).
+      if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+      const ansEntry = actL('answers');
+      if (!ansEntry) return _deadLetter('answers');   // navigation-tabs-4
+      const bc = boundaryConfig('answers', ansEntry);
+      return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('answers')} {...bc} entry={ansEntry} partLabel="Answers" onNavToChapter={_navToChapter} footnotesMode={true} />;
+    })),
 
     'hm-letter': () => {
       if (!_votReady) return _wrapVot(null); // see 'holy-days-entry'

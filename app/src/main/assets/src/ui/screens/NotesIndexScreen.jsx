@@ -207,7 +207,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
               onClick={() => { setBackPill(null); onBack(); }}
               aria-label={'Back to ' + backPill.title}
             >
-              <span className="back-hint-arrow">‹</span>Back to{' '}
+              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
               <span className="back-hint-title">{backPill.title}</span>
             </button>
           </div>

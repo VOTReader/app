@@ -470,3 +470,33 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
     expect(_pushCalls.length).toBe(1);
   });
 });
+
+describe('useAndroidBack — Answers Only God Can Give', () => {
+  it('the landing backs to Home, even though it is also the collection\'s index screen', () => {
+    /** @type {any} */ (globalThis).COL_BY_INDEX_SC = new Map([['answers-home', { volKey: 'answers' }]]);
+    const props = baseProps({ screen: 'answers-home' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goHome).toHaveBeenCalledTimes(1);
+    expect(props.goVolumesHome).not.toHaveBeenCalled();
+  });
+
+  it.each(['answers-subject', 'answers-az'])('%s steps back to the landing', (screen) => {
+    const props = baseProps({ screen });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setScreen).toHaveBeenCalledWith('answers-home');
+  });
+
+  it('a topic opened from a list unwinds to that list by the tap-through stack', () => {
+    /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['answers-entry']);
+    const props = baseProps({
+      screen: 'answers-entry',
+      fromLetterRef: { current: [{ sourceScreen: 'answers-subject', sourceLetterId: 'the-end-of-this-age' }] },
+    });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setLetterId).toHaveBeenCalledWith('the-end-of-this-age');
+    expect(props.setScreen).toHaveBeenCalledWith('answers-subject');
+  });
+});

@@ -160,6 +160,10 @@ const BUDGETS = [
   // 352 letters x ~15 rows x ~28 B ≈ 150 KB projected, lazy like audio-sync.js and
   // loaded only while a Part/Section compilation plays. Optional until it lands.
   { file: 'src/data/audio-sync-sections.js', measured: 150000, max: 260000, optional: true },
+  // Answers Only God Can Give (ANSWERS, tools/fetch-answers.py): 121 topic pages,
+  // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
+  // Served raw like the timings; the site is complete, so +15 %.
+  { file: 'src/data/answers.js', measured: 2488915, max: 2862000 },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';

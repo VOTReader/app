@@ -9,6 +9,8 @@
    - scrollKeyForTab
    =================================================================== */
 
+import { answersSubjectById } from './answers-shelves.js';
+
 /**
  * The tab-state shape these helpers consume. Sourced from useTabs (P6k-A)
  * and the tabField setters; every field is optional (a fresh tab on home
@@ -78,6 +80,15 @@ export function describeTab(tab) {
   }
   if (s === 'scriptures-home') return { title: 'Scriptures', subtitle: 'The Scriptures of Truth', resolved: true };
   if (s === 'scripture-genre') return { title: tab.genreId || 'Scriptures', subtitle: 'Browse by genre', resolved: true };
+
+  // Answers Only God Can Give — its landing is also the collection's
+  // indexScreen, so it is named here before the generic index rule.
+  if (s === 'answers-home') return { title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
+  if (s === 'answers-az') return { title: 'Every Topic, A–Z', subtitle: 'Answers Only God Can Give', resolved: true };
+  if (s === 'answers-subject') {
+    const _subj = answersSubjectById(tab.letterId);
+    return { title: _subj ? _subj.title : 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
+  }
 
   // Volumes & letter collections (via COLLECTIONS registry)
   const _ltrCol = COL_BY_LETTER_SC.get(s);
@@ -176,6 +187,7 @@ export function scrollKeyForTab(tab) {
   if (s === 'matthew-ch' || s === 'bible-ch') return `${tab.bookId}-${tab.chapterNum}`;
   if (s === 'bible-study-chapter') return `study-${tab.studyId || ''}-${tab.studyChapterId || ''}`;
   if (s === 'hm-letter') return `entry-${tab.letterId}`;
+  if (s === 'answers-subject') return `answers-subject-${tab.letterId || ''}`;
   const _sc = COL_BY_LETTER_SC.get(s);
   if (_sc) {
     const pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;

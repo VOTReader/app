@@ -829,7 +829,7 @@ export function JournalViewerScreen(props) {
         {jrnBack ? (
           <div className="back-hint-row">
             <button className="back-hint-pill" onClick={jrnGoBack} aria-label={'Back to ' + jrnBack.fromTitle}>
-              <span className="back-hint-arrow">‹</span>Back to{' '}
+              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
               <span className="back-hint-title">{jrnBack.fromTitle}</span>
             </button>
           </div>
@@ -840,7 +840,7 @@ export function JournalViewerScreen(props) {
           // would have to re-derive this same decision.
           <div className="back-hint-row">
             <button className="back-hint-pill" onClick={function() { tapThroughBack && tapThroughBack(); }} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title)}>
-              <span className="back-hint-arrow">‹</span>Back to{' '}
+              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
               <span className="back-hint-title">{backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title}</span>
             </button>
           </div>

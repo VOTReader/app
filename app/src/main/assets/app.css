@@ -1515,7 +1515,7 @@
         position: relative; overflow: hidden;
         /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
            hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
-        padding: min(5.5rem, 110px) 1.8rem min(4rem, 80px); text-align: center;
+        padding: min(5.5rem, 110px) min(1.8rem, max(29px, 7vw)) min(4rem, 80px); text-align: center;
         border-bottom: 1px solid var(--gold-border);
       }
       .hero-bg {
@@ -1579,6 +1579,7 @@
         font-size: clamp(var(--fs-30), 5vw, var(--fs-36));
         color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
         overflow-wrap: break-word; word-wrap: break-word;
+        hyphens: auto;
       }
       .hero-subtitle {
         font-family: var(--font-body); font-size: var(--fs-16); font-style: italic;
@@ -1663,7 +1664,10 @@
     
       /* ── PAGE / CHAPTER BODY ── */
       .page-wrapper {
-        max-width: 45rem; margin: 0 auto; padding: 2rem 1.5rem 6rem;
+        /* The sides stop growing at their phone size (the hero's rule, above):
+           at Text Size 3 a 360 px phone kept a 216 px reading column. Unchanged
+           at normal sizes and wherever 7vw is the larger (tablet, desktop). */
+        max-width: 45rem; margin: 0 auto; padding: 2rem min(1.5rem, max(24px, 7vw)) 6rem;
       }
       .chapter-body { font-size: var(--fs-18); line-height: 1.85; }
       /* .section-block and .section-heading defined in Bible reader section below */
@@ -1788,6 +1792,12 @@
            tracks to 197 + 165 px in a 274 px row at Text Size 1.8, and the Next card ran 74 px past the
            screen behind overflow-x: hidden on every letter and chapter (2026-09-05). */
         display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1rem; margin-top: 1.5rem;
+      }
+      /* At a large Text Size two cards leave a few characters a line ("Regarding
+         Judas Iscariot" stood one letter per line at 300 % on a 360 px phone):
+         once a card would be narrower than 7rem (never below 140 px), they stack. */
+      @supports (width: min(1px, 2px)) {
+        .bottom-nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, max(140px, 7rem)), 1fr)); }
       }
       .bottom-nav-card {
         background: var(--bg2); border: 1px solid var(--gold-border); border-radius: var(--radius);
@@ -2044,6 +2054,10 @@
     /* PERF4: defer off-screen paragraph layout/paint on long letters (DOM-preserving —
        the imperative [data-hl-dom] annotation passes + scroll-to-highlight still work). */
     .letter-para { font-size:var(--fs-18); line-height:1.8; color:var(--cream); margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 140px; }
+    /* A word wider than the reading column (a letter title in an attribution,
+       at a large Text Size) wraps rather than pushing the page sideways — the
+       .bottom-nav-card rule of 2026-09-05, for the body text too. */
+    .letter-para, .letter-poetry, .related-link { overflow-wrap:break-word; }
     /* Scroll-memory exact restore (use-scroll-memory.js Effect 3): while a saved
        position is being applied, lift PERF4's content-visibility (here + the
        Bible .section-block) so scrollTop lands against REAL block heights, not
@@ -2119,7 +2133,10 @@
     body.light .prophecy-card.pc-vot .prophecy-card-tag { color:rgba(30,60,140,0.85); }
     body.light .prophecy-card.pc-vot .prophecy-card-sublabel { color:rgba(30,60,140,0.6); }
 
-    .letter-poetry { margin:2.2rem auto; display:table; text-align:center; }
+    /* display:table never narrows below its longest word: at a large Text Size
+       a centred heading ("Misinterpretation") ran 76 px past a phone. anywhere
+       lets that word break instead; max-width keeps the table in the column. */
+    .letter-poetry { margin:2.2rem auto; display:table; text-align:center; max-width:100%; overflow-wrap:anywhere; }
     .poetry-line { font-size:var(--fs-16); line-height:1.9; color:var(--cream); font-style:italic; display:block; white-space:nowrap; }
     @media (max-width:480px) { .poetry-line { font-size:var(--fs-16); white-space:normal; } }
     .stanza-break { height:0.9rem; display:block; }
@@ -2308,10 +2325,21 @@
       transition:all 0.18s ease;
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
+      /* "‹ Back to" (.back-hint-lead) never wraps. The title, capped at 60vw,
+         ellipsizes beside it; when a Text Size leaves no room for both on one
+         line (300 % on a phone) it drops to a second line instead of shrinking
+         to nothing. */
+      white-space:nowrap;
+      flex-wrap:wrap;
+      row-gap:0.1rem;
+      position:relative;
     }
+    /* The pill stays slim; its hit area is 44 px tall. */
+    .back-hint-pill::after { content:''; position:absolute; left:0; right:0; top:50%; height:44px; transform:translateY(-50%); }
     .back-hint-pill:active { background:rgba(200,164,86,0.18); transform:scale(0.98); }
     @media (hover: hover) { .back-hint-pill:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .back-hint-pill .back-hint-arrow { color:var(--gold); font-size:var(--fs-14); margin-right:0.1rem; }
+    .back-hint-pill .back-hint-lead { display:inline-flex; align-items:center; gap:0.35rem; flex:0 0 auto; }
     .back-hint-pill .back-hint-title {
       color:var(--cream-dim); text-transform:none; font-size:var(--fs-12);
       letter-spacing:0; font-style:italic;
@@ -2400,11 +2428,18 @@
       font-size:0.82em; color:var(--gold-dim);
       text-decoration:none; letter-spacing:0.04em;
       margin:0 0.15em; padding:0 0.08em;
-      white-space:nowrap; cursor:pointer;
+      /* One unit, as nowrap made it: an atomic inline box moves to the next
+         line whole. Only a cite wider than the whole line (Text Size 3 on a
+         360 px phone) breaks inside itself instead of running off the edge. */
+      display:inline-block; max-width:100%; white-space:normal; overflow-wrap:anywhere;
+      cursor:pointer;
       transition:color 0.18s ease;
     }
     @media (hover: hover) { .wtlb-cite:hover, .wtlb-cite:active { color:var(--gold-bright); } }
     .footnote-list-header { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
+    /* The body beside the number may shrink below its longest line and wraps:
+       a verse quote ran 570 px wide in a 360 px phone at Text Size 3. */
+    .footnote-list-item > :not(.footnote-list-num) { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
     .footnote-list-item { display:flex; gap:0.75rem; margin-bottom:0.6rem; font-size:var(--fs-15); line-height:1.6; color:var(--cream-dim); padding:0.5rem 0.75rem; border-radius:var(--radius); transition:background 0.3s ease; scroll-margin-top:80px; cursor:pointer; }
     .footnote-list-item:hover { background:rgba(200,164,86,0.06); }
     .footnote-list-item:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
@@ -2418,9 +2453,9 @@
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */
     .related-section { margin-top:2.5rem; padding-top:2.5rem; border-top:1px solid var(--gold-border); display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; }
-    .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem 1.4rem; }
+    .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem min(1.4rem, 6vw); }
     .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
-    .related-link { display:block; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.3rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
+    .related-link { display:block; min-height:44px; box-sizing:border-box; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.6rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
     @media (hover: hover) { .related-link:hover { color:var(--gold-bright); border-bottom-color:var(--gold-dim); } }
     /* External-link affordance: every target="_blank" anchor (audio/video
        links, related topics, About, footnote URLs, playlist buttons) leaves
@@ -2428,7 +2463,7 @@
        In-app links never carry target, so they stay unmarked. */
     a[target="_blank"]::after { content:" \2197"; font-size:0.8em; opacity:0.65; }
     /* ── HOME SCREEN ── */
-    .home-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1.5rem; }
+    .home-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem min(1.5rem, 6.7vw); }
     /* SacredUI hero — pull the brand mark up toward the top of the viewport
        and give the three section tiles more breathing room */
     .home-screen-app { justify-content:flex-start; padding-top:1.6rem; }
@@ -2438,7 +2473,7 @@
     .home-sub { font-size:var(--fs-16); color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
     .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:25rem; }
     /* ── Volumes landing: fill screen, no scroll ── */
-    .volumes-landing { padding:1.2rem 1.2rem 0.8rem; justify-content:flex-start; }
+    .volumes-landing { padding:1.2rem min(1.2rem, 5.4vw) 0.8rem; justify-content:flex-start; }
     .volumes-landing .home-eyebrow { margin-bottom:0.3rem; }
     .volumes-landing .home-title { font-size:var(--fs-24); margin-bottom:0.15rem; }
     .volumes-landing .home-sub { margin-bottom:0.6rem; font-size:var(--fs-15); }
@@ -2574,12 +2609,15 @@
     .home-nav-item {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      /* Side padding and the gap stop growing at their phone size (4.5vw is
+         16 px at 360 px): at a 300 % Text Size they grew with the text and left
+         the words a column a few letters wide. Unchanged at normal sizes. */
+      gap: min(1rem, 4.5vw);
       width: 100%;
       background: linear-gradient(135deg, var(--bg2) 0%, rgba(200,164,86,0.035) 100%);
       border: 1px solid var(--gold-border);
       border-radius: 10px;
-      padding: 0.7rem 1rem;
+      padding: 0.7rem min(1rem, 4.5vw);
       cursor: pointer;
       text-align: left;
       color: inherit;
@@ -2650,6 +2688,9 @@
         0 0 0 1px var(--gold);
     }
     .hni-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    /* At a large Text Size a single word ("DOCTRINES", letter-spaced) can be
+       wider than the card's text column: break it rather than clip it. */
+    .hni-eyebrow, .hni-title, .hni-detail { overflow-wrap: anywhere; }
     .hni-eyebrow {
       display: block;
       font-family: 'Cinzel', serif;
@@ -2678,7 +2719,8 @@
     .hni-arrow {
       display: block;
       font-family: var(--font-body);
-      font-size: var(--fs-24);
+      /* A decorative chevron: chrome size, not text size (it tripled at 300 %). */
+      font-size: var(--fsc-24);
       color: var(--gold);
       flex-shrink: 0;
       line-height: 1;
@@ -7536,3 +7578,88 @@
       }
       body.light .settings-help-btn { color: #fff; }
       .settings-help-note { font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); margin: 8px 0 0; line-height: 1.4; }
+
+/* ── ANSWERS ONLY GOD CAN GIVE (ui/screens/AnswersHome.jsx) ──
+   The landing, one subject, and A–Z share the Volumes landing's header and
+   tiles; everything below is laid on the same 32.5rem column. */
+.answers-landing .home-sub { max-width:22rem; }
+.answers-section, .answers-results, .answers-az-list { width:100%; max-width:32.5rem; }
+.answers-section { margin-bottom:1.3rem; }
+.answers-label { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:0 0.5rem; }
+.answers-label > span:first-child { min-width:0; }
+.answers-label-count { font-family:var(--font-body); font-size:var(--fs-12); font-style:italic; letter-spacing:normal; text-transform:none; color:var(--cream-muted); }
+.answers-ask { display:flex; align-items:center; gap:0.6rem; width:100%; max-width:32.5rem; min-height:3.25rem; margin-bottom:1.3rem; padding:0 0.25rem 0 0.9rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--gold-faint); color:var(--gold); }
+.answers-ask:focus-within { border-color:var(--gold); }
+.answers-ask > svg { width:20px; height:20px; flex-shrink:0; }
+.answers-ask-input { flex:1; min-width:0; min-height:44px; border:0; outline:none; background:transparent; color:var(--input-text); font-family:var(--font-body); font-size:var(--fs-18); }
+.answers-ask-input::placeholder { color:var(--cream-muted); font-style:italic; opacity:1; }
+.answers-ask-input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; }
+.answers-ask-clear { width:44px; height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:0; background:none; color:var(--cream-muted); cursor:pointer; }
+.answers-ask-clear svg { width:18px; height:18px; }
+/* The Ten Commandments as two tablets, arched at the top. */
+/* Two tablets side by side while a tablet can be 8.5rem (at least 140 px)
+   wide; at a large Text Size (rem grows with it) they stack. */
+.answers-tablets { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(140px, 8.5rem)), 1fr)); gap:0.75rem; }
+.answers-tablet { display:flex; flex-direction:column; min-width:0; padding:1rem 0.25rem 0.3rem; border:1px solid var(--gold-border); border-radius:5rem 5rem 10px 10px / 2.75rem 2.75rem 10px 10px; background:var(--bg2); }
+.answers-tablet-range { padding-bottom:0.45rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; color:var(--gold-dim); }
+.answers-tablet-row { display:flex; align-items:center; gap:0.35rem; min-height:44px; padding:0.2rem 0.125rem; border:0; border-top:1px solid var(--border); border-radius:4px; background:none; color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-15); line-height:1.2; }
+.answers-tablet-label { flex:1 1 0; min-width:0; }
+/* 1.8rem holds "VIII" (the widest numeral, ~1.65rem) and leaves each label
+   one line beside it on a 360 px phone. */
+.answers-tablet-numeral { flex:0 0 1.8rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold); }
+@media (hover:hover) { .answers-tablet-row:hover { background:var(--gold-faint); } }
+.answers-subjects .genre-tile { display:flex; flex-direction:column; justify-content:center; min-height:5.25rem; }
+.answers-subjects .answers-az-tile { background:var(--gold-faint); }
+/* A topic in any list: short title, passage count, chevron. */
+.answers-topic-list { display:flex; flex-direction:column; }
+.answers-topic-row { display:flex; align-items:center; gap:0.75rem; width:100%; min-height:3.25rem; padding:0.45rem 0.1rem; border:0; border-bottom:1px solid var(--border); background:none; color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
+.answers-topic-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.1rem; }
+.answers-topic-title { font-size:var(--fs-18); line-height:1.3; color:var(--cream-dim); }
+/* At a large Text Size one long word can be wider than its column: let it
+   break rather than push the page sideways. */
+.answers-topic-title, .answers-topic-full, .answers-hit-title, .answers-hit-eyebrow, .answers-hit-source,
+.answers-tablet-label, .answers-label > span, .answers-subjects .genre-tile-title, .answers-subjects .genre-tile-sub,
+.answers-sheet-verse p, .answers-landing .home-title,
+.answers-sheet .select-sheet-eyebrow, .answers-sheet .select-sheet-title { overflow-wrap:anywhere; }
+.answers-topic-full { font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); }
+.answers-topic-count { font-size:var(--fs-14); color:var(--cream-muted); font-variant-numeric:tabular-nums; }
+.answers-topic-arrow { font-size:var(--fs-20); line-height:1; color:var(--gold-dim); }
+@media (hover:hover) { .answers-topic-row:hover .answers-topic-title { color:var(--gold-bright); } }
+/* "What does The Lord say about…" results. */
+.answers-hit-card { display:flex; flex-direction:column; gap:0.5rem; width:100%; margin-bottom:0.6rem; padding:0.8rem 1rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
+.answers-hit-head { display:flex; align-items:center; gap:0.75rem; }
+.answers-hit-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
+.answers-hit-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); }
+.answers-hit-title { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.04em; color:var(--gold); }
+.answers-hit-snippet { font-size:var(--fs-16); line-height:1.5; color:var(--cream-dim); }
+.answers-hit-mark { background:transparent; color:var(--gold-bright); font-weight:600; }
+.answers-hit-source { font-size:var(--fs-13); font-style:italic; color:var(--gold-dim); }
+.answers-hit-summary { margin:0.1rem 0 0.35rem; font-size:var(--fs-14); font-style:italic; color:var(--cream-muted); }
+.answers-more { min-height:44px; padding:0.3rem 0; border:0; background:none; color:var(--gold); text-align:left; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; }
+.answers-empty { margin:0.6rem 0; text-align:center; font-size:var(--fs-16); font-style:italic; color:var(--cream-muted); }
+.answers-source { overflow-wrap:anywhere; margin:0.4rem 0 1rem; text-align:center; font-size:var(--fs-13); font-style:italic; line-height:1.45; color:var(--cream-muted); }
+/* Every Topic, A–Z */
+.answers-az-jump { display:flex; flex-wrap:wrap; justify-content:center; gap:0.15rem; width:100%; max-width:32.5rem; margin-bottom:1rem; }
+.answers-az-jump button { min-width:2.3rem; min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-15); }
+@media (hover:hover) { .answers-az-jump button:hover { background:var(--gold-faint); } }
+.answers-az-letter { padding:0.2rem 0 0.25rem; border-bottom:1px solid var(--gold-border); scroll-margin-top:0.5rem; font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold); }
+/* A commandment's sheet: its verse, then its topics. */
+.answers-sheet-verse { margin:0 0 1.1rem; padding:0; text-align:center; }
+.answers-sheet-verse p { margin:0 0 0.4rem; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; line-height:1.45; color:var(--cream); }
+.answers-sheet-ref { min-height:44px; padding:0 0.6rem; border:0; background:none; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; color:var(--gold); }
+/* A search landing in a Format B entry (WtlbEntryView landedPara): the matched
+   paragraph glows twice in the letters' highlight gold and fades back out
+   before the 4 s clear. The class was always set; it had no style. */
+.letter-para.pulse, .letter-poetry.pulse { --land-base:200,164,86; --land-peak:255,235,180; border-radius:4px; animation:wtlb-land-pulse 4s ease forwards; }
+body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168,126,40; --land-peak:214,168,62; }
+@keyframes wtlb-land-pulse {
+  0% { background:rgba(var(--land-base),0); }
+  15% { background:rgba(var(--land-peak),0.30); }
+  35% { background:rgba(var(--land-base),0.22); }
+  55% { background:rgba(var(--land-peak),0.30); }
+  100% { background:rgba(var(--land-base),0); }
+}
+/* A topic page's source line (WtlbEntryView, entry.siteUrl). */
+.wtlb-source-line { margin:1.25rem 0 0.25rem; text-align:center; font-size:var(--fs-13); opacity:0.7; overflow-wrap:anywhere; }
+.wtlb-source-line a { color:var(--cream-dim); text-decoration:none; }
+@media (hover:hover) { .wtlb-source-line a:hover { color:var(--gold-bright); } }

@@ -100,8 +100,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const debounceRef = React.useRef(null);
 
   // Build the index on mount. The engine reads the lazy corpus globals
-  // (BOOKS / MATTHEW / VOT); building before they arrive yields an empty
-  // index, so load every corpus first, then build. A warm boot restores the
+  // (BOOKS / MATTHEW / VOT / ANSWERS); building before they arrive yields an
+  // empty index, so load every corpus first, then build. A warm boot restores the
   // serialized index from the vot-minisearch-cache IDB (~0.3s) instead of
   // rebuilding (~10s) behind the progress bar.
   React.useEffect(() => {
@@ -120,7 +120,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
-    Promise.all([loadBible, loadMatthew, loadVot])
+    const loadAnswers = (typeof window.__loadAnswersCorpus === 'function') ? window.__loadAnswersCorpus().catch(() => {}) : Promise.resolve();
+    Promise.all([loadBible, loadMatthew, loadVot, loadAnswers])
       .then(() => E.init({
         onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
       }))

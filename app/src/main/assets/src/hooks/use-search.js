@@ -454,7 +454,7 @@ export function useSearch({
       setScreen(doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
       return;
     }
-    if (k === 'letter' || k === 'letter-title' || k === 'footnote' || k === 'wtlb' || k === 'wtlb-title' || k === 'blessed' || k === 'blessed-title' || k === 'holy-day' || k === 'holy-day-title') {
+    if (k === 'letter' || k === 'letter-title' || k === 'footnote' || k === 'wtlb' || k === 'wtlb-title' || k === 'blessed' || k === 'blessed-title' || k === 'holy-day' || k === 'holy-day-title' || k === 'answers' || k === 'answers-title') {
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);

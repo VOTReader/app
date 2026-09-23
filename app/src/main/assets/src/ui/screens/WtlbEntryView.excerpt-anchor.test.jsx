@@ -97,3 +97,31 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(seekToSeen.every((v) => v == null)).toBe(true);
   });
 });
+
+describe('WtlbEntryView — an Answers topic renders before the letters have landed', () => {
+  // WTLB_SCRIPTURES rides the VOT corpus; an Answers topic is its own corpus.
+  // A restored tab reopened straight onto a topic after a reload threw
+  // "WTLB_SCRIPTURES is not defined" and took the whole app to its error screen.
+  it('builds its footnotes with no WTLB_SCRIPTURES global at all', () => {
+    delete globalThis.WTLB_SCRIPTURES;
+    const topic = {
+      id: 'regarding-pride', title: 'Regarding Pride', num: 105,
+      paragraphs: [
+        { align: 'justify', text: 'The pride of man {{ref:Proverbs 16:18}} goes before destruction.' },
+        { align: 'right', text: '~ [From “Pride” ~ Words To Live By: Part One]' },
+      ],
+      related: [{ id: 'the-messiah', title: 'The Messiah' }],
+      siteUrl: 'https://answersonlygodcangive.com/Regarding_Pride',
+      prevEntry: null, nextEntry: null,
+    };
+    expect(() => render(
+      <WtlbEntryView entry={topic} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={true}
+        onNavigate={() => {}} onHome={() => {}} />,
+    )).not.toThrow();
+    expect(document.querySelector('.footnote-list')).toBeTruthy();
+    // Where it is filed, not its number in the site's page list.
+    expect(document.querySelector('.hero-eyebrow').textContent).toBe('Answers · Walking With God');
+    expect(document.querySelector('.related-card').textContent).toContain('The Messiah');
+    expect(document.querySelector('.wtlb-source-line a').getAttribute('href')).toBe('https://answersonlygodcangive.com/Regarding_Pride');
+  });
+});

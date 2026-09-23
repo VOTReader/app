@@ -339,7 +339,7 @@
      them back it reads `lazyArrival ok`. */
   async function lazyArrival() {
     var out = { ok: true, legs: [] };
-    var corpusLoaders = ['__loadVotCorpus', '__loadBibleCorpus', '__loadMatthewCorpus'];
+    var corpusLoaders = ['__loadVotCorpus', '__loadBibleCorpus', '__loadMatthewCorpus', '__loadAnswersCorpus'];
     for (var ci = 0; ci < corpusLoaders.length; ci++) {
       if (typeof root[corpusLoaders[ci]] === 'function') {
         try { await root[corpusLoaders[ci]](); } catch (_e) { /* best-effort */ }
@@ -427,6 +427,21 @@
       clickByText(/^Volume One/); await sleep(320);
       clickByText(/A Word of Warning|Chosen by God/); await sleep(200);
       return /letter-body|letter-para|letter-intro/.test(document.body.innerHTML);
+    });
+    await step('Answers', async function () {
+      // Home card -> landing -> a subject -> a topic. The topics are their own
+      // lazy file (src/data/answers.js, utils/sync-loaders.js): a deploy or an
+      // APK ignore pattern that drops it leaves the landing on "Loading..."
+      // forever, and fails HERE.
+      if (!clickByText(/Topics & Doctrines/)) return false;
+      var ok = false;
+      for (var w = 0; w < 40 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.answers-tablet-row').length === 10; }
+      if (!ok || document.querySelectorAll('.answers-subject-tile').length !== 10) return false;
+      if (!clickByText(/^The End of This Age/)) return false;
+      await sleep(300);
+      if (!clickByText(/^The Coming of The Lord/)) return false;
+      await sleep(400);
+      return !!document.querySelector('[data-hl-key^="wtlb:the-coming-of-the-lord:"]');
     });
     await step('Read-along wiring', async function () {
       // Mount a letter that HAS forced-alignment rows and check the read-along

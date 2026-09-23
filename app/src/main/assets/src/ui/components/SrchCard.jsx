@@ -26,7 +26,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
   const headline = named ? doc.title : refLine;
   const locLine = (named && refLine && refLine !== doc.title) ? refLine : '';
   const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
-  (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title') ?
+  (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title' || doc.kind === 'answers-title') ?
   (doc.title || doc.text) :
   doc.text;
   // Merge the engine's per-result matched terms (MiniSearch only — the

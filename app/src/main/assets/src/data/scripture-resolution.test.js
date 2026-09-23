@@ -80,8 +80,8 @@ afterEach(() => {
 
 /* ── COLLECTION REGISTRY ──────────────────────────────────────── */
 describe('COLLECTIONS registry', () => {
-  it('has 15 collections, each with the load-bearing keys', () => {
-    expect(COLLECTIONS.length).toBe(15);
+  it('has 16 collections, each with the load-bearing keys', () => {
+    expect(COLLECTIONS.length).toBe(16);
     for (const c of COLLECTIONS) {
       expect(typeof c.volKey).toBe('string');
       expect(typeof c.globalName).toBe('string');
@@ -495,5 +495,26 @@ describe('findEntryContext', () => {
     // wide-path is a letter-kind entry; a wtlb hint should not find it (and the
     // study fallback is skipped for non-letter hints).
     expect(findEntryContext('wide-path', 'wtlb')).toBeNull();
+  });
+  describe('an Answers topic before its lazy corpus has landed', () => {
+    // A saved note / bookmark / link on a topic, in a fresh session: the
+    // always-loaded title index names it and routes it; entry stays null.
+    beforeEach(() => { window.__answersTitles = { 'regarding-pride': 'Regarding Pride' }; delete window.ANSWERS; });
+    afterEach(() => { delete window.__answersTitles; });
+    it('labels and routes it from the title index (no hint, or the wtlb hint its hl-keys carry)', () => {
+      const want = { kind: 'wtlb', screen: 'answers-entry', collection: 'Answers Only God Can Give', title: 'Regarding Pride', entry: null };
+      expect(findEntryContext('regarding-pride')).toEqual(want);
+      expect(findEntryContext('regarding-pride', 'wtlb')).toEqual(want);
+    });
+    it('is not consulted for another kind, an unknown id, or a prototype key', () => {
+      expect(findEntryContext('regarding-pride', 'letter')).toBeNull();
+      expect(findEntryContext('regarding-nothing', 'wtlb')).toBeNull();
+      expect(findEntryContext('toString', 'wtlb')).toBeNull();
+    });
+    it('the loaded corpus wins: the real entry comes back once it has landed', () => {
+      window.ANSWERS = [{ id: 'regarding-pride', title: 'Regarding Pride', paragraphs: [] }];
+      expect(findEntryContext('regarding-pride', 'wtlb').entry).toBe(window.ANSWERS[0]);
+      delete window.ANSWERS;
+    });
   });
 });

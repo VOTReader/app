@@ -35,6 +35,7 @@ export const KIND_BOOST = {
   wtlb: 1.0,
   blessed: 1.0,
   'holy-day': 1.0,
+  answers: 1.0,
   'bible-study': 0.8,
 };
 

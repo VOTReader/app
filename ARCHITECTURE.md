@@ -546,7 +546,7 @@ Major code-quality pass on 2026-05-09: eliminated ~200 lines of duplicate branch
 
 ### 18.1 COLLECTIONS registry (`src/data/scripture-resolution.js`)
 
-Single source of truth for all 15 content collections. Replaces 150+ duplicate if/else/switch branches scattered across navigation, back-routing, search, last-read tracking, and data loading.
+Single source of truth for all 16 content collections. Replaces 150+ duplicate if/else/switch branches scattered across navigation, back-routing, search, last-read tracking, and data loading.
 
 ```js
 const COLLECTIONS = [
@@ -554,9 +554,11 @@ const COLLECTIONS = [
     prefaceGlobal: 'LETTERS_V1_PREFACE', letterScreen: 'vot-one-letter',
     indexScreen: 'vot-one-index', label: 'Volume One', registryLabel: 'Volume One',
     searchVolId: 'v1', kind: 'letter', surpriseType: 'vot-one' },
-  // ... 14 more entries (all volumes, Timothy, Flock, Rebuke, WTLB 1/2, Blessed, Holy Days, Hidden Manna)
+  // ... 15 more entries (all volumes, Timothy, Flock, Rebuke, WTLB 1/2, Blessed, Holy Days, Answers, Hidden Manna)
 ];
 ```
+
+**Answers Only God Can Give (row added 2026-09-22).** `volKey: 'answers'`, `kind: 'wtlb'` (its topics are Format B and render in WtlbEntryView, so highlights/bookmarks/links reuse the WTLB paths; `answers-shelves.test.js` pins that no topic id collides with a WTLB/Blessed/Holy Days id, since `wtlb:<id>:<n>` is a shared highlight namespace), `cardId: null` (no Library/Volumes tile, so achievements' public-letter total and the audio library ignore it), `surpriseType: null`, not in `READING_CHAIN`. Its data is NOT in a corpus bundle: `src/data/answers.js` is a lazy raw file created by `utils/sync-loaders.js` (finish hook `__finishVotInit`, published as `window.__answersCorpus` / `__loadAnswersCorpus`, subscribed by `useLazyBundles`). Its `indexScreen` is `answers-home`, the landing reached from the Home card — so use-android-back and tabs.js name `answers-home` BEFORE their generic index-screen rules. The landing's two shelves live in `utils/answers-shelves.js`: the Ten Commandments (the site's own filing, `entry.group`) and nine subjects (the app's own grouping). A letter's `relatedTopics` rows resolve through `utils/answers-url-index.js` (generated with the corpus by `tools/fetch-answers.py`).
 
 **Derived lookup maps (O(1) access):**
 - `COL_BY_KEY` — volKey → collection (`COL_BY_KEY.get('three')`)

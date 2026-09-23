@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
+import { answersIdForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
@@ -299,7 +300,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onBack} aria-label="Back to source letter">
-            <span className="back-hint-arrow">‹</span>Back to{' '}
+            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
             <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
           </button>
         </div>
@@ -571,15 +572,25 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               {letter.relatedTopics?.length > 0 && (
                 <div className="related-card">
                   <div className="related-card-title">Related Topics</div>
-                  {letter.relatedTopics.map((t, i) =>
-                    t.link && wrappedInAppLink ? (
+                  {letter.relatedTopics.map((t, i) => {
+                    // An answersonlygodcangive.com row opens the vendored topic
+                    // in-app at once — the answers-entry route shows Loading…
+                    // while the corpus arrives; a row the index cannot place
+                    // keeps its external link.
+                    const answersId = !t.link ? answersIdForUrl(t.url) : null;
+                    const openAnswers = answersId && onNavigateToLink
+                      ? () => onNavigateToLink({ type: 'wtlb', screen: 'answers-entry', letterId: answersId }, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null })
+                      : answersId && wrappedInAppLink ? () => openAnswersLink(answersLinkForUrl(t.url), wrappedInAppLink) : null;
+                    return t.link && wrappedInAppLink ? (
                       <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(t.link); }}>{t.label}</a>
+                    ) : openAnswers ? (
+                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); openAnswers(); }}>{t.label}</a>
                     ) : t.internalStudy && onStudyNavigate ? (
                       <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); onStudyNavigate(t.internalStudy); }}>{t.label}</a>
                     ) : (
                       <a key={i} className="related-link" href={t.url} target="_blank" rel="noopener noreferrer">{t.label}</a>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
               )}
 

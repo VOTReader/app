@@ -82,7 +82,8 @@ export function _validateTabState(s) {
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-letter$/.test(s.screen) && !s.letterId) s.screen = "home";
   if (s.screen === "vot-letter" && !s.letterId) s.screen = "home";
   if (s.screen === "hm-letter" && !s.letterId) s.screen = "home";
-  if (/^(wtlb-one-entry|wtlb-two-entry|blessed-entry|holy-days-entry)$/.test(s.screen) && !s.letterId) s.screen = "home";
+  if (/^(wtlb-one-entry|wtlb-two-entry|blessed-entry|holy-days-entry|answers-entry)$/.test(s.screen) && !s.letterId) s.screen = "home";
+  if (s.screen === "answers-subject" && !s.letterId) s.screen = "answers-home";
   if (s.screen === "garden-view" && s.gardenPage == null) s.screen = "home";
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-index$/.test(s.screen)) s.screen = "volumes-home";
   if ((s.screen === "matthew-idx" || s.screen === "bible-idx") && !s.bookId) s.screen = "home";

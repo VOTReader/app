@@ -165,7 +165,8 @@ export function buildDocs(options) {
         title: en.title || '',
         heading: volumeLabel || '',
         text: body,
-        ref: volumeLabel + ' ' + (en.num || ''),
+        // An Answers topic's num is only its place in the site's page list.
+        ref: kind === 'answers' ? volumeLabel : volumeLabel + ' ' + (en.num || ''),
       });
     }
   }
@@ -252,6 +253,9 @@ export function buildDocs(options) {
   if (typeof WTLB_TWO !== 'undefined') pushEntryCollection(WTLB_TWO, 'wtlb', 'wtlb2', 'Words To Live By: Part Two');
   if (typeof THE_BLESSED !== 'undefined') pushEntryCollection(THE_BLESSED, 'blessed', 'blessed', 'The Blessed');
   if (typeof HOLY_DAYS !== 'undefined') pushEntryCollection(HOLY_DAYS, 'holy-day', 'holydays', 'Holy Days');
+  // Answers Only God Can Give — its own kind, so a hit is badged "Answers",
+  // grouped under its own heading, and scoped by its own volume chip.
+  if (typeof ANSWERS !== 'undefined') pushEntryCollection(ANSWERS, 'answers', 'answers', 'Answers Only God Can Give');
 
   // Hidden Manna is deliberately NOT emitted. Owner policy (CLAUDE.md): it is
   // reachable only through the Matthew study chain — never the public index,

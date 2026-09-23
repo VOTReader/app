@@ -50,6 +50,7 @@ export const COLLECTIONS = [
   { volKey: 'wtlb2',   cardId: 'words-to-live-by-2',readKey: 'wtlb-two',        globalName: 'WTLB_TWO',       prefaceGlobal: null,                       letterScreen: 'wtlb-two-entry',     indexScreen: 'wtlb-two-index',    label: 'Words To Live By: Part Two',                              registryLabel: 'Words To Live By: Part Two',                              searchVolId: 'wtlb2',         kind: 'wtlb',       surpriseType: 'wtlb2' },
   { volKey: 'blessed', cardId: 'the-blessed',       readKey: 'the-blessed',     globalName: 'THE_BLESSED',     prefaceGlobal: null,                       letterScreen: 'blessed-entry',      indexScreen: 'blessed-index',     label: 'The Blessed',                                             registryLabel: 'The Blessed',                                             searchVolId: 'blessed',       kind: 'blessed',    surpriseType: 'blessed' },
   { volKey: 'holydays',cardId: 'holy-days',         readKey: 'holy-days',       globalName: 'HOLY_DAYS',       prefaceGlobal: null,                       letterScreen: 'holy-days-entry',    indexScreen: 'holy-days-index',   label: 'Regarding The Holy Days',                                 registryLabel: 'Regarding The Holy Days',                                 searchVolId: 'holydays',      kind: 'holy-days',  surpriseType: 'holydays' },
+  { volKey: 'answers', cardId: null,                readKey: 'answers',         globalName: 'ANSWERS',         prefaceGlobal: null,                       letterScreen: 'answers-entry',      indexScreen: 'answers-home',      label: 'Answers Only God Can Give',                               registryLabel: 'Answers Only God Can Give',                               searchVolId: 'answers',       kind: 'wtlb',       surpriseType: null },
   { volKey: 'hm',      cardId: null,                readKey: 'hidden-manna',    globalName: 'HIDDEN_MANNA',    prefaceGlobal: null,                       letterScreen: 'hm-letter',          indexScreen: null,                label: 'Hidden Manna',                                            registryLabel: 'Hidden Manna',                                            searchVolId: 'hidden-manna',  kind: 'letter',     surpriseType: null }
 ];
 
@@ -59,7 +60,7 @@ export const COL_BY_LETTER_SC = new Map(COLLECTIONS.map(c => [c.letterScreen, c]
 export const COL_BY_INDEX_SC  = new Map(COLLECTIONS.filter(c => c.indexScreen).map(c => [c.indexScreen, c]));
 export const COL_BY_SEARCH_ID = new Map(COLLECTIONS.filter(c => c.searchVolId).map(c => [c.searchVolId, c]));
 export const COL_BY_READ_KEY  = new Map(COLLECTIONS.filter(c => c.readKey).map(c => [c.readKey, c]));
-export const _NAV_ICONS = {one:'V1',two:'V2',three:'V3',four:'V4',five:'V5',six:'V6',seven:'V7',timothy:'LT',flock:'LF',rebuke:'LR',wtlb1:'W1',wtlb2:'W2',blessed:'TB',holydays:'HD',hm:'HM'};
+export const _NAV_ICONS = {one:'V1',two:'V2',three:'V3',four:'V4',five:'V5',six:'V6',seven:'V7',timothy:'LT',flock:'LF',rebuke:'LR',wtlb1:'W1',wtlb2:'W2',blessed:'TB',holydays:'HD',answers:'AN',hm:'HM'};
 export const COL_NAV_ICON = new Map(COLLECTIONS.map(c => [c.label, _NAV_ICONS[c.volKey] || '?']));
 
 /* Boundary-card short labels (default to .label when same). Used by the
@@ -409,6 +410,18 @@ export function findEntryContext(id, kindHint) {
         if (f) return { kind: 'holy-days', screen: hdCol.letterScreen, collection: hdCol.label, title: f.title || id, entry: f };
       }
     }
+  }
+  // An Answers topic before its lazy corpus has landed (a fresh session's
+  // My Notes / Bookmarks / Links): the always-loaded title index
+  // (utils/answers-url-index.js, published by utils/answers-links.js) still
+  // names it and its screen, so the row labels and opens it; the answers-entry
+  // route fetches the topics. `entry` stays null — callers treat that as
+  // "not loaded yet".
+  if (!kindHint || kindHint === 'wtlb') {
+    const titles = typeof window !== 'undefined' ? window.__answersTitles : null;
+    const t = titles && Object.prototype.hasOwnProperty.call(titles, id) ? titles[id] : null;
+    const aCol = t && COL_BY_KEY && COL_BY_KEY.get ? COL_BY_KEY.get('answers') : null;
+    if (aCol) return { kind: aCol.kind, screen: aCol.letterScreen, collection: aCol.label, title: t, entry: null };
   }
   if (kindHint && kindHint !== 'letter') return null;
   var _bs = _studies();

@@ -117,6 +117,9 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid, jid) {
   // offset — a nonsense position the 90-frame restore loop then re-applied
   // against the user's finger ("scroll keeps jerking me back", Android).
   if (scr === "journal-viewer" || scr === "journal-editor") return scr + '-' + (jid || '');
+  // Same reason, per Answers subject (its id rides letterId): one shared slot
+  // restored a long subject's offset onto a short one.
+  if (scr === "answers-subject") return scr + '-' + (lid || '');
   var _sc = COL_BY_LETTER_SC.get(scr);
   if (_sc) {
     var pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;

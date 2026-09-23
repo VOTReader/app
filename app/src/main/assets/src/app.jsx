@@ -580,7 +580,8 @@ function App() {
     if (id === "scriptures") goScripturesHome();else
     if (id === "volumes") goVolumesHome();else
     if (id === "studies") {setFromStudies(false);setGenreId(null);goStudiesHome();}else
-    if (id === "library") goLibrary();
+    if (id === "library") goLibrary();else
+    if (id === "answers") setScreen("answers-home");
   };
 
   /* handleSurprise → src/hooks/use-surprise.js (P7j). */

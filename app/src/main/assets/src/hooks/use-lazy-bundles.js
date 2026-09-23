@@ -64,4 +64,11 @@ export function useLazyBundles() {
     React.useCallback((cb) => (typeof window.__screensH !== 'undefined' ? window.__screensH.subscribe(cb) : () => {}), []),
     () => (typeof window.__screensH !== 'undefined' ? window.__screensH.getVersion() : 0)
   );
+  // Answers Only God Can Give (src/data/answers.js). Its loader is not in
+  // index.html: utils/sync-loaders.js creates it as bundle-d evaluates and
+  // publishes the corpus here, so it exists before App first subscribes.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus.subscribe(cb) : () => {}), []),
+    () => (typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus.getVersion() : 0)
+  );
 }

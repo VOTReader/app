@@ -23,7 +23,10 @@
    directions: ids no longer in DEFAULT_ORDER (a retired tile, or a
    foreign id from an import payload) are dropped in place, and every
    default id the save is missing (a tile that shipped after the save)
-   is appended at the end in default order. The result can never carry
+   is placed beside its default neighbour — after the nearest tile that
+   precedes it in DEFAULT_ORDER, else before the nearest that follows —
+   so a new tile arrives where it belongs, not under Settings and
+   History at the bottom of a hand-arranged screen. The result can never carry
    an unknown id or omit a real tile — the invariant the strict check
    was guarding — while the user's arrangement survives the schema
    change. Only a value that isn't an array of strings is untrustworthy
@@ -42,10 +45,35 @@ import { CachedStore, extendStore } from './cached-store.js';
 
 /** Canonical default home-tile order. 'listening' joined 2026-08-09 (the
  *  Listening Library moved home from the Library + Volumes entry points);
- *  existing saved orders keep their arrangement and gain it at the end. */
+ *  'answers' (Answers Only God Can Give) joined 2026-09-22. An existing
+ *  saved order keeps its arrangement and gains each beside its neighbour. */
 export const DEFAULT_HOME_ORDER = Object.freeze([
-  'volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history',
+  'volumes', 'scriptures', 'answers', 'studies', 'listening', 'library', 'settings', 'history',
 ]);
+
+/**
+ * Merge a saved order (known string ids only, deduped) with the defaults:
+ * each missing default id goes after the nearest present id that precedes it
+ * in DEFAULT_HOME_ORDER, else before the nearest present one that follows it.
+ * @param {string[]} clean
+ * @returns {string[]}
+ */
+function placeMissing(clean) {
+  const out = clean.slice();
+  DEFAULT_HOME_ORDER.forEach((id, d) => {
+    if (out.includes(id)) return;
+    for (let p = d - 1; p >= 0; p--) {
+      const at = out.indexOf(DEFAULT_HOME_ORDER[p]);
+      if (at >= 0) { out.splice(at + 1, 0, id); return; }
+    }
+    for (let n = d + 1; n < DEFAULT_HOME_ORDER.length; n++) {
+      const at = out.indexOf(DEFAULT_HOME_ORDER[n]);
+      if (at >= 0) { out.splice(at, 0, id); return; }
+    }
+    out.push(id);
+  });
+  return out;
+}
 
 export const HomeOrderStore = extendStore(
   CachedStore('vot-home-order', /** @type {string[]} */ ([]), { idb: true }),
@@ -53,7 +81,8 @@ export const HomeOrderStore = extendStore(
     /**
      * Saved order merged against the current defaults (deduped, with
      * ids no longer in DEFAULT_HOME_ORDER dropped in place and any
-     * default ids the save predates appended at the end); a save that
+     * default ids the save predates placed beside their default
+     * neighbours — placeMissing); a save that
      * isn't an array of strings falls back to DEFAULT_HOME_ORDER.
      * Returns a defensive read — callers must not mutate the returned
      * array.
@@ -67,8 +96,7 @@ export const HomeOrderStore = extendStore(
       const seen = new Set();
       const clean = saved.filter((id) =>
         DEFAULT_HOME_ORDER.includes(id) && !seen.has(id) && seen.add(id));
-      const missing = DEFAULT_HOME_ORDER.filter((id) => !seen.has(id));
-      return /** @type {string[]} */ (clean.concat(missing));
+      return placeMissing(clean);
     },
 
     /**

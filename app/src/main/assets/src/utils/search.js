@@ -31,6 +31,7 @@ export function srchGroupKey(doc) {
   if (k === 'wtlb' || k === 'wtlb-title') return doc.volumeId || 'wtlb';
   if (k === 'blessed' || k === 'blessed-title') return 'blessed';
   if (k === 'holy-day' || k === 'holy-day-title') return 'holydays';
+  if (k === 'answers' || k === 'answers-title') return 'answers';
   if (k === 'bible-study') return 'bible-studies';
   return 'other';
 }

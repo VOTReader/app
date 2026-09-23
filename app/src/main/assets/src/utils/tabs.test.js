@@ -141,6 +141,13 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true });
     });
 
+    it('names the Answers screens, a subject by its own title', () => {
+      expect(describeTab({ screen: 'answers-home' })).toEqual({ title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true });
+      expect(describeTab({ screen: 'answers-az' }).title).toBe('Every Topic, A–Z');
+      expect(describeTab({ screen: 'answers-subject', letterId: 'the-end-of-this-age' }).title).toBe('The End of This Age');
+      expect(describeTab({ screen: 'answers-subject', letterId: 'gone' }).title).toBe('Answers');
+    });
+
     it('enumerates EVERY corpus-independent route — none but home itself may label "Home"', () => {
       // Every screen that needs no corpus lookup must describe itself with
       // resolved:true and a non-Home title; the Home default is reserved for
@@ -151,6 +158,7 @@ describe('describeTab', () => {
         'search', 'history', 'settings', 'about', 'library', 'my-progress',
         'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
         'links-index', 'bookmarks-index', 'highlights-index', 'home',
+        'answers-home', 'answers-az', 'answers-subject',
       ];
       for (const screen of corpusIndependent) {
         const d = describeTab({ screen });

@@ -37,6 +37,7 @@
    │  7. search                                → goSearchOrigin            │
    │  8. scripture-genre                       → goScripturesHome          │
    │  9. scriptures-home / volumes-home        → goHome                    │
+   │     · answers-home → goHome; answers-subject / answers-az → answers-home│
    │ 10. matthew-ch / -idx, bible-study-* ,     → context-aware (fromSearch │
    │     bible-ch / -idx                          / fromStudies / fromWtlb │
    │                                              / single-chapter book …) │
@@ -314,6 +315,12 @@ export function useAndroidBack({
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
       if (s === "scriptures-home") {goHome();return "true";} else
       if (s === "volumes-home") {goHome();return "true";} else
+      // Answers: the landing is also the collection's indexScreen, so it must be
+      // matched BEFORE the index-screen rule below sends it to Volumes. A subject
+      // and A–Z step back to the landing; a topic unwinds by the tap-through
+      // stack its opener pushed, else the letter-screen rule (indexScreen).
+      if (s === "answers-home") {goHome();return "true";} else
+      if (s === "answers-subject" || s === "answers-az") {setScreen("answers-home");return "true";} else
       if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
       // Wave 0 (P1-13 + matthew-idx hub parity): fromSearch is armed on
       // book-level search results too (ref-book lands on the -idx screens),

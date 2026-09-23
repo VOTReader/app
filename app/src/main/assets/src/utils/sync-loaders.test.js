@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   loadAudioSync, audioSyncStore,
   loadBibleSync, bibleSyncStore,
+  loadAnswers,
   resetSyncLoadersForTests,
 } from './sync-loaders.js';
 
@@ -205,5 +206,44 @@ describe('sync-loaders — an edition that declares itself untimed is never fetc
     const paths = globalThis.__makeLazyLoader.mock.calls.map((c) => c[1]);
     expect(paths).not.toContain('src/data/bible-sync-john-film.js');
     expect(paths.some((p) => String(p).includes('john-film'))).toBe(false);
+  });
+});
+
+describe('the Answers corpus (src/data/answers.js)', () => {
+  afterEach(() => { delete globalThis.__makeLazyLoader; });
+
+  it('is a no-op without the factory', async () => {
+    await expect(loadAnswers()).resolves.toBeUndefined();
+    expect(globalThis.__answersCorpus).toBeUndefined();
+  });
+
+  it('makes ONE loader, for the literal path, finishing through __finishVotInit, and publishes it', async () => {
+    installFactory();
+    await loadAnswers();
+    await loadAnswers();
+    const l = byPath('src/data/answers.js');
+    expect(l).toBeTruthy();
+    expect(made.filter((x) => x.path === 'src/data/answers.js').length).toBe(1);
+    expect(l.finishFn).toBe('__finishVotInit');
+    expect(l.load).toHaveBeenCalledTimes(2);
+    // screen-routes gates on these, useLazyBundles subscribes App to the corpus.
+    expect(globalThis.__answersCorpus).toBe(l.corpus);
+    expect(typeof globalThis.__loadAnswersCorpus).toBe('function');
+  });
+
+  it('a failed load resolves (the corpus keeps its error for a retry)', async () => {
+    installFactory();
+    await loadAnswers();
+    byPath('src/data/answers.js').load.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    await expect(loadAnswers()).resolves.toBeUndefined();
+  });
+
+  it('reuses a loader another bundle already published', async () => {
+    installFactory();
+    const shared = { corpus: { loaded: true }, load: vi.fn(() => Promise.resolve()) };
+    globalThis.__answersLoader = shared;
+    await loadAnswers();
+    expect(shared.load).toHaveBeenCalledTimes(1);
+    expect(byPath('src/data/answers.js')).toBeNull();
   });
 });
