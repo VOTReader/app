@@ -49,6 +49,12 @@ export function AudioPlayerBar() {
   const track = queue[st.qi] || {};
   const reader = AudioPlayer.readerLabel(track.readerCode);
   const part = displayPartLabel(track.title, track.partLabel);
+  // A WTLB compilation reads 19-31 letters from one file: the letter under the
+  // clock takes the title line and the section label moves beside it
+  // (2026-09-22). Null for a keyed track, during the file intro, and until the
+  // registry lands — the section label then titles the bar as before.
+  const live = AudioPlayer.liveLetter();
+  const liveTitle = live && live.title ? live.title : null;
   // The player continues into the next collection by itself (w-audio-continue, 2026-09-11); for the
   // FIRST track after a crossing the title names the collection — "Volume Two · Solo Letter" — so the
   // reader is informed rather than surprised, no toast and no confirm. Every other track keeps its plain
@@ -116,11 +122,13 @@ export function AudioPlayerBar() {
         >
           <span className="audio-bar-summary-text">
             <span className="audio-bar-title">
-              {(crossed ? track.sub + ' · ' : '') + (track.title || '')}
+              {(crossed ? track.sub + ' · ' : '') + (liveTitle || track.title || '')}
               {/* Silent when it would only repeat the title: a per-chapter
                   Bible track is titled "Genesis 2" AND labelled "Chapter 2",
                   so the bar read both (2026-08-10). See displayPartLabel. */}
-              {part ? <span className="audio-bar-part">{' · ' + part}</span> : null}
+              {liveTitle
+                ? <span className="audio-bar-part">{' · ' + (track.title || '')}</span>
+                : part ? <span className="audio-bar-part">{' · ' + part}</span> : null}
             </span>
             <span className="audio-bar-sub">
               <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>

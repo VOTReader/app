@@ -310,14 +310,7 @@ function _mediaSession(track) {
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
-    const MM = _g().MediaMetadata;
-    if (typeof MM === 'function') {
-      ms.metadata = new MM({
-        title: track.title + (track.partLabel ? ' — ' + track.partLabel : ''),
-        artist: _cardArtist(track),
-        album: track.sub || '',
-      });
-    }
+    _setCardMetadata(ms, track);
     _setAction(ms, 'play', () => toggle());
     _setAction(ms, 'pause', () => toggle());
     _setAction(ms, 'seekto', (/** @type {any} */ d) => seek((d && d.seekTime) || 0));
@@ -439,6 +432,47 @@ function _cardArtist(track) {
   return 'The Volumes of Truth' + (reader ? ' · ' + reader : '');
 }
 
+/**
+ * The title line of a media card: inside a compilation, the letter being read
+ * (the follower's _secKey — re-sent at each letter boundary by
+ * _refreshCardMetadata); otherwise the track's own title and part.
+ * @param {Track} track @returns {string}
+ */
+function _cardTitle(track) {
+  const live = track.key == null && _secKey && _state.queue[_state.qi] === track ? _letterTitleOf(_secKey) : null;
+  return live || track.title + (track.partLabel ? ' — ' + track.partLabel : '');
+}
+
+/**
+ * The album line: the collection, plus — once a compilation's letter holds the
+ * title line — the section label it moved out of it.
+ * @param {Track} track @returns {string}
+ */
+function _cardAlbum(track) {
+  const live = track.key == null && _secKey && _state.queue[_state.qi] === track ? _letterTitleOf(_secKey) : null;
+  return live ? [track.sub, track.title].filter(Boolean).join(' · ') : (track.sub || '');
+}
+
+/** @param {any} ms @param {Track} track @returns {void} */
+function _setCardMetadata(ms, track) {
+  const MM = _g().MediaMetadata;
+  if (typeof MM !== 'function') return;
+  ms.metadata = new MM({ title: _cardTitle(track), artist: _cardArtist(track), album: _cardAlbum(track) });
+}
+
+/**
+ * Re-send both media cards for the SAME track under a new name — a
+ * compilation crossing into its next letter. An edge, never a tick.
+ * @param {Track} track @returns {void}
+ */
+function _refreshCardMetadata(track) {
+  _syncNative();
+  try {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    _setCardMetadata(/** @type {any} */ (navigator).mediaSession, track);
+  } catch (_e) { /* the card is cosmetic; playback must never notice */ }
+}
+
 /** Push the current track + state snapshot to the native media card. */
 function _syncNative() {
   try {
@@ -447,7 +481,7 @@ function _syncNative() {
     const track = _state.queue[_state.qi];
     if (!track) return;
     b.setAudioNowPlaying(
-      track.title + (track.partLabel ? ' — ' + track.partLabel : ''),
+      _cardTitle(track),
       _cardArtist(track),
       // Buffering counts as playing — same rule as _syncMediaSessionState.
       _state.status === 'playing' || _state.status === 'loading',
@@ -512,6 +546,7 @@ function _ensureEl() {
   el.addEventListener('timeupdate', () => {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
+    _followSectionLetter();   // a compilation: name the letter, credit the one heard (cheap: ~30 keys)
     // timeupdate fires ~4x/second. Only re-render subscribers when the
     // displayed (whole-second) clock actually changes.
     const sec = Math.floor(_state.time);
@@ -788,6 +823,129 @@ function sectionOpeningKey(track) {
   return first || null;
 }
 
+/* ── THE LETTER A COMPILATION IS READING (2026-09-22) ─────────────────────
+   A section track keeps key null (one file, one resume position), so every
+   surface that names a recording by its track — the mini-player, the desk,
+   the web Media Session, the Android card — said "Part 1 · Intro–19" for the
+   whole 10-24 minute file, and _notifyListened returned on the null key: none
+   of the 347 letters heard through a compilation was ever credited (owner rule
+   2026-08-09: a full listen counts like a full read). The clock already knows
+   the letter (sectionLetterKeyAt). _followSectionLetter walks with it on every
+   timeupdate: it NAMES the letter (liveLetter, the card) and CREDITS one heard
+   through — SECTION_HEARD_FRACTION of its span actually played, seeks excluded
+   — when the clock walks on into the next letter, or at 'ended' for the last. */
+
+/** Share of a letter's span that must actually play for it to count as heard. */
+const SECTION_HEARD_FRACTION = 0.8;
+/** The letter under the clock of the loaded compilation, as the follower last saw it. */
+let _secKey = /** @type {string | null} */ (null);
+/** Seconds of that letter actually heard (forward playback steps only). */
+let _secHeard = 0;
+/** The clock at the previous step; -1 after a start or a seek, so a jump never counts as heard. */
+let _secLastT = -1;
+/** "volKey:id" → title. Titles are immutable once the lazy registry has landed. */
+const _letterTitles = new Map();
+
+/** @returns {void} */
+function _resetSectionFollow() {
+  _secKey = null;
+  _secHeard = 0;
+  _secLastT = -1;
+}
+
+/**
+ * A letter's title from the lazy VOT registry, or null until it lands.
+ * @param {string | null} key - "volKey:id"
+ * @returns {string | null}
+ */
+function _letterTitleOf(key) {
+  if (!key) return null;
+  if (_letterTitles.has(key)) return /** @type {string} */ (_letterTitles.get(key));
+  const divider = key.indexOf(':');
+  if (divider <= 0) return null;
+  const items = _collectionItems(key.slice(0, divider));
+  const id = key.slice(divider + 1);
+  const item = items ? items.find((it) => it && it.id === id) : null;
+  const title = item && typeof item.title === 'string' && item.title ? item.title : null;
+  if (title) _letterTitles.set(key, title);
+  return title;
+}
+
+/**
+ * The letter the loaded compilation is reading right now, or null — for a
+ * keyed recording, before the file's first letter, or until the timings land.
+ * `title` is null until the registry lands (callers fall back to the track).
+ * @returns {{ key: string, title: string | null } | null}
+ */
+function liveLetter() {
+  const track = _state.queue[_state.qi];
+  if (!track || track.key != null || _state.status === 'idle') return null;
+  const key = sectionLetterKeyAt(track, Number(_state.time) || 0);
+  return key ? { key, title: _letterTitleOf(key) } : null;
+}
+
+/**
+ * A letter's span on the file clock: its first row to the next letter's first
+ * row, or to the end of the file for the last one. 0 when unknown.
+ * @param {any} track @param {string} key @returns {number}
+ */
+function _sectionSpan(track, key) {
+  const table = _sectionTableFor(track);
+  if (!table || !Array.isArray(table[key]) || !table[key].length) return 0;
+  const keys = Object.keys(table);
+  const at = keys.indexOf(key);
+  const start = Number(table[key][0][0]) || 0;
+  const nextRows = at >= 0 && at + 1 < keys.length ? table[keys[at + 1]] : null;
+  const end = nextRows && nextRows.length ? Number(nextRows[0][0]) || 0 : Number(_state.duration) || 0;
+  return Math.max(0, end - start);
+}
+
+/**
+ * Credit one letter heard through a compilation — the same bridge a keyed
+ * recording's end reaches (__votAudioListened), and never the recordings-heard
+ * counter: a letter inside a file is not a recording.
+ * @param {any} track @param {string} key @param {number} heard @returns {void}
+ */
+function _creditSectionLetter(track, key, heard) {
+  try {
+    const span = _sectionSpan(track, key);
+    if (!(span > 0) || heard < span * SECTION_HEARD_FRACTION) return;
+    const divider = key.indexOf(':');
+    if (divider <= 0) return;
+    const g = _g();
+    if (typeof g.__votAudioListened === 'function') g.__votAudioListened(key.slice(0, divider), key.slice(divider + 1), 0);
+  } catch (_e) { /* listen counting must never interfere with playback */ }
+}
+
+/**
+ * Walk with the clock of a playing compilation (called on every timeupdate):
+ * add the forward step to the current letter's heard time, and at a letter
+ * boundary credit the letter just left when the clock walked straight on from
+ * it into the next, then re-send the media card under the new letter's name.
+ * @returns {void}
+ */
+function _followSectionLetter() {
+  const track = _state.queue[_state.qi];
+  if (!track || track.key != null) { if (_secKey) _resetSectionFollow(); return; }
+  const t = Number(_state.time) || 0;
+  const live = _state.status === 'playing' || _state.status === 'loading';
+  if (_secKey && _secLastT >= 0 && live && t > _secLastT) _secHeard += t - _secLastT;
+  _secLastT = t;
+  const key = sectionLetterKeyAt(track, t);
+  if (key === _secKey) return;
+  const left = _secKey;
+  const heard = _secHeard;
+  _secKey = key;
+  _secHeard = 0;
+  if (left && key) {
+    const table = _sectionTableFor(track);
+    const keys = table ? Object.keys(table) : [];
+    const at = keys.indexOf(left);
+    if (at >= 0 && keys[at + 1] === key) _creditSectionLetter(track, left, heard);
+  }
+  _refreshCardMetadata(track);
+}
+
 /**
  * A recording finished playing to its end (owner directive 2026-08-09: a full
  * listen counts like a full read — the item's read count increments). Fired
@@ -807,6 +965,14 @@ function sectionOpeningKey(track) {
 function _notifyListened() {
   try {
     const track = _state.queue[_state.qi];
+    if (track && track.key == null && _sectionTableFor(track)) {
+      // A COMPILATION'S END (2026-09-22): its last letter is credited like any
+      // other heard through (the follower's rule, spanning to the file's end),
+      // and the file itself is one recording heard to the end.
+      if (_secKey) _creditSectionLetter(track, _secKey, _secHeard);
+      _countCompletion();
+      return;
+    }
     if (!track || !track.key) return;
     const divider = track.key.indexOf(':');
     if (divider <= 0) return;
@@ -847,6 +1013,7 @@ function _start() {
   // Before anything else: whatever this start does, a seek armed for the
   // PREVIOUS track is no longer this element's business.
   _seekGen++;
+  _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
   if (!isVotAudioUrl(track.url)) {
@@ -2431,6 +2598,7 @@ function prev() {
  * @returns {void}
  */
 function seek(seconds) {
+  _secLastT = -1;   // a jump is never "heard": the compilation follower re-bases on the next tick
   if (!_el) {
     /* THE BOOT-RESTORED BAR HAS NO ELEMENT YET, and returning silently here
        was read-along-4: a reader who opens a timed chapter after a cold boot
@@ -2702,6 +2870,7 @@ function stop() {
   _lastTick = -1;
   _errorTime = 0;
   _prewarmKey = null;
+  _resetSectionFollow();
   _clearMediaSession();
   if (wasActive) _setAudioActive(false);
   _notify();
@@ -2933,6 +3102,7 @@ export const AudioPlayer = {
   bibleChapterOfTrack,
   sectionLetterKeyAt,
   sectionOpeningKey,
+  liveLetter,
   playTrack,
   toggle,
   next,

@@ -273,12 +273,17 @@ export function AudioManagerSheet({ open, state, onClose }) {
   // Mirrors the bar: a queue of one turns prev into a Restart rather than a
   // dead control, and the place-in-queue readout stays silent at 1 of 1.
   const single = !restoring && queue.length < 2;
+  // A WTLB compilation: the letter under the clock is the heading and the
+  // section label joins the line under it (2026-09-22, as the bar does).
+  const live = AudioPlayer.liveLetter();
+  const liveTitle = live && live.title ? live.title : null;
+  const heading = liveTitle || current.title;
   const headLine = [
     current.sub,
     // Suppressed when it would only echo the <h2> directly above it — a
     // per-chapter Bible track is titled "Genesis 2" and labelled "Chapter 2"
     // (2026-08-10). The label itself is untouched; see displayPartLabel.
-    displayPartLabel(current.title, current.partLabel),
+    liveTitle ? current.title : displayPartLabel(current.title, current.partLabel),
     reader,
     restoring || single ? null : (state.qi + 1) + ' of ' + queue.length,
   ].filter(Boolean).join(' · ') || 'The Volumes of Truth';
@@ -322,13 +327,13 @@ export function AudioManagerSheet({ open, state, onClose }) {
             <button
               type="button"
               className="audio-manager-track-copy audio-manager-jump"
-              aria-label={'Open the reading — ' + trackLabel(current.title) + '; playback continues'}
+              aria-label={'Open the reading — ' + trackLabel(heading) + '; playback continues'}
               title="Open the reading"
               onClick={() => { window.__openAudioText(current); onClose(); }}
             >
               {/* '›' — the same go-to cue the home cards carry; marks the
                   title as the tap that opens the text. */}
-              <h2 id="audio-manager-title">{trackLabel(current.title)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
+              <h2 id="audio-manager-title">{trackLabel(heading)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
               <p>{headLine}</p>
               {/* The words, drawn (2026-09-12): the Settings row sends a reader here
                   by name, and a phone shows neither the tooltip nor the aria-label. */}
@@ -336,7 +341,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
             </button>
           ) : (
           <div className="audio-manager-track-copy">
-            <h2 id="audio-manager-title">{trackLabel(current.title)}</h2>
+            <h2 id="audio-manager-title">{trackLabel(heading)}</h2>
             <p>{headLine}</p>
           </div>
           )}
