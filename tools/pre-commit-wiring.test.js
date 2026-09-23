@@ -76,6 +76,31 @@ describe('pre-commit gate wiring', () => {
     expect(triggerFor('bundle_source_changed').test('app/build.gradle.kts')).toBe(false);
   });
 
+  it('Step 5 re-stages every dist/ file the build writes (pc1)', () => {
+    // bundle-g and bundle-h (2026-09-22) were added to the build chain but not to
+    // this list, so a source change that landed in g or h committed a STALE bundle
+    // unless someone staged it by hand, and CI's bundle-match failed after the push.
+    // The list is held to what exists: every tracked dist/ file and every esbuild
+    // --outfile in package.json must be in the hook's `git add`, so a bundle-i
+    // fails here the day it is added.
+    const start = lines.findIndex((l) => /^\s*git add app\/src\/main\/assets\/dist\//.test(l));
+    expect(start, 'no `git add app/src/main/assets/dist/...` in the hook').toBeGreaterThan(-1);
+    const staged = [];
+    for (let i = start; i < lines.length; i++) {
+      staged.push(...lines[i].replace(/^\s*git add\s+/, '').replace(/\\\s*$/, '').trim().split(/\s+/).filter(Boolean));
+      if (!/\\\s*$/.test(lines[i])) break;
+    }
+    const tracked = execFileSync('git', ['ls-files', 'app/src/main/assets/dist/'], { cwd: root, encoding: 'utf8' })
+      .split('\n').map((s) => s.trim()).filter(Boolean);
+    expect(tracked.length).toBeGreaterThan(10);
+    const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts;
+    const outfiles = Object.values(scripts).flatMap((s) => [...String(s).matchAll(/--outfile=(\S+)/g)].map((m) => m[1]));
+    expect(outfiles.length).toBeGreaterThan(5);
+    for (const f of new Set([...tracked, ...outfiles])) {
+      expect(staged, `${f} is built and tracked but Step 5 never re-stages it`).toContain(f);
+    }
+  });
+
   it('the Kotlin trigger matches every input the Robolectric suite reads', () => {
     const kotlin = triggerFor('kotlin_changed');
     for (const p of [

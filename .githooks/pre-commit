@@ -653,12 +653,14 @@ if [ -n "$bundle_source_changed" ]; then
   fi
   # Stage the regenerated bundles + the re-versioned SW so the commit
   # lands with everything in sync.
-  # Stage ALL seven bundles, incl. the lazy corpus bundles (a-bible /
+  # Stage EVERY dist/ output, incl. the lazy corpus bundles (a-bible /
   # a-matthew / a-vot) — a data-file edit (books.js, matthew.js, a VOT
   # corpus) regenerates those, and they're tracked, so they must be
   # re-staged or the committed bundle goes stale (CI bundle-match fails +
   # the app ships old data). `git add` of an unchanged bundle is a no-op,
-  # so listing them is safe on non-corpus commits.
+  # so listing them is safe on non-corpus commits. The lazy screen bundles
+  # g and h were missing here for a day (pc1); tools/pre-commit-wiring.test.js
+  # now holds this list to `git ls-files dist/` and package.json's --outfile set.
   git add app/src/main/assets/dist/bundle-a.js \
           app/src/main/assets/dist/bundle-a-bible.js \
           app/src/main/assets/dist/bundle-a-matthew.js \
@@ -668,6 +670,8 @@ if [ -n "$bundle_source_changed" ]; then
           app/src/main/assets/dist/bundle-d.js \
           app/src/main/assets/dist/bundle-e.js \
           app/src/main/assets/dist/bundle-f.js \
+          app/src/main/assets/dist/bundle-g.js \
+          app/src/main/assets/dist/bundle-h.js \
           app/src/main/assets/dist/app.min.css \
           app/src/main/assets/index.html \
           app/src/main/assets/service-worker.js
