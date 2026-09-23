@@ -98,7 +98,7 @@ import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js
    across the bundle boundary: a second bundled copy of audio-player.js would be
    TWO players, and a second AudioShelf two module states of one row. */
 import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../utils/audio-track.js';
-import { COVERAGE_READ_ALONG, bibleEditionCoverage } from '../utils/audio-coverage.js';
+import { COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage } from '../utils/audio-coverage.js';
 import { AudioSeekSlider } from './components/AudioSeekSlider.jsx';
 import { CoverageBadge } from './components/CoverageBadge.jsx';
 import {
@@ -264,7 +264,7 @@ Object.assign(window, {
   AudioPlayer, audioTrackUrl,
   // …and the shelf parts + audio tables bundle-h reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
-  COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,
+  COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,
   ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
   StarIcon, TextIcon, audioLibraryStore, audioPositionsStore, hasTextDestination,
   relativePlayedAt, remainingLabel, renditionRemainingLabel, trackMeta, trackName,

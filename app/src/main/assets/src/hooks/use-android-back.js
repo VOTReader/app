@@ -275,11 +275,12 @@ export function useAndroidBack({
       if (s === "history") {goNavOrigin();return "true";} else
       if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else
       if (s === "audio-library") {goNavOrigin();return "true";} else
-      // The two Listening Library sub-screens chain their origin back to the
+      // The Listening Library sub-screens chain their origin back to the
       // hub (screen-routes' _enterAudioSub), so one goNavOrigin pops one level.
       if (s === "audio-library-volumes") {goNavOrigin();return "true";} else
       if (s === "audio-library-collection") {goNavOrigin();return "true";} else
       if (s === "audio-library-saved") {goNavOrigin();return "true";} else
+      if (s === "audio-library-studies") {goNavOrigin();return "true";} else
       if (s === "milestones") {goNavOrigin();return "true";} else
       if (s === "scripture-web") {goNavOrigin();return "true";} else
       // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)

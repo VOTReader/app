@@ -92,6 +92,7 @@ export function describeTab(tab) {
   if (s === 'audio-library-volumes') return { title: 'Listening Library', subtitle: 'The Volumes of Truth', resolved: true };
   if (s === 'audio-library-collection') return { title: 'Listening Library', subtitle: 'Recordings in one source', resolved: true };
   if (s === 'audio-library-saved') return { title: 'Listening Library', subtitle: 'Saved recordings', resolved: true };
+  if (s === 'audio-library-studies') return { title: 'Listening Library', subtitle: 'Bible/Letter Studies', resolved: true };
   if (s === 'milestones') return { title: 'Milestones', subtitle: 'Your journey', resolved: true };
   if (s === 'scripture-web') return { title: 'The Scripture Web', subtitle: 'Cross-reference atlas', resolved: true };
 

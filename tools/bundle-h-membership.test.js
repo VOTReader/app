@@ -10,7 +10,7 @@
  * AudioManagerSheet live in the always-present shell and play on EVERY
  * screen, so audio-player.js, AudioShelf (rows, icons, the position
  * hook), AudioSeekSlider, CoverageBadge and the two audio tables all stay
- * in bundle-d, and the four screens read them as free globals. A second
+ * in bundle-d, and the five screens read them as free globals. A second
  * bundled audio-player.js would be two players fighting over one
  * <audio> element — a silent, miserable bug. This file makes that
  * impossible to land by accident.
@@ -29,7 +29,7 @@ const read = (p) => readFileSync(p, 'utf-8');
    identifier: esbuild minifies each screen's function to a one-letter name, and
    the identifier still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
-const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen'];
+const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen'];
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
    writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
    — and that colon reads exactly like a definition. A definition is a KEY in
@@ -37,7 +37,7 @@ const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScr
 const defines = (bundle, name) => new RegExp('[{,]\s*' + name + ':').test(bundle);
 
 describe('bundle-h carries the Listening Library, and bundle-d no longer does', () => {
-  it('the four screens are defined in bundle-h', () => {
+  it('the five screens are defined in bundle-h', () => {
     const h = read(resolve(DIST, 'bundle-h.js'));
     for (const name of MARKERS) {
       expect(defines(h, name), `bundle-h.js lacks ${name}`).toBe(true);

@@ -981,6 +981,7 @@ export function buildScreenRoutes({
         onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
         onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
+        onOpenStudies={() => _enterAudioSub('audio-library-studies')}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1003,11 +1004,29 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    'audio-library-studies': () => typeof AudioStudiesScreen !== 'undefined' ? (
+      <AudioStudiesScreen
+        onBack={goNavOrigin}
+        backLabel="Listening Library"
+        onOpenStudy={(studyId) => {
+          // A study opens the same recordings screen a collection does, as 'study:<id>'.
+          setAudioColKey('study:' + studyId);
+          setNavOrigin({ screen: 'audio-library-studies', returnOrigin: navOrigin || null });
+          setScreen('audio-library-collection');
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     'audio-library-collection': () => typeof AudioCollectionScreen !== 'undefined' ? (
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes' : 'Listening Library'}
+        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes'
+          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Studies'
+          : 'Listening Library'}
         onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
         onSearch={goSearch}
         onHistory={goHistory}

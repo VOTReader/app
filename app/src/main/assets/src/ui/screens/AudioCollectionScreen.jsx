@@ -28,6 +28,17 @@ function isBibleVol(volKey) {
 }
 
 /**
+ * 'study:<studyId>' names ONE Bible/Letter Study (the Studies screen, 2026-09-22):
+ * its chapters are the items, and the player knows them as volKey 'study'
+ * ("study:<chapterId>" in the manifest). Null for any other source.
+ * @param {string} volKey
+ * @returns {string | null}
+ */
+function studyIdOf(volKey) {
+  return typeof volKey === 'string' && volKey.lastIndexOf('study:', 0) === 0 ? volKey.slice(6) : null;
+}
+
+/**
  * The source's display label plus its caller-ordered items (preface first
  * where one exists). An unknown volKey resolves to an empty source rather
  * than throwing — a stale tab must render a way back, not a blank screen.
@@ -36,6 +47,12 @@ function isBibleVol(volKey) {
  * @returns {{ label: string, items: Array<any>, col: any }}
  */
 function resolveSource(volKey) {
+  const studyId = studyIdOf(volKey);
+  if (studyId) {
+    const studies = typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [];
+    const study = studies.find((entry) => entry && (entry.id === studyId || entry.slug === studyId)) || null;
+    return { label: study ? study.title || '' : '', items: study && Array.isArray(study.chapters) ? study.chapters : [], col: { kind: 'chapter' } };
+  }
   if (isBibleVol(volKey)) {
     const edition = Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey) || null;
     const books = typeof BIBLE_AUDIO_BOOKS !== 'undefined' && Array.isArray(BIBLE_AUDIO_BOOKS) ? BIBLE_AUDIO_BOOKS : [];
@@ -52,8 +69,9 @@ function resolveSource(volKey) {
   return { label: col.label || '', items: preface ? [preface, ...letters] : letters, col };
 }
 
-/** Letters, or entries for the WTLB/Blessed/Holy-Days families. */
+/** Letters, a study's chapters, or entries for the WTLB/Blessed/Holy-Days families. */
 function itemNoun(col, count) {
+  if (col && col.kind === 'chapter') return count === 1 ? 'chapter' : 'chapters';
   const entry = !!(col && col.kind && col.kind !== 'letter');
   return count === 1 ? (entry ? 'entry' : 'letter') : (entry ? 'entries' : 'letters');
 }
@@ -76,11 +94,24 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   useAudioPositions();
 
   const bible = isBibleVol(volKey);
+  // A study's recordings are 'study:<chapterId>' to the player, whatever study
+  // this screen shows; every other source is its own player volKey.
+  const study = studyIdOf(volKey);
+  const srcKey = study ? 'study' : volKey;
   // Letter audio needs the lazy VOT corpus (registry + manifest); the Bible
   // editions ride bundle-a and must never wait on it.
   React.useEffect(() => {
     if (!bible && typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, [bible]);
+  // A study also needs its own lazy file, the studies registry.
+  const [, setStudiesLanded] = React.useState(0);
+  React.useEffect(() => {
+    if (!study) return undefined;
+    let live = true;
+    const load = /** @type {any} */ (window).loadBibleStudies;
+    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesLanded((n) => n + 1); }, () => {});
+    return () => { live = false; };
+  }, [study]);
   React.useSyncExternalStore(
     React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
@@ -92,9 +123,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
 
   const { label, items, col } = resolveSource(volKey);
-  const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(volKey, item.id));
+  const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
   const missing = items.length - playable.length;
-  const sections = bible ? null : AudioPlayer.sectionsFor(volKey);
+  const sections = bible || study ? null : AudioPlayer.sectionsFor(volKey);
   // Per ROW, through the one rule every Listening Library surface uses: a
   // collection that declares a letter screen, or any Bible edition (whose
   // tracks open the book's chapter in the reader). The screen-level `!bible`
@@ -129,9 +160,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
       : playable.length + ' of ' + items.length + ' ' + itemNoun(col, items.length) + ' have recordings');
 
   const playFrom = (item) => {
-    if (current && current.key === volKey + ':' + item.id) { AudioPlayer.toggle(); return; }
+    if (current && current.key === srcKey + ':' + item.id) { AudioPlayer.toggle(); return; }
     if (bible) AudioPlayer.playBibleBook({ volKey, bookId: item.id, label });
-    else AudioPlayer.playCollection({ volKey, items, collectionLabel: label, startId: item.id });
+    else AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label, startId: item.id });
   };
 
   return (
@@ -142,7 +173,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
           <h1>{label}</h1>
           <p className="audio-library-intro">{countLine}</p>
           {playable.length ? (
-            <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey, items, collectionLabel: label })}>
+            <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
               <PlayIcon /><span>Play all</span>
             </button>
           ) : null}
@@ -169,8 +200,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
           {playable.length ? (
             <div className="audio-library-list">
               {playable.map((item) => {
-                const key = volKey + ':' + item.id;
-                const renditions = AudioPlayer.renditionsFor(volKey, item, label);
+                const key = srcKey + ':' + item.id;
+                const renditions = AudioPlayer.renditionsFor(srcKey, item, label);
                 const primary = renditions[0] || null;
                 const isCurrent = !!(current && current.key === key);
                 const rowPlaying = isCurrent && live;
@@ -248,7 +279,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                               <button
                                 type="button"
                                 className="audio-library-row-play"
-                                onClick={() => AudioPlayer.playCollection({ volKey, items, collectionLabel: label, startId: item.id, startReader: rendition.reader })}
+                                onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label, startId: item.id, startReader: rendition.reader })}
                                 aria-label={'Play ' + (item.title || 'this recording') + ' — ' + name}
                               >
                                 <PlayIcon />

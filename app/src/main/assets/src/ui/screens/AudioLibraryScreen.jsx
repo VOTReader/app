@@ -15,6 +15,8 @@
    screen. This file reads them as free globals at call time — one player, one
    shelf, one copy of each table. */
 
+import { studiesSummary } from './AudioStudiesScreen.jsx';
+
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
 const RECENT_OPEN_KEY = 'vot-audio-recent-open';
@@ -75,6 +77,7 @@ function bibleReaderCode(volKey) {
  *   onOpenCollection: (volKey: string) => void,
  *   onOpenVolumes: () => void,
  *   onOpenSaved: () => void,
+ *   onOpenStudies?: () => void,
  *   onOpenTrack: (track: any) => void,
  *   onSearch: () => void,
  *   onHistory: () => void,
@@ -83,7 +86,7 @@ function bibleReaderCode(volKey) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -103,6 +106,16 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
   );
 
+  // The studies are their own lazy file (bible-studies.js); their recordings
+  // ride the VOT manifest warmed above. Re-render once the registry lands.
+  const [, setStudiesLanded] = React.useState(0);
+  React.useEffect(() => {
+    let live = true;
+    const load = /** @type {any} */ (window).loadBibleStudies;
+    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesLanded((n) => n + 1); }, () => {});
+    return () => { live = false; };
+  }, []);
+
   const [recentOpen, setRecentOpen] = React.useState(readRecentOpen);
   const [recentAll, setRecentAll] = React.useState(false);
 
@@ -115,6 +128,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   // Every edition the registry OFFERS — one whose assets are not on the
   // release is a shelf row that opens onto 404s (bibleAudioOffered).
   const editions = Object.values(BIBLE_AUDIO_EDITIONS).filter(bibleAudioOffered);
+  // One doorway for the Bible/Letter Studies (2026-09-22), shown once a study
+  // has a recording: a row that opens onto nothing to hear is a dead end.
+  const studies = studiesSummary();
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
@@ -261,6 +277,18 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               </span>
               <span className="audio-library-shelf-tail"><ArrowIcon /></span>
             </button>
+            {studies.recorded > 0 ? (
+              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenStudies) onOpenStudies(); }}>
+                <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
+                <span className="audio-library-shelf-copy">
+                  <strong>Bible/Letter Studies</strong>
+                  <small>{studies.count + (studies.count === 1 ? ' study' : ' studies') + ' · ' + studies.recorded + ' recorded'}</small>
+                  {/* Every recorded study chapter is timed (align's census 2026-09-22). */}
+                  <CoverageBadge state={COVERAGE_READ_ALONG} />
+                </span>
+                <span className="audio-library-shelf-tail"><ArrowIcon /></span>
+              </button>
+            ) : null}
             {editions.map((edition) => {
               const books = bibleBookCount(edition.volKey);
               // mt1 (2026-09-21): a true second line — a noun that agrees with

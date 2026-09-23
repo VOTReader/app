@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 580 distinct identifiers.
+// Total: 583 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ACHIEVEMENT_STORE_NAMES: any;
@@ -40,6 +40,7 @@ declare const AudioSavedScreen: any;
 declare const AudioSectionChips: any;
 declare const AudioSeekSlider: any;
 declare const AudioShelfRow: any;
+declare const AudioStudiesScreen: any;
 declare const AudioVolumesScreen: any;
 declare const AutoScrollContext: any;
 declare const AutoScrollControl: any;
@@ -85,6 +86,7 @@ declare const COL_BY_LETTER_SC: any;
 declare const COL_BY_READ_KEY: any;
 declare const COL_BY_SEARCH_ID: any;
 declare const COL_NAV_ICON: any;
+declare const COVERAGE_NONE: any;
 declare const COVERAGE_READ_ALONG: any;
 declare const CachedStore: any;
 declare const ChapterBookmarkBtn: any;
@@ -100,6 +102,7 @@ declare const DATA: any;
 declare const DEFAULT_HOME_ORDER: any;
 declare const DEFAULT_LIBRARY_ORDER: any;
 declare const DIST: any;
+declare const DOORWAYS: any;
 declare const Data: any;
 declare const DiagnosticLog: any;
 declare const EXPAND_THRESHOLD: any;
