@@ -146,3 +146,17 @@ describe('smoke-ci: every control a phone reader taps is at least 24 px', () => 
     expect(broken.summary).toContain('TAP TARGETS audit failed: no search box');
   });
 });
+
+import { foldSharedLink } from './smoke-ci.js';
+
+describe('smoke-ci: a shared passage link opens there (A8)', () => {
+  it('names the passage on a pass and fails the run with the evidence otherwise', () => {
+    const good = foldSharedLink(passingReport(), { ok: true, verseOnPage: true, search: '' });
+    expect(good.ok).toBe(true);
+    expect(good.summary).toContain('shared link opens John 3:16');
+    const bad = foldSharedLink(passingReport(), { ok: false, verseOnPage: false, search: '?p=bible%3Ajohn%3A3%3A16' });
+    expect(bad.ok).toBe(false);
+    expect(bad.summary).toContain('SHARED LINK FAIL');
+    expect(bad.summary).toContain('verseOnPage":false');
+  });
+});

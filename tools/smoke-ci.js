@@ -262,6 +262,40 @@ async function auditPhoneTapTargets(page) {
   return audit;
 }
 
+// ── A shared passage link opens there (A8, 2026-09-22) ─────────────────────
+// Someone taps a link a reader shared: a FRESH profile (no saved route, first
+// run) opens https://…/app/?p=bible:john:3:16. John 3 must mount with verse 16's
+// container on the page, and ?p= must be gone from the address so a reload or
+// Back does not replay it. Folded like the other audits; pure fold pinned in
+// tools/smoke-ci.test.js.
+export const SHARED_LINK_KEY = 'bible:john:3:16';
+export function foldSharedLink(report, audit) {
+  report.sharedLink = audit;
+  if (audit && audit.ok) report.summary += ' | shared link opens John 3:16';
+  else {
+    report.ok = false;
+    report.summary += ` | SHARED LINK FAIL ${JSON.stringify(audit)}`;
+  }
+  return report;
+}
+async function auditSharedLink(browser, url) {
+  const ctx = await browser.createBrowserContext();
+  try {
+    const page = await ctx.newPage();
+    await page.setViewport({ width: 360, height: 800 });
+    await page.goto(url + '?p=' + encodeURIComponent(SHARED_LINK_KEY), { waitUntil: 'domcontentloaded' });
+    let at = false;
+    for (let i = 0; i < 120 && !at; i++) {
+      at = await page.evaluate((k) => !!document.querySelector('[data-hl-key="' + k + '"]'), SHARED_LINK_KEY);
+      if (!at) await new Promise((r) => setTimeout(r, 250));
+    }
+    const search = await page.evaluate(() => location.search);
+    return { ok: at && !/[?&]p=/.test(search), verseOnPage: at, search };
+  } finally {
+    await ctx.close();
+  }
+}
+
 // Fold the page's uncaught errors into the walk's verdict. Exported for
 // tools/smoke-ci.test.js; pure, so the verdict rule is pinned without a browser.
 export function foldPageErrors(report, pageErrors) {
@@ -358,6 +392,13 @@ async function runAttempt(url) {
       tapTargets = { error: (error && error.message) || String(error) };
     }
     foldTapTargets(report, tapTargets);
+    let sharedLink;
+    try {
+      sharedLink = await auditSharedLink(browser, url);
+    } catch (error) {
+      sharedLink = { ok: false, error: (error && error.message) || String(error) };
+    }
+    foldSharedLink(report, sharedLink);
     return { report, pageErrors };
   } finally {
     if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }

@@ -5,6 +5,8 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
+import { withPassageLink } from '../../utils/passage-link.js';
+import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 
 /** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
     bookmark decoration chrome (marker digit or icon glyph), not reading text.
@@ -961,7 +963,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const handleShare = React.useCallback(() => {
     if (!selInfo) return;
-    const text = selInfo.text;
+    // A8: the quote travels with its reference and a link that opens the
+    // passage (utils/passage-link.js); a key that may not travel (the reader's
+    // own journal) sends the words alone. A multi-verse selection links to
+    // its first verse.
+    const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
+      ? selInfo.multiContainers[0].dataset.hlKey : null);
+    const text = withPassageLink(selInfo.text, key, key ? _bookmarkSourceLabel(key) : null);
     window.getSelection().removeAllRanges();
     setVisible(false);
     // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,

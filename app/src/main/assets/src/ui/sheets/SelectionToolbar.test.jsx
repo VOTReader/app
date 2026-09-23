@@ -1088,6 +1088,38 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     expect(recovery()).toBeNull();
   });
 
+  /* A8 (2026-09-22): Share carries the passage as a link that opens there;
+     the reader's own journal writing never travels as a link. */
+  /** @param {string} key */
+  function raiseToolbarOn(key) {
+    const c = readingContainer(key, QUOTE);
+    mount();
+    stubSelection(rangeOver(c, 0, QUOTE.length));
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+  }
+  it('Share sends the quote, its reference and a link that opens the passage (A8)', async () => {
+    const sent = /** @type {any[]} */ ([]);
+    setShare((d) => { sent.push(d); return Promise.resolve(); });
+    raiseToolbarOn('bible:john:3:16');
+    tapAction('Share');
+    await settle();
+    expect(sent.length).toBe(1);
+    expect(sent[0].text.startsWith(QUOTE)).toBe(true);
+    expect(sent[0].text).toContain('3:16');
+    expect(sent[0].text.endsWith('https://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16')).toBe(true);
+  });
+
+  it('Share from the reader’s own journal sends the words alone, no link (A8)', async () => {
+    const sent = /** @type {any[]} */ ([]);
+    setShare((d) => { sent.push(d); return Promise.resolve(); });
+    raiseToolbarOn('journal:abc123:0');
+    tapAction('Share');
+    await settle();
+    expect(sent.length).toBe(1);
+    expect(sent[0].text).toBe(QUOTE);
+  });
+
   it('Share failing for another reason, with copy denied too, keeps the quote recoverable', async () => {
     setShare(() => Promise.reject(Object.assign(new Error('not allowed'), { name: 'NotAllowedError' })));
     setClipboard(denied);

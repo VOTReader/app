@@ -130,6 +130,7 @@ import { useDocumentTitle } from '../hooks/use-document-title.js';
 import { useTabTitleMemo } from '../hooks/use-tab-title-memo.js';
 import { useLazyBundles } from '../hooks/use-lazy-bundles.js';
 import { useDesktopKeyboard } from '../hooks/use-desktop-keyboard.js';
+import { useSharedPassageLink } from '../hooks/use-shared-passage-link.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
@@ -261,6 +262,7 @@ Object.assign(window, {
   useTabTitleMemo,
   useLazyBundles,
   useDesktopKeyboard,
+  useSharedPassageLink,
   useStorageInfo,
   formatBytes,
   StorageHealth,

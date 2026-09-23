@@ -474,6 +474,9 @@ function App() {
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
     setSurpriseAnchor, setJournalEntryId,
   });
+  // A8: a shared link (…/app/?p=<public passage key>) opens that passage once,
+  // at boot, over whatever route the app restored.
+  useSharedPassageLink(navigateToLink);
 
   const { createAndEditJournal } = useJournalMutations({
     setJournalEntryId, setScreen,
