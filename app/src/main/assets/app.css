@@ -1084,9 +1084,17 @@
          -moz-range-* twins. appearance:none drops the platform track in each;
          the thumb's -5px margin centers a 14px circle on the 4px track
          (webkit only — Firefox centers the thumb itself). */
+      /* A 24 px tall HIT box around the same thin track (WCAG 2.5.8; ux2,
+         2026-09-22): at 14 px a finger aimed at the seek landed on "Open
+         listening controls" above it. Block, not the input's default inline:
+         an inline range sits on a text line box, which is what the old 14 px
+         input's 18 px footprint was. The margins give back exactly that
+         footprint (24 - 2 - 4 = 18) - 2 px up into the column gap, never into
+         the summary button, and 4 px down into the bar's own bottom padding -
+         so the bar keeps its height; the drawn track sits 3 px lower. */
       .audio-bar-seek {
         -webkit-appearance: none; appearance: none;
-        width: 100%; height: 14px; margin: 0; padding: 0;
+        display: block; width: 100%; height: 24px; margin: -2px 0 -4px; padding: 0;
         background: transparent; cursor: pointer;
       }
       .audio-bar-seek:disabled { opacity: 0.4; cursor: default; }
