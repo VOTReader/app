@@ -179,11 +179,22 @@
       /* B5: the offline-library notice (OfflineLibraryBanner) is news, not an
          alarm. It sits just UNDER the top nav, at .chapter-nav-sticky's offset,
          so the nav stays usable while it shows; the storage banners keep the
-         very top. Design: Codex mockup variant B (b5-mockups.html). */
+         very top. Design: Codex mockup variant B (b5-mockups.html).
+         b5l (2026-09-23): and it takes layout space, as variant B drew it. The
+         component sets body.offline-strip-open + --offline-strip-h; the rule
+         below opens that much room under the page's nav (not under the tabs
+         overview's, which covers the strip), and .chapter-nav-sticky moves
+         below it. Fixed and unspaced it hid the top 44 px of every page. In
+         flow it casts no shadow, and min-height holds the one-row states
+         (incomplete, downloading, complete) at one height so the page does
+         not jump between them. */
       .sh-banner.offline-library-banner {
-        top: calc(var(--inset-top, 0px) + 44px + 1.4rem + 1px);
+        top: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
         padding-top: 0.5rem;
+        min-height: 44px;
+        box-shadow: none;
       }
+      body.offline-strip-open :not(.tabs-overview-layer) > .screen-layout > .top-nav { margin-bottom: var(--offline-strip-h, 0px); }
       .sh-banner-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
       .sh-banner-btn {
         background: none; border: 1px solid var(--gold-border); border-radius: 6px;
@@ -873,15 +884,20 @@
          clone-side only: SCREENSHOT_IGNORE_CLASSES in platform-bridge.js.) */
       /* Floating — pinned to the viewport just under the top nav. Takes zero
          layout space, so the hero tucks flush under the nav bar with no gap.
-         Top offset = inset-top + nav button height (44px) + nav padding (1.4rem). */
+         Top offset = inset-top + nav button height (44px) + nav padding (22.4px)
+         + its 1px border. The padding is px, not 1.4rem: the chrome-pin block at
+         the end of this file freezes the nav in px at every text size, and 1.4rem
+         grows with the reader's text size (6.7 px below the nav at size 1.3). */
       .chapter-nav-sticky {
         position: fixed; left: 0; right: 0;
-        top: calc(var(--inset-top, 0px) + 44px + 1.4rem + 1px);
+        top: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
         z-index: 55;
         display: flex; justify-content: space-between; align-items: center;
         padding: 0.55rem 0.95rem;
         pointer-events: none;
       }
+      /* b5l: while the offline-library strip shows, it holds this spot; the arrows sit below it. */
+      body.offline-strip-open .chapter-nav-sticky { top: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px + var(--offline-strip-h, 0px)); }
       /* Alternate layouts — both arrows grouped under one thumb */
       body.arrows-right .chapter-nav-sticky { justify-content: flex-end; gap: 0.55rem; }
       body.arrows-left  .chapter-nav-sticky { justify-content: flex-start; gap: 0.55rem; }

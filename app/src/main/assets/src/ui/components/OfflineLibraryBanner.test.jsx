@@ -90,4 +90,26 @@ describe('OfflineLibraryBanner (B5)', () => {
     fireEvent.click(getByLabelText('Dismiss'));
     expect(container.querySelector('.offline-library-banner')).toBeNull();
   });
+
+  it('declares itself while it shows, so app.css can make room for it (b5l)', async () => {
+    // jsdom has no layout: give the strip the 44.17 px it measured in the real app.
+    const rect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const h = this.classList.contains('offline-library-banner') ? 44.17 : 0;
+      return /** @type {DOMRect} */ ({ x: 0, y: 0, top: 0, left: 0, right: 0, width: 0, bottom: h, height: h, toJSON() { return {}; } });
+    };
+    const root = document.documentElement;
+    try {
+      const { getByLabelText } = render(<OfflineLibraryBanner />);
+      expect(document.body.classList.contains('offline-strip-open')).toBe(false);
+      await act(async () => { await OfflineLibrary.check(() => fakeWorker({ CHECK_OFFLINE: status(['a']) }), 1000); });
+      expect(document.body.classList.contains('offline-strip-open')).toBe(true);
+      expect(root.style.getPropertyValue('--offline-strip-h')).toBe('44.2px');
+      fireEvent.click(getByLabelText('Dismiss'));
+      expect(document.body.classList.contains('offline-strip-open')).toBe(false);
+      expect(root.style.getPropertyValue('--offline-strip-h')).toBe('');
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = rect;
+    }
+  });
 });
