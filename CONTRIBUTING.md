@@ -152,9 +152,6 @@ git add app/src/main/assets/index.html app/src/main/assets/service-worker.js app
 git commit
 ```
 
-Also stage `dist/` yourself after any change that lands in bundle-g or bundle-h: the hook's re-stage list names
-bundle-a through bundle-f only.
-
 `git commit --no-verify` skips all of this. CI runs the same gates on every push anyway, so skipping only moves
 the failure to after your push, on `main`.
 

@@ -28,7 +28,7 @@ if (lines > BUDGET) {
   console.error(`[check-app-size] app.jsx is ${lines} lines — over the ${BUDGET}-line budget.`);
   console.error('App() is the composition root: extract the new concern into a hook');
   console.error('under app/src/main/assets/src/hooks/ instead of inlining it here.');
-  console.error('See CLAUDE.md "App() decomposition" for the pattern.');
+  console.error('See ARCHITECTURE.md "P6 extraction workflow" and docs/FILE-STRUCTURE.md for the pattern.');
   process.exit(1);
 }
 
