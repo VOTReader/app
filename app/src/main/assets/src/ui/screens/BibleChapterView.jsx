@@ -327,6 +327,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           chapter={chapter.num}
           mainRef={bodyRef}
           leadRef={leadRef}
+          onListen={AudioPlayer.hasAudio(bibleAudio.volKey, book.id) ? () => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num }) : null}
           hlKeyFn={bibleKeyFn}
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}

@@ -579,7 +579,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           offsetMapFn projects onto whatever is on screen right now, which is
           what lets these entries paint a line at a time instead of washing a
           whole paragraph. Both halves are separately gated in Settings.  */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} leadRef={leadRef} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} seekOffset={landedOff} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} leadRef={leadRef} onListen={AudioPlayer.hasAudio(volKey, entry.id) ? () => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null }) : null} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} seekOffset={landedOff} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

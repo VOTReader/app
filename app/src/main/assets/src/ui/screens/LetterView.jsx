@@ -654,7 +654,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           ::highlight(vot-reading) registration, and must never write the
           live container's scrollTop. Both halves are separately gated in
           Settings → Reading. */}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} leadRef={leadRef} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} leadRef={leadRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

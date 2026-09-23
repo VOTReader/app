@@ -645,6 +645,45 @@ export function readingIndexAt(frags, t, leadOn) {
 }
 
 /**
+ * LISTEN FROM HERE's landing (2026-09-22): in block `hlKey`, the last fragment
+ * starting at or before `offset` in the RENDERED text (a Format B row's corpus
+ * offset is projected through offsetMapFn first, the way the paint does), else
+ * that block's first fragment. A block with no timed clause falls forward to the
+ * first fragment of a later block in reading order. -1 when nothing is timed at
+ * or after the block.
+ *
+ * @param {any[]} frags
+ * @param {string} hlKey
+ * @param {number | null} offset
+ * @param {string} letterId
+ * @param {(id: string, i: number) => string} hlKeyFn
+ * @param {((bi: number) => ((off: number, isEnd?: boolean) => number) | null) | null} offsetMapFn
+ * @param {HTMLElement | null} mainEl
+ * @returns {number}
+ */
+export function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMapFn, mainEl) {
+  let target = -1;
+  for (let i = 0; i < frags.length; i++) {
+    const bi = frags[i][1];
+    if (hlKeyFn(letterId, bi) !== hlKey) continue;
+    if (target < 0) target = i;
+    const cs0 = frags[i][2];
+    if (typeof cs0 !== 'number' || cs0 < 0 || typeof offset !== 'number') continue;
+    const map = offsetMapFn && offsetMapFn(bi);
+    if ((map ? map(cs0) : cs0) <= offset) target = i;
+  }
+  if (target >= 0 || !mainEl) return target;
+  const esc = (k) => String(k).replace(/"/g, '\\"');
+  const blockEl = mainEl.querySelector('[data-hl-key="' + esc(hlKey) + '"]');
+  if (!blockEl) return -1;
+  for (let i = 0; i < frags.length; i++) {
+    const el = mainEl.querySelector('[data-hl-key="' + esc(hlKeyFn(letterId, frags[i][1])) + '"]');
+    if (el && (blockEl.compareDocumentPosition(el) & 4)) return i;   // 4 = DOCUMENT_POSITION_FOLLOWING
+  }
+  return -1;
+}
+
+/**
  * @param {object} props
  * @param {string} props.volKey
  * @param {string} props.letterId
@@ -668,8 +707,11 @@ export function readingIndexAt(frags, t, leadOn) {
  *   voice is on BEFORE the first timed row (a letter's title, a chapter's
  *   "Book · Chapter N" line): washed through the lead-in of the recording's
  *   first part. Absent, the lead-in stays dark as it always did.
+ * @param {(() => void) | null} [props.onListen] - the host's own Listen action
+ *   (its hero pill's). Given, this unit offers LISTEN FROM HERE through
+ *   window.__votListenFrom; absent (no recording), it offers nothing.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, leadRef = null }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, leadRef = null, onListen = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -952,6 +994,64 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     seekServed.current = seekTo;
     AudioPlayer.seek(frags[target][0]);
   }, [seekTo, seekOffset, frags, letterId, hlKeyFn]);
+
+  // LISTEN FROM HERE (2026-09-22). A reader in the middle of a long unit who
+  // wants to listen from the paragraph in front of them used to scroll to the
+  // hero, press Listen, and find their place again. While the host offers a
+  // recording (onListen), the live pane registers window.__votListenFrom:
+  //   has(hlKey)        - is this block part of the unit on screen?
+  //   start(hlKey, off) - play this unit from the clause holding `off`: through
+  //                       the host's own Listen when it is not the loaded track
+  //                       (the landing then waits for its timings, below), a
+  //                       straight seek when it is, resumed if it was paused.
+  // The follow-scroll stands down meanwhile: the reader is looking at the place.
+  // One live pane at a time (the !inert contract), and the cleanup only clears
+  // the slot if it is still this pane's.
+  const listenOffered = typeof onListen === 'function';
+  const onListenRef = React.useRef(onListen);
+  onListenRef.current = onListen;
+  const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string }} */ ({ frags: null, loaded: false, status: 'idle' }));
+  listenCtx.current = { frags, loaded, status: st.status };
+  const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null } | null} */ (null));
+  React.useEffect(() => {
+    if (!listenOffered || typeof window === 'undefined') return undefined;
+    const w = /** @type {any} */ (window);
+    const has = (/** @type {string} */ hlKey) => {
+      const el = mainRef.current;
+      return !!(el && hlKey && el.querySelector('[data-hl-key="' + String(hlKey).replace(/"/g, '\\"') + '"]'));
+    };
+    const entry = {
+      has,
+      start: (/** @type {string} */ hlKey, /** @type {number | null} */ offset) => {
+        if (!has(hlKey)) return false;
+        const off = offset == null || !Number.isFinite(Number(offset)) ? null : Number(offset);
+        userScrollAt.current = Date.now();
+        const c = listenCtx.current;
+        if (c.loaded && c.frags) {
+          const i = listenTargetAt(c.frags, hlKey, off, letterId, hlKeyFn, offsetMapFn, mainRef.current);
+          if (i >= 0) AudioPlayer.seek(c.frags[i][0]);
+          if (c.status === 'paused') AudioPlayer.toggle();
+          return true;
+        }
+        pendingListen.current = { hlKey, offset: off };
+        const go = onListenRef.current;
+        if (typeof go === 'function') go();
+        return true;
+      },
+    };
+    w.__votListenFrom = entry;
+    return () => { if (w.__votListenFrom === entry) w.__votListenFrom = null; };
+  }, [listenOffered, mainRef, letterId, hlKeyFn, offsetMapFn]);
+  // The landing a start() through the host's Listen is waiting for: applied
+  // once, the moment this unit is the loaded track with its timings in memory.
+  React.useEffect(() => {
+    const p = pendingListen.current;
+    if (!p || !loaded || !frags) return;
+    pendingListen.current = null;
+    const i = listenTargetAt(frags, p.hlKey, p.offset, letterId, hlKeyFn, offsetMapFn, mainRef.current);
+    if (i >= 0) AudioPlayer.seek(frags[i][0]);
+    userScrollAt.current = Date.now();
+  }, [loaded, frags, letterId, hlKeyFn, offsetMapFn, mainRef]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {
