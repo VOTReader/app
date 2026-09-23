@@ -121,6 +121,19 @@ describe('smoke-ci: every control a phone reader taps is at least 24 px', () => 
     expect(r.offenders.map((o) => o.label)).toEqual(['Sort verses in book order']);
   });
 
+  it('probes only inside the root it is given (the read-along e2e scopes it to the player bar)', () => {
+    document.body.innerHTML = '';
+    const bar = el('<div class="audio-bar"></div>');
+    const seek = document.createElement('input');
+    seek.type = 'range'; seek.setAttribute('aria-label', 'Seek'); bar.appendChild(seek);
+    const outside = el('<button aria-label="Sort verses in book order">Book order</button>');
+    layout([{ el: seek, drawn: { x: 60, y: 300, w: 127, h: 14 } }, { el: outside, drawn: { x: 20, y: 100, w: 80, h: 22 } }]);
+    const r = probeTapTargets(TAP_TARGET_MIN_PX, '.audio-bar');
+    expect(r.probed).toBe(1);
+    expect(r.offenders.map((o) => o.label)).toEqual(['Seek']);
+    expect(probeTapTargets(TAP_TARGET_MIN_PX, '.no-such-root')).toEqual({ probed: 0, offenders: [] });
+  });
+
   it('exempts an inline link in a sentence, and skips a control covered at its centre', () => {
     document.body.innerHTML = '';
     const link = el('<a href="https://example.org" style="display:inline">thevolumesoftruth.com</a>');
