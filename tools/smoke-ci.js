@@ -137,14 +137,18 @@ async function auditCompactReadingNav(page) {
 // (the inline exception), disabled or inert controls, a control whose centre is
 // covered by something else (a sheet, the nav), and one whose circle leaves the
 // viewport. Runs IN THE PAGE (page.evaluate), so it may use only page globals.
+// `rootSel` (optional) probes only the controls inside that element - the
+// read-along e2e uses it for the player bar (ux2, 2026-09-22).
 export const TAP_TARGET_MIN_PX = 24;
-export function probeTapTargets(minPx) {
+export function probeTapTargets(minPx, rootSel) {
   var R = minPx / 2 - 0.5;
   var sel = 'button, a[href], [role="button"], [role="link"], [role="tab"], [role="switch"], [role="checkbox"], ' +
     'input:not([type="hidden"]), select, textarea';
   var out = { probed: 0, offenders: [] };
   function lands(el, x, y) { var h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); }
-  var els = document.querySelectorAll(sel);
+  var root = rootSel ? document.querySelector(rootSel) : document;
+  if (!root) return out;
+  var els = root.querySelectorAll(sel);
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
     if (el.disabled || (el.closest && el.closest('[inert], [aria-hidden="true"]'))) continue;

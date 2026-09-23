@@ -42,6 +42,7 @@ import { resolve, dirname, normalize, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import puppeteer from 'puppeteer';
+import { probeTapTargets, TAP_TARGET_MIN_PX } from './smoke-ci.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -707,6 +708,7 @@ async function run() {
 
   const failures = [];
   const report = [];
+  let barProbed = false;
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
@@ -939,6 +941,25 @@ async function run() {
         else console.log(`    pixel proof: +${proof.delta.dR.toFixed(1)}R +${proof.delta.dG.toFixed(1)}G over the block`);
       }
       report.push({ key, rows: rows.length, sampled: sampled.length, painted, domainBad: domCheck.bad.length });
+      if (!barProbed) {
+        // THE PLAYER BAR TAKES A FINGER (ux2, 2026-09-22). The bar is pinned
+        // chrome on every screen while a recording is loaded, so the first
+        // key's reading screen is where to probe it: at a phone's 360 x 800,
+        // every control in it must catch all 8 points of a 24 px circle
+        // around its centre (smoke-ci's probeTapTargets, WCAG 2.5.8). The seek
+        // was 14 px tall and a finger aimed at it opened the listening desk.
+        barProbed = true;
+        await page.setViewport({ width: 360, height: 800 });
+        await sleep(400);
+        const bar = await page.evaluate(probeTapTargets, TAP_TARGET_MIN_PX, '.audio-bar');
+        await page.setViewport({ width: 1280, height: 900 });
+        await sleep(200);
+        if (!bar.probed) failures.push({ key, kind: 'TAP-TARGETS', detail: 'the player bar was not on screen to probe' });
+        for (const o of bar.offenders) {
+          failures.push({ key, kind: 'TAP-TARGETS', detail: `player bar: ${o.label} ${o.w}x${o.h} - ${o.missed} of 8 points on a 24 px circle land elsewhere` });
+        }
+        console.log(`    player bar at 360x800: ${bar.probed} controls probed, ${bar.offenders.length} under ${TAP_TARGET_MIN_PX} px`);
+      }
       console.log(`  ${key.padEnd(58)} ${painted}/${sampled.length} painted` +
         (domCheck.bad.length ? `  DOMAIN-MISMATCH x${domCheck.bad.length}` : ''));
       await page.evaluate(() => AudioPlayer.stop());
