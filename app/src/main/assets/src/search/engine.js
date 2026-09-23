@@ -51,6 +51,12 @@ const NAV_ONLY_KINDS = new Set(['ref-bible', 'ref-letter', 'command']);
  */
 const NAV_TEXT_LIMIT = 5;
 
+/* Typo tolerance is a FALLBACK (2026-09-22). MiniSearch rounds fuzzy 0.2 to ONE edit
+   on a three-letter word, so a correctly spelled "one" also matched "owe" and "gone",
+   "son" matched "sun", "peace" matched "place": verses the reader never asked for, with
+   the near-miss highlighted as if it were the hit. A literal unit now searches exact +
+   prefix first and retries with FUZZY only when that finds nothing, which is exactly the
+   typo ("shephard" -> shepherd). search/fuzzy-fallback.test.js pins both halves. */
 const FUZZY = 0.2;
 
 /** @type {any} */ let msIndex = null;
@@ -232,12 +238,9 @@ async function search(query, options) {
     const unit = units[u];
     let res;
     try {
-      res = msIndex.search(unit.term, {
-        prefix: unit.literal,
-        fuzzy: unit.literal ? FUZZY : false,
-        combineWith: 'AND',
-        boost: MS_SEARCH_DEFAULTS.boost,
-      });
+      const opts = { prefix: unit.literal, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost };
+      res = msIndex.search(unit.term, opts);
+      if (unit.literal && (!res || !res.length)) res = msIndex.search(unit.term, { ...opts, fuzzy: FUZZY });
     } catch { continue; }
     if (!res) continue;
     for (let r = 0; r < res.length; r++) {

@@ -8,6 +8,16 @@
 
 import { expandArchaicTerms } from './tokenize.js';
 
+/* Whole words only (2026-09-22). The engine tokenises on word boundaries, so a term
+   found INSIDE another word ("one" in "everyone", "love" in "Beloved") is never what
+   it matched on. A hit starts where a word starts and is marked to the word's end
+   ("loves", "lovest" whole); a snippet opens and closes between words. */
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+/** @param {string} text @param {number} i */
+function startsWord(text, i) { return i === 0 || !WORD_CHAR.test(text[i - 1]); }
+/** @param {string} text @param {number} i */
+function insideWord(text, i) { return i > 0 && i < text.length && WORD_CHAR.test(text[i - 1]) && WORD_CHAR.test(text[i]); }
+
 /**
  * The ~maxLen-wide window covering the MOST DISTINCT query terms — the passage
  * where the query words actually cluster (the remembered phrase), not the
@@ -30,7 +40,7 @@ export function bestMatch(text, terms, maxLen) {
     if (t.length < 2) continue;
     let idx = lower.indexOf(t);
     while (idx >= 0 && occ.length < 400) {
-      occ.push({ idx, len: t.length, term: t });
+      if (startsWord(lower, idx)) occ.push({ idx, len: t.length, term: t });
       idx = lower.indexOf(t, idx + t.length);
     }
   }
@@ -64,16 +74,41 @@ export function snippet(text, terms, maxLen) {
   maxLen = maxLen || 180;
   if (!text) return '';
   const m = bestMatch(text, terms, maxLen);
-  if (!m) return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+  if (!m) {
+    if (text.length <= maxLen) return text;
+    return text.slice(0, closeBetweenWords(text, 0, maxLen, 0)) + '…';
+  }
   // Center the matched span within maxLen.
   const pad = Math.max(0, Math.floor((maxLen - m.span) / 2));
   let start = Math.max(0, m.start - pad);
-  const end = Math.min(text.length, start + maxLen);
+  let end = Math.min(text.length, start + maxLen);
   if (end - start < maxLen) start = Math.max(0, end - maxLen);
-  let clip = text.slice(start, end);
+  // the last hit is a whole word too ("love" found in "loved" keeps the "d")
+  let matchEnd = m.start + m.span;
+  while (insideWord(text, matchEnd)) matchEnd++;
+  start = openBetweenWords(text, start, m.start);
+  end = closeBetweenWords(text, start, Math.max(end, matchEnd), matchEnd);
+  let clip = text.slice(start, end).trim();
   if (start > 0) clip = '…' + clip;
   if (end < text.length) clip = clip + '…';
   return clip;
+}
+
+/** Move a window's start forward to the first letter of a whole word (past a cut word's
+ *  tail and the punctuation it leaves, "….. Understand"), never past `limit` (the match). */
+function openBetweenWords(text, start, limit) {
+  if (start === 0) return 0;
+  let i = start;
+  while (i < limit && !(WORD_CHAR.test(text[i]) && startsWord(text, i))) i++;
+  return Math.min(i, limit);
+}
+/** Move a window's end back out of a half word, never before `floor` (the match's end). */
+function closeBetweenWords(text, start, end, floor) {
+  if (!insideWord(text, end)) return end;
+  let i = end;
+  while (i > Math.max(start, floor) && insideWord(text, i)) i--;
+  // a single word longer than the window (no boundary to retreat to) keeps the hard cut
+  return i > start && !insideWord(text, i) ? i : end;
 }
 
 /**
@@ -112,7 +147,8 @@ export function highlightSpans(text, terms) {
   const esc = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   esc.sort((a, b) => b.length - a.length); // longer first
   let re;
-  try { re = new RegExp('(' + esc.join('|') + ')', 'gi'); } catch { return [{ text, hit: false }]; }
+  // a hit starts a word and runs to its end: "love" marks "loves" whole, never "Be-love-d"
+  try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + esc.join('|') + ')[\\p{L}\\p{N}]*', 'giu'); } catch { return [{ text, hit: false }]; }
   const out = [];
   let last = 0;
   let m;
