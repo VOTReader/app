@@ -14,7 +14,7 @@ There is no backend and no account. Whatever a reader writes stays on the device
 ## Your first day
 
 1. Read this file, then **CONTRIBUTING.md** (build, test, gates, landing, coordination), then **CLAUDE.md** (the
-   agent briefing: current state, product rules, permanent data rules, data formats).
+   agent briefing: current state, product rules, permanent data rules). Data formats: `docs/DATA-FORMATS.md`.
 2. On this machine, read `D:\AgentMemory\START-HERE.md` first: twelve documents in order, ending at the live board.
    Several agent sessions work on this repo at once and coordinate through `D:\Swarm` (CONTRIBUTING.md,
    "Coordinating with parallel work").
@@ -103,11 +103,11 @@ boot. The other seven load the first time something needs them.
 |---|---|---|
 | `README.md` | this front door | |
 | `CONTRIBUTING.md` | build, test, gates, landing, coordination | |
-| `CLAUDE.md` | the agent briefing: "Current state", product rules, permanent data rules, data formats | "Current state" is one dated screen: rewrite it, never grow it into a log |
-| `HISTORY.md` | the narrative of landed work | prepend a dated entry for each landing, plus a one-liner in CLAUDE.md's Closed-phases index |
+| `CLAUDE.md` | the agent briefing: "Current state", product rules, permanent data rules, the landing flow in brief | "Current state" is one dated screen: rewrite it, never grow it into a log |
+| `HISTORY.md` | the narrative of landed work | prepend a dated entry for each landing, plus a one-liner in its Closed-phases index (top of the file) |
 | `ARCHITECTURE.md` | deep reference: annotations, COLLECTIONS, navigation, read-along, audio, lazy corpora | |
 | `BRIDGES.md` | every `window.__*` bridge between bundles | change it in the same commit as the bridge |
-| `docs/` | subsystem docs: `docs/AUDIO-MANAGER.md`, `docs/OCR-PIPELINE.md` | a finished plan moves to `docs/archive/`, with a line in `docs/archive/README.md` |
+| `docs/` | subsystem docs: `docs/DATA-FORMATS.md` (the corpus data formats), `docs/FILE-STRUCTURE.md` (the directory tour), `docs/AUDIO-MANAGER.md`, `docs/OCR-PIPELINE.md` | a finished plan moves to `docs/archive/`, with a line in `docs/archive/README.md` |
 | `tools/SMOKE.md`, `tools/n1-smoke-walk.md` | the smoke harness; the manual device walk | |
 | `VENDORED-LIBS.md` | the vendored libraries and what the APK ships | |
 | `AGENTS.md` | a pointer to CLAUDE.md for tools that auto-load AGENTS.md | |

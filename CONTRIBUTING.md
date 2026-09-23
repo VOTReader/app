@@ -1,7 +1,7 @@
 # Contributing to VOTReader
 
 > Last updated 2026-09-22. Read README.md first; it has the quick start, the bundle map and the doc map. CLAUDE.md
-> is the agent briefing (current state, product rules, permanent data rules, data formats).
+> is the agent briefing (current state, product rules, permanent data rules); the data formats are in docs/DATA-FORMATS.md.
 
 The order here is the order of a change: where you work, how you build and test, what the gates check, how a
 commit lands, and how you stay out of the way of the other sessions working on the same repo.
@@ -212,8 +212,8 @@ code and still succeeds.
 - Bump `CORPUS_VERSION` in `app/src/main/assets/service-worker.js` on any corpus content change, or installed PWAs
   keep serving the old text. `npm run check:corpus` enforces it against `tools/corpus-version.lock`.
 - Fix the source, not the renderer. Match the file's existing format (Volume Two uses unquoted keys, the other
-  volumes quoted keys). Verse ranges use an ASCII hyphen. The full rules and the data formats are in CLAUDE.md
-  ("Permanent rules", "Data formats").
+  volumes quoted keys). Verse ranges use an ASCII hyphen. The full rules are in CLAUDE.md ("Permanent rules"),
+  the data formats in `docs/DATA-FORMATS.md`.
 
 ---
 
@@ -249,8 +249,8 @@ The old coordination file is closed history: `docs/archive/PLAN.txt`.
 
 - **CLAUDE.md "Current state (date)"** is one screen. Rewrite it when the picture changes; never append a log to it.
   It loads into every agent session, so every line costs something.
-- **HISTORY.md**: prepend a dated narrative entry for each landed piece of work, and add a one-liner to CLAUDE.md's
-  Closed-phases index.
+- **HISTORY.md**: prepend a dated narrative entry for each landed piece of work, and add a one-liner to the
+  Closed-phases index at the top of HISTORY.md.
 - **BRIDGES.md**: same commit as any `window.__*` bridge change.
 - **docs/**: subsystem docs. A finished plan or tracker moves to `docs/archive/` with a line in
   `docs/archive/README.md`.
