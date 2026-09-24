@@ -117,7 +117,8 @@ class BridgeContractTest {
         "offlineAudioState" to 0,
         "offlineAudioSave" to 1,
         "offlineAudioRemove" to 1,
-        "offlineAudioCancel" to 1
+        "offlineAudioCancel" to 1,
+        "offlineAudioSizes" to 1
     )
 
     @Test

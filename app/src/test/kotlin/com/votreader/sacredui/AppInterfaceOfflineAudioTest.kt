@@ -27,6 +27,7 @@ class AppInterfaceOfflineAudioTest {
 
     private val url1 = "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/one-christmas-B.mp3"
     private val url2 = "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/one-wide-path-B.mp3"
+    private val events = mutableListOf<JSONObject>()
 
     private fun subject(): Pair<AppInterface, OfflineAudioStore> {
         val store = OfflineAudioStore(
@@ -34,6 +35,10 @@ class AppInterfaceOfflineAudioTest {
             opener = { OfflineAudioStore.Opened(ByteArrayInputStream(ByteArray(100)), 100L) },
             executor = Executor { it.run() },
             freeBytes = { 10L shl 30 },
+            emit = { events += JSONObject(it) },
+            sizeLister = { mapOf("one-christmas-B.mp3" to 18_000_000L) },
+            headSize = { null },
+            sizeExecutor = Executor { it.run() },
         )
         val host = object : BridgeHost by FakeBridgeHost() {
             override val offlineAudio: OfflineAudioStore get() = store
@@ -54,6 +59,15 @@ class AppInterfaceOfflineAudioTest {
         assertFalse(store.isSaved(url1))
         app.offlineAudioRemove("""["*"]""")
         assertFalse(store.isSaved(url2))
+    }
+
+    @Test
+    fun `sizes are looked up for the listed recordings and answered as one event`() {
+        val (app, _) = subject()
+        app.offlineAudioSizes("""["$url1"]""")
+        val sizes = events.last { it.getString("type") == "sizes" }.getJSONObject("sizes")
+        assertEquals(18_000_000L, sizes.getLong(url1))
+        app.offlineAudioSizes("not json")   // quiet
     }
 
     @Test

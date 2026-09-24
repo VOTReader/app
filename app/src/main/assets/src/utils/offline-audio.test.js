@@ -21,6 +21,7 @@ function fakeBridge(initial = []) {
     offlineAudioSave: vi.fn(),
     offlineAudioRemove: vi.fn(),
     offlineAudioCancel: vi.fn(),
+    offlineAudioSizes: vi.fn(),
   };
   /** @type {any} */ (window).AndroidBridge = b;
   return b;
@@ -100,6 +101,19 @@ describe('offline-audio — in the phone app', () => {
     expect(JSON.parse(b.offlineAudioRemove.mock.calls[1][0])).toEqual(['*']);
     OfflineAudio.cancel([U2]);
     expect(JSON.parse(b.offlineAudioCancel.mock.calls[0][0])).toEqual([U2]);
+  });
+
+  it('asks the phone for sizes before a download and answers them per recording', () => {
+    const b = fakeBridge([{ url: U2, key: 'k2', title: 't2', bytes: 20, savedAt: 1 }]);
+    OfflineAudio.refresh();
+    expect(OfflineAudio.sizeOf(U1)).toBeNull();
+    OfflineAudio.requestSizes([U1, U2]);
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U1]);   // a download on the phone already knows its size
+    send({ type: 'sizes', sizes: { [U1]: 18_000_000 } });
+    expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
+    expect(OfflineAudio.sizeOf(U2)).toBe(20);
+    OfflineAudio.requestSizes([U1]);
+    expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);                     // known sizes are not asked again
   });
 
   it('a cancelled download is simply not there any more', () => {
