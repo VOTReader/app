@@ -44,6 +44,25 @@ import { IDBAdapter } from './idb-adapter.js';
 const _idbStoreRegistry = new Set();
 
 /**
+ * v04-02 (improvement sweep 2026-09-22): the Clear-All write fence. While it is
+ * up, every store's `_save()` / `_saveMerged()` is a no-op — no localStorage
+ * write (LS mode or the vot-state boot shim), no IDB put, no STORE-4 retry.
+ * Clear All raises it BEFORE deleting the databases and holds it through the
+ * reload: a write after deleteDatabase() reopens 'votreader', recreates every
+ * store and puts whatever was still in memory back, so a wiped device came back
+ * with its old data. Lowered only by the path that does not reload (a delete
+ * that failed). Bundle-d reaches it through the window global _entry-b.js
+ * publishes; the flag itself lives here, in the one bundle that has stores.
+ */
+let _writeFence = false;
+
+/** @param {boolean} on */
+export function setStoreWriteFence(on) { _writeFence = !!on; }
+
+/** @returns {boolean} */
+export function isStoreWriteFenced() { return _writeFence; }
+
+/**
  * STORE-1: is the Web Locks API present? The cross-tab-safe flush serializes
  * its read-merge-write through `navigator.locks`. Native on the chrome108
  * floor; if a host lacks it (very old PWA browser, or a bare test env without
@@ -384,6 +403,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * store ([D4]), so the LS branch is no longer exclusive to this one.
      */
     _save() {
+      if (_writeFence) return;   // v04-02: nothing may land between Clear All's deletes and its reload
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
         // The boot-script copy is written SYNCHRONOUSLY here, before either
@@ -457,10 +477,15 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * local cache — identical to the pre-STORE-1 behavior, never worse.
      */
     _saveMerged() {
+      if (_writeFence) return;
       const self = this;
       const name = idbStoreName;
       const p = navigator.locks.request('vot-store:' + name, function () {
+        // v04-02: a merge queued behind this lock may run after the fence went
+        // up; its get would reopen the deleted database and its put refill it.
+        if (_writeFence) return undefined;
         return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
+          if (_writeFence) return undefined;
           const theirs = (theirsRaw === undefined) ? null : theirsRaw;
           // ── synchronous merge + adopt: no `await` between reading `_cache`
           //    and reassigning it, so a concurrent in-place mutation of the old

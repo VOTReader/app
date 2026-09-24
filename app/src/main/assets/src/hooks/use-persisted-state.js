@@ -88,6 +88,20 @@
         the record is a two-minute bridge across one self-reload. A flush
         that must survive a reload uses a synchronous store; IDB is never
         that store.
+     7. THE RESTORE / WIPE FREEZE (v04-01, 2026-09-24): an import REPLACES
+        vot-state (and Clear All deletes it), then the page reloads 0.6-5 s
+        later — but the React state this sink writes is still the PRE-import
+        state, and nothing refreshes it. A scroll, a tap or the reload's own
+        pagehide in that window used to write the stale union over the
+        restored one; StateStore's 3-way merge then kept the stale fields and
+        DELETED restored readItems (they were in base and theirs, not ours).
+        So window.__freezePersistState(true) drops any pending union and
+        makes the persist effect AND every flush (hide, close, unmount, the
+        export and update-reload bridges) no-ops until the page reloads;
+        SettingsScreen flushes first, then freezes, BEFORE it applies.
+        __freezePersistState(false) is the path that does not reload (a
+        failed or refused import): it thaws, and a union rendered while
+        frozen is re-armed on the debounce, never dropped.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -127,7 +141,8 @@
    WINDOW: PERSIST_DEBOUNCE_MS trailing debounce (below); flush listeners
            on window (pagehide, beforeunload) + document
            (visibilitychange) for the life of App(). Publishes
-           window.__flushPersistState (contract 5) for the export path.
+           window.__flushPersistState (contract 5) for the export path and
+           window.__freezePersistState (contract 7) for import / Clear All.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { StateStore } from '../stores/state-store.js';
@@ -225,6 +240,9 @@ export function usePersistedState({
   // The last union rendered, written or still pending — the base a patched
   // flush (the update reload) applies to.
   const latestRef = React.useRef(null);
+  // Contract 7: true from an import / Clear All until the page reloads (or the
+  // path that does not reload thaws it) — every write below is a no-op.
+  const frozenRef = React.useRef(false);
 
   // ── Mount-only: install the guaranteed-flush listeners + unmount flush.
   React.useEffect(() => {
@@ -241,6 +259,7 @@ export function usePersistedState({
        choice. A sessionStorage that throws (quota, unavailable) must not stop the
        store write or the reload behind it. */
     const flush = (patch, opts) => {
+      if (frozenRef.current) return;             // contract 7: the stale union must not land
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       const pending = pendingRef.current;
       const base = pending != null ? pending : (typeof patch === 'function' ? latestRef.current : null);
@@ -267,6 +286,29 @@ export function usePersistedState({
     // + IDB read. Registered (not stubbed in vitest.setup) because this hook
     // is the sole owner; callers guard with typeof === 'function'.
     window.__flushPersistState = flush;
+    // Contract 7: the import / Clear All freeze. Freezing drops the pending
+    // union (the caller flushed it first) and cancels its timer; thawing re-arms
+    // whatever was rendered meanwhile, so the path that does not reload loses
+    // nothing. Same bridge rules as the flush above (bundle-d calls it).
+    const freeze = (on) => {
+      if (on) {
+        if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
+        pendingRef.current = null;
+        frozenRef.current = true;
+        return;
+      }
+      if (!frozenRef.current) return;
+      frozenRef.current = false;
+      const latest = latestRef.current;
+      if (latest == null || latest === writtenRef.current) return;
+      pendingRef.current = latest;
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        const f = flushRef.current;
+        if (f) f();
+      }, PERSIST_DEBOUNCE_MS);
+    };
+    window.__freezePersistState = freeze;
     const onVisibility = () => {
       // Only 'hidden' flushes — a return to 'visible' must not cut a
       // still-accumulating debounce window short.
@@ -283,7 +325,8 @@ export function usePersistedState({
       // Only clear the bridge if it's still mine (the guarded-cleanup
       // pattern) — a racing second registration must not be clobbered.
       if (window.__flushPersistState === flush) window.__flushPersistState = null;
-      flush();   // App teardown never strands a pending union
+      if (window.__freezePersistState === freeze) window.__freezePersistState = null;
+      flush();   // App teardown never strands a pending union (a no-op while frozen)
     };
   }, []);
 
@@ -295,6 +338,9 @@ export function usePersistedState({
       activeReadKey, settings, readItems,
     };
     latestRef.current = union;
+    // Contract 7: rendered from pre-import state — kept in latestRef for a thaw,
+    // never written while frozen.
+    if (frozenRef.current) return;
     const prev = writtenRef.current;
     const boot = _bootFields(union);
     const prevBoot = _bootFields(prev);

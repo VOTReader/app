@@ -39,6 +39,9 @@ import { useSettings } from '../hooks/use-settings.js';
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { hydrateAllStores, hasAnyPendingStores } from '../stores/cached-store.js';
+// Namespace import: v04-02's fence is read by property, so this file still loads
+// (and the v04-02 case fails on its assertion, not on a link error) without it.
+import * as cachedStoreModule from '../stores/cached-store.js';
 import { JournalMediaStore } from '../stores/journal-media-store.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from './import-validators.js';
 import { StorageHealth } from './storage-health.js';
@@ -1427,6 +1430,85 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(setSpy).toHaveBeenCalledTimes(2);
     setSpy.mockRestore();
     delete /** @type {any} */ (window).__flushPersistState;
+  }, 20000);
+
+  /* v04-01 (improvement sweep 2026-09-22): after an import the React state App
+     persists is still the PRE-import state, and nothing refreshes it before the
+     reload. A scroll in the reload window (a new tabs union, the 250 ms debounce)
+     or the reload's own pagehide flush put that stale union over the restored
+     vot-state; StateStore's 3-way merge then kept the stale theme and DELETED the
+     restored readItems (present in base and theirs, absent from ours). The REAL
+     hook on the REAL StateStore + fake IDB, driven through SettingsScreen's
+     import prelude: flush, freeze, apply. */
+  it('v04-01: a stale union rendered after an import never overwrites the restored vot-state', async () => {
+    const w = /** @type {any} */ (window);
+    const stale = {
+      tabs: [{ id: 't1', screen: 'settings' }], activeTabIdx: 0, theme: 'dark',
+      lastReadChapters: {}, lastReadLetterMap: {}, activeReadKey: null,
+      settings: { fontStyle: 'modern', fontScale: '1.0' }, readItems: {},
+    };
+    const restored = {
+      ...stale, theme: 'light', settings: { fontStyle: 'classic', fontScale: '1.3' },
+      readItems: { 'letter-1': true, 'letter-2': true },
+    };
+    const { rerender, unmount } = renderHook((p) => usePersistedState(p), { initialProps: stale });
+    try {
+      await flushAll();                                           // the mount write is durable
+      rerender({ ...stale, tabs: [{ id: 't1', screen: 'settings', scroll: 120 }] });   // pending
+
+      // SettingsScreen._withLiveWritersFrozen, then the apply.
+      if (typeof w.__flushPersistState === 'function') w.__flushPersistState();
+      if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
+      const res = await applyImportPayload(
+        { exportVersion: 2, stores: { 'vot-state': restored } },
+        { storesMap: { 'vot-state': { store: StateStore, method: 'set' } }, flagMap: {},
+          mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord },
+      );
+      expect(res.writeFailures).toBe(0);
+
+      // The reload window: the reader scrolls, the debounce elapses, the reload's pagehide fires.
+      rerender({ ...stale, tabs: [{ id: 't1', screen: 'settings', scroll: 480 }] });
+      await new Promise((r) => setTimeout(r, 300));
+      window.dispatchEvent(new Event('pagehide'));
+      await flushAll();
+
+      const onDisk = await IDBAdapter.get('vot-state', 'v');
+      expect(onDisk.theme, 'the restored theme survives').toBe('light');
+      expect(onDisk.settings.fontScale).toBe('1.3');
+      expect(onDisk.readItems, 'restored reading history is not deleted by the merge').toEqual(restored.readItems);
+    } finally {
+      unmount();
+      delete w.__flushPersistState;
+      delete w.__freezePersistState;
+    }
+  }, 20000);
+
+  /* v04-02: Clear All deletes 'votreader', then reloads 600 ms later. A store
+     write in between reopened the database, recreated every store and put back
+     what was still in memory — the wiped device came back with its data (and the
+     vot-state boot shim put the old theme back in localStorage). The fence raised
+     before the deletes makes every such write a no-op. */
+  it('v04-02: a store write after Clear All deleted the database does not bring the data back', async () => {
+    const fence = /** @type {any} */ (cachedStoreModule).setStoreWriteFence;
+    StateStore.set({ theme: 'light', settings: { fontStyle: 'classic' }, tabs: [] });
+    HomeOrderStore.set(['letters', 'bible']);
+    await flushAll();
+    expect((await IDBAdapter.get('vot-state', 'v')).theme).toBe('light');   // precondition: on disk
+    try {
+      if (typeof fence === 'function') fence(true);             // Clear All, before its deletes
+      await deleteVotreaderDb();
+      localStorage.clear();                                       // the wipe's LS sweep
+      // Live writers in the reload window: the persisted union, a store mutation.
+      StateStore.set({ theme: 'light', settings: { fontStyle: 'classic' }, tabs: [] });
+      HomeOrderStore.set(['bible', 'letters']);
+      await flushAll();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(localStorage.getItem('vot-state'), 'no boot shim written back').toBeNull();
+      expect(await IDBAdapter.get('vot-state', 'v'), 'the wiped database stays empty').toBeUndefined();
+      expect(await IDBAdapter.get('vot-home-order', 'v')).toBeUndefined();
+    } finally {
+      if (typeof fence === 'function') fence(false);
+    }
   }, 20000);
 });
 

@@ -32,6 +32,7 @@ import {
   CachedStore, extendStore,
   hydrateAllStores, hasAnyPendingStores, _resetStoreRegistry,
   clearLegacyLs, _resetLegacyLsFlag, LS_SKIP_LIST,
+  setStoreWriteFence, isStoreWriteFenced,
 } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
@@ -659,6 +660,72 @@ describe('CachedStore STORE-4 — bounded write-retry on a transient failure', (
     // 1 initial write + 4 bounded retries, then it stops (no infinite loop).
     expect(putSpy).toHaveBeenCalledTimes(5);
     expect(store._writeRetryTimer).toBeNull();
+  });
+});
+
+/* v04-02 (improvement sweep 2026-09-22): Clear All deletes the databases and
+   reloads 600 ms later. Any store write in between reopened 'votreader',
+   recreated every store and put back whatever was still in memory, so a wiped
+   device came back with its data. The fence makes every _save a no-op until
+   the reload; the path that does not reload lowers it. */
+describe('CachedStore v04-02 — the Clear-All write fence', () => {
+  beforeEach(() => {
+    localStorage.clear?.();
+    _resetStoreRegistry();
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    window.StorageHealth = { onWriteFailure: vi.fn(), onWriteSuccess: vi.fn() };
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete window.StorageHealth;
+    setStoreWriteFence(false);   // last: nothing after it may be skipped if it throws
+  });
+
+  it('while the fence is up a store writes nothing to IDB, and the edit is still in memory', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-fence', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    setStoreWriteFence(true);
+    expect(isStoreWriteFenced()).toBe(true);
+    store.add({ id: 'a', label: 'A' });
+    await vi.advanceTimersByTimeAsync(120000);            // no write, so no retry chain either
+    expect(putSpy).not.toHaveBeenCalled();
+    expect(store.all().map((i) => i.id)).toEqual(['a']);  // the session keeps working until the reload
+  });
+
+  it('an lsShim store (vot-state) writes no boot-script copy while fenced', () => {
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = extendStore(
+      CachedStore('vot-state-fence', {}, { idb: true, lsShim: (full) => ({ theme: full && full.theme }) }),
+      {
+        setTheme(t) {
+          if (this._shouldDefer('setTheme', t)) return;
+          /** @type {any} */ (this._load()).theme = t;
+          this._save();
+          this._bump();
+        },
+      }
+    );
+    store._resetForTests({ forceLoaded: true });
+    setStoreWriteFence(true);
+    store.setTheme('light');
+    expect(localStorage.getItem('vot-state-fence')).toBeNull();
+  });
+
+  it('CONTROL: lowered (the wipe failed, no reload), the next write carries the whole cache', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-fence-lift', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    setStoreWriteFence(true);
+    store.add({ id: 'a', label: 'A' });
+    setStoreWriteFence(false);
+    store.add({ id: 'b', label: 'B' });
+    await Promise.resolve();
+    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a', 'b']);
   });
 });
 

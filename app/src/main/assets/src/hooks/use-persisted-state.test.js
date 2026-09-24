@@ -74,6 +74,7 @@ afterEach(() => {
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
   // The export flush bridge is hook-owned; never leak a registration.
   delete /** @type {any} */ (window).__flushPersistState;
+  delete /** @type {any} */ (window).__freezePersistState;
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -418,6 +419,75 @@ describe('usePersistedState — the reload record (sessionStorage)', () => {
     try {
       act(() => { /** @type {any} */ (window).__flushPersistState((u) => u, { reload: true }); });
     } finally { spy.mockRestore(); }
+    expect(setSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ── contract 7 (v04-01 / v04-02, improvement sweep 2026-09-22): the restore / wipe freeze.
+   An import REPLACES vot-state and Clear All deletes it; the page reloads 0.6-5 s later.
+   The React state this sink writes is still the PRE-import state, and a scroll, a tap or
+   the reload's own pagehide used to write it over the restore (the 3-way merge then
+   deleted restored readItems). Frozen, the sink writes nothing until the reload; the path
+   that does not reload thaws it and re-arms what was rendered meanwhile. */
+describe('usePersistedState — window.__freezePersistState (the restore / wipe freeze)', () => {
+  const freezeBridge = () => /** @type {any} */ (window).__freezePersistState;
+
+  it('is published for the life of App() and cleared on unmount', () => {
+    const { unmount } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    expect(typeof freezeBridge()).toBe('function');
+    unmount();
+    expect(freezeBridge()).toBe(null);
+  });
+
+  it('frozen, a pending union is dropped and nothing rendered afterwards is written — boot-critical fields included', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { rerender(withQuery('scrolled-before-the-import')); });   // pending in the 250 ms window
+    act(() => { freezeBridge()(true); });
+    act(() => { rerender(withQuery('scrolled-after-the-import')); });
+    act(() => { rerender(makeState({ theme: 'light' })); });          // would bypass the debounce
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(setSpy, 'no stale union may land over the restore').not.toHaveBeenCalled();
+  });
+
+  it('frozen, every flush is a no-op: hidden, pagehide, beforeunload, the bridge (patched, reload) and unmount', () => {
+    sessionStorage.clear();
+    const { rerender, unmount } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { freezeBridge()(true); });
+    act(() => { rerender(withQuery('stale')); });
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    act(() => { window.dispatchEvent(new Event('beforeunload')); });
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });
+    act(() => { /** @type {any} */ (window).__flushPersistState((u) => ({ ...u, activeReadKey: 'x' }), { reload: true }); });
+    expect(sessionStorage.getItem(RESUME_STATE_KEY), 'no resume record either: the next boot must read the restore').toBeNull();
+    unmount();
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('thawed (the import did not reload), the union rendered while frozen is re-armed on the debounce, not lost', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { freezeBridge()(true); });
+    act(() => { rerender(withQuery('typed-while-frozen')); });
+    act(() => { freezeBridge()(false); });
+    expect(setSpy).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy.mock.calls[0][0].tabs[0].searchQuery).toBe('typed-while-frozen');
+  });
+
+  it('CONTROL: thawed with nothing rendered meanwhile writes nothing, and writes resume as before', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    setSpy.mockClear();
+    act(() => { freezeBridge()(true); });
+    act(() => { freezeBridge()(false); });
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(setSpy).not.toHaveBeenCalled();
+    act(() => { rerender(withQuery('after')); });
+    act(() => { vi.advanceTimersByTime(300); });
     expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });

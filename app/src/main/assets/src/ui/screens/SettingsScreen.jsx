@@ -794,6 +794,41 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       window.location.reload();
     }
   }, []);
+  /**
+   * Freeze the live writers from BEFORE storage is replaced (an import) or wiped
+   * (Clear All) until the reload that reboots into it (v04-01 / v04-02,
+   * improvement sweep 2026-09-22).
+   *
+   * The React state App persists is the PRE-import state, and nothing refreshes
+   * it before the reload: a scroll, a tap or the reload's own pagehide used to
+   * write it over the restored vot-state, and the 3-way merge then deleted the
+   * restored readItems. So a union still inside the persist debounce window is
+   * written FIRST (it lands before the import, which replaces it), then the sink
+   * freezes. A wipe also raises the store write fence: any write after
+   * deleteDatabase() recreates the database with what was still in memory.
+   *
+   * Lifted only when `operation` ends WITHOUT scheduling the reload (refused,
+   * failed, cancelled) — the pending-reload ref is the same flag the unmount
+   * effect above fires on — so a session that stays up keeps saving.
+   *
+   * @param {() => Promise<any>} operation
+   * @param {{ fenceStores?: boolean }} [opts]
+   */
+  const _withLiveWritersFrozen = async (operation, opts) => {
+    const fenceStores = !!(opts && opts.fenceStores);
+    const w = /** @type {any} */ (window);
+    if (typeof w.__flushPersistState === 'function') w.__flushPersistState();
+    if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
+    if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(true);
+    try {
+      return await operation();
+    } finally {
+      if (!backupReloadPendingRef.current) {
+        if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(false);
+        if (typeof w.__freezePersistState === 'function') w.__freezePersistState(false);
+      }
+    }
+  };
   const [backupBusy, setBackupBusy] = React.useState(false);
   const _runBackupOperation = async (operation) => {
     if (backupBusyRef.current) return;
@@ -1276,7 +1311,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         });
       });
       if (!confirmed) return;                       // Cancel / backdrop / Back / Escape
-      await _applyConfirmedImport(parsed, applyFn, getIntegrity);
+      // v04-01: the stale pre-import state must not be written over the restore.
+      await _withLiveWritersFrozen(() => _applyConfirmedImport(parsed, applyFn, getIntegrity));
     };
 
     // The post-confirm tail of an import: progress toast → degraded-store
@@ -1749,9 +1785,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     } catch (_e) { finish(false); }
   });
 
-  // Runs via _runLockedBackupOperation (mutex + cross-tab lock live there).
-  const clearAllPersonalData = async () => {
+  // The wipe itself. clearAllPersonalData (below) runs it with every live writer frozen.
+  const _wipeAllPersonalData = async () => {
     try {
+      // v04-02: a PLAYING recording is a live writer — its position every 5 s and
+      // again on the reload's pagehide, into the database being deleted. stop()
+      // idles it (its last position write meets the fence; its snapshot is
+      // cleared), so neither the timer nor the pagehide writes again.
+      try {
+        const player = /** @type {any} */ (globalThis).AudioPlayer;
+        if (player && typeof player.stop === 'function') player.stop();
+      } catch (_e) { /* best-effort: the store write fence still holds */ }
       // NTV3: wipe the native Garden image disk cache too (Android: cacheDir/garden,
       // capped at 800 MB — it survived "Clear All" before because the JS wipe only
       // touched IDB + localStorage). Best-effort + a no-op on web; never block the
@@ -1808,6 +1852,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       _showToast('Clear did not finish. Please try again.');
     }
   };
+  // Runs via _runLockedBackupOperation (mutex + cross-tab lock live there).
+  // v04-02: the persist sink AND every store write stay frozen from before the
+  // deletes until the reload, so nothing still in memory can recreate the data.
+  const clearAllPersonalData = () => _withLiveWritersFrozen(_wipeAllPersonalData, { fenceStores: true });
 
   const textScalePercent = Math.round(clampFontScale(settings.fontScale || '1') * 100);
   const selectedFont = typeof readingFontById === 'function'

@@ -15,7 +15,7 @@
    ───────────────────────────────────────────────────────────────────── */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CachedStore, extendStore, _resetStoreRegistry } from './cached-store.js';
+import { CachedStore, extendStore, _resetStoreRegistry, setStoreWriteFence } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { mergeListStore, mergeStateStore } from './store-merge.js';
 
@@ -322,5 +322,35 @@ describe('STOR5 — no navigator.locks: blind-write fallback + one-shot trace', 
     await s.whenSaved();
     expect(idsIn('vot-test-nolocks')).toEqual(['X', 'Y']);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* v04-02 (improvement sweep 2026-09-22): Clear All raises the store write fence and then
+   deletes the databases. A merged flush QUEUED behind this lock before the fence went up
+   runs its callback afterwards; its get would reopen the deleted database and its put
+   would refill it. The callback re-checks the fence. */
+describe('v04-02 — a merged flush queued before the Clear-All fence never reaches IDB', () => {
+  afterEach(() => { setStoreWriteFence(false); });
+
+  it('the queued merge sees the fence and neither reads nor writes', async () => {
+    const s = makeJournalLikeStore('vot-test-fence-merge', mergeListStore);
+    await s._hydrate();
+    // Another holder has the store's lock (a sibling tab mid-flush, say).
+    let release;
+    let started;
+    const holding = new Promise((r) => { started = r; });
+    const held = navigator.locks.request('vot-store:vot-test-fence-merge', () => {
+      started();
+      return new Promise((r) => { release = r; });
+    });
+    await holding;                          // the other holder is inside the lock now
+    s.add(entry('A'));                      // _saveMerged queues behind it
+    setStoreWriteFence(true);               // Clear All: the fence goes up, the deletes follow
+    const getCalls = /** @type {any} */ (IDBAdapter.get).mock.calls.length;
+    release();
+    await held;
+    await s.whenSaved();
+    expect(/** @type {any} */ (IDBAdapter.get).mock.calls.length, 'no read: it would reopen the deleted database').toBe(getCalls);
+    expect(idsIn('vot-test-fence-merge'), 'no write: the wipe stays a wipe').toEqual([]);
   });
 });
