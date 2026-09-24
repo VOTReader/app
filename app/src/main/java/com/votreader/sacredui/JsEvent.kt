@@ -16,6 +16,7 @@ package com.votreader.sacredui
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
  *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
  *   MediaCommand          -> audio-player.__votMediaCommand(cmd, posMs)
+ *   OfflineAudio          -> offline-audio.__votOfflineAudio(json)
  */
 sealed class JsEvent(val fn: String) {
     data object ImportFile : JsEvent("__onImportFile")
@@ -54,4 +55,9 @@ sealed class JsEvent(val fn: String) {
     // seek target in ms (0 for everything else). audio-player.js installs the
     // receiver and drives its own toggle()/next()/prev()/seek().
     data object MediaCommand : JsEvent("__votMediaCommand")
+    // A downloaded-recordings event from OfflineAudioStore (listening item 8):
+    // one JSON string, {type: queued|progress|done|failed|cancelled|removed,
+    // url?, urls?, all?, bytes?, total?, reason?}. utils/offline-audio.js
+    // installs the receiver and mirrors the store.
+    data object OfflineAudio : JsEvent("__votOfflineAudio")
 }

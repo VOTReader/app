@@ -1,5 +1,6 @@
 package com.votreader.sacredui
 
+import android.content.Context
 import android.webkit.WebResourceResponse
 import org.json.JSONArray
 import org.json.JSONObject
@@ -304,6 +305,26 @@ class OfflineAudioStore(
     }
 
     companion object {
+        /**
+         * Where [shared]'s events go: MainActivity sets it to the JsBridge (JsEvent.OfflineAudio) and clears it in
+         * onDestroy (the AudioKeepAliveService.commandSink pattern). Null: the event drops, the download goes on.
+         */
+        @Volatile
+        var eventSink: ((String) -> Unit)? = null
+
+        @Volatile
+        private var sharedStore: OfflineAudioStore? = null
+
+        /**
+         * The one store per process. Two over one folder would each sweep the other's in-flight .part at start and
+         * load diverging indexes, so the Activity (which can be re-created) never builds its own.
+         */
+        fun shared(context: Context): OfflineAudioStore =
+            sharedStore ?: synchronized(this) {
+                sharedStore ?: OfflineAudioStore(context.applicationContext.filesDir, emit = { json -> eventSink?.invoke(json) })
+                    .also { sharedStore = it }
+            }
+
         const val DIR_NAME = "offline-audio"
         private const val PART = ".part"
         private const val MIME = "audio/mpeg"

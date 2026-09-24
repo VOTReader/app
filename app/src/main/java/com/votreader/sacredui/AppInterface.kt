@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import androidx.annotation.RequiresApi
 import androidx.core.view.WindowInsetsControllerCompat
+import org.json.JSONArray
 import timber.log.Timber
 
 /**
@@ -603,6 +604,58 @@ class AppInterface(
         host.clearGardenCache()
     }
 
+    // ─── Downloaded recordings (listening item 8) ───────────────────────
+    // JSON in, JSON out; every input is untrusted page data, so a bad shape is a
+    // quiet no-op. Runs on the binder thread: the store is thread-safe and its
+    // downloads run on its own worker.
+
+    /** The whole store as JSON (OfflineAudioStore.stateJson), or "" on a host without one. */
+    @JavascriptInterface
+    fun offlineAudioState(): String = try { host.offlineAudio?.stateJson() ?: "" } catch (e: Exception) { "" }
+
+    /** Download each of `[{url, key, title}]` (at most [MAX_OFFLINE_BATCH] per call). */
+    @JavascriptInterface
+    fun offlineAudioSave(json: String?) {
+        val store = host.offlineAudio ?: return
+        val arr = parseJsonArray(json) ?: return
+        val items = ArrayList<OfflineAudioStore.Item>()
+        for (i in 0 until minOf(arr.length(), MAX_OFFLINE_BATCH)) {
+            val o = arr.optJSONObject(i) ?: continue
+            val url = o.optString("url")
+            if (url.isNotEmpty()) items += OfflineAudioStore.Item(url, o.optString("key"), o.optString("title"))
+        }
+        if (items.isNotEmpty()) store.enqueue(items)
+    }
+
+    /** Remove `[url, ...]`, or everything for `["*"]`. */
+    @JavascriptInterface
+    fun offlineAudioRemove(json: String?) {
+        val store = host.offlineAudio ?: return
+        val urls = parseUrls(json) ?: return
+        if (urls.contains("*")) store.removeAll() else if (urls.isNotEmpty()) store.remove(urls)
+    }
+
+    /** Stop `[url, ...]` queued or downloading, or everything for `["*"]`. */
+    @JavascriptInterface
+    fun offlineAudioCancel(json: String?) {
+        val store = host.offlineAudio ?: return
+        val urls = parseUrls(json) ?: return
+        if (urls.contains("*")) store.cancelAll() else if (urls.isNotEmpty()) store.cancel(urls)
+    }
+
+    private fun parseJsonArray(json: String?): JSONArray? =
+        if (json.isNullOrBlank()) null else try { JSONArray(json) } catch (_: Exception) { null }
+
+    private fun parseUrls(json: String?): List<String>? {
+        val arr = parseJsonArray(json) ?: return null
+        val out = ArrayList<String>()
+        for (i in 0 until minOf(arr.length(), MAX_OFFLINE_BATCH)) {
+            val s = arr.opt(i) as? String ?: continue
+            if (s.isNotEmpty()) out += s
+        }
+        return out
+    }
+
     @JavascriptInterface
     fun setImmersiveMode(immersive: Boolean) {
         // Delegated to the host: hiding the bars is only half the job (the
@@ -715,5 +768,10 @@ class AppInterface(
         bridge.callOptional(
             JsEvent.NativeRecordingComplete, result.base64, result.durationMs, "audio/mp4", null, url
         )
+    }
+
+    private companion object {
+        // One call's cap: a Bible book tops out at 150 chapters, the largest collection at 203 entries.
+        const val MAX_OFFLINE_BATCH = 400
     }
 }

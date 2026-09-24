@@ -207,6 +207,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override val audioSystemService: AudioManager? get() = audioManager
     // NTV3: wipe the native Garden image disk cache from the JS "Clear All" flow.
     override fun clearGardenCache() { gardenCache.clear() }
+    override val offlineAudio: OfflineAudioStore get() = OfflineAudioStore.shared(this)
     // Streaming audio: anchor the process in a mediaPlayback foreground service
     // for as long as JS reports playback. Never throws (see setActive's KDoc).
     override fun setAudioKeepAlive(active: Boolean) = AudioKeepAliveService.setActive(this, active)
@@ -508,6 +509,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         AudioKeepAliveService.commandSink = { cmd, posMs ->
             bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
+        // Downloaded recordings (listening item 8): the process-wide store's
+        // events reach this Activity's page; cleared in onDestroy like the sink above.
+        OfflineAudioStore.eventSink = { json -> bridge.callOptional(JsEvent.OfflineAudio, json) }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
@@ -860,6 +864,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // font, icon served from appassets.androidplatform.net).
                 val asset = assetLoader.shouldInterceptRequest(request.url)
                 if (asset != null) return asset
+                // A recording downloaded to the phone (listening item 8) is
+                // answered from disk, Range included, so it plays, seeks and
+                // reads along with no signal; null for anything not downloaded.
+                if (request.method.equals("GET", ignoreCase = true)) {
+                    val range = request.requestHeaders.entries.firstOrNull { it.key.equals("Range", ignoreCase = true) }?.value
+                    val offline = OfflineAudioStore.shared(this@MainActivity).intercept(request.url.toString(), range)
+                    if (offline != null) return offline
+                }
                 // Garden page images: serve from / populate the disk cache so
                 // navigation is instant on the 2nd+ view and limited-data users
                 // don't re-download. Returns null for any non-Garden URL, so
@@ -1401,6 +1413,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         mainHandler.removeCallbacks(splashSafetyHatch)
         // System-transport sink is bound to THIS Activity's bridge/WebView.
         AudioKeepAliveService.commandSink = null
+        OfflineAudioStore.eventSink = null
         // The WebView (and with it the <audio> element) is destroyed below, so
         // playback is over whether or not JS got to say setAudioActive(false).
         // Without this an ongoing "Playing audio" notification would outlive the

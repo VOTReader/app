@@ -143,4 +143,10 @@ interface BridgeHost {
      * the implementation never throws.
      */
     fun setAudioKeepAlive(active: Boolean)
+
+    /**
+     * The process's downloaded-recordings store (listening item 8), or null on a host without one (tests, an older
+     * shell): AppInterface's offlineAudio* methods then answer empty and do nothing.
+     */
+    val offlineAudio: OfflineAudioStore? get() = null
 }
