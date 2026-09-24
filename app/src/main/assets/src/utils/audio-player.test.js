@@ -2003,19 +2003,22 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
 });
 
 describe('audio-player — Android keep-alive bridge', () => {
-  it('activates on playing, HOLDS through pause, deactivates on stop', () => {
+  it('activates on the first Listen, HOLDS through pause, deactivates on stop', () => {
     // Media-card rework 2026-08-09: pause no longer releases the anchor —
     // the paused system media card needs the WebView (this player) alive for
     // its Play button to work, so only 'idle' (stop / queue end) deactivates.
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
-    expect(bridge.setAudioActive).not.toHaveBeenCalled(); // 'loading' is not playback
+    // v02-audio-01 (improvement sweep 2026-09-22): the anchor rises at the START
+    // ('loading'), not at the first 'playing' event. MainActivity.onPause halts
+    // the WebView's media unless streamAudioActive, so a screen turned off during
+    // the 1-2 s cold start (20 s in a stall) stopped the letter before it began.
+    expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
 
     el().dispatchEvent(new Event('playing'));
-    expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
+    expect(bridge.setAudioActive).not.toHaveBeenCalledWith(false);
 
     AudioPlayer.toggle();   // pause
     expect(bridge.setAudioActive).not.toHaveBeenCalledWith(false);
-    expect(bridge.setAudioActive).toHaveBeenCalledTimes(1);
 
     el().dispatchEvent(new Event('playing'));
     AudioPlayer.stop();
@@ -2142,6 +2145,29 @@ describe('audio-player — native media card (setAudioNowPlaying + __votMediaCom
     el().dispatchEvent(new Event('durationchange'));
     window.__votMediaCommand('seekTo', 30000);   // ms in, seconds applied
     expect(AudioPlayer.getState().time).toBe(30);
+  });
+
+  // v02-audio-02 (improvement sweep 2026-09-22): the platform MediaSession sends
+  // onPause (KEYCODE_MEDIA_PAUSE, Assistant, Wear, a car head unit) whatever the
+  // state, and the session advertises both ACTION_PLAY and ACTION_PAUSE. Through
+  // toggle(), an explicit Pause while paused STARTED playback.
+  it('an explicit Pause while paused stays paused; an explicit Play while playing keeps playing', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('playing'));
+    window.__votMediaCommand('pause', 0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    window.__votMediaCommand('pause', 0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(el().paused).toBe(true);
+    window.__votMediaCommand('play', 0);
+    expect(el().paused).toBe(false);
+    el().dispatchEvent(new Event('playing'));
+    window.__votMediaCommand('play', 0);
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(el().paused).toBe(false);
+    // The notification's own button stays a toggle.
+    window.__votMediaCommand('toggle', 0);
+    expect(AudioPlayer.getState().status).toBe('paused');
   });
 
   it('a bad command never throws into the bridge', () => {
