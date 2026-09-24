@@ -313,6 +313,29 @@ describe('IDBAdapter — open failure', () => {
   });
 });
 
+describe('IDBAdapter - a database saved by a newer VOTReader (v04-03)', () => {
+  it('open() rejects with a VersionError that isVersionError names', async () => {
+    // What an older build meets after a newer one bumped DB_VERSION: an APK installed
+    // over a newer one with adb install -r -d, or a stale PWA tab across a schema bump.
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDBAdapter.DB_NAME, IDBAdapter.DB_VERSION + 1);
+      req.onsuccess = () => { req.result.close(); resolve(undefined); };
+      req.onerror = () => reject(req.error);
+    });
+    let err = null;
+    try { await IDBAdapter.open(); } catch (e) { err = e; }
+    expect(err, 'an older app cannot open a newer database').not.toBeNull();
+    expect(IDBAdapter.isVersionError(err)).toBe(true);
+  });
+
+  it('isVersionError is false for every other failure', () => {
+    expect(IDBAdapter.isVersionError(new Error('IDB open failed'))).toBe(false);
+    expect(IDBAdapter.isVersionError({ name: 'QuotaExceededError' })).toBe(false);
+    expect(IDBAdapter.isVersionError(null)).toBe(false);
+    expect(IDBAdapter.isVersionError(undefined)).toBe(false);
+  });
+});
+
 describe('IDBAdapter — isQuotaError', () => {
   it('true for an error with name=QuotaExceededError', () => {
     const e = new Error('quota'); /** @type {any} */ (e).name = 'QuotaExceededError';

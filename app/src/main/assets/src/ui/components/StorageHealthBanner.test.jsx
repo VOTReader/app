@@ -264,6 +264,28 @@ describe('StorageHealthBanner — scenario 8 (private mode)', () => {
 
 /* ─── Priority order ───────────────────────────────────────────── */
 
+/* ─── Banner: a database saved by a newer VOTReader (v04-03) ─────── */
+
+describe('StorageHealthBanner - a database saved by a newer VOTReader (v04-03)', () => {
+  it('says what happened and what to do, instead of promising the changes will save', () => {
+    // Every store is degraded too (they cannot open the database), so the old banner
+    // said "will be saved automatically once it catches up" - it never could catch up.
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true, versionTooNew: true });
+    const banner = container.querySelector('.sh-banner');
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toMatch(/newer version of VOTReader/);
+    expect(banner.textContent).toMatch(/nothing (on this device )?has been lost/i);
+    expect(banner.textContent).toMatch(/won't be saved/);
+    expect(banner.textContent).not.toMatch(/saved automatically/);
+    expect(container.querySelector('.sh-banner-dismiss'), 'not dismissable: it stays true all session').toBeNull();
+  });
+
+  it('CONTROL: a merely slow store keeps its own banner', () => {
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true, versionTooNew: false });
+    expect(container.querySelector('.sh-banner').textContent).toContain('Storage is slow to load');
+  });
+});
+
 describe('StorageHealthBanner — priority', () => {
   it('READONLY+writeFailed > privateModeLikely', () => {
     const { container } = renderBanner({

@@ -13,6 +13,7 @@
    (owner call) — only banners about ACTUAL data danger remain.
 
    Priority (highest first):
+     versionTooNew                        → newer-version (v04-03)
      READONLY with writeFailedThisSession → scenario 7 (write-failed)
      CRITICAL with privateModeLikely      → scenario 8 (private mode)
      CRITICAL                             → scenario 7 (critical quota)
@@ -69,7 +70,21 @@ export function StorageHealthBanner({ onNavigateSettings }) {
    * @param {import('../../utils/storage-health.js').StorageHealthReport} r
    */
   function _pickScenario(r) {
-    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded } = r;
+    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded, versionTooNew } = r;
+
+    // v04-03: a NEWER VOTReader saved this device's data, so this build cannot open
+    // it (IDB VersionError). First: it explains every other symptom - the stores are
+    // degraded (never "slow", they cannot catch up) and a write that fails here is
+    // not full storage. The data on disk is untouched; the fix is the latest build.
+    if (versionTooNew) {
+      return {
+        id: 'newer-version',
+        style: 'danger',
+        text: "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: install the latest version. Changes you make here won't be saved.",
+        dismissable: false,
+        buttons: [],
+      };
+    }
 
     if (tier === StorageHealth.TIER.READONLY && writeFailedThisSession) {
       return {

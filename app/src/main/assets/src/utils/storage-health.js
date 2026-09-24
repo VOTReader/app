@@ -116,6 +116,7 @@ const RISK = Object.freeze({
  *   writeFailedThisSession: boolean,
  *   safariGateBlocked: boolean,
  *   storesDegraded: boolean,
+ *   versionTooNew: boolean,
  * }} StorageHealthReport
  */
 
@@ -134,6 +135,7 @@ const _DEFAULT_REPORT = Object.freeze({
   writeFailedThisSession: false,
   safariGateBlocked: false,
   storesDegraded: false,
+  versionTooNew: false,
 });
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -168,6 +170,10 @@ let _safariGateBlocked = false;
 // StorageHealthBanner — which only subscribes to StorageHealth — can surface
 // a low-key "storage is slow" heads-up.
 let _storesDegraded = false;
+// v04-03: true once a store met a database that a NEWER VOTReader upgraded (IDB
+// VersionError). This build can never open it, so the banner stops promising that
+// changes will be saved and says what to do instead. It never clears in a session.
+let _versionTooNew = false;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
 /** @type {(() => void) | null} */
@@ -431,6 +437,7 @@ async function _assessImpl() {
       writeFailedThisSession: _writeFailedThisSession,
       safariGateBlocked: _safariGateBlocked,
       storesDegraded: _storesDegraded,
+      versionTooNew: _versionTooNew,
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
@@ -489,6 +496,7 @@ async function _assessImpl() {
     writeFailedThisSession: _writeFailedThisSession,
     safariGateBlocked: _safariGateBlocked,
     storesDegraded: _storesDegraded,
+    versionTooNew: _versionTooNew,
   };
 
   _report = report;
@@ -571,9 +579,10 @@ function _notifyWriteFailureToast() {
   });
 }
 
-function _onWriteFailure(_err) {
+function _onWriteFailure(err) {
   _writeFailedThisSession = true;
-  _notifyWriteFailureToast();
+  // v04-03: a newer app's database is not full storage; its own banner explains it.
+  if (!(err && /** @type {any} */ (err).name === 'VersionError')) _notifyWriteFailureToast();
   if (_report) {
     var risks = _report.risks.includes(RISK.WRITE_FAILED)
       ? _report.risks
@@ -592,6 +601,7 @@ function _onWriteFailure(_err) {
       writeFailedThisSession: true,
       safariGateBlocked: _safariGateBlocked,
       storesDegraded: _storesDegraded,
+      versionTooNew: _versionTooNew,
     };
   }
   _bump();
@@ -734,6 +744,20 @@ function _setStoresDegraded(v) {
 }
 
 /**
+ * v04-03: set the "a newer VOTReader saved this database" flag (see _versionTooNew).
+ * Cached stores call it, typeof-guarded, when IDB refuses to open with a VersionError.
+ *
+ * @param {boolean} v
+ */
+function _setVersionTooNew(v) {
+  var b = !!v;
+  if (b === _versionTooNew) return;
+  _versionTooNew = b;
+  if (_report) _report = Object.assign({}, _report, { versionTooNew: b });
+  _bump();
+}
+
+/**
  * Start periodic health assessment. Called once after hydration
  * completes (from HydrationGate). Kicks off the initial assess(),
  * sets up a 5-minute refresh interval, and listens for visibility
@@ -801,6 +825,7 @@ function _resetForTests(opts) {
   _safariWarningShownThisSession = false;
   _safariGateBlocked = false;
   _storesDegraded = false;
+  _versionTooNew = false;
   _assessInFlight = null;
   _persistInFlight = false;
   _storageApiOverride = (opts && opts.storageApi) || null;
@@ -824,6 +849,7 @@ export const StorageHealth = {
   dismissScenario: _dismissScenario,
   isDismissed: _isDismissed,
   setStoresDegraded: _setStoresDegraded,
+  setVersionTooNew: _setVersionTooNew,
   start: _start,
   stop: _stop,
   _resetForTests: _resetForTests,

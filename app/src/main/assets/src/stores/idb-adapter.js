@@ -18,6 +18,7 @@
      IDBAdapter.commitMigration(store,data,ver) → Promise<void>  (W7.1b, atomic)
      IDBAdapter.setWriteFence(on)               → void  (v04-02: Clear All; via setStoreWriteFence)
      IDBAdapter.isQuotaError(err)               → boolean
+     IDBAdapter.isVersionError(err)             → boolean  (v04-03: a newer app's database)
      IDBAdapter.STORE_NAMES                     → readonly string[]
      IDBAdapter.DB_NAME, IDBAdapter.DB_VERSION  → constants
 
@@ -405,6 +406,19 @@ export const IDBAdapter = (function () {
   }
 
   /**
+   * True iff the error is IndexedDB's VersionError: the database on disk was
+   * upgraded by a NEWER VOTReader (DB_VERSION is lower than its version), so this
+   * build can never open it - retrying cannot help (v04-03). The open request's
+   * error is a DOMException whose name says so.
+   *
+   * @param {unknown} err
+   * @returns {boolean}
+   */
+  function isVersionError(err) {
+    return !!err && /** @type {any} */ (err).name === 'VersionError';
+  }
+
+  /**
    * True iff the error is a quota-exceeded error. Checks both `name`
    * (DOM-spec standard) and legacy numeric `code` for older WebViews.
    *
@@ -452,6 +466,7 @@ export const IDBAdapter = (function () {
     commitMigration: commitMigration,
     setWriteFence: setWriteFence,
     isQuotaError: isQuotaError,
+    isVersionError: isVersionError,
     _putOnce: _putOnce,
     _wrapRequest: wrapRequest,
     _resetForTests: _resetForTests,

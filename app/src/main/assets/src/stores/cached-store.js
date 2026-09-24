@@ -83,6 +83,18 @@ export function setStoreWriteFence(on) {
 export function isStoreWriteFenced() { return _writeFence; }
 
 /**
+ * v04-03: a store met a database that a NEWER VOTReader upgraded (IDB VersionError).
+ * Tell StorageHealth - its banner says so plainly: nothing on the device is lost,
+ * install the latest build, changes here cannot be saved - and trace it once per
+ * store for the diagnostic export. Bare, typeof-guarded globals, as elsewhere here.
+ * @param {string} storageKey
+ */
+function _reportNewerDatabase(storageKey) {
+  if (typeof StorageHealth !== 'undefined' && typeof StorageHealth.setVersionTooNew === 'function') StorageHealth.setVersionTooNew(true);
+  if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ': the database was saved by a newer VOTReader (IDB VersionError); no retry');
+}
+
+/**
  * STORE-1: is the Web Locks API present? The cross-tab-safe flush serializes
  * its read-merge-write through `navigator.locks`. Native on the chrome108
  * floor; if a host lacks it (very old PWA browser, or a bare test env without
@@ -876,6 +888,12 @@ export function CachedStore(storageKey, defaultVal, opts) {
           clearTimeout(timeoutId);
           if (self._state === 'loaded') { settle(); return; }
           console.warn('IDB hydration failed for', storageKey, err);
+          // v04-03: a database a NEWER VOTReader upgraded can never be opened by this
+          // build, so retrying only loops (5/10/30/60 s, then every minute, forever)
+          // behind a banner promising the edits "will be saved automatically". It is
+          // terminal: degraded once, StorageHealth told (its own banner), no retry.
+          const newerDb = typeof IDBAdapter.isVersionError === 'function' && IDBAdapter.isVersionError(err);
+          if (newerDb) _reportNewerDatabase(storageKey);
           if (self._state !== 'degraded') {
             self._state = 'degraded';
             // E5: trace the degraded transition (see the timeout path above).
@@ -885,7 +903,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             self._version += 1;
             self._crossKeyVersion += 1; // F1+F2: keyed verses re-render on a degraded transition too
             self._notifySubscribers();
-            self._backgroundRetry();
+            if (!newerDb) self._backgroundRetry();
           }
           settle();
         });
@@ -1029,7 +1047,12 @@ export function CachedStore(storageKey, defaultVal, opts) {
             if (self._state === 'loaded') return;
             self._rebaseAndPromote(/** @type {any} */ (finalData));
           });
-        }).catch(function () {
+        }).catch(function (err) {
+          // v04-03: a newer app's database never becomes openable; stop, do not loop.
+          if (typeof IDBAdapter.isVersionError === 'function' && IDBAdapter.isVersionError(err)) {
+            _reportNewerDatabase(storageKey);
+            return;
+          }
           attempt += 1;
           var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);
           if (idx < 0) return;

@@ -741,6 +741,60 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
   });
 });
 
+/* v04-03 (improvement sweep 2026-09-22): an older build meeting a database a newer build
+   upgraded gets a VersionError at open. Every store degraded and retried every 60 s forever,
+   and the banner promised changes "will be saved automatically once it catches up" - they
+   never could be. Now the VersionError is terminal: degraded once, StorageHealth told, no retry. */
+describe('CachedStore v04-03 - a database saved by a newer VOTReader is terminal, not a retry loop', () => {
+  const versionError = () => Object.assign(new Error('The requested version is less than the existing version.'), { name: 'VersionError' });
+  beforeEach(() => {
+    localStorage.clear?.();
+    _resetStoreRegistry();
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    window.StorageHealth = { onWriteFailure: vi.fn(), onWriteSuccess: vi.fn(), setStoresDegraded: vi.fn(), setVersionTooNew: vi.fn() };
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete window.StorageHealth;
+  });
+
+  it('a VersionError at hydration degrades once, tells StorageHealth, and never retries', async () => {
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockRejectedValue(versionError());
+    const store = createTestStore('vot-test-newer-db', { idb: true });
+    await store._hydrate();
+    expect(store.getState()).toBe('degraded');
+    expect(window.StorageHealth.setVersionTooNew).toHaveBeenCalledWith(true);
+    await vi.advanceTimersByTimeAsync(600000);   // ten minutes of the old retry schedule
+    expect(getSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a retry that meets a VersionError stops the chain (the hydration had timed out first)', async () => {
+    const getSpy = vi.spyOn(IDBAdapter, 'get')
+      .mockImplementationOnce(() => new Promise(() => {}))   // the first read hangs past the timeout
+      .mockRejectedValue(versionError());
+    const store = createTestStore('vot-test-newer-db-2', { idb: true, hydrationTimeoutMs: 100 });
+    const p = store._hydrate();
+    await vi.advanceTimersByTimeAsync(150);
+    await p;
+    expect(store.getState()).toBe('degraded');
+    await vi.advanceTimersByTimeAsync(600000);
+    expect(getSpy.mock.calls.length, 'one hung read + one retry, then it stops').toBe(2);
+    expect(window.StorageHealth.setVersionTooNew).toHaveBeenCalledWith(true);
+  });
+
+  it('CONTROL: any other hydration failure keeps retrying (the slow-storage path is unchanged)', async () => {
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockRejectedValue(new Error('transient'));
+    const store = createTestStore('vot-test-slow-db', { idb: true });
+    await store._hydrate();
+    await vi.advanceTimersByTimeAsync(600000);
+    expect(getSpy.mock.calls.length).toBeGreaterThan(3);
+    expect(window.StorageHealth.setVersionTooNew).not.toHaveBeenCalled();
+  });
+});
+
 describe('CachedStore W2.2 — batched replay (Flag 2: single save + single bump)', () => {
   beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });

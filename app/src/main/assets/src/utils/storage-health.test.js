@@ -747,6 +747,33 @@ describe('write-path integration', () => {
    requestPersistence
    ═══════════════════════════════════════════════════════════════════ */
 
+/* v04-03 (improvement sweep 2026-09-22): the stores meet a database a NEWER VOTReader saved. */
+describe('a database saved by a newer VOTReader (v04-03)', () => {
+  const versionError = () => Object.assign(new Error('newer'), { name: 'VersionError' });
+
+  it('setVersionTooNew puts versionTooNew on the report, and a re-assess keeps it', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().versionTooNew).toBe(false);
+    StorageHealth.setVersionTooNew(true);
+    expect(StorageHealth.getReport().versionTooNew).toBe(true);
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().versionTooNew, 'the rebuilt report must carry the flag').toBe(true);
+  });
+
+  it('a write that fails on a newer database does not tell the reader their storage may be full', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    StorageHealth.onWriteFailure(versionError());
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL: any other write failure still raises the write-fail toast', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    StorageHealth.onWriteFailure(new Error('quota'));
+    expect(showToast).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('requestPersistence', () => {
   it('granted → returns true and re-assesses', async () => {
     const api = mockStorage({ persisted: false, persistResult: true });
