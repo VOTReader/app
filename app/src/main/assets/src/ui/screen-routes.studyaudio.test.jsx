@@ -106,6 +106,44 @@ describe('Library "open the text" on a study recording', () => {
   });
 });
 
+/* Codex critique 1 (2026-09-23): a study with no recording yet opens to READ
+   from the Listening Library's Studies screen — its index (or its one page),
+   with the back pill returning to Studies — never an empty recordings page. */
+describe('the Studies screen: Read study', () => {
+  const study = (id, n, extra = {}) => ({ id, slug: id, chapters: Array.from({ length: n }, (_, i) => ({ id: id + '-ch' + (i + 1) })), ...extra });
+  const readStudyOf = (p) => {
+    globalThis.AudioStudiesScreen = () => null;
+    try {
+      const routes = buildScreenRoutes(p);
+      return routes['audio-library-studies']().props.onReadStudy;
+    } finally { delete globalThis.AudioStudiesScreen; }
+  };
+
+  it('a multi-chapter study opens its index, the back pill naming Studies', () => {
+    const p = makeRoutes({ getStudyById: vi.fn((id) => (id === 'grace-and-law' ? study('grace-and-law', 7) : null)) });
+    readStudyOf(p)('grace-and-law');
+    expect(p.pushFromLetter).toHaveBeenCalledWith({
+      sourceScreen: 'audio-library-studies', sourceLetterTitle: 'Studies',
+      destSnapshot: { screen: 'bible-study-index', studyId: 'grace-and-law' },
+    });
+    expect(p.selectStudy).toHaveBeenCalledWith('grace-and-law');
+  });
+
+  it('a one-page study opens that page', () => {
+    const p = makeRoutes({ getStudyById: vi.fn(() => study('odds-chart', 1)) });
+    readStudyOf(p)('odds-chart');
+    expect(p.pushFromLetter.mock.calls[0][0].destSnapshot).toEqual({ screen: 'bible-study-chapter', studyId: 'odds-chart', studyChapterId: 'odds-chart-ch1' });
+    expect(p.selectStudy).toHaveBeenCalledWith('odds-chart');
+  });
+
+  it('control: a study the corpus does not hold does nothing', () => {
+    const p = makeRoutes();
+    readStudyOf(p)('nope');
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+    expect(p.selectStudy).not.toHaveBeenCalled();
+  });
+});
+
 /* The data the arm relies on. Evaluated into LOCALS (a gate must own its data:
    a neighbour's afterEach must not be able to switch it off), with every count
    checked against a SECOND, independent reading of the same file. */
