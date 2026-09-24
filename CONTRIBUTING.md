@@ -131,27 +131,25 @@ on them through the same corpus objects. The contract and its one race class are
 
 `.githooks/pre-commit` runs only what the staged files need, in this order:
 
+0. always first: it **refuses a commit whose bundle sources have unstaged edits** (every gate and the rebuild read
+   the working tree, so the commit would ship bundles built from code it does not contain: stage or stash them);
+   staged Scripture Web source runs `check:s22`, which **warns** on a stale S22 measurement (CI only warns too;
+   re-measure when the phone is on adb) and fails on a scene over budget;
 1. data files: `check_balance.py`, `tools/validate-schemas.js --strict`, the read-along offset and Bible-timing
    checks, the audio manifest check;
-2. source files: eslint on the staged files (after regenerating the globals), `tsc --noEmit`, then **the full vitest
+2. bundle sources, `index.html`, `app.css`, `manifest.json`, `offline.html`, `service-worker.js`: **`npm run
+   build`**, before any test reads `dist/`;
+3. source files: eslint on the staged files (after regenerating the globals), `tsc --noEmit`, then **the full vitest
    suite with coverage floors**; a staged `tools/` script runs `vitest run tools/`;
-3. bundle sources, `index.html`, `app.css`, `manifest.json`, `offline.html`, `service-worker.js`:
-   **`npm run build`, then re-stage** what it regenerated; then the type-scale, CSS-token, byte-budget,
+4. after those gates, **re-stage** what the build regenerated; then the type-scale, CSS-token, byte-budget,
    CORPUS_VERSION, search-index-version and runtime-asset gates;
-4. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check;
-5. `.kt` or `app/build.gradle.kts`: the Kotlin unit tests.
+5. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check;
+6. `.kt` or `app/build.gradle.kts`: the Kotlin unit tests.
 
-A docs-only commit runs step 4 and nothing else.
-
-**The order trap.** Step 2 (vitest) runs before step 3 (the rebuild). So when you edit `index.html`, or any file
-the service worker hashes directly (`manifest.json`, `offline.html`), `service-worker.test.js` fails on the stale
-`ASSET_INTEGRITY` hash (`'./'` is index.html) before the hook gets to rebuild it. Build and stage first:
-
-```sh
-npm run build
-git add app/src/main/assets/index.html app/src/main/assets/service-worker.js app/src/main/assets/dist
-git commit
-```
+A docs-only commit runs step 5 and nothing else. There is no build-and-stage-first step before an `index.html` or
+`manifest.json` edit any more: the rebuild runs before the tests, so `service-worker.test.js` reads fresh hashes.
+Never kill the hook while it runs `lint-staged`: that tool swaps the staged content into the working tree and keeps
+a backup in `git stash`, and a killed run leaves both behind (`git stash list` shows it).
 
 `git commit --no-verify` skips all of this. CI runs the same gates on every push anyway, so skipping only moves
 the failure to after your push, on `main`.

@@ -88,12 +88,12 @@ Live work is assigned through `D:\Swarm` (lane briefs + TODO lines on `BOARD.md`
 
 **CRITICAL:** Only edit files in `app/src/main/`. Never touch `app/build/`. Never edit an `app.OLD-*` backup.
 
-## Gates, landing, and the pre-commit order trap
+## Gates, landing, and what the pre-commit hook refuses
 
 Gates on every commit (pre-commit + CI): build, lint `--max-warnings 0`, typecheck, vitest + coverage floors, Kotlin `testDebugUnitTest` + lintDebug + JaCoCo floor, headless smoke:ci, check_balance, schema-validate, audio-sync, corpus-version, CSP-hash, asset-integrity, bundle budget, ≤800-line app.jsx canary; counts drift — verify with the runners. The full flow is CONTRIBUTING.md §5.
 
 - **Land:** `git fetch origin && git rebase origin/main` (linear, never a merge commit) → `git push origin HEAD:main` → watch **both** CI and Deploy Web to green (`gh run list --commit $(git rev-parse HEAD)`, then `gh run watch <run-id> --exit-status`; Deploy Web starts only after CI is green: `gh run list --workflow=deploy-web.yml --limit 3`) → `npm run check:live` must print `LIVE AND CURRENT`, or `LIVE (INCLUDED)` when a later main commit containing HEAD is serving (it names the branch; read it). Then post one DONE line with the hash (`D:/Swarm/post.sh`, CONTRIBUTING.md §7). One logical change per commit; conventional subjects (`feat(scope): …`, `fix(scope): …`, `docs: …`).
-- **The order trap:** the hook runs vitest *before* it rebuilds. Edit `index.html` (or `manifest.json` / `offline.html`, which the service worker hashes directly) and `service-worker.test.js` fails on the stale `ASSET_INTEGRITY` hash (`'./'` is index.html) before the hook reaches the rebuild. Build and stage first: `npm run build`, then `git add app/src/main/assets/index.html app/src/main/assets/service-worker.js app/src/main/assets/dist`, then commit.
+- **Stage whole, or stash:** the hook refuses a commit whose bundle sources have unstaged edits (its gates and the rebuild read the working tree; pc2, v12-04). It rebuilds `dist/` *before* vitest, so an `index.html` / `manifest.json` / `offline.html` edit needs no hand build first (the old order trap, v12-03). Staged Scripture Web source runs `check:s22`: a stale S22 measurement only warns (here and in CI; the S22 must never block), a scene over budget fails. Never kill the hook mid-`lint-staged`: it leaves the staged content in the working tree and a backup in `git stash`.
 - A docs-only commit runs only the APK-asset and `ASSET_INTEGRITY` checks. `git commit --no-verify` skips the hook; CI then fails the same gates on `main` after the push.
 
 ## Quick start: app failed to load? read this first

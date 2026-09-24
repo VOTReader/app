@@ -53,12 +53,17 @@
 #      outside tsconfig and the bundle-source list, so a gate script used to
 #      reach CI with no local run of its own *.test.js.
 #
-#   5. python tools/build.py  when any bundle-source file changes
-#      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
-#      output so the commit lands with bundles in sync with source.
-#      Replaces the "remember to run the build" trap — the hook does
-#      it for you. Runs ONLY on commits that touch bundle sources;
-#      docs/gradle/plan commits skip it entirely.
+#   5. npm run build          when any bundle-source file changes
+#      Rebuilds every dist/ bundle, the CSP hashes and the SW version
+#      BEFORE step 2 (step 1z, so the tests read fresh bundles), and
+#      stages the regenerated output after the gates (step 5) so the
+#      commit lands with bundles in sync with source. Runs ONLY on
+#      commits that touch bundle sources; docs/gradle/plan commits skip it.
+#
+#   Before all of it: 0b refuses a commit whose bundle sources have
+#      UNSTAGED edits (the gates and the build read the working tree);
+#      0c warns when staged Scripture Web source no longer matches its
+#      S22 frame-time measurement (CI's check:s22 would fail).
 #
 #   6. gradle test (NK1)     when any .kt or app/build.gradle.kts changes
 #      `./gradlew :app:testDebugUnitTest` runs the full Kotlin unit-test
@@ -119,6 +124,54 @@ else
 fi
 
 staged=$(git diff --cached --name-only "$against")
+
+# ─── Step 0b: the commit is the INDEX; every gate reads the WORKING TREE (v12-04) ──
+# Lint, tsc, vitest and Step 5's rebuild all read files on disk, and Step 5
+# stages the dist/ it builds from them. A bundle source with UNSTAGED edits
+# therefore commits bundles compiled from code the commit does not contain, and
+# the gates pass on code that is not being committed (improvement sweep
+# 2026-09-22, v12-04). Refuse before anything runs. index.html and
+# service-worker.js are exempt: the build rewrites both and Step 5 re-stages
+# them whole, so what is on disk is exactly what lands.
+# VOT_HOOK_TEST_NO_STAGE_GUARD is for tools/pre-commit-wiring.test.js only: it
+# runs this hook against a private index at HEAD, where a developer's uncommitted
+# work reads as unstaged.
+if [ -z "$VOT_HOOK_TEST_NO_STAGE_GUARD" ]; then
+  unstaged_sources=$(git diff --name-only | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|manifest\.json|offline\.html)$' || true)
+  if [ -n "$unstaged_sources" ]; then
+    echo "[pre-commit] FATAL: bundle sources with UNSTAGED changes:"
+    echo "$unstaged_sources" | sed 's/^/    /'
+    echo "  Every gate and the dist/ rebuild read the working tree, so this commit"
+    echo "  would ship bundles built from code it does not contain. Stage them"
+    echo "  (git add <file>) or set them aside (git stash push -- <file>), then retry."
+    exit 1
+  fi
+fi
+
+# ─── Step 0c: Scripture Web source vs its S22 measurement (v12-05) ──
+# CI's check:s22 was the first to say the Scripture Web source had moved past
+# its S22 frame-time measurement (2026-09-24: a one-sentence guide edit, with
+# the phone off adb). It only hashes source, so ask it here, at the commit.
+# A STALE measurement only WARNS - in CI too - because the fix needs the phone
+# and the S22 must never block (Corbin, 2026-09-24): the check prints the
+# warning itself and exits 0. A scene over budget or a missing measurement
+# still fails, here as in CI.
+s22_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/(utils|ui)/scripture-web/[^/]+\.(js|jsx)|app/src/main/assets/src/ui/screens/ScriptureWebScreen\.jsx|tools/perf/s22-frame-time\.json)$' | grep -vE '\.test\.(js|jsx)$' || true)
+if [ -n "$s22_changed" ]; then
+  echo "[pre-commit] Scripture Web source staged — checking its S22 frame-time measurement..."
+  node tools/check-s22-frame-time.js
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "S22 frame-time gate FAILED — a scene is over budget, or the"
+    echo "measurement is missing (see above). CI fails on this too."
+    echo "Re-measure on the S22 (npm run measure:s22), or fix the regression."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo ""
+fi
 
 # ─── Step 1: corpus data file validation ────────────────────────────
 data_changed=$(echo "$staged" | grep '^app/src/main/assets/src/data/' || true)
@@ -435,6 +488,64 @@ if [ -n "$mem_changed" ]; then
   echo ""
 fi
 
+# ─── Step 1z: rebuild the bundles BEFORE the tests (v12-03) ──────────
+# Step 4's vitest reads dist/ (bundle-membership, the service-worker hashes,
+# the CSS rule-order tests), so it has to run AFTER the rebuild, or an
+# index.html / manifest.json / offline.html edit failed service-worker.test.js
+# on the stale ASSET_INTEGRITY hash before the hook got to rebuild it (the
+# "order trap" CONTRIBUTING.md used to warn about). Build here; Step 5
+# re-stages what it regenerated once every gate has passed. The trigger list
+# and the reasons for each entry are in Step 5's header.
+bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|index\.html|manifest\.json|offline\.html|service-worker\.js)$' || true)
+
+if [ -n "$bundle_source_changed" ]; then
+  echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js before the tests..."
+  # `npm run build` chains both bundlers in one command:
+  #   1. python tools/build.py  → bundle-a.js (classic-script concat)
+  #   2. esbuild                → bundle-b.js (G.2.2), bundle-c.js (G.2.1), bundle-d.js (G.2.3)
+  # All four must succeed before we stage.
+  #
+  # All four bundles rebuild + re-stage every time, so a commit can include
+  # changes to bundles whose source you did not edit — the hook normalizes
+  # any previously-stale bundle here. That extra diff is intentional.
+  #
+  # Node is required on PATH for the esbuild half. The original assumption
+  # was that git-bash on Windows inherits the system PATH containing
+  # C:\Program Files\nodejs (the winget install location). In practice
+  # that's not always true — winget installs don't refresh PATH for
+  # already-running shells, and git-bash invoked from File Explorer /
+  # an IDE inherits the parent process's PATH, which may pre-date the
+  # Node install. So we probe known install locations and prepend the
+  # first one that exists.
+  if ! command -v npm >/dev/null 2>&1; then
+    for candidate in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$LOCALAPPDATA/Programs/Node.js" \
+        "$HOME/AppData/Roaming/npm"; do
+      if [ -x "$candidate/npm" ] || [ -x "$candidate/npm.cmd" ]; then
+        export PATH="$candidate:$PATH"
+        echo "[pre-commit] Added $candidate to PATH (npm not on inherited PATH)"
+        break
+      fi
+    done
+  fi
+  npm run build
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Bundle rebuild FAILED — see output above."
+    echo "If npm or node is missing, install Node LTS from nodejs.org"
+    echo "(or via winget install OpenJS.NodeJS.LTS) and try again."
+    echo "Fix the build error, re-stage, then retry the commit."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Bundles rebuilt (re-staged in Step 5, after the gates)."
+  echo ""
+fi
+
 # ─── Step 2: lint staged source files (Q3.5) ───────────────────────
 # Mirrors CI's `npm run lint -- --max-warnings 0` gate but only on
 # staged files. Sub-second on typical commits; fails fast at the commit
@@ -586,7 +697,7 @@ if [ -n "$tools_changed" ] && [ -z "$src_changed" ]; then
   echo ""
 fi
 
-# ─── Step 5: bundle rebuild + SW cache version ──────────────────────
+# ─── Step 5: re-stage the rebuilt bundles + SW cache version ──────────────────────
 # Any change to a bundled source OR a core-cached asset (app.css,
 # index.html) means dist/bundle-*.js and/or the SW's content-hash
 # CACHE_VERSION is stale. `npm run build` rebuilds the bundles AND
@@ -605,52 +716,8 @@ fi
 # change) ran no build, no map regeneration, no re-stage, and not even lint or the
 # tests. The one file whose staleness can stop every client from updating was the one
 # file the hook ignored. Now any edit to it runs the whole battery.
-bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|index\.html|manifest\.json|offline\.html|service-worker\.js)$' || true)
-
+# (The trigger is computed in Step 1z, which also ran the build before the tests.)
 if [ -n "$bundle_source_changed" ]; then
-  echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
-  # `npm run build` chains both bundlers in one command:
-  #   1. python tools/build.py  → bundle-a.js (classic-script concat)
-  #   2. esbuild                → bundle-b.js (G.2.2), bundle-c.js (G.2.1), bundle-d.js (G.2.3)
-  # All four must succeed before we stage.
-  #
-  # All four bundles rebuild + re-stage every time, so a commit can include
-  # changes to bundles whose source you did not edit — the hook normalizes
-  # any previously-stale bundle here. That extra diff is intentional.
-  #
-  # Node is required on PATH for the esbuild half. The original assumption
-  # was that git-bash on Windows inherits the system PATH containing
-  # C:\Program Files\nodejs (the winget install location). In practice
-  # that's not always true — winget installs don't refresh PATH for
-  # already-running shells, and git-bash invoked from File Explorer /
-  # an IDE inherits the parent process's PATH, which may pre-date the
-  # Node install. So we probe known install locations and prepend the
-  # first one that exists.
-  if ! command -v npm >/dev/null 2>&1; then
-    for candidate in \
-        "/c/Program Files/nodejs" \
-        "/c/Program Files (x86)/nodejs" \
-        "$LOCALAPPDATA/Programs/Node.js" \
-        "$HOME/AppData/Roaming/npm"; do
-      if [ -x "$candidate/npm" ] || [ -x "$candidate/npm.cmd" ]; then
-        export PATH="$candidate:$PATH"
-        echo "[pre-commit] Added $candidate to PATH (npm not on inherited PATH)"
-        break
-      fi
-    done
-  fi
-  npm run build
-  status=$?
-  if [ $status -ne 0 ]; then
-    echo ""
-    echo "---------------------------------------------------------------"
-    echo "Bundle rebuild FAILED — see output above."
-    echo "If npm or node is missing, install Node LTS from nodejs.org"
-    echo "(or via winget install OpenJS.NodeJS.LTS) and try again."
-    echo "Fix the build error, re-stage, then retry the commit."
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
   # Stage the regenerated bundles + the re-versioned SW so the commit
   # lands with everything in sync.
   # Stage EVERY dist/ output, incl. the lazy corpus bundles (a-bible /
