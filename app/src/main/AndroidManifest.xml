@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ACCESS_NETWORK_STATE — a "normal" (non-runtime) permission, no prompt. WebView
+         updates navigator.onLine (and fires 'offline'/'online') only when the app
+         holds it (Chromium android_webview StartupTasks); without it the page
+         believes it is always online. Downloaded recordings (listening item 8)
+         need the truth: with no signal the player plays what is on the phone and
+         the rows say "Needs a connection". ManifestNetworkStateTest pins it. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Microphone — required for in-app voice recording (journal voice memos).
          Runtime permission is requested via ActivityResultContracts.RequestPermission
          on API 23+. WebChromeClient.onPermissionRequest grants the WebView

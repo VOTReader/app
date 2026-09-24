@@ -85,6 +85,7 @@ class OfflineAudioStore(
     private val sizesFile = File(dir, "sizes.json")
     private val sizeLock = Any()
     private val sizeCache = HashMap<String, Pair<Long, Map<String, Long>>>()   // guarded by sizeLock
+    private val listingFailedAt = HashMap<String, Long>()                        // guarded by sizeLock
 
     init {
         // A .part is a download a kill interrupted: never resumed, never served.
@@ -104,10 +105,16 @@ class OfflineAudioStore(
         if (wanted.isEmpty()) return
         sizeExecutor.execute {
             val out = JSONObject()
+            var heads = 0
             for ((tag, group) in wanted.groupBy { it.second }) {
                 val listing = listingFor(tag)
                 for ((url, _, asset) in group) {
-                    val n = listing?.get(asset) ?: try { headSize(url) } catch (_: Exception) { null }
+                    // A HEAD (a round trip and a redirect) only for what a listing did not answer, a few per ask:
+                    // a failed listing must not turn one screen into a thousand requests.
+                    val n = listing?.get(asset) ?: if (heads < MAX_HEADS_PER_ASK) {
+                        heads++
+                        try { headSize(url) } catch (_: Exception) { null }
+                    } else null
                     if (n != null && n > 0L) out.put(url, n)
                 }
             }
@@ -119,9 +126,15 @@ class OfflineAudioStore(
         synchronized(sizeLock) {
             val hit = sizeCache[tag]
             if (hit != null && clock() - hit.first < SIZE_TTL) return hit.second
+            // A listing that just failed (no signal, GitHub's 60-an-hour limit) is not asked again for a while.
+            val failed = listingFailedAt[tag]
+            if (failed != null && clock() - failed < LISTING_RETRY_MS) return hit?.second
         }
         val fresh = try { sizeLister(tag) } catch (_: Exception) { null }
-        if (fresh == null) return synchronized(sizeLock) { sizeCache[tag]?.second }   // a stale listing beats none
+        if (fresh == null) return synchronized(sizeLock) {
+            listingFailedAt[tag] = clock()
+            sizeCache[tag]?.second   // a stale listing beats none
+        }
         synchronized(sizeLock) {
             sizeCache[tag] = clock() to fresh
             persistSizes()
@@ -175,43 +188,63 @@ class OfflineAudioStore(
                 else { queued.add(item.url); true }
             }
             if (!fresh) continue
-            cancelled.remove(item.url)
             emit(event("queued", item.url).toString())
             executor.execute { download(item, name) }
         }
     }
 
-    /** Stop [urls] (queued or running). */
+    /**
+     * Stop [urls]: one still waiting comes off the queue at once (and says so); the one downloading stops at its next
+     * chunk. The worker skips any task whose URL is no longer queued.
+     */
     fun cancel(urls: List<String>) {
-        synchronized(lock) { for (u in urls) if (queued.contains(u) || active?.url == u) cancelled.add(u) }
+        val dropped = ArrayList<String>()
+        synchronized(lock) {
+            for (u in urls) {
+                if (queued.remove(u)) dropped += u
+                else if (active?.url == u) cancelled.add(u)
+            }
+        }
+        for (u in dropped) emit(event("cancelled", u).toString())
     }
 
-    /** Stop everything queued or running. */
+    /** Stop everything queued or downloading. */
     fun cancelAll() {
-        synchronized(lock) { cancelled.addAll(queued); active?.let { cancelled.add(it.url) } }
+        val dropped: List<String>
+        synchronized(lock) {
+            dropped = queued.toList()
+            queued.clear()
+            active?.let { cancelled.add(it.url) }
+        }
+        for (u in dropped) emit(event("cancelled", u).toString())
     }
 
     /** Take [urls] off the phone (file and index entry). */
     fun remove(urls: List<String>) {
         val gone = ArrayList<String>()
+        val files = ArrayList<String>()
         synchronized(lock) {
             for (u in urls) {
                 val e = entries.remove(u) ?: continue
-                File(dir, e.file).delete()
+                files.add(e.file)
                 gone.add(u)
             }
             if (gone.isNotEmpty()) persist()
         }
+        for (f in files) File(dir, f).delete()
         if (gone.isNotEmpty()) emit(JSONObject().put("type", "removed").put("urls", JSONArray(gone)).toString())
     }
 
-    /** Take every downloaded recording off the phone. */
+    /** Take every downloaded recording off the phone, and stop what is still queued or downloading. */
     fun removeAll() {
+        cancelAll()
+        val files: List<String>
         synchronized(lock) {
-            for (e in entries.values) File(dir, e.file).delete()
+            files = entries.values.map { it.file }
             entries.clear()
             persist()
         }
+        for (f in files) File(dir, f).delete()
         emit(JSONObject().put("type", "removed").put("all", true).toString())
     }
 
@@ -237,6 +270,11 @@ class OfflineAudioStore(
      * The WebView's request for [url]: a downloaded recording answered from disk (200 whole, 206 for a Range, 416
      * past the end); anything else null, so the WebView loads it exactly as before. Called on a WebView background
      * thread.
+     *
+     * WebView cuts the Range ITSELF from the stream it is handed (Chromium input_stream_reader.cc: the size from
+     * available(), the bounds from the request's Range, a skip to the first byte, then a read to the end of the
+     * stream), and it sets Content-Length. So the answer is the file from byte 0, capped after the range's last byte,
+     * with the 206 status and Content-Range; a body cut here would be cut twice (the refutation of 2026-09-24).
      */
     fun intercept(url: String, range: String?): WebResourceResponse? {
         val e = synchronized(lock) { entries[url] } ?: return null
@@ -245,16 +283,10 @@ class OfflineAudioStore(
         if (!f.isFile || total <= 0L) return null
         return try {
             when (val r = parseRange(range, total)) {
-                RangeAnswer.Full -> WebResourceResponse(MIME, null, 200, "OK",
-                    baseHeaders() + ("Content-Length" to total.toString()), FileInputStream(f))
-                is RangeAnswer.Part -> {
-                    val len = r.end - r.start + 1
-                    val input = FileInputStream(f)
-                    skipFully(input, r.start)
-                    WebResourceResponse(MIME, null, 206, "Partial Content",
-                        baseHeaders() + mapOf("Content-Range" to "bytes ${r.start}-${r.end}/$total", "Content-Length" to len.toString()),
-                        Bounded(input, len))
-                }
+                RangeAnswer.Full -> WebResourceResponse(MIME, null, 200, "OK", baseHeaders(), FileInputStream(f))
+                is RangeAnswer.Part -> WebResourceResponse(MIME, null, 206, "Partial Content",
+                    baseHeaders() + ("Content-Range" to "bytes ${r.start}-${r.end}/$total"),
+                    Capped(FileInputStream(f), r.end + 1))
                 RangeAnswer.Unsatisfiable -> WebResourceResponse(MIME, null, 416, "Range Not Satisfiable",
                     baseHeaders() + ("Content-Range" to "bytes */$total"), ByteArrayInputStream(ByteArray(0)))
             }
@@ -267,10 +299,13 @@ class OfflineAudioStore(
     // ── download ──────────────────────────────────────────────────────
 
     private fun download(item: Item, name: String) {
-        synchronized(lock) { queued.remove(item.url) }
-        if (cancelled.remove(item.url)) { emit(event("cancelled", item.url).toString()); return }
         val act = Active(item.url)
-        active = act
+        synchronized(lock) {
+            // Cancelled (or removed by Remove all) while it waited: its 'cancelled' was already sent.
+            if (!queued.remove(item.url)) return
+            cancelled.remove(item.url)
+            active = act
+        }
         val part = File(dir, name + PART)
         var opened: Opened? = null
         try {
@@ -287,7 +322,7 @@ class OfflineAudioStore(
                 opened.stream.use { input ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
-                        if (cancelled.remove(item.url)) { out.close(); part.delete(); emit(event("cancelled", item.url).toString()); return }
+                        if (cancelled.remove(item.url)) { out.close(); part.delete(); active = null; emit(event("cancelled", item.url).toString()); return }
                         val n = input.read(buf)
                         if (n < 0) break
                         total += n
@@ -312,6 +347,7 @@ class OfflineAudioStore(
             synchronized(lock) {
                 entries[item.url] = Entry(name, total, clock(), item.key.take(MAX_TEXT), item.title.take(MAX_TEXT))
                 persist()
+                active = null   // before 'done': the page re-reads the state on it
             }
             emit(event("done", item.url).put("bytes", total).toString())
         } catch (e: Exception) {
@@ -325,6 +361,7 @@ class OfflineAudioStore(
     }
 
     private fun fail(url: String, reason: String) {
+        active = null
         emit(event("failed", url).put("reason", reason).toString())
     }
 
@@ -335,7 +372,21 @@ class OfflineAudioStore(
     // ── index ─────────────────────────────────────────────────────────
 
     private fun load() {
-        val text = try { if (indexFile.isFile) indexFile.readText() else null } catch (e: Exception) { null } ?: return
+        val text = try { if (indexFile.isFile) indexFile.readText() else null } catch (e: Exception) { null }
+        if (text != null) readIndex(text)
+        // A recording on disk that the index does not list (a failed index write, a kill between the move and the
+        // write, a torn or missing index) is listed again from its name, so it can still be played and removed.
+        var found = false
+        dir.listFiles { f -> f.isFile && f.name.endsWith(".mp3") }?.forEach { f ->
+            val url = urlForFileName(f.name) ?: return@forEach
+            if (entries.containsKey(url) || f.length() <= 0L) return@forEach
+            entries[url] = Entry(f.name, f.length(), f.lastModified(), "", f.name.substringAfter("__").removeSuffix(".mp3"))
+            found = true
+        }
+        if (found) persist()
+    }
+
+    private fun readIndex(text: String) {
         try {
             val items = JSONObject(text).optJSONObject("items") ?: return
             for (url in items.keys()) {
@@ -347,7 +398,7 @@ class OfflineAudioStore(
                 entries[url] = Entry(file, f.length(), o.optLong("savedAt"), o.optString("key"), o.optString("title"))
             }
         } catch (e: Exception) {
-            Timber.w(e, "offline audio: index unreadable - the shelf starts empty (files stay until removed)")
+            Timber.w(e, "offline audio: index unreadable - its files are found again from their names")
         }
     }
 
@@ -359,28 +410,46 @@ class OfflineAudioStore(
         }
         val tmp = File(dir, "index.json.tmp")
         try {
-            tmp.writeText(JSONObject().put("v", 1).put("items", items).toString())
+            FileOutputStream(tmp).use { out ->
+                out.write(JSONObject().put("v", 1).put("items", items).toString().toByteArray(Charsets.UTF_8))
+                out.fd.sync()   // on disk before it replaces the index
+            }
             Files.move(tmp.toPath(), indexFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (e: Exception) {
-            Timber.w(e, "offline audio: index write failed")
+            Timber.w(e, "offline audio: index write failed - the files are found again at the next start")
         }
     }
 
-    /** Reads at most [left] bytes of [input] (the 206 slice). */
-    private class Bounded(input: InputStream, private var left: Long) : FilterInputStream(input) {
+    /**
+     * The file from byte 0, ending after byte [cap] - 1: WebView sizes it by available(), skips to the range's first
+     * byte with skip(), and reads to its end, so all three respect the cap.
+     */
+    private class Capped(input: InputStream, private val cap: Long) : FilterInputStream(input) {
+        private var pos = 0L
+
+        override fun available(): Int = minOf(super.available().toLong(), maxOf(0L, cap - pos)).toInt()
+
         override fun read(): Int {
-            if (left <= 0) return -1
+            if (pos >= cap) return -1
             val b = super.read()
-            if (b >= 0) left--
+            if (b >= 0) pos++
             return b
         }
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
-            if (left <= 0) return -1
-            val n = super.read(b, off, minOf(len.toLong(), left).toInt())
-            if (n > 0) left -= n
+            if (pos >= cap) return -1
+            val n = super.read(b, off, minOf(len.toLong(), cap - pos).toInt())
+            if (n > 0) pos += n
             return n
         }
+
+        override fun skip(n: Long): Long {
+            val k = super.skip(minOf(n, maxOf(0L, cap - pos)))
+            if (k > 0) pos += k
+            return k
+        }
+
+        override fun markSupported(): Boolean = false
     }
 
     companion object {
@@ -426,6 +495,8 @@ class OfflineAudioStore(
         // Sizes: a week-old listing is asked again; one ask covers at most a big collection or book.
         private const val SIZE_TTL = 7L * 24 * 3600 * 1000
         private const val MAX_SIZE_BATCH = 400
+        private const val MAX_HEADS_PER_ASK = 40
+        private const val LISTING_RETRY_MS = 10L * 60 * 1000
         private const val MAX_LISTING_BYTES = 8L * 1024 * 1024
         private const val API_RELEASE_BY_TAG = "https://api.github.com/repos/VOTReader/votreader-assets/releases/tags/"
 
@@ -439,6 +510,14 @@ class OfflineAudioStore(
             val asset = rest.substring(slash + 1)
             if (!TAG_RE.matches(tag) || !ASSET_RE.matches(asset)) return null
             return tag to asset
+        }
+
+        /** The release URL a stored file name came from (the inverse of [fileNameFor]); null for any other name. */
+        internal fun urlForFileName(name: String): String? {
+            val at = name.indexOf("__")   // a tag never holds '_', so the first "__" is the joint
+            if (at <= 0) return null
+            val url = PREFIX + name.substring(0, at) + "/" + name.substring(at + 2)
+            return if (fileNameFor(url) == name) url else null
         }
 
         /** `<tag>__<asset>.mp3` for one of the app's audio releases; null for anything else. */
@@ -543,17 +622,6 @@ class OfflineAudioStore(
         }
 
         private fun baseHeaders() = mapOf("Accept-Ranges" to "bytes", "Cache-Control" to "no-store")
-
-        private fun skipFully(input: InputStream, n: Long) {
-            var left = n
-            while (left > 0) {
-                val s = input.skip(left)
-                if (s <= 0) {
-                    if (input.read() < 0) throw IOException("file shorter than its range")
-                    left--
-                } else left -= s
-            }
-        }
 
         private fun hostAllowed(url: String): Boolean = try {
             val u = URL(url)

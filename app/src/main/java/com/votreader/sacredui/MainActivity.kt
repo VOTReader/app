@@ -166,6 +166,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // scoped, not WebView-scoped.
     private val gardenCache: GardenImageCache by lazy { GardenImageCache(cacheDir) }
 
+    // This page's sink for downloaded-recording events (listening item 8), kept so onDestroy clears only its own.
+    private var offlineSink: ((String) -> Unit)? = null
+
     // #5: the asset loader + its handler are stateless w.r.t. the WebView
     // instance, so build them ONCE (lazy) and reuse across renderer-crash
     // rebuilds instead of re-allocating in every createConfiguredWebView pass.
@@ -511,7 +514,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }
         // Downloaded recordings (listening item 8): the process-wide store's
         // events reach this Activity's page; cleared in onDestroy like the sink above.
-        OfflineAudioStore.eventSink = { json -> bridge.callOptional(JsEvent.OfflineAudio, json) }
+        offlineSink = { json -> bridge.callOptional(JsEvent.OfflineAudio, json) }
+        OfflineAudioStore.eventSink = offlineSink
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
@@ -1413,7 +1417,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         mainHandler.removeCallbacks(splashSafetyHatch)
         // System-transport sink is bound to THIS Activity's bridge/WebView.
         AudioKeepAliveService.commandSink = null
-        OfflineAudioStore.eventSink = null
+        // Only if it is still THIS page's: a quick relaunch's new Activity may already have set its own.
+        if (OfflineAudioStore.eventSink === offlineSink) OfflineAudioStore.eventSink = null
         // The WebView (and with it the <audio> element) is destroyed below, so
         // playback is over whether or not JS got to say setAudioActive(false).
         // Without this an ongoing "Playing audio" notification would outlive the
