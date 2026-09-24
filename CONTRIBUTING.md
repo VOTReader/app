@@ -184,8 +184,10 @@ git push origin HEAD:main
    `gh run list --workflow=deploy-web.yml --limit 3` and watch it too. A red CI deploys nothing: the live site
    stays on the last green commit.
 2. Confirm the deploy: `npm run check:live` compares the live service worker with HEAD and prints
-   `LIVE AND CURRENT` when they match (`--wait` polls up to 25 minutes; `--strict` exits 1 unless HEAD is live).
-   It also prints `(HEAD on <branch>)` and exits 0 on a wrong branch, so read the branch name.
+   `LIVE AND CURRENT` when they match, or `LIVE (INCLUDED)` when a later `main` commit that contains HEAD is
+   the build serving (other work landed after yours; it names that commit). `--wait` polls up to 25 minutes;
+   `--strict` exits 1 unless HEAD is live. It also prints `(HEAD on <branch>)` and exits 0 on a wrong branch, so
+   read the branch name.
 3. Rejected because `main` moved? Fetch, rebase, re-run what the new commits could disturb, push again.
 4. Commit subjects follow conventional commits: `feat(scope): …`, `fix(scope): …`, `test(…)`, `docs: …`,
    `chore(build): …`. One logical change per commit.

@@ -16,7 +16,9 @@
  *   COMMITTED — the same two values in HEAD's service-worker.js
  *   LOCAL     — the same two values in the working tree
  * and tells you plainly which of "not committed", "not pushed", "not deployed
- * yet", or "live" you are actually in.
+ * yet", or "live" you are actually in. "Live" includes LIVE (INCLUDED): other
+ * work landed after yours and a later main commit that contains HEAD is the
+ * build serving - by the time a deploy that waits for CI is live, usually so.
  *
  * Usage:
  *   node tools/check-live-version.js            # report
@@ -83,7 +85,26 @@ line('COMMITTED', `${committed.cache}  corpus ${committed.corpus}   (HEAD on ${b
 line('LOCAL', `${local.cache}  corpus ${local.corpus}${swDirty ? '   [working tree DIRTY]' : ''}`);
 console.log('');
 
+/**
+ * A LATER main commit whose deploy is serving `cache`, when HEAD is on main: lanes push often, so by
+ * the time anyone checks, HEAD's own build has usually been replaced by a newer one that contains it.
+ * Main is linear, so every commit in HEAD..origin/main is a descendant of HEAD. Null when none of the
+ * newest 50 carries `cache` (or git cannot answer).
+ * @param {string} cache
+ * @returns {string | null} the short SHA
+ */
+function laterCommitServing(cache) {
+  try {
+    const newer = git('rev-list --max-count=50 HEAD..origin/main').split('\n').filter(Boolean);
+    for (const sha of newer) {
+      if (versionsOf(git(`show ${sha}:${SW_PATH}`), sha).cache === cache) return sha.slice(0, 8);
+    }
+  } catch (_e) { /* offline or shallow: no answer */ }
+  return null;
+}
+
 const headIsLive = committed.cache === live.cache;
+const includedIn = onMain && !headIsLive ? laterCommitServing(live.cache) : null;
 const problems = [];
 
 if (local.cache !== committed.cache || swDirty) {
@@ -92,7 +113,7 @@ if (local.cache !== committed.cache || swDirty) {
 if (!onMain) {
   problems.push(`NOT ON MAIN: HEAD is not contained in origin/main, so the deploy workflow will never publish it. ${unpushed !== '(unknown)' ? `${unpushed} commit(s) ahead of origin/main. ` : ''}The Pages deploy runs only after a green CI run of a push to main.`);
 }
-if (onMain && !headIsLive) {
+if (onMain && !headIsLive && !includedIn) {
   problems.push('NOT DEPLOYED YET: HEAD is on origin/main but the live site still serves an older CACHE_VERSION. The deploy starts when CI on main finishes green (~10 min) and takes ~4 more — re-run this with --wait, or check: gh run list --workflow=deploy-web.yml');
 }
 
@@ -102,7 +123,9 @@ if (onMain && !headIsLive) {
 // Windows ("!(handle->flags & UV_HANDLE_CLOSING)") which exits 127 — a false
 // failure that would poison this tool's use as a gate.
 
-if (!problems.length) {
+if (!problems.length && includedIn) {
+  console.log(`LIVE (INCLUDED) — HEAD is inside ${includedIn}, a later main commit whose build (${live.cache}) votreader.github.io/app/ is serving.\n`);
+} else if (!problems.length) {
   console.log(`LIVE AND CURRENT — HEAD (${committed.cache}) is what votreader.github.io/app/ is serving.\n`);
 } else {
   console.log('NOT LIVE:\n');
@@ -120,10 +143,15 @@ if (!problems.length) {
       await new Promise((r) => setTimeout(r, 15000));
       process.stdout.write('.');
       const now = await fetchLive();
-      if (now.cache === committed.cache) landed = true;
+      if (now.cache === committed.cache) { landed = true; break; }
+      try { git('fetch origin main --quiet'); } catch (_e) { /* offline: keep polling what we have */ }
+      const later = laterCommitServing(now.cache);
+      if (later) { landed = `inside ${later}, whose build ${now.cache} is serving`; break; }
     }
-    if (landed) {
+    if (landed === true) {
       console.log(`\n\nLIVE — ${committed.cache} is now serving.\n`);
+    } else if (landed) {
+      console.log(`\n\nLIVE (INCLUDED) — HEAD is ${landed}.\n`);
     } else {
       console.log(`\n\nTIMED OUT after ${WAIT_MIN} min. Check CI first (the deploy waits for it), then: gh run list --workflow=deploy-web.yml\n`);
       process.exitCode = 1;
