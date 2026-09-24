@@ -162,7 +162,9 @@ the failure to after your push, on `main`.
   build plus "committed bundles, SW version and CSP hashes match source", CORPUS_VERSION, ASSET_INTEGRITY, the
   budgets, the type scale, the smoke walk and the read detector; and a Kotlin job (unit tests, Android lint,
   the JaCoCo floor).
-- `.github/workflows/deploy-web.yml` publishes every push to `main` to GitHub Pages, with no path filter.
+- `.github/workflows/deploy-web.yml` publishes every push to `main` to GitHub Pages, with no path filter, once that
+  push's CI run is green (`workflow_run`). Its `build` job runs npm with read-only rights; only the `deploy` job holds
+  the Pages token, and it runs no repository code.
 
 ### Landing a change
 
@@ -177,10 +179,12 @@ git push origin HEAD:main
 
 1. The push prints `Bypassed rule violations ... Required status check "build + syntax-check" is expected`. You
    pushed past the required check, so the CI run after the push is the check. Watch **both** runs to the end:
-   `gh run list --commit $(git rev-parse HEAD)`, then `gh run watch <run-id> --exit-status` for CI and for
-   Deploy Web.
+   `gh run list --commit $(git rev-parse HEAD)`, then `gh run watch <run-id> --exit-status` for CI. Deploy Web
+   starts only when that CI run finishes green (`workflow_run`), so find it after CI with
+   `gh run list --workflow=deploy-web.yml --limit 3` and watch it too. A red CI deploys nothing: the live site
+   stays on the last green commit.
 2. Confirm the deploy: `npm run check:live` compares the live service worker with HEAD and prints
-   `LIVE AND CURRENT` when they match (`--wait` polls up to 10 minutes; `--strict` exits 1 unless HEAD is live).
+   `LIVE AND CURRENT` when they match (`--wait` polls up to 25 minutes; `--strict` exits 1 unless HEAD is live).
    It also prints `(HEAD on <branch>)` and exits 0 on a wrong branch, so read the branch name.
 3. Rejected because `main` moved? Fetch, rebase, re-run what the new commits could disturb, push again.
 4. Commit subjects follow conventional commits: `feat(scope): …`, `fix(scope): …`, `test(…)`, `docs: …`,

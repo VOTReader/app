@@ -55,8 +55,11 @@ permissions:
   contents: read
 
 # One CI run per ref at a time. A superseded push to a branch cancels the run it
-# replaces (nobody was going to read that result); main never cancels, so every
-# landed commit keeps a complete CI record beside its deploy.
+# replaces (nobody was going to read that result). On main a RUNNING CI is never
+# cancelled - but GitHub keeps one PENDING run per group, so a newer push replaces
+# a main run that is still waiting (it is not true that every landed commit gets a
+# CI record). deploy-web.yml deploys only after a green CI run on main, so such a
+# replaced commit is never deployed on its own; the push that replaced it is.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}

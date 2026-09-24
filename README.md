@@ -60,7 +60,7 @@ app/src/main/assets/          the app itself (web)
 app/src/main/java/com/votreader/sacredui/   the Android shell (MainActivity.kt; AppInterface.kt is the JS bridge)
 tools/                        build scripts, gates, smoke and e2e harnesses, alignment and audio-sync pipelines
 .githooks/pre-commit          the local gate
-.github/workflows/            ci.yml (every push), deploy-web.yml (every push to main, to GitHub Pages)
+.github/workflows/            ci.yml (every push), deploy-web.yml (main, to GitHub Pages, once its CI is green)
 docs/                         subsystem docs; docs/archive/ holds finished plans
 ```
 

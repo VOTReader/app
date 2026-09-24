@@ -21,7 +21,8 @@
  * Usage:
  *   node tools/check-live-version.js            # report
  *   node tools/check-live-version.js --strict   # exit 1 unless HEAD is live
- *   node tools/check-live-version.js --wait     # poll until HEAD goes live (10 min cap)
+ *   node tools/check-live-version.js --wait     # poll until HEAD goes live (25 min cap: the
+ *                                               # deploy starts only after CI is green)
  */
 
 import { readFileSync } from 'fs';
@@ -36,6 +37,8 @@ const LIVE_URL = 'https://votreader.github.io/app/service-worker.js';
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
 const wait = args.includes('--wait');
+/** --wait's cap, in minutes: CI, then the deploy that waits for it, then Pages' cache. */
+const WAIT_MIN = 25;
 
 /** Pull the two version literals out of a service-worker.js text. */
 function versionsOf(text, label) {
@@ -87,10 +90,10 @@ if (local.cache !== committed.cache || swDirty) {
   problems.push('UNCOMMITTED: the working tree differs from HEAD. Commit (pre-commit rebuilds dist/ + the SW version) or these changes cannot reach anyone.');
 }
 if (!onMain) {
-  problems.push(`NOT ON MAIN: HEAD is not contained in origin/main, so the deploy workflow will never publish it. ${unpushed !== '(unknown)' ? `${unpushed} commit(s) ahead of origin/main. ` : ''}The Pages deploy triggers only on a push to main.`);
+  problems.push(`NOT ON MAIN: HEAD is not contained in origin/main, so the deploy workflow will never publish it. ${unpushed !== '(unknown)' ? `${unpushed} commit(s) ahead of origin/main. ` : ''}The Pages deploy runs only after a green CI run of a push to main.`);
 }
 if (onMain && !headIsLive) {
-  problems.push('NOT DEPLOYED YET: HEAD is on origin/main but the live site still serves an older CACHE_VERSION. The deploy takes ~3 min — re-run this, or check: gh run list --workflow=deploy-web.yml');
+  problems.push('NOT DEPLOYED YET: HEAD is on origin/main but the live site still serves an older CACHE_VERSION. The deploy starts when CI on main finishes green (~10 min) and takes ~4 more — re-run this with --wait, or check: gh run list --workflow=deploy-web.yml');
 }
 
 // NOTE: this file sets process.exitCode and returns rather than calling
@@ -108,7 +111,9 @@ if (!problems.length) {
 
   const blocked = problems.some((p) => p.startsWith('UNCOMMITTED') || p.startsWith('NOT ON MAIN'));
   if (wait && !blocked) {
-    const deadline = Date.now() + 10 * 60 * 1000;
+    // The deploy starts only when CI finishes green (deploy-web.yml, workflow_run):
+    // CI ~10 min + deploy ~4 min + Pages' max-age=600 on service-worker.js.
+    const deadline = Date.now() + WAIT_MIN * 60 * 1000;
     let landed = false;
     process.stdout.write('waiting for the deploy');
     while (Date.now() < deadline && !landed) {
@@ -120,7 +125,7 @@ if (!problems.length) {
     if (landed) {
       console.log(`\n\nLIVE — ${committed.cache} is now serving.\n`);
     } else {
-      console.log('\n\nTIMED OUT after 10 min. Check: gh run list --workflow=deploy-web.yml\n');
+      console.log(`\n\nTIMED OUT after ${WAIT_MIN} min. Check CI first (the deploy waits for it), then: gh run list --workflow=deploy-web.yml\n`);
       process.exitCode = 1;
     }
   } else if (strict) {

@@ -43,33 +43,46 @@ name: Deploy Web (PWA → GitHub Pages)
 # flip is the fallback if the workflow token cannot enable Pages.
 
 on:
-  push:
+  # THE DEPLOY WAITS FOR GREEN CI (2026-09-24, improvement sweep v12-01). It used
+  # to fire on the push itself, beside CI, and re-run a SUBSET of CI's gates; CI-red
+  # commits went live that way (1b23d1e0, a5b66a31, b3113383, 60e84ce3: CI failed,
+  # Deploy succeeded), and the user-facing checks that ran only in CI (smoke:ci's
+  # black-screen walk, e2e:read, e2e:readalong, bible-sync, drive routing) guarded
+  # nothing that shipped. workflow_run is the cross-workflow `needs:` the old
+  # comments said did not exist: this workflow starts when a CI run on main
+  # COMPLETES, and the build job below goes on only if that run succeeded, came
+  # from a push to main in THIS repository (a fork's pull request from a branch
+  # named main completes a CI run too, and must never reach the Pages token), and
+  # checks out exactly the SHA that CI proved. Cost: a change goes live about ten
+  # minutes after its push instead of about four. A superseded main push whose CI
+  # was replaced while pending (see ci.yml's concurrency block) is not deployed;
+  # the push that replaced it is.
+  #
+  # Every push to main still deploys once its CI is green (owner directive
+  # 2026-08-11: "any kind of change should always automatically deploy"). There is
+  # NO `paths:` filter, deliberately: the published bytes come from `npm run
+  # build`, whose output depends on far more than any list (tools/minify-bundle.mjs,
+  # every tools/gen-*.mjs, .nvmrc, the esbuild version in package-lock), and an
+  # allow-list once let a commit that changed what SHOULD be live match no path,
+  # deploy nothing and say nothing. A redundant redeploy is nearly free and a no-op
+  # for clients: the build is deterministic, so identical source produces an
+  # identical CACHE_VERSION and the browser's update check installs nothing.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    # NO `paths:` FILTER — DELIBERATE (2026-08-11, owner directive: "any kind of
-    # change should always automatically deploy, whether a small bug fix or a big
-    # feature add or renderer/math/type change anything").
-    #
-    # There used to be an allow-list here (assets/**, package.json, build.py,
-    # sync-sw-version.js, this file). It was a landmine: the published bytes are
-    # produced by `npm run build`, whose output depends on far more than that list
-    # — tools/minify-bundle.mjs, every tools/gen-*.mjs generator, .nvmrc, the
-    # esbuild version in package-lock — so a commit could legitimately change what
-    # SHOULD be live and match no path, and then nothing deployed and nothing said
-    # so. The failure was silent in the worst direction: the developer believes he
-    # shipped.
-    #
-    # A redundant redeploy is nearly free (~3 min of Actions time) and is a no-op
-    # for clients: `npm run build` is deterministic, so identical source produces
-    # an identical CACHE_VERSION, and an unchanged service-worker.js means the
-    # browser's update check finds no byte-diff and installs nothing. Publishing
-    # on EVERY push to main trades a few wasted minutes for the guarantee that
-    # "committed to main" and "live" can never silently diverge.
+  # The manual override: deploy HEAD of the chosen ref even though CI is red (a
+  # flaky e2e, say). The build job re-proves the publish gates itself on this path.
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Least privilege, split by job (2026-09-24, improvement sweep v10-01). The deploy
+# job used to run `npm ci`, lint, typecheck, vitest and the build - every
+# devDependency's code, lifecycle scripts included - while holding pages: write and
+# id-token: write, the two permissions that publish to the live PWA. Now `build`
+# runs all of that with contents: read and hands over the finished _site/ as the
+# Pages artifact; `deploy` holds the publishing permissions and runs no repository
+# code at all: no checkout, no npm, only GitHub's own Pages actions (SHA-pinned).
+permissions: {}
 
 # One deployment at a time; let in-flight deploys finish (don't cancel).
 concurrency:
@@ -77,14 +90,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
+    # A green CI run of a PUSH to main in THIS repository, or the manual override
+    # (see `on:`). `head_repository` is the guard that matters: a fork's pull
+    # request from its own branch named main also completes a CI run on this repo.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout (exactly the SHA CI proved; the dispatched ref on the manual path)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
       - name: Set up Node (pinned via .nvmrc)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -99,31 +123,18 @@ jobs:
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
 
-      - name: Gate — re-run CI's blocking publish checks (BLD-1 + BLD2)
-        # The deploy publishes STRAIGHT to the live PWA and runs as a SEPARATE
-        # workflow from ci.yml (no cross-workflow `needs:`), so it must re-prove the
-        # blocking gates itself or a commit that fails CI could still publish.
-        # BLD-1 added the data/CSP gates; BLD2 widens it to the correctness gates
-        # that `npm run build` alone does NOT run (lint / typecheck / vitest) — so a
-        # build that compiles but fails a type check or test never reaches the live
-        # PWA. BLD3 (2026-08-09, external audit): check_balance + smoke-lite added —
-        # the en-dash / smart-quote data classes aren't JS syntax errors, so no
-        # other deploy gate saw them, and a module-graph cycle or globals-mirror
-        # drift black-screens just the same. 2026-09-03: check:audio-sync and
-        # check:css-tokens join -- both were CI-only by omission, not by design,
-        # and both corrupt the published artifact (a stale read-along span paints
-        # mid-word on the live PWA; an undeclared var() drops its whole
-        # declaration). What stays CI-only BY DESIGN, listed exactly so the two
-        # lists can be diffed against ci.yml mechanically: smoke:ci (needs the
-        # puppeteer browser + is flake-prone), the coverage floors (test:coverage
-        # -- `npm run test` below is the same suite without them), app-size,
-        # bundle-budget and type-scale (quality ratchets -- they can't corrupt the
-        # published artifact), check:apk-assets (APK-only), the src/ syntax pass
-        # (`npm run build` parses the same files), and the gate self-tests
-        # test_check_balance / test_preview_server (dev tooling, not the
-        # artifact). ci.yml runs all of those on the same push. A non-zero exit
-        # aborts the deploy before anything is published -- the site stays on the
-        # prior good version (the safe failure mode).
+      - name: Gate — the publish checks, on the MANUAL path only (BLD-1 + BLD2)
+        # On the workflow_run path CI has already run every one of these, and
+        # everything this list used to leave out (smoke:ci's black-screen walk, the
+        # coverage floors, e2e:read, e2e:readalong, bible-sync, drive routing,
+        # check:s22, the budgets), on this exact SHA: the job's `if:` is that proof.
+        # A manual dispatch has no CI run behind it - it is the override for a red
+        # CI - so it re-proves the checks that decide whether the published bytes
+        # are sound: the data gates (check_balance, schemas, corpus/search/audio
+        # versions, footnotes, CSS tokens, CSP), lint, typecheck and vitest. A
+        # non-zero exit stops the deploy before anything is published, and the site
+        # stays on the prior good version (the safe failure mode).
+        if: github.event_name == 'workflow_dispatch'
         run: |
           pip install -r requirements-dev.txt   # esprima — check_balance's authoritative JS parse
           python check_balance.py        # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
@@ -157,10 +168,10 @@ jobs:
         # staged it, and only ci.yml's identical check would have caught it — on a
         # branch whose commits were never pushed, so nothing ever ran.
         #
-        # ci.yml runs this too, but the deploy is a SEPARATE workflow with no
-        # cross-workflow `needs:`, so it must re-prove it or a red-CI commit can
-        # still publish. A non-zero exit aborts before anything is staged, leaving
-        # the site on the prior good version — the safe failure mode.
+        # ci.yml runs this too, and the deploy now waits for it; it stays here
+        # because these are the bytes about to be published (and the manual path
+        # has no CI run behind it). A non-zero exit aborts before anything is
+        # staged, leaving the site on the prior good version — the safe failure mode.
         #
         # index.html is included because build:csp may rewrite its CSP script-src
         # hashes; service-worker.js because build:sw rewrites CACHE_VERSION.
@@ -209,15 +220,28 @@ jobs:
           echo "Staged file count: $(find _site -type f | wc -l)"
           echo "Runtime src/data files staged: $(ls _site/src/data/ | wc -l)"
 
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
-        with:
-          enablement: true
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: _site
+
+  deploy:
+    # The only job holding the publishing permissions. It runs no repository code:
+    # no checkout, no npm - GitHub's own Pages actions, SHA-pinned, on the
+    # artifact `build` uploaded.
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+        with:
+          enablement: true
 
       - name: Deploy to GitHub Pages
         id: deployment
