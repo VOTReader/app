@@ -37,7 +37,7 @@ const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScr
 const defines = (bundle, name) => new RegExp('[{,]\s*' + name + ':').test(bundle);
 
 describe('bundle-h carries the Listening Library, and bundle-d no longer does', () => {
-  it('the five screens are defined in bundle-h', () => {
+  it('the six screens are defined in bundle-h', () => {
     const h = read(resolve(DIST, 'bundle-h.js'));
     for (const name of MARKERS) {
       expect(defines(h, name), `bundle-h.js lacks ${name}`).toBe(true);
@@ -77,8 +77,9 @@ describe('bundle-h carries the Listening Library, and bundle-d no longer does', 
       expect(defines(d, name), `bundle-d.js no longer defines ${name} for the shell`).toBe(true);
       expect(defines(h, name), `bundle-h.js ships its own ${name}`).toBe(false);
     }
-    // A bundle-h that stayed small is the cheap proof of all of the above.
-    expect(h.length < 40000, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
+    // A bundle-h that stayed small is the cheap proof of all of the above. The player alone is far over this;
+    // 47,000 tracks check-bundle-budget's ceiling (46,900 since item 8's sixth screen, 2026-09-24).
+    expect(h.length < 47000, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
   });
 
   it('the loader, the routes, the precache and the build all know the bundle', () => {

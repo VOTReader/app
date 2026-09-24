@@ -130,7 +130,13 @@ const BUDGETS = [
   // row and the collection screen's 'study:<id>' source; `esbuild --analyze` shows
   // the five screens and nothing else (the player did not come along).
   // 28,931 x 1.15 = 33,270.65 -> the hundred above.
-  { file: 'bundle-h.js', measured: 28931, max: 33300 },     // Listening Library hub / Volumes / Studies / collection / saved
+  // 2026-09-24 (readalong, listening items 4b + 8): +11,849 B. 4b's honest Studies
+  // copy and Back pill (+867 B, 29,798 on main), then item 8's SIXTH screen, "On this
+  // phone" (AudioOfflineScreen), and the downloads controls on every recordings row
+  // (OfflineAudioControls: the row line, Download all and its size confirm). The
+  // downloads STORE stays in bundle-d beside the player (bundle-h-membership pins
+  // '__votOfflineAudio' out of bundle-h). 40,780 x 1.15 = 46,897 -> the hundred above.
+  { file: 'bundle-h.js', measured: 40780, max: 46900 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },
