@@ -161,8 +161,9 @@ the failure to after your push, on `main`.
   budgets, the type scale, the smoke walk and the read detector; and a Kotlin job (unit tests, Android lint,
   the JaCoCo floor).
 - `.github/workflows/deploy-web.yml` publishes every push to `main` to GitHub Pages, with no path filter, once that
-  push's CI run is green (`workflow_run`). Its `build` job runs npm with read-only rights; only the `deploy` job holds
-  the Pages token, and it runs no repository code.
+  push's CI run is green (`workflow_run`) and only while that commit is still `main`'s tip (a re-run of an older
+  CI never replaces a newer deploy; the newer commit deploys through its own green run). Its `build` job runs npm
+  with read-only rights; only the `deploy` job holds the Pages token, and it runs no repository code.
 
 ### Landing a change
 

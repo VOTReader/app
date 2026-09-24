@@ -64,12 +64,34 @@ describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
     expect(on, 'the manual override stays').toMatch(/\n {2}workflow_dispatch:/);
   });
 
-  it('builds only for a SUCCESSFUL CI run of a PUSH to main in THIS repository (a fork PR from a branch named main must not reach the token)', () => {
-    const build = code(jobs().build || '');
-    expect(build).toContain("github.event.workflow_run.conclusion == 'success'");
-    expect(build).toContain("github.event.workflow_run.event == 'push'");
-    expect(build).toContain("github.event.workflow_run.head_branch == 'main'");
-    expect(build).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
+  it('goes on only for a SUCCESSFUL CI run of a PUSH to main in THIS repository (a fork PR from a branch named main must not reach the token)', () => {
+    const gate = code(jobs().gate || '');
+    expect(gate).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(gate).toContain("github.event.workflow_run.event == 'push'");
+    expect(gate).toContain("github.event.workflow_run.head_branch == 'main'");
+    expect(gate).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
+  });
+
+  it('publishes only a commit that is still main\'s tip (an older green run must never replace a newer deploy)', () => {
+    // The ci9 refutation's MED finding (lanes/docs/out/ci9-refute.md): re-running an old
+    // commit's CI, or a dispatch while an older CI ran, published it over the newer one.
+    // The same check stops a TAG named main (CI runs on tags, and reports the tag as the branch).
+    const all = jobs();
+    const gate = code(all.gate || '');
+    expect(gate).toMatch(/git ls-remote [^\n]*refs\/heads\/main/);
+    expect(gate).toMatch(/publish=true/);
+    expect(gate).toMatch(/outputs:\n\s+publish: \$\{\{ steps\.tip\.outputs\.publish \}\}/);
+    const build = code(all.build || '');
+    expect(build).toMatch(/needs: gate/);
+    expect(build).toContain("if: needs.gate.outputs.publish == 'true'");
+    expect(code(all.deploy || '')).toMatch(/needs: build/);
+  });
+
+  it('the pages concurrency group sits on the deploy job, so a skipped run cannot cancel a waiting deploy', () => {
+    // The refutation's LOW: at the workflow level every CI completion - red, cancelled, a fork PR -
+    // queued a run that then skipped, and a newer queued run replaces a waiting one.
+    expect(topBlock('concurrency'), 'no workflow-level concurrency').toBe('');
+    expect(code(jobs().deploy || '')).toMatch(/concurrency:\n\s+group: pages\n\s+cancel-in-progress: false/);
   });
 
   it('checks out exactly the SHA CI proved, without leaving a token in .git', () => {

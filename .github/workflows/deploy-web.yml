@@ -84,13 +84,8 @@ on:
 # code at all: no checkout, no npm, only GitHub's own Pages actions (SHA-pinned).
 permissions: {}
 
-# One deployment at a time; let in-flight deploys finish (don't cancel).
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
-  build:
+  gate:
     # A green CI run of a PUSH to main in THIS repository, or the manual override
     # (see `on:`). `head_repository` is the guard that matters: a fork's pull
     # request from its own branch named main also completes a CI run on this repo.
@@ -100,6 +95,37 @@ jobs:
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.tip.outputs.publish }}
+    steps:
+      - name: Publish only main's tip (an older green run must never replace a newer deploy)
+        # The ci9 refutation (2026-09-24): re-running an older commit's CI, or a
+        # dispatch while an older CI ran, published that commit over a newer one, and
+        # every client then installed the older build. A tag named main (CI also runs
+        # on tags, and reports the tag as the branch) could publish a commit that is
+        # not on main at all. Both end here: this run publishes only if the commit it
+        # would build IS main's tip right now. A newer commit deploys through its own
+        # green CI run.
+        id: tip
+        env:
+          WANT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          tip=$(git ls-remote "https://github.com/$REPO" refs/heads/main | cut -f1)
+          echo "main is at $tip; this run would publish $WANT"
+          if [ -n "$tip" ] && [ "$tip" = "$WANT" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::$WANT is not main's tip ($tip). The newer commit deploys through its own green CI run."
+          fi
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -234,6 +260,13 @@ jobs:
     permissions:
       pages: write
       id-token: write
+    # One deployment at a time; let an in-flight deploy finish (don't cancel). On
+    # this job, not the workflow: there, every CI completion (red, cancelled, a
+    # fork's PR) queued a run that then skipped, and a newer queued run replaces a
+    # waiting one, so a skip could cancel a real deploy waiting its turn.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
