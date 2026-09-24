@@ -288,3 +288,57 @@ describe('AudioCollectionScreen -- defensive states', () => {
     expect(screen.getByText(/This source has no recordings to show/)).toBeTruthy();
   });
 });
+
+
+/* Listening item 8: downloads to the phone, on the recordings screen (Codex mockup round 1, option 1). The screen reads
+   the bundle-d store as a global (OfflineAudio); a plain stand-in drives it here. */
+describe('a recordings screen in the phone app: downloads', () => {
+  function fakeStore({ available = true } = {}) {
+    const s = {
+      subscribe: () => () => {}, getVersion: () => 0, available: () => available, refresh: () => {},
+      statusOf: () => 'none', isSaved: () => false, sizeOf: () => null, progressOf: () => null, failureOf: () => null,
+      items: () => [], totalBytes: () => 0, freeBytes: () => 5e9,
+      requestSizes: vi.fn(), download: vi.fn(() => true), remove: vi.fn(), removeAll: vi.fn(), cancel: vi.fn(),
+    };
+    globalThis.OfflineAudio = s;
+    return s;
+  }
+  function setOnline(v) { Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => v }); }
+  afterEach(() => { delete globalThis.OfflineAudio; setOnline(true); AudioPlayer.setPreferredReader('auto'); });
+
+  it('every recording row says what the phone holds, and Download all sits beside Play all', () => {
+    const store = fakeStore();
+    AudioPlayer.setPreferredReader('V');
+    renderScreen('one');
+    const rows = [...document.querySelectorAll('.audio-collection-item')];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.querySelector('.offline-row').textContent).toMatch(/^Download/);
+    expect(screen.getByRole('button', { name: /download all/i })).toBeTruthy();
+    // A row downloads the reading its own Play plays: letter C in the chosen reader V, both parts.
+    fireEvent.click(rows[1].querySelector('.offline-row-download'));
+    expect(store.download.mock.calls[0][0].map((t) => t.url)).toEqual([URL_OF('idC1v'), URL_OF('idC2v')]);
+  });
+
+  it('a Bible edition offers a book at a time, never the whole edition', () => {
+    fakeStore();
+    renderScreen('bible-brm-kjv');
+    expect(document.querySelectorAll('.audio-collection-item .offline-row').length).toBe(2);
+    expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
+  });
+
+  it('on the web none of it renders', () => {
+    fakeStore({ available: false });
+    renderScreen('one');
+    expect(document.querySelector('.offline-row')).toBeNull();
+    expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
+  });
+
+  it('with no signal, a row not on the phone is marked unavailable', () => {
+    fakeStore();
+    setOnline(false);
+    renderScreen('one');
+    const rows = [...document.querySelectorAll('.audio-collection-item')];
+    expect(rows.every((r) => r.classList.contains('is-unavailable'))).toBe(true);
+    expect(rows[0].querySelector('.offline-row').textContent).toMatch(/Needs a connection/);
+  });
+});

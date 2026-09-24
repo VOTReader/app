@@ -89,6 +89,38 @@ describe('the Listening Library hub: one doorway for the studies', () => {
   });
 });
 
+describe('the Listening Library hub: On this phone (item 8)', () => {
+  const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
+  function fakeStore(items, available = true) {
+    globalThis.OfflineAudio = {
+      subscribe: () => () => {}, getVersion: () => 0, available: () => available,
+      items: () => items, totalBytes: () => items.reduce((n, i) => n + i.bytes, 0), statusOf: () => 'none', sizeOf: () => null,
+    };
+  }
+  afterEach(() => { delete globalThis.OfflineAudio; });
+  const hub = (onOpenOffline) => render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={noop} onOpenOffline={onOpenOffline} {...common} />);
+
+  it('shows what the phone holds and opens it', () => {
+    fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 18_000_000, savedAt: 1 }, { url: U('b'), key: 'one:b', title: 'B', bytes: 12_000_000, savedAt: 2 }]);
+    const onOpenOffline = vi.fn();
+    hub(onOpenOffline);
+    const row = screen.getByText('On this phone').closest('button');
+    expect(row.textContent).toContain('2 recordings · 30 MB');
+    fireEvent.click(row);
+    expect(onOpenOffline).toHaveBeenCalledTimes(1);
+  });
+
+  it('is absent with nothing downloaded, and on the web', () => {
+    fakeStore([]);
+    hub(noop);
+    expect(screen.queryByText('On this phone')).toBeNull();
+    cleanup();
+    fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 1, savedAt: 1 }], false);
+    hub(noop);
+    expect(screen.queryByText('On this phone')).toBeNull();
+  });
+});
+
 describe('the Studies screen', () => {
   it('lists every study in reading order, recorded ones read-along, the rest honest', () => {
     const onOpenStudy = vi.fn();
