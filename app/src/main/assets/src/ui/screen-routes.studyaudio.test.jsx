@@ -106,6 +106,31 @@ describe('Library "open the text" on a study recording', () => {
   });
 });
 
+/* Listening item 8: the hub's "On this phone" row enters the downloads screen as a Library sub-screen (its back
+   returns to the hub), and the route draws it from bundle-h's AudioOfflineScreen. */
+describe('On this phone (item 8): the hub door and the route', () => {
+  it('the hub row enters audio-library-offline with the hub as its origin', () => {
+    globalThis.AudioLibraryScreen = () => null;
+    try {
+      const p = makeRoutes();
+      const routes = buildScreenRoutes(p);
+      routes['audio-library']().props.onOpenOffline();
+      expect(p.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: null });
+      expect(p.setScreen).toHaveBeenCalledWith('audio-library-offline');
+    } finally { delete globalThis.AudioLibraryScreen; }
+  });
+
+  it('the route draws AudioOfflineScreen, whose back is the nav origin', () => {
+    globalThis.AudioOfflineScreen = () => null;
+    try {
+      const p = makeRoutes({ screen: 'audio-library-offline' });
+      const el = buildScreenRoutes(p)['audio-library-offline']();
+      expect(el.type).toBe(globalThis.AudioOfflineScreen);
+      expect(el.props.onBack).toBe(p.goNavOrigin);
+    } finally { delete globalThis.AudioOfflineScreen; }
+  });
+});
+
 /* Codex critique 1 (2026-09-23): a study with no recording yet opens to READ
    from the Listening Library's Studies screen — its index (or its one page),
    with the back pill returning to Studies — never an empty recordings page. */

@@ -139,6 +139,7 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'My Progress', subtitle: 'Reading progress', resolved: true });
       expect(describeTab({ screen: 'about' })).toEqual({ title: 'About', subtitle: 'VOTReader', resolved: true });
       expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true });
+      expect(describeTab({ screen: 'audio-library-offline' })).toEqual({ title: 'Listening Library', subtitle: 'On this phone', resolved: true });
     });
 
     it('names the Answers screens, a subject by its own title', () => {

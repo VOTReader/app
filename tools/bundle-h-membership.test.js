@@ -29,7 +29,7 @@ const read = (p) => readFileSync(p, 'utf-8');
    identifier: esbuild minifies each screen's function to a one-letter name, and
    the identifier still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
-const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen'];
+const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen'];
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
    writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
    — and that colon reads exactly like a definition. A definition is a KEY in
@@ -50,6 +50,16 @@ describe('bundle-h carries the Listening Library, and bundle-d no longer does', 
       expect(defines(d, name), `bundle-d.js still defines ${name}`).toBe(false);
     }
     expect(d.includes('AudioLibraryScreen'), 'bundle-d.js lost its guard on AudioLibraryScreen').toBe(true);
+  });
+
+  // Item 8: the downloads store is ONE object, bundle-d's (the player's offline gate and the page's rows must see the
+  // same state); bundle-h reads it as the OfflineAudio global. A bundled copy would install a second receiver.
+  it('there is exactly one downloads store, and it is the shell\'s', () => {
+    const h = read(resolve(DIST, 'bundle-h.js'));
+    const d = read(resolve(DIST, 'bundle-d.js'));
+    expect(h.includes('__votOfflineAudio'), 'bundle-h.js bundled its own offline-audio store').toBe(false);
+    expect(d.includes('__votOfflineAudio'), 'bundle-d.js lost the offline-audio store').toBe(true);
+    expect(defines(d, 'OfflineAudio'), 'bundle-d.js does not publish OfflineAudio').toBe(true);
   });
 
   it('there is exactly one player, and it is the shell\'s', () => {
