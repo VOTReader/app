@@ -8,6 +8,14 @@ import { AnnotationHint } from './AnnotationHint.jsx';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 import { AutoScrollControl } from './AutoScrollControl.jsx';
 
+/** The document's selected text; '' when nothing is selected or it cannot be read. */
+function selectionText() {
+  try {
+    const s = window.getSelection && window.getSelection();
+    return s && !s.isCollapsed ? String(s) : '';
+  } catch (_e) { return ''; }
+}
+
 // Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
 // given scroll container — used for the inert peek so it renders already at the
 // neighbor's saved offset (a swipe lands where the live screen restores to, no
@@ -172,6 +180,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
     const el = scrollRef.current;
     if (!el) return;
     let startX = 0, startY = 0, startScrollTop = 0, startTime = 0, didScroll = false, didSwipeX = false;
+    let startSel = '';
     let suppressFn = null, suppressTid = null;
 
     const cleanupSuppress = () => {
@@ -189,6 +198,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       startY = e.touches[0].clientY;
       startScrollTop = el.scrollTop;
       startTime = performance.now();
+      startSel = selectionText();
       didScroll = false;
       didSwipeX = false;
       cleanupSuppress();
@@ -207,13 +217,18 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       else if (dx > 8 && dx > dy * 1.3) didSwipeX = true;
     };
     const onEndCapture = (e) => {
-      // Suppress scroll-lifts (finger moved) and long-holds (finger held > 300 ms).
-      // Either means the gesture was not a tap — clicking whatever you landed on
-      // would be accidental. Small WebView scrolls below the 8px touchmove delta
-      // are caught by the scrollTop change check.
+      // Suppress scroll-lifts (finger moved) and holds that selected words (a
+      // long-press began a selection). Either means the gesture was not a tap —
+      // clicking whatever you landed on would be accidental. Small WebView scrolls
+      // below the 8px touchmove delta are caught by the scrollTop change check.
+      // A slow, still press that selected nothing IS a tap: a bare 300 ms cap ate
+      // every such press on every control inside a screen, and older hands press
+      // slowly (v08-01). A selection already there when the finger went down
+      // does not count.
       const scrolled = didScroll || el.scrollTop !== startScrollTop;
-      const tooLong = (performance.now() - startTime) > 300;
-      if (!scrolled && !tooLong) { didScroll = false; didSwipeX = false; return; }
+      const selNow = (performance.now() - startTime) > 300 ? selectionText() : '';
+      const heldToSelect = !!selNow && selNow !== startSel;
+      if (!scrolled && !heldToSelect) { didScroll = false; didSwipeX = false; return; }
       const wasSwipeX = didSwipeX;   // a horizontal pager swipe owns this lift
       didScroll = false;
       didSwipeX = false;
