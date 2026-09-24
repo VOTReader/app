@@ -643,6 +643,14 @@ class AppInterface(
         if (urls.contains("*")) store.cancelAll() else if (urls.isNotEmpty()) store.cancel(urls)
     }
 
+    /** Look up the sizes of `[url, ...]` before a download; answered as one JsEvent.OfflineAudio "sizes" event. */
+    @JavascriptInterface
+    fun offlineAudioSizes(json: String?) {
+        val store = host.offlineAudio ?: return
+        val urls = parseUrls(json) ?: return
+        if (urls.isNotEmpty()) store.requestSizes(urls)
+    }
+
     private fun parseJsonArray(json: String?): JSONArray? =
         if (json.isNullOrBlank()) null else try { JSONArray(json) } catch (_: Exception) { null }
 

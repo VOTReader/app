@@ -37,6 +37,10 @@ let _queued = new Set();
 let _active = null;
 /** @type {Map<string, string>} */
 let _failed = new Map();
+/** @type {Map<string, number>} sizes (bytes) looked up before a download */
+let _sizes = new Map();
+/** @type {Set<string>} */
+let _sizesAsked = new Set();
 let _loaded = false;
 
 /** @returns {any} */
@@ -115,6 +119,14 @@ function _onEvent(json) {
       _queued.delete(url);
       if (_active && _active.url === url) _active = null;
       break;
+    case 'sizes': {
+      const sizes = e.sizes && typeof e.sizes === 'object' ? e.sizes : {};
+      for (const k of Object.keys(sizes)) {
+        const n = Number(sizes[k]);
+        if (n > 0) _sizes.set(k, n);
+      }
+      break;
+    }
     default:
       return;
   }
@@ -163,6 +175,27 @@ export const OfflineAudio = {
   progressOf: (url) => (_active && _active.url === url ? { bytes: _active.bytes, total: _active.total } : null),
   /** @param {string} url @returns {string | null} network | space | short | size | disk */
   failureOf: (url) => _failed.get(url) || null,
+  /**
+   * Bytes of `url`: a download's own size, else one looked up (requestSizes), else null.
+   * @param {string} url @returns {number | null}
+   */
+  sizeOf: (url) => {
+    const saved = _saved.get(url);
+    if (saved && saved.bytes > 0) return saved.bytes;
+    return _sizes.get(url) || null;
+  },
+  /**
+   * Ask the phone for the sizes of `urls` not yet known (answered by a 'sizes' event).
+   * @param {string[]} urls
+   */
+  requestSizes(urls) {
+    const b = _bridge();
+    if (!b || typeof b.offlineAudioSizes !== 'function') return;
+    const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u));
+    if (!want.length) return;
+    for (const u of want) _sizesAsked.add(u);
+    try { b.offlineAudioSizes(JSON.stringify(want)); } catch (_e) { for (const u of want) _sizesAsked.delete(u); }
+  },
   /** @returns {SavedItem[]} newest first */
   items: () => { if (!_loaded) refresh(); return [..._saved.values()].sort((a, b) => b.savedAt - a.savedAt); },
   totalBytes: () => { if (!_loaded) refresh(); return _totalBytes; },
@@ -193,7 +226,7 @@ export const OfflineAudio = {
   /** Tests only: forget everything and re-install the receiver. */
   _reset() {
     _listeners.clear();
-    _saved = new Map(); _queued = new Set(); _failed = new Map();
+    _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set();
     _active = null; _totalBytes = 0; _freeBytes = -1; _loaded = false; _version = 0;
     _install();
   },
