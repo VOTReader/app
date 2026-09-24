@@ -200,6 +200,28 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
     expect(props.setScreen).toHaveBeenCalledWith('bible-idx');
   });
 
+  // Item 4b (2026-09-24): the Listening Library's Studies screen opens a study
+  // with no recording yet on its INDEX as a tap-through; the index shows the pill.
+  it('bible-study-index with the pill showing pops the tap-through stack (not the Studies home)', () => {
+    const props = baseProps({
+      screen: 'bible-study-index', studyId: 'grace-and-law',
+      fromLetterRef: { current: [{ sourceScreen: 'audio-library-studies', sourceLetterTitle: 'Studies' }] }, backActive: true,
+    });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.goStudiesHome).not.toHaveBeenCalled();
+  });
+
+  it('bible-study-index with NO pill still backs to the Studies home (regression guard)', () => {
+    const props = baseProps({ screen: 'bible-study-index', studyId: 'grace-and-law', backActive: false });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.tapThroughBack).not.toHaveBeenCalled();
+    expect(props.goStudiesHome).toHaveBeenCalledTimes(1);
+  });
+
   it('the pill wins over a stale fromSearch on bible-ch (pill is the user intent)', () => {
     const props = baseProps({
       screen: 'bible-ch', fromSearch: true,
