@@ -1685,6 +1685,90 @@ describe('audio-player — offline', () => {
   });
 });
 
+/* Listening item 8 (2026-09-24): recordings downloaded to the phone play with no signal. The Android app's
+   OfflineAudioStore answers the <audio> element from disk; the player must stop refusing them. Offline, a queue plays
+   what is on the phone from where the listener started, passing over what is not; a seam onto a recording that is not
+   on the phone pauses there with the offline notice. On the web nothing is ever downloaded, so today's refusals stand. */
+describe('audio-player — offline, recordings downloaded to the phone (item 8)', () => {
+  async function downloaded(ids) {
+    bridge.offlineAudioState = () => JSON.stringify({ items: ids.map((id) => ({ url: URL_OF(id), key: '', title: '', bytes: 1, savedAt: 1 })), totalBytes: ids.length, freeBytes: 1e9, active: null, queued: [] });
+    const { OfflineAudio } = await import('./offline-audio.js');
+    OfflineAudio.refresh();
+  }
+
+  it('a downloaded letter plays with no signal', async () => {
+    await downloaded(['idC']);
+    setOnline(false);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    expect(AudioPlayer.getState().status).toBe('loading');
+    expect(el().src).toBe(URL_OF('idC'));
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+  });
+
+  it('Play all with no signal starts at the first downloaded recording', async () => {
+    await downloaded(['idC']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].url).toBe(URL_OF('idC'));
+    expect(el().src).toBe(URL_OF('idC'));
+  });
+
+  it('a seam onto a recording not on the phone pauses there with the offline notice', async () => {
+    await downloaded(['idA1']);
+    setOnline(false);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    el().dispatchEvent(new Event('ended'));
+    const s = AudioPlayer.getState();
+    expect(s.status).toBe('paused');
+    expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    // Back online, Play loads the recording the bar names (not the one that ended).
+    setOnline(true);
+    AudioPlayer.toggle();
+    expect(el().src).toBe(URL_OF('idA2'));
+  });
+
+  it('a load error on a downloaded recording is a load failure, not a missing connection', async () => {
+    await downloaded(['idC']);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    setOnline(false);
+    el().dispatchEvent(new Event('error'));
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Couldn’t load this track.');
+  });
+
+  it('a restored bar whose recording is on the phone resumes with no signal', async () => {
+    localStorage.setItem('vot-audio-pos', JSON.stringify({
+      v: 1, mode: 'letter', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:letter-c', time: 12,
+      track: { title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC'), key: 'vol1:letter-c' },
+    }));
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      await load();
+      await downloaded(['idC']);
+      setOnline(false);
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(el().src).toBe(URL_OF('idC'));
+      expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+    } finally {
+      delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
+    }
+  });
+
+  it('CONTROL: with no signal, a recording not on the phone is still refused before anything changes', async () => {
+    await downloaded(['idC']);
+    setOnline(false);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(AudioPlayer.getState().queue).toHaveLength(0);
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+  });
+});
+
 describe('audio-player — load errors', () => {
   it('a mid-play error pauses and toasts, keeping the queue for a retry', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
