@@ -9,24 +9,31 @@
  * is median 16.7 / p90 16.8 ms. Those numbers lived in a lane's out/ folder
  * and nothing failed when they slipped. Now measure-s22-frame-time.mjs
  * writes them to tools/perf/s22-frame-time.json with a hash of the Scripture
- * Web SOURCE it measured, and this check fails when
- *   (a) the Scripture Web source has changed since the measurement - a
- *       landing that touches the web must carry its own measurement; or
- *   (b) any scene is over budget (BUDGET below).
+ * Web SOURCE it measured, and this check
+ *   (a) WARNS when the Scripture Web source has changed since the measurement:
+ *       the landing that touched the web owes a new measurement; and
+ *   (b) FAILS when any scene is over budget (BUDGET below), a scene is
+ *       missing, or there is no measurement at all.
  *
  * CI has no phone, so the measurement is made here before the commit
  * (see the recipe in measure-s22-frame-time.mjs). A stale hash is not a
- * performance failure - it is an unmeasured change, which is the thing this
- * gate refuses to let through. Docs, tests, CSS and the rest of the app do
- * not move the hash.
+ * performance failure - it is an unmeasured change. It used to fail CI too,
+ * and once the deploy waited for a green CI (deploy-web.yml, 2026-09-24) that
+ * froze every deploy until someone plugged the S22 in (it was off adb the day
+ * a one-sentence guide edit went stale). Corbin's rule, the same day: the S22
+ * must never block. So STALE is a warning: in CI a ::warning annotation and a
+ * note in the job summary (staleNotice below), and the lane that touched the
+ * web re-measures when the phone is back. Docs, tests, CSS and the rest of the
+ * app do not move the hash.
  *
  * RE-BASELINING the budget is a deliberate act: edit BUDGET below in the
- * same commit as the reason. No env var and no flag silences this gate.
+ * same commit as the reason. No env var and no flag silences the budget.
  *
- * Run: node tools/check-s22-frame-time.js   (exit 1 stale or over budget)
+ * Run: node tools/check-s22-frame-time.js   (exit 1 over budget or no measurement;
+ *                                             a stale hash warns and exits 0)
  */
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,18 +75,18 @@ export function sourceHash(root) {
 
 /**
  * @param {string} root
- * @returns {{ok:boolean, lines:string[]}}
+ * @returns {{ok:boolean, stale:boolean, lines:string[]}}  ok = no failure; stale = warn
  */
 export function check(root) {
   const lines = [];
   const path = join(root, JSON_PATH);
-  if (!existsSync(path)) return { ok: false, lines: [`${JSON_PATH} missing - run npm run measure:s22 on the phone`] };
+  if (!existsSync(path)) return { ok: false, stale: false, lines: [`${JSON_PATH} missing - run npm run measure:s22 on the phone`] };
   const m = JSON.parse(readFileSync(path, 'utf8'));
   let ok = true;
   const now = sourceHash(root);
-  if (m.sourceHash !== now) {
-    ok = false;
-    lines.push(`STALE: the Scripture Web source is ${now}, the measurement (${m.measured}, ${m.sha}) speaks for ${m.sourceHash} - run npm run measure:s22 and commit ${JSON_PATH}`);
+  const stale = m.sourceHash !== now;
+  if (stale) {
+    lines.push(`STALE (a warning, not a failure): the Scripture Web source is ${now}, the measurement (${m.measured}, ${m.sha}) speaks for ${m.sourceHash} - with the S22 on adb, run npm run measure:s22 and commit ${JSON_PATH}`);
   }
   for (const k of SCENES) {
     const s = m.scenes && m.scenes[k];
@@ -91,14 +98,45 @@ export function check(root) {
     else lines.push(`ok ${k.padEnd(9)} median ${s.median} p90 ${s.p90} ms (${s.frames} frames)`);
   }
   lines.push(`${m.device && m.device.renderer} - measured ${m.measured} at ${m.sha}, source ${m.sourceHash}`);
-  return { ok, lines };
+  return { ok, stale, lines };
+}
+
+/**
+ * What CI shows for a stale measurement: a one-line GitHub Actions ::warning
+ * annotation (on the measurement file) and a markdown note for the job
+ * summary. Null when the measurement is fresh.
+ * @param {{stale:boolean, lines:string[]}} result
+ * @returns {{annotation:string, summary:string} | null}
+ */
+export function staleNotice(result) {
+  if (!result || !result.stale) return null;
+  const why = (result.lines.find((l) => l.startsWith('STALE')) || 'STALE').replace(/[\r\n]+/g, ' ');
+  // A workflow command ends at the newline; '%' ':' ',' in the message are fine after the '::'.
+  const annotation = `::warning file=${JSON_PATH},title=S22 frame-time measurement is stale::${why.replace(/%/g, '%25')}`;
+  const summary = [
+    '### S22 frame-time: STALE measurement (a warning)',
+    '',
+    why,
+    '',
+    'This does not fail CI or hold the deploy (the S22 must never block). The lane that changed the',
+    'Scripture Web re-measures when the phone is on adb: `npm run measure:s22`, then commit `' + JSON_PATH + '`.',
+    '',
+  ].join('\n');
+  return { annotation, summary };
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const { ok, lines } = check(root);
-  for (const l of lines) console.log('[s22-frame-time] ' + l);
-  if (!ok) { console.error('[s22-frame-time] FAIL'); process.exit(1); }
-  console.log('[s22-frame-time] ok');
+  const result = check(root);
+  for (const l of result.lines) console.log('[s22-frame-time] ' + l);
+  const notice = staleNotice(result);
+  if (notice && process.env.GITHUB_ACTIONS === 'true') {
+    console.log(notice.annotation);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, notice.summary); } catch (_e) { /* the annotation still shows */ }
+    }
+  }
+  if (!result.ok) { console.error('[s22-frame-time] FAIL'); process.exit(1); }
+  console.log(notice ? '[s22-frame-time] ok, with a WARNING: the measurement is STALE (not blocking)' : '[s22-frame-time] ok');
 }

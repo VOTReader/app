@@ -394,8 +394,10 @@ jobs:
         # tools/perf/s22-frame-time.json is the phone's own measurement
         # (median / p90 rAF gap at fit, ~12x, the ceiling, panned up) with a
         # hash of the Scripture Web source it speaks for. CI has no phone: this
-        # fails when the source moved without a fresh `npm run measure:s22`,
-        # or when a scene is over budget (median 17 / p90 20 ms).
+        # fails when a scene is over budget (median 17 / p90 20 ms) or the
+        # measurement is missing, and only WARNS (an annotation + a job-summary
+        # note) when the source moved without a fresh `npm run measure:s22` -
+        # the S22 must never block a deploy (Corbin, 2026-09-24).
         run: npm run check:s22
 
       - name: Verify the type scale (one ladder, no literal font-sizes)

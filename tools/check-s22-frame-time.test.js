@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { check, sourceHash, BUDGET, SCENES, JSON_PATH } from './check-s22-frame-time.js';
+import { check, sourceHash, staleNotice, BUDGET, SCENES, JSON_PATH } from './check-s22-frame-time.js';
 
 const SRC = 'app/src/main/assets/src/utils/scripture-web';
 let root;
@@ -59,12 +59,46 @@ describe('the gate', () => {
     expect(r.lines.filter((l) => l.startsWith('ok ')).length).toBe(SCENES.length);
   });
 
-  it('fails a STALE measurement once the source moves', () => {
+  it('WARNS on a STALE measurement once the source moves, and does not fail (the S22 must never block)', () => {
+    // Corbin 2026-09-24 (hub ANSWER 10:32): the phone is often off adb, and since the deploy waits
+    // for a green CI, a stale hash failing CI froze every deploy until someone plugged it in.
     write(JSON_PATH, JSON.stringify(measurement(sourceHash(root))));
     write(`${SRC}/geometry.js`, 'export const A = 3;\n');
     const r = check(root);
-    expect(r.ok).toBe(false);
+    expect(r.ok, r.lines.join('\n')).toBe(true);
+    expect(r.stale).toBe(true);
     expect(r.lines.join('\n')).toMatch(/STALE/);
+  });
+
+  it('a fresh measurement is not stale', () => {
+    write(JSON_PATH, JSON.stringify(measurement(sourceHash(root))));
+    expect(check(root).stale).toBe(false);
+  });
+
+  it('STALE does not soften the budget: stale AND over budget still fails', () => {
+    const scenes = good();
+    scenes.fit = scene(BUDGET.median + 8, BUDGET.p90 + 12);
+    write(JSON_PATH, JSON.stringify(measurement('0000000000000000', scenes)));
+    const r = check(root);
+    expect(r.stale).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.lines.join('\n')).toMatch(/OVER BUDGET fit/);
+  });
+
+  it('in CI a stale measurement becomes a warning annotation and a job-summary note', () => {
+    write(JSON_PATH, JSON.stringify(measurement(sourceHash(root))));
+    write(`${SRC}/geometry.js`, 'export const A = 4;\n');
+    const n = staleNotice(check(root));
+    expect(n.annotation).toMatch(/^::warning file=tools\/perf\/s22-frame-time\.json,title=[^:]+::/);
+    expect(n.annotation).toMatch(/measure:s22/);
+    expect(n.annotation, 'one line: a newline would end the workflow command').not.toMatch(/\n/);
+    expect(n.summary).toMatch(/STALE/);
+    expect(n.summary).toMatch(/does not fail/);
+  });
+
+  it('no notice when the measurement is fresh', () => {
+    write(JSON_PATH, JSON.stringify(measurement(sourceHash(root))));
+    expect(staleNotice(check(root))).toBe(null);
   });
 
   it('fails a scene over budget and names it', () => {
