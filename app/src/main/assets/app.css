@@ -191,9 +191,26 @@
       .sh-banner.offline-library-banner {
         top: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
         padding-top: 0.5rem;
-        min-height: 44px;
+        /* b5c: a 44px control + this padding (0.5rem top, 0.6rem bottom) + the 1.5px border */
+        min-height: calc(44px + 1.1rem + 1.5px);
         box-shadow: none;
       }
+      /* b5c (2026-09-24, Codex critique of the built b5l strip): its two controls take a
+         finger. Retry was 53x25.6 px, and the X's 44x44 ::after overlay reached 4.3 px into
+         Retry, so a tap near their boundary could dismiss the warning instead of retrying.
+         Both are real 44px boxes now, 8px apart; the strip grows to the ~62px the mockup drew
+         and holds that height when it has no controls (downloading, complete). Scoped here:
+         the storage banners keep their compact form. */
+      .sh-banner.offline-library-banner .sh-banner-actions { gap: 8px; }
+      .sh-banner.offline-library-banner .sh-banner-btn {
+        min-height: 44px; padding: 0 0.9rem;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .sh-banner.offline-library-banner .sh-banner-dismiss {
+        width: 44px; height: 44px; flex: 0 0 44px; padding: 0;
+        display: grid; place-items: center;
+      }
+      .sh-banner.offline-library-banner .sh-banner-dismiss::after { display: none; }
       body.offline-strip-open :not(.tabs-overview-layer) > .screen-layout > .top-nav { margin-bottom: var(--offline-strip-h, 0px); }
       .sh-banner-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
       .sh-banner-btn {

@@ -53,3 +53,30 @@ describe('the offline-library strip takes layout space (b5l)', () => {
     expect(moved).toBe(strip.replace(/\)$/, ' + var(--offline-strip-h, 0px))'));
   });
 });
+
+/* b5c (2026-09-24): Codex's critique of the built b5l strip (lanes/docs/out/b5l-codex-critique.md) measured
+   Retry at 53x25.6 px and the X's 44x44 ::after overlay reaching 4.3 px into Retry. The strip's controls are
+   real 44px boxes now; the real-browser measurement is in the commit message, this pins the CSS. */
+describe("the offline-library strip's controls take a finger (b5c)", () => {
+  const S = '.sh-banner.offline-library-banner';
+
+  it('Retry is at least 44px tall', () => {
+    expect(blocks(S + ' .sh-banner-btn')[0] || '').toMatch(/min-height:\s*44px/);
+  });
+
+  it('the X is a real 44x44 box, and its overlay (which reached into Retry) is off', () => {
+    const x = blocks(S + ' .sh-banner-dismiss')[0] || '';
+    expect(x).toMatch(/width:\s*44px/);
+    expect(x).toMatch(/height:\s*44px/);
+    expect(blocks(S + ' .sh-banner-dismiss::after')[0] || '').toMatch(/display:\s*none/);
+  });
+
+  it('the two sit at least 8px apart', () => {
+    const gap = /gap:\s*(\d+)px/.exec(blocks(S + ' .sh-banner-actions')[0] || '');
+    expect(gap && Number(gap[1])).toBeGreaterThanOrEqual(8);
+  });
+
+  it('the strip holds one height whether or not it shows controls (44px control + padding + border)', () => {
+    expect(blocks(S)[0] || '').toMatch(/min-height:\s*calc\(44px \+ 1\.1rem \+ 1\.5px\)/);
+  });
+});
