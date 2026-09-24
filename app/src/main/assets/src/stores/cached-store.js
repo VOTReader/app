@@ -56,8 +56,28 @@ const _idbStoreRegistry = new Set();
  */
 let _writeFence = false;
 
-/** @param {boolean} on */
-export function setStoreWriteFence(on) { _writeFence = !!on; }
+/** Stores whose save the fence skipped: each is saved again the moment the fence comes down. */
+/** @type {Set<any>} */
+const _fencedDirty = new Set();
+
+/**
+ * Raise or lower the Clear-All write fence - this module's and IDBAdapter's together (the adapter's
+ * stops the writers that bypass the stores). Lowered means the wipe did NOT happen (a delete failed,
+ * no reload): an edit made while the fence was up is still only in memory, so every store whose
+ * save was skipped is saved now, or that edit would be lost at the next launch (the rs23
+ * refutation's HIGH finding).
+ * @param {boolean} on
+ */
+export function setStoreWriteFence(on) {
+  _writeFence = !!on;
+  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFence);
+  if (_writeFence) return;
+  const skipped = Array.from(_fencedDirty);
+  _fencedDirty.clear();
+  for (const store of skipped) {
+    try { store._save(); } catch (e) { console.warn('re-save after the write fence came down failed', e); }
+  }
+}
 
 /** @returns {boolean} */
 export function isStoreWriteFenced() { return _writeFence; }
@@ -403,7 +423,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * store ([D4]), so the LS branch is no longer exclusive to this one.
      */
     _save() {
-      if (_writeFence) return;   // v04-02: nothing may land between Clear All's deletes and its reload
+      if (_writeFence) { _fencedDirty.add(this); return; }   // v04-02: nothing may land between Clear All's deletes and its reload
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
         // The boot-script copy is written SYNCHRONOUSLY here, before either
@@ -477,15 +497,15 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * local cache — identical to the pre-STORE-1 behavior, never worse.
      */
     _saveMerged() {
-      if (_writeFence) return;
+      if (_writeFence) { _fencedDirty.add(this); return; }
       const self = this;
       const name = idbStoreName;
       const p = navigator.locks.request('vot-store:' + name, function () {
         // v04-02: a merge queued behind this lock may run after the fence went
         // up; its get would reopen the deleted database and its put refill it.
-        if (_writeFence) return undefined;
+        if (_writeFence) { _fencedDirty.add(self); return undefined; }
         return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
-          if (_writeFence) return undefined;
+          if (_writeFence) { _fencedDirty.add(self); return undefined; }
           const theirs = (theirsRaw === undefined) ? null : theirsRaw;
           // ── synchronous merge + adopt: no `await` between reading `_cache`
           //    and reassigning it, so a concurrent in-place mutation of the old

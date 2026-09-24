@@ -16,6 +16,7 @@
      IDBAdapter.delete(storeName, key)          → Promise<void>
      IDBAdapter.getAll(storeName)               → Promise<Record<string, any>>
      IDBAdapter.commitMigration(store,data,ver) → Promise<void>  (W7.1b, atomic)
+     IDBAdapter.setWriteFence(on)               → void  (v04-02: Clear All; via setStoreWriteFence)
      IDBAdapter.isQuotaError(err)               → boolean
      IDBAdapter.STORE_NAMES                     → readonly string[]
      IDBAdapter.DB_NAME, IDBAdapter.DB_VERSION  → constants
@@ -124,6 +125,18 @@ export const IDBAdapter = (function () {
 
   /** @type {Promise<IDBDatabase> | null} */
   let _dbPromise = null;
+
+  /* v04-02 (2026-09-24, the rs23 refutation): Clear All's write fence, at the one door every
+     'votreader' write goes through. CachedStore's fence skips a store's whole save; this one also
+     stops the writers that call the adapter directly - the Settings storage-size sample, the audio
+     player's boot snapshot, a migration commit - any of which reopened the database Clear All had
+     just deleted, recreated every store and put its value back. While it is up, put / delete /
+     commitMigration resolve without opening anything. Raised and lowered only through
+     CachedStore's setStoreWriteFence, so the two can never disagree. */
+  let _writeFence = false;
+
+  /** @param {boolean} on */
+  function setWriteFence(on) { _writeFence = !!on; }
 
   /**
    * Wrap an IDBRequest in a Promise that resolves with `req.result` or
@@ -248,6 +261,7 @@ export const IDBAdapter = (function () {
    * @returns {Promise<void>}
    */
   function put(storeName, key, value) {
+    if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
     if (value === undefined) return _self.delete(storeName, key);
     return _self._putOnce(storeName, key, value).catch(function (err) {
       if (err && err.name === 'AbortError') {
@@ -299,6 +313,7 @@ export const IDBAdapter = (function () {
    * @returns {Promise<void>}
    */
   function del(storeName, key) {
+    if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
     return txStore(storeName, 'readwrite').then(function (ctx) {
       return new Promise(function (resolve, reject) {
         let settled = false;
@@ -369,6 +384,7 @@ export const IDBAdapter = (function () {
     if (!STORE_SET.has(storeName)) {
       return Promise.reject(new Error('Unknown IDB store: ' + storeName));
     }
+    if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
         let settled = false;
@@ -434,6 +450,7 @@ export const IDBAdapter = (function () {
     delete: del,
     getAll: getAll,
     commitMigration: commitMigration,
+    setWriteFence: setWriteFence,
     isQuotaError: isQuotaError,
     _putOnce: _putOnce,
     _wrapRequest: wrapRequest,

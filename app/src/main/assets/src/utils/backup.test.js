@@ -1504,11 +1504,38 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
       await flushAll();
       await new Promise((r) => setTimeout(r, 50));
       expect(localStorage.getItem('vot-state'), 'no boot shim written back').toBeNull();
+      // The writers that call the adapter directly (the rs23 refutation's MED finding: the
+      // Settings storage-size sample; also the audio snapshot, a migration commit).
+      await IDBAdapter.put('meta', 'user-data-samples', [{ d: '2026-09-24', b: 12345 }]);
+      await IDBAdapter.delete('meta', 'audio-snapshot');
+      await IDBAdapter.commitMigration('vot-notes', {}, 2);
+      expect((await indexedDB.databases()).some((d) => d.name === 'votreader'),
+        'no writer recreated the wiped database').toBe(false);
       expect(await IDBAdapter.get('vot-state', 'v'), 'the wiped database stays empty').toBeUndefined();
       expect(await IDBAdapter.get('vot-home-order', 'v')).toBeUndefined();
+      expect(await IDBAdapter.get('meta', 'user-data-samples')).toBeUndefined();
     } finally {
       if (typeof fence === 'function') fence(false);
     }
+  }, 20000);
+
+  /* The rs23 refutation's HIGH finding, on the real stores: Clear All raised the fence, a delete
+     then FAILED, so the screen lowered it without reloading. An edit made while the fence was up
+     must reach the disk when it comes down - not wait for some later edit of the same store. */
+  it('v04-02: when a failed Clear All lowers the fence, an edit made while it was up is saved', async () => {
+    const fence = /** @type {any} */ (cachedStoreModule).setStoreWriteFence;
+    HomeOrderStore.set(['letters', 'bible']);
+    await flushAll();
+    try {
+      if (typeof fence === 'function') fence(true);
+      HomeOrderStore.set(['bible', 'letters']);                  // edited while the wipe ran
+    } finally {
+      if (typeof fence === 'function') fence(false);             // the wipe failed: no reload
+    }
+    await flushAll();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await IDBAdapter.get('vot-home-order', 'v'), 'the fenced edit was saved when the fence came down')
+      .toEqual(['bible', 'letters']);
   }, 20000);
 });
 

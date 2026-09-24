@@ -715,17 +715,29 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
     expect(localStorage.getItem('vot-state-fence')).toBeNull();
   });
 
-  it('CONTROL: lowered (the wipe failed, no reload), the next write carries the whole cache', async () => {
+  it('lowered (the wipe failed, no reload), an edit made while it was up is saved at once - no second edit needed', async () => {
+    // The rs23 refutation's HIGH finding: lowering only flipped the flag, so an edit made
+    // in the fenced window lived in memory alone and was lost at the next launch.
     const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
     const store = createTestStore('vot-test-fence-lift', { idb: true });
     store._resetForTests({ forceLoaded: true });
     setStoreWriteFence(true);
     store.add({ id: 'a', label: 'A' });
+    expect(putSpy).not.toHaveBeenCalled();
     setStoreWriteFence(false);
-    store.add({ id: 'b', label: 'B' });
     await Promise.resolve();
     expect(putSpy).toHaveBeenCalledTimes(1);
-    expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a', 'b']);
+    expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('CONTROL: a store that did not try to save while fenced is not rewritten when it comes down', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-fence-quiet', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    setStoreWriteFence(true);
+    setStoreWriteFence(false);
+    await Promise.resolve();
+    expect(putSpy).not.toHaveBeenCalled();
   });
 });
 
