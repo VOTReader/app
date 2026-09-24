@@ -46,8 +46,15 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
     }, 150);
     const fadeTimer = setTimeout(() => setHighlightedVerses([]), 4000);
-    return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
+    // v01-02: the cleanup cancels the fade, so it must also clear the flash: the
+    // anchor only changes with navigation, and this instance is reused (no key) for
+    // the next chapter, where the same verse numbers would light up and the
+    // read-along would seek to them.
+    return () => { clearTimeout(timer); clearTimeout(fadeTimer); setHighlightedVerses([]); };
   }, [surpriseAnchor]);
+  // v01-02: a landing belongs to the chapter it landed in, even on a way of moving
+  // that leaves the anchor set.
+  React.useEffect(() => () => setHighlightedVerses([]), [book.id, chapter.num]);
   const prevCh = book.chapters.find((c) => c.num === chapter.num - 1);
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
   const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();

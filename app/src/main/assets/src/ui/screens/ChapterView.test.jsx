@@ -210,6 +210,32 @@ describe('ChapterView — the Surprise anchor flashes a verse, then lets go', ()
     renderCh({ surpriseAnchor: { type: 'letter', letterId: 'x' } });
     expect(document.querySelector('.verse-surprise')).toBeNull();
   });
+
+  // v01-02 (improvement sweep 2026-09-22): the chapter nav clears the anchor and shows the next
+  // chapter in the SAME instance (no key). The cleanup cancelled the 4 s fade and nothing cleared
+  // the flash, so it - and the read-along seek built from it - landed on the next chapter's verse 2.
+  const at = (bk, num, anchor) => (
+    <ChapterView book={bk} chapter={bk.chapters.find((c) => c.num === num)} mode="pdf" theme="dark"
+      markAsReadEnabled={false} onNavigate={() => {}} onIndex={() => {}} surpriseAnchor={anchor} />
+  );
+
+  it('moving to the next chapter inside the 4 s does not carry the flash there (v01-02)', () => {
+    vi.useFakeTimers();
+    const bk = book();
+    const { rerender } = render(at(bk, 2, { type: 'verse', verses: [2] }));
+    expect(document.querySelector('#v-2').className).toContain('verse-surprise');
+    rerender(at(bk, 3, null));
+    expect(document.querySelector('.verse-surprise')).toBeNull();
+  });
+
+  it('nor when the way it moved left the anchor set (v01-02)', () => {
+    vi.useFakeTimers();
+    const bk = book();
+    const anchor = { type: 'verse', verses: [2] };
+    const { rerender } = render(at(bk, 2, anchor));
+    rerender(at(bk, 3, anchor));
+    expect(document.querySelector('.verse-surprise')).toBeNull();
+  });
 });
 
 /* ── the scripture sheet ──────────────────────────────────────────── */

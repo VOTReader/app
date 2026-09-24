@@ -45,6 +45,13 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // there too. Shorter heads are tried: the excerpt may run past the paragraph.
   const [landedPara, setLandedPara] = React.useState(/** @type {number} */ (-1));
   const [landedOff, setLandedOff] = React.useState(/** @type {number | null} */ (null));   // where in it the words start (corpus domain, ≈ the rows')
+  // v01-03: a landing belongs to its entry. The instance is reused (no key) for the
+  // next entry, and the landing effect below returns early for an anchor made for
+  // another entry - before anything reset these - so the next entry's paragraph at
+  // the same index pulsed and a playing recording sought there. LetterView resets
+  // its own on every letter change the same way. Declared first: on a change that
+  // brings a new landing, the reset runs and then the landing sets the new place.
+  React.useEffect(() => { setLandedPara(-1); setLandedOff(null); }, [entry.id]);
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours

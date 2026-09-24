@@ -84,6 +84,24 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(seekOffsetSeen.at(-1)).toBe(0);
   });
 
+  it('moving to the next entry inside the 4 s does not carry the pulse or the seek there (v01-03)', () => {
+    // Improvement sweep 2026-09-22, v01-reading-03: the entry changes in the SAME instance, the
+    // anchor (made for the old entry) is skipped by the letterId guard - which returned before
+    // anything reset landedPara, so the next entry's paragraph 1 pulsed and a playing recording
+    // sought there. LetterView resets its own on every letter change; this now does too.
+    const anchor = { type: 'excerpt', text: 'All who are weary, And I will give you rest', letterId: ENTRY.id };
+    const { rerender } = renderEntry({ surpriseAnchor: anchor });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:1"]').className).toContain('pulse');
+    const NEXT = { ...ENTRY, id: 'the-next-entry', title: 'The Next Entry', num: 12 };
+    rerender(
+      <WtlbEntryView entry={NEXT} volKey="wtlb2" partLabel="Part Two" theme="dark" markAsReadEnabled={false} footnotesMode={false}
+        onNavigate={() => {}} onHome={() => {}} surpriseAnchor={anchor} />,
+    );
+    expect(document.querySelector('[data-hl-key="wtlb:the-next-entry:1"]').className).not.toContain('pulse');
+    expect(seekToSeen.at(-1)).toBe(null);
+  });
+
   it('an anchor made for ANOTHER entry is ignored', () => {
     renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'All who are weary', letterId: 'some-other-entry' } });
     act(() => { vi.advanceTimersByTime(200); });
