@@ -49,6 +49,9 @@ class OfflineAudioStore(
     private val freeBytes: () -> Long = { root.usableSpace },
     private val emit: (String) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
+    private val sizeLister: (String) -> Map<String, Long>? = ::listReleaseSizes,
+    private val headSize: (String) -> Long? = ::headLength,
+    private val sizeExecutor: Executor = Executors.newSingleThreadExecutor { r -> Thread(r, "offline-audio-sizes").apply { isDaemon = true } },
 ) {
     /** One recording to download: its release URL, the player key it plays under, and a title for the shelf. */
     data class Item(val url: String, val key: String, val title: String)
@@ -78,10 +81,86 @@ class OfflineAudioStore(
     private val cancelled: MutableSet<String> = ConcurrentHashMap.newKeySet()
     @Volatile private var active: Active? = null
 
+    // Release sizes (bytes) per tag: tag -> (fetchedAt, asset name -> bytes), kept in sizes.json for [SIZE_TTL].
+    private val sizesFile = File(dir, "sizes.json")
+    private val sizeLock = Any()
+    private val sizeCache = HashMap<String, Pair<Long, Map<String, Long>>>()   // guarded by sizeLock
+
     init {
         // A .part is a download a kill interrupted: never resumed, never served.
         dir.listFiles { f -> f.name.endsWith(PART) }?.forEach { runCatching { it.delete() } }
         load()
+        loadSizes()
+    }
+
+    /**
+     * Look up the size of each of [urls] before it is downloaded (the rows' "Download · 18 MB", a collection's total):
+     * one release listing per tag, cached on the phone for a week, a HEAD per file only for what a listing does not
+     * answer. Runs on its own worker (never behind a download) and answers with one event:
+     * {type: "sizes", sizes: {url: bytes}}; a size nobody could give is simply absent.
+     */
+    fun requestSizes(urls: List<String>) {
+        val wanted = urls.distinct().mapNotNull { u -> splitRelease(u)?.let { Triple(u, it.first, it.second) } }.take(MAX_SIZE_BATCH)
+        if (wanted.isEmpty()) return
+        sizeExecutor.execute {
+            val out = JSONObject()
+            for ((tag, group) in wanted.groupBy { it.second }) {
+                val listing = listingFor(tag)
+                for ((url, _, asset) in group) {
+                    val n = listing?.get(asset) ?: try { headSize(url) } catch (_: Exception) { null }
+                    if (n != null && n > 0L) out.put(url, n)
+                }
+            }
+            emit(JSONObject().put("type", "sizes").put("sizes", out).toString())
+        }
+    }
+
+    private fun listingFor(tag: String): Map<String, Long>? {
+        synchronized(sizeLock) {
+            val hit = sizeCache[tag]
+            if (hit != null && clock() - hit.first < SIZE_TTL) return hit.second
+        }
+        val fresh = try { sizeLister(tag) } catch (_: Exception) { null }
+        if (fresh == null) return synchronized(sizeLock) { sizeCache[tag]?.second }   // a stale listing beats none
+        synchronized(sizeLock) {
+            sizeCache[tag] = clock() to fresh
+            persistSizes()
+        }
+        return fresh
+    }
+
+    private fun loadSizes() {
+        val text = try { if (sizesFile.isFile) sizesFile.readText() else null } catch (_: Exception) { null } ?: return
+        try {
+            val tags = JSONObject(text).optJSONObject("tags") ?: return
+            for (tag in tags.keys()) {
+                if (!TAG_RE.matches(tag)) continue
+                val o = tags.optJSONObject(tag) ?: continue
+                val assets = o.optJSONObject("assets") ?: continue
+                val m = HashMap<String, Long>()
+                for (name in assets.keys()) { val n = assets.optLong(name, -1L); if (n > 0L && ASSET_RE.matches(name)) m[name] = n }
+                sizeCache[tag] = o.optLong("at") to m
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "offline audio: sizes cache unreadable - asked again")
+        }
+    }
+
+    /** Called under [sizeLock]. */
+    private fun persistSizes() {
+        val tags = JSONObject()
+        for ((tag, v) in sizeCache) {
+            val assets = JSONObject()
+            for ((name, n) in v.second) assets.put(name, n)
+            tags.put(tag, JSONObject().put("at", v.first).put("assets", assets))
+        }
+        val tmp = File(dir, "sizes.json.tmp")
+        try {
+            tmp.writeText(JSONObject().put("v", 1).put("tags", tags).toString())
+            Files.move(tmp.toPath(), sizesFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: Exception) {
+            Timber.w(e, "offline audio: sizes cache write failed")
+        }
     }
 
     /** True when [url] is on the phone (whole, indexed). */
@@ -344,8 +423,14 @@ class OfflineAudioStore(
         private const val MAX_REDIRECTS = 5
         private const val USER_AGENT = "VOTReader-Android/1.0"
 
-        /** `<tag>__<asset>.mp3` for one of the app's audio releases; null for anything else. */
-        fun fileNameFor(url: String): String? {
+        // Sizes: a week-old listing is asked again; one ask covers at most a big collection or book.
+        private const val SIZE_TTL = 7L * 24 * 3600 * 1000
+        private const val MAX_SIZE_BATCH = 400
+        private const val MAX_LISTING_BYTES = 8L * 1024 * 1024
+        private const val API_RELEASE_BY_TAG = "https://api.github.com/repos/VOTReader/votreader-assets/releases/tags/"
+
+        /** (tag, asset) of one of the app's audio releases; null for anything else. */
+        private fun splitRelease(url: String): Pair<String, String>? {
             if (!url.startsWith(PREFIX)) return null
             val rest = url.substring(PREFIX.length)
             val slash = rest.indexOf('/')
@@ -353,7 +438,86 @@ class OfflineAudioStore(
             val tag = rest.substring(0, slash)
             val asset = rest.substring(slash + 1)
             if (!TAG_RE.matches(tag) || !ASSET_RE.matches(asset)) return null
-            return "${tag}__$asset"
+            return tag to asset
+        }
+
+        /** `<tag>__<asset>.mp3` for one of the app's audio releases; null for anything else. */
+        fun fileNameFor(url: String): String? = splitRelease(url)?.let { (tag, asset) -> "${tag}__$asset" }
+
+        /** The production lister: GitHub's release JSON for [tag] (every asset's name and size), read capped. */
+        fun listReleaseSizes(tag: String): Map<String, Long>? {
+            if (!TAG_RE.matches(tag)) return null
+            val conn = (URL(API_RELEASE_BY_TAG + tag).openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                connectTimeout = 15_000
+                readTimeout = 30_000
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/vnd.github+json")
+                setRequestProperty("User-Agent", USER_AGENT)
+            }
+            return try {
+                if (conn.responseCode != HttpURLConnection.HTTP_OK) return null
+                val bytes = conn.inputStream.use { readCapped(it, MAX_LISTING_BYTES) } ?: return null
+                val assets = JSONObject(String(bytes, Charsets.UTF_8)).optJSONArray("assets") ?: return null
+                val out = HashMap<String, Long>()
+                for (i in 0 until assets.length()) {
+                    val a = assets.optJSONObject(i) ?: continue
+                    val name = a.optString("name")
+                    val size = a.optLong("size", -1L)
+                    if (size > 0L && ASSET_RE.matches(name)) out[name] = size
+                }
+                out
+            } catch (e: Exception) {
+                Timber.w(e, "offline audio: release listing for %s failed", tag); null
+            } finally {
+                conn.disconnect()
+            }
+        }
+
+        /** The production HEAD: the declared length of [url], redirects followed by hand on the allowlist. */
+        fun headLength(url: String): Long? {
+            if (!hostAllowed(url)) return null
+            var current = url
+            var hops = 0
+            while (true) {
+                val conn = (URL(current).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    connectTimeout = 15_000
+                    readTimeout = 15_000
+                    requestMethod = "HEAD"
+                    setRequestProperty("User-Agent", USER_AGENT)
+                }
+                try {
+                    val code = conn.responseCode
+                    if (code in 300..399) {
+                        val loc = conn.getHeaderField("Location")
+                        if (loc.isNullOrBlank() || ++hops > MAX_REDIRECTS) return null
+                        val next = try { URL(URL(current), loc).toString() } catch (_: Exception) { return null }
+                        if (!hostAllowed(next)) return null
+                        current = next
+                        continue
+                    }
+                    if (code != HttpURLConnection.HTTP_OK) return null
+                    val n = conn.contentLengthLong
+                    return if (n > 0L) n else null
+                } finally {
+                    conn.disconnect()
+                }
+            }
+        }
+
+        private fun readCapped(input: InputStream, cap: Long): ByteArray? {
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(64 * 1024)
+            var total = 0L
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                total += n
+                if (total > cap) return null
+                out.write(buf, 0, n)
+            }
+            return out.toByteArray()
         }
 
         /** RFC 9110 single byte ranges; a multi-range, a unit other than bytes or an invalid spec is ignored (whole). */
