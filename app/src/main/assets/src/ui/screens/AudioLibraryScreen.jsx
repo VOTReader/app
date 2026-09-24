@@ -282,7 +282,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                 <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
                 <span className="audio-library-shelf-copy">
                   <strong>Bible/Letter Studies</strong>
-                  <small>{studies.count + (studies.count === 1 ? ' study' : ' studies') + ' · ' + studies.recorded + ' recorded'}</small>
+                  {/* 'with audio', not 'recorded': '2 recorded' read as two chapters (Codex critique 3). */}
+                  <small>{studies.count + (studies.count === 1 ? ' study' : ' studies') + ' · ' + studies.recorded + ' with audio'}</small>
                   {/* Every recorded study chapter is timed (align's census 2026-09-22). */}
                   <CoverageBadge state={COVERAGE_READ_ALONG} />
                 </span>

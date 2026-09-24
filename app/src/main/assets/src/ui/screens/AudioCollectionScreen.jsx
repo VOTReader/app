@@ -131,6 +131,10 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   // tracks open the book's chapter in the reader). The screen-level `!bible`
   // gate withheld the icon from Bible rows that hasTextDestination resolves.
   const canOpenText = typeof onOpenText === 'function';
+  // A partly recorded study names what a listener will skip (Codex critique 4,
+  // 2026-09-23: Lamb's '14 of 16' left the two unnamed), each name opening its
+  // text; past three names it only counts them.
+  const textOnly = study && playable.length ? items.filter((item) => item && item.id && playable.indexOf(item) < 0) : [];
 
   const state = AudioPlayer.getState();
   const queue = Array.isArray(state.queue) ? state.queue : [];
@@ -172,6 +176,23 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
           <div className="audio-library-eyebrow">Listening Library</div>
           <h1>{label}</h1>
           <p className="audio-library-intro">{countLine}</p>
+          {textOnly.length ? (
+            <p className="audio-collection-text-only">
+              {textOnly.length > 3 ? textOnly.length + ' ' + itemNoun(col, textOnly.length) + ' are text only' : (
+                <>
+                  {'Text only: '}
+                  {textOnly.map((item, i) => (
+                    <React.Fragment key={item.id}>
+                      {i ? ', ' : null}
+                      {canOpenText
+                        ? <button type="button" className="audio-collection-text-only-link" onClick={() => onOpenText({ key: srcKey + ':' + item.id })}>{item.title}</button>
+                        : item.title}
+                    </React.Fragment>
+                  ))}
+                </>
+              )}
+            </p>
+          ) : null}
           {playable.length ? (
             <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
               <PlayIcon /><span>Play all</span>

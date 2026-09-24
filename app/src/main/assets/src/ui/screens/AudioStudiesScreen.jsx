@@ -42,8 +42,10 @@ export function studiesSummary() {
 }
 
 /**
- * "16 chapters · 14 recorded", "· all recorded", or "· not yet recorded" —
- * no promise of when (nobody has given one).
+ * "16 chapters · 14 recorded", "6 chapters · all recorded", or, for a study
+ * with no recording yet, just "31 chapters": its Read study badge already
+ * says there is nothing to hear (Codex critique 5, 2026-09-23), and nobody
+ * has promised when there will be.
  * @param {any} study
  * @returns {string}
  */
@@ -51,8 +53,8 @@ export function studyCountLine(study) {
   const total = study && Array.isArray(study.chapters) ? study.chapters.length : 0;
   const recorded = studyRecordedCount(study);
   const noun = total === 1 ? ' chapter' : ' chapters';
-  const state = recorded === 0 ? 'not yet recorded' : recorded === total ? 'all recorded' : recorded + ' recorded';
-  return total + noun + ' · ' + state;
+  if (recorded === 0) return total + noun;
+  return total + noun + ' · ' + (recorded === total ? 'all recorded' : recorded + ' recorded');
 }
 
 /**
@@ -60,6 +62,7 @@ export function studyCountLine(study) {
  *   onBack: () => void,
  *   backLabel?: string,
  *   onOpenStudy: (studyId: string) => void,
+ *   onReadStudy?: (studyId: string) => void,
  *   onSearch: () => void,
  *   onHistory: () => void,
  *   onSettings: () => void,
@@ -67,7 +70,7 @@ export function studyCountLine(study) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', onOpenStudy, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', onOpenStudy, onReadStudy, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   // The recordings ride the lazy VOT corpus (the manifest) and the studies are
   // their own lazy file: warm both, and re-render as each lands.
@@ -87,6 +90,7 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
   }, []);
 
   const studies = studiesList();
+  const withAudio = studies.filter((study) => studyRecordedCount(study) > 0).length;
   const state = AudioPlayer.getState();
   const current = Array.isArray(state.queue) ? state.queue[state.qi] : null;
   const currentKey = current && typeof current.key === 'string' ? current.key : '';
@@ -99,7 +103,9 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
         <header className="audio-library-hero">
           <div className="audio-library-eyebrow">Listening Library</div>
           <h1>Bible/Letter Studies</h1>
-          <p className="audio-library-intro">Choose a study to hear it chapter by chapter, in reading order.</p>
+          {/* Codex critique 2 (2026-09-23): the old 'Choose a study to hear it'
+              promised audio for all seven while two had any. */}
+          <p className="audio-library-intro">Listen to a recorded study chapter by chapter, in reading order. The others open to read.</p>
         </header>
 
         <section className="audio-library-section" aria-labelledby="audio-studies-list">
@@ -108,17 +114,27 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
             <strong aria-label={studies.length + ' studies'}>{studies.length}</strong>
           </div>
           {studies.length ? (
+            <p className="audio-studies-split">{withAudio + ' with audio · ' + (studies.length - withAudio) + ' to read'}</p>
+          ) : null}
+          {studies.length ? (
             <div className="audio-library-shelf">
               {studies.map((study) => {
                 const recorded = studyRecordedCount(study);
                 const playing = !!currentKey && (study.chapters || []).find((chapter) => chapter && currentKey === 'study:' + chapter.id);
+                // Codex critique 1 (2026-09-23): a study with nothing to hear
+                // opened an empty recordings page; it opens its text instead.
+                const open = recorded || typeof onReadStudy !== 'function' ? () => onOpenStudy(study.id) : () => onReadStudy(study.id);
                 return (
-                  <button key={study.id} type="button" className="audio-library-shelf-row" onClick={() => onOpenStudy(study.id)}>
+                  <button key={study.id} type="button" className="audio-library-shelf-row" onClick={open}>
                     <span className="audio-library-shelf-mark" aria-hidden="true">{recorded ? '♪' : '○'}</span>
                     <span className="audio-library-shelf-copy">
                       <strong>{study.title}</strong>
                       <small>{studyCountLine(study) + (playing ? ' · Playing chapter ' + (playing.num != null ? playing.num : '') : '')}</small>
-                      <CoverageBadge state={recorded ? COVERAGE_READ_ALONG : COVERAGE_NONE} />
+                      {recorded ? <CoverageBadge state={COVERAGE_READ_ALONG} /> : (
+                        <span className="coverage-badge-wrap">
+                          <span className="coverage-badge coverage-badge-read-study" title="Not recorded yet: opens the study to read">Read study</span>
+                        </span>
+                      )}
                     </span>
                     <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                   </button>

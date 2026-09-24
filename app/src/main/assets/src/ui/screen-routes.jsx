@@ -1048,6 +1048,22 @@ export function buildScreenRoutes({
           setNavOrigin({ screen: 'audio-library-studies', returnOrigin: navOrigin || null });
           setScreen('audio-library-collection');
         }}
+        onReadStudy={(studyId) => {
+          // A study with no recording yet opens to READ (Codex critique 1,
+          // 2026-09-23): its index, or its one page, with the back pill
+          // returning to the Studies screen (same wiring as _openAudioText).
+          const s = getStudyById(studyId);
+          if (!s || !Array.isArray(s.chapters) || !s.chapters.length) return;
+          const single = s.chapters.length === 1 || s.singlePage;
+          pushFromLetter({
+            sourceScreen: 'audio-library-studies',
+            sourceLetterTitle: 'Studies',
+            destSnapshot: single
+              ? { screen: 'bible-study-chapter', studyId, studyChapterId: s.chapters[0].id }
+              : { screen: 'bible-study-index', studyId },
+          });
+          selectStudy(studyId);
+        }}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
