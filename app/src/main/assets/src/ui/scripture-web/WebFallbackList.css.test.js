@@ -33,6 +33,13 @@ describe('the Scripture Web list keeps its bearings (landing 34 follow-up)', () 
     expect(d).toMatch(/background\s*:\s*var\(--bg3\)/); // the card's own ground: rows pass under, not through
   });
 
+  it('the pinned heading sits flush at the top: the list keeps no top padding of its own', () => {
+    // sticky honours the scroll container's padding, so an 18 px padding-top left a strip
+    // above the pinned heading where the row before it showed through (the 412 px look)
+    expect(rule('.sw-fallback-list')).toMatch(/padding\s*:\s*0\s/);
+    expect(rule('.swf-head')).toMatch(/padding-top\s*:\s*18px/);
+  });
+
   it('the status note balances its two lines instead of leaving one word alone', () => {
     expect(rule('.swf-note > span')).toMatch(/text-wrap\s*:\s*balance/);
   });
