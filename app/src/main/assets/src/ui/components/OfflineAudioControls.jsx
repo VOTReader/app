@@ -206,6 +206,8 @@ export function OfflineCollectionAction({ units, label }) {
           <p className="offline-confirm-line">{recordings + (need ? ' · ' + formatBytes(need) : '')}</p>
           {free > 0 ? <p className="offline-confirm-line">{'Free space on this phone: ' + formatBytes(free)}</p> : null}
           {noRoom ? <p className="offline-confirm-warn">Not enough room: free some space on the phone first.</p> : null}
+          {/* Downloads run while the app is open: no background service yet (the refutation of 2026-09-24, SHOULD 9). */}
+          <p className="offline-confirm-line">Keep VOTReader open until it finishes.</p>
           <div className="offline-confirm-actions">
             <button type="button" className="offline-confirm-cancel" onClick={() => setAsking(false)}>Cancel</button>
             <button type="button" className="offline-confirm-go" disabled={noRoom}

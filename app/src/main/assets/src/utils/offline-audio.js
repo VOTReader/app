@@ -125,6 +125,8 @@ function _onEvent(json) {
         const n = Number(sizes[k]);
         if (n > 0) _sizes.set(k, n);
       }
+      // What went unanswered (no signal, a failed lookup) may be asked again by the next screen that shows it.
+      for (const u of [..._sizesAsked]) if (!_sizes.has(u)) _sizesAsked.delete(u);
       break;
     }
     default:

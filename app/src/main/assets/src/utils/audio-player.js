@@ -2398,7 +2398,9 @@ function playCollection(opts) {
     // order let the rendition swap re-grow the parts the index had trimmed.
     queue = _slicePartHorizon(queue, startKey, o.startPartIndex);
   }
-  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
+  // A letter the listener CHOSE (startId) must itself be on the phone (or a reading of it): offline, it is never
+  // silently swapped for a later downloaded one. Play all (no start) plays what is on the phone from the top.
+  if (_offlineRefuses(startKey ? queue.filter((t) => t.key === startKey) : queue)) { _toast(OFFLINE_MSG); return false; }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
@@ -2481,7 +2483,8 @@ function playSection(volKey, index, collectionLabel) {
  * @returns {void}
  */
 function playTrack(track) {
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
+  // No blanket offline refusal (item 8): playBibleBook and playCollection check for themselves, and the lone
+  // track below is checked before any state changes - "On this phone", the shelves and Resume last play through here.
   const normalized = normalizeAudioTrack(track);
   if (!normalized) return;
   const at = _locateTrack(normalized);
@@ -2506,6 +2509,7 @@ function playTrack(track) {
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
+  if (_offlineRefuses([normalized])) { _toast(OFFLINE_MSG); return; }
   _rememberOutgoingPosition();
   _setPendingRestore(null);
   _setSource({ mode: 'custom', volKey: '', label: normalized.sub });
