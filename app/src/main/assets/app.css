@@ -1368,6 +1368,41 @@
       .audio-studies-split { margin:-.3rem .1rem .63rem; color:var(--gold-dim); font-size:var(--fs-12); font-style:italic; }
       .audio-collection-text-only { position:relative; z-index:1; margin:.3rem 0 0; color:var(--cream-dim); font-size:var(--fs-12); font-style:italic; line-height:1.5; }
       .audio-collection-text-only-link { background:none; border:0; padding:.2rem 0; min-height:24px; color:var(--gold); font:inherit; font-style:italic; text-decoration:underline; text-decoration-color:var(--gold-border); text-underline-offset:.18em; cursor:pointer; }
+      /* ── DOWNLOADS TO THE PHONE (listening item 8, 2026-09-24) — Codex mockup round 1, option 1: a plain line under each
+         recording row, Download all beside Play all with a size confirm, and the On this phone shelf. Android only. ── */
+      .offline-icon { width:14px; height:14px; flex:0 0 auto; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+      .offline-row { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin:.3rem 0 0; font-size:var(--fs-12); line-height:1.4; color:var(--cream-dim); }
+      .offline-row.is-saved { color:var(--gold); }
+      .offline-row.is-offline { color:var(--cream-dim); opacity:.78; }
+      .offline-row.is-failed { color:#e0897a; }
+      body.light .offline-row.is-failed { color:#9b3a2a; }
+      .offline-row-download { background:none; border:0; padding:.25rem 0; min-height:32px; color:var(--gold); font-family:inherit; cursor:pointer; text-align:left; }
+      .offline-row-label { display:inline-flex; align-items:center; gap:.35rem; color:var(--gold); }
+      .offline-row-link { background:none; border:0; padding:.25rem .15rem; min-height:32px; color:var(--gold); font:inherit; text-decoration:underline; text-decoration-color:var(--gold-border); text-underline-offset:.18em; cursor:pointer; }
+      .offline-row-bar { flex:1 0 100%; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
+      .offline-row-bar > span { display:block; height:100%; background:var(--gold); transition:width .3s ease; }
+      .audio-collection-item.is-unavailable .audio-library-row-play { opacity:.45; }
+      .audio-collection-item.is-unavailable .audio-library-row-copy strong { color:var(--cream-dim); }
+      .audio-library-hero .offline-collection { position:relative; z-index:1; display:inline-flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:.9rem 0 0 .5rem; max-width:100%; vertical-align:top; }
+      .offline-collection.is-saved, .offline-collection.is-busy { font-size:var(--fs-12); color:var(--gold); }
+      .audio-library-secondary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }
+      .audio-library-secondary-action:disabled { opacity:.5; cursor:default; }
+      .audio-library-secondary-action .offline-icon { width:16px; height:16px; }
+      .offline-collection-note { margin:0; font-size:var(--fs-12); color:var(--cream-dim); }
+      .offline-confirm { flex-basis:100%; margin:.4rem 0 0; padding:.8rem .9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
+      .offline-confirm-title { margin:0 0 .3rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-14); }
+      .offline-confirm-line { margin:.1rem 0; color:var(--cream-dim); font-size:var(--fs-12); }
+      .offline-confirm-warn { margin:.35rem 0 0; color:#e0897a; font-size:var(--fs-12); }
+      body.light .offline-confirm-warn { color:#9b3a2a; }
+      .offline-confirm-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; }
+      .offline-confirm-cancel, .offline-confirm-go { min-height:44px; padding:.34rem .9rem; border-radius:7px; border:1px solid var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; cursor:pointer; }
+      .offline-confirm-cancel { background:transparent; color:var(--gold); }
+      .offline-confirm-go { background:var(--gold); color:#17130a; }
+      body.light .offline-confirm-go { color:var(--bg); }
+      .offline-confirm-go:disabled { opacity:.45; cursor:default; }
+      .audio-offline-remove { min-height:36px; padding:.2rem .7rem; border:1px solid var(--gold-border); border-radius:7px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.035em; cursor:pointer; }
+      .audio-offline-remove-all { margin-top:1rem; }
+      .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }
       .audio-library-search label { flex:1; min-width:0; }.audio-library-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-13); }.audio-library-search input::placeholder { color:var(--cream-dim); opacity:.75; }.audio-library-search button { min-width:44px; min-height:44px; padding:.2rem .35rem; border:0; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-10); }.audio-library-search:focus-within { border-color:var(--gold); background:rgba(200,164,86,.055); }

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    _entry-h.js — esbuild entry for bundle-h.js (the Listening Library)
    ═══════════════════════════════════════════════════════════════════════
-   The library hub and its four sub-screens — the Volumes, the Studies, a
+   The library hub and its five sub-screens — On this phone (item 8), the Volumes, the Studies, a
    collection's (or a study's) recordings, the saved list. A reader goes
    there to choose something to listen to; nobody passes through it on the
    way to a chapter, and the
@@ -25,7 +25,8 @@ import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
+import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
 
 Object.assign(window, {
-  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen,
+  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen,
 });

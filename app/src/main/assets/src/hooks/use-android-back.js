@@ -284,6 +284,7 @@ export function useAndroidBack({
       if (s === "audio-library-collection") {goNavOrigin();return "true";} else
       if (s === "audio-library-saved") {goNavOrigin();return "true";} else
       if (s === "audio-library-studies") {goNavOrigin();return "true";} else
+      if (s === "audio-library-offline") {goNavOrigin();return "true";} else
       if (s === "milestones") {goNavOrigin();return "true";} else
       if (s === "scripture-web") {goNavOrigin();return "true";} else
       // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)

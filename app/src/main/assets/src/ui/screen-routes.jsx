@@ -1016,6 +1016,7 @@ export function buildScreenRoutes({
         onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
         onOpenStudies={() => _enterAudioSub('audio-library-studies')}
+        onOpenOffline={() => _enterAudioSub('audio-library-offline')}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1032,6 +1033,17 @@ export function buildScreenRoutes({
           setNavOrigin({ screen: 'audio-library-volumes', returnOrigin: navOrigin || null });
           setScreen('audio-library-collection');
         }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    // Downloads to the phone (listening item 8): the hub's "On this phone" row.
+    'audio-library-offline': () => typeof AudioOfflineScreen !== 'undefined' ? (
+      <AudioOfflineScreen
+        onBack={goNavOrigin}
+        backLabel="Listening Library"
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
