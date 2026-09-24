@@ -14,6 +14,7 @@
    reading, the row discloses the voices and each one starts the same queue
    on that rendition.
 */
+import { OfflineRowStatus, OfflineCollectionAction, useOfflineAudio, useOnline } from '../components/OfflineAudioControls.jsx';
 
 /* Cluster H (esbuild bundle-h.js, lazy) since 2026-09-22, landing 24. The
    player itself does NOT come along: AudioPlayer, the AudioShelf rows, icons
@@ -118,6 +119,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   );
 
   const [openVoices, setOpenVoices] = React.useState(/** @type {string | null} */ (null));
+  // Downloads to the phone (item 8): the store when this is the Android app, else null; and the signal.
+  const offline = useOfflineAudio();
+  const online = useOnline();
   // One book's chapters, disclosed. Rendered only while open — a Bible edition
   // lists 66 books and Psalms alone would put 150 rows on the page uninvited.
   const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
@@ -163,6 +167,11 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
       ? 'All ' + items.length + ' ' + itemNoun(col, items.length) + ' have recordings'
       : playable.length + ' of ' + items.length + ' ' + itemNoun(col, items.length) + ' have recordings');
 
+  // The reading each row's own Play plays: what a download saves (AudioPlayer.playbackTracks, item 8).
+  const ownTracks = (item) => (typeof AudioPlayer.playbackTracks === 'function'
+    ? AudioPlayer.playbackTracks(srcKey, item, label)
+    : ((AudioPlayer.renditionsFor(srcKey, item, label)[0] || { tracks: [] }).tracks));
+
   const playFrom = (item) => {
     if (current && current.key === srcKey + ':' + item.id) { AudioPlayer.toggle(); return; }
     if (bible) AudioPlayer.playBibleBook({ volKey, bookId: item.id, label });
@@ -198,6 +207,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
               <PlayIcon /><span>Play all</span>
             </button>
           ) : null}
+          {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
+          {offline && !bible && playable.length ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
         </header>
 
         {sections ? (
@@ -234,13 +245,16 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader].filter(Boolean).join(' · ');
                 const remaining = primary ? renditionRemainingLabel(primary.tracks) : '';
                 const voicesOpen = openVoices === item.id;
+                const own = offline ? ownTracks(item) : [];
+                // No signal and not on the phone: the row cannot play (item 8).
+                const unavailable = !!offline && !online && !(own.length && own.every((t) => offline.isSaved(t.url)));
                 // A per-chapter Bible book is a list of recordings, not one:
                 // the row discloses them so a chapter can be started from the
                 // Listening Library instead of only from the reader.
                 const chapters = bible && parts > 1 ? primary.tracks : null;
                 const chaptersOpen = !!chapters && openChapters === item.id;
                 return (
-                  <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '')}>
+                  <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '') + (unavailable ? ' is-unavailable' : '')}>
                     <div className="audio-library-row">
                       <button
                         type="button"
@@ -254,6 +268,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                       <div className="audio-library-row-copy">
                         <strong>{!bible && item.num ? <span className="audio-collection-num">{item.num}</span> : null}{item.title}</strong>
                         {meta ? <small>{meta}</small> : null}
+                        {offline ? <OfflineRowStatus tracks={own} name={item.title} /> : null}
                       </div>
                       <div className="audio-library-row-actions">
                         {remaining ? <span className="audio-library-remaining">{remaining}</span> : null}

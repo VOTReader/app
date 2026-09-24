@@ -16,6 +16,7 @@
    shelf, one copy of each table. */
 
 import { studiesSummary } from './AudioStudiesScreen.jsx';
+import { useOfflineAudio, formatBytes, DownloadIcon } from '../components/OfflineAudioControls.jsx';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -78,6 +79,7 @@ function bibleReaderCode(volKey) {
  *   onOpenVolumes: () => void,
  *   onOpenSaved: () => void,
  *   onOpenStudies?: () => void,
+ *   onOpenOffline?: () => void,
  *   onOpenTrack: (track: any) => void,
  *   onSearch: () => void,
  *   onHistory: () => void,
@@ -86,7 +88,7 @@ function bibleReaderCode(volKey) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -131,6 +133,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   // One doorway for the Bible/Letter Studies (2026-09-22), shown once a study
   // has a recording: a row that opens onto nothing to hear is a dead end.
   const studies = studiesSummary();
+  // Downloads to the phone (item 8): the shelf row appears once something is on it (Android only).
+  const offline = useOfflineAudio();
+  const downloads = offline ? offline.items() : [];
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
@@ -224,6 +229,25 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             </button>
           </div>
         </section>
+
+        {/* Downloads to the phone (item 8): shown once something is on it; Android only. */}
+        {offline && downloads.length ? (
+          <section className="audio-library-section audio-library-offline-row" aria-label="On this phone">
+            <div className="audio-library-shelf">
+              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
+                <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
+                <span className="audio-library-shelf-copy">
+                  <strong>On this phone</strong>
+                  <small>{(downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
+                </span>
+                <span className="audio-library-shelf-tail">
+                  <b>{downloads.length}</b>
+                  <ArrowIcon />
+                </span>
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="audio-library-section" aria-labelledby="audio-library-recent">
           <div className="audio-library-section-head">

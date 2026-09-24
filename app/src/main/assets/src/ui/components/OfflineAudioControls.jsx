@@ -100,7 +100,7 @@ function _item(t, name) {
   return { url: t.url, key: t.key || '', title: (name || t.title || '') + part };
 }
 
-function DownloadIcon() {
+export function DownloadIcon() {
   return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 19.5h14" /></svg>;
 }
 function CheckIcon() {
