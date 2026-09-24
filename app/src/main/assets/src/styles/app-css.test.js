@@ -503,3 +503,19 @@ describe('app.css — one pill grammar in the Scripture Web strip', () => {
     expect(opt[1].trim()).toBe(btn[1].trim());
   });
 });
+
+/* Item 7b (2026-09-24), Codex's critique of the built LISTEN FROM HERE row
+   (lanes/readalong/out/mockups/listen-from-here/critique.md): a daily listener's
+   finger target and a primary action's weight, in both themes. */
+describe('app.css — the selection toolbar\'s Listen from here', () => {
+  it('takes a full finger (44 px) and reads as the primary action: 12 px semibold label, solid gold edge, 15 px icon', () => {
+    const block = ruleBlock(CSS, '.sel-listen-btn {');
+    expect(block).toMatch(/min-height:\s*44px/);
+    expect(block).toMatch(/font-size:\s*var\(--fs-12\)/);
+    expect(block).toMatch(/font-weight:\s*600/);
+    expect(block).toMatch(/border:\s*1px solid var\(--gold\)/);
+    const icon = ruleBlock(CSS, '.sel-listen-btn svg');
+    expect(icon).toMatch(/width:\s*15px/);
+    expect(icon).toMatch(/height:\s*15px/);
+  });
+});
