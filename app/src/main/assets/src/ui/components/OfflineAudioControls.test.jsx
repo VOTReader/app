@@ -153,6 +153,8 @@ describe('Download all, beside Play all', () => {
     expect(container.textContent).toMatch(/Download Volume One\?/);
     expect(container.textContent).toMatch(/3 recordings · 210 MB/);
     expect(container.textContent).toMatch(/Free space on this phone: 1.5 GB/);
+    // Downloads run while the app is open (SHOULD 9 of the refutation: no background service yet).
+    expect(container.textContent).toMatch(/Keep VOTReader open until it finishes/);
     fireEvent.click(getByRole('button', { name: /download 210 MB/i }));
     expect(s.download.mock.calls[0][0].map((t) => t.url)).toEqual([U('b'), U('b2'), U('c')]);
   });

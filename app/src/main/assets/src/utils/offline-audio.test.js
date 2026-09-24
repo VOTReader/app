@@ -116,6 +116,14 @@ describe('offline-audio — in the phone app', () => {
     expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);                     // known sizes are not asked again
   });
 
+  it('a size the phone could not give is asked again next time (not given up for the session)', () => {
+    const b = fakeBridge();
+    OfflineAudio.requestSizes([U1, U2]);
+    send({ type: 'sizes', sizes: { [U1]: 5 } });   // U2 went unanswered (no signal, a failed lookup)
+    OfflineAudio.requestSizes([U1, U2]);
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
+  });
+
   it('a cancelled download is simply not there any more', () => {
     fakeBridge();
     send({ type: 'queued', url: U1 });

@@ -1779,6 +1779,40 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
   });
 
+  // The refutation of 2026-09-24, MUST 3: "On this phone", the shelf rows and Resume last all play through playTrack.
+  it('playTrack plays a downloaded recording with no signal, and refuses one that is not on the phone', async () => {
+    await downloaded(['idC']);
+    setOnline(false);
+    AudioPlayer.playTrack({ key: 'vol1:letter-c', title: 'Letter C', url: URL_OF('idC') });
+    expect(el().src).toBe(URL_OF('idC'));
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+    AudioPlayer.stop();
+    AudioPlayer.playTrack({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA1') });
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+  });
+
+  // SHOULD 5: a letter the listener CHOSE is refused when it is not on the phone, even if a later one is.
+  it('with no signal, a chosen letter not on the phone is refused, not swapped for a later downloaded one', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      await downloaded(['idC']);
+      setOnline(false);
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+      expect(AudioPlayer.getState().status).toBe('idle');
+      expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+      expect(AudioPlayer.getState().status).toBe('idle');
+      // Play all (no chosen start) still plays what is on the phone.
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+      expect(el().src).toBe(URL_OF('idC'));
+    } finally {
+      delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
+    }
+  });
+
   it('CONTROL: with no signal, a recording not on the phone is still refused before anything changes', async () => {
     await downloaded(['idC']);
     setOnline(false);
