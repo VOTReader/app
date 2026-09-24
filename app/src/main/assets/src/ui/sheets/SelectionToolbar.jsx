@@ -7,6 +7,7 @@ import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.j
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+import { listenFromTarget, startListenFrom } from '../../utils/listen-from.js';
 
 /** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
     bookmark decoration chrome (marker digit or icon glyph), not reading text.
@@ -152,7 +153,7 @@ export function computeEdgeAutoScroll({ focusTop, focusBottom, boxTop, boxBottom
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
-  const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, copyText, existingHl, multiVerse }
+  const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, copyText, existingHl, multiVerse, listen }
   const [activeStyle, setActiveStyle] = React.useState('highlight'); // 'highlight' | 'underline'
   // Confirm-strip mode for the ✕ remove button. Resets whenever the
   // selection changes so a fresh selection always lands on the normal
@@ -511,19 +512,23 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       }
       const endContainer = findHlContainer(endNode);
       const isMultiVerse = !container || !endContainer || endContainer !== container;
+      // LISTEN FROM HERE (item 7): where the voice would start for this
+      // selection, or null when the text under it has no recording (the pane
+      // on screen decides; see utils/listen-from.js).
+      const listen = listenFromTarget(sel);
       if (isMultiVerse) {
         // Cross-container selection: find all [data-hl-key] containers that overlap
         const allHlContainers = Array.from(document.querySelectorAll('[data-hl-key]'))
           .filter(function(c) { return range.intersectsNode(c); });
         if (allHlContainers.length === 0) { setVisible(false); return; }
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, existingHl: null, multiVerse: true, multiContainers: allHlContainers });
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
         const end = computeOffset(container, endNode, endOff);
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
-        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, existingHl: existing || null, multiVerse: false });
+        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, existingHl: existing || null, multiVerse: false, listen });
       }
       const rect = range.getBoundingClientRect();
       const toolbarW = 320;
@@ -1010,6 +1015,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (window.__goSearch) window.__goSearch();
   }, [selInfo]);
 
+  // LISTEN FROM HERE: start the recording at the clause the selection starts
+  // in. The target was taken when the toolbar was raised, so the press does
+  // not depend on the selection surviving it.
+  const handleListen = React.useCallback(() => {
+    if (!selInfo || !selInfo.listen) return;
+    const target = selInfo.listen;
+    window.getSelection().removeAllRanges();
+    setVisible(false);
+    startListenFrom(target);
+  }, [selInfo]);
+
 
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
@@ -1236,6 +1252,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
               </button>
             )}
           </div>
+        </div>
+      )}
+      {/* Listen from here: its own row between the colours and the actions
+          (the Codex mockup pick, r1 option 2), only on text with a recording. */}
+      {selInfo.listen && (
+        <div className="sel-toolbar-row sel-toolbar-listen">
+          <button type="button" className="sel-listen-btn" onClick={handleListen}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+            <span>Listen from here</span>
+          </button>
         </div>
       )}
       {/* Action buttons: note only for single-container; link + copy/share/search always */}

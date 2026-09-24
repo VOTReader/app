@@ -4340,6 +4340,22 @@
     }
     .sel-action-btn:active { background: var(--gold-faint); }
     .sel-action-btn svg { width: 18px; height: 18px; stroke: var(--cream-dim); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    /* LISTEN FROM HERE (item 7, 2026-09-24): a slim outlined action in its own
+       row between the colours and the six actions (Codex mockup r1 option 2);
+       rendered only on text with a recording. Gold, so it reads as the
+       listening action, not a seventh annotation tool. */
+    .sel-toolbar-listen { padding-top: 2px; }
+    .sel-listen-btn {
+      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 36px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+      background: transparent; border: 1px solid var(--gold-border);
+      color: var(--gold); font-family: 'Cinzel', serif;
+      font-size: var(--fs-11); letter-spacing: 0.08em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .sel-listen-btn:active { background: var(--gold-faint); border-color: var(--gold); }
+    .sel-listen-btn svg { width: 13px; height: 13px; fill: var(--gold); stroke: none; flex-shrink: 0; }
 
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
@@ -6846,6 +6862,7 @@
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
     .sel-style-btn { font-size: var(--fsc-16); }
     .sel-action-btn { font-size: var(--fsc-10); }
+    .sel-listen-btn { font-size: var(--fsc-11); }
     .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }

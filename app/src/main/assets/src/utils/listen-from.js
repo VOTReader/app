@@ -44,13 +44,24 @@ export function listenFromTarget(selection) {
 }
 
 /**
- * Act on it: the pane starts (or seeks) the unit at the chosen clause.
+ * Act on a target listenFromTarget gave: the pane starts (or seeks) the unit
+ * at the chosen clause. The toolbar keeps the target it offered, so the tap
+ * does not depend on the selection surviving the press.
+ *
+ * @param {{ hlKey: string, offset: number | null } | null | undefined} target
+ * @returns {boolean} false when there was nothing to start
+ */
+export function startListenFrom(target) {
+  const lf = pane();
+  return !!(target && lf && lf.start(target.hlKey, target.offset));
+}
+
+/**
+ * Act on a selection: listenFromTarget, then startListenFrom.
  *
  * @param {Selection | null | undefined} selection
  * @returns {boolean} false when there was nothing to start
  */
 export function listenFromSelection(selection) {
-  const target = listenFromTarget(selection);
-  const lf = pane();
-  return !!(target && lf && lf.start(target.hlKey, target.offset));
+  return startListenFrom(listenFromTarget(selection));
 }
