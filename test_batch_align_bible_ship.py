@@ -308,6 +308,66 @@ class TheNameTolerantWitnessIsOptInAndNameGuarded(unittest.TestCase):
         self.assertIsNone(al.tok_match("zechariah", "zaccur", names | {"zaccur"}), "a real mishearing stays a miss")
         self.assertEqual(al.tok_match("amariah", "amariah", names), "exact", "the strict kinds come first")
 
+    def test_an_iah_name_heard_ending_ia_is_a_near_hearing(self):
+        """2026-09-24: Ezra 10:35-36 (WOP) stayed dark under the tolerant witness. Whisper heard "binaya
+        bidia" for "Benaiah, Bedeiah" and "venaya" for "Vaniah": the heard -ia ending lacks the name's final
+        h, so the skeletons differed ("bn"/"bnh") and the spellings fell under 0.8. Tolerance 2: when the
+        NAME ends -iah, a heard -ia gets the h and the consonant skeletons must then agree. Dropping the h
+        instead would have made "zechariah" and "zaccur" one skeleton ("zkr")."""
+        al = self.al
+        names = al.name_tokens("Benaiah, Bedeiah, Cheluh, Vaniah, Meremoth, Eliashib, Zaccur, Zechariah")
+        for heard, want in (("binaya", "benaiah"), ("bidia", "bedeiah"), ("venaya", "vaniah")):
+            self.assertEqual(al.tok_match(heard, want, names), "name", (heard, want))
+            self.assertIsNone(al.tok_match(heard, want, names, iah=False), "tolerance 1 did not hear it")
+            self.assertIsNone(al.tok_match(heard, want), "strict stays strict")
+        self.assertIsNone(al.tok_match("binaya", "bedeiah", names), "the next name in the list stays apart")
+        self.assertIsNone(al.tok_match("zechariah", "zaccur", names), "a real mishearing stays a miss")
+        self.assertIsNone(al.tok_match("bunni", "benaiah", names | {"bunni"}), "the -iah ending is not dropped")
+
+    def test_the_iah_rule_never_touches_a_name_without_the_h(self):
+        """Codex refuter, 2026-09-24, against the first tolerance 2 (it wrote EVERY final -ia as -iah):
+        whisper's "binia" (WOP 1 Chr 8:37, cached) stopped hearing "Binea" -- the h it was given made
+        the skeletons differ -- and "uriah" started hearing "Uzzia" (1 Chr 11:41/44, two men) because
+        "uziah"/"uriah" reach the 0.8 ratio. The h now goes only to a heard form set against an -iah
+        name, and then only an exact skeleton counts."""
+        al = self.al
+        names = al.name_tokens("Binea, Rapha, Uzzia, Uriah, Ashterathite, Nogah, Nepheg, Japhia")
+        self.assertEqual(al.tok_match("binia", "binea", names), "name", "tolerance 1's hearing is kept")
+        self.assertIsNone(al.tok_match("uriah", "uzzia", names), "Uriah is not Uzzia")
+        self.assertIsNone(al.tok_match("uzzia", "uriah", names), "nor the other way")
+        self.assertEqual(al.tok_match("jephiah", "japhia", names), "name",
+                         "the other direction: WEB 1 Chr 3:7 heard 'jephiah' for 'Japhia' (cached)")
+        self.assertIsNone(al.tok_match("jephiah", "japhia", names, iah=False))
+        self.assertTrue(al.probe_ok("binea rapha".split(), "binia rapha".split(), names, tolerant=True))
+        self.assertFalse(al.probe_ok("the son of uzzia".split(), "the son of uriah".split(), names, tolerant=True))
+
+    def test_the_tolerance_is_stamped_and_an_older_one_is_not_current(self):
+        """How the tolerant witness matches is an input of its belts, so the resume key covers it: a
+        tolerant belt from an older version (no stamp = 1, c61; or 2) re-aligns on the next
+        --name-tolerant run. Strict belts never use it and carry no stamp."""
+        al = self.al
+        self.assertEqual(al.witness_stamp(al.settings_for("bible-wop-nkjv")), {"witness": "strict"})
+        self.assertEqual(al.witness_stamp(al.settings_for("bible-wop-nkjv", name_tolerant=True)),
+                         {"witness": "name-tolerant", "tolerance": al.TOLERANCE})
+        self.assertEqual(al.TOLERANCE, 3)
+        with tempfile.TemporaryDirectory() as td:
+            audio = os.path.join(td, "a.mp3")
+            open(audio, "wb").write(b"x" * 10)
+            verses = os.path.join(td, "v.json")
+            json.dump({"verses": [{"n": 1, "text": "Benaiah, Bedeiah, Cheluh,"}]}, open(verses, "w"))
+            want = al.settings_hash(al.settings_for("bible-wop-nkjv"))
+            vh = al.sha10(json.dumps([[1, "Benaiah, Bedeiah, Cheluh,"]], ensure_ascii=False, separators=(",", ":")))
+            belt_path = os.path.join(td, "b.json")
+            base = {"settings_hash": want, "audioSize": 10, "versesHash": vh, "verses": [{"n": 1, "t": 0.5}]}
+            json.dump({**base, "witness": "name-tolerant"}, open(belt_path, "w"))
+            self.assertFalse(bab.is_current(belt_path, want, verses, audio, "name-tolerant"), "c61's re-aligns")
+            json.dump({**base, "witness": "name-tolerant", "tolerance": 2}, open(belt_path, "w"))
+            self.assertFalse(bab.is_current(belt_path, want, verses, audio, "name-tolerant"), "so does 2's")
+            json.dump({**base, "witness": "name-tolerant", "tolerance": al.TOLERANCE}, open(belt_path, "w"))
+            self.assertTrue(bab.is_current(belt_path, want, verses, audio, "name-tolerant"))
+            json.dump({**base, "witness": "strict"}, open(belt_path, "w"))
+            self.assertTrue(bab.is_current(belt_path, want, verses, audio), "a strict belt needs no stamp")
+
     def test_the_mode_lives_in_the_belt_not_the_settings_hash(self):
         al = self.al
         strict = al.settings_for("bible-wop-nkjv")
@@ -327,10 +387,234 @@ class TheNameTolerantWitnessIsOptInAndNameGuarded(unittest.TestCase):
             self.assertTrue(bab.is_current(belt_path, want, verses, audio), "a belt before the field is strict")
             self.assertFalse(bab.is_current(belt_path, want, verses, audio, "name-tolerant"),
                              "asking for the tolerant witness re-aligns a strict belt")
-            json.dump({**base, "witness": "name-tolerant"}, open(belt_path, "w"))
+            json.dump({**base, **al.witness_stamp(tolerant)}, open(belt_path, "w"))
             self.assertTrue(bab.is_current(belt_path, want, verses, audio, "name-tolerant"))
             self.assertFalse(bab.is_current(belt_path, want, verses, audio),
                              "and a strict run does not keep a tolerant belt")
+
+
+def _v1_fold(w):
+    w = w.replace("ch", "k").replace("ck", "k").replace("ph", "f").replace("c", "k")
+    w = w.replace("y", "i").replace("j", "i")
+    return re.sub(r"(.)\1+", r"\1", w)
+
+
+def _v1_skel(w):
+    f = _v1_fold(w)
+    return f[0] + re.sub(r"[aeiou']", "", f[1:])
+
+
+def _v1_tok_match(a, b, names=None):
+    """tok_match as tolerance 1 (c61, be364ece) shipped it, frozen here so no later edit to
+    _alignlib can move the oracle along with the code it judges."""
+    import difflib
+    if a == b:
+        return "exact"
+    if len(a) > 4 and len(b) > 2 and (a.startswith(b) or b.startswith(a)):
+        return "prefix"
+    if names and b in names and len(a) >= 5 and len(b) >= 5 and (
+            _v1_skel(a) == _v1_skel(b) or difflib.SequenceMatcher(None, _v1_fold(a), _v1_fold(b)).ratio() >= 0.8):
+        return "name"
+    return None
+
+
+def _v1_probe(want, heard, names=None):
+    """The probe's scan before tolerance 3, copied verbatim, on tolerance 1's hearing."""
+    hi = matched = content_matched = 0
+    for w in want:
+        j = hi
+        while j < len(heard) and not _v1_tok_match(heard[j], w, names):
+            j += 1
+        if j < len(heard):
+            matched += 1
+            if len(w) >= 4:
+                content_matched += 1
+            hi = j + 1
+    content_have = sum(1 for w in want if len(w) >= 4)
+    content_ok = content_matched >= min(2, content_have) if content_have else True
+    return (matched >= max(2, len(want) - 2)) and content_ok
+
+
+class TheTolerantWitnessAsksASecondQuestionWithBetterEars(unittest.TestCase):
+    """Tolerance 3 (2026-09-24). When no leg passes the probe's question, the name-tolerant witness asks a
+    second: the same greedy scan, hearing a name -ia for -iah (name_alike's iah rule) and a KJV spelling
+    the modern way ("labouring"/"laboring", "shewed"/"showed"). Tolerant runs only: the strict witness,
+    and every strict belt, keep the old scan byte for byte.
+
+    The first tolerance 3 took the most words any in-order matching found instead. Two refuters (Codex,
+    then Opus) broke it in exactly the chapters this witness serves: a king list's neighbour verse,
+    another man's name by the 0.8 ratio, a leg a word late beating the right one, a trimmed opening lit
+    2 s late. Each of their inputs is a test here."""
+
+    def setUp(self):
+        self.al = bab.al
+
+    def test_a_kjv_spelling_and_its_modern_twin_fold_together(self):
+        al = self.al
+        for kjv, modern in (("labouring", "laboring"), ("neighbour", "neighbor"), ("honour", "honor"),
+                            ("favour", "favor"), ("labourers", "laborers"), ("honourable", "honorable"),
+                            ("saviour", "savior"), ("savour", "savor"), ("dishonour", "dishonor"),
+                            ("armourbearer", "armorbearer"), ("sheweth", "showeth"), ("shewed", "showed"),
+                            ("fulness", "fullness"), ("brake", "break"), ("aught", "ought")):
+            self.assertEqual(al.spelling_fold(kjv), al.spelling_fold(modern), (kjv, modern))
+        for w in ("our", "ours", "your", "yours", "four", "hour", "pour", "the", "lord", "word",
+                  "devour", "devoured", "scour", "scoured", "flour"):
+            self.assertEqual(al.spelling_fold(w), w, "an ordinary word is never folded")
+
+    def test_two_different_words_never_fold_together(self):
+        """Codex refuter, 2026-09-24: a rule on every -our made "scoured" "scored", and a verse
+        heard as "and he scored all the land" passed for "And he scoured all the land"."""
+        al = self.al
+        self.assertNotEqual(al.spelling_fold("scoured"), al.spelling_fold("scored"))
+        self.assertFalse(al.probe_ok("and he scoured all the land".split(),
+                                     "and he scored all the land".split(), tolerant=True))
+
+    def test_a_neighbour_verse_of_the_same_formula_is_not_the_verse(self):
+        """The refuters' neighbour windows (1 Chronicles, real hearings). "And when Bela was dead, Jobab
+        ..." then "And when Jobab was dead, Husham ...": probed at v44's start for v45, a most-words
+        matching takes and/when/was/dead and leaves both names out. The scan's order says no: it spends
+        a word on its later mention and runs out of window. Same for "the sons of simeon were" heard for
+        "And the sons of Shimon were" (another man, one 0.8 ratio away) and for Lotan heard in the
+        previous verse's list."""
+        al = self.al
+        names = al.name_tokens("And when Bela was dead, Jobab the son of Zerah of Bozrah reigned in his stead. "
+                               "And when Jobab was dead, Husham of the land of the Temanites reigned in his stead. "
+                               "And when Husham was dead, Hadad the son of Bedad reigned in his stead. "
+                               "The sons of Simeon were Nemuel and Jamin, Jarib. The sons of Shimon were Amnon. "
+                               "The sons of Seir; Lotan, and Shobal, and Zibeon. And the sons of Lotan; Hori.")
+        v44 = "and when bela was dead jobab the son of zerah".split()
+        v45 = "and when jobab was dead husham of the land of the temanites".split()
+        for want, heard in (("and when jobab was dead husham", v44),
+                            ("and when husham was dead hadad", v45),
+                            ("and when baal hanan was dead", "and when samlah was dead shaul of rehoboth by the "
+                             "river reigned in his stead and when shaul was dead baal".split()),
+                            ("and the sons of shimon were", "the sons of simeon were nemuel and jamin jerib".split()),
+                            ("and the sons of lotan hori", "the sons of seir lotan and shobel and zibion".split())):
+            self.assertFalse(al.probe_ok(want.split(), heard, names, tolerant=True), want)
+        self.assertTrue(al.probe_ok("and when jobab was dead husham".split(), v45, names, tolerant=True),
+                        "at its own start the verse still passes")
+        rows = self.belt({100.0: v44, 130.0: "reigned in his stead and when husham".split()},
+                         "And when Jobab was dead, Husham of the land", names)
+        self.assertEqual(rows[0]["status"], "REVIEW", "dark, not v44's start")
+
+    def belt(self, heard_at, text, names, tA=100.0, tB=130.0, first_spoken=0, wts=None):
+        """One verse through al.belt with legs at tA / tB (disagreeing), the probe answering from
+        heard_at[t] as probe() does: (ok, heard, second question), `want` from the text belt hands it."""
+        al = self.al
+        s = al.settings_for("bible-wop-nkjv", name_tolerant=True)
+        nrm = al.normalizer(s)
+
+        def probe_fn(t, expect):
+            want, h = [nrm(w) for w in al.spoken_words(expect)][:6], heard_at[t]
+            ok = al.probe_ok(want, h, names)
+            return ok, h, not ok and al.second_chance(want, h, names)
+
+        units = [{"owner": 0, "tokens": al.spoken_words(text), "text": text, "ident": {"n": 1}}]
+        A = {0: {"t": tA, "tEnd": tA + 4, "score": 0.9, "wordTs": wts or [tA]}}
+        B = {0: {"t": tB, "tEnd": tB + 4, "hit": 9, "tot": 9, "firstSpoken": first_spoken}}
+        return al.belt(A, B, units, s, probe_fn)
+
+    def test_the_second_question_never_moves_a_stamp_the_first_proves(self):
+        """A leg that passes only the second question must not beat a leg the first one proves: asked in
+        one breath with A first, the first tolerance 3 moved 6 of the 19 PROBED_B verses of the tolerant
+        belts to a leg A a word late (WOP Exodus 36:1: "bezalel and aholiab" for "And Bezalel and
+        Aholiab"). The belt asks both legs the first question, then the second."""
+        al = self.al
+        text = "Benaiah, Bedeiah, Cheluh,"
+        names = al.name_tokens(text + " Vaniah")
+        ears = "binaya bidia kela vinaya".split()
+        rows = self.belt({100.0: ears, 130.0: "benaiah bedeiah cheluh vaniah".split()}, text, names)
+        self.assertEqual((rows[0]["status"], rows[0]["t"]), ("PROBED_B", 130.0))
+        self.assertNotIn("secondChance", rows[0])
+        self.assertTrue(al.second_chance("benaiah bedeiah cheluh".split(), ears, names),
+                        "A does pass the second question: only the order keeps it out")
+
+    def test_a_verse_neither_leg_proves_takes_the_second_question(self):
+        al = self.al
+        text = "And he shewed me Joshua the high priest standing before the angel of the LORD,"
+        rows = self.belt({1.76: "and he showed me joshua the high priest standing before the angel".split(),
+                          8.0: "standing before the angel of the lord and satan standing".split()},
+                         text, al.name_tokens(text), tA=1.76, tB=8.0)
+        self.assertEqual((rows[0]["status"], rows[0]["t"], rows[0].get("secondChance")), ("PROBED_A", 1.76, True))
+
+    def test_a_trimmed_opening_gets_no_second_question(self):
+        """Opus refuter, 2026-09-24: whisper's transcript of WEB Ezekiel 36 misses 0-30 s, so leg B took
+        v3's spoken "prophesy and say" for unspoken (firstSpoken 5) and the looser matcher lit v3 at "the
+        Lord Yahweh", 2.1 s late, where it had painted 0.7 s early by interpolation. A trimmed opening
+        can be junk (the belt says so of BRM Psalm 3 v2): no second question on it."""
+        al = self.al
+        text = "The sleep of a labouring man is sweet, whether he eat little or much"
+        heard = {9.5: "the sleep of a laboring man is sweet whether he eat little".split(),
+                 10.0: "sleep of a laboring man is sweet whether he eat little or".split(),
+                 20.0: "but the abundance of the rich will not suffer him to sleep".split()}
+        rows = self.belt(heard, text, None, tA=9.5, tB=20.0, first_spoken=1, wts=[9.5, 10.0])
+        self.assertEqual(rows[0]["status"], "REVIEW")
+        rows = self.belt(heard, text, None, tA=9.5, tB=20.0, first_spoken=0, wts=[9.5, 10.0])
+        self.assertEqual((rows[0]["status"], rows[0]["t"], rows[0].get("secondChance")), ("PROBED_A", 9.5, True))
+
+    def test_the_residue_verses_it_can_hear_now_pass_tolerant_only(self):
+        al = self.al
+        ezra = al.name_tokens("Benaiah, Bedeiah, Cheluh, Vaniah, Meremoth, Eliashib, Mattaniah, Mattenai, Jaasai")
+        chron = al.name_tokens("Nogah, Nepheg, Japhia, Elishama, Eliada, Eliphelet")
+        for ref, want, heard, names in (
+                ("BRM Eccl 5:12", "the sleep of a labouring man", "the sleep of a laboring man is sweet whether he eat little", None),
+                ("BRM Job 12:4", "i am as one mocked of his neighbour", "i am as one mocked of his neighbor who calleth upon god", None),
+                ("BRM Rev 22:1", "and he shewed me a pure", "and he showed me a pure river of water of life clear", None),
+                ("WOP Ezra 10:35", "benaiah bedeiah cheluh", "binaya bidia kela vinaya murama elashib matan", ezra),
+                ("WOP Ezra 10:36", "vaniah meremoth eliashib", "venaya murama eliashib mataniah matanai jsi", ezra),
+                ("WEB 1 Chr 3:7", "nogah nepheg japhia", "and noga and nepheg and jephiah and elishema and elias", chron)):
+            w, h = want.split(), heard.split()
+            self.assertFalse(al.probe_ok(w, h, names), f"{ref}: the first question still says no")
+            self.assertTrue(al.probe_ok(w, h, names, tolerant=True), f"{ref}: the second hears it")
+        for ref, want, heard in (
+                ("BRM 1Kgs 17:2", "and the word of the lord", "and a word of the lord came unto him saying get thee"),
+                ("WEB Ezek 14:1", "then came certain of the elders", "then some of the elders of israel came to me and sat")):
+            self.assertFalse(al.probe_ok(want.split(), heard.split(), tolerant=True),
+                             f"{ref}: the scan's own limit stays; the matcher that lit it also lit wrong windows")
+
+    def test_the_guards_still_hold_when_tolerant(self):
+        al = self.al
+        self.assertFalse(al.probe_ok("and the word of the lord".split(),
+                                     "and the lord said unto moses speak unto the children".split(), tolerant=True),
+                         "a formulaic line matching only function words and one content word is not the verse")
+        self.assertFalse(al.probe_ok("the sleep of a labouring man".split(), "a man".split(), tolerant=True))
+        self.assertFalse(al.probe_ok("the sleep of a labouring man".split(), [], tolerant=True))
+
+    # Words for the random tests: formula and function words, KJV twins, and names with their hearings
+    # (-ia for -iah, a name with no h, two men one ratio apart, a king list's neighbours).
+    VOCAB = ["the", "and", "of", "a", "lord", "word", "came", "when", "dead", "unto", "labouring", "laboring",
+             "neighbour", "neighbor", "man", "benaiah", "binaya", "binea", "binia", "uzzia", "uriah", "uzziah",
+             "jobab", "bela", "husham", "zechariah", "zaccur"]
+    NAMES = frozenset({"benaiah", "binea", "uzzia", "uriah", "jobab", "bela", "husham", "zechariah", "zaccur"})
+
+    def test_strict_is_the_old_scan_and_tolerant_never_says_no_where_tolerance_1_said_yes(self):
+        """Against tolerance 1 FROZEN in this file (_v1_probe): the first version of this test ran the old
+        scan on the live tok_match, so it could not see the -ia rule costing "binia" its "Binea" (Codex)."""
+        import random
+        al = self.al
+        rng = random.Random(924)
+        for k in range(6000):
+            want = [rng.choice(self.VOCAB) for _ in range(rng.randint(1, 9))]
+            heard = [rng.choice(self.VOCAB) for _ in range(rng.randint(0, 14))]
+            names = set(self.NAMES) if k % 2 else None
+            self.assertEqual(al.probe_ok(want, heard), _v1_probe(want, heard), (want, heard))
+            self.assertEqual(al.probe_ok(want, heard, names), _v1_probe(want, heard, names), (want, heard))
+            if _v1_probe(want, heard, names):
+                self.assertTrue(al.probe_ok(want, heard, names, tolerant=True), (want, heard, names))
+
+    def test_the_second_question_is_the_old_scan_where_the_ears_agree(self):
+        """Not a looser scan: with no -ia/-iah pair and no KJV twin among the words, the second question
+        answers exactly as tolerance 1 did."""
+        import random
+        al = self.al
+        vocab = ["the", "and", "of", "a", "lord", "word", "came", "when", "dead", "unto", "man", "sons",
+                 "binea", "binia", "jobab", "bela", "husham", "zaccur", "hattush", "hattish", "simeon", "shimon"]
+        names = {"binea", "jobab", "bela", "husham", "zaccur", "hattush", "shimon"}
+        rng = random.Random(3)
+        for _ in range(6000):
+            want = [rng.choice(vocab) for _ in range(rng.randint(1, 9))]
+            heard = [rng.choice(vocab) for _ in range(rng.randint(0, 14))]
+            self.assertEqual(al.second_chance(want, heard, names), _v1_probe(want, heard, names), (want, heard))
 
 
 class TheVersesCacheFollowsTheCorpus(unittest.TestCase):

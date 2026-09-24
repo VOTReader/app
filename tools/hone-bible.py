@@ -143,7 +143,7 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
            "versesHash": al.sha10(json.dumps([[v["n"], v["text"]] for v in verses],
                                              ensure_ascii=False, separators=(",", ":"))),
            "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
-           "witness": "name-tolerant" if s.get("name_tolerant") else "strict",
+           **al.witness_stamp(s),
            "names": sorted(names),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
            "verses": rows}

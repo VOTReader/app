@@ -116,7 +116,7 @@ def is_digit_token(tok):
 
 # ----------------------------------------------------------------- matcher --
 
-def tok_match(a, b, names=None):
+def tok_match(a, b, names=None, iah=True):
     """'exact' | 'prefix' | 'name' | None. Prefix = stem match, guarded against short words.
 
     `a` is the SPOKEN token (transcript / probe), `b` the REFERENCE token -- every
@@ -124,12 +124,13 @@ def tok_match(a, b, names=None):
     name-tolerant witness (2026-09-22), granted only when `b` is in `names`, the
     chapter's proper nouns (name_tokens), and the two sound alike (name_alike).
     Ordinary words never get it: "there"/"three" share a consonant skeleton and
-    would false-confirm a stamp on scripture's formulaic lines."""
+    would false-confirm a stamp on scripture's formulaic lines. iah=False is
+    tolerance 1's hearing of a name (no -iah rule), kept for probe_ok's first pass."""
     if a == b:
         return "exact"
     if len(a) > 4 and len(b) > 2 and (a.startswith(b) or b.startswith(a)):
         return "prefix"
-    if names and b in names and name_alike(a, b):
+    if names and b in names and name_alike(a, b, iah):
         return "name"
     return None
 
@@ -157,30 +158,85 @@ def name_tokens(text, nrm=None):
     return out
 
 
+# The name-tolerant witness's version. Stamped in every tolerant belt (witness_stamp) and compared
+# by batch-align-bible.is_current: how the tolerant witness matches is an input of its belts, and a
+# cache key covers every input. The strict witness never changes with it.
+#   1  c61 (2026-09-22; belts carry no stamp): a proper noun may match a near hearing.
+#   2  a name heard -ia for -iah or -iah for -ia (name_alike: "binaya" for "Benaiah", Ezra 10:35).
+#   3  when no leg passes the probe's question, a second one: the same scan with better ears
+#      (the -iah rule, a KJV spelling's modern twin; second_chance).
+TOLERANCE = 3
+
+
 def _name_fold(w):
     """One spelling for the sounds a transcriber renders many ways: ch/ck/c -> k,
-    ph -> f, y/j -> i, doubled letters collapsed ("Malchijah" -> "malkiiah")."""
+    ph -> f, y/j -> i, doubled letters collapsed ("Malchijah" -> "malkiah")."""
     w = w.replace("ch", "k").replace("ck", "k").replace("ph", "f").replace("c", "k")
     w = w.replace("y", "i").replace("j", "i")
     return re.sub(r"(.)\1+", r"\1", w)
 
 
-def _name_skel(w):
-    f = _name_fold(w)
+def witness_stamp(s):
+    """The belt fields that name its witness: strict, or name-tolerant with its version."""
+    if s.get("name_tolerant"):
+        return {"witness": "name-tolerant", "tolerance": TOLERANCE}
+    return {"witness": "strict"}
+
+
+# KJV / British spellings whisper writes the American way, by list: a rule on every -our would
+# also make "scoured" "scored", a different word (Codex refuter, 2026-09-24). Only words whose
+# two spellings are one sound: our, your, four, hour, pour, devour and scour are never touched.
+_OUR = re.compile(r"^((?:dis|un)?(?:ard|arm|behavi|cand|clam|col|dol|endeav|fav|ferv|flav|harb|hon|hum|lab|"
+                  r"neighb|od|parl|ranc|rig|rum|savi|sav|splend|succ|ten|tum|val|vap|vig)o)ur"
+                  r"(s|ed|ing|er|ers|able|ably|ite|ites|est|eth|less|bearer|bearers)?$")
+_KJV_TWIN = {"fulness": "fullness", "brake": "break", "aught": "ought", "throughly": "thoroughly"}
+
+
+def spelling_fold(w):
+    """One spelling for a KJV word and its modern twin (tolerance 3): labouring -> laboring,
+    neighbour -> neighbor, shewed -> showed, fulness -> fullness, brake -> break, aught -> ought.
+    Applied to both sides; each pair is one word, or two spellings of one sound."""
+    w = _OUR.sub(r"\1r\2", w)
+    if w.startswith("shew"):
+        w = "show" + w[4:]
+    return _KJV_TWIN.get(w, w)
+
+
+def _skel(f):
     return f[0] + re.sub(r"[aeiou']", "", f[1:])
 
 
-def name_alike(a, b):
+def _name_skel(w):
+    return _skel(_name_fold(w))
+
+
+def name_alike(a, b, iah=True):
     """True when a spoken token is a plausible hearing of the name `b`: same
     consonant skeleton after folding ("pashur"/"pashhur", "malak"/"malluch"), or
     the folded spellings agree on 80 % of their characters ("hattish"/"hattush").
     Both sides five characters or more -- short names have too few consonants
-    to be told apart."""
+    to be told apart.
+
+    Tolerance 2 (iah): whisper hears "Benaiah" as "binaya" and "Japhia" as "jephiah" --
+    one side ends -ia where the other ends -iah. Then the -ia side gets the h and only
+    the consonant skeleton may match ("bnh", "ifh"). The h is added, never dropped
+    (dropping it makes "zechariah" and "zaccur" one skeleton, "zkr"); a pair with no
+    -iah is untouched ("binia" stays a hearing of "Binea"); and the 80 % ratio never
+    judges it ("uzzia" + h against "uriah" reaches it: two men, 1 Chr 11:41/44)."""
     if len(a) < 5 or len(b) < 5:
         return False
-    if _name_skel(a) == _name_skel(b):
+    fa, fb = _name_fold(a), _name_fold(b)
+    if _skel(fa) == _skel(fb):
         return True
-    return difflib.SequenceMatcher(None, _name_fold(a), _name_fold(b)).ratio() >= 0.8
+    if difflib.SequenceMatcher(None, fa, fb).ratio() >= 0.8:
+        return True
+    if not iah:
+        return False
+    if fa.endswith("ia") and fb.endswith("iah"):
+        return _skel(fa + "h") == _skel(fb)
+    if fb.endswith("ia") and fa.endswith("iah"):
+        return _skel(fa) == _skel(fb + "h")
+    return False
 
 
 def nw_align(words, cols, s, names=None):
@@ -613,7 +669,11 @@ def probe(wav_path, t, expect_text, s, whisper_leg, names=None):
 
     The window is deliberately long: a dramatised reading pauses mid-verse
     ("Then God said," [beat, actor change] "Let there be...") and a short window
-    hears only the first half and fails a perfectly good stamp."""
+    hears only the first half and fails a perfectly good stamp.
+
+    Returns (ok, heard[:12], second): `second` is the name-tolerant witness's
+    second question (second_chance), False on a strict run or when ok. belt() takes
+    it only when no candidate is ok."""
     pcm = pcm_16k(wav_path)
     a = int(max(0.0, t - 0.2) * 16000)
     b = min(len(pcm), a + int(s["probe_len"] * 16000))
@@ -634,19 +694,52 @@ def probe(wav_path, t, expect_text, s, whisper_leg, names=None):
     want = all_want[:take]
     if not want:
         return False, heard[:8]
+    ok = probe_ok(want, heard, names)
+    return ok, heard[:12], not ok and bool(s.get("name_tolerant")) and second_chance(want, heard, names)
+
+
+def probe_ok(want, heard, names=None, tolerant=False):
+    """The probe's verdict on words already heard: `want` (the verse's opening) found IN ORDER in
+    `heard`, all but two of them, with at least two of its content words (len >= 4) among the hits
+    -- one when it has one (the Deut-15 guard above).
+
+    A greedy scan, NON-CONSUMING on a miss: one misheard word ("yet"->"get") costs one token, not the
+    scan for all that follow. It is the whole strict probe, and the tolerant witness's first question
+    with tolerance 1's hearing (iah=False). tolerant=True adds the second chance (either passes)."""
+    if _scan(want, heard, lambda h, w: tok_match(h, w, names, iah=False) is not None):
+        return True
+    return bool(tolerant) and second_chance(want, heard, names)
+
+
+def _scan(want, heard, hears):
+    need, need_c = max(2, len(want) - 2), min(2, sum(1 for w in want if len(w) >= 4))
     hi = matched = content_matched = 0
-    for w in want:                       # in-order fuzzy match, NON-CONSUMING on a miss:
-        j = hi                           # one misheard word ("yet"->"get") must cost one
-        while j < len(heard) and not tok_match(heard[j], w, names):
-            j += 1                       # token, not exhaust the scan for all that follow
+    for w in want:                   # in-order fuzzy match, NON-CONSUMING on a miss:
+        j = hi                       # one misheard word ("yet"->"get") must cost one
+        while j < len(heard) and not hears(heard[j], w):
+            j += 1                   # token, not exhaust the scan for all that follow
         if j < len(heard):
             matched += 1
             if len(w) >= 4:
                 content_matched += 1
             hi = j + 1
-    content_have = sum(1 for w in want if len(w) >= 4)
-    content_ok = content_matched >= min(2, content_have) if content_have else True
-    return (matched >= max(2, len(want) - 2)) and content_ok, heard[:12]
+    return matched >= need and content_matched >= need_c
+
+
+def second_chance(want, heard, names=None):
+    """The name-tolerant witness's second question (tolerance 3): the same scan with better ears --
+    a name heard -ia for -iah or the other way (name_alike's iah rule: "binaya" for "Benaiah") and a
+    KJV spelling heard the modern way (spelling_fold: "showed" for "shewed") count as hits. belt()
+    asks it only when no candidate passes probe_ok, so a stamp the first question proves stays put.
+
+    Not a looser scan, on purpose. A most-words in-order matching (the first tolerance 3) lit more
+    dark verses ("and a word of the lord" for "And the word of the LORD"), and the refuters showed it
+    passing the WRONG window in exactly the chapters this witness serves: a king list's neighbour
+    ("and when bela was dead jobab" for "And when Jobab was dead, Husham"), "the sons of simeon were"
+    for "the sons of Shimon were", and 43 windows one or two verses off in the 128 chapters' own
+    transcripts (Codex and Opus, 2026-09-24). The scan's order is what kept those out."""
+    return _scan(want, heard, lambda h, w: tok_match(h, w, names) is not None
+                 or tok_match(spelling_fold(h), spelling_fold(w), names) is not None)
 
 
 def _interpolate_runs(rows, end_t=None, weights=None):
@@ -779,16 +872,25 @@ def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
             row.update(t=round(min(tA, tB), 2), status="CONFIRMED",
                        delta=round(abs(tA - tB), 2), tEnd=la["tEnd"])
         else:
-            picked = None
+            picked = second = None
             misses = []
             for cand, tag in ((tA, "PROBED_A"), (tB, "PROBED_B")):
                 if cand is None:
                     continue
-                ok, heard = probe_fn(cand, expect)
+                ok, heard, *more = probe_fn(cand, expect)
                 if ok:
                     picked = (cand, tag, heard)
                     break
+                if second is None and more and more[0] and not k:
+                    second = (cand, tag, heard)
                 misses.append({"t": cand, "heard": " ".join(heard)})
+            # The tolerant witness's second question (probe's third value) only when neither
+            # candidate passed the first: a stamp the first question proves never moves. Never
+            # on a trimmed opening (k): leg B's firstSpoken can be junk (see above), and a verse
+            # whose spoken first words were trimmed would light late (WEB Ezekiel 36:3, 2.1 s).
+            if picked is None and second is not None:
+                picked = second
+                row["secondChance"] = True
             if picked:
                 row.update(t=round(picked[0], 2), status=picked[1],
                            probe=" ".join(picked[2]), tEnd=(la or lb)["tEnd"])

@@ -242,7 +242,8 @@ def verses_json(ed, book_id, chapter, out_dir):
 def is_current(belt_path, want_settings, verses_path, audio_path, witness="strict"):
     """The resume key: settings, the reference text, the recording's bytes, and
     the witness mode (strict or name-tolerant -- outside settings_hash by design,
-    see _alignlib.settings_hash; a belt written before the field exists is strict)."""
+    see _alignlib.settings_hash; a belt written before the field exists is strict),
+    and for a tolerant belt the version of the tolerant witness that made it (no stamp = 1)."""
     if not os.path.exists(belt_path):
         return False
     try:
@@ -252,6 +253,8 @@ def is_current(belt_path, want_settings, verses_path, audio_path, witness="stric
     if d.get("settings_hash") != want_settings:
         return False
     if d.get("witness", "strict") != witness:
+        return False
+    if witness == "name-tolerant" and d.get("tolerance", 1) != al.TOLERANCE:
         return False
     if d.get("audioSize") != os.path.getsize(audio_path):
         return False
