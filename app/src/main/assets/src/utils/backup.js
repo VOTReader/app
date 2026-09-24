@@ -588,9 +588,11 @@ export function verifyImportCounts(manifest, mediaApplied) {
  * silently drop the just-imported data — and this is the only backup.
  *
  * A store/media section that fails shape validation is SKIPPED (never
- * written) so a corrupt section can't overwrite good data. Caller is
- * responsible for the envelope check, the confirm dialog, and the
- * degraded-store precondition guard.
+ * written) so a corrupt section can't overwrite good data. A skipped store,
+ * or a backup with no journal section, turns the media replace into a
+ * no-delete merge (v04-05, as applyV3). Caller is responsible for the
+ * envelope check, the confirm dialog, and the degraded-store precondition
+ * guard.
  *
  * @param {any} parsed                 the parsed backup envelope
  * @param {ApplyImportCtx} ctx
@@ -704,11 +706,20 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
     // for an exact REPLACE. An id the backup mentions is NEVER pruned (its existing
     // copy survives even if the new record failed to decode), so a corrupt backup
     // can't wipe data.
-    try {
-      const inBackup = new Set(backupIds);
-      const existingIds = await mediaStore.allIds();
-      for (const id of existingIds) { if (!inBackup.has(id)) await mediaStore.delete(id); }
-    } catch (e) { console.warn('prune stale media failed', e); }
+    // v04-05: the same demotion as applyV3's exactRestore. A skipped (kept-old)
+    // store, or a journal this backup does not carry (Settings promises to leave
+    // it unchanged), may still reference device media, so either one makes this a
+    // no-delete MERGE: pruning would strand those attachments for good.
+    const missingJournalStore = Object.prototype.hasOwnProperty.call(storesMap, 'vot-journal')
+      && !(parsed.stores && typeof parsed.stores === 'object'
+        && Object.prototype.hasOwnProperty.call(parsed.stores, 'vot-journal'));
+    if (skippedStores.length === 0 && !missingJournalStore) {
+      try {
+        const inBackup = new Set(backupIds);
+        const existingIds = await mediaStore.allIds();
+        for (const id of existingIds) { if (!inBackup.has(id)) await mediaStore.delete(id); }
+      } catch (e) { console.warn('prune stale media failed', e); }
+    }
   }
 
   // (4) U1 DURABILITY BARRIER — wait for every imported store's IDB write to land

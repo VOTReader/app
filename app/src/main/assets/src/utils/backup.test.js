@@ -534,6 +534,72 @@ describe('applyImportPayload', () => {
     expect(Object.keys(store)).toEqual(['keep']);   // 'drop' (not in backup) pruned; exact replace
   });
 
+  // v04-05 (improvement sweep 2026-09-22): the legacy path pruned media whenever
+  // `media` was an object, even when the store that references it was skipped or
+  // absent. v3 demotes to a no-delete merge in both cases; legacy must too.
+  function mediaOnDevice(ids) {
+    const store = {};
+    for (const id of ids) store[id] = { id, blob: new Blob([new Uint8Array([7])]), type: 'image' };
+    return {
+      _store: store,
+      allIds: async () => Object.keys(store),
+      delete: async (id) => { delete store[id]; },
+      put: async (rec) => { store[rec.id] = rec; },
+    };
+  }
+
+  it('v04-05: an invalid store demotes legacy media to a no-delete merge', async () => {
+    const journal = fakeStore('replaceAll');
+    const media = mediaOnDevice(['photo', 'memo']);
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-journal': { bad: true } }, media: {} },
+      {
+        storesMap: { 'vot-journal': { store: journal, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: media,
+        validateStorePayload: () => ['shape violation'], validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.skippedStores).toEqual(['vot-journal']);
+    expect(journal.calls).toEqual([]);                            // kept-old journal...
+    expect(Object.keys(media._store).sort()).toEqual(['memo', 'photo']); // ...keeps its attachments
+  });
+
+  it('v04-05: a v2 file with no journal section keeps every journal attachment', async () => {
+    // The plausible trigger: a pre-June v2 export made before any journal entry
+    // existed ('vot-journal' absent, media {}) imported onto a phone that now has one.
+    const journal = fakeStore('replaceAll');
+    const media = mediaOnDevice(['photo', 'memo']);
+    await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-annotations': { k: [] } }, media: {} },
+      {
+        storesMap: {
+          'vot-journal': { store: journal, method: 'replaceAll' },
+          'vot-annotations': { store: fakeStore('replaceAll'), method: 'replaceAll' },
+        },
+        flagMap: {}, mediaStore: media,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(journal.calls).toEqual([]);                            // journal left unchanged...
+    expect(Object.keys(media._store).sort()).toEqual(['memo', 'photo']); // ...and so are its photos + memos
+  });
+
+  it('v04-05 control: a valid journal section still gets an exact media replace', async () => {
+    const journal = fakeStore('replaceAll');
+    const media = mediaOnDevice(['keep', 'drop']);
+    await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-journal': { entries: [] } },
+        media: { keep: { data: 'aGk=', type: 'image', mime: 'image/png', size: 2, created: 1 } } },
+      {
+        storesMap: { 'vot-journal': { store: journal, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: media,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(journal.calls).toEqual([{ entries: [] }]);
+    expect(Object.keys(media._store)).toEqual(['keep']);        // 'drop' pruned: the clean case is unchanged
+  });
+
   it('S5: stops importing media once the aggregate decoded-byte cap is hit', async () => {
     const put = vi.fn(async () => {});
     const okB64 = 'QUJDREVG'; // 8 base64 chars → ~6 decoded bytes each
