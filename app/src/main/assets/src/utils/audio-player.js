@@ -27,6 +27,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { showToast } from './toast.js';
+import { OfflineAudio } from './offline-audio.js';
 import { loadAudioSyncSections } from './sync-loaders.js';
 import {
   AUDIO_BIBLE_RELEASE_PREFIX,
@@ -283,6 +284,26 @@ function _tourShowing() {
 /** @returns {boolean} */
 function _offline() {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * Offline, and this recording is not downloaded to the phone, so it cannot load (listening item 8: the Android app
+ * answers a downloaded one from disk; on the web nothing is ever downloaded).
+ * @param {Track | null | undefined} track
+ * @returns {boolean}
+ */
+function _unreachable(track) {
+  return _offline() && !(track && typeof track.url === 'string' && OfflineAudio.isSaved(track.url));
+}
+
+/**
+ * Offline, and nothing in `queue` is on the phone: the whole request is refused BEFORE any state changes, which is
+ * what the old blanket offline guards did (a queue with something downloaded plays that, from where it starts).
+ * @param {Array<{ url?: string }>} queue
+ * @returns {boolean}
+ */
+function _offlineRefuses(queue) {
+  return _offline() && !queue.some((t) => !_unreachable(/** @type {any} */ (t)));
 }
 
 /** @param {string} text */
@@ -672,7 +693,8 @@ function _onError() {
   _errorTime = _state.time;
   _setStatus('paused');
   _persist();
-  _toast(_offline() ? OFFLINE_MSG : LOAD_FAIL_MSG);
+  // A downloaded recording failing offline is a load failure, not a missing connection.
+  _toast(_unreachable(_state.queue[_state.qi]) ? OFFLINE_MSG : LOAD_FAIL_MSG);
 }
 
 /* ── gentle queue prefetch (owner directive 2026-08-09) ───────────────────
@@ -1069,6 +1091,23 @@ function _start() {
     _toast(LOAD_FAIL_MSG);
     return;
   }
+  // No signal (item 8): a recording that is not on the phone cannot load. The queue plays what IS on the phone,
+  // passing over the rest; with nothing downloaded ahead, it pauses on this one with the offline notice, and Play
+  // (toggle) loads it once the connection is back.
+  if (_unreachable(track)) {
+    const ahead = _state.queue.findIndex((t, i) => i > _state.qi && !_unreachable(t));
+    if (ahead < 0) {
+      _state.time = 0;
+      _errorTime = 0;
+      _setStatus('paused');
+      _persist();
+      _toast(OFFLINE_MSG);
+      return;
+    }
+    _state.qi = ahead;
+    _start();
+    return;
+  }
   // THE QUEUE IS THE SITE ORDER, ONE UNIT AHEAD (w-audio-continue, 2026-09-11). Crossing into
   // another collection moves the descriptor FIRST — the desk and the boot snapshot describe THIS
   // track's collection, and a restart rebuilds around it (the rebuild reads r.volKey, not a saved
@@ -1235,7 +1274,6 @@ function collectionHasAudio(volKey) {
  */
 function playBibleBook(opts) {
   const o = opts || /** @type {any} */ ({});
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
   // Queue scope is THE BOOK (owner directive 2026-08-10): a chapter tap
   // queues that book's remaining chapters, never the rest of the Bible up
@@ -1254,12 +1292,12 @@ function playBibleBook(opts) {
   const parts = (m && m[o.volKey + ':' + o.bookId]) || [];
   const perChapter = parts.length > 1;
   const n = Number(o.chapterNum);
-  playCollection({
+  const started = playCollection({
     volKey: o.volKey, items, collectionLabel: o.label || null, startId: o.bookId,
     startPartIndex: perChapter && Number.isInteger(n) && n >= 2 ? Math.min(n - 1, parts.length - 1) : 0,
     noResume: !!o.noResume,
   });
-  if (perChapter) return;
+  if (perChapter || !started) return;
   // A whole-book edition seeks INTO the book track. The chapter the reader
   // actually tapped outranks a remembered position: playCollection queued its
   // resume listener first, so this one — added second — wins the assignment.
@@ -2001,7 +2039,8 @@ function _migrateWholeBookResume(r, queue) {
 async function _rebuildRestoredQueue() {
   const r = _pendingRestore;
   if (!r) return;
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
+  // Offline, the saved recording itself must be on the phone (item 8).
+  if (_offline() && !(typeof r.url === 'string' && OfflineAudio.isSaved(r.url))) { _toast(OFFLINE_MSG); return; }
   _setPendingRestore(null);
   const g = _g();
   if (r.mode !== 'custom') {
@@ -2234,7 +2273,6 @@ function _locateTrack(track) {
  */
 function playLetter(opts) {
   const o = opts || /** @type {any} */ ({});
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
   let queue = _tracksFor(o.volKey, o.letter, o.collectionLabel);
   if (!queue.length) return;
   const reader = o.reader || _preferredReaderFor(o.volKey, o.letter, o.collectionLabel);
@@ -2250,6 +2288,7 @@ function playLetter(opts) {
   }
   const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, reader);
   if (rendition) queue = rendition.tracks;
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return; }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
@@ -2279,11 +2318,10 @@ function playLetter(opts) {
  * chapter-grained.
  *
  * @param {{ volKey: string, items: Array<{ id?: string, title?: string }>, collectionLabel?: string, startId?: string, startReader?: string, startPartIndex?: number, noResume?: boolean }} opts
- * @returns {void}
+ * @returns {boolean} false when nothing started (no recordings, or offline with none of them downloaded)
  */
 function playCollection(opts) {
   const o = opts || /** @type {any} */ ({});
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
   const items = Array.isArray(o.items) ? o.items : [];
   /** @type {Track[]} */
   let queue = [];
@@ -2291,7 +2329,7 @@ function playCollection(opts) {
     const tracks = _tracksFor(o.volKey, item, o.collectionLabel);
     for (const t of tracks) queue.push(t);
   }
-  if (!queue.length) return;
+  if (!queue.length) return false;
   let startKey = null;
   if (o.startId) {
     const wanted = o.volKey + ':' + o.startId;
@@ -2317,6 +2355,7 @@ function playCollection(opts) {
     // order let the rendition swap re-grow the parts the index had trimmed.
     queue = _slicePartHorizon(queue, startKey, o.startPartIndex);
   }
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
@@ -2334,6 +2373,7 @@ function playCollection(opts) {
   // remembered position in the OTHER voice would drop the listener
   // mid-sentence in a recording with different pacing.
   if (!o.noResume) _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
+  return true;
 }
 
 /**
@@ -2347,10 +2387,10 @@ function playCollection(opts) {
  * @returns {void}
  */
 function playSection(volKey, index, collectionLabel) {
-  if (_offline()) { _toast(OFFLINE_MSG); return; }
   const sections = sectionsFor(volKey);
   if (!sections || !sections.length) return;
   const startIndex = Math.max(0, Math.min(index || 0, sections.length - 1));
+  if (_offlineRefuses(sections.slice(startIndex).map((s) => ({ url: trackUrl(s[1]) })))) { _toast(OFFLINE_MSG); return; }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
@@ -2461,12 +2501,16 @@ function toggle() {
 
   const track = _state.queue[_state.qi];
   if (!track) return;
-  if (_el.error) {
-    // A failed element stays failed until src is re-assigned. Re-load it and
-    // seek back to where playback died once metadata is available (currentTime
-    // can't be set before then).
+  // A failed element stays failed until src is re-assigned; an element still
+  // holding ANOTHER recording (a seam that paused offline, item 8) must load
+  // the one the bar names.
+  if (_el.error || _el.src !== track.url) {
+    // Re-load it and seek back to where playback died once metadata is
+    // available (currentTime can't be set before then).
     const resumeAt = _errorTime;
     _el.src = track.url;
+    // AFTER src: the load algorithm resets playbackRate (see _start).
+    try { _el.defaultPlaybackRate = _state.rate; _el.playbackRate = _state.rate; } catch (_e) { /* older media engines can ignore rates */ }
     // Through the shared helper, not a hand-written listener: this seek is a
     // promise about THIS track, and if the reader gives up and opens another
     // one before the metadata arrives, the raw version landed on that one
