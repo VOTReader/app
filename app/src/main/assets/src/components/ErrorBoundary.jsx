@@ -47,8 +47,20 @@ function _recordCrash() {
 }
 
 export class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null, crashCount: 0 }; }
+  constructor(props) { super(props); this.state = { error: null, crashCount: 0, caught: false, caughtKey: undefined }; }
   static getDerivedStateFromError(err) { return { error: err }; }
+  // A boundary that must come back is handed a resetKey: an error caught under
+  // one key is dropped once the key moves on, and the children render again.
+  // The AppShell chrome's boundaries (fallback={null}) never reset before, so one
+  // crashed sheet took the selection toolbar and every other sheet with it until
+  // a restart (v15-01). The key is noted on the render that catches, so a key
+  // that changed in the crashing render itself does not retry it at once. No
+  // resetKey (the root and screen boundaries): never resets, as before.
+  static getDerivedStateFromProps(props, state) {
+    if (!state.error) return null;
+    if (!state.caught) return { caught: true, caughtKey: props.resetKey };
+    return props.resetKey !== state.caughtKey ? { error: null, caught: false, caughtKey: undefined } : null;
+  }
   componentDidCatch(error) {
     // Count the crash (windowed) and surface the count, then log. Both are
     // wrapped so storage/logging can never break the boundary itself.

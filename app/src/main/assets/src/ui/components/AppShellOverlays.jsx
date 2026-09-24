@@ -76,7 +76,11 @@ export function AppShellOverlays({
   return (
     // ERR3: a crash in any overlay is caught HERE (fallback={null} → it vanishes
     // + logs) instead of escaping to the root boundary and taking down the app.
-    <ErrorBoundary fallback={null}>
+    // v15-01: it also comes back whenever an overlay opens or closes or the
+    // screen changes (a reader's action, so a broken overlay cannot loop). It
+    // never reset before: a crashed tabs overview also took the storage
+    // warning away until a restart.
+    <ErrorBoundary fallback={null} resetKey={[screen, !!tabsOverviewOpen, tabActionIdx, !!disableTabsPromptOpen, !!gardenWarningOpen].join('|')}>
     <>
       <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
       <Safari7DayModal />

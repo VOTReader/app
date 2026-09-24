@@ -105,6 +105,32 @@ export function AppShellSheets({
     active: !!bookmarkCreatePending,
   });
 
+  // v15-01: the boundary below comes back. A crash closes every open sheet (the
+  // one that threw among them) and bumps the boundary's resetKey, so the
+  // selection toolbar returns and the next sheet opens; before, all of them stayed
+  // gone until the app restarted. Three crashes inside ten seconds leave it down:
+  // a sheet that throws on every render would otherwise loop.
+  const [sheetsEpoch, setSheetsEpoch] = React.useState(0);
+  const sheetCrashesRef = React.useRef(/** @type {number[]} */ ([]));
+  const recoverSheets = function() {
+    const now = Date.now();
+    const recent = sheetCrashesRef.current.filter(function(t) { return now - t < 10000; });
+    recent.push(now);
+    sheetCrashesRef.current = recent;
+    if (recent.length >= 3) return;
+    setAnnChip(null);
+    if (linkSidebarKey) closeLinkSidebar();
+    if (linkPickerSource) closeLinkPicker();
+    setLinkRefineRequest(null);
+    setNoteSheetTarget(null);
+    setNotebookPickerTarget(null);
+    setMultiNotePayload(null);
+    setBookmarkPopoverPayload(null);
+    setBookmarkCreatePending(null);
+    setInboundJournalPayload(null);
+    setSheetsEpoch(function(n) { return n + 1; });
+  };
+
   return (
     // ERR3: a crash in any sheet/popover is caught HERE (fallback={null} → it
     // vanishes + logs) instead of escaping to the root boundary and nuking the
@@ -113,7 +139,8 @@ export function AppShellSheets({
     // where the panel went. showToast resolves from window at call time
     // (bundle-b assigns it); the try/catch keeps the ack from ever throwing
     // inside an error boundary.
-    <ErrorBoundary fallback={null} onCatch={function() {
+    <ErrorBoundary fallback={null} resetKey={sheetsEpoch} onCatch={function() {
+      try { recoverSheets(); } catch (_e) { /* recovery must never throw inside a boundary */ }
       try {
         if (typeof showToast === 'function') {
           showToast({
