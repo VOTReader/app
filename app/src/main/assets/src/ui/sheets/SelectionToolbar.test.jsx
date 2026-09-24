@@ -1183,3 +1183,67 @@ describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1
     expect(written[0]).toBe('If anyone adds to these words,\nI will add to them the punishments');
   });
 });
+
+/* LISTEN FROM HERE (item 7, 2026-09-24). The live reading pane registers
+   window.__votListenFrom { has, start } while its unit has a recording
+   (ReadAlongHighlight, onListen). The toolbar offers ONE extra action then, in
+   its own row between the style/colour strip and the six actions (the Codex
+   mockup pick, r1 option 2); text without a recording keeps today's toolbar. */
+describe('SelectionToolbar — Listen from here', () => {
+  afterEach(() => { delete /** @type {any} */ (window).__votListenFrom; });
+
+  async function raise(c, start, end) {
+    stubSelection(rangeOver(c, start, end));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+  }
+
+  it('offers it, in its own row between the colours and the actions, on text with a recording', async () => {
+    const c = readingContainer('letter:one:chosen:3', 'Many things will I teach you. And though you feel weak');
+    const start = vi.fn(() => true);
+    /** @type {any} */ (window).__votListenFrom = { has: (k) => k === 'letter:one:chosen:3', start };
+    mount();
+    const tb = await raise(c, 30, 45);   // "And though you "
+    const btn = /** @type {HTMLButtonElement} */ (tb.querySelector('.sel-listen-btn'));
+    expect(btn).not.toBeNull();
+    expect(btn.textContent.trim()).toBe('Listen from here');
+    expect(btn.getAttribute('type')).toBe('button');
+    const rows = [...tb.children].map((el) => el.className);
+    const iListen = rows.findIndex((cl) => /sel-toolbar-listen/.test(cl));
+    expect(iListen).toBeGreaterThan(rows.findIndex((cl) => /sel-toolbar-styles/.test(cl)));
+    expect(iListen).toBeLessThan(rows.findIndex((cl) => /sel-toolbar-actions/.test(cl)));
+    // The six actions are untouched.
+    expect([...tb.querySelectorAll('.sel-action-btn span')].map((s) => s.textContent))
+      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('a tap starts the recording at the selection start and puts the toolbar away', async () => {
+    const c = readingContainer('letter:one:chosen:3', 'Many things will I teach you. And though you feel weak');
+    const start = vi.fn(() => true);
+    /** @type {any} */ (window).__votListenFrom = { has: () => true, start };
+    mount();
+    const tb = await raise(c, 30, 45);
+    act(() => { fire(/** @type {any} */ (tb.querySelector('.sel-listen-btn')), 'click'); });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledWith('letter:one:chosen:3', 30);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  it('text without a recording keeps today\'s toolbar exactly (no pane, or a block the pane does not own)', async () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    mount();
+    let tb = await raise(c, 4, 14);
+    expect(tb.querySelector('.sel-listen-btn')).toBeNull();
+    expect(tb.querySelector('.sel-toolbar-listen')).toBeNull();
+    cleanup();
+    /** @type {any} */ (window).__votListenFrom = { has: () => false, start: vi.fn(() => true) };
+    mount();
+    tb = await raise(c, 4, 14);
+    expect(tb.querySelector('.sel-listen-btn')).toBeNull();
+  });
+});
