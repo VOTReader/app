@@ -91,4 +91,20 @@ class OfflineAudioSizesTest {
         assertEquals(0, headed)
         assertTrue(events.none { it.getString("type") == "sizes" && it.getJSONObject("sizes").length() > 0 })
     }
+
+    @Test
+    fun `a failed listing is not asked again for ten minutes, and HEADs are capped per ask`() {
+        var listed = 0
+        var headed = 0
+        val s = store(lister = { listed++; null }, head = { headed++; 5L })
+        val many = (1..60).map { base + "audio-v1/letter-$it-B.mp3" }
+        s.requestSizes(many)
+        assertEquals(1, listed)
+        assertEquals(40, headed, "at most 40 HEADs for one ask")
+        s.requestSizes(many)
+        assertEquals(1, listed, "a failed listing is remembered")
+        now += 11L * 60 * 1000
+        s.requestSizes(many)
+        assertEquals(2, listed, "and asked again after ten minutes")
+    }
 }
