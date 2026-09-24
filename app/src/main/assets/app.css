@@ -7131,6 +7131,7 @@
     .swf-step:focus-visible, .swf-retry:focus-visible, .swf-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     .swf-step-label { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: var(--fs-24); font-weight: 600; color: var(--gold); }
     .swf-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: var(--fs-15); color: var(--cream-muted); }
+    .swf-note > span { text-wrap: balance; } /* two even lines beside Try again, never 'now.' alone */
     .swf-retry {
       flex: 0 0 auto; min-height: 44px; padding: 0 16px; border-radius: 999px;
       background: none; border: 1px solid var(--gold-border); color: var(--gold);
@@ -7140,7 +7141,9 @@
     .swf-h2 { margin: 0; font-size: var(--fs-24); font-weight: 600; color: var(--gold); }
     .swf-count { font-size: var(--fs-16); color: var(--gold-dim); white-space: nowrap; }
     .swf-card { border: 1px solid var(--gold-border); border-radius: 14px; padding: 4px 16px 6px; margin-bottom: 14px; background: var(--bg3); }
-    .swf-card-head { padding: 12px 0 10px; border-bottom: 1px solid var(--gold-border); font-size: var(--fs-18); }
+    /* sticky: a long card (John 3:2 has ten rows) keeps saying which verse its rows start from;
+       opaque on the card's own ground so the rows pass under it (Codex critique, 2026-09-24) */
+    .swf-card-head { position: sticky; top: 0; z-index: 1; background: var(--bg3); padding: 12px 0 10px; border-bottom: 1px solid var(--gold-border); font-size: var(--fs-18); }
     .swf-card-verse { color: var(--gold); font-weight: 600; }
     .swf-card-count { color: var(--cream-dim); }
     .swf-rows { list-style: none; margin: 0; padding: 0; }
