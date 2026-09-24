@@ -303,7 +303,22 @@ function _unreachable(track) {
  * @returns {boolean}
  */
 function _offlineRefuses(queue) {
-  return _offline() && !queue.some((t) => !_unreachable(/** @type {any} */ (t)));
+  return _offline() && !queue.some((t) => !_unreachable(/** @type {any} */ (t)) || !!_downloadedReading(/** @type {any} */ (t)));
+}
+
+/**
+ * Offline, the reading of `track`'s letter that IS on the phone when the queue holds another one (a listener with a
+ * chosen reader downloads that reading; a Play all queues the primary for every letter after the first), or null.
+ * @param {Track | null | undefined} track
+ * @returns {Rendition | null}
+ */
+function _downloadedReading(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  const volKey = _volKeyOf(key);
+  if (!volKey) return null;
+  const item = { id: key.slice(volKey.length + 1) };
+  const all = renditionsFor(volKey, item, track ? track.sub : null);
+  return all.find((r) => r.tracks.length > 0 && r.tracks.every((t) => !_unreachable(t))) || null;
 }
 
 /** @param {string} text */
@@ -1095,7 +1110,20 @@ function _start() {
   // passing over the rest; with nothing downloaded ahead, it pauses on this one with the offline notice, and Play
   // (toggle) loads it once the connection is back.
   if (_unreachable(track)) {
-    const ahead = _state.queue.findIndex((t, i) => i > _state.qi && !_unreachable(t));
+    const reading = _downloadedReading(track);
+    if (reading) {
+      // Replace this letter's run of tracks with the downloaded reading, at the same part where it has one.
+      let a = _state.qi;
+      while (a > 0 && _state.queue[a - 1] && _state.queue[a - 1].key === track.key) a--;
+      let b = _state.qi;
+      while (b + 1 < _state.queue.length && _state.queue[b + 1] && _state.queue[b + 1].key === track.key) b++;
+      const part = Math.min(_state.qi - a, reading.tracks.length - 1);
+      _state.queue = _state.queue.slice(0, a).concat(reading.tracks, _state.queue.slice(b + 1));
+      _state.qi = a + part;
+      _start();
+      return;
+    }
+    const ahead = _state.queue.findIndex((t, i) => i > _state.qi && (!_unreachable(t) || !!_downloadedReading(t)));
     if (ahead < 0) {
       _state.time = 0;
       _errorTime = 0;
@@ -1469,6 +1497,21 @@ function renditionsFor(volKey, item, collectionLabel) {
  * @param {string | null | undefined} reader
  * @returns {Rendition | null}
  */
+/**
+ * The tracks a row's own Play starts with for `item`: the listener's chosen reader where that reader read it, else
+ * the manifest's primary reading (the unit a download saves, item 8). [] when the item has no recording.
+ *
+ * @param {string} volKey
+ * @param {{ id?: string, title?: string } | null | undefined} item
+ * @param {string | null | undefined} collectionLabel
+ * @returns {Track[]}
+ */
+function playbackTracks(volKey, item, collectionLabel) {
+  const reader = _preferredReaderFor(volKey, item, collectionLabel);
+  const chosen = reader ? _renditionByReader(volKey, item, collectionLabel, reader) : null;
+  return chosen ? chosen.tracks : _tracksFor(volKey, item, collectionLabel);
+}
+
 function _renditionByReader(volKey, item, collectionLabel, reader) {
   if (!reader) return null;
   return renditionsFor(volKey, item, collectionLabel).find((r) => r.reader === reader) || null;
@@ -3196,6 +3239,7 @@ export const AudioPlayer = {
   readerLabel,
   renditionsFor,
   setPreferredReader,
+  playbackTracks,
   playLetter,
   playCollection,
   playSection,
