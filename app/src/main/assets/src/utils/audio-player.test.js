@@ -1759,6 +1759,26 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     }
   });
 
+  it('a row downloads what its own Play plays: the chosen reader where that reader read it, else the primary', () => {
+    AudioPlayer.setPreferredReader('V');
+    try {
+      expect(AudioPlayer.playbackTracks('vol1', { id: 'letter-c', title: 'Letter C' }, 'Volume One').map((t) => t.url)).toEqual([URL_OF('idCv')]);
+      expect(AudioPlayer.playbackTracks('vol1', { id: 'preface', title: 'Preface' }, 'Volume One').map((t) => t.url)).toEqual([URL_OF('idPreface')]);
+    } finally { AudioPlayer.setPreferredReader('auto'); }
+    expect(AudioPlayer.playbackTracks('vol1', { id: 'letter-c', title: 'Letter C' }, 'Volume One').map((t) => t.url)).toEqual([URL_OF('idC')]);
+    expect(AudioPlayer.playbackTracks('vol1', { id: 'letter-b', title: 'Letter B' }, 'Volume One')).toEqual([]);
+  });
+
+  it('with no signal, a letter queued in one reading plays the reading that IS on the phone', async () => {
+    await downloaded(['idCv']);   // the V reading of letter C was downloaded; the queue holds the primary (idC)
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-c' });
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].url).toBe(URL_OF('idCv'));
+    expect(el().src).toBe(URL_OF('idCv'));
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+  });
+
   it('CONTROL: with no signal, a recording not on the phone is still refused before anything changes', async () => {
     await downloaded(['idC']);
     setOnline(false);
