@@ -56,8 +56,48 @@ const NAV_TEXT_LIMIT = 5;
    "son" matched "sun", "peace" matched "place": verses the reader never asked for, with
    the near-miss highlighted as if it were the hit. A literal unit now searches exact +
    prefix first and retries with FUZZY only when that finds nothing, which is exactly the
-   typo ("shephard" -> shepherd). search/fuzzy-fallback.test.js pins both halves. */
+   typo ("shephard" -> shepherd). search/fuzzy-fallback.test.js pins both halves.
+
+   The retry corrects to ONE word (ux4, 2026-09-24): taking every word in reach at once
+   let "shephard" (8 letters, 2 edits) bring Chephar and Mount Shepher, place names in
+   one verse each that outrank a common word on BM25. searchCorrected() below. */
 const FUZZY = 0.2;
+
+/**
+ * The typo fallback for one literal unit that found nothing as typed.
+ *
+ * A one-word term is corrected to the NEAREST word in the index: one edit before
+ * two, and among words at the same distance the one in the most documents (the
+ * word a reader most likely meant; ties alphabetical, so the answer never depends
+ * on insertion order). That word is then searched as if it had been typed, exact +
+ * prefix, so "shephard" finds "shepherd" AND "shepherds" and nothing at two edits.
+ * The edit budget stays MiniSearch's own: round(0.2 x length), capped at maxFuzzy
+ * (one edit for 3-7 letters, two for 8+), so a short word never widens to two.
+ * A multi-word unit (a quoted phrase) keeps the plain fuzzy retry.
+ * @param {string} term
+ * @param {Object} opts  the unit's exact + prefix options
+ */
+function searchCorrected(term, opts) {
+  const tokens = kjvEncode(term);
+  if (tokens.length !== 1) return msIndex.search(term, { ...opts, fuzzy: FUZZY });
+  const word = tokens[0];
+  const maxEdits = Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY));
+  for (let edits = 1; edits <= maxEdits; edits++) {
+    const near = msIndex.search(word, { ...opts, prefix: false, fuzzy: edits });
+    if (!near || !near.length) continue;
+    const docs = Object.create(null);
+    for (let r = 0; r < near.length; r++) {
+      const ts = near[r].terms || [];
+      for (let t = 0; t < ts.length; t++) docs[ts[t]] = (docs[ts[t]] || 0) + 1;
+    }
+    let best = null;
+    for (const w in docs) {
+      if (best === null || docs[w] > docs[best] || (docs[w] === docs[best] && w < best)) best = w;
+    }
+    if (best) return msIndex.search(best, opts);
+  }
+  return [];
+}
 
 /** @type {any} */ let msIndex = null;
 /** @type {Promise<boolean>|null} */ let building = null;
@@ -240,7 +280,7 @@ async function search(query, options) {
     try {
       const opts = { prefix: unit.literal, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost };
       res = msIndex.search(unit.term, opts);
-      if (unit.literal && (!res || !res.length)) res = msIndex.search(unit.term, { ...opts, fuzzy: FUZZY });
+      if (unit.literal && (!res || !res.length)) res = searchCorrected(unit.term, opts);
     } catch { continue; }
     if (!res) continue;
     for (let r = 0; r < res.length; r++) {
