@@ -4211,7 +4211,7 @@
     /* ── SELECTION TOOLBAR ───────────────────────────────────────── */
     .sel-toolbar {
       position: fixed; z-index: 9000;
-      background: rgba(38,32,24,0.97); border: 1px solid var(--gold-border);
+      background: rgb(38,32,24); border: 1px solid var(--gold-border);
       border-radius: 14px; padding: 8px 10px 6px;
       box-shadow: 0 8px 28px rgba(0,0,0,0.6);
       display: flex; flex-direction: column; gap: 4px;
@@ -4220,10 +4220,11 @@
       width: max-content; max-width: min(360px, calc(100vw - 16px));
       -webkit-user-select: none; user-select: none;
       /* No backdrop-filter — promotes the toolbar to a GPU layer and makes
-         the action labels and "A" style buttons render fuzzy. Bg is
-         already 0.97 alpha so it reads as solid. */
+         the action labels and "A" style buttons render fuzzy. The background
+         is SOLID (7c, 2026-09-24): at 0.97 alpha a settled capture still
+         showed the letter text through it, over the Listen from here row. */
     }
-    body.light .sel-toolbar { background: rgba(232,222,200,0.97); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
+    body.light .sel-toolbar { background: rgb(232,222,200); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
     /* Animate ONLY opacity (transform is set via inline style for positioning,
        and animating transform here clobbered the inline translateY(-100%)
        that makes the toolbar sit above the y-coordinate). */
