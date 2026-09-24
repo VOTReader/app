@@ -75,7 +75,7 @@ export function useLinkPickerOrchestration() {
       const ctx = findEntryContext(parts[1], parts[0]);
       if (ctx && ctx.title) label = ctx.title;
     } else if (parts[0] === 'journal') {
-      // journal:<entryId>:<blockIdx>
+      // journal:<entryId>:<blockId> (a block's id since v05-01; position keys before)
       const eid = parts[1];
       const je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
       if (je && typeof JournalHelpers !== 'undefined') {

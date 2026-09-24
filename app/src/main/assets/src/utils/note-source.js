@@ -134,7 +134,7 @@ export function noteSourceLabel(note) {
     return id;
   }
   if (kind === 'journal') {
-    // journal:<entryId>:<blockIdx>
+    // journal:<entryId>:<blockId> (a block's id since v05-01; position keys before)
     const eid = parts0[1];
     const je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
     if (je) {
