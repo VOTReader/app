@@ -53,9 +53,9 @@ committed bytes differ from what the source builds.
   stale bundles after a rebuild. A dev server that can expose the tree on the LAN is a defect.
 - The service worker caches aggressively. For a clean slate in the preview, run the snippet under "Preview
   clean-slate" in CLAUDE.md.
-- `npm run e2e:read` and `npm run e2e:readalong` start their own servers on OS-assigned ports. Nothing needs to be
-  running first. Never give an e2e harness a fixed port: a reused port once let a gate pass while serving another
-  worktree's files.
+- `npm run e2e:read`, `npm run e2e:readalong` and `npm run e2e:restore-fresh` start their own servers on
+  OS-assigned ports. Nothing needs to be running first. Never give an e2e harness a fixed port: a reused port once
+  let a gate pass while serving another worktree's files.
 - On Windows, run npm from Git Bash (PowerShell blocks `npm.ps1`).
 
 **Rules that break the build in silence if you forget them:**
@@ -114,6 +114,7 @@ on them through the same corpus objects. The contract and its one race class are
 | Kotlin unit tests | `./gradlew :app:testDebugUnitTest` (JDK 21) |
 | headless smoke walk | `npm run smoke:ci` |
 | end-to-end read detectors | `npm run e2e:read`, `npm run e2e:readalong` |
+| backup restores on a clean device (Export -> Import in two fresh profiles, plus a cut-file control) | `npm run e2e:restore-fresh` |
 
 - Tests sit next to their source as `*.test.js(x)`. Tests of gate scripts and of the built bundles live in `tools/`.
   React-as-global and the `window.__*` stubs are in `vitest.setup.js`.

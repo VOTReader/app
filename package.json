@@ -25,6 +25,7 @@
     "smoke:ci": "node tools/smoke-ci.js",
     "e2e:read": "node tools/e2e-read-detector.mjs",
     "e2e:readalong": "node tools/e2e-readalong.mjs",
+    "e2e:restore-fresh": "node tools/e2e-restore-fresh.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
