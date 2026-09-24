@@ -110,7 +110,14 @@ class BridgeContractTest {
         "v3ImportClose" to 0,
         "getCrashLog" to 0,
         "clearGardenCache" to 0,
-        "haptic" to 1
+        "haptic" to 1,
+        // Listening item 8, downloaded recordings: called DIRECTLY (guarded
+        // window.AndroidBridge) by src/utils/offline-audio.js, the same pattern as
+        // setAudioActive, so androidImpl has no mirror. JSON in, JSON out.
+        "offlineAudioState" to 0,
+        "offlineAudioSave" to 1,
+        "offlineAudioRemove" to 1,
+        "offlineAudioCancel" to 1
     )
 
     @Test
