@@ -44,6 +44,35 @@ class AppInterfaceTest {
         return Triple(app, host, bridge)
     }
 
+    // ─── Downloaded recordings (listening item 8): thin delegations ──────
+    // (The JSON parsing and the store itself are covered by the Robolectric suites
+    // AppInterfaceOfflineAudioTest / OfflineAudio*Test, which JaCoCo cannot see.)
+
+    @Test
+    fun `offline audio methods hand the page's JSON to the store, and do nothing without one`() {
+        val store = mockk<OfflineAudioStore>(relaxed = true)
+        every { store.stateJson() } returns "{\"items\":[]}"
+        val host = object : BridgeHost by FakeBridgeHost() {
+            override val offlineAudio: OfflineAudioStore get() = store
+        }
+        val app = AppInterface(host, mockk(relaxed = true), mockk(relaxed = true))
+        assertEquals("{\"items\":[]}", app.offlineAudioState())
+        app.offlineAudioSave("[1]")
+        app.offlineAudioRemove("[2]")
+        app.offlineAudioCancel("[3]")
+        app.offlineAudioSizes("[4]")
+        verify { store.enqueueJson("[1]") }
+        verify { store.removeJson("[2]") }
+        verify { store.cancelJson("[3]") }
+        verify { store.requestSizesJson("[4]") }
+        every { store.stateJson() } throws IllegalStateException("native threw")
+        assertEquals("", app.offlineAudioState())
+
+        val bare = AppInterface(FakeBridgeHost(), mockk(relaxed = true), mockk(relaxed = true))
+        assertEquals("", bare.offlineAudioState())
+        bare.offlineAudioSave("[]"); bare.offlineAudioRemove("[]"); bare.offlineAudioCancel("[]"); bare.offlineAudioSizes("[]")
+    }
+
     // ─── Native recorder delegation ───────────────────────────────────
 
     @Test

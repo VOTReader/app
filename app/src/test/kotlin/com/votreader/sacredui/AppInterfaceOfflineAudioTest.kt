@@ -71,6 +71,34 @@ class AppInterfaceOfflineAudioTest {
     }
 
     @Test
+    fun `cancel reaches the store for a list and for everything`() {
+        val held = mutableListOf<Runnable>()
+        val store = OfflineAudioStore(
+            tmp.root,
+            opener = { OfflineAudioStore.Opened(ByteArrayInputStream(ByteArray(100)), 100L) },
+            executor = Executor { held += it },
+            freeBytes = { 10L shl 30 },
+            emit = { events += JSONObject(it) },
+            sizeLister = { null }, headSize = { null }, sizeExecutor = Executor { it.run() },
+        )
+        val host = object : BridgeHost by FakeBridgeHost() {
+            override val offlineAudio: OfflineAudioStore get() = store
+        }
+        val app = AppInterface(host, mockk(relaxed = true), mockk(relaxed = true))
+        app.offlineAudioSave("""[{"url":"$url1","key":"k1","title":"t1"},{"url":"$url2","key":"k2","title":"t2"}]""")
+        app.offlineAudioCancel("""["$url1"]""")
+        assertEquals(listOf(url1), events.filter { it.getString("type") == "cancelled" }.map { it.getString("url") })
+        app.offlineAudioCancel("""["*"]""")
+        assertEquals(listOf(url1, url2), events.filter { it.getString("type") == "cancelled" }.map { it.getString("url") })
+        held.forEach { it.run() }
+        assertFalse(store.isSaved(url1))
+        assertFalse(store.isSaved(url2))
+        app.offlineAudioCancel("[]")
+        app.offlineAudioSizes("[]")
+        app.offlineAudioRemove("[]")
+    }
+
+    @Test
     fun `bad input is a quiet no-op`() {
         val (app, store) = subject()
         app.offlineAudioSave(null)

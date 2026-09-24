@@ -14,7 +14,6 @@ import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import androidx.annotation.RequiresApi
 import androidx.core.view.WindowInsetsControllerCompat
-import org.json.JSONArray
 import timber.log.Timber
 
 /**
@@ -605,64 +604,30 @@ class AppInterface(
     }
 
     // ─── Downloaded recordings (listening item 8) ───────────────────────
-    // JSON in, JSON out; every input is untrusted page data, so a bad shape is a
-    // quiet no-op. Runs on the binder thread: the store is thread-safe and its
-    // downloads run on its own worker.
+    // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
+    // (a bad shape is a quiet no-op). Runs on the binder thread: the store is
+    // thread-safe and its downloads run on its own worker. A host without a store
+    // (tests, an older shell) answers "" and does nothing.
 
     /** The whole store as JSON (OfflineAudioStore.stateJson), or "" on a host without one. */
     @JavascriptInterface
     fun offlineAudioState(): String = try { host.offlineAudio?.stateJson() ?: "" } catch (e: Exception) { "" }
 
-    /** Download each of `[{url, key, title}]` (at most [MAX_OFFLINE_BATCH] per call). */
+    /** Download each of `[{url, key, title}]`. */
     @JavascriptInterface
-    fun offlineAudioSave(json: String?) {
-        val store = host.offlineAudio ?: return
-        val arr = parseJsonArray(json) ?: return
-        val items = ArrayList<OfflineAudioStore.Item>()
-        for (i in 0 until minOf(arr.length(), MAX_OFFLINE_BATCH)) {
-            val o = arr.optJSONObject(i) ?: continue
-            val url = o.optString("url")
-            if (url.isNotEmpty()) items += OfflineAudioStore.Item(url, o.optString("key"), o.optString("title"))
-        }
-        if (items.isNotEmpty()) store.enqueue(items)
-    }
+    fun offlineAudioSave(json: String?) { host.offlineAudio?.enqueueJson(json) }
 
     /** Remove `[url, ...]`, or everything for `["*"]`. */
     @JavascriptInterface
-    fun offlineAudioRemove(json: String?) {
-        val store = host.offlineAudio ?: return
-        val urls = parseUrls(json) ?: return
-        if (urls.contains("*")) store.removeAll() else if (urls.isNotEmpty()) store.remove(urls)
-    }
+    fun offlineAudioRemove(json: String?) { host.offlineAudio?.removeJson(json) }
 
     /** Stop `[url, ...]` queued or downloading, or everything for `["*"]`. */
     @JavascriptInterface
-    fun offlineAudioCancel(json: String?) {
-        val store = host.offlineAudio ?: return
-        val urls = parseUrls(json) ?: return
-        if (urls.contains("*")) store.cancelAll() else if (urls.isNotEmpty()) store.cancel(urls)
-    }
+    fun offlineAudioCancel(json: String?) { host.offlineAudio?.cancelJson(json) }
 
     /** Look up the sizes of `[url, ...]` before a download; answered as one JsEvent.OfflineAudio "sizes" event. */
     @JavascriptInterface
-    fun offlineAudioSizes(json: String?) {
-        val store = host.offlineAudio ?: return
-        val urls = parseUrls(json) ?: return
-        if (urls.isNotEmpty()) store.requestSizes(urls)
-    }
-
-    private fun parseJsonArray(json: String?): JSONArray? =
-        if (json.isNullOrBlank()) null else try { JSONArray(json) } catch (_: Exception) { null }
-
-    private fun parseUrls(json: String?): List<String>? {
-        val arr = parseJsonArray(json) ?: return null
-        val out = ArrayList<String>()
-        for (i in 0 until minOf(arr.length(), MAX_OFFLINE_BATCH)) {
-            val s = arr.opt(i) as? String ?: continue
-            if (s.isNotEmpty()) out += s
-        }
-        return out
-    }
+    fun offlineAudioSizes(json: String?) { host.offlineAudio?.requestSizesJson(json) }
 
     @JavascriptInterface
     fun setImmersiveMode(immersive: Boolean) {
@@ -776,10 +741,5 @@ class AppInterface(
         bridge.callOptional(
             JsEvent.NativeRecordingComplete, result.base64, result.durationMs, "audio/mp4", null, url
         )
-    }
-
-    private companion object {
-        // One call's cap: a Bible book tops out at 150 chapters, the largest collection at 203 entries.
-        const val MAX_OFFLINE_BATCH = 400
     }
 }

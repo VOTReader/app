@@ -176,6 +176,51 @@ class OfflineAudioStore(
         }
     }
 
+    // ── the page's JSON (AppInterface hands it over untouched; untrusted, a bad shape is a quiet no-op) ──
+
+    /** `[{url, key, title}, ...]`: download each (at most [MAX_BATCH] per call). */
+    fun enqueueJson(json: String?) {
+        val arr = parseArray(json) ?: return
+        val items = ArrayList<Item>()
+        for (i in 0 until minOf(arr.length(), MAX_BATCH)) {
+            val o = arr.optJSONObject(i) ?: continue
+            val url = o.optString("url")
+            if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"))
+        }
+        if (items.isNotEmpty()) enqueue(items)
+    }
+
+    /** `[url, ...]`, or `["*"]` for everything. */
+    fun removeJson(json: String?) {
+        val urls = parseUrls(json) ?: return
+        if (urls.contains("*")) removeAll() else if (urls.isNotEmpty()) remove(urls)
+    }
+
+    /** `[url, ...]`, or `["*"]` for everything. */
+    fun cancelJson(json: String?) {
+        val urls = parseUrls(json) ?: return
+        if (urls.contains("*")) cancelAll() else if (urls.isNotEmpty()) cancel(urls)
+    }
+
+    /** `[url, ...]`: look their sizes up (one 'sizes' event back). */
+    fun requestSizesJson(json: String?) {
+        val urls = parseUrls(json) ?: return
+        if (urls.isNotEmpty()) requestSizes(urls)
+    }
+
+    private fun parseArray(json: String?): JSONArray? =
+        if (json.isNullOrBlank()) null else try { JSONArray(json) } catch (_: Exception) { null }
+
+    private fun parseUrls(json: String?): List<String>? {
+        val arr = parseArray(json) ?: return null
+        val out = ArrayList<String>()
+        for (i in 0 until minOf(arr.length(), MAX_BATCH)) {
+            val s = arr.opt(i) as? String ?: continue
+            if (s.isNotEmpty()) out += s
+        }
+        return out
+    }
+
     /** True when [url] is on the phone (whole, indexed). */
     fun isSaved(url: String): Boolean = synchronized(lock) { entries.containsKey(url) }
 
@@ -495,6 +540,8 @@ class OfflineAudioStore(
         // Sizes: a week-old listing is asked again; one ask covers at most a big collection or book.
         private const val SIZE_TTL = 7L * 24 * 3600 * 1000
         private const val MAX_SIZE_BATCH = 400
+        // One call from the page: a Bible book tops out at 150 chapters, the largest collection at 203 entries.
+        private const val MAX_BATCH = 400
         private const val MAX_HEADS_PER_ASK = 40
         private const val LISTING_RETRY_MS = 10L * 60 * 1000
         private const val MAX_LISTING_BYTES = 8L * 1024 * 1024
