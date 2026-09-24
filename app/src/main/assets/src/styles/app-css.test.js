@@ -519,3 +519,16 @@ describe('app.css — the selection toolbar\'s Listen from here', () => {
     expect(icon).toMatch(/height:\s*15px/);
   });
 });
+
+/* Item 7c (2026-09-24): the selection toolbar is SOLID. Its comment always said "Bg is already 0.97 alpha so it
+   reads as solid", but a settled 360x800 capture (1.2 s after it rose, lanes/readalong/out/listen-from-look/
+   toolbar.png) showed the letter text plainly through it, over the new Listen from here row; the same capture
+   with the background forced opaque (toolbar-opaque.png) showed none. */
+describe('app.css — the selection toolbar is opaque in both themes', () => {
+  it('paints a solid background, dark and light', () => {
+    const dark = ruleBlock(CSS, '.sel-toolbar {');
+    expect(dark).toMatch(/background:\s*rgb\(38,\s*32,\s*24\)/);
+    const light = ruleBlock(CSS, 'body.light .sel-toolbar {');
+    expect(light).toMatch(/background:\s*rgb\(232,\s*222,\s*200\)/);
+  });
+});
