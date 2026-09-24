@@ -545,9 +545,14 @@ function _installNativeTransport() {
       if (cmd === 'next') next();
       else if (cmd === 'prev') prev();
       else if (cmd === 'seekTo') seek((Number(posMs) || 0) / 1000);
-      // play / pause / toggle all resolve through toggle(): the system only
-      // offers Play while paused and Pause while playing, so the edge is
-      // always the right one.
+      // Play and Pause are idempotent (v02-audio-02, improvement sweep
+      // 2026-09-22): the platform MediaSession sends onPause for
+      // KEYCODE_MEDIA_PAUSE, the Assistant, Wear or a car head unit WHATEVER
+      // the state, and the session advertises both actions, so a Pause while
+      // paused must not start playback. Only the notification's own button
+      // is a toggle.
+      else if (cmd === 'pause') pauseIfPlaying();
+      else if (cmd === 'play') { if (_state.status === 'paused') toggle(); }
       else toggle();
     } catch (_e) { /* a bad system command must never crash the player */ }
   };
@@ -1104,6 +1109,13 @@ function _start() {
   // Assign directly rather than via _setStatus: queue/qi changed too, so this
   // must notify even when the previous track was already 'loading'.
   _state.status = 'loading';
+  // The keep-alive rises HERE, at the start, not at the first 'playing' event
+  // (v02-audio-01, improvement sweep 2026-09-22): MainActivity.onPause halts the
+  // WebView's media unless streamAudioActive, so a screen turned off during the
+  // cold start (1-2 s over TLS, 20 s in a stall) stopped the letter before it
+  // began. The app is in the foreground at the tap, so starting the service is
+  // legal; the tour guard is the same one _setStatus applies.
+  if (!_tourShowing()) _setAudioActive(true);
   _notify();
   _mediaSession(track);
   _pauseOtherDomAudio(null);

@@ -580,8 +580,13 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // JS handler returns "true" when it consumed the press (closed
             // a sheet, popped fromLetterStack, navigated to a parent
             // screen) and "false" when there's nothing to pop. On "false"
-            // we finish() so the user actually exits, instead of being
-            // stuck on the home screen.
+            // the task moves to the back, like the Home button and like
+            // Android 12+ does for a root activity itself (v11-android-03,
+            // improvement sweep 2026-09-22): finish() ran onDestroy, which
+            // stopped the streaming audio and destroyed the WebView that
+            // owns the <audio> element, so Back on Home killed the letter
+            // playing in the background and forced a cold start.
+            // MainActivityBackToHomeTest drives it.
             //
             // DUAL ENCODING: evaluateJavascript JSON-encodes the JS return
             // value, so a JS string "true" arrives as `"true"` (quoted) but
@@ -595,7 +600,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             bridge.callWithResult(
                 "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
             ) { result ->
-                if (!MainActivityLogic.isBackPressConsumed(result)) finish()
+                if (!MainActivityLogic.isBackPressConsumed(result)) moveTaskToBack(true)
             }
         }
     }

@@ -5,11 +5,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
@@ -71,6 +74,18 @@ class AudioKeepAliveService : Service() {
     private var session: MediaSessionCompat? = null
     private var artwork: Bitmap? = null
 
+    // Headphones out (or a Bluetooth headset dropping) pause the letter instead
+    // of carrying on through the speaker (v02-audio-10, improvement sweep
+    // 2026-09-22). Chrome pauses in its own chrome/ layer, which the WebView
+    // lacks. Registered for the service's lifetime = the listening session
+    // (playing or paused); the explicit "pause" is idempotent in the player.
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) commandSink?.invoke("pause", 0L)
+        }
+    }
+    private var noisyRegistered = false
+
     // Last now-playing snapshot — rendered into the notification + session on
     // every intent. Defaults cover the brief window between the setActive(true)
     // start and the first metadata update.
@@ -113,6 +128,16 @@ class AudioKeepAliveService : Service() {
             // A session-less service still anchors the process; the card is lost,
             // the audio is not.
             Timber.w(e, "MediaSession create failed — keep-alive continues without a card"); null
+        }
+        noisyRegistered = try {
+            // A protected system broadcast still reaches a NOT_EXPORTED receiver.
+            ContextCompat.registerReceiver(
+                this, noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            true
+        } catch (e: Exception) {
+            Timber.w(e, "becoming-noisy receiver failed — an unplug will not pause"); false
         }
     }
 
@@ -208,6 +233,10 @@ class AudioKeepAliveService : Service() {
 
     override fun onDestroy() {
         running = false
+        if (noisyRegistered) {
+            try { unregisterReceiver(noisyReceiver) } catch (_: Exception) { /* teardown best-effort */ }
+            noisyRegistered = false
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         try { session?.release() } catch (_: Exception) { /* teardown best-effort */ }
         session = null
