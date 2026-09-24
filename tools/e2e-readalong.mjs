@@ -709,6 +709,7 @@ async function run() {
   const failures = [];
   const report = [];
   let barProbed = false;
+  let listenProbed = false;
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
@@ -959,6 +960,50 @@ async function run() {
           failures.push({ key, kind: 'TAP-TARGETS', detail: `player bar: ${o.label} ${o.w}x${o.h} - ${o.missed} of 8 points on a 24 px circle land elsewhere` });
         }
         console.log(`    player bar at 360x800: ${bar.probed} controls probed, ${bar.offenders.length} under ${TAP_TARGET_MIN_PX} px`);
+      }
+      if (!listenProbed && !isB && volKey !== 'study') {
+        // LISTEN FROM HERE (item 7, 2026-09-24), through the real pane and the
+        // real selection toolbar: a word selected in a timed paragraph well down
+        // a SILENT letter must be offered "Listen from here", and the tap must
+        // start the recording with the voice on the clause holding that word.
+        listenProbed = true;
+        const pick = await page.evaluate(() => {
+          AudioPlayer.stop();
+          const blocks = [...document.querySelectorAll('[data-hl-key]')]
+            .filter((b) => !b.closest('[inert]') && (b.textContent || '').trim().split(/\s+/).length > 25);
+          const b = blocks[Math.min(6, blocks.length - 1)];
+          if (!b) return { err: 'no long paragraph to select in' };
+          const tw = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+          let n; let seen = 0; let hit = null;
+          while (!hit && (n = tw.nextNode())) {
+            const re = /[A-Za-z]{5,}/g; let m;
+            while ((m = re.exec(n.textContent))) { if (++seen >= 9) { hit = { n, i: m.index, len: m[0].length }; break; } }
+          }
+          if (!hit) return { err: 'no word to select' };
+          const up = document.createRange(); up.setStart(b, 0); up.setEnd(hit.n, hit.i);
+          hit.n.parentElement.scrollIntoView({ block: 'center' });
+          const r = document.createRange(); r.setStart(hit.n, hit.i); r.setEnd(hit.n, hit.i + hit.len);
+          const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          return { hlKey: b.getAttribute('data-hl-key'), offset: up.toString().length, word: r.toString() };
+        });
+        const offered = pick.err ? false : await page.waitForSelector('.sel-listen-btn', { timeout: 8000 }).then(() => true, () => false);
+        if (pick.err || !offered) {
+          failures.push({ key, kind: 'LISTEN-FROM-HERE', detail: pick.err || `selecting "${pick.word}" raised no Listen from here` });
+        } else {
+          await page.evaluate(() => document.querySelector('.sel-listen-btn').click());
+          const playing = await page.waitForFunction('AudioPlayer.getState().status === "playing"', { timeout: 30000 }).then(() => true, () => false);
+          await sleep(500);
+          const lit = await page.evaluate(() => {
+            const H = CSS.highlights && CSS.highlights.get('vot-reading'); const r = H && [...H][0];
+            const blk = r ? (r.startContainer.nodeType === 3 ? r.startContainer.parentElement : r.startContainer).closest('[data-hl-key]') : null;
+            if (!r || !blk) return null;
+            const up = document.createRange(); up.setStart(blk, 0); up.setEnd(r.startContainer, r.startOffset);
+            return { hlKey: blk.getAttribute('data-hl-key'), start: up.toString().length, end: up.toString().length + r.toString().length };
+          });
+          const ok = playing && lit && lit.hlKey === pick.hlKey && lit.start <= pick.offset && pick.offset < lit.end;
+          if (!ok) failures.push({ key, kind: 'LISTEN-FROM-HERE', detail: `"${pick.word}" @${pick.offset} in ${pick.hlKey}: ${playing ? 'lit ' + JSON.stringify(lit) : 'never played'}` });
+          else console.log(`    listen from here: "${pick.word}" -> the voice starts on its clause [${lit.start}, ${lit.end})`);
+        }
       }
       console.log(`  ${key.padEnd(58)} ${painted}/${sampled.length} painted` +
         (domCheck.bad.length ? `  DOMAIN-MISMATCH x${domCheck.bad.length}` : ''));
