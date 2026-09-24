@@ -203,12 +203,14 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
             </p>
           ) : null}
           {playable.length ? (
-            <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
-              <PlayIcon /><span>Play all</span>
-            </button>
+            <div className="audio-library-hero-actions">
+              <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
+                <PlayIcon /><span>Play all</span>
+              </button>
+              {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
+              {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
+            </div>
           ) : null}
-          {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
-          {offline && !bible && playable.length ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
         </header>
 
         {sections ? (

@@ -1383,7 +1383,10 @@
       .offline-row-bar > span { display:block; height:100%; background:var(--gold); transition:width .3s ease; }
       .audio-collection-item.is-unavailable .audio-library-row-play { opacity:.45; }
       .audio-collection-item.is-unavailable .audio-library-row-copy strong { color:var(--cream-dim); }
-      .audio-library-hero .offline-collection { position:relative; z-index:1; display:inline-flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:.9rem 0 0 .5rem; max-width:100%; vertical-align:top; }
+      .audio-library-hero-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .6rem; margin-top:.9rem; }
+      .audio-library-hero-actions .audio-library-primary-action { margin-top:0; }
+      .offline-collection { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; max-width:100%; }
+      .offline-collection:has(.offline-confirm) { flex-basis:100%; }
       .offline-collection.is-saved, .offline-collection.is-busy { font-size:var(--fs-12); color:var(--gold); }
       .audio-library-secondary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }
       .audio-library-secondary-action:disabled { opacity:.5; cursor:default; }
