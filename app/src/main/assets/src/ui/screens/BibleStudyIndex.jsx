@@ -4,7 +4,7 @@
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 
-export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled }) {
+export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, backHint = null, onTapThroughBack }) {
   const currentRef = React.useRef(null);
   const [expandedPart, setExpandedPart] = React.useState(null);
 
@@ -58,6 +58,17 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
 
   return (
     <ScreenLayout navChildren={navBar}>
+      {/* Opened as a tap-through (the Listening Library's Studies screen opens a
+          study with no recording yet here, item 4b): the same pill
+          BibleChapterView shows, so the reader is one tap from where they were. */}
+      {backHint && (
+        <div className="back-hint-row">
+          <button className="back-hint-pill" onClick={onTapThroughBack} aria-label={'Back to ' + backHint.title}>
+            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+            <span className="back-hint-title">{backHint.title}</span>
+          </button>
+        </div>
+      )}
       <div className="vol-index">
         <div className="vol-index-header">
           <div className="vol-index-eyebrow">Bible/Letter Study</div>

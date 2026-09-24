@@ -1288,6 +1288,7 @@ export function buildScreenRoutes({
           readCount={(chId) => Number(readItems[getReadKey(studyReadKey(study.slug), chId)]) || 0}
           markAsReadEnabled={settings.markAsRead}
           theme={theme} onThemeChange={setTheme}
+          backHint={backHint} onTapThroughBack={tapThroughBack}
         />
       );
     },

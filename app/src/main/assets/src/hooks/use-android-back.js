@@ -268,7 +268,9 @@ export function useAndroidBack({
       // tap-through stack and restore the source — exactly what tapping the pill
       // does (tapThroughBack). Must precede the fromSurprise/fromSearch chapter
       // routing below so a visible pill wins.
-      if ((s === "bible-ch" || s === "matthew-ch") && backActiveRef.current) {
+      // A study index opened from the Listening Library's Studies screen
+      // (item 4b, 2026-09-24) shows the same pill: back matches it too.
+      if ((s === "bible-ch" || s === "matthew-ch" || s === "bible-study-index") && backActiveRef.current) {
         tapThroughBackRef.current();
         return "true";
       }
