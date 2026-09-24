@@ -42,6 +42,14 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeListStore } from './store-merge.js';
+import { rekeyJournalMarks } from './journal-mark-rekey.js';
+
+/**
+ * While rekeyMarks() waits for a store that is still loading: the unsubscribers
+ * of its watch on each such store; null when nothing waits.
+ * @type {Array<() => void> | null}
+ */
+var rekeyWait = null;
 
 /**
  * A journal entry. Block contents are intentionally `any[]` — block shape
@@ -298,6 +306,73 @@ export var JournalStore = extendStore(
         highlights: Object.keys(hlG).length, underlines: Object.keys(ulG).length,
         notes: Object.keys(noteG).length, bookmarks: bkmIds.length, links: linkIds.length
       };
+    },
+
+    /**
+     * Move every journal mark still keyed by block POSITION onto its block's
+     * ID (v05-01): annotations, notes, bookmarks and link ends keyed
+     * journal:<id>:<n>. The rules are journal-mark-rekey.js; this reads the
+     * four stores and writes back only the ones where something moved.
+     * HydrationGate runs it at every boot before anything renders a journal,
+     * so a restored old backup is moved on the boot after its reload. Once
+     * nothing is keyed by position it writes nothing. Never throws.
+     *
+     * It moves nothing until all five stores have loaded: a store whose read
+     * outlived the gate's 3 s timeout serves an empty stand-in, and a pass over
+     * it would move a note without its segments, or miss the segments for
+     * good. It waits for that store instead and runs the moment every one has
+     * loaded (the refutation's F8).
+     *
+     * A tab still on an older version can have edited a mark under its old key
+     * after this pass read it; the save's cross-tab merge then keeps that edit
+     * AND this move (an edit beats a delete), and the mark is there twice. So
+     * once the pass's writes have landed it runs once more: the returned copy
+     * moves too, and one copy stays, the newer (the refutation's F7).
+     * @param {boolean} [again] - this is that one settling pass
+     * @returns {{ moved: number, left: number, waiting?: number }}
+     */
+    rekeyMarks(again) {
+      try {
+        var self = this;
+        var loading = [this,
+          typeof AnnotationStore !== 'undefined' ? AnnotationStore : null,
+          typeof NoteStore !== 'undefined' ? NoteStore : null,
+          typeof BookmarkStore !== 'undefined' ? BookmarkStore : null,
+          typeof LinkStore !== 'undefined' ? LinkStore : null
+        ].filter(function(s) { return s && typeof s.isReady === 'function' && !s.isReady(); });
+        if (loading.length) {
+          if (!rekeyWait && !again) {
+            rekeyWait = loading.map(function(s) {
+              return s.subscribe(function() {
+                if (!rekeyWait || !loading.every(function(l) { return l.isReady(); })) return;
+                rekeyWait.forEach(function(off) { off(); });
+                rekeyWait = null;
+                // after the load that woke this has finished its own save and notify
+                Promise.resolve().then(function() { self.rekeyMarks(); });
+              });
+            });
+          }
+          return { moved: 0, left: 0, waiting: loading.length };
+        }
+        var next = rekeyJournalMarks(this._load().list || [], {
+          annotations: typeof AnnotationStore !== 'undefined' ? AnnotationStore.all() : null,
+          notes: typeof NoteStore !== 'undefined' ? NoteStore.all() : null,
+          bookmarks: typeof BookmarkStore !== 'undefined' ? BookmarkStore.all() : null,
+          links: typeof LinkStore !== 'undefined' ? LinkStore.all() : null
+        });
+        /** @type {any[]} */ var written = [];
+        if (next.annotations) { AnnotationStore.replaceAll(next.annotations); written.push(AnnotationStore); }
+        if (next.notes) { NoteStore.replaceAll(next.notes); written.push(NoteStore); }
+        if (next.bookmarks) { BookmarkStore.replaceAll(next.bookmarks); written.push(BookmarkStore); }
+        if (next.links) { LinkStore.replaceAll(next.links); written.push(LinkStore); }
+        if (written.length && !again) {
+          Promise.all(written.map(function(s) { return s.whenSaved(); }))
+            .then(function() { self.rekeyMarks(true); });
+        }
+        return { moved: next.moved, left: next.left };
+      } catch (_e) {
+        return { moved: 0, left: 0 };
+      }
     },
 
     /**

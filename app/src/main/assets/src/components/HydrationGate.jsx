@@ -53,6 +53,14 @@ export function HydrationGate({ children }) {
       // per-store self-seed has already read the legacy keys.
       // Best-effort + idempotent — failures don't block render.
       .then(() => clearLegacyLs())
+      // v05-01: journal marks still keyed by block position move onto block
+      // ids before anything paints them. Idempotent; a failure leaves the
+      // marks on their old keys for the next boot and never blocks render.
+      .then(() => {
+        try {
+          if (typeof JournalStore !== 'undefined' && JournalStore.rekeyMarks) JournalStore.rekeyMarks();
+        } catch (_e) { /* next boot */ }
+      })
       .finally(() => {
         if (!alive) return;
         const endMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();

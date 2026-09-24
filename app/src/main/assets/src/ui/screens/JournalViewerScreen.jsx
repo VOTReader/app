@@ -120,7 +120,13 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (!block) return null;
   callbacks = callbacks || {};
   var b = block;
-  var hlKey = entryId != null && blockIndex != null ? ('journal:' + entryId + ':' + blockIndex) : null;
+  // Marks are keyed by the block's ID, never its position (v05-01): the editor
+  // moves positions (a photo inserted above, a paragraph deleted, a drag), and a
+  // position key slid every later mark onto another paragraph. The boot pass in
+  // stores/journal-mark-rekey.js moved the old position keys. A block without an
+  // id (none is made without one, journal-helpers newBlock) keeps its position.
+  var hlKey = entryId != null && blockIndex != null
+    ? ('journal:' + entryId + ':' + (b.id ? b.id : blockIndex)) : null;
   var hlProps = hlKey ? { 'data-hl-key': hlKey, 'data-hl-dom': true } : {};
 
   if (b.type === 'p') {
