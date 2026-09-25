@@ -3,7 +3,7 @@
 // run it with mocked self / caches / fetch (mirroring the real Cache.add
 // semantics: a non-ok response rejects, and addAll is all-or-nothing), capture
 // the registered handlers, and drive 'install'.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { webcrypto } from 'crypto';
 import { resolve, dirname } from 'path';
@@ -11,6 +11,9 @@ import { fileURLToPath } from 'url';
 
 const swPath = resolve(dirname(fileURLToPath(import.meta.url)), 'service-worker.js');
 const SW_SRC = readFileSync(swPath, 'utf8');
+/** This build's bucket names, read from the worker's own constants. */
+const CURRENT_CORE = 'vot-core-' + SW_SRC.match(/const CACHE_VERSION = '([^']+)'/)[1];
+const CURRENT_CORPUS = 'vot-corpus-' + SW_SRC.match(/const CORPUS_VERSION = '([^']+)'/)[1];
 
 class FakeCache {
   constructor(fetchFn, resolveKeys) { this.store = new Map(); this._fetch = fetchFn; this._resolve = !!resolveKeys; }
@@ -110,7 +113,8 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   };
   // The SW's runtime `fetch` (coreFirst/corpusFirst) can be overridden per-test;
   // the FakeCaches' own fetch (for install cache.add) stays the install one.
-  const fetchFn = fetchImpl || installFetch;
+  // fetchImpl gets the install network as its second argument, so a test can install normally and then go offline.
+  const fetchFn = fetchImpl ? (req, init) => fetchImpl(req, installFetch, init) : installFetch;
   const caches = new FakeCaches(installFetch, resolveKeys);
   const claimed = { count: 0 };
   // service-worker-4: fake connected clients, so install's PRECACHE_INCOMPLETE
@@ -382,7 +386,7 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
   it('serves a cached core asset from cache — no network hit', async () => {
     const netCalls = [];
     const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return { ok: true }; } });
-    const core = await sw.caches.open('vot-core-seed');
+    const core = await sw.caches.open(CURRENT_CORE);
     const cachedResp = { body: 'cached-bundle' };
     await core.put('https://app.test/dist/bundle-a.js', cachedResp);
     const res = await fetchEvent(sw, getReq('https://app.test/dist/bundle-a.js'));
@@ -432,7 +436,7 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
 
   it('falls back to the precached shell on an offline navigation with a query string (SW-2)', async () => {
     const sw = bootSW({ fetchImpl: async () => { throw new Error('offline'); } });
-    const core = await sw.caches.open('vot-core-seed');
+    const core = await sw.caches.open(CURRENT_CORE);
     const shell = { body: 'app-shell' };
     await core.put('./index.html', shell);
     const res = await fetchEvent(sw, { url: 'https://app.test/index.html?utm=x', method: 'GET', mode: 'navigate' });
@@ -473,6 +477,135 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     // keeps the old controller while its old core cache is deleted above —
     // sw-register's reload never happens and the tab 503s offline.
     expect(sw.claimed.count).toBe(1);
+  });
+});
+
+/* THE OLD LIBRARY STAYS UNTIL THE NEW ONE IS WHOLE (REPORT #10, v06-03, 2026-09-25). A phone that lost signal
+   halfway through a new corpus used to lose the old one at activate too: offline, the Bible answered 503. */
+describe('service-worker — an incomplete install keeps the previous library (v06-03)', () => {
+  const BIBLE = './dist/bundle-a-bible.js';
+  const BIBLE_URL = 'https://app.test/dist/bundle-a-bible.js';
+  async function seedOld(sw) {
+    const oldCorpus = await sw.caches.open('vot-corpus-OLD');
+    await oldCorpus.put(BIBLE_URL, { body: 'old-bible' });
+    const oldCore = await sw.caches.open('vot-core-OLD');
+    await oldCore.put('https://app.test/dist/bundle-e.js', { body: 'old-e' });
+    return { oldCorpus, oldCore };
+  }
+
+  it('activate keeps the previous corpus while the new one misses a file', async () => {
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true });
+    await seedOld(sw);
+    await install(sw);
+    await activate(sw);
+    const after = await sw.caches.keys();
+    expect(after).toContain('vot-corpus-OLD');
+    // the core bucket was installed whole: its stale predecessor goes as before
+    expect(after).not.toContain('vot-core-OLD');
+  });
+
+  it('offline after that install, the Bible still reads, from the previous corpus', async () => {
+    let offline = false;
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
+    await seedOld(sw);
+    await install(sw);
+    await activate(sw);
+    offline = true;
+    const res = await fetchEvent(sw, getReq(BIBLE_URL));
+    expect(res.body).toBe('old-bible');
+  });
+
+  it('online, a file the new bucket lacks comes from the network, never the old build', async () => {
+    const net = { ok: true, redirected: false, body: 'new-bible', clone: () => ({ body: 'new-bible' }) };
+    let installed = false;
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true, fetchImpl: async (r, inst) => (installed ? net : inst(r)) });
+    await seedOld(sw);
+    await install(sw);
+    await activate(sw);
+    installed = true;
+    const res = await fetchEvent(sw, getReq(BIBLE_URL));
+    expect(res).toBe(net);
+    const core = await sw.caches.open('vot-core-OLD2');
+    await core.put('https://app.test/dist/bundle-d.js', { body: 'old-d' });
+    const d = await fetchEvent(sw, getReq('https://app.test/dist/bundle-d.js'));
+    expect(d.body, 'core: this build\'s own copy, not an older bucket\'s').not.toBe('old-d');
+  });
+
+  it('keeps only the newest stale bucket of a kind while the new one is incomplete', async () => {
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true });
+    await sw.caches.open('vot-corpus-OLDER');
+    await seedOld(sw);
+    await install(sw);
+    await activate(sw);
+    const after = await sw.caches.keys();
+    expect(after).toContain('vot-corpus-OLD');
+    expect(after).not.toContain('vot-corpus-OLDER');
+  });
+
+  it('once a repair makes the new library whole, the previous one is deleted', async () => {
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true });
+    await seedOld(sw);
+    await install(sw);
+    await activate(sw);
+    expect(await sw.caches.keys()).toContain('vot-corpus-OLD');
+    // the network is back: the repair fetches the Bible into the new bucket
+    const corpus = await sw.caches.open(CURRENT_CORPUS);
+    corpus._fetch = async () => ({ ok: true, status: 200, body: 'bible' });
+    let reply;
+    sw.handlers.message({ data: { type: 'REPAIR_OFFLINE' }, ports: [{ postMessage: (m) => { reply = m; } }], waitUntil: () => {} });
+    await vi.waitFor(() => expect(reply).toBeTruthy());
+    expect(reply.complete).toBe(true);
+    expect(await sw.caches.keys()).not.toContain('vot-corpus-OLD');
+  });
+
+  it('two short installs in a row keep the bucket that still has the Bible, not just the newest', async () => {
+    const sw = bootSW({ fail: [BIBLE], resolveKeys: true });
+    const whole = await sw.caches.open('vot-corpus-c61');
+    await whole.put(BIBLE, { body: 'c61-bible' });
+    await sw.caches.open('vot-corpus-c62');           // the first short install: no Bible either
+    await install(sw);
+    await activate(sw);
+    const after = await sw.caches.keys();
+    expect(after).toContain('vot-corpus-c61');
+    expect(after).not.toContain('vot-corpus-c62');
+  });
+
+  it('offline, an older build\'s CODE is never served next to the new one; its pictures are', async () => {
+    let offline = false;
+    const sw = bootSW({ fail: ['./dist/bundle-g.js', './study-cover-lamb.jpg'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
+    const oldCore = await sw.caches.open('vot-core-OLD');
+    await oldCore.put('https://app.test/dist/bundle-g.js', { body: 'old-g' });
+    await oldCore.put('https://app.test/study-cover-lamb.jpg', { body: 'old-jpg' });
+    await install(sw);
+    await activate(sw);
+    expect(await sw.caches.keys()).toContain('vot-core-OLD');
+    offline = true;
+    const g = await fetchEvent(sw, getReq('https://app.test/dist/bundle-g.js'));
+    expect(g.status, 'the lazy screen\'s own Try again, not old code').toBe(503);
+    const jpg = await fetchEvent(sw, getReq('https://app.test/study-cover-lamb.jpg'));
+    expect(jpg.body).toBe('old-jpg');
+  });
+
+  it('an older core bucket is not kept only for code it may never serve', async () => {
+    const sw = bootSW({ fail: ['./dist/bundle-g.js'], resolveKeys: true });
+    const oldCore = await sw.caches.open('vot-core-OLD');
+    await oldCore.put('./dist/bundle-g.js', { body: 'old-g' });
+    await install(sw);
+    await activate(sw);
+    expect(await sw.caches.keys()).not.toContain('vot-core-OLD');
+  });
+
+  it('offline, a deep link boots THIS build\'s shell even with an older core bucket kept', async () => {
+    let offline = false;
+    const sw = bootSW({ fail: ['./dist/bundle-g.js'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
+    const oldCore = await sw.caches.open('vot-core-OLD');
+    await oldCore.put('./index.html', { body: 'OLD-shell' });
+    await install(sw);
+    await activate(sw);
+    offline = true;
+    const res = await fetchEvent(sw, { url: 'https://app.test/index.html?utm=x', method: 'GET', mode: 'navigate' });
+    expect(res.body).not.toBe('OLD-shell');
+    expect(res).toBe(await (await sw.caches.open(CURRENT_CORE)).match('./index.html'));
   });
 });
 

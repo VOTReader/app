@@ -547,6 +547,19 @@ function repairOffline() {
 }
 
 async function repairOfflineOnce() {
+  const status = await repairMissing();
+  if (status.complete) await pruneStale([]);   // the new library is whole: the old one can go
+  return status;
+}
+
+/** The status check; a library that has become whole (cache-on-use filled the gaps) lets the old one go. */
+async function checkOffline() {
+  const status = await offlineStatus();
+  if (status.complete) await pruneStale([]);
+  return status;
+}
+
+async function repairMissing() {
   const missing = await offlineMissing();
   let idx = 0;
   await Promise.allSettled(Array.from({ length: 4 }, async () => {
@@ -575,21 +588,74 @@ self.addEventListener('activate', (event) => {
     // would 503 offline. claim() is what moves those tabs onto this SW and
     // fires controllerchange.
     await self.clients.claim();
-    const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter((key) => {
-          if (key.startsWith('vot-core-') && key !== CORE_CACHE) return true;
-          if (key.startsWith('vot-corpus-') && key !== CORPUS_CACHE) return true;
-          // One-day design (2026-07-31): the download-on-demand font bucket.
-          // Fonts are all vendored + corpus-cached now; reclaim the space.
-          if (key === 'vot-fonts-v1') return true;
-          return false;
-        })
-        .map((key) => caches.delete(key))
-    );
+    await pruneStale(await offlineMissing());
   })());
 });
+
+/* ── THE OLD LIBRARY STAYS UNTIL THE NEW ONE IS WHOLE (REPORT #10, v06-03, 2026-09-25) ──
+   Install is best-effort for everything but the CRITICAL shell: a phone that loses signal
+   halfway through a new corpus (5 MB of Bible in one file) still installs, and activate used to
+   delete the previous vot-corpus-* / vot-core-* at once. An offline reader was then left with
+   neither copy: the Bible, Studies and Answers answered 503. Now a stale bucket is deleted only
+   once its kind's new bucket holds every file the offline library needs (offlineMissing, read
+   from the caches); until then the stale buckets holding what the new one misses stay
+   (staleToDrop), and the fetch paths fall back to them only when a fetch fails: the current
+   bucket or the network answers first. The fallback serves corpus files, pictures, fonts and
+   offline.html, never an older build's code or shell (oldCopyServes). An old corpus next to
+   new code is the trade: marks made offline on an older corpus whose paragraphs later moved
+   could sit one paragraph off, against the Bible not opening at all. The repair and the
+   status check (sent 9 s after every load, offline-library.js) prune once the new bucket is
+   whole. */
+
+/**
+ * Delete the stale versioned buckets the new ones no longer need.
+ * @param {{ bucket: string }[]} missing  offlineMissing() for the current buckets
+ */
+async function pruneStale(missing) {
+  const keys = await caches.keys();
+  const drop = []
+    // An old core bucket is worth keeping only for what it may serve offline (oldCopyServes), never for code.
+    .concat(await staleToDrop(keys, 'vot-core-', CORE_CACHE, missing.filter((m) => oldCopyServes(m.url))))
+    .concat(await staleToDrop(keys, 'vot-corpus-', CORPUS_CACHE, missing));
+  // One-day design (2026-07-31): the download-on-demand font bucket.
+  // Fonts are all vendored + corpus-cached now; reclaim the space.
+  if (keys.includes('vot-fonts-v1')) drop.push('vot-fonts-v1');
+  await Promise.all(drop.map((key) => caches.delete(key)));
+}
+
+/**
+ * The stale buckets of one kind that hold nothing the current one misses. Newest first (caches.keys()
+ * lists buckets in creation order), a stale bucket is kept while it holds a missing file no bucket kept so
+ * far holds: two short installs in a row (the 5 MB Bible failing twice on a weak signal) keep the bucket
+ * that still has the Bible, not merely the newest one.
+ */
+async function staleToDrop(keys, prefix, current, missing) {
+  const stale = keys.filter((k) => k.startsWith(prefix) && k !== current);
+  let need = missing.filter((m) => m.bucket === current).map((m) => m.url);
+  const drop = [];
+  for (const key of stale.slice().reverse()) {
+    if (!need.length) { drop.push(key); continue; }
+    const cache = await caches.open(key);
+    const held = [];
+    for (const url of need) if (await cache.match(url)) held.push(url);
+    if (held.length) need = need.filter((u) => !held.includes(u));
+    else drop.push(key);
+  }
+  return drop;
+}
+
+/** The current build's copy: this core bucket, then this corpus bucket. Never an older bucket. */
+async function matchCurrent(request, opts) {
+  return (await (await caches.open(CORE_CACHE)).match(request, opts))
+    || (await (await caches.open(CORPUS_CACHE)).match(request, opts));
+}
+
+/** Files an older build's copy can stand in for offline: pictures, fonts, the offline page. Never code:
+    an old bundle next to the new ones is a crash at best and old code writing new stores at worst (the
+    hazard index.html's own reload guards). */
+function oldCopyServes(url) {
+  return /\.(jpe?g|png|webp|gif|svg|ico|woff2?|ttf|otf)$/i.test(url) || /\/offline\.html$/.test(url);
+}
 
 // ── Message: page-triggered activation (belt-and-suspenders) ────
 // Install already calls skipWaiting(); this path exists for a SW left
@@ -617,7 +683,7 @@ self.addEventListener('message', (event) => {
   // waitUntil keeps the worker alive through a repair's downloads; a failure to
   // read the caches answers "not complete", never "complete".
   if (event.data && (event.data.type === 'CHECK_OFFLINE' || event.data.type === 'REPAIR_OFFLINE')) {
-    const work = (event.data.type === 'REPAIR_OFFLINE' ? repairOffline() : offlineStatus())
+    const work = (event.data.type === 'REPAIR_OFFLINE' ? repairOffline() : checkOffline())
       .catch((err) => ({
         type: 'OFFLINE_STATUS', total: 0, missing: [], complete: false,
         error: String((err && err.message) || err),
@@ -702,20 +768,27 @@ self.addEventListener('fetch', (event) => {
 });
 
 async function coreFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await matchCurrent(request);
   if (cached) return cached;
 
   try {
     const response = await fetch(request);
     return response;
   } catch (_e) {
+    // Offline: an older build's copy of a picture or font, kept while this build's library is
+    // incomplete (pruneStale). Never an older build's code (oldCopyServes).
+    if (request.mode !== 'navigate' && oldCopyServes(new URL(request.url, self.location.origin).pathname)) {
+      const kept = await caches.match(request);
+      if (kept) return kept;
+    }
     if (request.mode === 'navigate') {
       // SW-2: a deep link carrying a query string (…/index.html?x=1, …/?utm=…) misses
       // the exact-match cache; fall back to the precached shell (ignoreSearch) so the
-      // app still boots offline, before serving the offline page.
-      const shell = await caches.match('./index.html', { ignoreSearch: true });
+      // app still boots offline, before serving the offline page. THIS build's shell:
+      // a kept older core bucket holds an older index.html, and it was created first.
+      const shell = await matchCurrent('./index.html', { ignoreSearch: true });
       if (shell) return shell;
-      const offline = await caches.match('./offline.html');
+      const offline = (await matchCurrent('./offline.html')) || (await caches.match('./offline.html'));
       if (offline) return offline;
     }
     return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
@@ -750,7 +823,7 @@ async function staleWhileRevalidate(event) {
 }
 
 async function corpusFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await matchCurrent(request);
   if (cached) return cached;
 
   try {
@@ -772,6 +845,9 @@ async function corpusFirst(request) {
     }
     return response;
   } catch (_e) {
+    // Offline: the previous corpus, kept while this one is incomplete (pruneStale), still reads.
+    const kept = await caches.match(request);
+    if (kept) return kept;
     return new Response('Corpus not available offline', {
       status: 503,
       statusText: 'Service Unavailable',
