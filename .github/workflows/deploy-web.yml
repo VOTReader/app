@@ -90,8 +90,10 @@ permissions: {}
 # ONE deploy at a time, gate to publish (ci10). A run waits while another runs;
 # a newer waiting run replaces an older waiting one, which is harmless now: every
 # run picks the newest green commit when its gate starts, so the survivor
-# publishes at least what the replaced one would have. Serialized runs and a
-# target that only moves forward mean a deploy never goes backwards. One cost: a
+# publishes at least what the replaced one would have. A deploy never goes
+# backwards: the gate publishes only a pick strictly newer than the live
+# build-sha.txt (the floor; the run listing alone once answered stale), and
+# serialized runs keep that floor current. One cost: a
 # manual override still WAITING when a CI run completes is replaced by that run,
 # which publishes the newest green commit, not the red tip; dispatch it again.
 concurrency:
@@ -126,6 +128,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          LIVE_SHA_URL: https://votreader.github.io/app/build-sha.txt
           DISPATCH_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
         run: node tools/deploy-target.mjs
 
@@ -251,6 +254,9 @@ jobs:
             mkdir -p "_site/$(dirname "$rel")"
             cp "app/src/main/assets/$rel" "_site/$rel"
           done
+          # The floor for the next deploy's gate (ci10): the commit these bytes came
+          # from. tools/deploy-target.mjs publishes only a pick strictly newer than it.
+          git rev-parse HEAD > _site/build-sha.txt
           # Fail the deploy if any runtime asset did not land. This is the gate that
           # turns "silently 404s in production" into "the deploy stops".
           node tools/list-runtime-src-assets.js --check --site _site

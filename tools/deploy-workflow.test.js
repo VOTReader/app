@@ -80,6 +80,14 @@ describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
     expect(code(all.deploy || '')).toMatch(/needs: build/);
   });
 
+  it('the live site carries the commit it was built from, and the gate reads it as the floor', () => {
+    // 06:50Z 2026-09-25 (run 36104660970): a stale run listing picked a commit 53 behind the tip and
+    // published it over a newer build. The floor refuses anything not strictly newer than live.
+    const all = jobs();
+    expect(code(all.build || '')).toContain('git rev-parse HEAD > _site/build-sha.txt');
+    expect(code(all.gate || '')).toMatch(/LIVE_SHA_URL: https:\/\/votreader\.github\.io\/app\/build-sha\.txt/);
+  });
+
   it('a re-run never publishes: "Re-run failed jobs" keeps the gate\'s old pick (the ci10 refutation)', () => {
     // An older run whose build or deploy failed, re-run after a newer deploy, would publish its
     // older commit over the newer one. Both jobs that can lead to a publish run on attempt 1 only.

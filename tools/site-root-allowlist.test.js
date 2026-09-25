@@ -69,7 +69,7 @@ describe('the published site root', () => {
       }
     };
     walk(assets);
-    const control = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'index.html']);
+    const control = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'build-sha.txt', 'index.html']);
     const unreferenced = [...allowed].filter((name) => !control.has(name) && !texts.some((t) => t.includes(name)));
     expect(unreferenced).toEqual([]);
   });

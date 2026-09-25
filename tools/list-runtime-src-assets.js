@@ -115,8 +115,9 @@ export function allowedSiteRootFiles() {
   const sw = readFileSync(resolve(assetsDir, 'service-worker.js'), 'utf-8');
   const block = sw.match(/const CORE_ASSETS = \[([\s\S]*?)\];/);
   if (!block) return null;
-  // Pages control files: not app assets, but legitimately published.
-  const names = new Set(['service-worker.js', 'CNAME', '.nojekyll']);
+  // Pages control files: not app assets, but legitimately published. build-sha.txt is the
+  // deploy's own floor (ci10: tools/deploy-target.mjs reads the live one).
+  const names = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'build-sha.txt']);
   for (const m of block[1].matchAll(/'\.\/([^'/]+)'/g)) names.add(m[1]);
   return names;
 }
