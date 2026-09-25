@@ -228,6 +228,38 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* THE REDESIGN WALK'S LARGE-TYPE FIXES (2026-09-25). An Opus walk of the night's screens at 180 %
+   on 360 px found: Progress's "12 of 89 reached" running 66 px off the screen (the page scrolled
+   sideways), its chart heading doing the same, header counts dropping under a title's start, a
+   notebook's title cut to "Study o…", Settings leaving its words a 100 px column, and the index
+   lists' top line sitting 1rem above row 1 and wider than the rows. */
+describe('app.css — the redesign walk\'s large-type fixes hold', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = (sel) => {
+    const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.()]/g, (c) => '\\' + c) + ' \\{([^}]*)\\}').exec(bare);
+    return m ? m[1] : '';
+  };
+  it('Progress headings wrap, their figures to the right', () => {
+    expect(block('.prg-section-head')).toMatch(/flex-wrap:\s*wrap/);
+    expect(block('.prg-section-meta')).toMatch(/margin-left:\s*auto/);
+    expect(block('.prg-days-head')).toMatch(/flex-wrap:\s*wrap/);
+  });
+  it('a wrapped header count stays at the right', () => {
+    expect(block('.study-head-count')).toMatch(/margin-left:\s*auto/);
+  });
+  it('a notebook title wraps instead of being cut', () => {
+    expect(block('.nb-drilled-title')).not.toMatch(/white-space:\s*nowrap|text-overflow:\s*ellipsis/);
+  });
+  it('Settings keeps its icon, chevron and gaps in px', () => {
+    expect(ruleBlock(CSS, '.settings-group-icon {')).toMatch(/width:\s*36px/);
+    expect(ruleBlock(CSS, '.settings-group-chevron {')).toMatch(/width:\s*24px/);
+    expect(ruleBlock(CSS, '.settings-group-head {')).toMatch(/gap:\s*12px/);
+  });
+  it('the index lists draw no line above their first row', () => {
+    expect(block('.chapter-cards:not(.two-col)')).not.toMatch(/border-top/);
+  });
+});
+
 /* THE SELECTION TOOLBAR SAYS ITS ACTIONS IN WORDS (redesign round 6, 2026-09-25): "Note", "Link",
    "Bookmark" under the icons at 13 px, pinned to px like the rest of the floating chrome, not 10 px
    spaced capitals. */
