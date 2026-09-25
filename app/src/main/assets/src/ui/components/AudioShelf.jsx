@@ -12,7 +12,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AUDIO_RESUME_END_FRACTION } from '../../utils/audio-track.js';
+import { AUDIO_RESUME_END_FRACTION, isSongKey, songIdOfKey } from '../../utils/audio-track.js';
+import { songById } from '../../utils/song-catalog.js';
 import { formatClock } from './AudioSeekSlider.jsx';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
@@ -120,11 +121,19 @@ export function relativePlayedAt(stamp) {
  * letter under the clock while it is the loaded track, else the section's first
  * letter (AudioPlayer.sectionLetterKeyAt / sectionOpeningKey); null until its
  * timings land, which keeps the tap inert exactly as it was.
+ * A SONG (`song:<id>`, 2026-09-25) is not a reading of anything: its text is
+ * the letter it was made from, when the catalog links it with medium or high
+ * confidence (README §1.4), else it has none — never the song key itself.
  * @param {any} track
  * @returns {string | null}
  */
 export function textKeyOf(track) {
   if (!track) return null;
+  if (isSongKey(track.key)) {
+    const song = songById(songIdOfKey(track.key));
+    const src = song && song.src;
+    return src && src.k === 'letter' && src.id && (src.c === 'h' || src.c === 'm') ? src.id : null;
+  }
   if (typeof track.key === 'string') return track.key;
   const st = AudioPlayer.getState();
   const cur = st && Array.isArray(st.queue) ? st.queue[st.qi] : null;

@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 612 distinct identifiers.
+// Total: 615 distinct identifiers.
 
 export const projectGlobals = {
   ACHIEVEMENT_STORE_NAMES: "readonly",
@@ -486,8 +486,10 @@ export const projectGlobals = {
   linkWtlbEntries: "readonly",
   lnkId: "readonly",
   loadBibleStudies: "readonly",
+  loadSongLyrics: "readonly",
   loadTranslation: "readonly",
   lookupVersesFromBooks: "readonly",
+  lyricLineAt: "readonly",
   measureLineHeight: "readonly",
   measureUserData: "readonly",
   modalRegistry: "readonly",
@@ -603,6 +605,7 @@ export const projectGlobals = {
   useSettings: "readonly",
   useSharedPassageLink: "readonly",
   useSheetOrchestration: "readonly",
+  useSongLyrics: "readonly",
   useStorageHealth: "readonly",
   useStorageInfo: "readonly",
   useSurprise: "readonly",

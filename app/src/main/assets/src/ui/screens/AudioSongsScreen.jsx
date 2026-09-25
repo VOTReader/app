@@ -17,6 +17,8 @@
    here as FREE GLOBALS — one catalog, one player.
 */
 
+import { SongPage } from './SongPage.jsx';
+
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
 /** Rows of "New from the flock" on the hub; See all opens the ten. */
@@ -284,8 +286,10 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
         {[0, 1, 2, 3, 4].map((i) => <div key={i} className="songs-skeleton-row"><span /><span><i /><i /></span></div>)}
       </div>
     );
+  } else if (top.k === 'song') {
+    body = <SongPage familyId={top.v} library={library} playingId={playingId} active={active} onPush={onPush} FamilyRow={FamilyRow} />;
   } else if (top.k === 'list') {
-    body = <SongsList frame={top} library={library} playingId={playingId} active={active} />;
+    body = <SongsList frame={top} library={library} playingId={playingId} active={active} onPush={onPush} />;
   } else {
     body = <SongsHub frame={top} library={library} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} corpusVersion={corpusVersion} />;
   }
@@ -401,7 +405,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
         <section className="songs-section" aria-labelledby="songs-results">
           <SectionHead id="songs-results" title={style && !words.length ? (styles[style] || 'Songs') : 'Songs'} action={<span className="songs-section-count">{songCountLabel(results.length)}</span>} />
           {results.length ? (
-            <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResults} />)}</div>
+            <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResults} onOpen={(f) => open({ k: 'song', v: f.id })} />)}</div>
           ) : (
             <p className="songs-empty">No song by that name. Try a word from the letter.</p>
           )}
@@ -412,7 +416,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
             <section className="songs-section" aria-labelledby="songs-new">
               <SectionHead id="songs-new" title="New from the flock" action={newest.length > NEW_ON_HUB ? <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'new' })}>See all<ChevronRightIcon /></button> : null} />
               <div className="songs-card songs-list">
-                {newest.slice(0, NEW_ON_HUB).map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' })} />)}
+                {newest.slice(0, NEW_ON_HUB).map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' })} onOpen={(s) => open({ k: 'song', v: s.f })} />)}
               </div>
             </section>
           ) : null}
@@ -474,9 +478,9 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
 
 /**
  * A collection's or shelf's list: its title, Play all and Shuffle, its rows.
- * @param {{ frame: any, library: any, playingId: string, active: boolean }} props
+ * @param {{ frame: any, library: any, playingId: string, active: boolean, onPush: (f: any) => void }} props
  */
-function SongsList({ frame, library, playingId, active }) {
+function SongsList({ frame, library, playingId, active, onPush }) {
   const cat = catalog();
   const content = listContent(frame.v, library);
   const fams = content.families;
@@ -505,9 +509,9 @@ function SongsList({ frame, library, playingId, active }) {
       </header>
       <section className="songs-section" aria-label={content.title}>
         {fams && fams.length ? (
-          <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={(s) => play(s, false)} inList />)}</div>
+          <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(f) => onPush({ k: 'song', v: f.id })} inList />)}</div>
         ) : content.songs && content.songs.length ? (
-          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => play(s, false)} />)}</div>
+          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(s) => onPush({ k: 'song', v: s.f })} />)}</div>
         ) : (
           <p className="songs-empty">{content.empty}</p>
         )}

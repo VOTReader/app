@@ -7,7 +7,9 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, songIdOfKey } from '../../utils/audio-track.js';
+import { songById } from '../../utils/song-catalog.js';
+import { SongDeskHead, SongVersionsCard, SongTransport, SongLyricsCard } from './SongDeskParts.jsx';
 import { AudioSpeedControl } from './AudioSpeedControl.jsx';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
@@ -263,7 +265,11 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const sleepSeconds = AudioPlayer.getSleepRemainingSeconds();
   const sleepAtEnd = !!state.sleepAtTrackEnd;
   const upcoming = queue.length - (state.qi + 1);
-  const voices = voiceChoices(current);
+  // Songs of the Letters (L3 + L5): the desk's song mode — cover head, Versions card, labelled
+  // transport, lyrics; no speed card. The sleep timer and the queue stay as they are.
+  const songId = songIdOfKey(current.key);
+  const song = songId ? songById(songId) : null;
+  const voices = songId ? null : voiceChoices(current);
   // A boot-restored bar is ONE placeholder track standing in for a queue whose
   // shape nobody knows yet — the real one is rebuilt on the first transport
   // tap. Describing it as a lone recording ("Restart", "1 recording", "1 of 1")
@@ -316,6 +322,12 @@ export function AudioManagerSheet({ open, state, onClose }) {
         onClick={(event) => event.stopPropagation()}
       >
         <SheetHandle onClose={onClose} />
+        {songId ? (
+          <SongDeskHead
+            current={current} song={song} saved={saved} onClose={onClose}
+            onToggleSave={() => { if (library && typeof library.toggleSaved === 'function') library.toggleSaved(current); }}
+          />
+        ) : (<>
         <div className="audio-manager-kicker">Listening now</div>
         <div className="audio-manager-head">
           {/* Owner request 2026-08-09: tapping the letter/chapter title jumps
@@ -358,6 +370,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
             <span>{saved ? 'Saved' : 'Save'}</span>
           </button>
         </div>
+        </>)}
+        {song ? <SongVersionsCard song={song} state={state} /> : null}
 
         {/* Voice sits right under the track identity (owner directive
             2026-08-10): what you're hearing and the switch for it are one
@@ -407,6 +421,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
           <div className="audio-manager-time"><span>{formatTime(state.time)}</span><span>{duration ? formatTime(duration) : '—'}</span></div>
         </div>
 
+        {songId ? <SongTransport state={state} /> : (
         <div className="audio-manager-transport" aria-label="Playback controls">
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(-15)} aria-label="Back 15 seconds">−15</button>
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}>
@@ -426,9 +441,11 @@ export function AudioManagerSheet({ open, state, onClose }) {
           </button>
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds">+15</button>
         </div>
+        )}
+        {songId ? <SongLyricsCard song={song} time={state.time} /> : null}
 
         <div className="audio-manager-tools">
-          <AudioSpeedControl rate={state.rate} />
+          {songId ? null : <AudioSpeedControl rate={state.rate} />}
           <div className="audio-manager-tool">
             <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
             <div className="audio-manager-segment" role="group" aria-label="Sleep timer">

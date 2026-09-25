@@ -426,6 +426,7 @@
         --cream-muted: var(--ink-cream-muted);
         --study-note:  rgba(232,192,80,0.10);
         --study-border: rgba(232,192,80,0.24);
+        --reading-wash: rgba(232,192,80,0.20);   /* the read-along wash: ::highlight(vot-reading) and a song's current lyric line */
         --radius:      6px;
         --transition:  0.2s ease;
 
@@ -535,6 +536,7 @@
         --cream-muted: #3a2510;
         --study-note:  rgba(122,92,16,0.07);
         --study-border: rgba(122,92,16,0.22);
+        --reading-wash: rgba(122,92,16,0.16);
         --tap-ref:        var(--gold-dim);
         --tap-ref-sub:    var(--gold-border);
         --tap-ref-active: var(--gold);
@@ -1183,6 +1185,67 @@
            the pulse at an arbitrary opacity; state it statically instead. */
         .audio-bar-play.is-loading { animation: none; opacity: 0.55; }
       }
+      /* The bar's and the desk's buttons speak in the reading serif (W3-07: a button does not inherit its font, so
+         the bar's title fell back to a sans). :where() keeps this at zero specificity, under every class that names
+         its own family (the Cinzel labels). */
+      :where(.audio-bar, .audio-manager-sheet) button { font-family: inherit; }
+      /* ── SONGS OF THE LETTERS: the bar's song skin (L3, picture final-08). Same 70 px bar and pull-tab; a 48 px
+         cover, the title and the version, a FILLED 48 px play/pause, next and close at 44 px, and a 3 px progress
+         line along the top edge instead of the slider (seeking lives in the desk). Type in --fsc px like the rest
+         of the bar. ── */
+      .audio-bar.is-song { gap: 4px; }
+      .audio-bar-line { position: absolute; top: 0; left: 14px; right: 14px; height: 3px; overflow: hidden; border-radius: 0 0 2px 2px; background: var(--gold-border); pointer-events: none; }
+      .audio-bar-line > span { display: block; height: 100%; background: var(--gold); }
+      .audio-bar-song-summary { flex: 1; height: 54px; gap: 10px; margin-right: 4px; }
+      .audio-bar-cover { width: 48px; height: 48px; border-radius: 8px; }
+      .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
+      .audio-bar.is-song .audio-bar-title { font-size: var(--fsc-15); }
+      .audio-bar-song-sub { display: block; overflow: hidden; color: var(--cream-muted); font-size: var(--fsc-13); font-style: italic; line-height: 1.3; white-space: nowrap; text-overflow: ellipsis; }
+      .audio-bar-song-sub.is-offline { color: var(--cream-dim); }
+      .audio-bar-song-play { position: relative; flex-shrink: 0; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: var(--gold); color: var(--bg); cursor: pointer; }
+      .audio-bar-song-play svg { width: 22px; height: 22px; }
+      .audio-bar-song-play.is-loading::after { content: ""; position: absolute; inset: -4px; border: 2px solid transparent; border-top-color: var(--gold); border-radius: 50%; animation: song-bar-spin 1s linear infinite; }
+      @keyframes song-bar-spin { to { transform: rotate(360deg); } }
+      .audio-bar-song-play.is-unavailable { opacity: 0.45; }
+      .audio-bar-song-play:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      .audio-bar.is-song .audio-bar-nav, .audio-bar.is-song .audio-bar-close { width: 44px; height: 44px; }
+      .audio-bar-song-next { color: var(--gold); }
+      @media (hover: hover) { .audio-bar-song-play:hover { background: var(--gold-bright); } }
+      @media (prefers-reduced-motion: reduce) { .audio-bar-song-play.is-loading::after { animation: none; border-color: var(--gold-border); } }
+      @media (max-width: 360px) { .audio-bar.is-song { gap: 2px; } .audio-bar-song-summary { gap: 8px; margin-right: 2px; } }
+      /* ── SONGS OF THE LETTERS: the listening desk in song mode (L3 + L5, picture final-04). A 72 px cover head with
+         "Open the letter ›", the Versions card in the Voice card's grammar, a transport with words under the icons,
+         and the lyrics card whose current line takes the read-along wash (--reading-wash, the ::highlight colour). ── */
+      .song-desk-head { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: start; gap: 14px; margin: 2px 0 14px; }
+      .song-desk-cover { width: 72px; height: 72px; border-radius: 8px; }
+      .song-desk-cover .song-cover-note { font-size: var(--fs-30); }
+      .song-desk-kicker { margin: 0 0 2px; }
+      .song-desk-copy { min-width: 0; }
+      .song-desk-copy h2 { margin: 0; color: var(--cream); font-size: var(--fs-20); font-weight: 500; line-height: 1.2; }
+      .song-desk-version { margin: 2px 0 0; color: var(--cream-dim); font-size: var(--fs-15); }
+      .song-desk-letter { min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--gold); font-size: var(--fs-16); text-align: left; cursor: pointer; }
+      .song-desk-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .song-desk-transport { align-items: flex-start; }
+      .song-desk-tool { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; padding: 0; border: 0; background: none; color: var(--gold); cursor: pointer; }
+      .song-desk-tool:disabled { opacity: 0.4; cursor: default; }
+      .song-desk-tool svg { width: 22px; height: 22px; }
+      .song-desk-tool.is-on .audio-manager-round { border-color: var(--gold); background: var(--gold-faint); }
+      .song-desk-main .audio-manager-play { border-color: var(--gold); background: var(--gold); color: var(--bg); }
+      .song-desk-main.is-loading .audio-manager-play { opacity: 0.7; }
+      .song-desk-word { color: var(--cream-dim); font-size: var(--fs-13); line-height: 1.2; }
+      .song-desk-tool.is-on .song-desk-word { color: var(--gold); }
+      .song-desk-tool:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px; }
+      .song-lyrics-card { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--bg3); }
+      .song-lyrics-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
+      .song-lyrics-head > span { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-13); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
+      .song-lyrics-follow { min-height: 36px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 999px; background: transparent; color: var(--cream-dim); font-size: var(--fs-13); cursor: pointer; }
+      .song-lyrics-follow.is-on { border-color: var(--gold); color: var(--gold); }
+      .song-lyrics-lines { position: relative; max-height: 13.5em; margin-top: 6px; overflow-y: auto; overscroll-behavior: contain; }
+      .song-lyrics-lines:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .song-lyrics-line { margin: 0; padding: 2px 6px; border-radius: 6px; color: var(--cream); font-size: var(--fs-16); font-style: italic; line-height: 1.5; }
+      .song-lyrics-line.is-now { background-color: var(--reading-wash); }
+      .song-lyrics-note { margin: 6px 0 0; color: var(--cream-dim); font-style: italic; }
+      .song-lyrics-foot { margin: 8px 0 0; color: var(--cream-dim); font-size: var(--fs-13); font-style: italic; }
 
       /* Listening desk — expanded controls for the SAME AudioPlayer singleton.
          It uses the app's established sheet geometry, but its calm, ledger-like
@@ -1566,6 +1629,28 @@
       .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-chip:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible, .songs-nav-row:focus-visible, .songs-tile:focus-visible, .songs-shelf:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .songs-chip:not(.is-on):hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-nav-row:hover, .songs-tile:hover, .songs-shelf:hover, .songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
       @media (max-width:360px) { .songs-tiles { grid-template-columns:minmax(0,1fr); }.songs-row-len { display:none; } }
+      /* The song page (L3, picture final-03): centred cover and title, PLAY filled and SAVE outlined, version rows. */
+      .song-page { display: flex; flex-direction: column; align-items: center; padding-top: .4rem; text-align: center; }
+      .song-page-eyebrow { margin-bottom: .7rem; }
+      .song-page-cover { width: 200px; height: 200px; border-radius: 10px; }
+      .song-page-cover .song-cover-note { font-size: var(--fs-48); }
+      .songs-screen .song-page h1 { margin-top: .8rem; }
+      .song-page-letter { min-height: 44px; margin-top: .3rem; padding: 0 .25rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-18); cursor: pointer; }
+      .song-page-letter em { text-decoration: underline; text-decoration-color: var(--gold-border); text-underline-offset: .18em; }
+      .song-page-shelf { margin: .1rem 0 0; color: var(--cream-dim); font-size: var(--fs-16); font-style: italic; }
+      .song-page-makers { margin: .35rem 0 0; color: var(--cream-dim); font-size: var(--fs-15); }
+      .song-page-actions { display: flex; gap: .6rem; width: 100%; margin-top: 1rem; }
+      .song-page-actions > button { flex: 1 1 0; width: auto; }
+      .song-page-save.is-saved { background: var(--gold-faint); }
+      .song-page .songs-section { width: 100%; text-align: left; }
+      .song-versions { border-top: 1px solid var(--border); }
+      .song-version { display: flex; align-items: center; gap: .6rem; padding: .3rem .1rem; border-bottom: 1px solid var(--border); }
+      .song-version-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: .75rem; min-height: 48px; padding: 0; border: 0; background: none; color: var(--cream); font: inherit; font-size: var(--fs-18); text-align: left; cursor: pointer; }
+      .song-version-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .song-version.is-current .song-version-label { color: var(--gold); }
+      .song-page-more { width: 100%; margin-top: .75rem; font-size: var(--fs-18); font-weight: 500; letter-spacing: 0; text-transform: none; }
+      .song-page-lyrics p { margin: 0; color: var(--cream); font-size: var(--fs-18); font-style: italic; line-height: 1.5; }
+      .song-version-main:focus-visible, .song-page-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
       /* Milestones — the full achievements ledger. Same restrained shelf
          language as the Listening Library screens; earned rows carry the ✦. */
@@ -2582,8 +2667,7 @@
     .ornament-divider + .footnote-list { border-top:none; padding-top:0; margin-top:1.5rem; }
     /* Read-along: the sentence currently being read aloud (CSS Custom
        Highlight API — no DOM mutation; only these properties apply). */
-    ::highlight(vot-reading) { background-color: rgba(232,192,80,0.20); }
-    body.light ::highlight(vot-reading) { background-color: rgba(122,92,16,0.16); }
+    ::highlight(vot-reading) { background-color: var(--reading-wash); }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }

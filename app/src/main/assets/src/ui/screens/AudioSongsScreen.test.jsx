@@ -190,6 +190,47 @@ describe('AudioSongsScreen -- lists', () => {
   });
 });
 
+describe('AudioSongsScreen -- the song page (final-03)', () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ v: 1, synced: true, lines: [{ t: 'Come, love awaits you', s: 1, e: 2 }] }) }));
+    library.isSongSaved = vi.fn(() => false);
+    library.toggleSongSaved = vi.fn();
+    window.__openAudioText = vi.fn();
+  });
+  afterEach(() => { delete window.__openAudioText; });
+
+  it('a row opens its song; the page names its versions, its letter and its makers', async () => {
+    const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
+    fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-main'));
+    expect(props.onPush).toHaveBeenCalledWith({ k: 'song', v: 'fam-a' });
+    expect(player.playSongs).not.toHaveBeenCalled();
+    cleanup();
+
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
+    expect(screen.getByText('Song · 2 versions')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Come, Love Awaits You');
+    fireEvent.click(screen.getByRole('button', { name: /From the letter/ }));
+    expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'wtlb1:come-love-awaits-you', title: 'Come, Love Awaits You (the letter)' });
+    expect(screen.getByText('Made with Suno · by hmarie777 and others')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Keep/ })).toBeNull();                // KEEP waits for L6
+    fireEvent.click(screen.getByRole('button', { name: /^Play$/ }));
+    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa1' }));
+    fireEvent.click(screen.getByRole('button', { name: /Play Come, Love Awaits You, Pop/ }));
+    expect(player.playSongs).toHaveBeenLastCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa2' }));
+    fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+    expect(library.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa1');
+    expect(await screen.findByText('Come, love awaits you')).toBeTruthy();            // the lyrics preview
+  });
+
+  it('a song with no letter says which shelf it is from, and has no letter link', () => {
+    renderScreen([{ k: 'song', v: 'fam-b' }]);
+    expect(screen.getByText('Song')).toBeTruthy();
+    expect(screen.getByText('Inspired by the letters')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /From the letter/ })).toBeNull();
+    expect(screen.getByText('Made with Suno · by members of the flock')).toBeTruthy();
+  });
+});
+
 describe('AudioSongsScreen -- states', () => {
   it('shows a skeleton while the catalog loads, and asks for it', () => {
     const load = vi.fn(() => new Promise(() => {}));

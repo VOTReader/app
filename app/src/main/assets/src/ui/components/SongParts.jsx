@@ -13,7 +13,7 @@
    plays, tokens only.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { songThumbUrl, songById, familyById } from '../../utils/song-catalog.js';
+import { songThumbUrl, songById, familyById, SONGS_HOST } from '../../utils/song-catalog.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -191,4 +191,79 @@ export function ChoiceSheet({ title, eyebrow, options, value, onChange, onClose 
       </div>
     </>
   );
+}
+
+/* ── lyrics (catalog-schema.md: lyrics/<id>.json, only when lyr > 0) ─────── */
+
+const LYRICS_TIMEOUT_MS = 15000;
+/** @type {Map<string, Promise<{ synced: boolean, lines: { t: string, s: number, e: number }[] } | null>>} */
+const _lyrics = new Map();
+
+/**
+ * A song's lyrics, fetched once per launch and kept in memory (the service
+ * worker keeps the file stale-while-revalidate in the PWA). Null when the song
+ * has none, or the file cannot be read; a failure is forgotten so the next ask
+ * tries again. Lines are validated; times are the publisher's own (no offset).
+ * @param {any} song @returns {Promise<{ synced: boolean, lines: { t: string, s: number, e: number }[] } | null>}
+ */
+export function loadSongLyrics(song) {
+  const id = song && typeof song.id === 'string' ? song.id : '';
+  if (!id || !/^[0-9a-f]{12}$/.test(id) || !(song.lyr > 0)) return Promise.resolve(null);
+  const known = _lyrics.get(id);
+  if (known) return known;
+  const run = (async () => {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), LYRICS_TIMEOUT_MS) : null;
+    try {
+      const res = await fetch(SONGS_HOST.origin + '/songs/lyrics/' + id + '.json', { credentials: 'omit', signal: ctl ? ctl.signal : undefined });
+      if (!res.ok) throw new Error('lyrics ' + res.status);
+      const raw = await res.json();
+      const lines = (Array.isArray(raw && raw.lines) ? raw.lines : [])
+        .filter((l) => l && typeof l.t === 'string' && l.t.trim())
+        .map((l) => ({ t: l.t.trim().slice(0, 400), s: Number(l.s) || 0, e: Number(l.e) || 0 }));
+      if (!lines.length) return null;
+      // A line is highlighted by its time ONLY when the dual-leg gate passed (lyr 2 = synced true).
+      return { synced: raw.synced === true && song.lyr === 2, lines };
+    } catch (_e) {
+      _lyrics.delete(id);
+      return null;
+    } finally { if (timer) clearTimeout(timer); }
+  })();
+  _lyrics.set(id, run);
+  return run;
+}
+
+/** Test seam. */
+export function _resetSongLyricsForTests() { _lyrics.clear(); }
+
+/**
+ * The lyrics of a song as React state: undefined while loading, null when there are none.
+ * @param {any} song
+ */
+export function useSongLyrics(song) {
+  const id = song && song.id;
+  const [state, setState] = React.useState(/** @type {any} */ ({ id: '', value: undefined }));
+  React.useEffect(() => {
+    let live = true;
+    if (!song || !(song.lyr > 0)) { setState({ id, value: null }); return undefined; }
+    setState({ id, value: undefined });
+    loadSongLyrics(song).then((value) => { if (live) setState({ id, value }); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  return state.id === id ? state.value : undefined;
+}
+
+/**
+ * The index of the line sung at `time` in synced lyrics, or -1 (before the
+ * first line, or between lines longer than a breath).
+ * @param {{ s: number, e: number }[]} lines @param {number} time @returns {number}
+ */
+export function lyricLineAt(lines, time) {
+  let at = -1;
+  for (let i = 0; i < lines.length; i++) { if (lines[i].s <= time) at = i; else break; }
+  if (at < 0) return -1;
+  const next = lines[at + 1];
+  const end = Math.max(lines[at].e, next ? Math.min(next.s, lines[at].e + 2) : lines[at].e + 2);
+  return time < end ? at : -1;
 }

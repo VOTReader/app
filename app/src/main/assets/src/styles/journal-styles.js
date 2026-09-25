@@ -496,6 +496,9 @@
   R('.jrn-fab:hover { transform: scale(1.05); }');
   R('.jrn-fab:active { transform: scale(0.96); }');
   R('.jrn-fab svg { width: 24px; height: 24px; display: block; }');
+  // W3-01 (songs walk, 2026-09-25): the mini-player (z 150, ~70 px) covered the FAB. Lift it with the bar, as
+  // app.css lifts .screen-scroll and .ascroll-pill: the FAB's own bottom plus the bar and the bar's inset.
+  R('body.audio-bar-open .jrn-fab { bottom: calc(24px + 72px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px))); }');
   R('.jrn-fab-plus { right: calc(22px + env(safe-area-inset-right)); left: auto; }');
   R('.jrn-fab-mic { left: calc(22px + env(safe-area-inset-left)); right: auto; background: var(--bg3); color: var(--gold); border: 2px solid var(--gold); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }');
   R('.jrn-fab-mic:hover { background: var(--gold-faint); }');

@@ -15,7 +15,10 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { displayPartLabel } from '../../utils/audio-track.js';
+import { displayPartLabel, songIdOfKey } from '../../utils/audio-track.js';
+import { songById } from '../../utils/song-catalog.js';
+import { SongCover, NextIcon } from './SongParts.jsx';
+import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
@@ -80,6 +83,54 @@ export function AudioPlayerBar() {
   // Place in the QUEUE, not in the book: "3 of 12" beside the source line.
   // Derived, never stored — and silent at 1 of 1, which is noise, not news.
   const place = single ? null : '· ' + (st.qi + 1) + ' of ' + queue.length;
+
+  // Songs of the Letters (L3, picture final-08): the SAME bar, 70 px, pull-tab kept, in its song skin — cover,
+  // title, version, a filled play/pause, next and close; progress is a 3 px line along the top edge (seeking
+  // lives in the desk). A mixed queue changes skin per track; the reading skin below is untouched.
+  const songId = songIdOfKey(track.key);
+  if (songId) {
+    const song = songById(songId);
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false && !active;
+    const pct = dur ? Math.min(100, Math.max(0, (st.time / dur) * 100)) : 0;
+    const line2 = st.status === 'loading' ? 'Loading…' : offline ? 'Not on this phone' : (track.partLabel || 'Songs of the Letters');
+    return (
+      <>
+      <div className="audio-bar is-song" role="region" aria-label="Audio player">
+        <button type="button" className="audio-bar-pull" onClick={() => setManagerOpen(true)} tabIndex={-1} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 14.5l6-5.5 6 5.5" />
+          </svg>
+        </button>
+        <span className="audio-bar-line" aria-hidden="true"><span style={{ width: pct + '%' }} /></span>
+        <button type="button" className="audio-bar-summary audio-bar-song-summary" onClick={() => setManagerOpen(true)} aria-label={'Open listening controls — ' + (track.title || 'song')} aria-expanded={managerOpen}>
+          <SongCover song={song || { id: songId }} className="audio-bar-cover" />
+          <span className="audio-bar-summary-text">
+            <span className="audio-bar-title">{track.title || ''}</span>
+            <span className={'audio-bar-song-sub' + (offline ? ' is-offline' : '')}>{line2}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={'audio-bar-song-play' + (st.status === 'loading' ? ' is-loading' : '') + (offline ? ' is-unavailable' : '')}
+          onClick={() => AudioPlayer.toggle()}
+          aria-label={active ? 'Pause' : 'Play'}
+          aria-busy={st.status === 'loading'}
+        >
+          {active ? <PauseIcon /> : <PlayIcon />}
+        </button>
+        {single ? null : (
+          <button type="button" className="audio-bar-nav audio-bar-song-next" onClick={() => AudioPlayer.next()} aria-label="Next song"><NextIcon /></button>
+        )}
+        <button type="button" className="audio-bar-close audio-bar-song-close" onClick={() => AudioPlayer.stop()} aria-label="Close player">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <AudioManagerSheet open={managerOpen} state={st} onClose={() => setManagerOpen(false)} />
+      </>
+    );
+  }
 
   return (
     <>
