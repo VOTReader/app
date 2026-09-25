@@ -72,7 +72,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
           ) : (
             <div className="audio-library-empty">Nothing is on this phone yet. Download a recording from its row in a collection, or a whole collection at once, and it plays with no signal.</div>
           )}
-          {items.length ? (
+          {/* With one recording its own Remove is the whole job (Codex critique of the built screens, 2026-09-24). */}
+          {items.length > 1 ? (
             askingAll ? (
               <div className="offline-confirm" role="group" aria-label="Remove all downloads">
                 <p className="offline-confirm-title">{'Remove all ' + count + ' (' + formatBytes(total) + ') from this phone?'}</p>

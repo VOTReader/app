@@ -174,6 +174,13 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
     ? AudioPlayer.playbackTracks(srcKey, item, label)
     : ((AudioPlayer.renditionsFor(srcKey, item, label)[0] || { tracks: [] }).tracks));
 
+  // With no signal in the phone app, Play all plays only what is on the phone (the player passes over the rest), so
+  // the button says so instead of promising the whole collection (Codex critique of the built screens, 2026-09-24).
+  const onPhone = offline && !online
+    ? playable.filter((item) => { const own = ownTracks(item); return own.length > 0 && own.every((t) => offline.isSaved(t.url)); }).length
+    : 0;
+  const playAllLabel = onPhone === 1 ? 'Play the one on this phone' : onPhone > 1 ? 'Play the ' + onPhone + ' on this phone' : 'Play all';
+
   const playFrom = (item) => {
     if (current && current.key === srcKey + ':' + item.id) { AudioPlayer.toggle(); return; }
     if (bible) AudioPlayer.playBibleBook({ volKey, bookId: item.id, label });
@@ -207,7 +214,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
           {playable.length ? (
             <div className="audio-library-hero-actions">
               <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
-                <PlayIcon /><span>Play all</span>
+                <PlayIcon /><span>{playAllLabel}</span>
               </button>
               {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
