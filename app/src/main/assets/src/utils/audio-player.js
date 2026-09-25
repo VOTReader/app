@@ -2149,7 +2149,7 @@ const SONG_IDS_PERSIST = 50;
  * explicit ids list longer than SONG_IDS_PERSIST is cut to the window that
  * starts at the playing song, and the snapshot's startKey and qi move with it.
  * @param {any} src @param {Track} track @param {number} qi
- * @returns {{ filter: any, one: boolean, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number }}
+ * @returns {{ filter: any, one: boolean, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number, wrap: boolean, swaps: Record<string, string> | null }}
  */
 function _songsSnapshotFields(src, track, qi) {
   let ids = Array.isArray(src.ids) ? src.ids.filter(isSongId) : undefined;

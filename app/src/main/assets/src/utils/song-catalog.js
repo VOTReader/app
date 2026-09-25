@@ -482,7 +482,7 @@ export function shuffledFeatured(filter, seed) {
  * listener who chose take 6 hears take 6, not the featured take as well). A
  * shuffled list opens on it; a plain list is FORWARD-ONLY from its slot, the
  * rule every other queue in the player keeps.
- * @param {Song[]} list @param {string} startId @param {boolean} shuffled @param {boolean} one
+ * @param {Song[]} list @param {string} startId @param {boolean} shuffled @param {boolean} one @param {boolean} [wrap]
  * @returns {Song[]}
  */
 function _fromStart(list, startId, shuffled, one, wrap) {
