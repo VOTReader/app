@@ -867,6 +867,22 @@ function _syncNativeUpcoming() {
 }
 
 /**
+ * A song that would not LOAD, with one to go on to (n3-03): not a drop partway through one (that pauses at its place,
+ * as before), not while paused (nothing to go on from), not the last one (nothing to skip to: it pauses, and Play
+ * tries again), not offline (nothing ahead would load either). The refutation of s2r, S1 S2 N1.
+ * @returns {boolean}
+ */
+function _songLoadFailed() {
+  const track = _state.queue[_state.qi];
+  if (!_isSong(track) || _offline()) return false;
+  if (_state.status !== 'loading' && _state.status !== 'playing') return false;
+  if (!(_state.qi + 1 < _state.queue.length || _repeatMode() === 'all')) return false;
+  const code = _el && _el.error ? Number(_el.error.code) || 0 : 0;
+  // 3 decode, 4 not a playable source: this file. Otherwise only a failure before any of it was heard.
+  return code === 3 || code === 4 || (_state.status === 'loading' && !((_el && _el.currentTime) > 0.5));
+}
+
+/**
  * End-of-track sleep firing. Deliberately identical to the countdown timer's
  * expiry — pause, never stop, so the queue and the resume snapshot survive —
  * and one-shot: the flag clears itself, so the NEXT track boundary advances
@@ -913,7 +929,7 @@ function _onError() {
   // A song that will not play is passed over, so hands-off listening goes on (songs README 3.5: "Couldn't play
   // this song", then it skips; sweep n3-03). Not offline (nothing ahead would play either), and at most
   // SONG_SKIP_CAP in a row: a run of failures is the network, and the player pauses on it as before.
-  if (_isSong(_state.queue[_state.qi]) && !_offline() && _songSkips < SONG_SKIP_CAP) {
+  if (_songLoadFailed() && _songSkips < SONG_SKIP_CAP) {
     _songSkips++;
     _toast(SONG_SKIP_MSG);
     next();
@@ -2833,6 +2849,7 @@ function _newSeed() {
  */
 function playSongs(opts) {
   const o = opts || /** @type {any} */ ({});
+  _songSkips = 0;
   const shuffle = !!o.shuffle;
   const seed = shuffle ? ((Number.isInteger(o.seed) ? /** @type {number} */ (o.seed) >>> 0 : 0) || _newSeed()) : 0;
   const startKey = isSongId(o.startId) ? 'song:' + o.startId : null;
@@ -2919,21 +2936,30 @@ function switchSongVersion(id) {
   if (!from || !to || curId === id || to.f !== from.f) return false;
   const track = _songTracks([to])[0];
   if (!track) return false;
+  // The chosen take is in the queue once, here: a queue of every take (the song page's) held it at another place
+  // too, and it played twice (the refutation of s2r, M1).
+  /** @type {Track[]} */
+  const queue = [];
+  let qi = 0;
+  _state.queue.forEach((t, i) => {
+    if (i === _state.qi) { qi = queue.length; queue.push(track); } else if (t.key !== track.key) queue.push(t);
+  });
   /** @type {any} */
   let desc;
-  if (Array.isArray(src.ids)) {
-    desc = { ...src, ids: src.ids.map((x) => (x === curId ? /** @type {string} */ (id) : x)) };
-  } else {
-    // Keyed by the catalog's own version at this place, however many switches ago it was replaced.
+  if (src.one && !Array.isArray(src.ids)) {
+    // One take per song ("Shuffle all songs", 900 of them): the descriptor stays small and keeps the choice as a
+    // swap, keyed by the catalog's take at this place, which its rebuild replays over the same order.
     const swaps = { ...(cleanSongSwaps(src.swaps) || {}) };
     const orig = Object.keys(swaps).find((k) => swaps[k] === curId) || curId;
     if (orig === id) delete swaps[orig]; else swaps[orig] = /** @type {string} */ (id);
     desc = { ...src, swaps: Object.keys(swaps).length ? swaps : null };
-    if (songIdOfKey(src.startKey) === curId) desc.startKey = track.key;   // the queue begins at this song
+  } else {
+    // Otherwise the queue as it now stands becomes the explicit list, so a restart rebuilds exactly it (M2).
+    desc = { ...src, ids: queue.map((t) => songIdOfKey(t.key)).filter(isSongId), filter: null, one: false, swaps: null, wrap: false, startKey: null };
   }
   _setSource(desc);
-  _state.queue = _state.queue.slice();
-  _state.queue[_state.qi] = track;
+  _state.queue = queue;
+  _state.qi = qi;
   _forgetPosition(track.url);   // from the start
   _start();
   _lastPersistSec = -1;
@@ -3416,7 +3442,8 @@ function _sleepTimerFire() {
   _state.sleepEndsAt = 0;
   _state.sleepMinutes = 0;
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
-  if (wasLive && _el) _el.pause();
+  // Even when the bar says paused: a phone call holds native silent while it still means to play on (s2r S3).
+  if (_el) _el.pause();
   _markPaused();
   _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
   if (!wasLive) _notify();
@@ -3593,6 +3620,9 @@ function pauseIfPlaying() {
   if ((_state.status === 'playing' || _state.status === 'loading') && _el) {
     _el.pause();
     _markPaused();
+  } else if (_native && _el) {
+    // A phone call holds native silent: the bar says paused, but native means to play on after it (s2r S3).
+    _el.pause();
   }
 }
 

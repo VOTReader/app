@@ -215,11 +215,17 @@ describe('native-audio - the <audio> surface', () => {
     el.src = A;
     el.play();
     const seen = recorder(el);
-    send({ type: 'error', url: A, code: 2004, name: 'ERROR_CODE_IO_BAD_HTTP_STATUS' });
+    send({ type: 'error', url: A, code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
     expect(seen).toEqual(['error']);
-    expect(el.error.code).toBe(2);
+    expect(el.error.code).toBe(2);                   // the network
     el.play();
-    expect(bridge.audioLoad).toHaveBeenCalledTimes(2);
+    send({ type: 'error', url: A, code: 2004, name: 'ERROR_CODE_IO_BAD_HTTP_STATUS' });
+    expect(el.error.code).toBe(4);                   // the file is not there: not playable
+    el.play();
+    send({ type: 'error', url: A, code: 3001, name: 'ERROR_CODE_PARSING_CONTAINER_MALFORMED' });
+    expect(el.error.code).toBe(3);                   // the file will not decode
+    el.play();
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(4);
     send({ type: 'error', url: A, code: 0, name: 'not-playable' });
     expect(el.error.code).toBe(4);
   });

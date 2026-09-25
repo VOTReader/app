@@ -213,6 +213,30 @@ describe('audio-player on the native player (m3)', () => {
     } finally { delete globalThis.TourController; }
   });
 
+  it('a sleep timer or a recorder pause during a phone call reaches native, so it does not play on after (s2r S3)', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 5000, dur: 600000, playing: true, want: true });
+    await flush();
+    const t0 = Date.now();
+    AudioPlayer.setSleepTimer(1);
+    send({ type: 'state', url: URL_OF('idC'), pos: 6000, dur: 600000, playing: false, want: true, suppressed: true });
+    expect(AudioPlayer.getState().status).toBe('paused');
+    bridge.audioPause.mockClear();
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 61000);
+    send({ type: 'tick', url: URL_OF('idC'), pos: 6000, dur: 600000, playing: false, want: true, suppressed: true });
+    expect(bridge.audioPause).toHaveBeenCalledTimes(1);
+    expect(AudioPlayer.getState().sleepEndsAt).toBe(0);
+    vi.restoreAllMocks();
+    // and the journal recorder's pause, the same way
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 1000, dur: 600000, playing: true, want: true });
+    await flush();
+    send({ type: 'state', url: URL_OF('idC'), pos: 1000, dur: 600000, playing: false, want: true, suppressed: true });
+    bridge.audioPause.mockClear();
+    AudioPlayer.pauseIfPlaying();
+    expect(bridge.audioPause).toHaveBeenCalledTimes(1);
+  });
+
   it('a pause from the lock screen pauses the player; the page\'s pause goes to native', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     send({ type: 'state', url: URL_OF('idC'), pos: 5000, dur: 60000, playing: true, want: true });

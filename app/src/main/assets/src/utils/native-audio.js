@@ -43,6 +43,7 @@ const MAX_EXTRAPOLATE_S = 1.5;
 const TICK_MS = 250;
 /** MediaError codes (the player only reads that one exists). */
 const MEDIA_ERR_NETWORK = 2;
+const MEDIA_ERR_DECODE = 3;
 const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
 
 const _g = () => /** @type {any} */ (globalThis);
@@ -416,7 +417,7 @@ class NativeAudio extends EventTarget {
     this._playing = false;
     this._paused = true;
     this._syncTicker();
-    this.error = { code: e.name === 'not-playable' ? MEDIA_ERR_SRC_NOT_SUPPORTED : MEDIA_ERR_NETWORK };
+    this.error = { code: mediaErrorOf(e) };
     this._loaded = false;
     this._expect = null;   // play() loads it afresh (the player's retry)
     this._fire('error');
@@ -457,6 +458,18 @@ class NativeAudio extends EventTarget {
   _fire(type) {
     try { this.dispatchEvent(new Event(type)); } catch (_e) { /* a listener's throw must not stop the next event */ }
   }
+}
+
+/**
+ * The MediaError code for a native error, as <audio> would give it: the file itself (not playable, HTTP 404/410, not
+ * found) is SRC_NOT_SUPPORTED, a file that will not parse or decode is DECODE, the rest is the network.
+ * @param {any} e @returns {number}
+ */
+function mediaErrorOf(e) {
+  const n = Number(e && e.code) || 0;
+  if ((e && e.name === 'not-playable') || n === 2004 || n === 2005) return MEDIA_ERR_SRC_NOT_SUPPORTED;
+  if (n >= 3000 && n < 5000) return MEDIA_ERR_DECODE;
+  return MEDIA_ERR_NETWORK;
 }
 
 /** @param {string} json */

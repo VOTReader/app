@@ -434,23 +434,56 @@ describe('songs - the sweep n3 paths', () => {
     expect(JSON.parse(localStorage.getItem('vot-audio-pos')).ids).toEqual(['aaaaaaaaaaa2', 'bbbbbbbbbbb1']);
   });
 
-  it('a song that will not play is passed over; three in a row, or offline, pause (n3-03)', () => {
+  it('a song that will not load is passed over; three in a row pause; one that plays resets the count (n3-03)', async () => {
+    await load(bigSongCatalog(10));
     AudioPlayer.playSongs({ filter: {} });
-    const s0 = AudioPlayer.getState();
-    expect(s0.queue.length).toBeGreaterThanOrEqual(4);
-    el().dispatchEvent(new Event('error'));
+    el().dispatchEvent(new Event('error'));            // loading, nothing heard: passed over
     expect(AudioPlayer.getState().qi).toBe(1);
     expect(AudioPlayer.getState().status).toBe('loading');
     el().dispatchEvent(new Event('playing'));          // it played: the count starts again
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().qi).toBe(2);
     el().dispatchEvent(new Event('error'));
     el().dispatchEvent(new Event('error'));
     el().dispatchEvent(new Event('error'));
-    expect(s0.queue).toHaveLength(5);                   // a1 a2 b1 c1 c2 (a3 hidden, d1 unhosted)
-    expect(AudioPlayer.getState().qi).toBe(4);          // three passed over
-    expect(AudioPlayer.getState().status).toBe('loading');
+    expect(AudioPlayer.getState().qi).toBe(5);          // three passed over
     el().dispatchEvent(new Event('error'));            // the fourth in a row: the network, not the song
     expect(AudioPlayer.getState().status).toBe('paused');
-    expect(AudioPlayer.getState().qi).toBe(4);
+    expect(AudioPlayer.getState().qi).toBe(5);
+  });
+
+  it('a drop partway through a song pauses at its place; the last song failing pauses too (s2r S1 S2)', async () => {
+    await load(bigSongCatalog(4));
+    AudioPlayer.playSongs({ filter: {} });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 95;
+    el().dispatchEvent(new Event('timeupdate'));
+    el().dispatchEvent(new Event('error'));            // a tunnel, online: not the file
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    AudioPlayer.playSongs({ filter: {}, startId: Songs.songQueue({ filter: {} })[3].id });
+    expect(AudioPlayer.getState().queue).toHaveLength(1);
+    el().dispatchEvent(new Event('error'));            // the last (only) song: nothing to skip to
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().queue).toHaveLength(1);   // the bar stays, Play tries again
+  });
+
+  it('a song page queue (every take): switching takes keeps one copy, and a restart rebuilds it exactly (s2r M1 M2)', async () => {
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa1', label: 'Come' });
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(['song:aaaaaaaaaaa1', 'song:aaaaaaaaaaa2']);
+    AudioPlayer.switchSongVersion('aaaaaaaaaaa2');
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(['song:aaaaaaaaaaa2']);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa1', label: 'Come' });
+    AudioPlayer.next();
+    expect(AudioPlayer.switchSongVersion('aaaaaaaaaaa1')).toBe(true);
+    const live = AudioPlayer.getState();
+    expect(live.queue.map((t) => t.key)).toEqual(['song:aaaaaaaaaaa1']);
+    AudioPlayer.toggle();
+    await load();
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(AudioPlayer.getState().status).not.toBe('idle'));
+    await vi.waitFor(() => expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(live.queue.map((t) => t.key)));
+    expect(AudioPlayer.getState().qi).toBe(live.qi);
   });
 
   it('offline, a failed song pauses with the offline notice instead of walking the queue', () => {

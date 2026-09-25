@@ -531,7 +531,7 @@ export function cleanSongSwaps(swaps) {
  *            on or off reorders a queue; it never changes which songs are in it.
  *   startKey `song:<id>` the queue begins at (see _fromStart).
  *   wrap     with startKey and no shuffle: the whole list rotated to begin there (what Shuffle off asks).
- *   swaps    {catalog version id: chosen version id}: the listener's version switches in a described queue.
+ *   swaps    {catalog version id: chosen version id}: the listener's version switches in a one-take-per-song queue.
  * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown, wrap?: unknown, swaps?: unknown } | null | undefined} desc
  * @returns {Song[]}
  */
@@ -557,14 +557,15 @@ export function songQueue(desc) {
     if (one) list.push(versions[0]); else for (const s of versions) list.push(s);
   }
   if (d.shuffle) list = seededShuffle(list, Number(d.seed) >>> 0);
-  const swaps = cleanSongSwaps(d.swaps);
-  if (swaps) {
-    list = list.map((s) => {
-      const to = swaps[s.id] ? songById(swaps[s.id]) : null;
-      return to && _visible(to) && to.f === s.f ? /** @type {Song} */ (to) : s;
-    });
-  }
-  return _fromStart(list, startId, !!d.shuffle, one, !!d.wrap);
+  const ordered = _fromStart(list, startId, !!d.shuffle, one, !!d.wrap);
+  // Swaps apply to the queue as ordered, so the start and its horizon are the catalog's; only a one-take-per-song
+  // queue carries them (any other switch makes the queue an explicit list; refutation of s2r M1/M2).
+  const swaps = one ? cleanSongSwaps(d.swaps) : null;
+  if (!swaps) return ordered;
+  return ordered.map((s) => {
+    const to = swaps[s.id] ? songById(swaps[s.id]) : null;
+    return to && _visible(to) && to.f === s.f ? /** @type {Song} */ (to) : s;
+  });
 }
 
 /**
