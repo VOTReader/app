@@ -309,6 +309,7 @@ declare const TourDoneFlagStore: any;
 declare const TourOverlay: any;
 declare const TourPrompt: any;
 declare const USER_DATA_STORES: any;
+declare const UsageStats: any;
 declare const Utilities: any;
 declare const VOT_LETTER_REGISTRY: any;
 declare const VersePickerScreen: any;

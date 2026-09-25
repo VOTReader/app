@@ -139,6 +139,7 @@ import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
 import { announceUpdateIfAny } from '../utils/update-toast.js';
+import { installUsageStats, usagePlatform } from '../utils/usage-stats.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -185,9 +186,18 @@ import {
 // (Cluster A, Cluster D, the inline App() block) can call by bare name.
 // Mirrors the implicit `function NAME(){}` → window.NAME classic-script
 // binding the modules had before this conversion.
+// us1: the one anonymous-usage-counts instance. Its version is the running build:
+// the service worker's answer, or in the APK (no controlling worker) the packaged
+// service-worker.js itself. The first-run notice (once) is a 12-second toast.
+const UsageStats = installUsageStats(window, async () =>
+  (await getBuildVersion()) || (usagePlatform() === 'apk' ? fetchServerBuildVersion() : null),
+  (text) => showToast({ id: 'vot-usage-notice', className: 'vot-toast', text, durationMs: 12000 }));
+
 Object.assign(window, {
   // Platform bridge (W1.1)
   PlatformBridge,
+  // us1: anonymous usage counts (utils/usage-stats.js)
+  UsageStats,
   // Stores
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   // v04-02: Clear All (bundle-d) fences every store write until it reloads.

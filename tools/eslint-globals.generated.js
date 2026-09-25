@@ -308,6 +308,7 @@ export const projectGlobals = {
   TourOverlay: "readonly",
   TourPrompt: "readonly",
   USER_DATA_STORES: "readonly",
+  UsageStats: "readonly",
   Utilities: "readonly",
   VOT_LETTER_REGISTRY: "readonly",
   VersePickerScreen: "readonly",

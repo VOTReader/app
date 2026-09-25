@@ -129,6 +129,8 @@ export const BookmarkStore = extendStore(
       this._load().push(bookmark);
       this._save();
       this._bump();
+      // us1: that a bookmark was made, counted anonymously; never where or what.
+      try { var u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null; if (u) u.count('feat', 'bookmark'); } catch (_e) { /* stats never break a save */ }
     },
 
     /**

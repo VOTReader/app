@@ -90,7 +90,8 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                       privacy promise it was really making (nothing of YOURS
                       leaves) is unchanged and stays; the download claim is now
                       the truth. */}
-                  <p>Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files — your own data never leaves this device.</p>
+                  <p>Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files. Your notes, highlights and journal never leave this device.</p>
+                  <p>VOTReader sends anonymous counts (which letters are opened, minutes listened, errors) to help improve the app. No account, no device ID, nothing you write. Turn it off in Settings &rsaquo; Your Data.</p>
                 </div>
               </>
             )}

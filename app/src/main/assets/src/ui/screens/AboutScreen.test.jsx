@@ -81,7 +81,13 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
   });
 
   it('still promises the reader that their own data stays on the device', () => {
-    expect(page2()).toMatch(/your own data never leaves this device/i);
+    expect(page2()).toMatch(/your notes, highlights and journal never leave this device/i);
+  });
+
+  it('says plainly that anonymous counts are sent, and where to turn them off (us1)', () => {
+    expect(page2()).toMatch(/sends anonymous counts/i);
+    expect(page2()).toMatch(/no device ID, nothing you write/i);
+    expect(page2()).toMatch(/Settings . Your Data/);
   });
 
   it('names the Listening Library among what the library holds', () => {

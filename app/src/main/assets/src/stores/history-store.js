@@ -65,6 +65,22 @@ function _historyKey(entry) {
 }
 
 /**
+ * us1: count what was opened into the anonymous usage stats (utils/usage-stats.js
+ * on window): the letter id, the Bible book (not the chapter) or the study -
+ * never a title, a verse or anything the reader wrote.
+ * @param {HistoryEntry} entry
+ */
+function _usageOpen(entry) {
+  try {
+    const u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null;
+    if (!u || !entry) return;
+    if (entry.type === 'letter' && entry.letterId != null) u.count('open', 'letter:' + entry.letterId);
+    else if (entry.type === 'study-chapter' && entry.studyId != null) u.count('open', 'study:' + entry.studyId);
+    else if (entry.type === 'chapter' && entry.bookId != null) u.count('open', 'bible:' + entry.bookId);
+  } catch (_e) { /* stats never break history */ }
+}
+
+/**
  * Stamp imported or legacy entries with the current dedup key. The history
  * payload is intentionally permissive, so retain malformed/unknown rows for
  * display rather than dropping user history; only known entry types are
@@ -106,6 +122,7 @@ export const HistoryStore = extendStore(
       this._cache = [stamped, ...this._load()].slice(0, 2000);
       this._save();
       this._bump();
+      _usageOpen(entry);
     },
 
     /**

@@ -85,6 +85,10 @@ export const AnnotationStore = extendStore(
       data[key].push(/** @type {Annotation} */ (stamped));
       this._save();
       this._bumpKey(key); // F1+F2: re-render only this verse, not the whole chapter
+      // us1: one anonymous count per mark (its first segment), by kind; never where or what.
+      if (stamped.groupId === stamped.id) {
+        try { const u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null; if (u) u.count('feat', stamped.kind); } catch (_e) { /* stats never break a save */ }
+      }
     },
 
     /**

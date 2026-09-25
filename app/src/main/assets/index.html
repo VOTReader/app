@@ -49,14 +49,18 @@
        their catalog, covers and lyrics (songs/). It IS 'self' in the PWA, but
        the APK's origin is appassets.androidplatform.net, so the host is named;
        and media-src has no 'self' at all. What may PLAY from it is narrower
-       still: audio-track.js accepts one exact song pattern. -->
+       still: audio-track.js accepts one exact song pattern.
+       https://stats.votreader.workers.dev (us1, 2026-09-25; Corbin said yes
+       2026-09-24) is in connect-src only: utils/usage-stats.js posts anonymous
+       day-counts there (sendBeacon / fetch), which the reader can switch off in
+       Settings > Your Data. No device id, no search or error text. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-OZZskKxH5d2nH7fpmheWhG0lWQwj2i4yj0e3WDqinZc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-2gDw+HTwJgFqmwbNaA7TdGaw2jmfdK6QVid1u16FpfA=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-OZZskKxH5d2nH7fpmheWhG0lWQwj2i4yj0e3WDqinZc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
-    connect-src 'self' https://votreader.github.io;
+    connect-src 'self' https://votreader.github.io https://stats.votreader.workers.dev;
     media-src blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     object-src 'none';
     frame-src 'none';
@@ -123,9 +127,9 @@
           });
           return;
         }
-        /* AUDIT-PLAN E2 — uncaught JS error (not a resource load). With no
-           telemetry by policy, the in-app DiagnosticLog is the ONLY failure
-           trace, and it previously captured NOTHING thrown from event handlers,
+        /* AUDIT-PLAN E2 — uncaught JS error (not a resource load). Error text
+           never leaves the device (us1 sends a count per tag, never a message),
+           so the in-app DiagnosticLog is the ONLY full failure trace, and it previously captured NOTHING thrown from event handlers,
            async effects, setTimeout callbacks, or store subscribers (i.e.
            everything outside React's ErrorBoundary). DiagnosticLog lives in
            bundle-b (loaded after this), so guard on its presence; messages are

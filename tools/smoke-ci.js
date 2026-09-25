@@ -344,6 +344,10 @@ async function runAttempt(url) {
     page.setDefaultTimeout(30000);
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e)));
+    // us1: automation must never reach the real usage numbers (utils/usage-stats.js
+    // stays silent under navigator.webdriver). Any request to the stats host fails the walk.
+    const statsRequests = [];
+    page.on('request', (r) => { if (r.url().includes('stats.votreader.workers.dev')) statsRequests.push(r.url()); });
 
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     // Wait for React to mount the app shell.
@@ -375,6 +379,15 @@ async function runAttempt(url) {
     if (overflowX > 1) {
       report.ok = false;
       report.summary += ` | HORIZONTAL OVERFLOW ${overflowX}px at 1920x1080`;
+    }
+    // us1: the usage counts are loaded and guarded, and nothing went to the stats host.
+    const usageGuard = await page.evaluate(() => (window.UsageStats ? window.UsageStats.isGuarded() : 'absent'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    if (usageGuard !== true || statsRequests.length) {
+      report.ok = false;
+      report.summary += ` | USAGE STATS NOT SILENT (guard ${usageGuard}, ${statsRequests.length} request(s))`;
+    } else {
+      report.summary += ' | usage stats silent';
     }
     let compactNav;
     try {

@@ -532,7 +532,7 @@ const SETTINGS_TOPICS = {
   topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
   features: 'search synonyms synonym filter stop words tabs history',
   garden: 'a return to the garden image quality pictures',
-  data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
+  data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection usage statistics stats anonymous counts sharing analytics',
   progress: 'mark as read progress book reading clear',
   // The tour's re-entry (Settings › Help › Show me around). Every group the screen renders needs a
   // row here: matchesGroup dereferences SETTINGS_TOPICS[id] for the first typed character, and a
@@ -906,6 +906,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // DiagnosticLog alone (W7.4). Empty on a clean session. Read once on
   // mount; the count is a static snapshot of "what would be exported now."
   const [diagnosticLog, setDiagnosticLog] = React.useState([]);
+  // us1: the anonymous-usage-counts switch and its "See what is shared" view
+  // (utils/usage-stats.js, on window from bundle-b). Default on (Corbin 09-24).
+  const [usageOn, setUsageOn] = React.useState(() => { try { return !window.UsageStats || window.UsageStats.isEnabled(); } catch (_e) { return true; } });
+  const [usageShown, setUsageShown] = React.useState(false);
   React.useEffect(() => {
     try {
       const raw = PlatformBridge.getCrashLog();
@@ -2351,6 +2355,26 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 </div>
                 <div className="settings-row-desc">{verifyReport.message}</div>
               </div>
+            )}
+            {/* us1: anonymous usage counts. Off clears whatever is queued and stops
+                all sending; the view shows the exact JSON that would leave. */}
+            <SettingsRow
+              label="Share anonymous usage counts"
+              desc="Counts such as which letters are opened, minutes listened and errors, to help improve the app. No account, no device ID, nothing you write or search. Turning it off stops all sending and deletes what is waiting to be sent."
+              checked={usageOn}
+              onToggle={() => {
+                const next = !usageOn;
+                try { if (window.UsageStats) window.UsageStats.setEnabled(next); } catch (_e) { /* the switch still reflects the choice */ }
+                setUsageOn(next);
+              }}
+            />
+            <DataActionRow label="See What Is Shared" desc="The counts waiting to be sent, exactly as they would leave this device.">
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setUsageShown((v) => !v); }}>{usageShown ? 'Hide' : 'Show'}</button>
+            </DataActionRow>
+            {usageShown && (
+              <pre className="settings-usage-json" style={{ margin: '0 16px 12px', maxHeight: 260, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {(() => { try { return window.UsageStats ? JSON.stringify(window.UsageStats.snapshot(), null, 2) : 'Not loaded.'; } catch (_e) { return 'Unavailable.'; } })()}
+              </pre>
             )}
             {/* Diagnostic-log status row. Renders only when entries exist
                 (Android: native BoundedLogTree merged with the JS DiagnosticLog;

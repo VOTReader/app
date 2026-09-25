@@ -204,6 +204,8 @@ export var JournalStore = extendStore(
       this._save();
       this._bump();
       this._reindex(entry);
+      // us1: that an entry was started, counted anonymously; never a word of it.
+      try { var u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null; if (u) u.count('feat', 'journal_new'); } catch (_e) { /* stats never break a save */ }
       return entry;
     },
 
