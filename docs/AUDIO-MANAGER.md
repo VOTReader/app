@@ -246,7 +246,10 @@ boot rebuild both call.
   at 1x; `setPlaybackRate` during a song stores the READING speed for the next
   reading). A songs queue never auto-continues into letters.
 - `setShuffle(on)` and `setRepeat('off' | 'one' | 'all')` govern songs queues only;
-  any queue that is not songs resets repeat, so a letter never loops.
+  any queue that is not songs resets repeat, so a letter never loops. Shuffle
+  REORDERS a queue and never changes which songs are in it; "one version per
+  family" (what "Shuffle all songs" plays) is its own descriptor flag,
+  `playSongs({ onePerFamily })`, defaulting to `shuffle`.
 - The media card's artist line is `Songs of the Letters · <version>`, and the web
   `MediaMetadata` carries the song's 512 px cover.
 - The catalog is published by the songs sites, not shipped in the app:

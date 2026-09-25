@@ -256,6 +256,19 @@ describe('AudioLibraryStore — Songs of the Letters shelves (2026-09-24)', () =
     expect(normalizeAudioLibrary({ saved: [] })).toMatchObject({ songSaved: [], songRecent: [] });
   });
 
+  it('a song TRACK stars and plays onto the songs shelves, never the recordings ones', () => {
+    const song = { key: 'song:' + sid(7), title: 'A Song', sub: null, url: 'https://votreader.github.io/songs-1/' + sid(7) + '.mp3', readerCode: '', partLabel: 'Pop' };
+    expect(AudioLibraryStore.toggleSaved(song)).toBe(true);
+    expect(AudioLibraryStore.isSaved(song)).toBe(true);
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(7)]);
+    expect(AudioLibraryStore.saved()).toEqual([]);
+    AudioLibraryStore.recordPlayed(song);
+    expect(AudioLibraryStore.songRecent()).toEqual([sid(7)]);
+    expect(AudioLibraryStore.recent()).toEqual([]);
+    expect(AudioLibraryStore.toggleSaved(song)).toBe(false);
+    expect(AudioLibraryStore.songSaved()).toEqual([]);
+  });
+
   it('carries the song shelves through replaceAll (the backup/import path)', () => {
     AudioLibraryStore.replaceAll({ songSaved: [sid(9)], songRecent: [sid(8), sid(9)] });
     expect(AudioLibraryStore.songSaved()).toEqual([sid(9)]);

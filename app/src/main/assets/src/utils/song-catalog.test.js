@@ -68,6 +68,11 @@ describe('the song trust boundary — ONE exact pattern, not a prefix', () => {
     expect(normalizeAudioTrack({ key: 'song:3fa9c1d2e4b5', title: 'x', url: ok + '?x' })).toBe(null);
   });
 
+  it('a song URL can never carry a letter’s key: the key is derived from the URL', () => {
+    expect(normalizeAudioTrack({ key: 'wtlb1:come-love-awaits-you', title: 'x', url: ok }).key).toBe('song:3fa9c1d2e4b5');
+    expect(normalizeAudioTrack({ key: null, title: 'x', url: ok }).key).toBe('song:3fa9c1d2e4b5');
+  });
+
   it('song keys are `song:` plus a 12-hex id, nothing else', () => {
     expect(isSongKey('song:3fa9c1d2e4b5')).toBe(true);
     expect(songIdOfKey('song:3fa9c1d2e4b5')).toBe('3fa9c1d2e4b5');
@@ -204,10 +209,17 @@ describe('order — the seeded shuffle and songQueue', () => {
       .toEqual(['aaaaaaaaaaa1', 'aaaaaaaaaaa2', 'bbbbbbbbbbb1', 'ccccccccccc2', 'ccccccccccc1']);
     expect(songQueue({ filter: {}, startKey: 'song:bbbbbbbbbbb1' }).map((s) => s.id))
       .toEqual(['bbbbbbbbbbb1', 'ccccccccccc2', 'ccccccccccc1']);
-    const shuffled = songQueue({ filter: {}, shuffle: true, seed: 3, startKey: 'song:aaaaaaaaaaa2' }).map((s) => s.id);
-    expect(shuffled[0]).toBe('aaaaaaaaaaa2');
-    expect(shuffled).not.toContain('aaaaaaaaaaa1');   // one version of fam-a, the chosen one
-    expect(shuffled).toHaveLength(3);
+    // One version per family: the chosen take fills its family's slot.
+    const one = songQueue({ filter: {}, one: true, shuffle: true, seed: 3, startKey: 'song:aaaaaaaaaaa2' }).map((s) => s.id);
+    expect(one[0]).toBe('aaaaaaaaaaa2');
+    expect(one).not.toContain('aaaaaaaaaaa1');
+    expect(one).toHaveLength(3);
+    expect(songQueue({ filter: {}, one: true, startKey: 'song:ccccccccccc1' }).map((s) => s.id))
+      .toEqual(['ccccccccccc1']);                     // plain: forward-only from fam-c's slot, take 1 in it
+    // Shuffle REORDERS: the same five songs as the plain list, the chosen one first.
+    const all = songQueue({ filter: {}, shuffle: true, seed: 3, startKey: 'song:aaaaaaaaaaa2' }).map((s) => s.id);
+    expect(all[0]).toBe('aaaaaaaaaaa2');
+    expect(all.slice().sort()).toEqual(['aaaaaaaaaaa1', 'aaaaaaaaaaa2', 'bbbbbbbbbbb1', 'ccccccccccc1', 'ccccccccccc2']);
     // Explicit ids keep their order; hidden and unknown ids drop out.
     expect(songQueue({ ids: ['ccccccccccc1', 'aaaaaaaaaaa3', 'ffffffffffff', 'bbbbbbbbbbb1'] }).map((s) => s.id))
       .toEqual(['ccccccccccc1', 'bbbbbbbbbbb1']);

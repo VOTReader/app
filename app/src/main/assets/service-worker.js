@@ -302,7 +302,7 @@ const ASSET_INTEGRITY = {
   './': '87e0a06590b8f8eb98d1c3a0b2e6abb707a7818eb8a99c0de7426251f76bf1de',
   './dist/app.min.css': '9f21d078ee376a68356e340c33fc8928cd2e13d71b9723892c8574b665eaacaa',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': 'c363d941dd83e4f4e4934feed229472382a6a1177705009e147cbab121035f98',
+  './dist/bundle-b.js': 'e59b53813627095feb69975ee963f53b8086408265999141c87d10087abc6137',
   './dist/bundle-c.js': 'bff22d74a82a8fddf2da2c7a89dd47df02292646634d184870ba6486fca1547f',
   './dist/bundle-d.js': 'af9bf5524da866ab4f88b7436b1b05d9c1e6a7edd70877e5bb40a38b7451bf7b',
   './dist/bundle-e.js': 'd7fcb3d0692a2855ee501654b7d1e87cdf2ab5b64fe5d5607cd3914a427a7934',

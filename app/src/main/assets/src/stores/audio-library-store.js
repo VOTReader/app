@@ -12,7 +12,7 @@
 */
 
 import { CachedStore, extendStore } from './cached-store.js';
-import { isSongId, normalizeAudioRate, normalizeAudioTrack } from '../utils/audio-track.js';
+import { isSongId, normalizeAudioRate, normalizeAudioTrack, songIdOfKey } from '../utils/audio-track.js';
 
 export const MAX_SAVED_AUDIO_TRACKS = 100;
 export const MAX_RECENT_AUDIO_TRACKS = 30;
@@ -202,6 +202,8 @@ export const AudioLibraryStore = extendStore(
     /** @param {unknown} track @returns {boolean} */
     isSaved(track) {
       const normalized = normalizeAudioTrack(track);
+      const songId = normalized ? songIdOfKey(normalized.key) : '';
+      if (songId) return this.isSongSaved(songId);   // a song's star is the songs shelf's
       return !!normalized && this.get().saved.some((item) => item.url === normalized.url);
     },
 
@@ -215,6 +217,10 @@ export const AudioLibraryStore = extendStore(
     toggleSaved(track) {
       const normalized = normalizeAudioTrack(track);
       if (!normalized) return false;
+      // A song saves to the SONGS shelf, by id: every star (the desk's, a row's)
+      // stays right for songs, and the 100 recordings slots stay the readings'.
+      const songId = songIdOfKey(normalized.key);
+      if (songId) return this.toggleSongSaved(songId);
       const wasSaved = this.isSaved(normalized);
       if (this._shouldDefer('toggleSaved', normalized)) return !wasSaved;
       const data = _writeableData(this);
@@ -246,6 +252,8 @@ export const AudioLibraryStore = extendStore(
     recordPlayed(track) {
       const normalized = normalizeAudioTrack(track);
       if (!normalized) return;
+      const songId = songIdOfKey(normalized.key);
+      if (songId) { this.recordSongPlayed(songId); return; }   // songs have their own shelf
       if (this._shouldDefer('recordPlayed', normalized)) return;
       const data = _writeableData(this);
       data.recent = data.recent.filter((item) => item.url !== normalized.url);

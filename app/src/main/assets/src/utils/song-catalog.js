@@ -473,29 +473,26 @@ export function seededShuffle(list, seed) {
  * @param {unknown} filter @param {number} seed @returns {Song[]}
  */
 export function shuffledFeatured(filter, seed) {
-  const f = normalizeSongFilter(filter);
-  /** @type {Song[]} */
-  const picks = [];
-  for (const fam of familiesFor(f)) {
-    const first = _matchingVersions(fam, f)[0];
-    if (first) picks.push(first);
-  }
-  return seededShuffle(picks, seed);
+  return songQueue({ filter, one: true, shuffle: true, seed });
 }
 
 /**
- * Begin a list at the song the listener chose. A shuffled list puts it first
- * and drops the rest of its family (one version per family holds); a plain
- * list is FORWARD-ONLY from it, the rule every other queue in the player keeps.
- * @param {Song[]} list @param {string} startId @param {boolean} shuffled @returns {Song[]}
+ * Begin a list at the song the listener chose. The chosen song takes its own
+ * SLOT — itself, or, in a one-version-per-family list, its family's pick (a
+ * listener who chose take 6 hears take 6, not the featured take as well). A
+ * shuffled list opens on it; a plain list is FORWARD-ONLY from its slot, the
+ * rule every other queue in the player keeps.
+ * @param {Song[]} list @param {string} startId @param {boolean} shuffled @param {boolean} one
+ * @returns {Song[]}
  */
-function _fromStart(list, startId, shuffled) {
+function _fromStart(list, startId, shuffled, one) {
   const start = startId ? songById(startId) : null;
   if (!_visible(start)) return list;
   const s = /** @type {Song} */ (start);
-  if (shuffled) return [s].concat(list.filter((x) => x.f !== s.f));
-  const at = list.findIndex((x) => x.id === s.id);
-  return at >= 0 ? list.slice(at) : [s].concat(list);
+  const slot = (/** @type {Song} */ x) => (one ? x.f === s.f : x.id === s.id);
+  if (shuffled) return [s].concat(list.filter((x) => !slot(x)));
+  const at = list.findIndex(slot);
+  return at >= 0 ? [s].concat(list.slice(at + 1)) : [s].concat(list);
 }
 
 /**
@@ -504,10 +501,14 @@ function _fromStart(list, startId, shuffled) {
  *   ids      an explicit list, ALREADY in play order (a shuffle of ids is
  *            applied once, when the queue is made, and the ids stored as
  *            played); hidden and unknown ids drop out.
- *   filter   otherwise: shuffled → one version per family, seeded; plain →
- *            every admitted version, family by family, featured first.
+ *   filter   otherwise: every admitted version, family by family, featured
+ *            first — or, with `one`, ONE version per family (the featured one,
+ *            or the first the filter admits), which is what "Shuffle all
+ *            songs" plays so 912 different songs come before any repeat.
+ *   shuffle  a seeded permutation (`seed`) of that same list. Turning shuffle
+ *            on or off reorders a queue; it never changes which songs are in it.
  *   startKey `song:<id>` the queue begins at (see _fromStart).
- * @param {{ ids?: unknown, filter?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown } | null | undefined} desc
+ * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown } | null | undefined} desc
  * @returns {Song[]}
  */
 export function songQueue(desc) {
@@ -521,14 +522,18 @@ export function songQueue(desc) {
       const s = songById(id);
       if (_visible(s) && !seen.has(id)) { seen.add(id); list.push(/** @type {Song} */ (s)); }
     }
-    return _fromStart(list, startId, false);
+    return _fromStart(list, startId, false, false);
   }
   const f = normalizeSongFilter(d.filter);
-  if (d.shuffle) return _fromStart(shuffledFeatured(f, Number(d.seed) >>> 0), startId, true);
+  const one = !!d.one;
   /** @type {Song[]} */
-  const list = [];
-  for (const fam of familiesFor(f)) for (const s of _matchingVersions(fam, f)) list.push(s);
-  return _fromStart(list, startId, false);
+  let list = [];
+  for (const fam of familiesFor(f)) {
+    const versions = _matchingVersions(fam, f);
+    if (one) list.push(versions[0]); else for (const s of versions) list.push(s);
+  }
+  if (d.shuffle) list = seededShuffle(list, Number(d.seed) >>> 0);
+  return _fromStart(list, startId, !!d.shuffle, one);
 }
 
 /**

@@ -148,6 +148,18 @@ describe('songs are gated out of reading credit and counters', () => {
     expect(lib.countCompletion).toHaveBeenCalledTimes(1);
   });
 
+  it('a song URL filed under a LETTER key still earns no credit (the key follows the URL)', () => {
+    const listened = vi.fn();
+    const lib = library();
+    globalThis.__votAudioListened = listened;
+    globalThis.AudioLibraryStore = lib;
+    AudioPlayer.playTrack({ key: 'vol1:letter-a', title: 'Not a letter', url: SONG_URL(2, 'bbbbbbbbbbb1') });
+    expect(AudioPlayer.getState().queue[0].key).toBe('song:bbbbbbbbbbb1');
+    ended();
+    expect(listened).not.toHaveBeenCalled();
+    expect(lib.countCompletion).not.toHaveBeenCalled();
+  });
+
   it('a song goes on the songs shelf by id — never the recordings shelf or the lifetime play count', () => {
     const lib = library();
     globalThis.AudioLibraryStore = lib;
@@ -328,6 +340,29 @@ describe('repeat and shuffle', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     expect(AudioPlayer.setShuffle(true)).toBe(false);
     expect(AudioPlayer.getState().shuffle).toBe(false);
+  });
+
+  it('shuffle reorders and never drops: every version on a song page stays in the queue', () => {
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });   // a1, a2
+    expect(AudioPlayer.setShuffle(true)).toBe(true);
+    const keys = AudioPlayer.getState().queue.map((t) => t.key);
+    expect(keys[0]).toBe('song:aaaaaaaaaaa1');
+    expect(keys.slice().sort()).toEqual(['song:aaaaaaaaaaa1', 'song:aaaaaaaaaaa2']);
+  });
+
+  it('"Shuffle all songs" is one version per family, and stays so when shuffle is turned off', () => {
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 11 });
+    let s = AudioPlayer.getState();
+    expect(s.queue).toHaveLength(3);                          // fam-a, fam-b, fam-c: one take each
+    expect(new Set(s.queue.map((t) => Songs.songById(t.key.slice(5)).f)).size).toBe(3);
+    const playing = s.queue[0];
+    expect(AudioPlayer.setShuffle(false)).toBe(true);
+    s = AudioPlayer.getState();
+    expect(s.shuffle).toBe(false);
+    expect(s.queue[0]).toEqual(playing);
+    expect(s.queue.every((t, i, q) => q.findIndex((u) => Songs.songById(u.key.slice(5)).f === Songs.songById(t.key.slice(5)).f) === i)).toBe(true);
+    AudioPlayer.toggle();                                     // the snapshot carries the rule
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos'))).toMatchObject({ mode: 'songs', one: true });
   });
 });
 

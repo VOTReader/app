@@ -572,7 +572,10 @@ export function normalizeAudioTrack(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = /** @type {Record<string, unknown>} */ (value);
   if (typeof raw.url !== 'string' || !isVotAudioUrl(raw.url)) return null;
-  const key = _text(raw.key, MAX_KEY);
+  // A song's key is DERIVED from its URL, whatever the stored row says: a song
+  // must never carry a letter's key (it would earn that letter's read credit).
+  const songId = isSongUrl(raw.url) ? raw.url.slice(raw.url.lastIndexOf('/') + 1, -4) : '';
+  const key = songId ? SONG_KEY_PREFIX + songId : _text(raw.key, MAX_KEY);
   const sub = _text(raw.sub, MAX_SUB);
   const partLabel = _text(raw.partLabel, MAX_PART);
   return {

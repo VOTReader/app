@@ -44,6 +44,7 @@ import {
   bibleReleaseTagFor,
   isSongId,
   isSongKey,
+  isSongUrl,
   isVotAudioUrl,
   normalizeAudioRate,
   normalizeAudioTrack,
@@ -180,9 +181,10 @@ const _bibleManifest = () => _g().BIBLE_AUDIO_MANIFEST || null;
  *  that edition's own OT/NT release tags (the retired whole-book tracks on
  *  audio-bible-v1 resolve through the same routing). */
 const _isBibleVol = (volKey) => typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
-/** A Songs of the Letters track (`song:<id>`). Songs are not readings: they
- *  earn no read credit, no lifetime counts, no resume point, and play at 1×. */
-const _isSong = (track) => !!track && isSongKey(track.key);
+/** A Songs of the Letters track (`song:<id>`, or anything streaming a song
+ *  URL). Songs are not readings: they earn no read credit, no lifetime counts,
+ *  no resume point, and play at 1×. */
+const _isSong = (track) => !!track && (isSongKey(track.key) || isSongUrl(track.url));
 /** The manifest a volKey's entries live in. */
 const _mapFor = (volKey) => (_isBibleVol(volKey) ? _bibleManifest() : _manifest());
 /** Release-aware asset → stream URL for a volKey's tracks. */
@@ -1638,7 +1640,7 @@ const PERSIST_KEY = 'vot-audio-pos';
  * is a few dozen bytes here, where a `custom` queue would re-serialize 900
  * tracks into IDB every second. song-catalog.js's songQueue() turns it back
  * into the same queue.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, seed?: number, shuffle?: boolean, ids?: string[] | null } | null} */
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -1962,6 +1964,7 @@ function _snapshot() {
     startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
     startReader: src.startReader || undefined,
     filter: songs ? songs.filter : undefined,
+    one: songs && songs.one ? true : undefined,
     seed: songs && songs.seed ? songs.seed : undefined,
     shuffle: songs && songs.shuffle ? true : undefined,
     ids: songs ? songs.ids : undefined,
@@ -1980,7 +1983,7 @@ const SONG_IDS_PERSIST = 50;
  * explicit ids list longer than SONG_IDS_PERSIST is cut to the window that
  * starts at the playing song, and the snapshot's startKey and qi move with it.
  * @param {any} src @param {Track} track @param {number} qi
- * @returns {{ filter: any, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number }}
+ * @returns {{ filter: any, one: boolean, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number }}
  */
 function _songsSnapshotFields(src, track, qi) {
   let ids = Array.isArray(src.ids) ? src.ids.filter(isSongId) : undefined;
@@ -1991,7 +1994,7 @@ function _songsSnapshotFields(src, track, qi) {
     startKey = null;
     qi = 0;
   }
-  return { filter: ids ? undefined : normalizeSongFilter(src.filter), seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi };
+  return { filter: ids ? undefined : normalizeSongFilter(src.filter), one: !ids && !!src.one, seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi };
 }
 
 function _clearPersist() {
@@ -2103,6 +2106,7 @@ function _applySnapshot(s) {
       startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
       filter: mode === 'songs' && !songIds ? normalizeSongFilter(s.filter) : null,
+      one: mode === 'songs' && !songIds && s.one === true,
       seed: mode === 'songs' ? (Number(s.seed) >>> 0) : 0,
       shuffle: mode === 'songs' && s.shuffle === true,
       ids: songIds,
@@ -2341,7 +2345,7 @@ async function _rebuildRestoredQueue() {
   // horizon it just replayed and the SECOND boot regrows part 1.
   // A songs source keeps the session's repeat (_applySnapshot restored it).
   _setSource(r.mode === 'songs'
-    ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids }
+    ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, one: !!r.one, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids }
     : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
@@ -2647,12 +2651,15 @@ function _newSeed() {
 /**
  * Play songs from the catalog. Either `ids` (an explicit list: a family's
  * versions, the saved songs) or a `filter` ({ col, style, letter, family, q,
- * lang, dl }; `{}` is every song). `shuffle` plays ONE version per family in a
- * seeded order (`seed` makes it reproducible; one is drawn when absent);
- * `startId` is the song to begin with. False when nothing started (no catalog,
- * nothing matched, or offline).
+ * lang, dl }; `{}` is every song). `shuffle` plays them in a seeded order
+ * (`seed` makes it reproducible; one is drawn when absent). `onePerFamily`
+ * queues ONE version of each song — the "Shuffle all songs" rule, so 912
+ * different songs play before any repeats — and defaults to `shuffle`: a
+ * shuffle started from a filter is one version per family unless the caller
+ * says otherwise. `startId` is the song to begin with. False when nothing
+ * started (no catalog, nothing matched, or offline).
  *
- * @param {{ ids?: string[], filter?: any, startId?: string, shuffle?: boolean, seed?: number, label?: string }} opts
+ * @param {{ ids?: string[], filter?: any, startId?: string, shuffle?: boolean, onePerFamily?: boolean, seed?: number, label?: string }} opts
  * @returns {boolean}
  */
 function playSongs(opts) {
@@ -2672,9 +2679,10 @@ function playSongs(opts) {
     const startId = startKey ? /** @type {string} */ (o.startId) : '';
     const order = shuffle ? (startId ? [startId] : []).concat(seededShuffle(ids.filter((id) => id !== startId), seed)) : ids;
     const list = songQueue({ ids: order, startKey: shuffle ? null : startKey });
-    desc = { mode: 'songs', volKey: 'song', label, ids: list.map((s) => s.id), filter: null, seed, shuffle, startKey: null };
+    desc = { mode: 'songs', volKey: 'song', label, ids: list.map((s) => s.id), filter: null, one: false, seed, shuffle, startKey: null };
   } else {
-    desc = { mode: 'songs', volKey: 'song', label, ids: null, filter: normalizeSongFilter(o.filter), seed, shuffle, startKey };
+    const one = typeof o.onePerFamily === 'boolean' ? o.onePerFamily : shuffle;
+    desc = { mode: 'songs', volKey: 'song', label, ids: null, filter: normalizeSongFilter(o.filter), one, seed, shuffle, startKey };
   }
   const queue = _songTracks(songQueue(desc));
   if (!queue.length) return false;
@@ -2718,12 +2726,13 @@ function setRepeat(mode) {
 }
 
 /**
- * Turn shuffle on or off for the songs queue that is playing. The song playing
- * keeps playing and becomes the head of a queue rebuilt from the descriptor:
- * on, the rest in a fresh seeded order, one version per family; off, the
- * catalog order onward from it. An explicit list reshuffles its rest on, and
- * keeps its order off (the order before the shuffle is not kept). False when
- * the queue is not songs.
+ * Turn shuffle on or off for the songs queue that is playing. It REORDERS; it
+ * never changes which songs are in the queue (one version per family stays
+ * exactly as it was). The song playing keeps playing and becomes the head of a
+ * queue rebuilt from the descriptor: on, the rest in a fresh seeded order; off,
+ * the catalog order onward from it. An explicit list reshuffles its rest on,
+ * and keeps its order off (the order before the shuffle is not kept). False
+ * when the queue is not songs.
  * @param {unknown} on
  * @returns {boolean}
  */
