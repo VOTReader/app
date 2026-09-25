@@ -441,3 +441,71 @@ describe('useReadingChainNav — _goFirst commit-fns (verified via boundaryConfi
     expect(props.setLetterId).toHaveBeenCalledWith('wtlb1-preface');
   });
 });
+
+// ── as1b: Revelation → Volume One before the VOT corpus has loaded ───────
+// A reader who goes straight to the Bible reaches Revelation 22 with the
+// VOT letters not loaded (index.html lazy-loads them). Next Book, the swipe
+// onto the boundary card and auto-continue all call _goFirst.one; it read
+// Volume One's letters at render time (an empty list) and did nothing.
+
+describe('useReadingChainNav — boundary jump before the letters load (as1b)', () => {
+  let loaded, listeners, prevCorpus, prevLoad;
+  beforeEach(() => {
+    loaded = false; listeners = new Set();
+    prevCorpus = window.__votCorpus; prevLoad = window.__loadVotCorpus;
+    const real = window.colLetterArr;
+    window.colLetterArr = (col) => (col?.volKey === 'one' && !loaded) ? [] : real(col);
+    window.__votCorpus = {
+      get loaded() { return loaded; },
+      subscribe: vi.fn((cb) => { listeners.add(cb); return () => listeners.delete(cb); }),
+    };
+    window.__loadVotCorpus = vi.fn(() => Promise.resolve());
+  });
+  afterEach(() => {
+    window.__votCorpus = prevCorpus; window.__loadVotCorpus = prevLoad;
+    vi.useRealTimers();
+  });
+  const land = () => { loaded = true; [...listeners].forEach((cb) => cb()); };
+  const atRev22 = () => setup({ book: stubBibleBookList[2], chapter: { num: 22 }, bookId: 'revelation' });
+
+  it('Next Book asks for the letters and lands on Volume One once they arrive, then stops listening', () => {
+    const { result, props } = atRev22();
+    result.current.bcvOnNextBook();
+    expect(window.__loadVotCorpus).toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalled();
+    expect(listeners.size).toBe(1);
+    land();
+    expect(props.setLetterId).toHaveBeenCalledWith('v1-a');
+    expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
+    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:one', expect.any(Function));
+    expect(listeners.size).toBe(0);
+  });
+
+  it('a jump the letters take longer than 8 s for is dropped (the reader has moved on)', () => {
+    vi.useFakeTimers();
+    const { result, props } = atRev22();
+    result.current.bcvOnNextBook();
+    vi.advanceTimersByTime(8001);
+    expect(listeners.size).toBe(0);
+    land();
+    expect(props.setScreen).not.toHaveBeenCalled();
+  });
+
+  it('a second tap while waiting replaces the first: one jump, one listener', () => {
+    const { result, props } = atRev22();
+    result.current.bcvOnNextBook();
+    result.current.bcvOnNextBook();
+    expect(listeners.size).toBe(1);
+    land();
+    expect(props.setScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('with the letters already loaded the jump is immediate and loads nothing', () => {
+    loaded = true;
+    const { result, props } = atRev22();
+    result.current.bcvOnNextBook();
+    expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
+    expect(window.__loadVotCorpus).not.toHaveBeenCalled();
+    expect(listeners.size).toBe(0);
+  });
+});
