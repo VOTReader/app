@@ -98,6 +98,10 @@ Where you land. It should open on where you left off, not on a directory of nine
 
 <table><tr><td valign="top"><img src="img/home-r2-refined.webp" width="180" alt="A2 · refined"><br><sub>A2 · refined</sub></td><td valign="top"><img src="img/home-r2-light.webp" width="180" alt="A2 · light twin"><br><sub>A2 · light twin</sub></td><td valign="top"><img src="img/home-r2-tabs.webp" width="180" alt="A2 · bottom tabs"><br><sub>A2 · bottom tabs</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/home-r4-home-r4.webp" width="180" alt="Home · Codex polish"><br><sub>Home · Codex polish</sub></td><td valign="top"><img src="img/home-r4-home-tabs-r4.webp" width="180" alt="Home, shortcuts docked · Codex polish"><br><sub>Home, shortcuts docked · Codex polish</sub></td></tr></table>
+
 ### Letter reader
 
 The heart of the app: one letter, read for twenty minutes at a time. Chrome should get out of the way.
@@ -111,6 +115,10 @@ The heart of the app: one letter, read for twenty minutes at a time. Chrome shou
 **Round 2 · iterating branch A**
 
 <table><tr><td valign="top"><img src="img/letter-r2-refined.webp" width="180" alt="A2 · refined, real text"><br><sub>A2 · refined, real text</sub></td><td valign="top"><img src="img/letter-r2-light.webp" width="180" alt="A2 · light twin"><br><sub>A2 · light twin</sub></td><td valign="top"><img src="img/letter-r2-focus.webp" width="180" alt="A2 · focus mode"><br><sub>A2 · focus mode</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/letter-r4-letter-r4.webp" width="180" alt="Letter 15 · Codex polish"><br><sub>Letter 15 · Codex polish</sub></td></tr></table>
 
 ### Bible chapter
 
@@ -130,6 +138,10 @@ Verse numbers, the reader's highlights, and the docked player.
 
 <table><tr><td valign="top"><img src="img/bible-html-bible-select-dark.webp" width="180" alt="Selecting text · Vesper · dark"><br><sub>Selecting text · Vesper · dark</sub></td><td valign="top"><img src="img/bible-html-bible-select-light.webp" width="180" alt="Selecting text · Vellum · light"><br><sub>Selecting text · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/bible-r4-bible-select-r4.webp" width="180" alt="Selecting text · Codex polish"><br><sub>Selecting text · Codex polish</sub></td><td valign="top"><img src="img/bible-r4-scriptures-r4.webp" width="180" alt="Scriptures home · Codex polish"><br><sub>Scriptures home · Codex polish</sub></td></tr></table>
+
 ### Footnote sheet
 
 The scripture behind a footnote, without leaving the letter.
@@ -148,6 +160,10 @@ The scripture behind a footnote, without leaving the letter.
 
 <table><tr><td valign="top"><img src="img/sheet-html-sheet-dark.webp" width="180" alt="Footnote sheet · Vesper · dark"><br><sub>Footnote sheet · Vesper · dark</sub></td><td valign="top"><img src="img/sheet-html-sheet-light.webp" width="180" alt="Footnote sheet · Vellum · light"><br><sub>Footnote sheet · Vellum · light</sub></td><td valign="top"><img src="img/sheet-html-sheet-stack-dark.webp" width="180" alt="Footnote carousel · Vesper · dark"><br><sub>Footnote carousel · Vesper · dark</sub></td><td valign="top"><img src="img/sheet-html-sheet-stack-light.webp" width="180" alt="Footnote carousel · Vellum · light"><br><sub>Footnote carousel · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/sheet-r4-sheet-r4.webp" width="180" alt="Footnote sheet · Codex polish"><br><sub>Footnote sheet · Codex polish</sub></td><td valign="top"><img src="img/sheet-r4-sheet-stack-r4.webp" width="180" alt="Footnote carousel · Codex polish"><br><sub>Footnote carousel · Codex polish</sub></td></tr></table>
+
 ### Read-along player
 
 Listening while the words follow along. Built for long, restful sessions.
@@ -165,6 +181,10 @@ Listening while the words follow along. Built for long, restful sessions.
 **HTML render · Vesper system**
 
 <table><tr><td valign="top"><img src="img/player-html-player-sleep-dark.webp" width="180" alt="Sleep timer · Vesper · dark"><br><sub>Sleep timer · Vesper · dark</sub></td><td valign="top"><img src="img/player-html-player-sleep-light.webp" width="180" alt="Sleep timer · Vellum · light"><br><sub>Sleep timer · Vellum · light</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/player-r4-player-r4.webp" width="180" alt="Listening desk · Codex polish"><br><sub>Listening desk · Codex polish</sub></td><td valign="top"><img src="img/player-r4-player-sleep-r4.webp" width="180" alt="Sleep timer · Codex polish"><br><sub>Sleep timer · Codex polish</sub></td></tr></table>
 
 ### Scripture Web
 
@@ -211,6 +231,10 @@ How the app is shaped, and the seven volumes at a glance.
 **Round 2 · iterating branch A**
 
 <table><tr><td valign="top"><img src="img/settings-volumes-r2-refined.webp" width="420" alt="A2 · refined"><br><sub>A2 · refined</sub></td><td valign="top"><img src="img/settings-volumes-r2-light.webp" width="420" alt="A2 · light twin"><br><sub>A2 · light twin</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/settings-volumes-r4-volumes-r4.webp" width="420" alt="The Volumes · Codex polish"><br><sub>The Volumes · Codex polish</sub></td></tr></table>
 
 ### Welcome and Songs
 
@@ -306,6 +330,10 @@ The Bible and letter studies and the Matthew Study Bible.
 
 <table><tr><td valign="top"><img src="img/studies-html-studies-dark.webp" width="180" alt="Studies · Vesper · dark"><br><sub>Studies · Vesper · dark</sub></td><td valign="top"><img src="img/studies-html-studies-light.webp" width="180" alt="Studies · Vellum · light"><br><sub>Studies · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/studies-r4-studies-r4.webp" width="180" alt="Studies · Codex polish"><br><sub>Studies · Codex polish</sub></td></tr></table>
+
 ### Answers Only God Can Give
 
 The Ten Commandments and 102 topics, browsable.
@@ -319,6 +347,10 @@ The Ten Commandments and 102 topics, browsable.
 **HTML render · Vesper system**
 
 <table><tr><td valign="top"><img src="img/answers-html-answers-dark.webp" width="180" alt="Answers · Vesper · dark"><br><sub>Answers · Vesper · dark</sub></td><td valign="top"><img src="img/answers-html-answers-light.webp" width="180" alt="Answers · Vellum · light"><br><sub>Answers · Vellum · light</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/answers-r4-answers-r4.webp" width="180" alt="Answers · Codex polish"><br><sub>Answers · Codex polish</sub></td></tr></table>
 
 ### Letter index
 
@@ -348,6 +380,10 @@ A calm trail of what you read, instead of an empty scroll.
 
 <table><tr><td valign="top"><img src="img/history-html-history-dark.webp" width="180" alt="History · Vesper · dark"><br><sub>History · Vesper · dark</sub></td><td valign="top"><img src="img/history-html-history-light.webp" width="180" alt="History · Vellum · light"><br><sub>History · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/history-r4-history-r4.webp" width="180" alt="History · Codex polish"><br><sub>History · Codex polish</sub></td></tr></table>
+
 ### Tabs switcher
 
 Several readings open at once.
@@ -374,6 +410,10 @@ Writing, a photo, a voice memo and a linked passage, kept on the phone.
 
 <table><tr><td valign="top"><img src="img/journal-html-journal-dark.webp" width="180" alt="Journal entry · Vesper · dark"><br><sub>Journal entry · Vesper · dark</sub></td><td valign="top"><img src="img/journal-html-journal-light.webp" width="180" alt="Journal entry · Vellum · light"><br><sub>Journal entry · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/journal-r4-journal-r4.webp" width="180" alt="Journal entry · Codex polish"><br><sub>Journal entry · Codex polish</sub></td></tr></table>
+
 ### Highlights
 
 Everything highlighted, filtered by the six calm colours.
@@ -385,6 +425,10 @@ Everything highlighted, filtered by the six calm colours.
 **HTML render · Vesper system**
 
 <table><tr><td valign="top"><img src="img/highlights-html-highlights-dark.webp" width="180" alt="Highlights · Vesper · dark"><br><sub>Highlights · Vesper · dark</sub></td><td valign="top"><img src="img/highlights-html-highlights-light.webp" width="180" alt="Highlights · Vellum · light"><br><sub>Highlights · Vellum · light</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/highlights-r4-highlights-r4.webp" width="180" alt="Highlights · Codex polish"><br><sub>Highlights · Codex polish</sub></td></tr></table>
 
 ### Appearance settings
 
@@ -400,6 +444,10 @@ Theme, text size and the reading font, previewed live.
 
 <table><tr><td valign="top"><img src="img/appearance-html-appearance-dark.webp" width="180" alt="Appearance · Vesper · dark"><br><sub>Appearance · Vesper · dark</sub></td><td valign="top"><img src="img/appearance-html-appearance-light.webp" width="180" alt="Appearance · Vellum · light"><br><sub>Appearance · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/appearance-r4-appearance-r4.webp" width="180" alt="Appearance · Codex polish"><br><sub>Appearance · Codex polish</sub></td></tr></table>
+
 ### Your data
 
 Backup made plain: export a file, import a file, nothing leaves the phone otherwise.
@@ -411,6 +459,10 @@ Backup made plain: export a file, import a file, nothing leaves the phone otherw
 **HTML render · Vesper system**
 
 <table><tr><td valign="top"><img src="img/yourdata-html-yourdata-dark.webp" width="180" alt="Your data · Vesper · dark"><br><sub>Your data · Vesper · dark</sub></td><td valign="top"><img src="img/yourdata-html-yourdata-light.webp" width="180" alt="Your data · Vellum · light"><br><sub>Your data · Vellum · light</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/yourdata-r4-yourdata-r4.webp" width="180" alt="Your data · Codex polish"><br><sub>Your data · Codex polish</sub></td></tr></table>
 
 ### Lock-screen player
 
@@ -454,6 +506,10 @@ Finding a passage across every collection.
 
 <table><tr><td valign="top"><img src="img/search-html-html-search-dark.webp" width="180" alt="Search · Vesper · dark"><br><sub>Search · Vesper · dark</sub></td><td valign="top"><img src="img/search-html-html-search-light.webp" width="180" alt="Search · Vellum · light"><br><sub>Search · Vellum · light</sub></td></tr></table>
 
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/search-html-r4-search-r4.webp" width="180" alt="Search · Codex polish"><br><sub>Search · Codex polish</sub></td></tr></table>
+
 ### Welcome
 
 One calm first-run screen instead of four stacked pop-ups.
@@ -463,3 +519,7 @@ One calm first-run screen instead of four stacked pop-ups.
 **HTML render · Vesper system**
 
 <table><tr><td valign="top"><img src="img/onboarding-html-html-onboarding-dark.webp" width="180" alt="Welcome · Vesper · dark"><br><sub>Welcome · Vesper · dark</sub></td><td valign="top"><img src="img/onboarding-html-html-onboarding-light.webp" width="180" alt="Welcome · Vellum · light"><br><sub>Welcome · Vellum · light</sub></td></tr></table>
+
+**Round 4 · Codex polish of the HTML render**
+
+<table><tr><td valign="top"><img src="img/onboarding-html-r4-onboarding-r4.webp" width="180" alt="Welcome · Codex polish"><br><sub>Welcome · Codex polish</sub></td></tr></table>
