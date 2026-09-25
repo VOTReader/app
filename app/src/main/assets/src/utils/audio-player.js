@@ -32,6 +32,7 @@
 import { showToast } from './toast.js';
 import { OfflineAudio } from './offline-audio.js';
 import { loadAudioSyncSections } from './sync-loaders.js';
+import { NativeAudio, nativeAudioAvailable } from './native-audio.js';
 import {
   AUDIO_BIBLE_RELEASE_PREFIX,
   AUDIO_RESUME_END_FRACTION,
@@ -133,6 +134,8 @@ export function trackUrl(id) {
 
 /** @type {HTMLAudioElement | null} */
 let _el = null;
+/** True once _ensureEl chose the native stand-in (native-audio.js, m3). */
+let _native = false;
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
@@ -256,6 +259,7 @@ function _syncSleepVolume() {
 
 function _notify() {
   _version++;
+  _syncNativeUpcoming();
   for (const cb of _listeners) {
     try { cb(); } catch (e) { console.warn('[audio] subscriber threw', e); }
   }
@@ -401,6 +405,8 @@ function _toast(text) {
  * @returns {boolean} false only when the APK says Android refused the service (sf1)
  */
 function _setAudioActive(active) {
+  // The native player (m3) is its own media service: the WebView keep-alive stays out of it.
+  if (_native) return true;
   try {
     const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
     // The APK answers whether the service holds (sf1); false is the one refusal. An older shell answers nothing,
@@ -632,6 +638,7 @@ function _refreshCardMetadata(track) {
 
 /** Push the current track + state snapshot to the native media card. */
 function _syncNative() {
+  if (_native) return;   // m3: the native player's session draws the card itself
   try {
     const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
     if (!b || typeof b.setAudioNowPlaying !== 'function') return;
@@ -687,7 +694,11 @@ function _installNativeTransport() {
  */
 function _ensureEl() {
   if (_el) return _el;
-  const el = new Audio();
+  // In the APK the recording plays natively (m3): a stand-in with <audio>'s surface, so every rule below holds.
+  _native = nativeAudioAvailable();
+  const el = _native
+    ? /** @type {HTMLAudioElement} */ (/** @type {unknown} */ (new NativeAudio({ meta: _nativeMeta, upcoming: _nativeUpcoming })))
+    : new Audio();
   _installMediaArbiter();
   el.preload = 'none';
   // Plain no-cors embed, DELIBERATELY no crossOrigin: the GitHub release
@@ -760,6 +771,43 @@ function _ensureEl() {
 
   _el = el;
   return el;
+}
+
+/* ── the native player's seam (m3) ─────────────────────────────────────── */
+
+/**
+ * The lock-screen text for the recording at `url`.
+ * @param {string} url
+ * @returns {{ title: string, artist: string, album: string }}
+ */
+function _nativeMeta(url) {
+  const t = _state.queue[_state.qi];
+  if (!t || t.url !== url) return { title: '', artist: '', album: '' };
+  return { title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t) };
+}
+
+/**
+ * What native plays after this recording without the page: exactly what the 'ended' handler would start, when that
+ * is a plain step it can take alone. Nothing when the end must stop (sleep at the end of this recording, the end of
+ * the order) or needs the page (a recording not on the phone while offline: the page substitutes or pauses).
+ * Repeat 'one' is this recording again. A song plays at 1x; a reading at the reading speed.
+ * @returns {{ url: string, title: string, artist: string, album: string, rate: number }[]}
+ */
+function _nativeUpcoming() {
+  if (_state.sleepAtTrackEnd || _pendingRestore) return [];
+  const cur = _state.queue[_state.qi];
+  if (!cur) return [];
+  let t = null;
+  if (_repeatMode() === 'one') t = cur;
+  else if (_state.qi + 1 < _state.queue.length) t = _state.queue[_state.qi + 1];
+  else if (_repeatMode() === 'all') t = _state.queue[0];
+  if (!t || !isVotAudioUrl(t.url) || _unreachable(t)) return [];
+  return [{ url: t.url, title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t), rate: _isSong(t) ? 1 : _readingRate }];
+}
+
+/** Keep native's next recording in step with the queue and its modes (cheap: one short JSON compare). */
+function _syncNativeUpcoming() {
+  if (_native && _el) /** @type {any} */ (_el).syncUpcoming();
 }
 
 /**
@@ -893,6 +941,7 @@ function _stopWarming() {
 }
 
 function _maybePrefetchNext() {
+  if (_native) return;   // m3: native already holds the next recording (upcoming) and buffers it itself
   if (_state.status === 'idle' || _pendingRestore || _warmingUrl) return;
   if (_offline() || _connectionPoor() || !_mainFullyBuffered()) return;
   const targets = _warmTargets();
