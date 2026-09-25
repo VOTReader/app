@@ -224,6 +224,12 @@ class OfflineAudioStore(
     /** True when [url] is on the phone (whole, indexed). */
     fun isSaved(url: String): Boolean = synchronized(lock) { entries.containsKey(url) }
 
+    /** The downloaded file for [url], or null when it is not on the phone (m3: the native player reads it directly). */
+    fun fileFor(url: String): File? {
+        val e = synchronized(lock) { entries[url] } ?: return null
+        return File(dir, e.file).takeIf { it.isFile && it.length() > 0L }
+    }
+
     /** Queue [items] (skipping any not from the audio releases, already on the phone, or already queued). */
     fun enqueue(items: List<Item>) {
         for (item in items) {

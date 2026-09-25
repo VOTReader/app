@@ -101,6 +101,18 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- m3: the native player (ExoPlayer in a Media3 MediaSessionService). Exported with the session
+             intent-filter so the system media surfaces, Bluetooth and cars can find and control the session; only
+             this app's own controller may set what plays (PlaybackService.onAddMediaItems). -->
+        <service
+            android:name=".PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

@@ -149,4 +149,10 @@ interface BridgeHost {
      * shell): AppInterface's offlineAudio* methods then answer empty and do nothing.
      */
     val offlineAudio: OfflineAudioStore? get() = null
+
+    /**
+     * The native player (m3): ExoPlayer in PlaybackService, reached through a MediaController. Null on a host without
+     * it (tests, an older shell): AppInterface's audio* methods then do nothing and the page keeps its <audio>.
+     */
+    val nativeAudio: NativeAudioPort? get() = null
 }

@@ -6,6 +6,7 @@ activityKtx = "1.13.0"
 webkit = "1.16.0"
 coreSplashscreen = "1.0.1"
 media = "1.7.1"
+media3 = "1.11.1"
 timber = "5.0.1"
 coroutines = "1.10.2"
 lifecycleRuntime = "2.9.1"
@@ -30,6 +31,11 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 # NOT media3: playback itself stays in the WebView's <audio>; native needs
 # only the session + styled notification (2026-08-09 owner call).
 androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
+# m3 (Corbin 2026-09-24 22:4x, reversing the 08-09 call above for PLAYBACK): in the APK the recording plays in
+# ExoPlayer inside a Media3 MediaSessionService, so Android 17 never mutes it with the screen off and the next chapter
+# starts natively. androidx.media stays for the html-engine fallback until that path retires.
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntime" }

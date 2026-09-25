@@ -632,6 +632,57 @@ class AppInterface(
     @JavascriptInterface
     fun offlineAudioSizes(json: String?) { host.offlineAudio?.requestSizesJson(json) }
 
+    // ─── The native player (m3) ─────────────────────────────────────────
+    // utils/native-audio.js, the page's stand-in <audio>, drives ExoPlayer through these. Binder thread: the port
+    // posts its work to the main looper and never throws; each call is wrapped anyway, because a throw across the
+    // bridge would reach the page as a JS exception inside the player. A host without a port (tests, an older shell)
+    // does nothing and journals "", and the page stays on the WebView's <audio>.
+    //
+    // vm.streamAudioActive follows play/pause as setAudioActive did: onPause then leaves the WebView running, so the
+    // page hears native's events at once with the screen off. No keep-alive service: Media3 holds the foreground.
+
+    /** Load a recording: {url, startMs, rate, volume, autoplay, title, artist, album, upcoming}. */
+    @JavascriptInterface
+    fun audioLoad(json: String?) { native { it.load(json) } }
+
+    @JavascriptInterface
+    fun audioPlay() {
+        vm.streamAudioActive = true
+        native { it.play() }
+        // The media card needs POST_NOTIFICATIONS on API 33+: asked at the first play, as setAudioActive did.
+        host.ensureNotificationsPermission()
+    }
+
+    @JavascriptInterface
+    fun audioPause() { vm.streamAudioActive = false; native { it.pause() } }
+
+    @JavascriptInterface
+    fun audioSeek(positionMs: Double) {
+        native { it.seek(if (positionMs.isFinite() && positionMs > 0.0) positionMs.toLong() else 0L) }
+    }
+
+    @JavascriptInterface
+    fun audioRate(rate: Double) { native { it.rate(rate) } }
+
+    @JavascriptInterface
+    fun audioVolume(volume: Double) { native { it.volume(volume) } }
+
+    /** What plays after this recording without the page: [{url, title, artist, album, rate}]. */
+    @JavascriptInterface
+    fun audioUpcoming(json: String?) { native { it.upcoming(json) } }
+
+    @JavascriptInterface
+    fun audioRelease() { vm.streamAudioActive = false; native { it.release() } }
+
+    /** The snapshot the page reads on its return to the screen, or "" on a host without the native player. */
+    @JavascriptInterface
+    fun audioJournal(): String = try { host.nativeAudio?.journal() ?: "" } catch (e: Exception) { "" }
+
+    private inline fun native(call: (NativeAudioPort) -> Unit) {
+        val port = host.nativeAudio ?: return
+        try { call(port) } catch (e: Exception) { Timber.w(e, "native audio: a bridge call threw") }
+    }
+
     @JavascriptInterface
     fun setImmersiveMode(immersive: Boolean) {
         // Delegated to the host: hiding the bars is only half the job (the

@@ -272,7 +272,8 @@ val coveredClasses = listOf(
     "com/votreader/sacredui/BoundedLogTree*.class",
     "com/votreader/sacredui/MainActivityLogic*.class",
     "com/votreader/sacredui/AppInterface*.class",
-    "com/votreader/sacredui/GardenImageCache*.class"
+    "com/votreader/sacredui/GardenImageCache*.class",
+    "com/votreader/sacredui/NativeAudioLogic*.class"
 )
 
 // Helper that returns the class tree filtered to the covered set.
@@ -364,6 +365,7 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         classFloor("JsBridge", "0.65")            // measured  69.6% (32/46)
         classFloor("AppInterface", "0.52")        // measured  58.2% (135/232)
         classFloor("GardenImageCache", "0.48")    // measured  54.4% (74/136)
+        classFloor("NativeAudioLogic", "0.95")    // m3, new: plain JVM, NativeAudioLogicTest
     }
 }
 
@@ -377,6 +379,9 @@ dependencies {
     // streaming audio letters (AudioKeepAliveService). androidx.media, not
     // media3 — see the version-catalog comment.
     implementation(libs.androidx.media)
+    // m3: the native player (ExoPlayer in a Media3 MediaSessionService) behind the page's stand-in <audio>.
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime.ktx)

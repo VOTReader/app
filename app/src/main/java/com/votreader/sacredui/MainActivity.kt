@@ -211,6 +211,13 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // NTV3: wipe the native Garden image disk cache from the JS "Clear All" flow.
     override fun clearGardenCache() { gardenCache.clear() }
     override val offlineAudio: OfflineAudioStore get() = OfflineAudioStore.shared(this)
+
+    // m3: the native player, created at the page's first audio* call (lazy is synchronized: those arrive on binder
+    // threads). Its events reach the page through this Activity's bridge; onDestroy shuts it down.
+    private val nativeAudioLazy = lazy {
+        NativeAudioController(applicationContext) { json -> bridge.callOptional(JsEvent.NativeAudio, json) }
+    }
+    override val nativeAudio: NativeAudioPort get() = nativeAudioLazy.value
     // Streaming audio: anchor the process in a mediaPlayback foreground service
     // for as long as JS reports playback. Never throws (see setActive's KDoc).
     override fun setAudioKeepAlive(active: Boolean): Boolean = AudioKeepAliveService.setActive(this, active)
@@ -512,6 +519,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         AudioKeepAliveService.commandSink = { cmd, posMs ->
             bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
+        // m3: the native player's session sends next/previous to the same receiver (the page owns the queue).
+        PlaybackService.commandSink = AudioKeepAliveService.commandSink
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
         // cutout mode a window may lay out into the cutout only while that
@@ -1420,6 +1429,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         mainHandler.removeCallbacks(splashSafetyHatch)
         // System-transport sink is bound to THIS Activity's bridge/WebView.
         AudioKeepAliveService.commandSink = null
+        PlaybackService.commandSink = null
+        // m3: the page that owns the queue is going, so native playback stops with it (as the <audio> did).
+        if (nativeAudioLazy.isInitialized()) nativeAudioLazy.value.shutdown()
         // Only if it is still THIS page's: a quick relaunch's new Activity may already have set its own.
         if (OfflineAudioStore.eventSink === offlineSink) OfflineAudioStore.eventSink = null
         // The WebView (and with it the <audio> element) is destroyed below, so
