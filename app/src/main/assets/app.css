@@ -8027,6 +8027,22 @@
 .answers-sheet-verse { margin:0 0 1.1rem; padding:0; text-align:center; }
 .answers-sheet-verse p { margin:0 0 0.4rem; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; line-height:1.45; color:var(--cream); }
 .answers-sheet-ref { min-height:44px; padding:0 0.6rem; border:0; background:none; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; color:var(--gold); }
+/* An Answers topic's contents (AnswersContents.jsx, 2026-09-25; picture: calls/ux-0925/r3-passages.png take 1):
+   a quiet line under the title that opens a sheet of its sections or passages. */
+.answers-contents-line { display:inline-flex; align-items:center; gap:0.35rem; min-height:44px; margin:0.35rem auto 0; padding:0 0.75rem; border:0; background:none; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream-muted); -webkit-tap-highlight-color:transparent; }
+.answers-contents-line svg { width:16px; height:16px; color:var(--gold); flex-shrink:0; }
+@media (hover:hover) { .answers-contents-line:hover { color:var(--cream); } }
+.answers-contents-line:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:6px; }
+.answers-contents-list { max-height:min(62vh, 36rem); overflow-y:auto; margin-top:0.4rem; overscroll-behavior:contain; }
+.answers-contents-row { display:block; width:100%; min-height:48px; padding:0.65rem 0.25rem; border:0; border-top:1px solid var(--border); background:none; cursor:pointer; text-align:left; color:var(--cream); font-family:var(--font-body); -webkit-tap-highlight-color:transparent; }
+.answers-contents-row:first-child { border-top:0; }
+.answers-contents-row:active { background:var(--gold-faint); }
+@media (hover:hover) { .answers-contents-row:hover { background:var(--gold-faint); } }
+.answers-contents-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+.answers-contents-row-title { display:flex; align-items:baseline; gap:0.5rem; font-size:var(--fs-18); line-height:1.3; overflow-wrap:anywhere; }
+.answers-contents-count { color:var(--gold); font-size:var(--fs-15); font-variant-numeric:tabular-nums; }
+.answers-contents-num { flex:0 0 1.9em; color:var(--gold-dim); font-size:var(--fs-15); font-variant-numeric:tabular-nums; }
+.answers-contents-row-sub { display:block; margin-top:0.15rem; font-size:var(--fs-14); font-style:italic; line-height:1.35; color:var(--cream-muted); overflow-wrap:anywhere; }
 /* A search landing in a Format B entry (WtlbEntryView landedPara): the matched
    paragraph glows twice in the letters' highlight gold and fades back out
    before the 4 s clear. The class was always set; it had no style. */

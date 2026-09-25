@@ -12,6 +12,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { answersFiledUnder } from '../../utils/answers-shelves.js';
+import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -45,6 +46,23 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // there too. Shorter heads are tried: the excerpt may run past the paragraph.
   const [landedPara, setLandedPara] = React.useState(/** @type {number} */ (-1));
   const [landedOff, setLandedOff] = React.useState(/** @type {number | null} */ (null));   // where in it the words start (corpus domain, ≈ the rows')
+  // An Answers topic's Contents sheet (AnswersContents.jsx) jumps to a section or passage:
+  // the paragraph comes to the top of the scroller, clear of a sticky "Back to" pill when one
+  // is showing (measured, not guessed), and glows like a search landing. One-shot and
+  // reader-initiated, the same class of write as that landing.
+  const jumpTimerRef = React.useRef(/** @type {any} */ (null));
+  React.useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
+  const jumpToPara = React.useCallback((/** @type {number} */ index) => {
+    const el = wtlbMainRef.current && /** @type {HTMLElement|null} */ (wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, index)}"]`));
+    if (!el) return;
+    const hint = document.querySelector('.back-hint-row');
+    el.style.scrollMarginTop = ((hint ? hint.getBoundingClientRect().height : 0) + 16) + 'px';
+    el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    setLandedPara(index);
+    setLandedOff(null);
+    clearTimeout(jumpTimerRef.current);
+    jumpTimerRef.current = setTimeout(() => setLandedPara(-1), 4000);
+  }, [entry.id]);
   // v01-03: a landing belongs to its entry. The instance is reused (no key) for the
   // next entry, and the landing effect below returns early for an anchor made for
   // another entry - before anything reset these - so the next entry's paragraph at
@@ -454,6 +472,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
             ? ['Answers', answersFiledUnder(entry)].filter(Boolean).join(' · ')
             : <>{partLabel} {" · "} {entry.num}</>}</div>
           <h1 className="hero-title" ref={leadRef}>{entry.title}</h1>
+          {volKey === 'answers' ? <AnswersContentsLine entry={entry} onJump={jumpToPara} /> : null}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />
             <div className="hero-ornament-diamond" />
