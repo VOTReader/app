@@ -219,7 +219,7 @@ describe('app.css — the personal-study header starts at one height', () => {
     const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
     return m ? m[1] : '';
   };
-  it.each(['.library-screen', '.prg-screen', '.notes-index-screen', '.links-screen', '.bkm-screen', '.milestones-screen'])(
+  it.each(['.library-screen', '.prg-screen', '.notes-index-screen', '.links-screen', '.bkm-screen', '.milestones-screen', '.plans-screen'])(
     '%s pads its top 1.25rem', (sel) => {
       expect(block(sel)).toMatch(/padding:\s*1\.25rem\s/);
     });

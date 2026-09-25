@@ -22,6 +22,7 @@ const TITLES = {
   LinksScreen: 'Links',
   HighlightsScreen: 'Highlights & Underlines',
   MilestonesScreen: 'Milestones',
+  ReadingPlansScreen: 'Reading plans',   // rp1 (web-builder, 2026-09-25) joined the family
 };
 const RETIRED = [
   'library-eyebrow', 'library-title', 'library-sub', 'jrn-hub-header', 'jrn-hub-title', 'jrn-hub-count',
