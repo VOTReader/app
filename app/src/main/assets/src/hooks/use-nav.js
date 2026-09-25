@@ -9,7 +9,7 @@
    They share two patterns this hook canonicalises:
 
      A) The "navOrigin capture" pattern (10 helpers). goSettings,
-        goHistory, goAbout, goLibrary, goProgress, goJournalHub,
+        goHistory, goAbout, goLibrary, goProgress, goReadingPlans, goJournalHub,
         goNotesIndex, goLinksIndex, goBookmarksIndex,
         goHighlightsIndex all do:
 
@@ -37,6 +37,7 @@
      - goAbout             _captureOrigin + setScreen
      - goLibrary           _captureOrigin + setScreen
      - goProgress          _captureOrigin + setScreen
+     - goReadingPlans      _captureOrigin + setScreen (rp1)
      - goJournalHub        _captureOrigin + setScreen
      - goJournalViewer     setJournalEntryId + setScreen (no-op if no eid)
      - goJournalEditor     setJournalEntryId + setScreen (no-op if no eid)
@@ -134,6 +135,7 @@
  *   goAbout: () => void,
  *   goLibrary: () => void,
  *   goProgress: () => void,
+ *   goReadingPlans: () => void,
  *   goJournalHub: () => void,
  *   goJournalViewer: (eid: string | null) => void,
  *   goJournalEditor: (eid: string | null) => void,
@@ -188,6 +190,7 @@ export function useNav({
   const goAbout           = () => { _captureOrigin(); setScreen('about'); };
   const goLibrary         = () => { _captureOrigin(); setScreen('library'); };
   const goProgress        = () => { _captureOrigin(); setScreen('my-progress'); };
+  const goReadingPlans    = () => { _captureOrigin(); setScreen('reading-plans'); };
   const goJournalHub      = () => { _captureOrigin(); setScreen('journal-home'); };
   const goNotesIndex      = () => { _captureOrigin(); setScreen('notes-index'); };
   const goLinksIndex      = () => { _captureOrigin(); setScreen('links-index'); };
@@ -215,7 +218,7 @@ export function useNav({
 
   return {
     goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
-    goSettings, goHistory, goAbout, goLibrary, goProgress,
+    goSettings, goHistory, goAbout, goLibrary, goProgress, goReadingPlans,
     goJournalHub, goJournalViewer, goJournalEditor,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goHighlightsIndex,
     goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx, goToGardenFirst,

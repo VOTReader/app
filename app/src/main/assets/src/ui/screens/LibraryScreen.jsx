@@ -43,7 +43,7 @@ function useStoreVersion(name) {
   );
 }
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, onOpenScriptureWeb, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
   // (AudioLibraryStore is in that list — the milestones chip counts listening.
   // The Listening Library itself moved to a HOME card on 2026-08-09.)
@@ -156,6 +156,20 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
           <line x1="12" y1="20" x2="12" y2="9" />
           <line x1="18" y1="20" x2="18" y2="4" />
           <path d="M3 20h18" />
+        </svg>
+      ),
+    },
+    // rp1: the way in to a reading plan (the Today card on Home shows it once it runs)
+    plans: {
+      id: 'plans', title: 'Reading plans',
+      count: readingPlanCount ? String(readingPlanCount) : null, unit: readingPlanCount === 1 ? ' plan running' : ' plans running',
+      empty: 'No plan yet',
+      desc: 'Bible in a Year, the Volumes in order',
+      guide: !readingPlanCount ? 'Read the Bible in a year, or the Volumes in order.' : null,
+      onClick: onOpenPlans,
+      icon: (
+        <svg viewBox="0 0 24 24">
+          <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
         </svg>
       ),
     },

@@ -20,11 +20,11 @@ beforeEach(() => {
 });
 
 describe('LibraryOrderStore — DEFAULT_LIBRARY_ORDER constant', () => {
-  it('is frozen and carries the 8 canonical tile ids', () => {
+  it('is frozen and carries the 9 canonical tile ids (rp1 added plans)', () => {
     expect(Object.isFrozen(DEFAULT_LIBRARY_ORDER)).toBe(true);
     expect(new Set(DEFAULT_LIBRARY_ORDER)).toEqual(new Set([
       'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
-      'milestones', 'scripture-web',
+      'plans', 'milestones', 'scripture-web',
     ]));
   });
 });
@@ -36,7 +36,7 @@ describe('LibraryOrderStore — get() schema merge', () => {
 
   it('returns a full valid permutation as-is', () => {
     const custom = ['milestones', 'scripture-web', 'progress', 'highlights', 'bookmarks',
-      'journal', 'links', 'notes'];
+      'journal', 'links', 'notes', 'plans'];
     LibraryOrderStore.set(custom);
     expect(LibraryOrderStore.get()).toEqual(custom);
   });
@@ -46,7 +46,7 @@ describe('LibraryOrderStore — get() schema merge', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'plans', 'milestones',
        'scripture-web']);
   });
 
@@ -54,7 +54,7 @@ describe('LibraryOrderStore — get() schema merge', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'notes', 'links', 'journal', 'bookmarks'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'plans', 'milestones',
        'scripture-web']);
   });
 
@@ -64,17 +64,17 @@ describe('LibraryOrderStore — get() schema merge', () => {
     // arrangement and nothing is appended.
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['milestones', 'audio', 'retired-tile', 'scripture-web', 'progress', 'highlights',
-       'bookmarks', 'journal', 'links', 'notes'];
+       'bookmarks', 'journal', 'links', 'notes', 'plans'];
     expect(LibraryOrderStore.get()).toEqual(
       ['milestones', 'scripture-web', 'progress', 'highlights', 'bookmarks', 'journal',
-       'links', 'notes']);
+       'links', 'notes', 'plans']);
   });
 
   it('drops a foreign id from an import payload the same way', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['highlights', 'foreign-id', 'notes'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'milestones',
+      ['highlights', 'notes', 'links', 'journal', 'bookmarks', 'progress', 'plans', 'milestones',
        'scripture-web']);
   });
 
@@ -96,7 +96,7 @@ describe('LibraryOrderStore — get() schema merge', () => {
     /** @type {any} */ (LibraryOrderStore)._cache =
       ['notes', 'notes', 'journal'];
     expect(LibraryOrderStore.get()).toEqual(
-      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress', 'milestones',
+      ['notes', 'journal', 'links', 'bookmarks', 'highlights', 'progress', 'plans', 'milestones',
        'scripture-web']);
   });
 });
@@ -104,11 +104,11 @@ describe('LibraryOrderStore — get() schema merge', () => {
 describe('LibraryOrderStore — set()', () => {
   it('persists a defensive COPY of the caller array', () => {
     const input = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights',
-      'milestones', 'scripture-web'];
+      'milestones', 'scripture-web', 'plans'];
     LibraryOrderStore.set(input);
     input.push('smuggled');
     expect(LibraryOrderStore.get()).toEqual(
       ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones',
-       'scripture-web']);
+       'scripture-web', 'plans']);
   });
 });

@@ -134,6 +134,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} goJournalHub
  * @property {*} goHighlightsIndex
  * @property {*} goProgress
+ * @property {*} goReadingPlans
  * @property {*} goJournalViewer
  * @property {*} goJournalEditor
  * @property {*} goSearchOrigin
@@ -225,6 +226,7 @@ export function buildScreenRoutes({
   goStudiesHome,
   goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
   goProgress,
+  goReadingPlans,
   goJournalViewer, goJournalEditor,
   goSearchOrigin, goColIdx,
   // ── Selection / handlers ──
@@ -278,6 +280,43 @@ export function buildScreenRoutes({
   const bibleAudioFor = (bookIdForAudio) => {
     const ed = resolveBibleAudio({ settings, bookId: bookIdForAudio }).offer;
     return ed ? { volKey: ed.volKey, label: ed.label } : null;
+  };
+  // rp1: the Today card's Read and Listen take the first chapter or letter of
+  // today's portion not read yet ({ bid, cid } as the read record keys it: a
+  // Bible bookId, or a collection's readKey). Read opens it the way a History
+  // row does; Listen plays from it (a Bible chapter on through its book, a
+  // letter on through its collection) and opens it when there is no recording.
+  const _planCol = (bid) => COLLECTIONS.find((c) => c.readKey === bid) || null;
+  const openPlanItem = (next) => {
+    if (!next) return;
+    const col = _planCol(next.bid);
+    setGenreId(null);
+    if (col) {
+      setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, next.cid));
+      navigateToLink({ screen: col.letterScreen, letterId: next.cid }, { sourceLetterTitle: 'Today', silent: true });
+    } else {
+      setActiveReadKey(next.bid, () => setLastReadChapters((prev) => ({ ...prev, [next.bid]: next.cid })));
+      navigateToLink({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
+    }
+  };
+  const listenPlanItem = (next) => {
+    if (!next) return;
+    const col = _planCol(next.bid);
+    let started = false;
+    if (col) {
+      if (AudioPlayer.collectionHasAudio(col.volKey)) {
+        const pref = colPreface(col);
+        const arr = colLetterArr(col);
+        started = AudioPlayer.playCollection({ volKey: col.volKey, items: pref ? [pref, ...arr] : arr, collectionLabel: col.label, startId: next.cid }) !== false;
+      }
+    } else {
+      const audio = bibleAudioFor(next.bid);
+      if (audio) {
+        AudioPlayer.playBibleBook({ volKey: audio.volKey, bookId: next.bid, label: audio.label, chapterNum: next.cid });
+        started = true;
+      }
+    }
+    if (!started) openPlanItem(next);
   };
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
@@ -774,6 +813,12 @@ export function buildScreenRoutes({
         history={readHistory}
         translation={settings.translation}
         theme={theme} onThemeChange={setTheme}
+        readingPlans={settings.readingPlans}
+        isRead={isRead}
+        markAsReadEnabled={settings.markAsRead !== false}
+        onPlanRead={openPlanItem}
+        onPlanListen={listenPlanItem}
+        onOpenPlans={goReadingPlans}
       />
     ),
     'about': () => (
@@ -842,6 +887,8 @@ export function buildScreenRoutes({
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
           onOpenMilestones={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
+          onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
+          readingPlanCount={Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0}
           onOpenScriptureWeb={() => {
             // Kick bundle-f before the route renders so the "Loading…" frame
             // is usually skipped entirely.
@@ -858,6 +905,22 @@ export function buildScreenRoutes({
           theme={theme} onThemeChange={setTheme}
         />
     ),
+    // rp1: the reading plans (bundle-g, like Milestones); back returns to where it was opened
+    'reading-plans': () => typeof ReadingPlansScreen !== 'undefined' ? (
+      <ReadingPlansScreen
+        onBack={goNavOrigin}
+        backLabel={navOrigin && navOrigin.screen === 'home' ? 'Home' : 'Library'}
+        readingPlans={settings.readingPlans}
+        isRead={isRead}
+        markAsReadEnabled={settings.markAsRead !== false}
+        onChangePlans={(plans) => updateSetting('readingPlans', plans)}
+        onRead={openPlanItem}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'milestones': () => typeof MilestonesScreen !== 'undefined' ? (
       <MilestonesScreen
         onBack={goNavOrigin}

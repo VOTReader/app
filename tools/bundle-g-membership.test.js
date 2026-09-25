@@ -29,7 +29,7 @@ const read = (p) => readFileSync(p, 'utf-8');
    screen-routes renders behind (`typeof MyProgressScreen !== 'undefined'`).
    The key is the definition; the bare name is only a question about it. */
 const MARKERS = ['MyProgressScreen', 'NotesIndexScreen', 'LinksScreen', 'HighlightsScreen',
-  'BookmarksScreen', 'MilestonesScreen', 'HistoryScreen'];
+  'BookmarksScreen', 'MilestonesScreen', 'HistoryScreen', 'ReadingPlansScreen'];
 /* AboutScreen is NOT in that list on purpose: use-tabs.js opens a fresh
    install on it, so it is boot-path weight however on-purpose it looks. */
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier

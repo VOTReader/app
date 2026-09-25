@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
+import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -22,7 +23,9 @@ function songsDetail() {
   return n ? n.toLocaleString('en-US') + ' songs from the words of the letters' : 'Songs from the words of the letters';
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans }) {
+  // rp1: the reader's plans for today, above Search (TodayCard.jsx)
+  const todayRows = useTodayRows(readingPlans, isRead);
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -294,6 +297,9 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           <div className="home-ornament-diamond" />
           <div className="home-ornament-line r" />
         </div>
+        <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled}
+          onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(next) => onPlanListen && onPlanListen(next)}
+          onOpenPlans={() => onOpenPlans && onOpenPlans()} />
         <nav className="home-shortcuts" aria-label="Quick access">
           {searchEnabled !== false && <button type="button" className="home-search-action" onClick={onSearch}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>

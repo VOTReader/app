@@ -46,7 +46,7 @@ export const BIBLE_YEAR_DAYS = 365;
 const _CHAPTERS = (function () {
   var out = [];
   for (var b = 0; b < BIBLE_BOOKS.length; b++) {
-    for (var c = 1; c <= BIBLE_BOOKS[b][2]; c++) out.push({ bid: BIBLE_BOOKS[b][0], cid: c, title: BIBLE_BOOKS[b][1] });
+    for (var c = 1; c <= Number(BIBLE_BOOKS[b][2]); c++) out.push({ bid: BIBLE_BOOKS[b][0], cid: c, title: BIBLE_BOOKS[b][1] });
   }
   return out;
 })();
@@ -116,7 +116,7 @@ export function volumesPortion(seq, day, pace) {
   if (!run.length) return { items: [], label: '' };
   var a = run[0], z = run[run.length - 1];
   var label = run.length === 1 ? a.short + ': ' + a.title
-    : a.short === z.short ? a.short + ': ' + a.title + ' + ' + (run.length - 1) + ' more'
+    : a.short === z.short ? a.short + ': ' + a.title + ' and ' + (run.length - 1) + ' more'
     : a.short + ': ' + a.title + ' - ' + z.short + ': ' + z.title;
   return { items: run.map(function (e) { return { bid: e.bid, cid: e.cid }; }), label: label };
 }

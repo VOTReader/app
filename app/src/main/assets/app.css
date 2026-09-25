@@ -2946,6 +2946,60 @@
     .home-shortcuts .home-search-action { display:flex; align-items:center; gap:0.6rem; flex-basis:100%; text-align:left; background:var(--gold-faint); }
     .home-search-action svg { width:18px; height:18px; flex-shrink:0; }
     @media (hover:hover) { .home-shortcuts button:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    /* rp1: the Today card (TodayCard.jsx; mockups lanes/myweb/out/mockups/rp1/r2-home-*.png) */
+    .today-card { width:100%; max-width:30rem; margin:0 0 0.75rem; padding:0.85rem 1rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream); font-family:var(--font-body); box-sizing:border-box; }
+    .today-head { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; }
+    .today-eyebrow { color:var(--gold); font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; }
+    .today-plans-link, .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
+    .today-plans-link { margin:-0.6rem -0.25rem -0.6rem 0; }
+    .today-one { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; margin-top:0.1rem; }
+    .today-one-text { display:flex; flex-direction:column; min-width:0; }
+    .today-title { margin:0; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-20); font-weight:400; line-height:1.25; }
+    .today-plan { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+    .today-actions { display:flex; gap:0.5rem; }
+    .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
+    .today-btn-wide { width:100%; margin-top:0.6rem; }
+    @media (hover:hover) { .today-btn:hover, .today-row-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    .today-progress-row { display:flex; align-items:center; gap:0.75rem; margin-top:0.7rem; }
+    .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
+    .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
+    .today-percent { color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
+    .today-rows { list-style:none; margin:0.35rem 0 0; padding:0; }
+    .today-row + .today-row { border-top:1px solid var(--gold-border); }
+    .today-row-btn { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.45rem 0.25rem; border:1px solid transparent; border-radius:6px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .today-row-text { display:flex; flex-direction:column; min-width:0; }
+    .today-row-title { color:var(--cream); font-size:var(--fs-18); }
+    .today-check { flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1.5px solid var(--gold); border-radius:50%; color:var(--bg, #000); }
+    .today-check[data-done="1"] { background:var(--gold); }
+    .today-note { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); font-style:italic; }
+    /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
+    .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:0 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }
+    .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
+    .plans-offer { display:grid; grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr)); gap:0.75rem; margin:0.5rem 0 1.25rem; }
+    .plans-offer-card { display:flex; flex-direction:column; align-items:center; gap:0.4rem; padding:1rem 0.85rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); text-align:center; }
+    .plans-offer-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
+    .plans-offer-sub { margin:0; color:var(--cream-dim); font-size:var(--fs-14); }
+    .plans-start { width:100%; margin-top:0.4rem; }
+    .plans-pace { display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:center; }
+    .plans-pace button { min-height:44px; padding:0 0.7rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .plans-pace button.on { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
+    .plans-eyebrow { margin:0.5rem 0 0.6rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
+    .plans-plan { margin:0 0 0.9rem; padding:0.9rem 1rem 0.6rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
+    .plans-plan-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
+    .plans-plan-sub { margin:0.2rem 0 0.5rem; color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-plan .today-progress { display:block; }
+    .plans-month { margin-top:0.9rem; }
+    .plans-month-name { margin-bottom:0.4rem; color:var(--gold); text-align:center; font-size:var(--fs-18); }
+    .plans-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem 0.2rem; text-align:center; }
+    .plans-weekday { color:var(--cream-muted); font-size:var(--fs-12); }
+    .plans-day { display:flex; flex-direction:column; align-items:center; gap:0.15rem; min-height:44px; padding-top:0.2rem; border:1px solid transparent; border-radius:6px; font-size:var(--fs-15); }
+    .plans-day-mark { width:10px; height:10px; }
+    .plans-day[data-state="done"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
+    .plans-day[data-state="missed"] .plans-day-mark { border:1.5px solid var(--gold); border-radius:50%; box-sizing:border-box; }
+    .plans-day[data-state="today"] { border-color:var(--gold); }
+    .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
+    .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-stop { display:block; margin:0.35rem 0 0 auto; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }

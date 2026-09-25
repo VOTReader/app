@@ -72,7 +72,7 @@ describe('The Volumes in order', () => {
 
   it('portions at the reader\'s pace, the last day short', () => {
     expect(volumesDays(seq, 3)).toBe(2);
-    expect(volumesPortion(seq, 0, 3).label).toBe('Volume One: A Word of Warning + 2 more');
+    expect(volumesPortion(seq, 0, 3).label).toBe('Volume One: A Word of Warning and 2 more');
     expect(volumesPortion(seq, 1, 3)).toEqual({ items: [{ bid: 'vot-two', cid: 'c' }], label: 'Volume Two: C' });
     expect(volumesPortion(seq, 1, 2).label).toBe('Volume One: B - Volume Two: C');
     expect(volumesPortion(seq, 9, 2).items).toEqual([]);

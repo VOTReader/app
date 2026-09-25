@@ -39,6 +39,8 @@ import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/
 // and sent back: use-tabs.js opens a FRESH INSTALL on About, so lazy would have
 // put a bundle fetch in front of a new reader's very first paint.
 import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+// rp1: the reading plans live with the other personal-study screens.
+import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import {
@@ -73,6 +75,7 @@ Object.assign(window, {
   MyProgressScreen,
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   MilestonesScreen, HistoryScreen,
+  ReadingPlansScreen,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

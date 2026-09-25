@@ -71,6 +71,29 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
   });
 
+  /* rp1: with a reading plan, today's card sits under the title and above Search
+     (r2-home-one.png); with none, Home is as it was; a Bible plan never wakes the Volumes. */
+  it('(rp1) shows the Today card above Search only while a plan runs', () => {
+    setupGlobals();
+    window.__loadVotCorpus = vi.fn(() => Promise.resolve());
+    const onPlanRead = vi.fn();
+    const today = new Date();
+    const start = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    const { container } = renderHome({ readingPlans: [{ id: 'bible-year', start }], isRead: () => false, markAsReadEnabled: true, onPlanRead });
+    const card = container.querySelector('.today-card');
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('Genesis 1-3');
+    const search = screen.getByRole('button', { name: 'Search library' });
+    expect(card.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.home-main-title').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 1-3' }));
+    expect(onPlanRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    expect(window.__loadVotCorpus).not.toHaveBeenCalled();
+    cleanup();
+    const bare = renderHome({ readingPlans: [], isRead: () => false });
+    expect(bare.container.querySelector('.today-card')).toBeNull();
+  });
+
   it('honors disabled Search and History in quick access', () => {
     setupGlobals();
     renderHome({ searchEnabled: false, historyEnabled: false });

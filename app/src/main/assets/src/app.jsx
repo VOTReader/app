@@ -434,7 +434,7 @@ function App() {
      journalEntryId state lives up at useScrollMemory (per-entry keys). */
   const {
     goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
-    goSettings, goHistory, goAbout, goLibrary, goProgress,
+    goSettings, goHistory, goAbout, goLibrary, goProgress, goReadingPlans,
     goJournalHub, goJournalViewer, goJournalEditor,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goHighlightsIndex,
     goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx, goToGardenFirst,
@@ -679,6 +679,7 @@ function App() {
     goStudiesHome,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
     goProgress,
+    goReadingPlans,
     goJournalViewer, goJournalEditor,
     goSearchOrigin, goColIdx,
     handleSelect, handleSurprise, handleScriptureSelect, handleVolumeSelect,

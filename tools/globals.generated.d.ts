@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 618 distinct identifiers.
+// Total: 619 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ACHIEVEMENT_STORE_NAMES: any;
@@ -243,6 +243,7 @@ declare const React: any;
 declare const ReactDOM: any;
 declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
+declare const ReadingPlansScreen: any;
 declare const ReadingStatsStore: any;
 declare const ReadingStreakStore: any;
 declare const RecentIcon: any;
