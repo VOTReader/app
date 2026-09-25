@@ -87,7 +87,17 @@ function newestSongs(n) {
   const list = [];
   for (let i = all.length - 1; i >= 0; i--) if (visible(all[i])) list.push({ s: all[i], i });
   list.sort((a, b) => (a.s.fs < b.s.fs ? 1 : a.s.fs > b.s.fs ? -1 : b.i - a.i));
-  return list.slice(0, n).map((x) => x.s);
+  // n3-09: one place per song - a song new in three versions took three
+  const seen = new Set();
+  const out = [];
+  for (const x of list) {
+    const fam = x.s.f || x.s.id;
+    if (seen.has(fam)) continue;
+    seen.add(fam);
+    out.push(x.s);
+    if (out.length >= n) break;
+  }
+  return out;
 }
 
 /** Saved or recent ids as the songs they name — a hidden duplicate stands in for its kept twin. @param {string[]} ids */
@@ -498,7 +508,10 @@ function SongsList({ frame, library, playingId, active, onPush }) {
       <header className="songs-hero songs-list-hero">
         <div className="songs-eyebrow">{content.eyebrow}</div>
         <h1>{content.title}</h1>
-        {count ? <p className="songs-intro">{songCountLabel(count)} · {hours}</p> : null}
+        {count ? <p className="songs-intro">{fams && count > fams.length
+          // n3-09: Play all plays one version per song, so the songs and their versions are counted apart
+          ? songCountLabel(fams.length) + ' · ' + songCountLabel(count, 'version', 'versions')
+          : songCountLabel(count)} · {hours}</p> : null}
         {ids.length ? (
           <div className="songs-list-actions">
             <button type="button" className="songs-shuffle songs-play-all" onClick={() => play(null, false)}><PlayIcon /><span>Play all</span></button>

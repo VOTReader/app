@@ -171,6 +171,22 @@ describe('AudioSongsScreen -- lists', () => {
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: ['aaaaaaaaaaa1'], shuffle: false }));
   });
 
+  /* n3-09 (sweep 2): the header counted every VERSION ("109 songs" for WTLB Part
+     One) while Play all plays one song per family (55). It now names both. */
+  it('(n3-09) a collection header counts its songs and, apart, their versions', () => {
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
+    const intro = document.querySelector('.songs-intro').textContent;
+    expect(intro).toMatch(/^1 song · 2 versions · /);
+  });
+
+  /* n3-09: New from the flock sorted every version by date, so a song new in three
+     versions filled three of its places. One place per song now. */
+  it('(n3-09) New from the flock lists a song once, whatever its versions', () => {
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'new' }]);
+    const titles = [...document.querySelectorAll('.songs-section strong, .songs-section .song-title')].map((e) => e.textContent);
+    expect(titles.filter((t) => t === 'Come, Love Awaits You').length).toBe(1);
+  });
+
   it('a letter\'s list never shows a low-confidence song, and leads with that letter\'s version', () => {
     renderScreen([{ k: 'list', v: 'letter:one:the-letter' }]);
     const row = rowOf('The Letter');
