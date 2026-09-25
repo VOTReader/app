@@ -279,6 +279,16 @@ let _hay = null;
  * Rebuilt only when the catalog or the (lazy) letters change.
  * @returns {Map<string, string>}
  */
+/**
+ * n3-07: what Find compares - lowercase, every apostrophe the straight one
+ * (the live catalog writes "God’s Glory"; a keyboard types '), accents gone.
+ * @param {string} s @returns {string}
+ */
+function foldSongText(s) {
+  return String(s || '').toLocaleLowerCase().replace(/[‘’ʼ`´]/g, "'")
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 function songHaystacks() {
   const corpus = /** @type {any} */ (globalThis).__votCorpus;
   const key = SongCatalog.getVersion() + ':' + (corpus && typeof corpus.getVersion === 'function' ? corpus.getVersion() : 0);
@@ -293,7 +303,7 @@ function songHaystacks() {
     if (letter) parts.push(letter.title, letter.colLabel);
     const col = fam.col && reg && typeof reg.get === 'function' ? reg.get(fam.col) : null;
     if (col && col.label) parts.push(col.label);
-    map.set(fam.id, parts.join(' ').toLocaleLowerCase());
+    map.set(fam.id, foldSongText(parts.join(' ')));
   }
   _hay = { key, map };
   return map;
@@ -308,7 +318,7 @@ function songHaystacks() {
  */
 export function findSongFamilies(query, style) {
   if (!SongCatalog.loaded) return [];
-  const words = String(query || '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const words = foldSongText(String(query || '').trim()).split(/\s+/).filter(Boolean);
   const list = SongCatalog.familiesFor(style ? { style } : {});
   if (!words.length) return list;
   const hay = songHaystacks();
