@@ -127,6 +127,11 @@ setup effect.
 - **Cleanup:** the next build overwrites it (null off the Songs screen)
 - **Consumers:** `hooks/use-android-back.js` (the `audio-library-songs` arm: pop one Songs frame from `audioColKey`, else leave by the navOrigin)
 
+### `__openSongs`
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: `(frames, label) => _openSongs(frames, { screen, letterId, label })`)
+- **Cleanup:** none — the next build overwrites it
+- **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's songs; Back returns to that letter, the back pill naming it)
+
 ---
 
 ## 4. Reading-state bridges

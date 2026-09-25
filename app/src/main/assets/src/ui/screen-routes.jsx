@@ -368,6 +368,8 @@ export function buildScreenRoutes({
     // retire the feature for a reader restoring an older backup.
     readAlongOn: settings.readAlongHighlight !== false,
     readAlongFollow: settings.readAlongFollow !== false,
+    // Songs of the Letters (L4): the HEAR IT SUNG pill and the songs card on letter pages. Default ON.
+    showSongs: settings.showLetterSongs !== false,
   };
   // {{nav:bookId:chapter}} inside a WTLB/Blessed/Holy-Days entry. Routed
   // through navigateToLink so it raises the same "‹ Back to <entry>" pill
@@ -474,6 +476,8 @@ export function buildScreenRoutes({
     if (popped) setAudioColKey(popped); else goNavOrigin();
   };
   window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
+  // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
+  window.__openSongs = (frames, label) => _openSongs(frames, { screen, letterId, label: label || '' });
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
@@ -1155,7 +1159,8 @@ export function buildScreenRoutes({
         onPush={(frame) => setAudioColKey(pushSongsFrame(audioColKey, frame))}
         onReplaceTop={(frame) => setAudioColKey(replaceSongsTop(audioColKey, frame))}
         onBack={_songsBack}
-        rootBackLabel={!navOrigin || navOrigin.screen === 'home' ? 'Home'
+        rootBackLabel={navOrigin && navOrigin.label ? navOrigin.label
+          : !navOrigin || navOrigin.screen === 'home' ? 'Home'
           : navOrigin.screen === 'audio-library' ? 'Listening Library'
           : navOrigin.screen === 'search' ? 'Search'
           : 'Back'}

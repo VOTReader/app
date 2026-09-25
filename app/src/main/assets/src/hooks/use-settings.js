@@ -211,6 +211,9 @@ export function useSettings({ savedSettings, theme }) {
       // `!undefined -> true` and the row stayed on (verifier-2, 2026-09-12). A NEW key,
       // so `...savedS` cannot shadow it and every existing profile starts ON.
       audioTurnPage: true,
+      // Songs of the Letters (L4): the HEAR IT SUNG pill and the SONGS FROM THIS LETTER card. Default ON, stated
+      // (not left to `!== false`) so toggleSetting's first tap turns it OFF — the audioTurnPage lesson above.
+      showLetterSongs: true,
       ...savedS,
       ...migrated // migration wins over stale saved values
     };

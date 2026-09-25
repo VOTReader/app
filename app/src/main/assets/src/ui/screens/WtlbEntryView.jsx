@@ -7,7 +7,7 @@ import { splitFormatBInline } from '../../utils/format-b-inline.js';
 import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
-import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
@@ -21,7 +21,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
@@ -462,11 +462,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           {/* Streaming audio entry — see LetterView's hero pill note (manifest
               rides the same lazy corpus bundle; inert peeks keep the pill for
               pixel parity, it can never fire there). */}
-          {AudioPlayer.hasAudio(volKey, entry.id) && (
-            <div className="hero-play-row">
-              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null })} />
-            </div>
-          )}
+          {/* Songs of the Letters (L4): ♪ HEAR IT SUNG beside LISTEN; both pills show a playing state (W3-08). */}
+          <LetterListenRow volKey={volKey} letter={entry} collectionLabel={partLabel || null} showSongs={showSongs} />
         </div>
       </header>
 
@@ -574,6 +571,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                   <div className="bottom-nav-title">—</div>
                 </div>
               )}
+            </div>
+
+            {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry. */}
+            <div className="related-section">
+              <LetterSongsCard volKey={volKey} letterId={entry.id} letterTitle={entry.title} showSongs={showSongs} />
             </div>
           </div>
         </div>

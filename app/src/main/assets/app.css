@@ -1611,7 +1611,7 @@
       .songs-tile-copy strong { color:var(--cream); font-size:var(--fs-16); font-weight:400; line-height:1.25; }
       .songs-tile-copy small { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
       .songs-shelves { display:grid; gap:.55rem; }
-      .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold-border); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .songs-shelf-title { flex:1; min-width:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
       .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); white-space:nowrap; }
       .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
@@ -2710,6 +2710,23 @@
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */
     .related-section { margin-top:2.5rem; padding-top:2.5rem; border-top:1px solid var(--gold-border); display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; }
+    /* A WTLB entry's end matter holds only the songs card (L4); with no songs it is empty, and an empty section draws no rule. */
+    .related-section:empty { display:none; }
+    /* Songs of the Letters on a letter page (L4, picture final-05): LISTEN filled, HEAR IT SUNG outlined beside it, same
+       height, each with the pill's 44 px hit band; both show a playing state (W3-08). The songs card is a related card. */
+    .letter-listen-row { flex-wrap:wrap; gap:.75rem; }
+    .letter-listen-row .hero-play-pill { min-height:40px; padding:.6em 1.5em; font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; }
+    .letter-listen-row.has-songs .hero-play-pill { flex:1 1 9.5rem; max-width:15rem; justify-content:center; }
+    .letter-listen-pill { border-color:var(--gold); background:var(--gold); color:var(--bg); }
+    .letter-listen-pill.is-playing { background:var(--gold-bright); border-color:var(--gold-bright); }
+    .letter-sung-pill { border-color:var(--gold); background:transparent; }
+    .letter-sung-pill.is-playing { background:var(--gold-faint); }
+    @media (hover: hover) { .letter-listen-pill:hover { background:var(--gold-bright); } }
+    .letter-songs-card { grid-column:1 / -1; }
+    .letter-songs-card .songs-row:last-child { border-bottom:0; }
+    .letter-songs-all { display:inline-flex; align-items:center; gap:.15rem; min-height:44px; margin-top:.35rem; padding:0; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; }
+    .letter-songs-all svg { width:18px; height:18px; }
+    .letter-songs-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem min(1.4rem, 6vw); }
     .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
     .related-link { display:block; min-height:44px; box-sizing:border-box; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.6rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }

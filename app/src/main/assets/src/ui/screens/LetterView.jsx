@@ -6,7 +6,7 @@ import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../compo
 import { answersIdForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
-import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
@@ -22,7 +22,7 @@ function _blockText(b) {
   return '';
 }
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
@@ -330,20 +330,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               never studyMode. An inert peek KEEPS the pill — the swipe
               preview must stay pixel-identical to the committed page (it
               can't fire: the peek is pointer-events:none + HTML inert). */}
-          {AudioPlayer.hasAudio(volKey, letter.id) && (
-            <div className="hero-play-row">
-              {/* C2-C [C2]: collectionLabel becomes the track's `sub` — the
-                  second line of the mini-player, the listening desk, the
-                  shelves, the saved-recording rows and the native media card.
-                  A wrong volume there is a lie that OUTLIVES the screen (it
-                  persists into the Listening Library). `sub` is nullable
-                  through the whole Track shape (utils/audio-track.js
-                  normalizes '' → null) and every reader guards it — the bar
-                  prints '', the desk/shelf filter(Boolean) it out, AudioShelf
-                  falls back to 'The Volumes of Truth'. */}
-              <AudioPlayButton onClick={() => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null })} />
-            </div>
-          )}
+          {/* Songs of the Letters (L4): ♪ HEAR IT SUNG sits beside LISTEN, and both pills show a playing state
+              (W3-08). C2-C [C2] still holds: collectionLabel becomes the track's `sub` — the second line of the
+              mini-player, the desk, the shelves and the native media card; a wrong volume there OUTLIVES the
+              screen. `sub` is nullable through the whole Track shape and every reader guards it. */}
+          <LetterListenRow volKey={volKey} letter={letter} collectionLabel={volumeLabel || null} showSongs={showSongs && !studyMode} />
         </div>
       </header>
 
@@ -608,6 +599,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   )}
                 </div>
               )}
+
+              {/* Songs of the Letters (L4): in-app songs sit above the external ↗ Audio / Video links. */}
+              {!studyMode ? <LetterSongsCard volKey={volKey} letterId={letter.id} letterTitle={letter.title} showSongs={showSongs} /> : null}
 
               {(letter.audioUrl || letter.soundcloudUrl) && (
                 <div className="related-card">

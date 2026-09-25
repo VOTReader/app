@@ -22,8 +22,10 @@ import { SongPage } from './SongPage.jsx';
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
 /** Rows of "New from the flock" on the hub; See all opens the ten. */
-const NEW_ON_HUB = 3;
+const NEW_ON_HUB = 2;
 const NEW_TOTAL = 10;
+/** Collection tiles before "Show all": the four with the most songs (Codex critique of U1, picture final-02). */
+const TILES_FIRST = 4;
 /** The letter collections, in reading order, as tiles under From the letters. */
 const LETTER_COLS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'flock', 'timothy'];
 const SHELVES = [
@@ -320,6 +322,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
   const [query, setQuery] = React.useState(frame.q || '');
   const [style, setStyle] = React.useState(frame.st || '');
   const [moreOpen, setMoreOpen] = React.useState(false);
+  const [allTiles, setAllTiles] = React.useState(false);
   // A frame restored or pushed with a query (Search's shortcut row) refills the box.
   React.useEffect(() => { setQuery(frame.q || ''); setStyle(frame.st || ''); }, [frame.q, frame.st]);
 
@@ -367,7 +370,12 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
   const newest = newestSongs(NEW_TOTAL);
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
   const recentCount = library ? songsOfIds(library.songRecent()).length : 0;
-  const tiles = LETTER_COLS.map((col) => ({ col, fams: letterOrder(cat.familiesFor({ col }), col) })).filter((t) => t.fams.length);
+  // The biggest collections first (ties keep reading order); the rest one tap away.
+  const tiles = LETTER_COLS.map((col, i) => {
+    const fams = letterOrder(cat.familiesFor({ col }), col);
+    return { col, fams, n: songsIn(fams), i };
+  }).filter((t) => t.fams.length).sort((a, b) => b.n - a.n || a.i - b.i);
+  const shownTiles = allTiles ? tiles : tiles.slice(0, TILES_FIRST);
 
   return (
     <>
@@ -443,16 +451,21 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
             <section className="songs-section" aria-labelledby="songs-letters">
               <SectionHead id="songs-letters" title="From the letters" />
               <div className="songs-tiles">
-                {tiles.map(({ col, fams }) => (
+                {shownTiles.map(({ col, fams, n }) => (
                   <button key={col} type="button" className="songs-tile" onClick={() => open({ k: 'list', v: 'col:' + col })}>
                     <span className="songs-mosaic" aria-hidden="true">
                       {[0, 1, 2, 3].map((i) => <SongCover key={i} song={fams[i] ? cat.featuredOf(fams[i]) : null} />)}
                     </span>
-                    <span className="songs-tile-copy"><strong>{colLabel(col)}</strong><small>{songCountLabel(songsIn(fams))}</small></span>
+                    <span className="songs-tile-copy"><strong>{colLabel(col)}</strong><small>{songCountLabel(n)}</small></span>
                     <ChevronRightIcon />
                   </button>
                 ))}
               </div>
+              {tiles.length > TILES_FIRST ? (
+                <button type="button" className="songs-see-all songs-tiles-more" aria-expanded={allTiles} onClick={() => setAllTiles(!allTiles)}>
+                  {allTiles ? 'Show fewer collections' : 'Show all ' + tiles.length + ' collections'}<ChevronRightIcon />
+                </button>
+              ) : null}
             </section>
           ) : null}
 

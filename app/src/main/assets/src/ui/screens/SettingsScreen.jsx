@@ -2151,6 +2151,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 the off switch); this row governs the SCREEN only. "Turn the Page", not "Follow the audio": the
                 row below already owns Follow, and two rows named Follow would be the one-label confusion again. */}
             <SettingsRow
+              label="Show songs on letter pages"
+              desc="Adds Hear It Sung beside Listen, and a Songs From This Letter card below the text, on letters the flock has sung. Off keeps the letter page text-only; the songs stay in the Listening Library."
+              checked={settings.showLetterSongs !== false}
+              onToggle={() => onToggle("showLetterSongs")}
+            />
+            <SettingsRow
               label="Turn the Page with the Audio"
               desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."
               checked={settings.audioTurnPage !== false}

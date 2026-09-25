@@ -27,7 +27,7 @@ const PROFILES = [
 ];
 
 describe('a row read as `!== false` turns OFF on ONE tap through the real toggleSetting', () => {
-  for (const key of ['audioTurnPage', 'searchSynonyms']) {
+  for (const key of ['audioTurnPage', 'searchSynonyms', 'showLetterSongs']) {
     for (const [who, savedSettings] of PROFILES) {
       it(`${key} — ${who}: the row reads ON, one tap reads OFF`, () => {
         const { result } = hook(savedSettings);
