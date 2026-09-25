@@ -97,6 +97,8 @@ import {
  * @property {boolean} shuffle - a songs queue plays in a seeded shuffle (songs only)
  * @property {'off'|'one'|'all'} repeat - a songs queue replays its song or wraps
  *   at its end; reset to 'off' by any queue that is not songs, so a letter never loops
+ * @property {{ url: string, start: number, end: number, times: number, pass: number, label: string, waits: boolean } | null} loop
+ *   - REPEAT THIS PASSAGE (setLoop): the span of the playing recording heard `times` times; null when none
  */
 
 /** Shared DOM id so every audio message replaces the previous one. */
@@ -156,7 +158,7 @@ let _seekGen = 0;
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off') };
+const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null };
 /** The READING speed — the listener's chosen rate for letters and chapters.
  *  `_state.rate` is the EFFECTIVE rate of what is playing, which is 1 for a
  *  song: the reader's 1.5× must not warp music (W3-05), and it must come back
@@ -830,6 +832,7 @@ function _ensureEl() {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
     if (_state.sleepEndsAt && Date.now() >= _state.sleepEndsAt) { _sleepTimerFire(); return; }   // an overdue timeout
+    if (_state.loop && _loopTick()) return;   // a repeated passage wrapped (or ended): the seek notified
     _syncSleepVolume();       // the sleep fade (a no-op unless a sleep mode is in its last stretch)
     _followSectionLetter();   // a compilation: name the letter, credit the one heard (cheap: ~30 keys)
     // timeupdate fires ~4x/second. Only re-render subscribers when the
@@ -859,6 +862,11 @@ function _ensureEl() {
     // An 'ended' always belongs to queue[qi]: a src swap fires 'emptied', never 'ended', so no url
     // guard is needed here — and none would work, el.src being the RESOLVED absolute URL.
     const finished = _state.queue[_state.qi];
+    // A repeated passage that runs to the recording's end wraps here, before anything counts the recording finished.
+    // The last pass pauses at the end, and it is not the whole recording heard: no listen credit.
+    const looped = _state.loop ? _loopEnded() : '';
+    if (looped === 'wrap') return;
+    if (looped === 'done') { _markPaused(); return; }
     _usage('listen_end');
     _notifyListened();
     // A recording heard to its end has no place to return to. Drop the record,
@@ -1400,6 +1408,12 @@ function _start() {
   _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
+  // A repeated passage belongs to the play that set it: any new start ends it, except the first start of a
+  // restored bar that took the loop before it had an element (setLoop's `waits`), which is that play.
+  if (_state.loop) {
+    if (_state.loop.waits && _state.loop.url === track.url) _state.loop = { ..._state.loop, waits: false };
+    else _clearLoop(false);
+  }
   if (!isVotAudioUrl(track.url)) {
     stop();
     _toast(LOAD_FAIL_MSG);
@@ -3396,6 +3410,124 @@ function prev() {
   _persist();
 }
 
+/* ── REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25) ─────────────────────────
+   A reader selects verses and presses REPEAT: the playing recording plays that span `times` times, then pauses at
+   its end. The span is [start, end) in the recording's own seconds (the pane reads both from its timing rows; an end
+   of Infinity runs to the recording's end). The
+   wrap is a seek, checked on every timeupdate; those fire ~4x a second, so the last stretch before the end is timed
+   (_loopTimer) and the voice goes back on the verse's last syllable, not a quarter second into the next verse. A
+   span that runs to the recording's end wraps from 'ended' (_loopEnded) instead of advancing. A seek out of the
+   span, another recording or a stop ends it. The web engine only: native (the APK) plays on by itself between
+   the page's 1 Hz ticks, so setLoop refuses there and the button is not offered (isNative). */
+
+/** Seconds a seek may land outside the span and still count as inside it (a tap on the span's first word). */
+const LOOP_SLACK_S = 0.5;
+/** Seconds before the end at which the wrap is due (the clock is read, not predicted). */
+const LOOP_EPS_S = 0.03;
+/** Wall seconds before the end below which the wrap is timed instead of left to the next timeupdate. */
+const LOOP_TIMED_S = 0.35;
+let _loopTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
+
+function _clearLoopTimer() {
+  if (_loopTimer) { clearTimeout(_loopTimer); _loopTimer = null; }
+}
+
+/** @param {boolean} [notify] @returns {void} */
+function _clearLoop(notify = true) {
+  _clearLoopTimer();
+  if (!_state.loop) return;
+  _state.loop = null;
+  if (notify) _notify();
+}
+
+/** The end of a pass: go round again, or, after the last, stop the loop and pause at the span's end. @returns {void} */
+function _loopWrap() {
+  const lp = _state.loop;
+  if (!lp) return;
+  _clearLoopTimer();
+  if (lp.pass < lp.times) {
+    _state.loop = { ...lp, pass: lp.pass + 1 };
+    seek(lp.start);
+    return;
+  }
+  _clearLoop(false);
+  if (_el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
+  _markPaused();
+  _notify();
+}
+
+/**
+ * The timeupdate side: wrap when the clock is at the span's end, or time the last stretch.
+ * @returns {boolean} true when it wrapped (the caller's tick is over)
+ */
+function _loopTick() {
+  const lp = _state.loop;
+  const track = _state.queue[_state.qi];
+  if (!lp || !_el) return false;
+  if (!track || track.url !== lp.url) { _clearLoop(); return false; }
+  const t = _el.currentTime || 0;
+  if (t >= lp.end - LOOP_EPS_S) { _loopWrap(); return true; }
+  const left = (lp.end - t) / (Number(_state.rate) || 1);
+  if (left < LOOP_TIMED_S && !_loopTimer && !_el.paused) {
+    _loopTimer = setTimeout(() => {
+      _loopTimer = null;
+      const cur = _state.loop;
+      // Only if the clock really is at the end: a pause or a seek back in the meantime leaves it to the ticks.
+      if (cur && _el && !_el.paused && (_el.currentTime || 0) >= cur.end - LOOP_TIMED_S / 2) _loopWrap();
+    }, Math.max(0, left * 1000));
+  }
+  return false;
+}
+
+/**
+ * 'ended' with a loop on: the span ran to the recording's end.
+ * @returns {'wrap'|'done'|''} 'wrap' played it again, 'done' was the last pass (the caller pauses), '' not ours
+ */
+function _loopEnded() {
+  const lp = _state.loop;
+  const track = _state.queue[_state.qi];
+  if (!lp || !_el || !track || track.url !== lp.url) { _clearLoop(false); return ''; }
+  _clearLoopTimer();
+  if (lp.pass >= lp.times) { _clearLoop(); return 'done'; }
+  _state.loop = { ...lp, pass: lp.pass + 1 };
+  seek(lp.start);
+  try {
+    const p = _el.play();
+    if (p && typeof p.then === 'function') p.then(null, _playRefused);
+  } catch (_e) { /* the element refused: the bar shows Play at the span's start */ }
+  return 'wrap';
+}
+
+/**
+ * REPEAT THIS PASSAGE: play [start, end) of the loaded recording `times` times, then pause at its end. Seeks to the
+ * start; the play state is the caller's (the pane resumes a paused bar, as Listen from here does).
+ * @param {{ start: number, end: number, times?: number, label?: string }} span
+ * @returns {boolean} false when there is nothing to loop (no recording loaded, a bad span, the native engine)
+ */
+function setLoop(span) {
+  const track = _state.queue[_state.qi];
+  const start = Number(span && span.start);
+  const end = Number(span && span.end);
+  const times = Math.max(1, Math.floor(Number(span && span.times) || 3));
+  if (_native || !track || _state.status === 'idle') return false;
+  // A bar restored after a restart has no element until its first Play: the loop waits for that start
+  // (_start keeps it) and the seek below writes the place that Play resumes at.
+  const waits = !_el && !!_pendingRestore && _pendingRestore.url === track.url;
+  if (!_el && !waits) return false;
+  // An end of Infinity is a span that runs to the recording's end: 'ended' wraps it.
+  if (!Number.isFinite(start) || start < 0 || !(end > start)) return false;
+  _clearLoopTimer();
+  _state.loop = { url: track.url, start, end, times, pass: 1, label: String((span && span.label) || ''), waits };
+  seek(start);
+  return true;
+}
+
+/** End a repeated passage now; playback goes on from where it is. @returns {void} */
+function clearLoop() { _clearLoop(); }
+
+/** True when the recording plays in the APK's native player (no passage loop there yet). @returns {boolean} */
+function isNative() { return _native || nativeAudioAvailable(); }
+
 /**
  * Seek within the current track. Clamped to [0, duration].
  *
@@ -3404,6 +3536,9 @@ function prev() {
  */
 function seek(seconds) {
   _secLastT = -1;   // a jump is never "heard": the compilation follower re-bases on the next tick
+  _clearLoopTimer();   // the timed wrap was for the old clock; the next timeupdate re-arms it
+  const lp = _state.loop;
+  if (lp && !(seconds >= lp.start - LOOP_SLACK_S && seconds <= lp.end + LOOP_SLACK_S)) _clearLoop(false);   // left the passage
   if (!_el) {
     /* THE BOOT-RESTORED BAR HAS NO ELEMENT YET, and returning silently here
        was read-along-4: a reader who opens a timed chapter after a cold boot
@@ -3496,6 +3631,7 @@ function setPlaybackRate(rate) {
   const effective = _isSong(_state.queue[_state.qi]) ? 1 : next;
   const changed = _state.rate !== effective;
   _state.rate = effective;
+  if (changed) _clearLoopTimer();   // a repeated passage's timed wrap was set for the old speed
   if (_el) {
     // Default too: the next load algorithm resets playbackRate to default.
     try { _el.defaultPlaybackRate = effective; _el.playbackRate = effective; } catch (_e) { /* unsupported engines retain normal speed */ }
@@ -3689,6 +3825,7 @@ function stop() {
   _stopWarming();
   _clearOfflineSkip();
   _songRecordPending = false;
+  _clearLoop(false);
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';
@@ -3940,6 +4077,9 @@ export const AudioPlayer = {
   setShuffle,
   switchSongVersion,
   setRepeat,
+  setLoop,
+  clearLoop,
+  isNative,
   bibleChapterStart,
   bibleChapterOfTrack,
   sectionLetterKeyAt,

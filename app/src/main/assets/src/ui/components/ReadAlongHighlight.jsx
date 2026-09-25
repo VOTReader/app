@@ -99,6 +99,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { bibleSyncGlobalFor, resolveBibleAudio } from '../../utils/audio-track.js';
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore, audioSyncSectionsStore } from '../../utils/sync-loaders.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
+import { showToast } from '../../utils/toast.js';
 
 const HL_NAME = 'vot-reading';
 /** How long a deliberate user scroll suspends follow-scroll. */
@@ -683,6 +684,37 @@ export function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMa
   return -1;
 }
 
+const REPEAT_TOAST_ID = 'vot-repeat-toast';
+const REPEAT_FAIL_MSG = 'This passage has no timings to repeat by.';
+const REPEAT_PART_MSG = 'Repeat works within one part of the recording. Select inside the part that is playing.';
+/** How long a Repeat waits for the unit it started (and its timings) before it is dropped. */
+const REPEAT_WAIT_MS = 20000;
+
+/**
+ * REPEAT THIS PASSAGE's span (rp1 part 3, 2026-09-25): the seconds a run of blocks covers in this recording, from
+ * the first timed clause of any of them to the first clause after the last of them (the rows hold starts only).
+ * Untimed blocks in the run are carried by their neighbours; a run that ends the recording ends at Infinity (the
+ * player then loops at 'ended'). Null when none of the blocks is timed.
+ *
+ * @param {any[] | null} frags
+ * @param {string[]} keys
+ * @param {string} letterId
+ * @param {(id: string, i: number) => string} hlKeyFn
+ * @returns {{ start: number, end: number } | null}
+ */
+export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
+  if (!frags || !frags.length || !keys || !keys.length) return null;
+  const want = new Set(keys);
+  let first = -1, last = -1;
+  for (let i = 0; i < frags.length; i++) {
+    if (!want.has(hlKeyFn(letterId, frags[i][1]))) continue;
+    if (first < 0) first = i;
+    last = i;
+  }
+  if (first < 0) return null;
+  return { start: frags[first][0], end: last + 1 < frags.length ? frags[last + 1][0] : Infinity };
+}
+
 /**
  * @param {object} props
  * @param {string} props.volKey
@@ -1013,6 +1045,23 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string }} */ ({ frags: null, loaded: false, status: 'idle' }));
   listenCtx.current = { frags, loaded, status: st.status };
   const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null } | null} */ (null));
+  const pendingRepeat = React.useRef(/** @type {{ keys: string[], label: string, times: number, at: number } | null} */ (null));
+  /** Loop the passage's span (repeatSpanOf) through the player; a paused bar resumes, as start() does. A passage
+   *  this recording cannot loop says so (a toast), never nothing: one in, or reaching into, another part of a
+   *  multi-part letter (the timings in hand are the playing part's), or one with no timed verse. */
+  const _startRepeat = (/** @type {any[]} */ fr, /** @type {{ keys: string[], label: string, times: number }} */ r, /** @type {string} */ status) => {
+    const want = new Set(r.keys);
+    const elsewhere = !perAsset && !!rows && rows.some((f) => (f[4] || 0) !== part && want.has(hlKeyFn(letterId, f[1])));
+    const span = elsewhere ? null : repeatSpanOf(fr, r.keys, letterId, hlKeyFn);
+    if (!span || !AudioPlayer.setLoop({ start: span.start, end: span.end, times: r.times, label: r.label })) {
+      showToast({ id: REPEAT_TOAST_ID, className: 'vot-toast', text: elsewhere ? REPEAT_PART_MSG : REPEAT_FAIL_MSG });
+      return false;
+    }
+    if (status === 'paused') AudioPlayer.toggle();
+    return true;
+  };
+  const startRepeatRef = React.useRef(_startRepeat);
+  startRepeatRef.current = _startRepeat;
   React.useEffect(() => {
     if (!listenOffered || typeof window === 'undefined') return undefined;
     const w = /** @type {any} */ (window);
@@ -1024,6 +1073,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       has,
       start: (/** @type {string} */ hlKey, /** @type {number | null} */ offset) => {
         if (!has(hlKey)) return false;
+        pendingRepeat.current = null;
+        AudioPlayer.clearLoop();   // listening on from a place ends a repeating passage
         const off = offset == null || !Number.isFinite(Number(offset)) ? null : Number(offset);
         userScrollAt.current = Date.now();
         const c = listenCtx.current;
@@ -1038,13 +1089,40 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
         if (typeof go === 'function') go();
         return true;
       },
+      // REPEAT THIS PASSAGE (rp1 part 3): loop these blocks `times` times under `label`. Offered on the web
+      // player only: native (the APK) plays on between the page's ticks and has no loop yet. And only with the
+      // read-along on: the span comes from the timings, which are not fetched with it off.
+      repeat: (AudioPlayer.isNative() || !readAlongOn) ? undefined : (/** @type {string[]} */ keys, /** @type {string} */ label, /** @type {number} */ times) => {
+        const mine = (Array.isArray(keys) ? keys : []).filter(has);
+        if (!mine.length) return false;
+        userScrollAt.current = Date.now();
+        const c = listenCtx.current;
+        if (c.loaded && c.frags) return startRepeatRef.current(c.frags, { keys: mine, label, times }, c.status);
+        pendingListen.current = null;
+        pendingRepeat.current = { keys: mine, label, times, at: Date.now() };
+        // Loaded with its timings still on the way: they land in a moment; the unit is not started again.
+        if (c.loaded) return true;
+        const go = onListenRef.current;
+        if (typeof go === 'function') go();
+        return true;
+      },
     };
     w.__votListenFrom = entry;
     return () => { if (w.__votListenFrom === entry) w.__votListenFrom = null; };
-  }, [listenOffered, mainRef, letterId, hlKeyFn, offsetMapFn]);
+  }, [listenOffered, mainRef, letterId, hlKeyFn, offsetMapFn, readAlongOn]);
   // The landing a start() through the host's Listen is waiting for: applied
   // once, the moment this unit is the loaded track with its timings in memory.
   React.useEffect(() => {
+    const r = pendingRepeat.current;
+    // A Repeat whose start never came (the host's Listen refused offline, say) is dropped, not applied to a later,
+    // unrelated play of this unit.
+    if (r && Date.now() - r.at > REPEAT_WAIT_MS) pendingRepeat.current = null;
+    else if (r && loaded && frags) {
+      pendingRepeat.current = null;
+      startRepeatRef.current(frags, r, listenCtx.current.status);
+      userScrollAt.current = Date.now();
+      return;
+    }
     const p = pendingListen.current;
     if (!p || !loaded || !frags) return;
     pendingListen.current = null;

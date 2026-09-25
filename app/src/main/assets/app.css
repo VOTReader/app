@@ -1166,6 +1166,8 @@
         font-size: var(--fsc-11); color: var(--cream-muted); line-height: 1.3;
       }
       .audio-bar-src { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* A repeating passage (rp1 part 3) takes the source's place, in gold. */
+      .audio-bar-loop { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--gold); }
       /* Place in the queue ("· 3 of 12"). Never shrinks: the SOURCE line is the
          part allowed to ellipsize, and the gap here is the sub-line's own. */
       .audio-bar-pos { flex-shrink: 0; margin-left: -0.22rem; color: var(--cream-dim); font-variant-numeric: tabular-nums; }
@@ -4834,7 +4836,7 @@
        listening action, not a seventh annotation tool; 44 px tall with a
        12 px semibold label and a solid gold edge after Codex's critique of the
        built row (7b). */
-    .sel-toolbar-listen { padding-top: 2px; }
+    .sel-toolbar-listen { padding-top: 2px; gap: 0; }
     .sel-listen-btn {
       flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
       min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
@@ -4846,6 +4848,20 @@
     }
     .sel-listen-btn:active { background: var(--gold-faint); }
     .sel-listen-btn svg { width: 15px; height: 15px; fill: var(--gold); stroke: none; flex-shrink: 0; }
+    /* REPEAT (rp1 part 3, mockup r1-repeat.png): the right-hand segment of the
+       same outlined box, Listen from here on the left, one gold divider. */
+    .sel-repeat-btn {
+      flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px; padding: 6px 14px; border-radius: 0 8px 8px 0; cursor: pointer;
+      background: transparent; border: 1px solid var(--gold); border-left-width: 0;
+      color: var(--gold); font-family: 'Cinzel', serif;
+      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .sel-repeat-btn:active { background: var(--gold-faint); }
+    .sel-repeat-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .sel-listen-btn:not(:last-child) { border-radius: 8px 0 0 8px; }
 
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
@@ -7306,6 +7322,7 @@
     .sel-style-btn { font-size: var(--fsc-16); }
     .sel-action-btn { font-size: var(--fsc-13); }
     .sel-listen-btn { font-size: var(--fsc-12); }
+    .sel-repeat-btn { font-size: var(--fsc-12); }
     .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }

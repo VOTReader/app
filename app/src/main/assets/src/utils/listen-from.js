@@ -10,7 +10,7 @@
    the reader chose. Nothing here knows about audio; the pane decides.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** @returns {{ has: (hlKey: string) => boolean, start: (hlKey: string, offset: number | null) => boolean } | null} */
+/** @returns {{ has: (hlKey: string) => boolean, start: (hlKey: string, offset: number | null) => boolean, repeat?: (keys: string[], label: string, times: number) => boolean } | null} */
 function pane() {
   const lf = typeof window !== 'undefined' ? /** @type {any} */ (window).__votListenFrom : null;
   return lf && typeof lf.has === 'function' && typeof lf.start === 'function' ? lf : null;
@@ -54,6 +54,37 @@ export function listenFromTarget(selection) {
 export function startListenFrom(target) {
   const lf = pane();
   return !!(target && lf && lf.start(target.hlKey, target.offset));
+}
+
+/* REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25): the selected blocks, looped three times by the pane
+   (window.__votListenFrom.repeat). A pane with no repeat (the APK's native player) offers no button. */
+
+/** How many times REPEAT plays the passage. */
+export const REPEAT_TIMES = 3;
+
+/**
+ * The blocks of a selection the pane can repeat, in reading order, or null.
+ *
+ * @param {string[] | null | undefined} hlKeys - the data-hl-keys the selection covers, in order
+ * @returns {{ keys: string[] } | null}
+ */
+export function repeatTarget(hlKeys) {
+  const lf = pane();
+  if (!lf || typeof lf.repeat !== 'function' || !Array.isArray(hlKeys)) return null;
+  const keys = hlKeys.filter((k) => !!k && lf.has(k));
+  return keys.length ? { keys } : null;
+}
+
+/**
+ * Act on a target repeatTarget gave: the pane loops those blocks REPEAT_TIMES times under `label`.
+ *
+ * @param {{ keys: string[] } | null | undefined} target
+ * @param {string} label - the passage's reference, for the bar ("Psalm 23:1–3")
+ * @returns {boolean} false when there was nothing to repeat
+ */
+export function startRepeat(target, label) {
+  const lf = /** @type {any} */ (pane());
+  return !!(target && lf && typeof lf.repeat === 'function' && lf.repeat(target.keys, label, REPEAT_TIMES));
 }
 
 /**

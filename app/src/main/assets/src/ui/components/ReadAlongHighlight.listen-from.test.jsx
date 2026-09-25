@@ -16,7 +16,7 @@ import { act, cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
-import { ReadAlongHighlight } from './ReadAlongHighlight.jsx';
+import { ReadAlongHighlight, repeatSpanOf } from './ReadAlongHighlight.jsx';
 
 class FakeAudio extends EventTarget {
   constructor() {
@@ -43,7 +43,7 @@ const BLOCK1 = 'Second paragraph, first clause. Second paragraph, second clause.
 const MANIFEST = { ['one:' + ID]: [['idLong', 'B']] };
 const SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [30.0, 1, 0, 31, 0], [36.5, 1, 32, 64, 0]] };
 
-function Host({ withListen = true, onListenSpy }) {
+function Host({ withListen = true, onListenSpy, readAlongOn = true }) {
   const mainRef = React.useRef(null);
   const onListen = React.useCallback(() => {
     if (onListenSpy) onListenSpy();
@@ -56,7 +56,7 @@ function Host({ withListen = true, onListenSpy }) {
         <p data-hl-key={letterHlKey(ID, 1)}>{BLOCK1}</p>
       </div>
       <ReadAlongHighlight volKey="one" letterId={ID} mainRef={mainRef} hlKeyFn={letterHlKey}
-        readAlongOn readAlongFollow={false} onListen={withListen ? onListen : undefined} />
+        readAlongOn={readAlongOn} readAlongFollow={false} onListen={withListen ? onListen : undefined} />
     </div>
   );
 }
@@ -131,5 +131,89 @@ describe('window.__votListenFrom: play the unit on screen from a chosen clause',
     render(<Host />);
     act(() => { LF().start(letterHlKey(ID, 0), 5); });
     expect(AudioPlayer.getState().time).toBe(30);
+  });
+});
+
+/* REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25): repeat(keys, label, times) loops the selected blocks. The span is
+   the first timed clause of the first block to the start of the first clause after the last block (the timing
+   rows hold starts only); a passage that runs to the recording's end has no clause after it and loops at 'ended'. */
+describe('repeatSpanOf: the seconds a run of blocks covers', () => {
+  const rows = [[12.0, 0, 0, 28, 0], [30.0, 1, 0, 31, 0], [36.5, 1, 32, 64, 0], [50.0, 2, 0, 10, 0]];
+  it('from the first clause of the first block to the first clause after the last', () => {
+    expect(repeatSpanOf(rows, [letterHlKey(ID, 0), letterHlKey(ID, 1)], ID, letterHlKey)).toEqual({ start: 12, end: 50 });
+    expect(repeatSpanOf(rows, [letterHlKey(ID, 1)], ID, letterHlKey)).toEqual({ start: 30, end: 50 });
+  });
+  it('the last block of the recording runs to its end', () => {
+    expect(repeatSpanOf(rows, [letterHlKey(ID, 2)], ID, letterHlKey)).toEqual({ start: 50, end: Infinity });
+  });
+  it('untimed blocks inside the run are carried; a run with nothing timed is null', () => {
+    expect(repeatSpanOf(rows, [letterHlKey(ID, 1), letterHlKey(ID, 7)], ID, letterHlKey)).toEqual({ start: 30, end: 50 });
+    expect(repeatSpanOf(rows, [letterHlKey(ID, 7)], ID, letterHlKey)).toBeNull();
+    expect(repeatSpanOf(null, [letterHlKey(ID, 1)], ID, letterHlKey)).toBeNull();
+  });
+});
+
+describe('window.__votListenFrom.repeat: loop the selected blocks three times', () => {
+  it('the unit playing: loops paragraph 1 alone, labelled, and resumes a paused bar', () => {
+    render(<Host />);
+    act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' }); });
+    tick(40);
+    act(() => { AudioPlayer.toggle(); });
+    let ok;
+    act(() => { ok = LF().repeat([letterHlKey(ID, 0)], 'A Long Letter', 3); });
+    expect(ok).toBe(true);
+    expect(AudioPlayer.getState().time).toBe(12);
+    expect(AudioPlayer.getState().loop).toMatchObject({ start: 12, end: 30, times: 3, pass: 1, label: 'A Long Letter' });
+    expect(AudioPlayer.getState().status).toBe('playing');
+  });
+
+  it('nothing playing: starts through the host\'s Listen, then loops once the timings are in', () => {
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} />);
+    act(() => { LF().repeat([letterHlKey(ID, 1)], 'Paragraph 2', 3); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(AudioPlayer.getState().loop).toMatchObject({ start: 30, end: Infinity, label: 'Paragraph 2' });
+    expect(AudioPlayer.getState().time).toBe(30);
+  });
+
+  it('no Repeat with the read-along off (the span comes from the timings it does not fetch)', () => {
+    render(<Host readAlongOn={false} />);
+    expect(LF().has(letterHlKey(ID, 1))).toBe(true);
+    expect(LF().repeat).toBeUndefined();
+  });
+
+  it('Listen from here ends a repeating passage', () => {
+    render(<Host />);
+    act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' }); });
+    tick(13);
+    act(() => { LF().repeat([letterHlKey(ID, 1)], 'x', 3); });
+    expect(AudioPlayer.getState().loop).not.toBeNull();
+    act(() => { LF().start(letterHlKey(ID, 1), 40); });
+    expect(AudioPlayer.getState().loop).toBeNull();
+  });
+
+  it('a multi-part letter: a passage in (or reaching into) a part that is not playing is refused, not half-looped', () => {
+    globalThis.AUDIO_MANIFEST = { ['one:' + ID]: [['idLong1', 'B'], ['idLong2', 'B']] };
+    globalThis.AUDIO_SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [3.0, 1, 0, 31, 1], [9.5, 1, 32, 64, 1]] };
+    render(<Host />);
+    act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' }); });
+    tick(13);
+    let ok;
+    act(() => { ok = LF().repeat([letterHlKey(ID, 1)], 'x', 3); });
+    expect(ok).toBe(false);
+    act(() => { ok = LF().repeat([letterHlKey(ID, 0), letterHlKey(ID, 1)], 'x', 3); });
+    expect(ok).toBe(false);
+    expect(AudioPlayer.getState().loop).toBeNull();
+    act(() => { ok = LF().repeat([letterHlKey(ID, 0)], 'x', 3); });
+    expect(ok, 'inside the playing part it loops').toBe(true);
+  });
+
+  it('blocks that are not this unit\'s: nothing happens', () => {
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} />);
+    let ok;
+    act(() => { ok = LF().repeat(['letter:elsewhere:0'], 'x', 3); });
+    expect(ok).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
   });
 });

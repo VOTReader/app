@@ -7,7 +7,7 @@ import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.j
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
-import { listenFromTarget, startListenFrom } from '../../utils/listen-from.js';
+import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 
@@ -545,14 +545,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const allHlContainers = Array.from(document.querySelectorAll('[data-hl-key]'))
           .filter(function(c) { return range.intersectsNode(c); });
         if (allHlContainers.length === 0) { setVisible(false); return; }
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen });
+        // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
+        const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen, repeat });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
         const end = computeOffset(container, endNode, endOff);
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
-        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, existingHl: existing || null, multiVerse: false, listen });
+        const repeat = listen ? repeatTarget([hlKey]) : null;
+        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, existingHl: existing || null, multiVerse: false, listen, repeat });
       }
       const rect = range.getBoundingClientRect();
       const toolbarW = 320;
@@ -1052,6 +1055,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     startListenFrom(target);
   }, [selInfo]);
 
+  // REPEAT THIS PASSAGE (rp1 part 3): the selected blocks, three times, under
+  // the passage's own reference (the Share label: "Psalm 23:1–3").
+  const handleRepeat = React.useCallback(() => {
+    if (!selInfo || !selInfo.repeat) return;
+    const target = selInfo.repeat;
+    const keys = target.keys;
+    window.getSelection().removeAllRanges();
+    setVisible(false);
+    startRepeat(target, shareLabel(keys[0], keys.length > 1 ? keys[keys.length - 1] : null));
+  }, [selInfo]);
+
 
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
@@ -1288,6 +1302,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
             <span>Listen from here</span>
           </button>
+          {selInfo.repeat && (
+            <button type="button" className="sel-repeat-btn" onClick={handleRepeat} aria-label={'Repeat this passage ' + REPEAT_TIMES + ' times'}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M17 2.5l3 3-3 3M4 11.5v-1a5 5 0 015-5h11M7 21.5l-3-3 3-3M20 12.5v1a5 5 0 01-5 5H4" />
+              </svg>
+              <span>Repeat</span>
+            </button>
+          )}
         </div>
       )}
       {/* Action buttons: note only for single-container; link + copy/share/search always */}

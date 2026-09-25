@@ -1298,3 +1298,52 @@ describe('SelectionToolbar — Listen from here', () => {
     expect(tb.querySelector('.sel-listen-btn')).toBeNull();
   });
 });
+
+/* REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25; mockup lanes/myweb/out/mockups/rp1/r1-repeat.png): REPEAT sits
+   beside Listen from here while the pane can loop (window.__votListenFrom.repeat; the APK's native player has
+   none yet), and loops the selected blocks three times under the passage's own reference. */
+describe('SelectionToolbar — Repeat', () => {
+  afterEach(() => { delete /** @type {any} */ (window).__votListenFrom; });
+
+  async function raise(c, start, end) {
+    stubSelection(rangeOver(c, start, end));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+  }
+
+  it('sits beside Listen from here and loops the verse three times under its reference', async () => {
+    const c = readingContainer('bible:psalms:23:1', 'The LORD is my shepherd; I shall not want.');
+    const repeat = vi.fn((/** @type {string[]} */ _keys, /** @type {string} */ _label, /** @type {number} */ _times) => true);
+    /** @type {any} */ (globalThis)._bookTitle = (id) => (id === 'psalms' ? 'Psalms' : id);   // the app's global
+    /** @type {any} */ (window).__votListenFrom = { has: () => true, start: vi.fn(() => true), repeat };
+    mount();
+    const tb = await raise(c, 4, 14);
+    const row = /** @type {HTMLElement} */ (tb.querySelector('.sel-toolbar-listen'));
+    const btn = /** @type {HTMLButtonElement} */ (row.querySelector('.sel-repeat-btn'));
+    expect(btn).not.toBeNull();
+    expect(btn.textContent.trim()).toBe('Repeat');
+    expect(btn.getAttribute('aria-label')).toBe('Repeat this passage 3 times');
+    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['sel-listen-btn', 'sel-repeat-btn']);
+    act(() => { fire(btn, 'click'); });
+    expect(repeat).toHaveBeenCalledTimes(1);
+    const [keys, label, times] = repeat.mock.calls[0];
+    expect(keys).toEqual(['bible:psalms:23:1']);
+    expect(label, 'the Share label of the passage').toBe('Psalms 23:1');
+    expect(times).toBe(3);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+    delete /** @type {any} */ (globalThis)._bookTitle;
+  });
+
+  it('no Repeat where the pane cannot loop: Listen from here stays alone', async () => {
+    const c = readingContainer('letter:one:chosen:3', 'Many things will I teach you. And though you feel weak');
+    /** @type {any} */ (window).__votListenFrom = { has: () => true, start: vi.fn(() => true) };
+    mount();
+    const tb = await raise(c, 30, 45);
+    expect(tb.querySelector('.sel-listen-btn')).not.toBeNull();
+    expect(tb.querySelector('.sel-repeat-btn')).toBeNull();
+  });
+});

@@ -190,10 +190,14 @@ export function AudioPlayerBar() {
                 : part ? <span className="audio-bar-part">{' · ' + part}</span> : null}
             </span>
             <span className="audio-bar-sub">
-              <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>
+              {/* REPEAT THIS PASSAGE (rp1 part 3): while a passage repeats, the
+                  source line says which and how far (mockup r1-repeat.png). */}
+              {st.loop
+                ? <span className="audio-bar-loop">{'Repeating ' + (st.loop.label || 'this passage') + ' · ' + st.loop.pass + ' of ' + st.loop.times}</span>
+                : <span className="audio-bar-src">{(track.sub || '') + (reader ? ' · ' + reader : '')}</span>}
               {/* Its own span, not appended to the source text: the source is
                   the part that ellipsizes, and the place must not vanish with it. */}
-              {place ? <span className="audio-bar-pos">{place}</span> : null}
+              {place && !st.loop ? <span className="audio-bar-pos">{place}</span> : null}
               {/* Until metadata lands the total is unknown, not 0:00. */}
               <span className="audio-bar-time">{dur ? fmt(st.time) + ' / ' + fmt(dur) : fmt(st.time)}</span>
             </span>
