@@ -117,6 +117,15 @@ async function click(page, label) { need(await clickIf(page, label), `no control
 
 /** Settings -> Your Data, open. */
 async function openYourData(page) {
+  // The compact top bar (54b14b14) keeps Settings inside its "More" menu:
+  // open it first when no gear or Settings control is on screen.
+  await page.evaluate(() => {
+    const direct = document.querySelector('[aria-label="Settings"]')
+      || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent || ''));
+    const more = document.querySelector('button[aria-label="More"]');
+    if (!direct && more) /** @type {HTMLElement} */ (more).click();
+  });
+  await sleep(300);
   const via = await page.evaluate(() => {
     const gear = document.querySelector('[aria-label="Settings"]');
     const tile = gear || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent || ''));
