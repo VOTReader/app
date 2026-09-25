@@ -136,6 +136,7 @@ function _cloneSnapshot(v) {
  *   migrations?: Record<number, (old: any) => any>,
  *   crossTabMerge?: (base: any, ours: any, theirs: any) => any,
  *   discardQueueOnRebase?: boolean,
+ *   baseIsOurs?: boolean,
  * }} CachedStoreOpts
  */
 
@@ -297,6 +298,20 @@ export function CachedStore(storageKey, defaultVal, opts) {
    * @type {((base: any, ours: any, theirs: any) => any) | null}
    */
   const crossTabMerge = (typeof opts.crossTabMerge === 'function') ? opts.crossTabMerge : null;
+  /**
+   * 2nd-tab stale merge (sweep 2): for a store whose writer keeps its OWN copy and
+   * never reads the merged value back (StateStore: usePersistedState writes the
+   * React union, which never absorbs a sibling's keys), the next merge's ancestor
+   * must be what this tab wrote, not the merged result. Otherwise a key only a
+   * sibling added sits in the base, is missing from ours, and this tab's next
+   * write deletes it. With `ours` as the ancestor, the merge applies exactly this
+   * tab's own changes since its last write onto the committed value. `_cache`
+   * stays the tab's own copy too (not the merge), so overlapping saves and the
+   * STORE-4 retry merge what the tab wrote. The store's writer must hand set()
+   * its WHOLE copy each time: a partial write would become the next ancestor.
+   * @type {boolean}
+   */
+  const baseIsOurs = opts.baseIsOurs === true;
   /**
    * storage-backup-3: opt-in for stores whose mutation contract is
    * FULL-REPLACEMENT (StateStore.set(fullState) is the only example today),
@@ -561,15 +576,33 @@ export function CachedStore(storageKey, defaultVal, opts) {
             console.warn('cross-tab merge failed for', name, '— writing local cache', e);
             merged = ours;
           }
-          self._cache = /** @type {any} */ (merged);
-          self._base = /** @type {any} */ (_cloneSnapshot(merged));   // new ancestor for the next merge
+          // baseIsOurs (a writer that never reads the merge back): `_cache` stays the
+          // tab's own copy, so a second save already waiting on the lock, and the
+          // STORE-4 retry, merge what this tab wrote, never this merge's result
+          // (the n4-05 refuter's R2-1: sibling keys leaked into the ancestor).
+          const ownCopy = baseIsOurs && !exact;
+          if (!ownCopy) self._cache = /** @type {any} */ (merged);
+          // the next merge's ancestor: what this tab wrote (ownCopy), else the merge
+          const nextBase = /** @type {any} */ (_cloneSnapshot(ownCopy ? ours : merged));
           // ── end synchronous section
           // No subscriber re-render here: STORE-1 is LOSS-PREVENTION, not live
           // cross-tab sync. A sibling's pulled-in records are now in `_cache`
           // (consistent + safe) and surface on the next ordinary bump / reload.
           // Skipping the bump keeps the hot path cheap — no per-save full-store
           // serialization, and the F1+F2 keyed-annotation isolation is preserved.
-          return IDBAdapter.put(name, 'v', merged);
+          // The ancestor moves only once the put has landed (R2-2): after a failed
+          // put the disk lacks this write, and an ancestor holding it would read a
+          // record this tab just added as a sibling's delete on the next merge.
+          // The lock is held until this promise settles, so no merge sees it early.
+          // On a failed put the disk still holds exactly `theirs`: a store whose
+          // cache took the merge adopts it as the ancestor (R3-1: else a record a
+          // sibling deleted next sat in ours but in neither base nor theirs, and came
+          // back as 'our add'); an own-copy store keeps its ancestor (`theirs` would
+          // hand it sibling keys it never had, R2-1).
+          return IDBAdapter.put(name, 'v', merged).then(function (r) { self._base = nextBase; return r; }, function (err) {
+            if (!ownCopy) self._base = /** @type {any} */ (_cloneSnapshot(theirs));
+            throw err;
+          });
         });
       });
       this._lastWrite = p;

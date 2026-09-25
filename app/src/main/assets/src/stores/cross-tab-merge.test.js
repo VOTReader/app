@@ -135,6 +135,26 @@ describe('STORE-1 protected (crossTabMerge) — committed data survives', () => 
     expect(idsIn('vot-test-merge-race')).toEqual(['A1', 'B1']);
   });
 
+  /* n4-05 refuter R2-2 / R3-1: the ancestor moves only when the put lands, and a
+     failed put leaves the disk at exactly what the merge read (`theirs`). */
+  it('after a failed put: this tab\'s own add survives, and a record the sibling deletes next stays deleted', async () => {
+    const store = 'vot-test-merge-failed-put';
+    const { a, b } = await twoTabs(store, mergeListStore);
+    b.add(entry('S'));
+    await b.whenSaved();
+    const realPut = /** @type {any} */ (IDBAdapter.put).getMockImplementation();
+    /** @type {any} */ (IDBAdapter.put).mockImplementationOnce(() => Promise.reject(new Error('AbortError')));
+    a.add(entry('X'));                        // merges S in, then its put fails
+    await a.whenSaved();
+    expect(idsIn(store)).toEqual(['S']);
+    /** @type {any} */ (IDBAdapter.put).mockImplementation(realPut);
+    b.remove('S');
+    await b.whenSaved();
+    a.add(entry('Y'));
+    await a.whenSaved();
+    expect(idsIn(store)).toEqual(['X', 'Y']);
+  });
+
   it('adopts the sibling record into the local cache after merge', async () => {
     const { a, b } = await twoTabs('vot-test-merge-adopt', mergeListStore);
     a.add(entry('X'));
@@ -159,9 +179,9 @@ const bootShim = (full) => ({
   settings: { fontStyle: full && full.settings && full.settings.fontStyle },
 });
 
-function makeStateLikeStore(storeName, merge) {
+function makeStateLikeStore(storeName, merge, baseIsOurs) {
   const base = CachedStore(storeName, {}, merge
-    ? { idb: true, lsShim: bootShim, crossTabMerge: merge }
+    ? { idb: true, lsShim: bootShim, crossTabMerge: merge, baseIsOurs: !!baseIsOurs }
     : { idb: true, lsShim: bootShim });
   return extendStore(base, {
     get() { return this._load(); },
@@ -224,6 +244,84 @@ describe('[D4] vot-state protected — the ledger merges, the session does not',
     expect(stateIn(store).tabs).toEqual([{ id: 'tb' }]);
     expect(stateIn(store).theme).toBe('dark');
     expect(stateIn(store).settings).toEqual({ fontScale: '100' });
+  });
+
+  /* 2nd-tab stale merge (sweep 2 leftover; n4-05 refuter): the app never folds a
+     merged write back into React, so a tab keeps writing its OWN union, which
+     never holds a mark another tab made. With the merged value as the next
+     ancestor, that mark sat in the base and was missing from ours: the second
+     write read it as this tab deleting it. vot-state's ancestor is the union this
+     tab last wrote (baseIsOurs), so a mark only another tab made survives any
+     number of this tab's writes, and this tab's own clears still land. */
+  it('a stale tab writing its own union twice never deletes a mark only the other tab made', async () => {
+    const store = 'vot-test-state-stale-twice';
+    const a = makeStateLikeStore(store, mergeStateStore, true);
+    const b = makeStateLikeStore(store, mergeStateStore, true);
+    await a._hydrate();
+    await b._hydrate();
+    a.set({ tabs: [{ id: 'ta' }], readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    b.set({ tabs: [{ id: 'tb' }], readItems: { 'v1:genesis:1': 1 } });   // B's React union: never learns john:3
+    await b.whenSaved();
+    b.set({ tabs: [{ id: 'tb' }], readItems: { 'v1:genesis:1': 1, 'v1:genesis:2': 1 } });
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ 'v1:john:3': 1, 'v1:genesis:1': 1, 'v1:genesis:2': 1 });
+    b.set({ tabs: [{ id: 'tb' }], readItems: { 'v1:genesis:2': 1 } });   // B clears its own genesis:1
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ 'v1:john:3': 1, 'v1:genesis:2': 1 });
+  });
+
+  it('refuter R2-1: two of the stale tab\'s saves overlapping (a font-slider burst) still never delete the other tab\'s mark', async () => {
+    const store = 'vot-test-state-overlap';
+    const a = makeStateLikeStore(store, mergeStateStore, true);
+    const b = makeStateLikeStore(store, mergeStateStore, true);
+    await a._hydrate();
+    await b._hydrate();
+    b.set({ readItems: { a: 1 } });
+    await b.whenSaved();
+    a.set({ readItems: { a: 1, K: 1 } });                              // the sibling adds K
+    await a.whenSaved();
+    b.set({ theme: 'light', readItems: { a: 1, x: 1 } });              // two back to back: both queue on the lock
+    b.set({ theme: 'dark', readItems: { a: 1, x: 1 } });
+    await b.whenSaved();
+    b.set({ theme: 'dark', readItems: { a: 1, x: 1, y: 1 } });
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ a: 1, K: 1, x: 1, y: 1 });
+  });
+
+  it('refuter R2-2: a put that fails never becomes the ancestor, so this tab\'s own new mark survives the next save', async () => {
+    const store = 'vot-test-state-failed-put';
+    const b = makeStateLikeStore(store, mergeStateStore, true);
+    await b._hydrate();
+    b.set({ readItems: { a: 1 } });
+    await b.whenSaved();
+    const realPut = /** @type {any} */ (IDBAdapter.put).getMockImplementation();
+    /** @type {any} */ (IDBAdapter.put).mockImplementationOnce(() => Promise.reject(new Error('AbortError')));
+    b.set({ readItems: { a: 1, x: 1 } });                              // this put fails
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ a: 1 });
+    /** @type {any} */ (IDBAdapter.put).mockImplementation(realPut);
+    b.set({ theme: 'dark', readItems: { a: 1, x: 1 } });               // the next save
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ a: 1, x: 1 });
+  });
+
+  it('with baseIsOurs a clear made in the other tab still lands over a stale tab\'s writes', async () => {
+    const store = 'vot-test-state-stale-clear';
+    const a = makeStateLikeStore(store, mergeStateStore, true);
+    await a._hydrate();
+    a.set({ readItems: { 'v1:john:3': 1 } });
+    await a.whenSaved();
+    const b = makeStateLikeStore(store, mergeStateStore, true);
+    await b._hydrate();
+    const bUnion = { readItems: { 'v1:john:3': 1 } };                 // B booted with the mark
+    b.set(bUnion);
+    await b.whenSaved();
+    a.set({ readItems: {} });                                          // A clears it
+    await a.whenSaved();
+    b.set({ readItems: { 'v1:john:3': 1, 'v1:luke:2': 1 } });          // B, stale, marks something else
+    await b.whenSaved();
+    expect(stateIn(store).readItems).toEqual({ 'v1:luke:2': 1 });
   });
 
   it('honors unmarkRead — the cleared mark is not resurrected', async () => {

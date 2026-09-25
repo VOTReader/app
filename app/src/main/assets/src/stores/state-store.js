@@ -114,6 +114,10 @@ export const StateStore = extendStore(
     // achievements) it was permanent loss. mergeStateStore splits the two —
     // see its doc comment for why the halves get opposite policies.
     crossTabMerge: mergeStateStore,
+    // 2nd-tab stale merge (sweep 2): the React union this store is written from
+    // never absorbs a sibling's keys, so the next merge's ancestor is what this
+    // tab wrote (cached-store.js baseIsOurs): a sibling's read mark survives.
+    baseIsOurs: true,
     // storage-backup-3: set() is full-replacement, so a degraded-then-
     // recovered hydration must NOT replay a pre-load queue onto the real
     // record — see cached-store.js's _rebaseAndPromote for the discard

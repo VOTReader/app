@@ -71,6 +71,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  delete /** @type {any} */ (StateStore)._lastWrite;   // n4-05 tests stand in a write promise
   // Restore jsdom's default visibility for the next test file / case.
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
   // The export flush bridge is hook-owned; never leak a registration.
@@ -378,6 +379,39 @@ describe('usePersistedState — the reload record (sessionStorage)', () => {
     expect(rec.state.theme).toBe('dark');
     expect(setSpy, 'IDB is still written — the record is a bridge, not a replacement').toHaveBeenCalledTimes(1);
     expect(setSpy.mock.calls[0][0].tabs[0].scrollPositions).toEqual({ k: { y: 900 } });
+  });
+
+  /* n4-05: the record carries the union this tab last saw LAND as its base, so the
+     next boot merges 3-way and a read mark another tab cleared stays cleared. */
+  it('the record carries the last union that landed as its base, not the one still in flight', async () => {
+    setSpy.mockImplementation(() => { /** @type {any} */ (StateStore)._lastWrite = Promise.resolve(); });
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState({ readItems: { a: 1 } }) });
+    await act(async () => {});                                   // the mount write lands (whenSaved true)
+    rerender(makeState({ readItems: { a: 1, b: 1 } }));          // debounced, not yet written
+    act(() => { /** @type {any} */ (window).__flushPersistState(undefined, { reload: true }); });
+    const rec = JSON.parse(/** @type {string} */ (sessionStorage.getItem(RESUME_STATE_KEY)));
+    expect(rec.state.readItems).toEqual({ a: 1, b: 1 });
+    expect(rec.base.readItems).toEqual({ a: 1 });
+    expect(Object.keys(rec.base).sort(), 'only the maps a base decides: the record stays small').toEqual(['lastReadChapters', 'lastReadLetterMap', 'readItems']);
+  });
+
+  it('a write that never lands is never a base (null: the boot unions as before)', async () => {
+    setSpy.mockImplementation(() => { /** @type {any} */ (StateStore)._lastWrite = Promise.resolve(); });
+    const saved = vi.spyOn(StateStore, 'whenSaved').mockImplementation(() => Promise.resolve(false));
+    renderHook((p) => usePersistedState(p), { initialProps: makeState({ readItems: { a: 1 } }) });
+    await act(async () => {});
+    act(() => { /** @type {any} */ (window).__flushPersistState(undefined, { reload: true }); });
+    expect(JSON.parse(/** @type {string} */ (sessionStorage.getItem(RESUME_STATE_KEY))).base).toBe(null);
+    saved.mockRestore();
+  });
+
+  it('a set that started no write of its own (queued while loading, fenced) is never a base', async () => {
+    /** @type {any} */ (StateStore)._lastWrite = Promise.resolve();   // an earlier write, already on disk
+    setSpy.mockImplementation(() => {});                               // this set queues: no new write
+    renderHook((p) => usePersistedState(p), { initialProps: makeState({ readItems: { a: 1 } }) });
+    await act(async () => {});
+    act(() => { /** @type {any} */ (window).__flushPersistState(undefined, { reload: true }); });
+    expect(JSON.parse(/** @type {string} */ (sessionStorage.getItem(RESUME_STATE_KEY))).base).toBe(null);
   });
 
   it('CONTROL: a patched flush WITHOUT the reload option writes no record', () => {

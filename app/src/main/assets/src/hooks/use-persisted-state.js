@@ -115,10 +115,12 @@
         restored from the back-forward cache clears it on pageshow, because
         the document lives on and will leave its own. Hidden alone is not
         leaving: that flush stays the store write it was. Because a record can
-        now follow any unload, useSavedState UNIONS it with the store
-        (mergeStateStore with no ancestor) instead of taking it whole: the
-        record's session fields win, and a read mark another tab wrote
-        meanwhile is kept rather than deleted by the mount write's merge.
+        now follow any unload, useSavedState MERGES it with the store
+        instead of taking it whole: the record's session fields win, and a
+        read mark another tab wrote meanwhile is kept rather than deleted by
+        the mount write's merge. n4-05: the record also carries `base`, the
+        last union this tab saw land (whenSaved true), so that merge is
+        3-way and a read mark another tab CLEARED stays cleared.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -192,6 +194,18 @@ export const RESUME_STATE_MAX_AGE_MS = 120000;
  * @returns {Record<string, any> | null}
  */
 export function takeResumeState() {
+  const rec = takeResumeRecord();
+  return rec ? rec.state : null;
+}
+
+/**
+ * takeResumeState's record whole: the state, and the base it carries (n4-05) -
+ * the union this tab last saw land in the store, null when it has none (an
+ * older build's record, or no write had landed yet). Same rules, same
+ * read-once clearing.
+ * @returns {{ state: Record<string, any>, base: Record<string, any> | null } | null}
+ */
+export function takeResumeRecord() {
   let raw = null;
   try {
     raw = sessionStorage.getItem(RESUME_STATE_KEY);
@@ -203,7 +217,9 @@ export function takeResumeState() {
   if (!rec || typeof rec !== 'object' || typeof rec.at !== 'number') return null;
   if (Date.now() - rec.at > RESUME_STATE_MAX_AGE_MS) return null;
   const s = rec.state;
-  return s && typeof s === 'object' ? s : null;
+  if (!s || typeof s !== 'object') return null;
+  const b = rec.base;
+  return { state: s, base: b && typeof b === 'object' ? b : null };
 }
 
 /**
@@ -262,6 +278,32 @@ export function usePersistedState({
   // Contract 7: true from an import / Clear All until the page reloads (or the
   // path that does not reload thaws it) — every write below is a no-op.
   const frozenRef = React.useRef(false);
+  // n4-05: the last union this tab saw LAND in the store (whenSaved true), and
+  // the write count it was: the leave record's base, so the next boot's merge
+  // honours a read mark another tab cleared meanwhile.
+  const landedRef = React.useRef(null);
+  const writeSeqRef = React.useRef(0);
+  const landedSeqRef = React.useRef(0);
+  /* n4-05: hand a union to the store; once it is on disk it is the base of the
+     next leave record. A later write that lands first is never overtaken by an
+     older one. Refs only, so every render's copy is the same function. */
+  const writeUnion = (union) => {
+    writtenRef.current = union;
+    const store = /** @type {any} */ (StateStore);
+    const before = store._lastWrite;
+    StateStore.set(union);
+    const seq = ++writeSeqRef.current;
+    // A set that started no write of its own (queued while the store loads,
+    // held by Clear All's fence) would have whenSaved report the one before it.
+    if (typeof StateStore.whenSaved !== 'function' || !store._lastWrite || store._lastWrite === before) return;
+    StateStore.whenSaved().then((ok) => {
+      // Only the maps a base decides (mergeStateStore): the record stays small.
+      if (ok && seq > landedSeqRef.current) {
+        landedSeqRef.current = seq;
+        landedRef.current = { readItems: union.readItems, lastReadChapters: union.lastReadChapters, lastReadLetterMap: union.lastReadLetterMap };
+      }
+    }, () => {});
+  };
 
   // ── Mount-only: install the guaranteed-flush listeners + unmount flush.
   React.useEffect(() => {
@@ -292,18 +334,17 @@ export function usePersistedState({
       pendingRef.current = null;
       latestRef.current = union;
       if (leaving) {
-        try { sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: union })); }
+        try { sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: union, base: landedRef.current })); }
         catch (_e) { /* the IDB write below is still made; the reload still happens */ }
       }
       // A leave with nothing new (no pending union, no patch) has already
       // been handed to the store; the record above is all it adds.
       if (pending == null && !patched) return;
-      writtenRef.current = union;
       // W2.3b: persistence routes through StateStore (IDB-backed). The
       // store's lsShim hook continues to write the reduced theme +
       // fontStyle + fontScale copy to localStorage for the boot-script
       // sync read at index.html:73 — no boot FOUC.
-      StateStore.set(union);
+      writeUnion(union);
     };
     flushRef.current = flush;
     // Contract 5: publish the SAME flush for the export path (see header).
@@ -400,8 +441,7 @@ export function usePersistedState({
       // any pending debounced union is superseded, not dropped.
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       pendingRef.current = null;
-      writtenRef.current = union;
-      StateStore.set(union);
+      writeUnion(union);
       return;
     }
 

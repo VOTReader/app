@@ -99,7 +99,7 @@ export function _validateTabState(s) {
 
 import { StateStore } from '../stores/state-store.js';
 import { mergeStateStore } from '../stores/store-merge.js';
-import { takeResumeState } from './use-persisted-state.js';
+import { takeResumeRecord } from './use-persisted-state.js';
 
 /**
  * Read + validate vot-state exactly once on mount. Source-of-truth
@@ -113,11 +113,14 @@ import { takeResumeState } from './use-persisted-state.js';
  * THE LEAVE RECORD comes first (usePersistedState header items 6 and 8):
  * the union the previous document of this tab wrote to sessionStorage as it
  * left — the update's self-reload, or any pagehide — because its IDB put may
- * never have landed. takeResumeState() clears it as it reads it. It is
- * UNIONED with the store, not taken whole: mergeStateStore with no ancestor
- * lets the record's session fields (the screen, the tabs) win and keeps every
- * accumulating-map key from either side, so a read mark another tab wrote
- * after this one last read the store survives. The result then goes through
+ * never have landed. takeResumeRecord() clears it as it reads it. It is
+ * MERGED with the store, not taken whole: mergeStateStore lets the record's
+ * session fields (the screen, the tabs) win and merges the accumulating maps
+ * 3-way against the record's base, the union this tab last saw land (n4-05):
+ * a read mark another tab wrote after this one last read the store survives,
+ * one another tab cleared stays cleared, one this tab added since its base is
+ * kept. A record with no base (an older build's, or no write had landed yet)
+ * unions every key from either side, as before. The result then goes through
  * exactly the validation below, and usePersistedState's mount write makes it
  * durable.
  *
@@ -136,9 +139,14 @@ export function useSavedState() {
     try {
       // The leave record, when this boot is the far side of a reload; the
       // store otherwise. Read-and-clear is one call.
-      const resumed = takeResumeState();
+      const resumed = takeResumeRecord();
       const stored = StateStore.get();
-      const raw = resumed ? mergeStateStore(null, resumed, stored) : stored;
+      // n4-05: the record's base (the union this tab last saw land) makes it a
+      // 3-way merge: a read mark another tab cleared stays cleared.
+      // Only over a store that really loaded (the n4-05 refuter's F1): a hydration
+      // that timed out serves {}, and every key in the base would read as deleted.
+      const loaded = typeof StateStore.getState !== 'function' || StateStore.getState() === 'loaded';
+      const raw = resumed ? mergeStateStore(loaded ? resumed.base : null, resumed.state, stored) : stored;
       // Defensive copy — _validateTabState mutates in place, and the
       // live store cache reference shouldn't be silently rewritten by
       // a read.

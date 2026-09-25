@@ -20,7 +20,7 @@
    shadow this rule's input.
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { _validateTabState, useSavedState } from './use-saved-state.js';
 import { StateStore } from '../stores/state-store.js';
@@ -625,6 +625,48 @@ describe('useSavedState — the update reload record is read first, applied, and
       'wtlb:regarding-pride': 1,                     // only the record had it: kept
     });
     expect(result.current.lastReadChapters, 'where I was last: the leaving tab').toEqual({ genesis: 5 });
+  });
+
+  /* n4-05 (sweep 2): unioned with no ancestor, a read mark cleared in ANOTHER tab
+     (gone from the store, still in this tab's record because this tab never learned
+     of the clear) came back. The record now carries the union this tab last saw
+     land on disk as its base: a key in the base and the record but not the store
+     was deleted elsewhere and stays deleted; a key new since the base is kept. */
+  it('a read mark another tab cleared stays cleared; one this tab added since its last landed write is kept', () => {
+    StateStore._cache = /** @type {any} */ ({
+      tabs: [{ screen: 'home' }], activeTabIdx: 0,
+      readItems: { 'v1:volume-one:christmas': 1 },                 // the other tab cleared the-wide-path
+    });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(),
+      base: { readItems: { 'v1:volume-one:the-wide-path': 1, 'v1:volume-one:christmas': 1 } },
+      state: {
+        tabs: [{ screen: 'answers-home' }], activeTabIdx: 0,
+        readItems: { 'v1:volume-one:the-wide-path': 1, 'v1:volume-one:christmas': 1, 'wtlb:regarding-pride': 1 },
+      } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen, 'session fields: the record still wins').toBe('answers-home');
+    expect(result.current.readItems).toEqual({
+      'v1:volume-one:christmas': 1,
+      'wtlb:regarding-pride': 1,                     // added by this tab since its base: kept though the store lacks it
+    });
+  });
+
+  it('refuter F1: over a store that did not load (hydration timed out, it serves {}), the base is not used: nothing reads as deleted', () => {
+    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('degraded');
+    StateStore._cache = /** @type {any} */ ({});
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(),
+      base: { readItems: { a: 1, b: 1, c: 1 } },
+      state: { tabs: [{ screen: 'home' }], activeTabIdx: 0, readItems: { a: 1, b: 1, c: 1, d: 1 } } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.readItems).toEqual({ a: 1, b: 1, c: 1, d: 1 });
+    gs.mockRestore();
+  });
+
+  it('a record without a base (an older build left it) unions as before', () => {
+    StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'home' }], activeTabIdx: 0, readItems: {} });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: { tabs: [{ screen: 'home' }], activeTabIdx: 0, readItems: { a: 1 } } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.readItems).toEqual({ a: 1 });
   });
 
   it('CONTROL: with no record, the store is what comes back', () => {
