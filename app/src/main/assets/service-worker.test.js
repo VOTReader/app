@@ -171,7 +171,7 @@ describe('service-worker install (P1pwa / P2pwa)', () => {
   });
 
   it('SURVIVES a best-effort asset 404 — install still resolves (P2pwa)', async () => {
-    const sw = bootSW({ fail: ['./offline.html', './splash.jpg'] });
+    const sw = bootSW({ fail: ['./offline.html', './study-cover-lamb.jpg'] });
     await expect(install(sw)).resolves.toBeUndefined();
     const core = await coreCache(sw);
     expect(await core.match('./index.html')).toBeTruthy(); // critical still cached
