@@ -47,6 +47,17 @@ function blockAwareText(frag) {
   return parts.join('');
 }
 
+/** The reference a shared quote carries. n6-10: a quote across Bible verses
+    names its range ("John 3:16–18", "John 3:36–4:2"), not its first verse;
+    anything else keeps its first block's label. */
+function shareLabel(firstKey, lastKey) {
+  var label = _bookmarkSourceLabel(firstKey);
+  if (!lastKey || lastKey === firstKey) return label;
+  var a = firstKey.split(':'), b = lastKey.split(':');
+  if (a[0] !== 'bible' || b[0] !== 'bible' || a[1] !== b[1] || !a[3] || !b[3]) return label;
+  return label + '–' + (a[2] === b[2] ? b[3] : b[2] + ':' + b[3]);
+}
+
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -491,6 +502,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           return text;
         }
       })();
+      // n6-02: Share sends what Copy keeps (a poem's lines, a letter's
+      // paragraphs) without the verse numbers `text` also leaves out.
+      const selShareText = (() => {
+        try {
+          const frag = range.cloneContents();
+          frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
+          return blockAwareText(frag).trim() || text;
+        } catch (_e) {
+          return text;
+        }
+      })();
       const container = findHlContainer(range.startContainer);
       // annotation-selection-8: Chrome's triple-click ends the range at child 0
       // of the NEXT block, so the end boundary names a container the selection
@@ -523,14 +545,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const allHlContainers = Array.from(document.querySelectorAll('[data-hl-key]'))
           .filter(function(c) { return range.intersectsNode(c); });
         if (allHlContainers.length === 0) { setVisible(false); return; }
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen });
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
         const end = computeOffset(container, endNode, endOff);
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
-        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, existingHl: existing || null, multiVerse: false, listen });
+        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, existingHl: existing || null, multiVerse: false, listen });
       }
       const rect = range.getBoundingClientRect();
       const toolbarW = 320;
@@ -996,7 +1018,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // its first verse.
     const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
       ? selInfo.multiContainers[0].dataset.hlKey : null);
-    const text = withPassageLink(selInfo.text, key, key ? _bookmarkSourceLabel(key) : null);
+    const many = selInfo.hlKey ? null : selInfo.multiContainers;
+    const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
+    const text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? shareLabel(key, lastKey) : null);
     window.getSelection().removeAllRanges();
     setVisible(false);
     // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,

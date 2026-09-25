@@ -7,8 +7,9 @@
    A shared link is PUBLIC_APP_URL?p=<public key> (utils/passage-link.js).
    On the first render: read ?p=, take it off the address (a reload or Back
    must not replay it), load the corpus that can resolve the key, and hand
-   navigateToLink a silent jump. Letters need the VOT corpus before their
-   screen is known (findEntryContext); a Bible key is checked against BOOKS
+   navigateToLink a silent jump. Letters need the VOT corpus (and the Bible
+   studies, whose chapters share as letter keys) before their screen is known
+   (findEntryContext); a Bible key is checked against BOOKS
    so a link to a book or chapter that does not exist opens nothing. A key
    that resolves to nothing leaves the reader where the app restored them.
    =================================================================== */
@@ -48,7 +49,16 @@ export function openSharedPassage(win, navigateToLink) {
   const load = kind === 'bible' ? win.__loadBibleCorpus
     : kind === 'study' ? win.__loadMatthewCorpus
       : win.__loadVotCorpus;
-  Promise.resolve(typeof load === 'function' ? load() : null).then(go, go);
+  /** @type {any[]} */
+  const loads = [typeof load === 'function' ? load() : null];
+  // n6-01: a Bible or Letter Study chapter shares as letter:<chapterId>:<n>,
+  // and findEntryContext knows study chapters only once the studies are in.
+  if (kind === 'letter') {
+    const studies = typeof win.loadBibleStudies === 'function' ? win.loadBibleStudies
+      : (typeof loadBibleStudies === 'function' ? loadBibleStudies : null);
+    if (studies) loads.push(Promise.resolve().then(studies).catch(() => null));
+  }
+  Promise.all(loads).then(go, go);
   return key;
 }
 

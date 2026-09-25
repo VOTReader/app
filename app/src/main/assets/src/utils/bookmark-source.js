@@ -36,7 +36,12 @@ export function _bookmarkSourceLabel(hlKey) {
     var bookName = m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : raw;
     var chapNum = m ? m[2] : '';
     var vs = parts[2] || '';
-    return vs ? (bookName + ' ' + chapNum + ':' + vs) : bookName;
+    if (!vs) return bookName;
+    // n6-11: a study note's key carries a suffix ("12-s0", "panel-s0");
+    // the label names the verse (or the chapter) and says what it is.
+    var vm = vs.match(/^(\d+)(.*)$/);
+    if (vm) return bookName + ' ' + chapNum + ':' + vm[1] + (vm[2] ? ' (study note)' : '');
+    return bookName + ' ' + chapNum + ' (study notes)';
   }
 
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {

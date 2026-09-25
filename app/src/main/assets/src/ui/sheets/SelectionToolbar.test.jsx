@@ -1110,6 +1110,26 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     expect(sent[0].text.endsWith('https://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16')).toBe(true);
   });
 
+  /* n6-10 (sweep 2): a quote across three verses was labelled with its
+     first verse only ("John 3:16"). The link still opens the first verse. */
+  it('(n6-10) a quote across verses is labelled with its range', async () => {
+    const sent = /** @type {any[]} */ ([]);
+    setShare((d) => { sent.push(d); return Promise.resolve(); });
+    const vs = ['bible:john:3:16', 'bible:john:3:17', 'bible:john:3:18'].map((k) => readingContainer(k, QUOTE));
+    mount();
+    const r = document.createRange();
+    r.setStart(/** @type {any} */ (vs[0].firstChild), 3);
+    r.setEnd(/** @type {any} */ (vs[2].firstChild), 10);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(r);
+    act(() => { fire(vs[0], 'contextmenu', { clientX: 5, clientY: 5 }); });
+    tapAction('Share');
+    await settle();
+    expect(sent.length).toBe(1);
+    expect(sent[0].text).toMatch(/\n3:16–18\n|John 3:16–18\n|john 3:16–18\n/);
+    expect(sent[0].text.endsWith('?p=bible%3Ajohn%3A3%3A16')).toBe(true);
+  });
+
   it('Share from the reader’s own journal sends the words alone, no link (A8)', async () => {
     const sent = /** @type {any[]} */ ([]);
     setShare((d) => { sent.push(d); return Promise.resolve(); });
@@ -1181,6 +1201,37 @@ describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1
       .find((s) => s.textContent === 'Copy')?.closest('.sel-action-btn'));
     act(() => { fire(copyBtn, 'click'); });
     expect(written[0]).toBe('If anyone adds to these words,\nI will add to them the punishments');
+  });
+
+  /* n6-02 (sweep 2): the cg1 fix reached Copy only; Share still sent
+     frag.textContent, so a poem's lines and a letter's paragraphs arrived glued. */
+  it('(n6-02) Share keeps the lines apart too, and leaves the verse numbers out', async () => {
+    const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    const sent = /** @type {any[]} */ ([]);
+    Object.defineProperty(navigator, 'share', { value: (d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    try {
+      const c = document.createElement('div');
+      c.setAttribute('data-hl-key', 'letter:test:3');
+      c.innerHTML = '<div class="poem-line"><span class="verse-num">18</span>If anyone adds to these words,</div><div class="poem-line">I will add to them the punishments</div>';
+      document.body.appendChild(c);
+      mount();
+      const lines = c.querySelectorAll('.poem-line');
+      const r = document.createRange();
+      r.setStart(/** @type {any} */ (lines[0].firstChild), 0);
+      r.setEnd(/** @type {any} */ (lines[1].firstChild), 34);
+      r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+      stubSelection(r);
+      act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+      const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+        .find((s) => s.textContent === 'Share')?.closest('.sel-action-btn'));
+      act(() => { fire(shareBtn, 'click'); });
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      expect(sent.length).toBe(1);
+      expect(sent[0].text.startsWith('If anyone adds to these words,\nI will add to them the punishments')).toBe(true);
+    } finally {
+      if (origShare) Object.defineProperty(navigator, 'share', origShare);
+      else delete /** @type {any} */ (navigator).share;
+    }
   });
 });
 

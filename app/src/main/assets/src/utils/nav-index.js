@@ -514,7 +514,10 @@ export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceE
     const m = parts[1].match(/^(.+)-(\d+)$/);
     const bookId = m ? m[1] : 'matthew';
     const chapter = m ? parseInt(m[2], 10) : null;
-    const verse = parts[2] && parts[2] !== '0' ? parseInt(parts[2], 10) : null;
+    // a study note's suffix ("12-s0") parses to its verse; a chapter panel's
+    // ("panel-s0") has none and opens the chapter (n6-11)
+    const vn = parts[2] ? parseInt(parts[2], 10) : NaN;
+    const verse = vn > 0 ? vn : null;
     return { type: 'study', key: sourceKey, bookId, chapter, verse, screen: 'matthew-ch', label: sourceLabel || sourceKey, ...excerpt };
   }
   // letter / wtlb / blessed / holy-days — look up so the source endpoint

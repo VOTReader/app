@@ -249,6 +249,27 @@ describe('NoteSheet Share outcome (A15)', () => {
     expect(calls[0][0].text).toMatch(/Copied instead/);
   });
 
+  /* n6-08 (sweep 2): the note shared its words with no reference or link;
+     the selection Share got both in A8. The link names the passage, never the note. */
+  it('(n6-08) a shared note carries its passage reference and a link to it; journal writing does not travel as a link', async () => {
+    const sent = /** @type {any[]} */ ([]);
+    setNav('share', (d) => { sent.push(d); return Promise.resolve(); });
+    for (const key of ['bible:john:3:16', 'journal:abc:0']) {
+      setupStores({ body: 'Saved note' });
+      window.AnnotationStore.getByGroup = () => [{ key, ann: { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'anchor' } }];
+      const { container, unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+      fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
+      fireEvent.click(screen.getByText('Share'));
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+      unmount();
+    }
+    expect(sent.length).toBe(2);
+    expect(sent[0].text.startsWith('anchor\n\nSaved note')).toBe(true);
+    expect(sent[0].text).toContain('3:16');
+    expect(sent[0].text).toContain('?p=bible%3Ajohn%3A3%3A16');
+    expect(sent[1].text).toBe('anchor\n\nSaved note');
+  });
+
   it('a share the reader cancels stays quiet', async () => {
     setNav('share', () => Promise.reject(Object.assign(new Error('Share canceled'), { name: 'AbortError' })));
     await shareFromMenu();

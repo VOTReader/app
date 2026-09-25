@@ -67,6 +67,30 @@ describe('openSharedPassage', () => {
     expect(nav.mock.calls[0][0]).toMatchObject({ type: 'letter', letterId: 'the-wide-path', screen: 'vot-one-letter', key: 'letter:the-wide-path:3' });
   });
 
+  /* n6-01: a Bible or Letter Study chapter reads as LetterView, so it shares as
+     letter:<chapterId>:<n>. findEntryContext knows study chapters only once the
+     studies are loaded, which a fresh recipient's boot never did: the link
+     opened nothing. */
+  it('(n6-01) opens a shared study chapter once the studies are loaded, not just the Volumes', async () => {
+    const nav = vi.fn();
+    let studiesIn = false;
+    let releaseStudies;
+    const studies = new Promise((r) => { releaseStudies = () => { studiesIn = true; r(undefined); }; });
+    /** @type {any} */ (globalThis).findEntryContext = (id) => (studiesIn && id === 'lamb-of-god-1'
+      ? { kind: 'study-letter', screen: 'bible-study-chapter', collection: 'Bible Studies', title: 'The Lamb of God', studyId: 'lamb-of-god', studyChapterId: 'lamb-of-god-1' }
+      : null);
+    openSharedPassage(fakeWin('?p=letter%3Alamb-of-god-1%3A3', {
+      __loadVotCorpus: () => Promise.resolve(),
+      loadBibleStudies: () => studies,
+    }).win, nav);
+    await flush();
+    expect(nav, 'waits for the studies').not.toHaveBeenCalled();
+    releaseStudies();
+    await flush();
+    expect(nav).toHaveBeenCalledTimes(1);
+    expect(nav.mock.calls[0][0]).toMatchObject({ type: 'study-letter', screen: 'bible-study-chapter', studyChapterId: 'lamb-of-god-1', key: 'letter:lamb-of-god-1:3' });
+  });
+
   it('opens nothing for a letter the corpus does not know', async () => {
     const nav = vi.fn();
     /** @type {any} */ (globalThis).findEntryContext = () => null;

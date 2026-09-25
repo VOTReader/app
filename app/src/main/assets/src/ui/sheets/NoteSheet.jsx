@@ -5,6 +5,8 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText } from '../../utils/copy-share.js';
+import { withPassageLink } from '../../utils/passage-link.js';
+import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 
 /**
  * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props
@@ -144,7 +146,11 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   // screen, so a refusal points the reader at its text rather than at a
   // second sheet; a cancelled native share stays quiet.
   const share = () => {
-    const text = anchor + (note.body ? '\n\n' + note.body : '');
+    // n6-08: the passage travels with its reference and a link, as the
+    // selection Share's does (A8); the link names the passage, never the
+    // note, and the reader's own journal sends the words alone.
+    const key = segs[0] && segs[0].key;
+    const text = withPassageLink(anchor + (note.body ? '\n\n' + note.body : ''), key, key ? _bookmarkSourceLabel(key) : null);
     setMenuOpen(false);
     shareText(text).then((outcome) => {
       if (typeof showToast !== 'function') return;
