@@ -280,6 +280,28 @@ describe('StorageHealthBanner - a database saved by a newer VOTReader (v04-03)',
     expect(container.querySelector('.sh-banner-dismiss'), 'not dismissable: it stays true all session').toBeNull();
   });
 
+  /* n6-14 (sweep 2): on the web there is nothing to install - a reload fetches the
+     latest version - so the banner said the wrong thing and offered nothing to tap. */
+  it('(n6-14) on the web it says reload and offers Reload; on the phone it says install', () => {
+    const G = /** @type {any} */ (globalThis);
+    const prev = G.PlatformBridge;
+    try {
+      G.PlatformBridge = { isAndroid: false };
+      let { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true, versionTooNew: true });
+      expect(container.querySelector('.sh-banner').textContent).toMatch(/reload/i);
+      expect(container.querySelector('.sh-banner').textContent).not.toMatch(/install/i);
+      const btn = [...container.querySelectorAll('.sh-banner button')].find((b) => /Reload/.test(b.textContent));
+      expect(btn, 'a Reload button').toBeTruthy();
+      cleanup();
+      G.PlatformBridge = { isAndroid: true };
+      ({ container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true, versionTooNew: true }));
+      expect(container.querySelector('.sh-banner').textContent).toMatch(/install the latest version/);
+      expect([...container.querySelectorAll('.sh-banner button')].some((b) => /Reload/.test(b.textContent))).toBe(false);
+    } finally {
+      if (prev === undefined) delete G.PlatformBridge; else G.PlatformBridge = prev;
+    }
+  });
+
   it('CONTROL: a merely slow store keeps its own banner', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true, versionTooNew: false });
     expect(container.querySelector('.sh-banner').textContent).toContain('Storage is slow to load');

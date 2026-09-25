@@ -77,12 +77,16 @@ export function StorageHealthBanner({ onNavigateSettings }) {
     // degraded (never "slow", they cannot catch up) and a write that fails here is
     // not full storage. The data on disk is untouched; the fix is the latest build.
     if (versionTooNew) {
+      // n6-14: the phone app is installed; on the web a reload fetches the latest.
+      const android = typeof PlatformBridge !== 'undefined' && !!PlatformBridge.isAndroid;
       return {
         id: 'newer-version',
         style: 'danger',
-        text: "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: install the latest version. Changes you make here won't be saved.",
+        text: android
+          ? "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: install the latest version. Changes you make here won't be saved."
+          : "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: reload VOTReader to get the latest version. Changes you make here won't be saved.",
         dismissable: false,
-        buttons: [],
+        buttons: android ? [] : [{ label: 'Reload', primary: true, onClick: () => { try { window.location.reload(); } catch (_e) { /* nothing more to do */ } } }],
       };
     }
 
