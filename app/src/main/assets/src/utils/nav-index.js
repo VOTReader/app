@@ -271,6 +271,18 @@ export function contentDocToNavItem(doc) {
 }
 
 /**
+ * bookId -> position in BIBLE_BOOK_LIST, the canonical Bible order built by
+ * index.html's __finishBibleInit. Empty until the Bible bundle has landed.
+ * @returns {Map<string, number>}
+ */
+function canonicalBookRanks() {
+  const list = (typeof BIBLE_BOOK_LIST !== 'undefined' && Array.isArray(BIBLE_BOOK_LIST)) ? BIBLE_BOOK_LIST : [];
+  const ranks = new Map();
+  list.forEach((book, i) => { if (book && book.id && !ranks.has(book.id)) ranks.set(book.id, i); });
+  return ranks;
+}
+
+/**
  * Group the nav index into the Browse drill-down tree the LinkPicker's
  * Browse mode renders — the same top-down hierarchy the app's own menus
  * use, so finding a link target works exactly like navigating the app.
@@ -300,7 +312,7 @@ export function buildNavTree() {
       if (!b) {
         b = { bookId: it.bookId, title: it.title, category: it.category, chapters: [] };
         bookMap.set(it.bookId, b);
-        bibleBooks.push(b); // _allBooks() iterates in canonical book order
+        bibleBooks.push(b); // encounter order; sorted canonically below
       }
       b.chapters.push(it);
     } else if (it.kind === 'study-chapter') {
@@ -312,6 +324,18 @@ export function buildNavTree() {
       if (!colMap.has(it.category)) colMap.set(it.category, []);
       colMap.get(it.category).push(it);
     }
+  }
+  // The encounter order above is NOT canonical: _allBooks() is
+  // { matthew, ...BOOKS }, and BOOKS iterates in books.js declaration order
+  // (Ephesians first, Genesis 27th) with 'matthew-plain' appended LAST by
+  // __finishBibleInit. BIBLE_BOOK_LIST (index.html) is the canonical order,
+  // OT then NT with 'matthew-plain' in Matthew's place. A book it doesn't list
+  // keeps its encounter order after the listed ones (Array#sort is stable);
+  // before the Bible bundle lands the list is empty and nothing moves.
+  const ranks = canonicalBookRanks();
+  if (ranks.size) {
+    const rankOf = (id) => (ranks.has(id) ? ranks.get(id) : Number.MAX_SAFE_INTEGER);
+    bibleBooks.sort((a, b) => rankOf(a.bookId) - rankOf(b.bookId));
   }
   return {
     bibleBooks,
