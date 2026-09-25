@@ -22,6 +22,8 @@ export const MAX_RECENT_AUDIO_TRACKS = 30;
  *  letters a reader was hearing off the 30-row recent shelf. */
 export const MAX_SAVED_SONGS = 500;
 export const MAX_RECENT_SONGS = 30;
+/** Songs kept on this phone (K1): every song the catalog holds, with room to grow. */
+export const MAX_KEPT_SONGS = 5000;
 
 /**
  * @typedef {{
@@ -38,7 +40,7 @@ export const MAX_RECENT_SONGS = 30;
 /** @typedef {SavedAudioTrack & { playedAt: number }} RecentAudioTrack */
 
 /**
- * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number, completions: number, songSaved: string[], songRecent: string[] }} AudioLibraryData
+ * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number, completions: number, songSaved: string[], songRecent: string[], songKept: string[] }} AudioLibraryData
  */
 
 /** Lifetime counters are monotonic and bounded — one ceiling for both. */
@@ -57,7 +59,10 @@ function _empty() {
   // invented number would be a lie about the reader's own listening.
   // `songSaved` / `songRecent` (2026-09-24): song ids, newest first. Additive
   // to v1 like the counters: an older record simply has none.
-  return { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [] };
+  // `songKept` (2026-09-25, K1): the ids of the songs kept on this phone, newest
+  // first. Only the LIST travels in the backup; the bytes live in the
+  // offline-songs store, which no backup carries, so a restore offers them again.
+  return { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [], songKept: [] };
 }
 
 /**
@@ -165,6 +170,7 @@ export function normalizeAudioLibrary(value) {
     completions: _lifetimeCount(raw.completions),
     songSaved: _songIds(raw.songSaved, MAX_SAVED_SONGS),
     songRecent: _songIds(raw.songRecent, MAX_RECENT_SONGS),
+    songKept: _songIds(raw.songKept, MAX_KEPT_SONGS),
   };
 }
 
@@ -401,6 +407,29 @@ export const AudioLibraryStore = extendStore(
       this._save();
       this._bump();
       return true;
+    },
+
+    /** The songs kept on this phone, as the backup lists them (newest first). @returns {string[]} */
+    songKept() { return this.get().songKept.slice(); },
+
+    /**
+     * Mark songs kept on this phone (on: true, newest first) or not (on: false). The list the
+     * backup carries; song-keep.js writes it as the bytes land or leave.
+     * @param {unknown[]} ids @param {boolean} on
+     * @returns {void}
+     */
+    setSongsKept(ids, on) {
+      const list = (Array.isArray(ids) ? ids : []).filter(isSongId).map(String);
+      if (!list.length) return;
+      if (this._shouldDefer('setSongsKept', list, on)) return;
+      const data = _writeableData(this);
+      const rest = data.songKept.filter((x) => list.indexOf(x) < 0);
+      const next = on ? list.concat(rest).slice(0, MAX_KEPT_SONGS) : rest;
+      if (next.length === data.songKept.length && next.every((x, i) => x === data.songKept[i])) return;
+      data.songKept = next;
+      this._cache = data;
+      this._save();
+      this._bump();
     },
 
     /** @param {unknown} rate @returns {number} */

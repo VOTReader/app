@@ -78,6 +78,33 @@ class OfflineAudioStoreTest {
         assertNull(OfflineAudioStore.fileNameFor(base + "audio-v1/x.mp3?evil=1"), "a query")
     }
 
+    @Test
+    fun `a Songs of the Letters mp3 is accepted exactly, as its own flat file name (K1)`() {
+        val song = "https://votreader.github.io/songs-3/a1b2c3d4e5f6.mp3"
+        assertEquals("songs-3__a1b2c3d4e5f6.mp3", OfflineAudioStore.fileNameFor(song))
+        assertEquals(song, OfflineAudioStore.urlForFileName("songs-3__a1b2c3d4e5f6.mp3"))
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io/songs-3/A1B2C3D4E5F6.mp3"), "upper-case id")
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io/songs-3/a1b2c3d4e5f.mp3"), "short id")
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io/songs/a1b2c3d4e5f6.mp3"), "not a shard")
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io/app/a1b2c3d4e5f6.mp3"), "another site")
+        assertNull(OfflineAudioStore.fileNameFor("http://votreader.github.io/songs-3/a1b2c3d4e5f6.mp3"), "not https")
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io.evil.test/songs-3/a1b2c3d4e5f6.mp3"), "a lookalike host")
+        assertNull(OfflineAudioStore.fileNameFor("https://votreader.github.io/songs-3/a1b2c3d4e5f6.mp3?x=1"), "a query")
+        assertNull(OfflineAudioStore.urlForFileName("songs-3__../x.mp3"), "a name that is no song")
+    }
+
+    @Test
+    fun `a kept song downloads, is served and survives a restart like a recording`() {
+        val song = "https://votreader.github.io/songs-2/0123456789ab.mp3"
+        val s = store()
+        s.enqueue(listOf(item(song, "song:0123456789ab", "A Song · Pop")))
+        assertTrue(s.isSaved(song))
+        assertNotNull(s.fileFor(song))
+        assertEquals(200, s.intercept(song, null)!!.statusCode)
+        File(File(tmp.root, "offline-audio"), "index.json").delete()
+        assertTrue(store().isSaved(song), "found again from its file name")
+    }
+
     // ── download ──────────────────────────────────────────────────────
 
     @Test

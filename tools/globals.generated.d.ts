@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 619 distinct identifiers.
+// Total: 628 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ACHIEVEMENT_STORE_NAMES: any;
@@ -169,6 +169,8 @@ declare const JournalStatsStore: any;
 declare const JournalStore: any;
 declare const JournalViewerScreen: any;
 declare const JrnExpandable: any;
+declare const KeepIcon: any;
+declare const KeptIcon: any;
 declare const LETTERS: any;
 declare const LETTERS_FLOCK: any;
 declare const LETTERS_FLOCK_PREFACE: any;
@@ -226,6 +228,7 @@ declare const NotebookStore: any;
 declare const NotesIndexScreen: any;
 declare const OT_BOOK_IDS: any;
 declare const OfflineAudio: any;
+declare const OfflineSongsStore: any;
 declare const PauseIcon: any;
 declare const PlatformBridge: any;
 declare const PlayIcon: any;
@@ -281,6 +284,9 @@ declare const Sheets: any;
 declare const ShuffleIcon: any;
 declare const SongCatalog: any;
 declare const SongCover: any;
+declare const SongKeep: any;
+declare const SongKeepAction: any;
+declare const SongKeepCard: any;
 declare const SongPlayButton: any;
 declare const SrchCard: any;
 declare const SrchGroup: any;
@@ -449,6 +455,7 @@ declare const formatBOffsetMap: any;
 declare const formatBuildVersion: any;
 declare const formatBytes: any;
 declare const formatImportSpaceWarning: any;
+declare const formatSongBytes: any;
 declare const formatVerifyReport: any;
 declare const gardenCacheKey: any;
 declare const gardenClearCache: any;
@@ -610,7 +617,9 @@ declare const useSearch: any;
 declare const useSettings: any;
 declare const useSharedPassageLink: any;
 declare const useSheetOrchestration: any;
+declare const useSongKeep: any;
 declare const useSongLyrics: any;
+declare const useSongsOnline: any;
 declare const useStorageHealth: any;
 declare const useStorageInfo: any;
 declare const useSurprise: any;

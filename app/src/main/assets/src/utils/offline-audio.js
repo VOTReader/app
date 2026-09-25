@@ -21,6 +21,8 @@
    setAudioActive pattern; BridgeContractTest pins the four).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { isSongUrl } from './audio-track.js';
+
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
 
@@ -157,6 +159,17 @@ function statusOf(url) {
   return 'none';
 }
 
+/**
+ * Songs of the Letters kept on this phone (K1) live in the same native store, under their song-site URLs, so
+ * ExoPlayer reads them from disk too. The recordings' own shelf (items, totalBytes, Remove all) never counts them;
+ * song-keep.js reads them through songItems().
+ * @returns {boolean} a song is saved, queued or downloading
+ */
+function _holdsSongs() {
+  if ([..._saved.keys()].some(isSongUrl) || [..._queued].some(isSongUrl)) return true;
+  return !!(_active && isSongUrl(_active.url));
+}
+
 /** @param {string[]} urls @param {string} method */
 function _send(urls, method) {
   const b = _bridge();
@@ -198,9 +211,17 @@ export const OfflineAudio = {
     for (const u of want) _sizesAsked.add(u);
     try { b.offlineAudioSizes(JSON.stringify(want)); } catch (_e) { for (const u of want) _sizesAsked.delete(u); }
   },
-  /** @returns {SavedItem[]} newest first */
-  items: () => { if (!_loaded) refresh(); return [..._saved.values()].sort((a, b) => b.savedAt - a.savedAt); },
-  totalBytes: () => { if (!_loaded) refresh(); return _totalBytes; },
+  /** The recordings on the phone (songs kept on it are songItems'). @returns {SavedItem[]} newest first */
+  items: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => !isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
+  /** The songs of the letters kept on the phone (K1). @returns {SavedItem[]} newest first */
+  songItems: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
+  /** Bytes of the recordings on the phone (songs left out). */
+  totalBytes: () => {
+    if (!_loaded) refresh();
+    let songs = 0;
+    for (const it of _saved.values()) if (isSongUrl(it.url)) songs += it.bytes;
+    return Math.max(0, _totalBytes - songs);
+  },
   freeBytes: () => { if (!_loaded) refresh(); return _freeBytes; },
   /**
    * Download each of `list` to the phone (queued one at a time natively).
@@ -221,10 +242,22 @@ export const OfflineAudio = {
   },
   /** @param {string[]} urls */
   remove: (urls) => { _send(urls, 'offlineAudioRemove'); },
-  removeAll: () => { _send(['*'], 'offlineAudioRemove'); },
+  /** Every RECORDING off the phone (kept songs stay: they are the Songs screens' to remove). */
+  removeAll: () => {
+    if (!_holdsSongs()) { _send(['*'], 'offlineAudioRemove'); return; }
+    const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
+    if (busy.length) _send(busy, 'offlineAudioCancel');
+    const urls = [..._saved.keys()].filter((u) => !isSongUrl(u));
+    if (urls.length) _send(urls, 'offlineAudioRemove');
+  },
   /** @param {string[]} urls */
   cancel: (urls) => { _send(urls, 'offlineAudioCancel'); },
-  cancelAll: () => { _send(['*'], 'offlineAudioCancel'); },
+  /** Stop every recording on its way (songs being kept go on). */
+  cancelAll: () => {
+    if (!_holdsSongs()) { _send(['*'], 'offlineAudioCancel'); return; }
+    const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
+    if (busy.length) _send(busy, 'offlineAudioCancel');
+  },
   /** Tests only: forget everything and re-install the receiver. */
   _reset() {
     _listeners.clear();

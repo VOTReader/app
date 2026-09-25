@@ -264,6 +264,31 @@ boot rebuild both call.
   `/songs/thumbs/` and `/songs/lyrics/` stale-while-revalidate from its own
   unversioned `vot-songs-v1` bucket.
 
+### Kept on this phone (K1, 2026-09-25)
+
+`utils/song-keep.js` (bundle-d, the `SongKeep` global) keeps songs for listening with no
+signal; the controls are `ui/components/SongKeepParts.jsx`.
+- **Web:** the page fetches the mp3 itself (the song sites are its own origin), checks the
+  bytes against the catalog's `b`, hashes them (SHA-256), writes `{ id, blob, bytes, sha256,
+  keptAt }` to the `offline-songs` IDB store (v12, `stores/offline-songs-store.js`), reads it
+  back and hashes the stored copy; a mismatch deletes it and tries once more. One song at a
+  time. A kept song plays from `URL.createObjectURL(blob)`, one URL alive at a time, revoked
+  when the track moves on (`_srcFor` in the player). No service worker is involved.
+- **Android app:** ExoPlayer cannot read a `blob:` URL, so songs go to the native
+  `OfflineAudioStore` beside the downloaded readings (it accepts exactly the song URL
+  pattern, file `songs-<n>__<id>.mp3`); ExoPlayer and the WebView read the file under the
+  song's own URL. `OfflineAudio.items()`/`totalBytes()`/Remove all leave songs out;
+  `songItems()` lists them. A file whose size is not the catalog's is removed and fetched once more.
+- Sizes come from the catalog, never `storage.estimate()`; a batch that cannot fit is
+  refused first ("Not enough room: needs 380 MB, 212 MB free."). The first keep calls
+  `navigator.storage.persist()`. An iPhone Safari tab (not on the Home Screen) is told to add
+  the app instead (Safari clears a site's storage after about a week unused).
+- Offline, a kept song plays; one that is not kept shows "Not on this phone" on the bar for
+  3 s (paused), then the next kept song plays; with none kept the offline notice stands.
+- The bytes never ride the backup (user-data-parity exempts `offline-songs` by name); the
+  ids do, as `songKept` in `vot-audio-library`, so after a restore the Kept list offers
+  "Download your N songs again (X MB)".
+
 ## One-audio policy
 
 `AudioPlayer` owns one detached `Audio` element. Before it starts, it pauses

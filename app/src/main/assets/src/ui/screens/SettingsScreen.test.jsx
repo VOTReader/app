@@ -248,6 +248,29 @@ describe('Listening group', () => {
     expect(groupRowLabels('Listening')).not.toContain('Follow the Voice');
   });
 
+  it('Songs kept on this phone: how many and how big, and Manage opens the Kept list (K1)', () => {
+    teardownSettingsGlobals();
+    const keep = {
+      subscribe: () => () => {}, getVersion: () => 0, availability: () => 'ok',
+      keptIds: () => ['aaaaaaaaaaa1', 'aaaaaaaaaaa2', 'bbbbbbbbbbb1'], missing: () => [], bytesOf: (ids) => ids.length * 47e6,
+    };
+    setupSettingsGlobals({ SongKeep: keep, formatSongBytes: (n) => Math.round(n / 1e6) + ' MB' });
+    window.__openSongs = vi.fn();
+    try {
+      renderSettings();
+      expect(groupRowLabels('Listening')).toContain('Songs kept on this phone');
+      const button = within(row('Songs kept on this phone')).getByRole('button');
+      expect(button.textContent).toContain('3 · 141 MB · Manage');
+      fireEvent.click(button);
+      expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'list', v: 'kept' }], 'Settings');
+    } finally { delete window.__openSongs; }
+  });
+
+  it('no keep store on this browser, no Songs kept row', () => {
+    renderSettings();
+    expect(groupRowLabels('Listening')).not.toContain('Songs kept on this phone');
+  });
+
   it('shows the speed the listening library already holds — no settings key', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ AudioLibraryStore: fakeAudioLibrary(1.5) });

@@ -126,6 +126,17 @@ describe('SONGS FROM THIS LETTER', () => {
     expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'list', v: 'letter:wtlb1:come-love-awaits-you' }], 'Come, Love Awaits You');
   });
 
+  it('offers to keep this letter’s songs on the phone, every version, sized from the catalog (K1)', async () => {
+    const { SongKeep } = await import('../../utils/song-keep.js');
+    globalThis.OfflineSongsStore = { all: async () => [], get: async () => null, put: async () => {}, delete: async () => {} };
+    if (!globalThis.indexedDB) globalThis.indexedDB = {};
+    SongKeep._reset();
+    try {
+      render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
+      expect(screen.getByRole('button', { name: 'Keep these 2 songs · 6 MB' })).toBeTruthy();
+    } finally { delete globalThis.OfflineSongsStore; SongKeep._reset(); }
+  });
+
   it('renders nothing for a letter without songs, or with the setting off', () => {
     const { container } = render(<LetterSongsCard volKey="two" letterId="none" />);
     expect(container.innerHTML).toBe('');

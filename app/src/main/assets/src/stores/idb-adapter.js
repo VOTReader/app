@@ -81,7 +81,13 @@ export const IDBAdapter = (function () {
   // 10 — added vot-audio-positions (durable per-recording resume points: a
   // bounded URL → {t,d,at} map, LRU-capped at 200). Same additive pattern.
   //  11 — added vot-tour-done (review-tutorial: the "Show me around" flag)
-  const DB_VERSION = 11;
+  //  12 — added offline-songs (Songs of the Letters kept on this phone, K1:
+  //       id → { blob, bytes, sha256, keptAt }). The one store holding BYTES
+  //       the reader can fetch again, so it is deliberately OUTSIDE the backup
+  //       (only the list of kept ids travels, as songKept in vot-audio-library)
+  //       and outside the "Your Data" size; user-data-parity.test.js exempts it
+  //       by name, like meta. Same additive pattern.
+  const DB_VERSION = 12;
 
   /**
    * The persistent `vot-*` stores, plus the `meta` store for migration
@@ -120,6 +126,7 @@ export const IDBAdapter = (function () {
     'vot-audio-library',
     'vot-audio-positions',
     'vot-tour-done',
+    'offline-songs',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

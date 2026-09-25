@@ -559,8 +559,14 @@ class OfflineAudioStore(
         private const val PROGRESS_MS = 500L
         private const val MAX_TEXT = 240
 
-        // The release host and the asset hosts its 302 goes to (GardenImageCache's allowlist).
-        private val ALLOWED_HOSTS = setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
+        // The release host and the asset hosts its 302 goes to (GardenImageCache's allowlist), and the Songs of the
+        // Letters shard sites (GitHub Pages, answered directly).
+        private val ALLOWED_HOSTS = setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com", "votreader.github.io")
+
+        // Songs of the Letters kept on this phone (K1): one mp3 on a shard site, the page's exact trust pattern
+        // (utils/audio-track.js SONG_URL). ExoPlayer reads a kept song from its file under the same URL.
+        private const val SONGS_ORIGIN = "https://votreader.github.io/"
+        private val SONG_RE = Regex("^https://votreader\\.github\\.io/(songs-[0-9]{1,3})/([0-9a-f]{12}\\.mp3)$")
         private const val MAX_REDIRECTS = 5
         private const val USER_AGENT = "VOTReader-Android/1.0"
 
@@ -586,16 +592,23 @@ class OfflineAudioStore(
             return tag to asset
         }
 
-        /** The release URL a stored file name came from (the inverse of [fileNameFor]); null for any other name. */
+        /** (site, asset) of one Songs of the Letters mp3 on a shard site; null for anything else. */
+        private fun splitSong(url: String): Pair<String, String>? =
+            SONG_RE.matchEntire(url)?.let { it.groupValues[1] to it.groupValues[2] }
+
+        /** The URL a stored file name came from (the inverse of [fileNameFor]); null for any other name. */
         internal fun urlForFileName(name: String): String? {
-            val at = name.indexOf("__")   // a tag never holds '_', so the first "__" is the joint
+            val at = name.indexOf("__")   // neither a tag nor a song site holds '_', so the first "__" is the joint
             if (at <= 0) return null
-            val url = PREFIX + name.substring(0, at) + "/" + name.substring(at + 2)
+            val head = name.substring(0, at)
+            val base = if (head.startsWith("songs-")) SONGS_ORIGIN else PREFIX
+            val url = base + head + "/" + name.substring(at + 2)
             return if (fileNameFor(url) == name) url else null
         }
 
-        /** `<tag>__<asset>.mp3` for one of the app's audio releases; null for anything else. */
-        fun fileNameFor(url: String): String? = splitRelease(url)?.let { (tag, asset) -> "${tag}__$asset" }
+        /** `<tag>__<asset>.mp3` for one of the app's audio releases, `songs-<n>__<id>.mp3` for a kept song; null for anything else. */
+        fun fileNameFor(url: String): String? =
+            (splitRelease(url) ?: splitSong(url))?.let { (tag, asset) -> "${tag}__$asset" }
 
         /** The production lister: GitHub's release JSON for [tag] (every asset's name and size), read capped. */
         fun listReleaseSizes(tag: String): Map<String, Long>? {

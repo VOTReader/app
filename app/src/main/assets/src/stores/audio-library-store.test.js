@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AudioLibraryStore,
   MAX_RECENT_AUDIO_TRACKS,
+  MAX_KEPT_SONGS,
   MAX_RECENT_SONGS,
   MAX_SAVED_AUDIO_TRACKS,
   MAX_SAVED_SONGS,
@@ -34,7 +35,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('AudioLibraryStore — normalized metadata', () => {
   it('starts with a conservative empty library and normal playback speed', () => {
-    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [] });
+    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [], songKept: [] });
   });
 
   it('recordPlayed keeps the recent shelf without crediting a lifetime play', () => {
@@ -143,7 +144,7 @@ describe('normalizeAudioLibrary — import boundary', () => {
       recent: [{ ...track(2), url: 'javascript:alert(1)', playedAt: 30 }],
       rate: 2,
     });
-    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0, completions: 0, songSaved: [], songRecent: [] });
+    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0, completions: 0, songSaved: [], songRecent: [], songKept: [] });
   });
 
   it('bounds an imported plays counter', () => {
@@ -254,6 +255,22 @@ describe('AudioLibraryStore — Songs of the Letters shelves (2026-09-24)', () =
     expect(data.songRecent).toEqual([]);
     // An older record without the fields reads as empty shelves (additive to v1).
     expect(normalizeAudioLibrary({ saved: [] })).toMatchObject({ songSaved: [], songRecent: [] });
+  });
+
+  it('keeps the list of songs kept on this phone (K1): newest first, off removes, ids only, bounded', () => {
+    AudioLibraryStore.setSongsKept([sid(1), sid(2)], true);
+    AudioLibraryStore.setSongsKept([sid(3)], true);
+    expect(AudioLibraryStore.songKept()).toEqual([sid(3), sid(1), sid(2)]);
+    AudioLibraryStore.setSongsKept([sid(1), 'nope'], false);
+    expect(AudioLibraryStore.songKept()).toEqual([sid(3), sid(2)]);
+    AudioLibraryStore.setSongsKept([sid(2)], true);   // kept again: to the top, once
+    expect(AudioLibraryStore.songKept()).toEqual([sid(2), sid(3)]);
+    const many = Array.from({ length: MAX_KEPT_SONGS + 3 }, (_u, i) => sid(i + 1));
+    expect(normalizeAudioLibrary({ songKept: many }).songKept).toHaveLength(MAX_KEPT_SONGS);
+    expect(normalizeAudioLibrary({ songKept: [sid(4), 'x', sid(4)] }).songKept).toEqual([sid(4)]);
+    // The list rides the backup: replaceAll restores it.
+    AudioLibraryStore.replaceAll({ songKept: [sid(9)] });
+    expect(AudioLibraryStore.songKept()).toEqual([sid(9)]);
   });
 
   it('a song TRACK stars and plays onto the songs shelves, never the recordings ones', () => {

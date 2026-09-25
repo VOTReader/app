@@ -1161,6 +1161,10 @@ Android only, and the JS player stays the single source of playback truth in bot
 
 Pause keeps the card alive (keep-alive releases only on idle; the paused notification detaches from the FGS so it is swipeable, and swiping stops the service). Separately, `_setAudioActive()` (`:226`) is the keep-alive edge that lets the WebView keep playing with the screen off.
 
+### 23.9b `offline-songs` — songs kept on this phone (IDB v12)
+
+`stores/offline-songs-store.js` (bundle-b, the `OfflineSongsStore` global): `id → { id, blob, bytes, sha256, keptAt }`, written only by `utils/song-keep.js` (docs/AUDIO-MANAGER.md, "Kept on this phone"). It is the one store besides `meta` that the backup skips, on purpose: it holds BYTES (up to gigabytes) the reader can fetch again. The seven legs, as landed: STORE_NAMES + DB_VERSION 12; `idb-adapter.test.js` (a Blob round trip); `_entry-b.js` import + window map; no STORE_SHAPES entry (nothing restores into it; the comment says so); no SettingsScreen export entry (comment beside `vot-audio-library`, whose record carries `songKept`, the list that does travel); not in `USER_DATA_STORES` (comment); `user-data-parity.test.js` exempts it by exact name beside `meta` and pins that `songKept` rides `vot-audio-library`. In the Android app the bytes live in the native OfflineAudioStore instead (ExoPlayer cannot read a `blob:`); this store stays empty there.
+
 ### 23.10 Prefetch, and what it must never warm
 
 `_warmTargets()` (`audio-player.js:598`) warms the next `PREFETCH_AHEAD = 2` queued URLs into the HTTP cache through a detached, never-playing element — a sliding window, skipped on Save-Data / 2g / a poor connection or while the current track is still filling. The one hard exclusion is a prefix test for `AUDIO_BIBLE_RELEASE_PREFIX`: whole-book tracks are 30–260 MB, so "warming" one is a full audiobook download. Every shipped edition is per-chapter and warms like a letter.

@@ -103,6 +103,23 @@ describe('offline-audio — in the phone app', () => {
     expect(JSON.parse(b.offlineAudioCancel.mock.calls[0][0])).toEqual([U2]);
   });
 
+  it('keeps kept SONGS (K1) off the recordings shelf: items, total and Remove all leave them alone', () => {
+    const S1 = 'https://votreader.github.io/songs-2/a1b2c3d4e5f6.mp3';
+    const b = fakeBridge([
+      { url: U1, key: 'k1', title: 't1', bytes: 10, savedAt: 1 },
+      { url: S1, key: 'song:a1b2c3d4e5f6', title: 'A song', bytes: 3000, savedAt: 2 },
+    ]);
+    OfflineAudio.refresh();
+    expect(OfflineAudio.items().map((i) => i.url)).toEqual([U1]);
+    expect(OfflineAudio.songItems().map((i) => i.url)).toEqual([S1]);
+    expect(OfflineAudio.totalBytes()).toBe(10);
+    expect(OfflineAudio.isSaved(S1)).toBe(true);
+    OfflineAudio.removeAll();
+    expect(JSON.parse(b.offlineAudioRemove.mock.calls[0][0])).toEqual([U1]);   // never '*' while a song is kept
+    OfflineAudio.cancelAll();
+    expect(b.offlineAudioCancel).not.toHaveBeenCalled();                       // nothing of the recordings' on its way
+  });
+
   it('asks the phone for sizes before a download and answers them per recording', () => {
     const b = fakeBridge([{ url: U2, key: 'k2', title: 't2', bytes: 20, savedAt: 1 }]);
     OfflineAudio.refresh();

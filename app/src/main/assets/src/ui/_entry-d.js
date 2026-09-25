@@ -106,6 +106,10 @@ import {
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
 } from './components/SongParts.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
+// Keep on this phone (K1): ONE keep store beside the player that plays kept songs from it; the lazy Songs screens and
+// Settings read it and its controls as globals.
+import { SongKeep, formatSongBytes } from '../utils/song-keep.js';
+import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon } from './components/SongKeepParts.jsx';
 /* The Listening Library screens went lazy (bundle-h, landing 24) while all of
    this stayed here, because AudioPlayerBar and AudioManagerSheet are mounted in
    the always-present shell and play on every screen. The library reads these
@@ -280,6 +284,7 @@ Object.assign(window, {
   SongCover, SongPlayButton, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
+  SongKeep, formatSongBytes, SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,
   // …and the shelf parts + audio tables bundle-h reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
   COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,

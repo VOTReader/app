@@ -113,6 +113,14 @@ function songsOfIds(ids) {
   return out;
 }
 
+/** Kept ids as songs, hidden ones included (a kept song must stay removable). @param {string[]} ids */
+function keptSongs(ids) {
+  const cat = catalog();
+  const out = [];
+  for (const id of ids) { const s = cat.songById(id); if (s) out.push(s); }
+  return out;
+}
+
 /** The italic line of a single song: its maker, else its shelf. @param {any} song */
 function songLine(song) {
   return song.cr || catalog().songAlbumLabel(song);
@@ -131,6 +139,15 @@ export function listContent(v, library) {
       eyebrow: 'Your songs', title: v === 'saved' ? 'Saved songs' : 'Recently played songs',
       families: null, songs: songsOfIds(ids),
       empty: v === 'saved' ? 'Tap Save on any song and it will wait here.' : 'Songs you play will appear here.',
+    };
+  }
+  if (v === 'kept') {
+    // K1: newest kept first. A kept song the catalog has since hidden still shows (so it can be removed); its twin
+    // stands in for a hidden duplicate, as on the other shelves.
+    const keep = typeof SongKeep !== 'undefined' ? SongKeep : null;
+    return {
+      eyebrow: 'Your songs', title: 'Kept on this phone', families: null, songs: keep ? keptSongs(keep.keptIds()) : [],
+      empty: 'Songs you keep play here with no signal. Tap Keep on a song, a collection or the songs of a letter.',
     };
   }
   if (v === 'new') return { eyebrow: 'New from the flock', title: 'New from the flock', families: null, songs: newestSongs(NEW_TOTAL), empty: 'No songs yet.' };
@@ -193,20 +210,21 @@ function FamilyRow({ fam, song, playingId, active, onPlay, onOpen, inList = fals
 }
 
 /**
- * One single song (a saved one, a recent one, a new one): cover, title, its
- * maker or shelf in italic, its length, the round ▶.
- * @param {{ key?: any, song: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (song: any) => void }} props
+ * One single song (a saved one, a recent one, a new one, a kept one): cover, title, its
+ * maker or shelf in italic, its length, the round ▶ — and Remove on the Kept list.
+ * @param {{ key?: any, song: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (song: any) => void, onRemove?: (song: any) => void }} props
  */
-function SongRow({ song, playingId, active, onPlay, onOpen }) {
+function SongRow({ song, playingId, active, onPlay, onOpen, onRemove }) {
   const isCurrent = playingId === song.id;
   const tap = () => { if (isCurrent) AudioPlayer.toggle(); else onPlay(song); };
   return (
     <div className={'songs-row' + (isCurrent ? ' is-current' : '')}>
       <button type="button" className="songs-row-main" onClick={() => (onOpen ? onOpen(song) : tap())}>
         <SongCover song={song} />
-        <span className="songs-row-copy"><strong>{song.t}</strong><small>{songLine(song)}</small></span>
-        <span className="songs-row-len">{songClock(song.d)}</span>
+        <span className="songs-row-copy"><strong>{song.t}</strong><small>{onRemove ? (song.v || songLine(song)) + ' · ' + formatSongBytes(song.b) : songLine(song)}</small></span>
+        {onRemove ? null : <span className="songs-row-len">{songClock(song.d)}</span>}
       </button>
+      {onRemove ? <button type="button" className="song-keep-remove" onClick={() => onRemove(song)} aria-label={'Remove ' + song.t + ' from this phone'}>Remove</button> : null}
       <SongPlayButton playing={isCurrent && active} label={song.t} onClick={tap} />
     </div>
   );
@@ -358,6 +376,10 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const newest = newestSongs(NEW_TOTAL);
   const readings = readingLetters();
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
+  // K1: the songs kept on this phone (and, after a restore, those the backup lists but the phone lacks).
+  const keep = useSongKeep();
+  const keptIds = keep.keptIds();
+  const missingCount = keep.missing().length;
   const recentCount = library ? songsOfIds(library.songRecent()).length : 0;
   // The biggest collections first (ties keep reading order); the rest one tap away.
   const tiles = LETTER_COLS.map((col, i) => {
@@ -433,6 +455,14 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
                 <span className="songs-nav-count">{recentCount}</span>
                 <ChevronRightIcon />
               </button>
+              {keep && keep.availability() !== 'none' ? (
+                <button type="button" className="songs-nav-row" onClick={() => open({ k: 'list', v: 'kept' })}>
+                  <span className="songs-nav-mark" aria-hidden="true"><KeepIcon /></span>
+                  <span className="songs-nav-label">Kept on this phone</span>
+                  <span className="songs-nav-count">{keptIds.length ? keptIds.length + ' · ' + formatSongBytes(keep.bytesOf(keptIds)) : missingCount ? 'Download again' : '0'}</span>
+                  <ChevronRightIcon />
+                </button>
+              ) : null}
             </div>
           </section>
 
@@ -491,6 +521,9 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
  */
 function SongsList({ frame, library, playingId, active, onPush }) {
   const cat = catalog();
+  const keep = useSongKeep();
+  const [askingRemoveAll, setAskingRemoveAll] = React.useState(false);
+  const keptList = frame.v === 'kept';
   const content = listContent(frame.v, library);
   const fams = content.families;
   // A family row in a letter's list leads with that letter's own version.
@@ -502,6 +535,11 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   const hours = seconds >= 3600 ? (Math.round(seconds / 360) / 10) + ' h' : Math.max(1, Math.round(seconds / 60)) + ' min';
   const ids = leads.map((s) => s.id);
   const play = (song, shuffle) => AudioPlayer.playSongs({ ids, startId: song ? song.id : undefined, shuffle: !!shuffle, label: content.title });
+  // K1: Keep all keeps every version shown here (the count the header states); the Kept list removes instead.
+  /** @type {string[]} */
+  const allIds = fams ? fams.reduce((out, fam) => out.concat(cat.versionsOf(fam).map((s) => s.id)), /** @type {string[]} */ ([])) : ids;
+  const missing = keptList ? keep.missing() : [];
+  const keptBytes = keptList ? keep.bytesOf(ids) : 0;
 
   return (
     <>
@@ -511,19 +549,41 @@ function SongsList({ frame, library, playingId, active, onPush }) {
         {count ? <p className="songs-intro">{fams && count > fams.length
           // n3-09: Play all plays one version per song, so the songs and their versions are counted apart
           ? songCountLabel(fams.length) + ' · ' + songCountLabel(count, 'version', 'versions')
-          : songCountLabel(count)} · {hours}</p> : null}
+          : songCountLabel(count)} · {keptList ? formatSongBytes(keptBytes) + ' · they play with no signal' : hours}</p> : null}
         {ids.length ? (
           <div className="songs-list-actions">
             <button type="button" className="songs-shuffle songs-play-all" onClick={() => play(null, false)}><PlayIcon /><span>Play all</span></button>
             {ids.length > 1 ? <button type="button" className="songs-outline-action" onClick={() => play(null, true)}><ShuffleIcon /><span>Shuffle</span></button> : null}
           </div>
         ) : null}
+        {!keptList && allIds.length ? (
+          <SongKeepAction ids={allIds} noteKey={'keep-list-' + frame.v} label={allIds.length > 1 ? 'Keep all ' + allIds.length.toLocaleString('en-US') : 'Keep this song'} />
+        ) : null}
+        {keptList && missing.length ? (
+          <div className="song-keep-restore">
+            <p>{'Your backup lists ' + songCountLabel(missing.length) + ' kept on this phone that are not on it now.'}</p>
+            <SongKeepAction ids={missing} noteKey="keep-restore" label={'Download your ' + songCountLabel(missing.length) + ' again ({size})'} />
+          </div>
+        ) : null}
+        {keptList && ids.length ? (
+          askingRemoveAll ? (
+            <div className="song-keep-confirm" role="group" aria-label="Remove all kept songs">
+              <p>{'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone? They can be kept again.'}</p>
+              <div className="song-keep-confirm-actions">
+                <button type="button" className="songs-outline-action" onClick={() => setAskingRemoveAll(false)}>Keep them</button>
+                <button type="button" className="songs-shuffle" onClick={() => { void keep.removeAll(); setAskingRemoveAll(false); }}>Remove all</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="songs-see-all song-keep-remove-all" onClick={() => setAskingRemoveAll(true)}>Remove all from this phone</button>
+          )
+        ) : null}
       </header>
       <section className="songs-section" aria-label={content.title}>
         {fams && fams.length ? (
           <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(f) => onPush({ k: 'song', v: f.id })} inList />)}</div>
         ) : content.songs && content.songs.length ? (
-          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(s) => onPush({ k: 'song', v: s.f })} />)}</div>
+          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(s) => onPush({ k: 'song', v: s.f })} onRemove={keptList ? (s) => { void keep.remove([s.id]); } : undefined} />)}</div>
         ) : (
           <p className="songs-empty">{content.empty}</p>
         )}

@@ -127,6 +127,37 @@ describe('the mini-player song skin (final-08)', () => {
     expect(document.querySelector('.audio-bar-song-play').className).toContain('is-unavailable');
   });
 
+  it('the bar hears the signal go and come back by itself, with no player event (K2)', () => {
+    playFamilyA();
+    emit('playing');
+    act(() => { AudioPlayer.toggle(); });
+    render(<AudioPlayerBar />);
+    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    act(() => { window.dispatchEvent(new Event('offline')); });
+    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Not on this phone');
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
+  });
+
+  it('offline, a song KEPT on this phone never says it is not on it (K1)', async () => {
+    const { SongKeep } = await import('../../utils/song-keep.js');
+    globalThis.OfflineSongsStore = { all: async () => [{ id: 'aaaaaaaaaaa1', blob: new Blob([new Uint8Array(4)]), bytes: 4, sha256: '', keptAt: 1 }], get: async () => null, put: async () => {}, delete: async () => {} };
+    if (!globalThis.indexedDB) globalThis.indexedDB = {};
+    SongKeep._reset();
+    await SongKeep.ready();
+    try {
+      playFamilyA();
+      emit('playing');
+      act(() => { AudioPlayer.toggle(); });
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+      render(<AudioPlayerBar />);
+      expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
+      expect(document.querySelector('.audio-bar-song-play').className).not.toContain('is-unavailable');
+    } finally { delete globalThis.OfflineSongsStore; SongKeep._reset(); }
+  });
+
   it('a reading keeps the reading skin exactly: its round play, its slider', () => {
     act(() => { AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'The Wide Path' }, collectionLabel: 'Volume One' }); });
     render(<AudioPlayerBar />);

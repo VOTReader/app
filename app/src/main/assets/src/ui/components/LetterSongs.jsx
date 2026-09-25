@@ -23,6 +23,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
 import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongCover, SongPlayButton, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
+import { SongKeepAction } from './SongKeepParts.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -137,6 +138,8 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
           All {songCountLabel(leads.length)} of this letter<ChevronRightIcon />
         </button>
       ) : null}
+      {/* K1: this letter's songs, every version, kept for listening with no signal. */}
+      <SongKeepAction ids={songs.map((s) => s.id)} noteKey={'keep-letter-' + letterKey} label={songs.length > 1 ? 'Keep these ' + songs.length + ' songs' : 'Keep this song'} />
     </div>
   );
 }

@@ -66,6 +66,8 @@ function findUnsafeKey(value, path = '') {
 //   'listObject'       — plain object with an array `list` field
 //   'array'            — any array
 //   'stringArray'      — array whose entries are all strings
+// offline-songs (IDB v12, kept songs' bytes) has no shape on purpose: no backup
+// carries it, so nothing is ever restored into it (user-data-parity.test.js).
 const STORE_SHAPES = {
   'vot-annotations': 'objectOfArrays',     // hlKey → annotation[]
   'vot-journal-index': 'objectOfArrays',   // refKey → entryId[]
@@ -75,7 +77,7 @@ const STORE_SHAPES = {
   'vot-reading-streak': 'object',          // {currentStreak, lastReadDate, …}
   'vot-reading-stats': 'object',           // {totalWordsRead, wordsByDay, progress, …}
   'vot-garden-pos': 'object',              // {lastPage}
-  'vot-audio-library': 'object',           // {saved, recent, rate}; store normalizes nested fields
+  'vot-audio-library': 'object',           // {saved, recent, rate, songSaved, songRecent, songKept}; store normalizes nested fields
   'vot-audio-positions': 'object',         // {positions}; store re-checks every URL key + clamps
   'vot-state': 'object',                   // {tabs?, settings?, …} — store does NOT coerce
   'vot-note-default': 'object',            // {style, color}; replaceAll routes through set(), which normalizes

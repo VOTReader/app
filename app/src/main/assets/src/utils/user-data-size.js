@@ -86,6 +86,9 @@ export const USER_DATA_STORES = [
   'vot-ann-hint-dismissed',
   // review-tutorial: the fifth flag — "Show me around" done / skipped / never again.
   'vot-tour-done',
+  // NOT here: offline-songs (IDB v12). It holds the bytes of songs kept on this
+  // phone, which the backup never carries (only their ids, songKept, inside
+  // vot-audio-library), so counting them would overstate what Export protects.
 ];
 
 /**

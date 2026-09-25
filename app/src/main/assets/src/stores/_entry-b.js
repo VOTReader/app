@@ -73,6 +73,9 @@ import { ReadingStatsStore } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { AudioLibraryStore } from './audio-library-store.js';
 import { AudioPositionsStore } from './audio-positions-store.js';
+// Songs of the Letters K1 (IDB v12): the bytes of the songs kept on this phone. Never backed up (only their ids,
+// as songKept); utils/song-keep.js in bundle-d reads it as the OfflineSongsStore global.
+import { OfflineSongsStore } from './offline-songs-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 
@@ -226,6 +229,7 @@ Object.assign(window, {
   GardenPosStore,
   AudioLibraryStore,
   AudioPositionsStore,
+  OfflineSongsStore,
   JournalIndexStore,
   jrnId, JournalStore, JournalNotebookStore,
   // Components

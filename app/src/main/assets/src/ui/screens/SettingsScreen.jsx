@@ -336,6 +336,40 @@ function AudioRateRow() {
   );
 }
 
+/**
+ * Songs of the Letters kept on this phone (K1): how many and how big (catalog bytes), and Manage › to the Kept
+ * list. SongKeep and the Songs screens live in bundle-d/h, read here as globals; no keep store, no row.
+ */
+function SongsKeptRow() {
+  const keep = /** @type {any} */ (globalThis).SongKeep;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (keep ? keep.subscribe(cb) : () => {}), [keep]),
+    () => (keep ? keep.getVersion() : 0)
+  );
+  if (!keep || keep.availability() === 'none') return null;
+  const ids = keep.keptIds();
+  const missing = keep.missing();
+  const fmt = /** @type {any} */ (globalThis).formatSongBytes;
+  const size = (/** @type {string[]} */ list) => (typeof fmt === 'function' ? ' · ' + fmt(keep.bytesOf(list)) : '');
+  const value = ids.length ? ids.length + size(ids) : missing.length ? missing.length + ' to download again' : 'None yet';
+  const manage = () => {
+    const open = /** @type {any} */ (window).__openSongs;
+    if (typeof open === 'function') open([{ k: 'list', v: 'kept' }], 'Settings');
+  };
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">Songs kept on this phone</span>
+        <span className="settings-row-grow" />
+        <button type="button" className="settings-select-trigger" aria-label={'Songs kept on this phone: ' + value + '. Manage'} onClick={(e) => { e.stopPropagation(); manage(); }}>
+          <span className="settings-row-value">{value + ' · Manage'}</span>
+          <span className="settings-select-chev">{"›"}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
 function DataInfoRow({ label, value = null, children = null }) {
   return (
@@ -1041,6 +1075,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     // AudioLibraryStore belongs to bundle-b. Resolve its runtime bridge only
     // when that bundle is present, so isolated UI/admin harnesses remain safe.
     const audioLibraryStore = /** @type {any} */ (globalThis).AudioLibraryStore;
+    // Its record also carries songKept, the ids of the songs kept on this phone. The songs' BYTES (the
+    // offline-songs store) are never exported: they can run to gigabytes and come back from the song sites,
+    // so a restore offers "Download your N songs again" instead (user-data-parity.test.js pins the exemption).
     if (audioLibraryStore) {
       stores['vot-audio-library'] = { store: audioLibraryStore, method: 'replaceAll' };
     }
@@ -2161,6 +2198,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.showLetterSongs !== false}
               onToggle={() => onToggle("showLetterSongs")}
             />
+            <SongsKeptRow />
             <SettingsRow
               label="Turn the Page with the Audio"
               desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."

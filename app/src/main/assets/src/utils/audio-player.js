@@ -31,6 +31,7 @@
 
 import { showToast } from './toast.js';
 import { OfflineAudio } from './offline-audio.js';
+import { SongKeep } from './song-keep.js';
 import { loadAudioSyncSections } from './sync-loaders.js';
 import { NativeAudio, nativeAudioAvailable } from './native-audio.js';
 import {
@@ -141,6 +142,10 @@ let _native = false;
 let _songSkips = 0;
 const SONG_SKIP_CAP = 3;
 const SONG_SKIP_MSG = "Couldn't play this song. Skipping to the next.";
+/** Offline, a song not kept on the phone says "Not on this phone" on the bar this long, then the next kept one plays (README 3.5). */
+const SONG_OFFLINE_SKIP_MS = 3000;
+/** The pending offline skip past a song not on the phone (cleared by any new start or a stop). */
+let _offlineSkipTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
@@ -387,7 +392,31 @@ function _offline() {
  * @returns {boolean}
  */
 function _unreachable(track) {
-  return _offline() && !(track && typeof track.url === 'string' && OfflineAudio.isSaved(track.url));
+  return _offline() && !(track && typeof track.url === 'string' && (OfflineAudio.isSaved(track.url) || _songKept(track)));
+}
+
+/**
+ * A song kept on this phone (K1): on the web its bytes are in the offline-songs store and play from an object URL; in
+ * the phone app they are native's file under the song's own URL (OfflineAudio.isSaved already answers for those).
+ * @param {Track | null | undefined} track @returns {boolean}
+ */
+function _songKept(track) {
+  return !!track && _isSong(track) && SongKeep.isKept(songIdOfKey(track.key));
+}
+
+/**
+ * What the element loads for `track`: a kept song's object URL on the web (one alive at a time, revoked when the
+ * track moves on), else the track's own URL. Native reads a kept song's file under its URL, so it always gets that.
+ * @param {Track} track @returns {string}
+ */
+function _srcFor(track) {
+  if (_native || !_isSong(track)) return track.url;
+  return SongKeep.objectUrlFor(songIdOfKey(track.key)) || track.url;
+}
+
+/** Drop the pending "Not on this phone" skip. */
+function _clearOfflineSkip() {
+  if (_offlineSkipTimer) { clearTimeout(_offlineSkipTimer); _offlineSkipTimer = null; }
 }
 
 /**
@@ -991,6 +1020,7 @@ function _warmTargets() {
   const limit = Math.min(_state.queue.length, _state.qi + 1 + PREFETCH_AHEAD);
   for (let i = _state.qi + 1; i < limit; i++) {
     const url = _state.queue[i] && _state.queue[i].url;
+    if (_songKept(_state.queue[i])) continue;   // on the phone already: nothing to warm
     // Whole-book Bible tracks are 30–260 MB each — "warming" one is a full
     // audiobook download, not a head-of-file cache fill. That shape now lives
     // ONLY on audio-bible-v1 (legacy saved tracks + pre-switch resumes), so
@@ -1337,6 +1367,7 @@ function _start() {
   // Before anything else: whatever this start does, a seek armed for the
   // PREVIOUS track is no longer this element's business.
   _seekGen++;
+  _clearOfflineSkip();
   _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
   const track = _state.queue[_state.qi];
   if (!track) { stop(); return; }
@@ -1381,6 +1412,23 @@ function _start() {
       _toast(OFFLINE_MSG);
       return;
     }
+    if (_isSong(track)) {
+      // A song not kept on this phone: the bar says "Not on this phone" (paused on it), then the next kept song
+      // plays (README 3.5, picture final-08). Any start or stop before then cancels the skip.
+      _state.time = 0;
+      _state.duration = 0;
+      _errorTime = 0;
+      _setStatus('paused');
+      _releaseEl();
+      _persist();
+      _offlineSkipTimer = setTimeout(() => {
+        _offlineSkipTimer = null;
+        if (_state.status !== 'paused' || _state.queue[_state.qi] !== track) return;
+        _state.qi = ahead;
+        _start();
+      }, SONG_OFFLINE_SKIP_MS);
+      return;
+    }
     _state.qi = ahead;
     _start();
     return;
@@ -1408,7 +1456,10 @@ function _start() {
   // speed back because it is read afresh here, at every start.
   _state.rate = _isSong(track) ? 1 : _readingRate;
   _state.time = 0;
-  _state.duration = el.src === track.url ? (el.duration || 0) : 0;
+  // A kept song on the web plays from its stored bytes; leaving one lets its object URL go.
+  const src = _srcFor(track);
+  if (src === track.url) SongKeep.releaseObjectUrl();
+  _state.duration = el.src === src ? (el.duration || 0) : 0;
   _lastTick = -1;
   _errorTime = 0;
   // A prewarm(…) already pointed the element at THIS url and buffered its
@@ -1416,7 +1467,7 @@ function _start() {
   // whose load FAILED (el.error set, NO_SOURCE) is re-pointed instead: nothing
   // is buffered to lose, and the fresh load's error fires at status 'loading'
   // where _onError can say so, not 20 s later from the stall watchdog (row 5).
-  if (el.src !== track.url || el.error) el.src = track.url;
+  if (el.src !== src || el.error) el.src = src;
   // AFTER src: the media load algorithm resets playbackRate to
   // defaultPlaybackRate, so a rate applied pre-assignment is silently lost.
   // Setting default too keeps any internal reload at the chosen speed.
@@ -1456,7 +1507,7 @@ function _start() {
     if (_stallRetried || _state.status !== 'loading' || !_el) return;
     if ((_el.currentTime || 0) > 0 || _el.readyState > 0) return; // data arrived
     _stallRetried = true;
-    _el.src = track.url;
+    _el.src = src;
     const p2 = _el.play();
     if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
   }, 20000);
@@ -3107,11 +3158,12 @@ function toggle() {
   // A failed element stays failed until src is re-assigned; an element still
   // holding ANOTHER recording (a seam that paused offline, item 8) must load
   // the one the bar names.
-  if (_el.error || _el.src !== track.url) {
+  const src = _srcFor(track);
+  if (_el.error || _el.src !== src) {
     // Re-load it and seek back to where playback died once metadata is
     // available (currentTime can't be set before then).
     const resumeAt = _errorTime;
-    _el.src = track.url;
+    _el.src = src;
     // AFTER src: the load algorithm resets playbackRate (see _start).
     try { _el.defaultPlaybackRate = _state.rate; _el.playbackRate = _state.rate; } catch (_e) { /* older media engines can ignore rates */ }
     // Through the shared helper, not a hand-written listener: this seek is a
@@ -3591,9 +3643,11 @@ function stop() {
   _clearStallWatchdog();
   _clearSleepTimer(false);
   _stopWarming();
+  _clearOfflineSkip();
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';
+    SongKeep.releaseObjectUrl();
     try { _el.load(); } catch (_e) { /* jsdom / older WebViews */ }
   }
   _state.queue = [];

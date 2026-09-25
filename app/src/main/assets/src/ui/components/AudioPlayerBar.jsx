@@ -18,12 +18,19 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { displayPartLabel, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { SongCover, NextIcon } from './SongParts.jsx';
+import { useSongsOnline } from './SongKeepParts.jsx';
+import { SongKeep } from '../../utils/song-keep.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
 export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // The song skin says "Not on this phone" the moment the signal goes (and stops when it returns): the player only
+  // re-renders the bar on its own events, so the bar listens for online/offline itself. It also re-reads the keep
+  // store, so a song kept while it plays stops saying so.
+  const online = useSongsOnline();
+  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
   const st = AudioPlayer.getState();
   const open = st.status !== 'idle';
   const [managerOpen, setManagerOpen] = React.useState(false);
@@ -90,7 +97,8 @@ export function AudioPlayerBar() {
   const songId = songIdOfKey(track.key);
   if (songId) {
     const song = songById(songId);
-    const offline = typeof navigator !== 'undefined' && navigator.onLine === false && !active;
+    // Offline and NOT kept on this phone (K1): a kept song plays with no signal and says nothing of it.
+    const offline = !online && !active && !SongKeep.isKept(songId);
     const pct = dur ? Math.min(100, Math.max(0, (st.time / dur) * 100)) : 0;
     const line2 = st.status === 'loading' ? 'Loading…' : offline ? 'Not on this phone' : (track.partLabel || 'Songs of the Letters');
     return (

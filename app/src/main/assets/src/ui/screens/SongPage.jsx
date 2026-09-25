@@ -4,7 +4,7 @@
    A frame of the Songs screen ({ k: 'song', v: <family id> }), drawn by
    AudioSongsScreen. A centred cover; SONG · N VERSIONS; the title; "From the
    letter: … ›" only for a medium or high link; the collection; "Made with
-   Suno · by …"; PLAY (filled) and SAVE (outlined; KEEP waits for L6); the
+   Suno · by …"; PLAY (filled) and SAVE (outlined); the KEEP card (K1); the
    version rows (first four, then "Show all N versions ›"); a lyrics preview;
    more songs from the same letter.
 
@@ -104,6 +104,8 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
           <StarIcon filled={saved} /><span>{saved ? 'Saved' : 'Save'}</span>
         </button>
       </div>
+      {/* K1 (picture r2-more-screens, third panel): the whole family, sized from the catalog. */}
+      <SongKeepCard ids={versions.map((v) => v.id)} noteKey={'keep-fam-' + fam.id} versions={versions.length} />
 
       {versions.length > 1 ? (
         <section className="songs-section" aria-labelledby="song-versions">

@@ -291,13 +291,30 @@ describe('user-data parity — STORE_NAMES (the IDB schema)', () => {
     );
   });
 
-  it('exempts `meta` and nothing else', () => {
+  it('exempts `meta` and `offline-songs` and nothing else', () => {
     // `meta` holds migration bookkeeping + the storage-growth series, and is
     // deliberately outside USER_DATA_STORES so the series cannot inflate the
-    // number it trends (see user-data-size.js). Pinned by exact match so the
-    // exemption cannot widen into a place to park a real store.
+    // number it trends (see user-data-size.js).
+    // `offline-songs` (IDB v12, Songs of the Letters K1) holds the BYTES of the
+    // songs kept on this phone: up to gigabytes the reader can fetch again from
+    // the song sites, so they never ride the Settings export and never count in
+    // "Your Data". What the reader chose is not lost: the list of kept ids
+    // travels in vot-audio-library (`songKept`), and a restore offers "Download
+    // your N songs again". Pinned by exact match so the exemption cannot widen
+    // into a place to park a real store.
     const nonVot = IDBAdapter.STORE_NAMES.filter((n) => !n.startsWith('vot-'));
-    expect(nonVot).toEqual(['meta']);
+    expect(nonVot).toEqual(['offline-songs', 'meta']);
     expect(USER_DATA_STORES).not.toContain('meta');
+    expect(USER_DATA_STORES).not.toContain('offline-songs');
+    expect(BACKED_UP).not.toContain('offline-songs');
+    expect(SETTINGS_SRC.indexOf("'offline-songs'")).toBe(-1);
+  });
+
+  it('the kept songs travel as a LIST: songKept is part of the vot-audio-library record', () => {
+    // The other half of the offline-songs exemption: the backup carries which
+    // songs were kept (vot-audio-library, restored whole by replaceAll).
+    expect(BACKED_UP).toContain('vot-audio-library');
+    const libSrc = readFileSync(join(HERE, '..', 'stores', 'audio-library-store.js'), 'utf8');
+    expect(libSrc).toMatch(/songKept: _songIds\(raw\.songKept/);
   });
 });

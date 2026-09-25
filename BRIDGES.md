@@ -130,7 +130,7 @@ setup effect.
 ### `__openSongs`
 - **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: `(frames, label) => _openSongs(frames, { screen, letterId, label })`)
 - **Cleanup:** none — the next build overwrites it
-- **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's songs; Back returns to that letter, the back pill naming it)
+- **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's songs; Back returns to that letter, the back pill naming it); `ui/screens/SettingsScreen.jsx` (K1: Listening → "Songs kept on this phone · Manage ›" opens the Kept list; Back returns to Settings)
 
 ---
 

@@ -495,6 +495,67 @@ describe('songs - the sweep n3 paths', () => {
   });
 });
 
+describe('songs kept on this phone (K1)', () => {
+  /** Mark songs kept on the web: the offline-songs store holds them, song-keep reads them. */
+  async function keptOnWeb(ids) {
+    globalThis.OfflineSongsStore = {
+      all: async () => ids.map((id) => ({ id, blob: new Blob([new Uint8Array(4)]), bytes: 4, sha256: '', keptAt: 1 })),
+      get: async () => null, put: async () => {}, delete: async () => {},
+    };
+    if (!globalThis.indexedDB) globalThis.indexedDB = {};
+    await load();
+    const { SongKeep } = await import('./song-keep.js');
+    await SongKeep.ready();
+    return SongKeep;
+  }
+  let made;
+  beforeEach(() => {
+    made = [];
+    URL.createObjectURL = vi.fn(() => { const u = 'blob:kept-' + made.length; made.push(u); return u; });
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => { delete globalThis.OfflineSongsStore; vi.useRealTimers(); });
+
+  it('a kept song plays from its stored bytes (an object URL), online too; the next song streams', async () => {
+    await keptOnWeb(['aaaaaaaaaaa1']);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    expect(el().src).toBe('blob:kept-0');
+    AudioPlayer.next();
+    expect(el().src).toBe(SONG_URL(1, 'aaaaaaaaaaa2'));
+    expect(made).toHaveLength(1);
+  });
+
+  it('offline, a kept song plays; one not kept says so on the bar, then the next kept song plays', async () => {
+    vi.useFakeTimers();
+    await keptOnWeb(['aaaaaaaaaaa2']);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    expect(AudioPlayer.playSongs({ filter: { family: 'fam-a' } })).toBe(true);   // a1 is not kept, a2 is
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().status).toBe('paused');   // the bar: "Not on this phone"
+    vi.advanceTimersByTime(3000);
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(el().src).toBe('blob:kept-0');
+    expect(AudioPlayer.getState().status).toBe('loading');
+  });
+
+  it('offline with nothing kept, a songs queue is refused with the offline notice', async () => {
+    await keptOnWeb([]);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    expect(AudioPlayer.playSongs({ filter: { family: 'fam-a' } })).toBe(false);
+    expect(AudioPlayer.getState().status).toBe('idle');
+  });
+
+  it('a stop before the skip lands cancels it', async () => {
+    vi.useFakeTimers();
+    await keptOnWeb(['aaaaaaaaaaa2']);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    AudioPlayer.stop();
+    vi.advanceTimersByTime(5000);
+    expect(AudioPlayer.getState().status).toBe('idle');
+  });
+});
+
 describe('the media card for a song', () => {
   it('artist names the shelf and the version; the web card carries the cover', () => {
     const session = { setActionHandler() {}, setPositionState() {}, metadata: null, playbackState: 'none' };

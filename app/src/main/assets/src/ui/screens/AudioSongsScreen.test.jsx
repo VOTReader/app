@@ -22,6 +22,8 @@ vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 import { AudioSongsScreen } from './AudioSongsScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as Parts from '../components/SongParts.jsx';
+import * as KeepParts from '../components/SongKeepParts.jsx';
+import { SongKeep, formatSongBytes } from '../../utils/song-keep.js';
 import { SongCatalog, adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
 
@@ -32,7 +34,7 @@ function installGlobals({ saved = [], recent = [] } = {}) {
   globalThis.LibraryNav = ({ backLabel }) => <nav>{backLabel}</nav>;
   globalThis.useModalRegistry = () => {};
   globalThis.useFocusTrap = () => null;
-  Object.assign(globalThis, Shelf, Parts);
+  Object.assign(globalThis, Shelf, Parts, KeepParts, { SongKeep, formatSongBytes });
   globalThis.AudioPlayer = player;
   globalThis.SongCatalog = SongCatalog;
   globalThis.COL_BY_KEY = new Map([
@@ -134,7 +136,7 @@ describe('AudioSongsScreen -- the hub', () => {
     expect(screen.getByRole('heading', { name: 'New from the flock' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Saved songs/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Recently played songs/ })).toBeTruthy();
-    expect(screen.queryByText(/Kept on this phone/)).toBeNull();                       // only once L6 ships
+    expect(screen.queryByText(/Kept on this phone/)).toBeNull();                       // no keep store here (AudioSongsScreen.keep.test)
     const tile = screen.getByRole('button', { name: /Words to Live By, Part One/ });
     expect(tile.textContent).toContain('2 songs');                                     // visible recordings, the hidden twin not counted
     expect(tile.querySelectorAll('.song-cover').length).toBe(4);                      // the 2x2 mosaic

@@ -1719,6 +1719,45 @@
       .song-page-more { width: 100%; margin-top: .75rem; font-size: var(--fs-18); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .song-page-lyrics p { margin: 0; color: var(--cream); font-size: var(--fs-18); font-style: italic; line-height: 1.5; }
       .song-version-main:focus-visible, .song-page-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      /* Keep on this phone (K1, picture r2-more-screens, third panel): a card in three states — KEEP FOR OFFLINE
+         LISTENING with a filled KEEP · 64 MB, KEEPING… with a thin bar and Cancel, AVAILABLE OFFLINE with a check —
+         and the same states on one line for a list and a letter's songs card. Tokens only. */
+      .song-keep-card { width: 100%; margin-top: 1.1rem; padding: .85rem .95rem 1rem; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); text-align: left; }
+      .song-keep-card.is-kept { border-color: var(--gold); }
+      .song-keep-head { margin: 0 0 .7rem; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-13); font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+      .song-keep-body { display: flex; align-items: flex-start; gap: .9rem; }
+      .song-keep-icon { width: 52px; height: 52px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--gold); border-radius: 10px; color: var(--gold); }
+      .song-keep-icon.is-round { border-radius: 50%; }
+      .song-keep-svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+      .song-keep-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .45rem; }
+      .song-keep-text { margin: 0; color: var(--cream); font-size: var(--fs-18); line-height: 1.35; }
+      .song-keep-card.is-kept .song-keep-text, .song-keep-card.is-busy .song-keep-text { padding-top: .75rem; }
+      .song-keep-sub, .song-keep-note { margin: 0; color: var(--cream-dim); font-size: var(--fs-15); font-style: italic; line-height: 1.35; }
+      .song-keep-note[role="status"] { color: var(--cream); font-style: normal; }
+      .songs-shuffle.song-keep-go { width: auto; align-self: stretch; margin-top: .2rem; }
+      .song-keep-progress { display: flex; align-items: center; gap: .9rem; }
+      .song-keep-bar { flex: 1; min-width: 0; height: 6px; overflow: hidden; border-radius: 999px; background: var(--gold-faint); }
+      .song-keep-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); transition: width .3s ease; }
+      .song-keep-cancel { flex: none; min-height: 44px; padding: 0 .2rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-16); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+      .song-keep-action { display: grid; gap: .35rem; margin-top: .8rem; }
+      .songs-outline-action.song-keep-btn { width: 100%; font-size: var(--fs-15); }
+      .songs-outline-action.song-keep-btn:disabled, .songs-shuffle.song-keep-go:disabled { opacity: .5; cursor: default; }
+      .song-keep-line { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-height: 44px; margin: 0; color: var(--cream); font-size: var(--fs-16); }
+      .song-keep-line .song-keep-svg { width: 22px; height: 22px; flex: none; color: var(--gold); }
+      .song-keep-line.is-note { color: var(--cream-dim); font-style: italic; }
+      .song-keep-line-label { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: .5rem; }
+      .song-keep-line .song-keep-bar { flex: 1 0 100%; }
+      .song-keep-remove { flex: none; min-height: 44px; padding: 0 .6rem; border: 1px solid var(--gold-border); border-radius: 999px; background: transparent; color: var(--cream); font: inherit; font-size: var(--fs-14); cursor: pointer; }
+      .song-keep-remove-all { margin-top: .4rem; }
+      .song-keep-restore { margin-top: .9rem; padding: .75rem .9rem; border: 1px solid var(--gold); border-radius: 10px; }
+      .song-keep-restore p { margin: 0; color: var(--cream); font-size: var(--fs-16); }
+      .song-keep-restore .song-keep-action { margin-top: .6rem; }
+      .song-keep-confirm { margin-top: .8rem; padding: .8rem .9rem; border: 1px solid var(--gold); border-radius: 10px; background: var(--bg3); }
+      .song-keep-confirm p { margin: 0 0 .7rem; color: var(--cream); font-size: var(--fs-16); }
+      .song-keep-confirm-actions { display: flex; gap: .6rem; }
+      .song-keep-confirm-actions > button { flex: 1 1 0; width: auto; }
+      .letter-songs-card .song-keep-action { margin-top: .5rem; }
+      .song-keep-cancel:focus-visible, .song-keep-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */
       .reading-list { display: grid; gap: .6rem; }
       .reading-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem .95rem; border: 1px solid var(--gold-border); border-radius: 10px; }
