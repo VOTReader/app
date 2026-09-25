@@ -91,6 +91,9 @@
          (base .vot-toast is pointer-events:none), so the Undo control works; it
          already sits at z-index 9998, above the tabs overview (z-index 400). */
       .vot-toast-undo { pointer-events:auto; }
+      /* n4-06: hideToast only drops .show, so a faded Undo stayed tappable; a late tap
+         restored a block whose marks were already gone. */
+      .vot-toast-undo:not(.show) { pointer-events:none; }
       .vot-toast-undo .vot-undo-btn { margin-left:0.7em; background:none; border:none; padding:0; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
       body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-strong,#9a7b2e); }
 

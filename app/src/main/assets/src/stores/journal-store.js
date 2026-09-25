@@ -117,6 +117,7 @@ function withBlockIds(blocks) {
  * @typedef {{
  *   annKeys: string[],
  *   noteGroupIds: string[],
+ *   noteTrims: Array<{ groupId: string, keys: string[] }>,
  *   bookmarkIds: string[],
  *   linkIds: string[],
  *   highlights: number,
@@ -269,14 +270,30 @@ export var JournalStore = extendStore(
      * Library hubs count. Never throws — a counting hiccup must not
      * block a deletion the user asked for.
      *
+     * With `blockId` (n4-06) the scan is ONE block's marks: keys
+     * journal:<id>:<blockId> and journal:<id>:<blockId>:<start>-<end>. A note
+     * whose segments are all on that block is the block's; one that also
+     * spans other blocks is listed in `noteTrims` (it keeps its other keys).
+     * Whole-entry links are never a block's.
+     *
      * @param {string} id
+     * @param {string} [blockId]
      * @returns {AssociatedScan}
      */
-    _scanAssociated(id) {
+    _scanAssociated(id, blockId) {
       var prefix = 'journal:' + id + ':';
+      var blockKey = blockId != null ? prefix + blockId : null;
+      /** @param {any} k */
+      var mine = function(k) {
+        var s = String(k);
+        if (blockKey === null) return s.indexOf(prefix) === 0;
+        return s === blockKey || (s.indexOf(blockKey) === 0 && /^:\d+-\d+$/.test(s.slice(blockKey.length)));
+      };
       /** @type {Record<string, 1>} */ var hlG = {};
       /** @type {Record<string, 1>} */ var ulG = {};
       /** @type {Record<string, 1>} */ var noteG = {};
+      /** @type {Record<string, 1>} */ var noteShown = {};
+      /** @type {Array<{ groupId: string, keys: string[] }>} */ var noteTrims = [];
       /** @type {string[]} */ var annKeys = [];
       /** @type {string[]} */ var bkmIds = [];
       /** @type {string[]} */ var linkIds = [];
@@ -284,11 +301,12 @@ export var JournalStore = extendStore(
         if (typeof AnnotationStore !== 'undefined') {
           var all = AnnotationStore.all() || {};
           Object.keys(all).forEach(function(k) {
-            if (k.indexOf(prefix) !== 0) return;
+            if (!mine(k)) return;
             annKeys.push(k);
             (all[k] || []).forEach(function(a) {
               var gid = a.groupId || a.id;
-              if (a.kind === 'note') noteG[gid] = 1;
+              // a legacy note segment: a whole-entry scan purges its group; one block's only its segments
+              if (a.kind === 'note') { if (blockKey === null) noteG[gid] = 1; else noteShown[gid] = 1; }
               else if (a.kind === 'underline') ulG[gid] = 1;
               else hlG[gid] = 1;
             });
@@ -298,10 +316,15 @@ export var JournalStore = extendStore(
           var nraw = NoteStore._load() || {};
           Object.keys(nraw).forEach(function(gid) {
             var keys = (nraw[gid] && nraw[gid].keys) || [];
-            if (keys.some(function(k) { return String(k).indexOf(prefix) === 0; })) noteG[gid] = 1;
+            var on = keys.filter(mine);
+            if (!on.length) return;
+            if (on.length === keys.length) noteG[gid] = 1;
+            else noteTrims.push({ groupId: gid, keys: keys.filter(function(k) { return !mine(k); }) });
           });
         }
-        if (typeof BookmarkStore !== 'undefined' && BookmarkStore.getForKeyPrefix) {
+        if (blockKey !== null && typeof BookmarkStore !== 'undefined' && BookmarkStore.all) {
+          (BookmarkStore.all() || []).forEach(function(b) { if (b && b.hlKey && mine(b.hlKey)) bkmIds.push(b.id); });
+        } else if (typeof BookmarkStore !== 'undefined' && BookmarkStore.getForKeyPrefix) {
           // getForKeyPrefix appends its own ':' (matches k.indexOf(prefix+':')),
           // so pass the entry prefix WITHOUT the trailing colon. The extra ':'
           // it adds also prevents substring-id false matches
@@ -312,19 +335,21 @@ export var JournalStore = extendStore(
           (LinkStore.all() || []).forEach(function(ln) {
             var s = ln.source || {}, t = ln.target || {};
             var hit =
-              (s.key && String(s.key).indexOf(prefix) === 0) ||
-              (t.key && String(t.key).indexOf(prefix) === 0) ||
-              (s.type === 'journal' && s.entryId === id) ||
-              (t.type === 'journal' && t.entryId === id);
+              (s.key && mine(s.key)) ||
+              (t.key && mine(t.key)) ||
+              (blockKey === null && s.type === 'journal' && s.entryId === id) ||
+              (blockKey === null && t.type === 'journal' && t.entryId === id);
             if (hit) linkIds.push(ln.id);
           });
         }
       } catch (_e) { /* counting must never block deletion */ }
       return {
-        annKeys: annKeys, noteGroupIds: Object.keys(noteG),
+        annKeys: annKeys, noteGroupIds: Object.keys(noteG), noteTrims: noteTrims,
         bookmarkIds: bkmIds, linkIds: linkIds,
         highlights: Object.keys(hlG).length, underlines: Object.keys(ulG).length,
-        notes: Object.keys(noteG).length, bookmarks: bkmIds.length, links: linkIds.length
+        // a note that spans other blocks survives the block's delete: not counted (refuter F3)
+        notes: Object.keys(Object.assign({}, noteG, noteShown)).length,
+        bookmarks: bkmIds.length, links: linkIds.length
       };
     },
 
@@ -421,12 +446,14 @@ export var JournalStore = extendStore(
     },
 
     /**
-     * Just the count summary for the delete-confirmation modal.
+     * Just the count summary for the delete-confirmation modal; with blockId,
+     * one block's (the editor's block-delete confirm, n4-06).
      * @param {string} id
+     * @param {string} [blockId]
      * @returns {{ highlights: number, underlines: number, notes: number, bookmarks: number, links: number, total: number }}
      */
-    associatedDataCounts(id) {
-      var s = this._scanAssociated(id);
+    associatedDataCounts(id, blockId) {
+      var s = this._scanAssociated(id, blockId);
       return {
         highlights: s.highlights, underlines: s.underlines, notes: s.notes,
         bookmarks: s.bookmarks, links: s.links,
@@ -438,10 +465,11 @@ export var JournalStore = extendStore(
      * Human-readable summary phrase for the delete confirmation
      * ("2 highlights, 1 bookmark and 1 link"). Null when nothing is tied.
      * @param {string} id
+     * @param {string} [blockId] - one block's marks (n4-06)
      * @returns {string | null}
      */
-    associatedDataSummary(id) {
-      var c = this.associatedDataCounts(id);
+    associatedDataSummary(id, blockId) {
+      var c = this.associatedDataCounts(id, blockId);
       if (!c.total) return null;
       /** @type {string[]} */
       var parts = [];
@@ -453,18 +481,46 @@ export var JournalStore = extendStore(
     },
 
     /**
+     * n4-06: remove the marks of a block the reader deleted, once its Undo
+     * window has passed. Nothing is removed while the entry still holds a
+     * block with that id (an Undo, or a re-add, put it back): the blocks the
+     * caller passes (the open editor's, newer than its debounced save), else the
+     * stored entry's.
+     * @param {string} id @param {string} blockId @param {any[]} [blocks]
+     * @returns {number} how many marks went (0 when the block is back)
+     */
+    purgeBlockMarks(id, blockId, blocks) {
+      try {
+        if (!id || !blockId) return 0;
+        var e = this.get(id);
+        var now = Array.isArray(blocks) ? blocks : (e && e.blocks) || [];
+        if (now.some(function(/** @type {any} */ b) { return b && b.id === blockId; })) return 0;
+        var c = this.associatedDataCounts(id, blockId);
+        if (c.total) this._purgeAssociated(id, blockId);
+        return c.total;
+      } catch (_e) { return 0; }
+    },
+
+    /**
      * Cascade-delete every annotation/bookmark/link tied to an entry.
      * Best-effort: a failure in one store doesn't block the others or
-     * the parent entry deletion.
+     * the parent entry deletion. With blockId, one block's marks (n4-06): a
+     * note that spans other blocks keeps its other keys.
      * @param {string} id
+     * @param {string} [blockId]
      * @returns {void}
      */
-    _purgeAssociated(id) {
-      var s = this._scanAssociated(id);
+    _purgeAssociated(id, blockId) {
+      var s = this._scanAssociated(id, blockId);
+      try {
+        s.noteTrims.forEach(function(n) { if (typeof NoteStore !== 'undefined') NoteStore.update(n.groupId, { keys: n.keys }); });
+      } catch (e) { console.warn('_purgeAssociated: note trim failed for', id, e); }
       try {
         s.noteGroupIds.forEach(function(gid) {
           if (typeof NoteStore !== 'undefined') NoteStore.remove(gid);
-          if (typeof AnnotationStore !== 'undefined') AnnotationStore.removeGroup(gid);
+          // one block's purge (n4-06 refuter F2): its own keys' segments go below; a note whose
+          // stored keys are out of date may still have a segment on a block that stays
+          if (blockId == null && typeof AnnotationStore !== 'undefined') AnnotationStore.removeGroup(gid);
         });
         if (typeof AnnotationStore !== 'undefined') {
           s.annKeys.forEach(function(k) { AnnotationStore.removeAllForKey(k); });

@@ -392,6 +392,7 @@ export function JournalEditorScreen(props) {
       var removed = removedSnap;
       if (!removed) return;
       var undone = false;
+      var expired = false;          // n4-06: past the window the marks are gone; Undo must not bring back a bare block
       // Splice `removed` back in at its old index, replacing the pristine
       // default paragraph that deleting the LAST block left behind (restoring
       // alongside it would leave a stray empty block). Shared by both restore
@@ -403,6 +404,7 @@ export function JournalEditorScreen(props) {
         return next;
       };
       var restore = function() {
+        if (expired) return;
         undone = true;               // both paths: the deferred media delete stays skipped
         hideToast('vot-toast-undo');
         if (mountedRef.current) { setBlocks(withRestored); scheduleSave(); return; }
@@ -429,6 +431,19 @@ export function JournalEditorScreen(props) {
       var el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo');
       var btn = el && el.querySelector('.vot-undo-btn');
       if (btn) btn.addEventListener('click', restore, { once: true });
+      // n4-06: the block's marks (highlights, notes, bookmarks, link ends) go too,
+      // once the Undo window has passed; the confirm named how many. An Undo, or
+      // the block back by any path, keeps them (purgeBlockMarks checks).
+      if (removed.id) {
+        setTimeout(function() {
+          if (undone) return;
+          expired = true;
+          if (btn) btn.removeEventListener('click', restore);
+          var eid = entryIdRef.current;
+          if (!eid || typeof JournalStore === 'undefined' || !JournalStore.purgeBlockMarks) return;
+          JournalStore.purgeBlockMarks(eid, removed.id, mountedRef.current ? blocksRef.current : undefined);
+        }, 6500);
+      }
       // Deferred media cleanup — the SAME only-when-nothing-needs-it rules
       // as before ((1) not an embed of another entry's media, (2) no other
       // entry embeds it, (3) this entry doesn't reuse it), now checked
@@ -827,12 +842,22 @@ export function JournalEditorScreen(props) {
   // .jrn-block-confirm keeps that positioning). Audio blocks route
   // through their own onRequestDelete callback (the waveform layout
   // owns the strip), so we don't render a duplicate × on audio.
+  // n4-06: a block that holds marks says so before it goes (they go with it).
+  function blockDeleteQuestion(idx) {
+    var b = blocks[idx];
+    var eid = entryIdRef.current;
+    var said = null;
+    try {
+      if (b && b.id && eid && typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary) said = JournalStore.associatedDataSummary(eid, b.id);
+    } catch (_e) { /* the plain question still asks */ }
+    return said ? 'Delete this block and its ' + said + '?' : 'Delete this block?';
+  }
   function blockDeleteUI(idx) {
     if (confirmDelIdx === idx) {
       return (
         <ConfirmStrip
           className="jrn-block-confirm"
-          question="Delete this block?"
+          question={blockDeleteQuestion(idx)}
           onCancel={() => setConfirmDelIdx(null)}
           onConfirm={() => deleteBlock(idx)}
         />

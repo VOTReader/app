@@ -55,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
   const t = document.getElementById('vot-toast-undo');
   if (t) t.remove();
 });
@@ -151,5 +152,57 @@ describe('JournalEditorScreen — [16] session undo', () => {
     deleteFirstBlock();
     flushTimers(8000);
     expect(globalThis.JournalMediaStore.delete).toHaveBeenCalledWith('m2');
+  });
+});
+
+/* n4-06 (sweep 2): a deleted block's marks went nowhere - listed in the Library,
+   painted nowhere. The confirm now names them, and once the Undo window has
+   passed they go with the block; an Undo keeps them. */
+describe('JournalEditorScreen - a deleted block takes its marks (n4-06)', () => {
+  it('the confirm names the block\'s marks', () => {
+    globalThis.ConfirmStrip = ({ onConfirm, question }) =>
+      React.createElement('button', { 'data-testid': 'confirm-del', 'data-q': question, onClick: onConfirm }, 'confirm');
+    const sum = vi.spyOn(JournalStore, 'associatedDataSummary').mockReturnValue('2 highlights and 1 note');
+    const first = JournalHelpers.newBlock('p', { text: 'first' });
+    const entry = openEntry([first, JournalHelpers.newBlock('p', { text: 'second' })]);
+    fireEvent.click(document.querySelectorAll('.jrn-block-del-btn')[0]);
+    expect(sum).toHaveBeenCalledWith(entry.id, first.id);
+    expect(document.querySelector('[data-testid="confirm-del"]').getAttribute('data-q')).toBe('Delete this block and its 2 highlights and 1 note?');
+  });
+
+  it('purges them after the Undo window, against the editor\'s live blocks', () => {
+    const purge = vi.spyOn(JournalStore, 'purgeBlockMarks').mockReturnValue(3);
+    const first = JournalHelpers.newBlock('p', { text: 'first' });
+    const entry = openEntry([first, JournalHelpers.newBlock('p', { text: 'second' })]);
+    deleteFirstBlock();
+    flushTimers(6000);
+    expect(purge).not.toHaveBeenCalled();
+    flushTimers(600);
+    expect(purge).toHaveBeenCalledTimes(1);
+    expect(purge.mock.calls[0][0]).toBe(entry.id);
+    expect(purge.mock.calls[0][1]).toBe(first.id);
+    expect(purge.mock.calls[0][2].map((b) => b.text)).toEqual(['second']);
+  });
+
+  it('refuter F1: past the window the faded Undo is dead - a late tap never restores a block whose marks went', () => {
+    // The real hideToast only drops .show: the node, and its button, stay in the page.
+    globalThis.hideToast = vi.fn((id) => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+    vi.spyOn(JournalStore, 'purgeBlockMarks').mockReturnValue(2);
+    const entry = openEntry([JournalHelpers.newBlock('p', { text: 'first' }), JournalHelpers.newBlock('p', { text: 'second' })]);
+    deleteFirstBlock();
+    flushTimers(7000);
+    expect(document.querySelectorAll('.jrn-block-del-btn')).toHaveLength(1);
+    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    flushTimers(1000);
+    expect(document.querySelectorAll('.jrn-block-del-btn'), 'the editor still holds one block').toHaveLength(1);
+    expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['second']);
+  });
+  it('an Undo keeps them', () => {
+    const purge = vi.spyOn(JournalStore, 'purgeBlockMarks').mockReturnValue(0);
+    openEntry([JournalHelpers.newBlock('p', { text: 'first' }), JournalHelpers.newBlock('p', { text: 'second' })]);
+    deleteFirstBlock();
+    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    flushTimers(7000);
+    expect(purge).not.toHaveBeenCalled();
   });
 });

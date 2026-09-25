@@ -577,3 +577,69 @@ describe('JournalStore: every block has an id (n4-07)', () => {
     expect(u.blocks[0].id).not.toBe(u.blocks[1].id);
   });
 });
+
+/* ──────────────────────────────────────────────────────────────
+   n4-06 (sweep 2): deleting ONE block takes its marks with it once the editor's
+   Undo window has passed, and nothing else: not the entry's other blocks, not a
+   note's keys on other blocks, not a whole-entry link, not a block that is back.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore - one block\'s marks (n4-06)', () => {
+  const setup = () => {
+    const j = JournalStore.add({ title: 'E', blocks: [{ id: 'b_a', type: 'p', text: 'one' }, { id: 'b_b', type: 'p', text: 'two' }] });
+    const A = 'journal:' + j.id + ':b_a', B = 'journal:' + j.id + ':b_b';
+    AnnotationStore.add(A, { id: 'h1', groupId: 'g1', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    AnnotationStore.add(A, { id: 'u1', groupId: 'g2', start: 0, end: 3, kind: 'underline' });
+    AnnotationStore.add(B, { id: 'h2', groupId: 'g3', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    AnnotationStore.add(A, { id: 's1', groupId: 'g4', start: 0, end: 3, kind: 'highlight', color: 'blue' });   // a note spanning A and B
+    AnnotationStore.add(B, { id: 's2', groupId: 'g4', start: 0, end: 3, kind: 'highlight', color: 'blue' });
+    NoteStore.set('g1', { body: 'only on A', keys: [A] });
+    NoteStore.set('g4', { body: 'spans', keys: [A, B] });
+    BookmarkStore.add({ id: 'bk_a', hlKey: A + ':0-3', label: 'x' });
+    BookmarkStore.add({ id: 'bk_a0', hlKey: A, label: 'x' });
+    BookmarkStore.add({ id: 'bk_ab', hlKey: 'journal:' + j.id + ':b_ab:0-3', label: 'not A: b_ab' });
+    LinkStore.add({ id: 'l_a', source: { type: /** @type {any} */ ('journal'), key: A + ':0-3' }, target: { type: 'letter', key: 'letter:x:0' }, created: 1 });
+    LinkStore.add({ id: 'l_whole', source: { type: /** @type {any} */ ('journal'), entryId: j.id, key: 'journal:' + j.id }, target: { type: 'letter', key: 'letter:x:0' }, created: 1 });
+    return { j, A, B };
+  };
+
+  it('counts and names only that block\'s marks (the confirm copy)', () => {
+    const { j } = setup();
+    const c = JournalStore.associatedDataCounts(j.id, 'b_a');
+    expect(c).toMatchObject({ highlights: 2, underlines: 1, notes: 1, bookmarks: 2, links: 1 });   // g4 spans B: it stays, not counted
+    expect(JournalStore.associatedDataSummary(j.id, 'b_zzz')).toBe(null);
+  });
+
+  it('purges them once the block is gone; the other block, the spanning note\'s other key and the whole-entry link stay', () => {
+    const { j, A, B } = setup();
+    JournalStore.update(j.id, { blocks: [{ id: 'b_b', type: 'p', text: 'two' }] });
+    expect(JournalStore.purgeBlockMarks(j.id, 'b_a')).toBeGreaterThan(0);
+    expect(AnnotationStore.get(A)).toEqual([]);
+    expect(AnnotationStore.get(B).map((a) => a.id).sort()).toEqual(['h2', 's2']);
+    expect(NoteStore.get('g1')).toBe(null);
+    expect(NoteStore.get('g4').keys).toEqual([B]);
+    expect(BookmarkStore.all().map((b) => b.id)).toEqual(['bk_ab']);
+    expect(LinkStore.all().map((l) => l.id)).toEqual(['l_whole']);
+  });
+
+  it('removes nothing while the block is still there (an Undo put it back), stored or in the editor\'s live blocks', () => {
+    const { j, A } = setup();
+    expect(JournalStore.purgeBlockMarks(j.id, 'b_a')).toBe(0);
+    JournalStore.update(j.id, { blocks: [{ id: 'b_b', type: 'p', text: 'two' }] });
+    expect(JournalStore.purgeBlockMarks(j.id, 'b_a', [{ id: 'b_a', type: 'p', text: 'one' }])).toBe(0);
+    expect(AnnotationStore.get(A)).toHaveLength(3);
+  });
+});
+
+describe('JournalStore - one block\'s purge never reaches another block (n4-06 refuter F2)', () => {
+  it('a note whose stored keys are out of date keeps its segment on a block that stays', () => {
+    const j = JournalStore.add({ title: 'E', blocks: [{ id: 'b_1', type: 'p', text: 'one' }, { id: 'b_12', type: 'p', text: 'two' }] });
+    const k1 = 'journal:' + j.id + ':b_1', k12 = 'journal:' + j.id + ':b_12';
+    AnnotationStore.add(k1, { id: 'y1', groupId: 'gy', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    AnnotationStore.add(k12, { id: 'y2', groupId: 'gy', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    NoteStore.set('gy', { body: 'stale keys', keys: [k1] });
+    JournalStore.update(j.id, { blocks: [{ id: 'b_12', type: 'p', text: 'two' }] });
+    JournalStore.purgeBlockMarks(j.id, 'b_1');
+    expect(AnnotationStore.get(k12).map((a) => a.id)).toEqual(['y2']);
+    expect(AnnotationStore.get(k1)).toEqual([]);
+  });
+});
