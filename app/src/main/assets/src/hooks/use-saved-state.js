@@ -98,6 +98,7 @@ export function _validateTabState(s) {
 }
 
 import { StateStore } from '../stores/state-store.js';
+import { mergeStateStore } from '../stores/store-merge.js';
 import { takeResumeState } from './use-persisted-state.js';
 
 /**
@@ -109,12 +110,16 @@ import { takeResumeState } from './use-persisted-state.js';
  * the migration boundary (first boot post-W2.3b: empty IDB →
  * StateStore reads vot-state from LS, seeds IDB, populates cache).
  *
- * THE UPDATE RELOAD'S RECORD comes first (usePersistedState header item
- * 6): the union the reloading document wrote to sessionStorage one call
- * before location.reload(), because its IDB put may never have landed.
- * takeResumeState() clears it as it reads it; the record then goes
- * through exactly the validation below, and usePersistedState's mount
- * write makes it durable.
+ * THE LEAVE RECORD comes first (usePersistedState header items 6 and 8):
+ * the union the previous document of this tab wrote to sessionStorage as it
+ * left — the update's self-reload, or any pagehide — because its IDB put may
+ * never have landed. takeResumeState() clears it as it reads it. It is
+ * UNIONED with the store, not taken whole: mergeStateStore with no ancestor
+ * lets the record's session fields (the screen, the tabs) win and keeps every
+ * accumulating-map key from either side, so a read mark another tab wrote
+ * after this one last read the store survives. The result then goes through
+ * exactly the validation below, and usePersistedState's mount write makes it
+ * durable.
  *
  * Returns the validated state (with stale screens coerced via
  * _validateTabState) or {} when the store is empty. Caller distributes
@@ -129,10 +134,11 @@ import { takeResumeState } from './use-persisted-state.js';
 export function useSavedState() {
   return React.useMemo(() => {
     try {
-      // The reload record, when this boot is the far side of an update's
-      // self-reload; the store otherwise. Read-and-clear is one call.
+      // The leave record, when this boot is the far side of a reload; the
+      // store otherwise. Read-and-clear is one call.
       const resumed = takeResumeState();
-      const raw = resumed || StateStore.get();
+      const stored = StateStore.get();
+      const raw = resumed ? mergeStateStore(null, resumed, stored) : stored;
       // Defensive copy — _validateTabState mutates in place, and the
       // live store cache reference shouldn't be silently rewritten by
       // a read.

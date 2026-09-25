@@ -601,6 +601,32 @@ describe('useSavedState — the update reload record is read first, applied, and
     expect(result.current.activeTabIdx).toBe(1);
   });
 
+  /* Every pagehide now leaves a record (usePersistedState contract 8), so another
+     tab's writes can land between this tab's leave and its boot. The record is
+     unioned with the store: its session fields win, and no read mark is lost —
+     taken whole, the mount write's 3-way merge would read a mark missing from the
+     record as a delete. */
+  it('the record is unioned with the store: its screen wins, and a read mark only the store holds is kept', () => {
+    StateStore._cache = /** @type {any} */ ({
+      tabs: [{ screen: 'home' }], activeTabIdx: 0,
+      readItems: { 'v1:volume-one:the-wide-path': 1, 'v1:volume-one:christmas': 1 },
+      lastReadChapters: { genesis: 3 },
+    });
+    sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: {
+      tabs: [{ screen: 'answers-home' }], activeTabIdx: 0,
+      readItems: { 'v1:volume-one:the-wide-path': 2, 'wtlb:regarding-pride': 1 },
+      lastReadChapters: { genesis: 5 },
+    } }));
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen).toBe('answers-home');
+    expect(result.current.readItems).toEqual({
+      'v1:volume-one:the-wide-path': 2,              // the higher count
+      'v1:volume-one:christmas': 1,                  // only the store had it: kept
+      'wtlb:regarding-pride': 1,                     // only the record had it: kept
+    });
+    expect(result.current.lastReadChapters, 'where I was last: the leaving tab').toEqual({ genesis: 5 });
+  });
+
   it('CONTROL: with no record, the store is what comes back', () => {
     StateStore._cache = /** @type {any} */ ({ tabs: [{ screen: 'matthew-ch', chapterNum: 3 }], activeTabIdx: 0 });
     const { result } = renderHook(() => useSavedState());

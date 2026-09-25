@@ -38,6 +38,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePersistedState, RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS, takeResumeState } from './use-persisted-state.js';
+import { useSavedState } from './use-saved-state.js';
 import { StateStore } from '../stores/state-store.js';
 
 /** Build a full 8-value union with overridable fields. */
@@ -410,6 +411,81 @@ describe('usePersistedState — the reload record (sessionStorage)', () => {
     sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ state: { tabs: [] } }));   // no timestamp: age unknown → not applied
     expect(takeResumeState()).toBeNull();
     expect(takeResumeState(), 'nothing stored → null (JSON.parse(null) is null too; the guard is explicit, not incidental)').toBeNull();
+  });
+
+  /* Contract 8 (2026-09-24): a reader who changed screens and reloaded inside the
+     debounce window came back to the PREVIOUS screen — pagehide flushed into an
+     asynchronous store write the unload aborted. Every leave now also writes the
+     synchronous record. setSpy mocks StateStore.set, which is exactly an aborted put:
+     nothing reaches the store. */
+  const record = () => {
+    const raw = sessionStorage.getItem(RESUME_STATE_KEY);
+    return raw ? JSON.parse(raw).state : null;
+  };
+  const answers = () => makeState({ tabs: [{ id: 't1', screen: 'answers-home' }] });
+
+  it('pagehide inside the debounce window leaves the record with the screen just opened', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { rerender(answers()); });                 // pending: the 250 ms window
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    expect(record() && record().tabs[0].screen, 'the reload must reopen the screen the reader was on').toBe('answers-home');
+    expect(setSpy.mock.calls[setSpy.mock.calls.length - 1][0].tabs[0].screen, 'and the store is still written').toBe('answers-home');
+  });
+
+  it('beforeunload leaves the record too', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { rerender(answers()); });
+    act(() => { window.dispatchEvent(new Event('beforeunload')); });
+    expect(record() && record().tabs[0].screen).toBe('answers-home');
+  });
+
+  it('pagehide with nothing pending still leaves the LATEST union (a write handed to the store may still be in flight), and writes the store no second time', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { rerender(answers()); });
+    act(() => { vi.advanceTimersByTime(300); });        // the debounced write fired ...
+    const writes = setSpy.mock.calls.length;
+    act(() => { window.dispatchEvent(new Event('pagehide')); });   // ... and the reload may abort it
+    expect(record() && record().tabs[0].screen).toBe('answers-home');
+    expect(setSpy.mock.calls.length, 'no redundant store write').toBe(writes);
+  });
+
+  it('CONTROL: hidden is not leaving — the store is written, no record is left', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { rerender(answers()); });
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(setSpy.mock.calls[setSpy.mock.calls.length - 1][0].tabs[0].screen).toBe('answers-home');
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+  });
+
+  it('back from the back-forward cache, the record its pagehide left is cleared; an ordinary pageshow keeps it', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: answers() });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    const show = (persisted) => { const e = new Event('pageshow'); Object.defineProperty(e, 'persisted', { value: persisted }); return e; };
+    act(() => { window.dispatchEvent(show(false)); });
+    expect(record(), 'not a restore: nothing to clear').not.toBeNull();
+    act(() => { window.dispatchEvent(show(true)); });
+    expect(sessionStorage.getItem(RESUME_STATE_KEY), 'the document lives on and will leave its own').toBeNull();
+  });
+
+  it('the import freeze clears a record an earlier pagehide left, so the boot after the import reads the restore', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: answers() });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    expect(record()).not.toBeNull();
+    act(() => { /** @type {any} */ (window).__freezePersistState(true); });
+    expect(sessionStorage.getItem(RESUME_STATE_KEY)).toBeNull();
+  });
+
+  it('round trip: a screen change, a reload inside the window whose store write never lands, and the next boot opens that screen', () => {
+    StateStore._resetForTests({ forceLoaded: true });
+    StateStore._cache = /** @type {any} */ (makeState());               // the store still says Home
+    localStorage.setItem('vot-scrollheal-1', '1');
+    const { rerender, unmount } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    act(() => { rerender(answers()); });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });        // StateStore.set is mocked: aborted
+    unmount();
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].screen).toBe('answers-home');
   });
 
   it('a sessionStorage that throws does not stop the store write — the reload must still happen', () => {

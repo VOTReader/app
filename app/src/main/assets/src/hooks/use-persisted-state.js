@@ -38,7 +38,8 @@
         inside the window coalesce to ONE StateStore.set carrying the
         LATEST union. Each new union resets the window.
      2. GUARANTEED FLUSH — a pending union is written synchronously on
-        visibilitychange→hidden, pagehide, beforeunload, and unmount.
+        visibilitychange→hidden, pagehide, beforeunload, and unmount
+        (pagehide and beforeunload also leave item 8's record).
         No union that reached this hook is ever dropped on tab
         background/close or App teardown. Flush clears the pending
         timer, so no duplicate trailing write follows.
@@ -101,7 +102,23 @@
         SettingsScreen flushes first, then freezes, BEFORE it applies.
         __freezePersistState(false) is the path that does not reload (a
         failed or refused import): it thaws, and a union rendered while
-        frozen is re-armed on the debounce, never dropped.
+        frozen is re-armed on the debounce, never dropped. Freezing also
+        clears any leave record (item 8) this document left behind.
+     8. EVERY LEAVE IS ITEM 6 (2026-09-24): a reader who changed screens and
+        reloaded inside the debounce window came back to the PREVIOUS screen.
+        pagehide / beforeunload did flush — but into StateStore.set, the same
+        asynchronous write item 6 already ruled a document one step from
+        unloading is not owed. So pagehide and beforeunload now leave the
+        sessionStorage record too, carrying the LATEST union even when nothing
+        is pending (the write handed to the store a moment earlier may still be
+        in flight). A tab that closes loses the record with its session; one
+        restored from the back-forward cache clears it on pageshow, because
+        the document lives on and will leave its own. Hidden alone is not
+        leaving: that flush stays the store write it was. Because a record can
+        now follow any unload, useSavedState UNIONS it with the store
+        (mergeStateStore with no ancestor) instead of taking it whole: the
+        record's session fields win, and a read mark another tab wrote
+        meanwhile is kept rather than deleted by the mount write's merge.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -156,8 +173,10 @@ import { StateStore } from '../stores/state-store.js';
 const PERSIST_DEBOUNCE_MS = 250;
 
 /**
- * The update reload's record (header item 6): `{ at, state }` in sessionStorage,
- * written by flush(patch, { reload: true }) and consumed once by takeResumeState().
+ * The leave record (header items 6 and 8): `{ at, state }` in sessionStorage,
+ * written by flush(patch, { reload: true }) — the update reload, and every
+ * pagehide / beforeunload — and consumed once by takeResumeState(). The key keeps
+ * its first name, from when only the update reload wrote it.
  * Same tab only, by sessionStorage's nature — which is the tab that reloads.
  */
 export const RESUME_STATE_KEY = 'vot-state-resume-after-update';
@@ -262,16 +281,24 @@ export function usePersistedState({
       if (frozenRef.current) return;             // contract 7: the stale union must not land
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       const pending = pendingRef.current;
-      const base = pending != null ? pending : (typeof patch === 'function' ? latestRef.current : null);
+      const leaving = !!(opts && opts.reload === true);
+      const patched = typeof patch === 'function';
+      // Leaving (contract 8) takes the latest union even when nothing is
+      // pending: the last write may have been handed to StateStore a moment
+      // ago and still be in flight, and the unload can abort it.
+      const base = pending != null ? pending : ((patched || leaving) ? latestRef.current : null);
       if (base == null) return;                  // nothing coalesced → no-op
-      const union = typeof patch === 'function' ? patch(base) : base;
+      const union = patched ? patch(base) : base;
       pendingRef.current = null;
-      writtenRef.current = union;
       latestRef.current = union;
-      if (opts && opts.reload === true) {
+      if (leaving) {
         try { sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: union })); }
         catch (_e) { /* the IDB write below is still made; the reload still happens */ }
       }
+      // A leave with nothing new (no pending union, no patch) has already
+      // been handed to the store; the record above is all it adds.
+      if (pending == null && !patched) return;
+      writtenRef.current = union;
       // W2.3b: persistence routes through StateStore (IDB-backed). The
       // store's lsShim hook continues to write the reduced theme +
       // fontStyle + fontScale copy to localStorage for the boot-script
@@ -295,6 +322,10 @@ export function usePersistedState({
         if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
         pendingRef.current = null;
         frozenRef.current = true;
+        // A leave record left by an earlier pagehide of this document (a
+        // back-forward-cache round trip) holds pre-import state: the boot
+        // after the import's reload must read the restored store, not it.
+        try { sessionStorage.removeItem(RESUME_STATE_KEY); } catch (_e) { /* unavailable: nothing to clear */ }
         return;
       }
       if (!frozenRef.current) return;
@@ -311,16 +342,28 @@ export function usePersistedState({
     window.__freezePersistState = freeze;
     const onVisibility = () => {
       // Only 'hidden' flushes — a return to 'visible' must not cut a
-      // still-accumulating debounce window short.
+      // still-accumulating debounce window short. Hidden is not leaving: the
+      // document lives on, so the store write has time to land.
       if (document.visibilityState === 'hidden') flush();
     };
+    // Contract 8: pagehide / beforeunload may be a reload, and the store write
+    // they start may never land — so they leave the synchronous record too.
+    const onLeave = () => flush(undefined, { reload: true });
+    // Back from the back-forward cache: this document lives on and will write
+    // its own record when it really leaves; the one its pagehide left behind
+    // must not outlive it into a later boot.
+    const onShow = (/** @type {PageTransitionEvent} */ e) => {
+      if (e && e.persisted) { try { sessionStorage.removeItem(RESUME_STATE_KEY); } catch (_e) { /* unavailable */ } }
+    };
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', flush);
-    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', onLeave);
+    window.addEventListener('beforeunload', onLeave);
+    window.addEventListener('pageshow', onShow);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', flush);
-      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', onLeave);
+      window.removeEventListener('beforeunload', onLeave);
+      window.removeEventListener('pageshow', onShow);
       flushRef.current = null;
       // Only clear the bridge if it's still mine (the guarded-cleanup
       // pattern) — a racing second registration must not be clobbered.
