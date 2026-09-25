@@ -13,6 +13,7 @@ import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { answersFiledUnder } from '../../utils/answers-shelves.js';
 import { AnswersContentsLine } from '../components/AnswersContents.jsx';
+import { passageTextBefore } from '../../utils/answers-contents.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -343,21 +344,30 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         const title = attrMatch[1];
         const collection = _attrCollectionLabel(attrMatch[2]);
         if (collection) {
+          // The tap carries the passage this source line closes, so the letter opens ON it and
+          // flashes it (pendingHighlight) instead of at its top (improvement sweep n5-01). The
+          // paragraph index comes from the host's data-hl-key at tap time: no render plumbing.
+          const sourceTarget = (/** @type {any} */ ev) => {
+            const host = ev && ev.currentTarget && ev.currentTarget.closest ? ev.currentTarget.closest('[data-hl-key]') : null;
+            const at = host ? /:(\d+)$/.exec(host.getAttribute('data-hl-key') || '') : null;
+            const excerpt = at ? passageTextBefore(entry.paragraphs, Number(at[1])) : '';
+            return excerpt ? { collection: collection, letterTitle: title, excerpt } : { collection: collection, letterTitle: title };
+          };
           return (
             <span
               key={si}
               className="letter-link-ref"
               role="link"
               tabIndex={0}
-              onClick={() => onInAppLink(
-                { collection: collection, letterTitle: title },
+              onClick={(ev) => onInAppLink(
+                sourceTarget(ev),
                 { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null }
               )}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter') return;
                 e.preventDefault();
                 onInAppLink(
-                  { collection: collection, letterTitle: title },
+                  sourceTarget(e),
                   { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null }
                 );
               }}

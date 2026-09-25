@@ -85,3 +85,35 @@ export function contentsSummary(c) {
   const p = c.passages === 1 ? '1 passage' : c.passages + ' passages';
   return named > 1 ? `${named} sections · ${p}` : p;
 }
+
+const HEADER_LINE_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
+
+/**
+ * The words of the passage a source line closes: the body paragraphs between the previous
+ * source line / heading / divider and `sourceIndex`, dated header lines left out, markers and
+ * **bold** / _italic_ marks stripped, joined with spaces. The letter it came from lands on and
+ * flashes these words when the reader taps the source (improvement sweep n5-01: the tap used to
+ * open the letter at its top). '' when there is nothing to quote.
+ * @param {Array<{ text?: string, align?: string }> | null | undefined} paragraphs
+ * @param {number} sourceIndex the index of the "~ [From …]" paragraph
+ * @returns {string}
+ */
+export function passageTextBefore(paragraphs, sourceIndex) {
+  const paras = Array.isArray(paragraphs) ? paragraphs : [];
+  const out = [];
+  for (let i = sourceIndex - 1; i >= 0; i--) {
+    const p = paras[i];
+    const text = p && typeof p.text === 'string' ? p.text.trim() : '';
+    if (!text) continue;
+    if (isAttribution(text) || text === '✦' || (p.align === 'center' && HEADING_RE.test(text))) break;
+    if (HEADER_LINE_RE.test(text)) continue;
+    out.unshift(text);
+  }
+  return out.join(' ')
+    .replace(/\{\{[^}]*\}\}/g, ' ')
+    .replace(/\*\*/g, '')
+    .replace(/(^|[\s([“"'])_|_(?=[\s)\].,;:!?”"']|$)/g, '$1')
+    .replace(/‗/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

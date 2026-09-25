@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { answersContents, contentsSummary } from './answers-contents.js';
+import { answersContents, contentsSummary, passageTextBefore } from './answers-contents.js';
 
 const P = (text, align = 'justify') => ({ text, align });
 
@@ -89,5 +89,28 @@ describe('on the real corpus', () => {
     expect(c.passages).toBe(54);
     expect(c.sections[0].title).toBe('I AM COME');
     expect(c.sections[0].passages[0]).toMatchObject({ title: 'I AM COME', collection: 'Volume 5' });
+  });
+});
+
+describe('passageTextBefore', () => {
+  const paras = [
+    P('**I AM COME**', 'center'),                                              // 0
+    P('_2/4/11_ **_From The Lord, Our God and Savior_**\n_The Word of The Lord_'), // 1 dated header: left out
+    P('_Thus says The Lord:_ My sons and daughters{{ref:John 3:16}}, **hear**.'),  // 2
+    P('Beloved, let go.'),                                                      // 3
+    P('~ [From “I AM COME” ~ Volume 5]', 'right'),                             // 4
+    P('✦', 'center'),                                                           // 5
+    P('Second passage.'),                                                       // 6
+    P('~ [From “B” ~ Volume 4]', 'right'),                                      // 7
+  ];
+  it('quotes the passage a source line closes, header out and marks stripped', () => {
+    expect(passageTextBefore(paras, 4)).toBe('Thus says The Lord: My sons and daughters , hear. Beloved, let go.');
+  });
+  it('stops at the previous source line / divider', () => {
+    expect(passageTextBefore(paras, 7)).toBe('Second passage.');
+  });
+  it('is empty when there is nothing to quote', () => {
+    expect(passageTextBefore(paras, 0)).toBe('');
+    expect(passageTextBefore(null, 3)).toBe('');
   });
 });
