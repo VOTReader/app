@@ -43,6 +43,11 @@ describe('staleDeps', () => {
     expect(staleDeps(root)).toEqual([]);
   });
 
+  it('the hook stops when the globals mirror cannot be regenerated (n7-10), instead of committing a stale one', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '.githooks', 'pre-commit'), 'utf8');
+    expect(hook).toMatch(/if ! npm run lint:globals >\/dev\/null 2>&1; then[\s\S]{0,300}exit 1/);
+  });
+
   it('the commit hook runs it before any gate', () => {
     const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '.githooks', 'pre-commit'), 'utf8');
     const at = hook.indexOf('node tools/check-node-modules.js');

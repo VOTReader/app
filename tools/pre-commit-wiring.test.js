@@ -112,13 +112,14 @@ describe('pre-commit: the commit is the index (v12-04, improvement sweep 2026-09
     expect(out, 'refused before lint / tsc / vitest').not.toContain('running lint-staged');
   }, 60_000);
 
-  it('guards every bundle source, but not the files the hook re-stages whole', () => {
+  it('guards every bundle source and index.html, but not the files the hook regenerates', () => {
     const guard = indentedTriggerFor('unstaged_sources');
     for (const p of ['app/src/main/assets/src/utils/backup.js', 'app/src/main/assets/src/ui/screens/SettingsScreen.jsx',
-      'app/src/main/assets/src/data/books.js', 'app/src/main/assets/app.css', 'app/src/main/assets/manifest.json']) {
+      'app/src/main/assets/src/data/books.js', 'app/src/main/assets/app.css', 'app/src/main/assets/manifest.json',
+      'app/src/main/assets/index.html']) { // n7-10: an unstaged index.html edit was committed in silence
       expect(guard.test(p), `${p} must be guarded`).toBe(true);
     }
-    for (const p of ['app/src/main/assets/index.html', 'app/src/main/assets/service-worker.js',
+    for (const p of ['app/src/main/assets/service-worker.js',
       'app/src/main/assets/dist/bundle-b.js', 'tools/eslint-globals.generated.js', 'CONTRIBUTING.md']) {
       expect(guard.test(p), `${p} is rebuilt/re-staged by the hook (or is no bundle source)`).toBe(false);
     }

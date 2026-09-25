@@ -105,6 +105,8 @@ Multi-part studies with chapters. Each study has `parts[].chapterIds[]` referenc
 
 ## Letter counts — downloaded vs. live website
 
+Counted from the data files (the arrays, by evaluation; 2026-09-25, n8-04): an "intro" or "preface" is not in the number beside it.
+
 | Collection | Downloaded | Status |
 |---|---|---|
 | Volume One | 29 + preface ("A Word of Warning") | ✅ |
@@ -113,13 +115,13 @@ Multi-part studies with chapters. Each study has `parts[].chapterIds[]` referenc
 | Volume Four | 29 | ✅ |
 | Volume Five | 29 | ✅ |
 | Volume Six | 31 | ✅ |
-| Volume Seven | 66 + preface ("The Indignation of The Lord") | ✅ |
+| Volume Seven | 67 + preface ("The Indignation of The Lord") | ✅ |
 | The Lord's Rebuke | 30 + preface ("A Warning") | ✅ |
 | Letters to the Flock | 61 + preface ("Be My Examples") | ✅ |
 | Letters from Timothy | 14 + preface ("Put All Your Trust in The Holy One") | ✅ |
-| WTLB Part One | 149 + intro | ✅ |
+| WTLB Part One | 148 + intro | ✅ |
 | WTLB Part Two | 203 (incl. intro) | ✅ |
-| The Blessed | 8 sections + intro | ✅ |
+| The Blessed | 7 sections + intro | ✅ |
 | Hidden Manna | 1 ("Woe to Dallas") | ✅ by design (not publicly indexed) |
 | Holy Days | 16 ghost entries (cross-pulled) | ✅ |
 | Bible Studies | 7 + Matthew Study Bible (separate file) | partial (see HISTORY §14.5/14.7) |

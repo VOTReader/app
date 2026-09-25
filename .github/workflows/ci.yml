@@ -68,6 +68,7 @@ jobs:
   build:
     name: build + syntax-check
     runs-on: ubuntu-latest
+    timeout-minutes: 30   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h; a green run takes ~12 min
     # Every PR opened here ran this whole chain TWICE. Measured, not inferred:
     # `gh pr checks 13` listed each check under two distinct run ids
     # (33872042913 and 33872045621). The `push` and `pull_request` events both
@@ -462,9 +463,18 @@ jobs:
         # FAILS (NOTHING-CHECKED), so this step cannot read green on an empty run.
         run: npm run e2e:readalong -- --synth --pixel-proof --keys one:regarding-the-celebration-of-christmas,wtlb1:a-heavy-stone,study:purity-ch1 --bible brm-kjv/psalms:23
 
+      - name: End-to-end backup restore on a fresh profile
+        # n7-06 (sweep 2026-09-25): the one check of the path a reader takes to get
+        # their data back - Export through Settings in a real browser, the file on disk,
+        # Import on a CLEAN profile, the confirm, the reload - was in no gate. It
+        # serves the assets itself on an OS-assigned port (~20 s) and exits 1 on any
+        # difference, and 1 if a file cut short claims "Import complete."
+        run: npm run e2e:restore-fresh
+
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # n7-05: ~3 min green
     # Same duplicate-run condition as the build job above; see the block there.
     # GitHub Actions does not expand YAML anchors, so it is written out twice.
     if: >-

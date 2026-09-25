@@ -18,7 +18,7 @@
  * Usage: node tools/check-node-modules.js [root]   (exit 1 + the fix when stale)
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -47,7 +47,16 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (stale.length) {
     console.error('[node-modules] this checkout\'s node_modules do not match package-lock.json:');
     for (const s of stale) console.error(`    ${s.name}: installed ${s.installed}, lockfile ${s.locked}`);
-    console.error('  The gates would run the old packages and pass what CI fails. Run: npm ci');
+    let shared = false;
+    try { shared = lstatSync(join(root, 'node_modules')).isSymbolicLink(); } catch { /* no node_modules at all */ }
+    if (shared) {
+      // Most worktrees junction the primary checkout's node_modules: an npm ci here would
+      // rewrite that SHARED install from this branch's lockfile, under every other lane.
+      console.error('  The gates would run other packages than CI. This worktree SHARES node_modules (a junction),');
+      console.error('  which follows main: rebase onto origin/main. Do not npm ci here - it rewrites the shared install.');
+    } else {
+      console.error('  The gates would run the old packages and pass what CI fails. Run: npm ci');
+    }
     process.exit(1);
   }
   console.log('[node-modules] ok - every direct dependency matches package-lock.json');

@@ -150,14 +150,16 @@ fi
 # stages the dist/ it builds from them. A bundle source with UNSTAGED edits
 # therefore commits bundles compiled from code the commit does not contain, and
 # the gates pass on code that is not being committed (improvement sweep
-# 2026-09-22, v12-04). Refuse before anything runs. index.html and
-# service-worker.js are exempt: the build rewrites both and Step 5 re-stages
-# them whole, so what is on disk is exactly what lands.
+# 2026-09-22, v12-04). Refuse before anything runs. service-worker.js is exempt:
+# the build rewrites its version and Step 5 re-stages it whole. index.html is NOT
+# (n7-10, sweep 2026-09-25): Step 5 re-stages it whole too, so an edit the
+# developer never staged was committed without a word; the build's own CSP-hash
+# rewrite happens after this check, so an unstaged index.html here is always theirs.
 # VOT_HOOK_TEST_NO_STAGE_GUARD is for tools/pre-commit-wiring.test.js only: it
 # runs this hook against a private index at HEAD, where a developer's uncommitted
 # work reads as unstaged.
 if [ -z "$VOT_HOOK_TEST_NO_STAGE_GUARD" ]; then
-  unstaged_sources=$(git diff --name-only | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|manifest\.json|offline\.html)$' || true)
+  unstaged_sources=$(git diff --name-only | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|manifest\.json|offline\.html|index\.html)$' || true)
   if [ -n "$unstaged_sources" ]; then
     echo "[pre-commit] FATAL: bundle sources with UNSTAGED changes:"
     echo "$unstaged_sources" | sed 's/^/    /'
@@ -626,7 +628,13 @@ if [ -n "$src_changed" ]; then
   # gap noted in [[globals-regen-workflow]]. (gen-eslint-globals.py is Python,
   # already on PATH from Step 1; the generator is idempotent — a no-op stages
   # nothing.)
-  npm run lint:globals >/dev/null 2>&1
+  # n7-10: a failed regeneration used to pass in silence and leave a stale mirror
+  # for CI's smoke-lite to find after the push.
+  if ! npm run lint:globals >/dev/null 2>&1; then
+    echo "[pre-commit] FATAL: npm run lint:globals failed - the globals mirror could not be regenerated."
+    echo "  Run it by hand to see why: npm run lint:globals"
+    exit 1
+  fi
   git add tools/eslint-globals.generated.js tools/globals.generated.d.ts
   npx lint-staged
   status=$?

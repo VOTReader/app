@@ -103,6 +103,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5   # n7-05: a handful of API reads
     permissions:
       contents: read
       actions: read
@@ -140,6 +141,7 @@ jobs:
     # by hand, dispatch the workflow (a fresh run, a fresh pick).
     if: needs.gate.outputs.publish == 'true' && github.run_attempt == 1
     runs-on: ubuntu-latest
+    timeout-minutes: 15   # n7-05: npm ci + build + staging
     permissions:
       contents: read
     steps:
@@ -277,6 +279,7 @@ jobs:
     # older artifact the first attempt built.
     if: github.run_attempt == 1
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # n7-05: the Pages actions only
     permissions:
       pages: write
       id-token: write
