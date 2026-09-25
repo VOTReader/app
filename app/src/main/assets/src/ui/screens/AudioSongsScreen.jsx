@@ -182,6 +182,41 @@ export function songsFrameTitle(frame, library) {
   return cat && cat.loaded ? listContent(frame.v, library).title : 'Songs';
 }
 
+/**
+ * What the songs screens draw of the player: the track it holds and whether it sounds — never its clock
+ * (n3-04: the player notifies once a second while anything plays, and a list can hold 900 rows).
+ * @returns {string}
+ */
+function playerMark() {
+  const state = AudioPlayer.getState();
+  const cur = state && Array.isArray(state.queue) ? state.queue[state.qi] : null;
+  return (cur && cur.key ? cur.key + '|' + (cur.readerCode || '') : '') + '|' + (playerIsActive(state) ? 'on' : 'off');
+}
+
+/**
+ * A stable function that always calls the latest `fn`: rows are memoized, and a row's tap must act on the
+ * list as it is now, not as it was when that row last drew. @template {(...args: any[]) => any} F
+ * @param {F} fn @returns {F}
+ */
+function useLatestFn(fn) {
+  const ref = React.useRef(fn);
+  ref.current = fn;
+  return /** @type {F} */ (React.useCallback((...args) => ref.current(...args), []));
+}
+
+/**
+ * Memo for a row: every prop the same, except that the player's song and state count only as this row's own
+ * mark (not current / current and paused / current and sounding), so a pause redraws one row, not the list.
+ * @param {(props: any) => number} markOf
+ */
+function sameRowFor(markOf) {
+  return (/** @type {any} */ a, /** @type {any} */ b) => {
+    for (const key of Object.keys(a)) if (key !== 'playingId' && key !== 'active' && a[key] !== b[key]) return false;
+    for (const key of Object.keys(b)) if (!(key in a)) return false;
+    return markOf(a) === markOf(b);
+  };
+}
+
 /* ── rows ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -190,7 +225,7 @@ export function songsFrameTitle(frame, library) {
  * `inList`: the row sits in its own collection's list, so its italic line names the version, not the collection again.
  * @param {{ key?: any, fam: any, song?: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (fam: any) => void, inList?: boolean }} props
  */
-function FamilyRow({ fam, song, playingId, active, onPlay, onOpen, inList = false }) {
+function FamilyRowPlain({ fam, song, playingId, active, onPlay, onOpen, inList = false }) {
   const cat = catalog();
   const lead = song || cat.featuredOf(fam);
   if (!lead) return null;
@@ -203,6 +238,7 @@ function FamilyRow({ fam, song, playingId, active, onPlay, onOpen, inList = fals
       len={songClock(lead.d)} current={isCurrent} playing={isCurrent && active} onPlay={tap} />
   );
 }
+const FamilyRow = React.memo(FamilyRowPlain, sameRowFor((p) => (familyIsPlaying(p.fam.id, p.playingId) ? (p.active ? 2 : 1) : 0)));
 
 /**
  * One single song (a saved one, a recent one, a new one, a kept one): cover, title, its maker or shelf in italic,
@@ -210,7 +246,7 @@ function FamilyRow({ fam, song, playingId, active, onPlay, onOpen, inList = fals
  * versions carries "N versions ›" to its song page.
  * @param {{ key?: any, song: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (song: any) => void, onRemove?: (song: any) => void }} props
  */
-function SongRow({ song, playingId, active, onPlay, onOpen, onRemove }) {
+function SongRowPlain({ song, playingId, active, onPlay, onOpen, onRemove }) {
   const cat = catalog();
   const fam = cat.familyById(song.f);
   const count = fam ? cat.versionsOf(fam).length : 1;
@@ -224,6 +260,7 @@ function SongRow({ song, playingId, active, onPlay, onOpen, onRemove }) {
     </SongListRow>
   );
 }
+const SongRow = React.memo(SongRowPlain, sameRowFor((p) => (p.playingId === p.song.id ? (p.active ? 2 : 1) : 0)));
 
 /** @param {{ title: string, id?: string, action?: any }} props */
 function SectionHead({ title, id, action }) {
@@ -262,7 +299,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
     React.useCallback((cb) => library && typeof library.subscribe === 'function' ? library.subscribe(cb) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  React.useSyncExternalStore(AudioPlayer.subscribe, playerMark);
   // The letters' titles (the Find box and "From the letter") ride the lazy VOT corpus.
   React.useSyncExternalStore(
     React.useCallback((cb) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}, []),
@@ -386,19 +423,35 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
     AudioPlayer.playSongs({ ids: results.map(leadOf).filter(Boolean).map((s) => s.id), startId: song.id, label: 'Songs of the Letters' });
   };
 
-  const newest = newestSongs(NEW_TOTAL);
-  const readings = readingLetters();
+  // The shelves are sorts over the whole catalog: work them out again only when the catalog or the letters change.
+  const corpusVersion = typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0;
+  const { newest, readings, tiles, shelves } = React.useMemo(() => ({
+    newest: newestSongs(NEW_TOTAL),
+    readings: readingLetters(),
+    // The biggest collections first (ties keep reading order); the rest one tap away.
+    tiles: LETTER_COLS.map((col, i) => {
+      const fams = letterOrder(cat.familiesFor({ col }), col);
+      return { col, fams, n: songsIn(fams), i };
+    }).filter((t) => t.fams.length).sort((a, b) => b.n - a.n || a.i - b.i),
+    shelves: SHELVES.map((shelf) => {
+      /** @type {any[]} */
+      let fams = [];
+      for (const col of shelf.cols) fams = fams.concat(cat.familiesFor({ col }));
+      return { shelf, fams: fams.length, n: fams.length ? songsIn(fams) : 0 };
+    }).filter((x) => x.fams > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the catalog and corpus versions are what these read
+  }), [version, corpusVersion]);
+  // Rows are memoized: their taps call through these, so they act on the results and shelves as they are now.
+  const playResultRow = useLatestFn(playResults);
+  const openFamily = useLatestFn((f) => open({ k: 'song', v: f.id }));
+  const openSongFamily = useLatestFn((s) => open({ k: 'song', v: s.f }));
+  const playNewRow = useLatestFn((s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' }));
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
   // K1: the songs kept on this phone (and, after a restore, those the backup lists but the phone lacks).
   const keep = useSongKeep();
   const keptIds = keep.keptIds();
   const missingCount = keep.missing().length;
   const recentCount = library ? songsOfIds(library.songRecent()).length : 0;
-  // The biggest collections first (ties keep reading order); the rest one tap away.
-  const tiles = LETTER_COLS.map((col, i) => {
-    const fams = letterOrder(cat.familiesFor({ col }), col);
-    return { col, fams, n: songsIn(fams), i };
-  }).filter((t) => t.fams.length).sort((a, b) => b.n - a.n || a.i - b.i);
   const shownTiles = allTiles ? tiles : tiles.slice(0, TILES_FIRST);
 
   return (
@@ -437,7 +490,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
         <section className="songs-section" aria-labelledby="songs-results">
           <SectionHead id="songs-results" title={style && !words.length ? (styles[style] || 'Songs') : 'Songs'} action={<span className="songs-section-count" aria-live="polite">{songCountLabel(results.length)}</span>} />
           {results.length ? (
-            <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResults} onOpen={(f) => open({ k: 'song', v: f.id })} />)}</div>
+            <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResultRow} onOpen={openFamily} />)}</div>
           ) : (
             <p className="songs-empty">No song by that name. Try a word from the letter.</p>
           )}
@@ -448,7 +501,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
             <section className="songs-section" aria-labelledby="songs-new">
               <SectionHead id="songs-new" title="New from the flock" action={newest.length > NEW_ON_HUB ? <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'new' })}>See all<ChevronRightIcon /></button> : null} />
               <div className="songs-card songs-list">
-                {newest.slice(0, NEW_ON_HUB).map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' })} onOpen={(s) => open({ k: 'song', v: s.f })} />)}
+                {newest.slice(0, NEW_ON_HUB).map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={playNewRow} onOpen={openSongFamily} />)}
               </div>
             </section>
           ) : null}
@@ -502,18 +555,13 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
           ) : null}
 
           <section className="songs-section songs-shelves" aria-label="More songs">
-            {SHELVES.map((shelf) => {
-              let fams = [];
-              for (const col of shelf.cols) fams = fams.concat(cat.familiesFor({ col }));
-              if (!fams.length) return null;
-              return (
-                <button key={shelf.v} type="button" className="songs-shelf" onClick={() => open({ k: 'list', v: shelf.v })}>
-                  <span className="songs-shelf-title">{shelf.title}</span>
-                  <span className="songs-shelf-count">{songCountLabel(songsIn(fams))}</span>
-                  <ChevronRightIcon />
-                </button>
-              );
-            })}
+            {shelves.map(({ shelf, n }) => (
+              <button key={shelf.v} type="button" className="songs-shelf" onClick={() => open({ k: 'list', v: shelf.v })}>
+                <span className="songs-shelf-title">{shelf.title}</span>
+                <span className="songs-shelf-count">{songCountLabel(n)}</span>
+                <ChevronRightIcon />
+              </button>
+            ))}
             {readings.length ? (
               <button type="button" className="songs-shelf" onClick={() => open({ k: 'readings' })}>
                 <span className="songs-shelf-title">Letters read with music</span>
@@ -553,6 +601,11 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   const allIds = fams ? fams.reduce((out, fam) => out.concat(cat.versionsOf(fam).map((s) => s.id)), /** @type {string[]} */ ([])) : ids;
   const missing = keptList ? keep.missing() : [];
   const keptBytes = keptList ? keep.bytesOf(ids) : 0;
+  // Rows are memoized: their taps call through these, so they play and open the list as it is now.
+  const playRow = useLatestFn((s) => play(s, false));
+  const openFamily = useLatestFn((f) => onPush({ k: 'song', v: f.id }));
+  const openSongFamily = useLatestFn((s) => onPush({ k: 'song', v: s.f }));
+  const removeRow = useLatestFn((s) => { void keep.remove([s.id]); });
 
   return (
     <>
@@ -596,9 +649,9 @@ function SongsList({ frame, library, playingId, active, onPush }) {
       </header>
       <section className="songs-section" aria-label={content.title}>
         {fams && fams.length ? (
-          <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(f) => onPush({ k: 'song', v: f.id })} inList />)}</div>
+          <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={playRow} onOpen={openFamily} inList />)}</div>
         ) : content.songs && content.songs.length ? (
-          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={(s) => play(s, false)} onOpen={(s) => onPush({ k: 'song', v: s.f })} onRemove={keptList ? (s) => { void keep.remove([s.id]); } : undefined} />)}</div>
+          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={playRow} onOpen={openSongFamily} onRemove={keptList ? removeRow : undefined} />)}</div>
         ) : (
           <p className="songs-empty">{content.empty}</p>
         )}

@@ -1660,6 +1660,11 @@
       .songs-row { display:flex; align-items:center; gap:.6rem; padding:.55rem .1rem; border-bottom:1px solid var(--border); }
       .songs-card .songs-row { padding:.55rem .7rem .55rem .55rem; border-bottom:0; border-top:1px solid var(--border); }
       .songs-card .songs-row:first-child { border-top:0; }
+      /* n3-04 (sweep 2): a collection or search list runs to 900 rows; those off screen skip layout and paint (as
+         PERF4's .letter-para). ~75 px is a row at 100 % (56 px cover + padding); `auto` remembers each drawn height.
+         Scroll restore needs real heights: body.scroll-restoring lifts it (with the letters' rule, PERF4). The row
+         clips what it paints: the clip margin keeps the ▶ focus ring and the versions link's 44 px target whole. */
+      .songs-list:not(.songs-card) > .songs-row { content-visibility:auto; contain-intrinsic-size:auto 75px; overflow-clip-margin:14px; }
       .songs-row-main { flex:1; min-width:0; display:flex; align-items:center; gap:.85rem; min-height:56px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .song-cover { position:relative; flex:none; width:56px; height:56px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; background:var(--bg3); }
       .song-cover-note { color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
@@ -2465,7 +2470,7 @@
        position once real heights render in (~1-2 s later). One frame only; the
        forced layout populates the `auto` remembered sizes, so re-engaging the
        optimization changes no geometry. */
-    body.scroll-restoring .letter-para, body.scroll-restoring .section-block { content-visibility: visible; }
+    body.scroll-restoring .letter-para, body.scroll-restoring .section-block, body.scroll-restoring .songs-list > .songs-row { content-visibility: visible; }
     .letter-intro { font-size:var(--fs-18); line-height:1.85; color:var(--cream); margin-bottom:1.8rem; }
     .study-heading { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
     .study-heading-l3 { font-size:var(--fs-13); color:var(--gold-dim); letter-spacing:0.18em; margin:2rem 0 0.85rem; }
