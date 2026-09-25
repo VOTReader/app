@@ -193,6 +193,7 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   setStudyChapterId: (v: any) => void,
  *   setSurpriseAnchor: (v: any) => void,
  *   setFromSearch: (v: any) => void,
+ *   setFromSurprise?: (v: boolean) => void,
  *   setGenreId: (v: any) => void,
  *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
  *   setLastReadForVol: (volKey: string, letterId: string) => void,
@@ -232,7 +233,7 @@ export function useSearch({
   tabField,
   screen, bookId, chapterNum, letterId,
   setScreen, setBookId, setChapterNum, setLetterId,
-  setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setGenreId,
+  setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
   setActiveReadKey, setLastReadForVol,
   handleSurprise, goSettings, goHome,
 }) {
@@ -383,6 +384,10 @@ export function useSearch({
   /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) */
   const handleSearchSelect = (entry, terms) => {
     setFromSearch(true);
+    // v01-04: this unit came from search, so its Back returns to search. A Surprise
+    // breadcrumb left from earlier outranks fromSearch in the letter screens' Back
+    // and sent it Home instead.
+    if (typeof setFromSurprise === 'function') setFromSurprise(false);
     // Wave 0 (sticky genreId): genreId is set ONLY by goScriptureGenre and
     // consulted by the bible-idx / matthew-idx / single-chapter back
     // branches, but goHome doesn't clear it — so it can outlive the genre

@@ -441,7 +441,7 @@ function App() {
   } = useNav({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     setScreen, setBookId, setChapterNum, setGenreId,
-    setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack,
+    setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack, setFromSurprise,
     setJournalEntryId, setGardenPage,
   });
   // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
@@ -564,15 +564,12 @@ function App() {
   }, []);
 
   // Expose the home-button handler globally so <HomeBtn /> can call it
-  // without prop drilling. Clears return-breadcrumbs so Home means Home.
+  // without prop drilling. It IS goHome (v01-04: the old hand copy missed the
+  // Surprise breadcrumb), which clears every return breadcrumb so Home means Home.
   useEffect(() => {
-    window.__goHome = () => {
-      setFromSearch(false);setFromWtlb(null);setFromLetterStack([]);
-      window.navHandoff.clear('pendingHighlight');
-      setScreen("home");setBookId(null);setChapterNum(null);
-    };
+    window.__goHome = goHome;
     return () => {if (window.__goHome) delete window.__goHome;};
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: window.__goHome wired once + cleaned up at unmount. setFromSearch/setFromWtlb/setFromLetterStack/setScreen/setBookId/setChapterNum are all useState setters from useTabs/useFromLetterStack (identity-stable per React invariant).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: window.__goHome wired once + cleaned up at unmount. goHome (useNav) closes over useState setters only (identity-stable per React invariant) plus window.navHandoff, so the mount-time copy never goes stale.
   }, []);
 
   /* ── Home category selector ── */
@@ -608,7 +605,7 @@ function App() {
     tabField,
     screen, bookId, chapterNum, letterId,
     setScreen, setBookId, setChapterNum, setLetterId,
-    setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch,
+    setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise,
     setGenreId, // Wave 0 (sticky genreId): useSearch clears it on every result dispatch
     setActiveReadKey, setLastReadForVol,
     handleSurprise, goSettings, goHome,
@@ -667,6 +664,7 @@ function App() {
     studyId, setStudyId, studyChapterId, setStudyChapterId,
     fromStudies, setFromStudies,
     fromSearch, setFromSearch, // Wave 0 (P1-13): index onBack props consume it
+    setFromSurprise, // v01-04/05: a pick from an index or a hub starts a new trail
     mode, setMode, showStudy, setShowStudy,
     genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
     audioColKey, setAudioColKey,

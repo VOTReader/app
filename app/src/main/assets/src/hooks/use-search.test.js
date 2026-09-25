@@ -153,6 +153,7 @@ const baseProps = () => ({
   setStudyChapterId: vi.fn(),
   setSurpriseAnchor: vi.fn(),
   setFromSearch: vi.fn(),
+  setFromSurprise: vi.fn(),
   setGenreId: vi.fn(),
   setActiveReadKey: vi.fn(),
   setLastReadForVol: vi.fn(),
@@ -359,6 +360,15 @@ describe('useSearch — handleSearchSelect (__direct refs)', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
     expect(props.setFromSearch).toHaveBeenCalledWith(true);
+  });
+
+  it('clears a Surprise breadcrumb: this unit came from search, so Back returns to search, not Home (v01-04)', () => {
+    // fromSurprise outranks fromSearch in the letter screens' Back branch, so a stale one sent a
+    // search-opened letter's Back straight Home.
+    const setFromSurprise = vi.fn();
+    const { result } = setup({ setFromSurprise });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(setFromSurprise).toHaveBeenCalledWith(false);
   });
 
   it('ref-bible routes to matthew-ch (Volumes corpus = study Matthew)', () => {

@@ -120,6 +120,7 @@
  *   setFromSearch: (v: any) => void,
  *   setFromWtlb: (v: any) => void,
  *   setFromLetterStack: (v: any) => void,
+ *   setFromSurprise?: (v: boolean) => void,
  *   setJournalEntryId: (v: any) => void,
  *   setGardenPage: (v: any) => void
  * }} args
@@ -150,7 +151,7 @@
 export function useNav({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setGenreId,
-  setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack,
+  setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack, setFromSurprise,
   setJournalEntryId, setGardenPage,
 }) {
   // Snapshot the current reading position so "Back" from the destination
@@ -166,6 +167,9 @@ export function useNav({
     setFromSearch(false);
     setFromWtlb(null);
     setFromLetterStack([]);
+    // v01-04: and the Surprise breadcrumb, or a letter reached later (Library, an
+    // index) still sent Back Home - it outranks every other branch in that Back.
+    if (typeof setFromSurprise === 'function') setFromSurprise(false);
     window.navHandoff.clear('pendingHighlight');
     window.navHandoff.clear('pendingScrollHlKey');
     setScreen('home');

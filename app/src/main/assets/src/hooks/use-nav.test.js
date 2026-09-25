@@ -190,6 +190,15 @@ describe('useNav — goHome (multi-state reset)', () => {
     expect(setters.setChapterNum).toHaveBeenCalledWith(null);
   });
 
+  it('clears the Surprise breadcrumb too, so Back from a letter reached later cannot jump Home (v01-04)', () => {
+    // Improvement sweep 2026-09-22, v01-reading-04: fromSurprise is set by a Surprise and was cleared
+    // only by the Back that consumed it. After Surprise -> Home -> Library -> a letter, Back went Home.
+    const setFromSurprise = vi.fn();
+    const { result } = setup({ setFromSurprise });
+    result.current.goHome();
+    expect(setFromSurprise).toHaveBeenCalledWith(false);
+  });
+
   it('does NOT touch navOrigin (goHome means "really home", not "snapshot for back")', () => {
     const { result, setters } = setup();
     result.current.goHome();
