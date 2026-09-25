@@ -4690,12 +4690,16 @@
       gap: 2px; padding-top: 4px;
       border-top: 1px solid var(--gold-border);
     }
+    /* Plain words under the icons ("Note", "Bookmark"), not 10 px capitals: the
+       redesign's round 6 (2026-09-25) drew every take this way, and each of the
+       three columns has ~105 px, room for "Bookmark" at 13 px. Pinned to px
+       below, like the rest of the toolbar. */
     .sel-action-btn {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
       padding: 8px 6px; border-radius: 8px; cursor: pointer;
       background: transparent; border: none;
-      color: var(--cream-dim); font-family: 'Cinzel', serif;
-      font-size: var(--fs-10); letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cream-dim); font-family: var(--font-body);
+      font-size: var(--fs-13); letter-spacing: 0; text-transform: none;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s;
     }
@@ -7168,7 +7172,7 @@
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
     .sel-style-btn { font-size: var(--fsc-16); }
-    .sel-action-btn { font-size: var(--fsc-10); }
+    .sel-action-btn { font-size: var(--fsc-13); }
     .sel-listen-btn { font-size: var(--fsc-12); }
     .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }

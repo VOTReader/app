@@ -228,6 +228,23 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* THE SELECTION TOOLBAR SAYS ITS ACTIONS IN WORDS (redesign round 6, 2026-09-25): "Note", "Link",
+   "Bookmark" under the icons at 13 px, pinned to px like the rest of the floating chrome, not 10 px
+   spaced capitals. */
+describe('app.css — the selection toolbar labels are plain words', () => {
+  it('sets them in the body face, sentence case, 13 px, pinned', () => {
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks = [];
+    const re = /(?:^|\n)\s*\.sel-action-btn \{([^}]*)\}/g;
+    let m;
+    while ((m = re.exec(bare))) blocks.push(m[1]);
+    expect(blocks.length).toBe(2);   // the base rule and the chrome pin
+    expect(blocks[0]).toMatch(/text-transform:\s*none/);
+    expect(blocks[0]).toMatch(/font-family:\s*var\(--font-body\)/);
+    expect(blocks[1]).toMatch(/font-size:\s*var\(--fsc-13\)/);
+  });
+});
+
 /* THE NOTEBOOKS ARE ROWS (redesign, 2026-09-25, Codex mockup r5 take 1): gold-outlined cards with
    10 px "DEFAULT" / "NOTEBOOK" eyebrows and a dashed New Notebook box became rows on hairlines. */
 describe('app.css — the Notebooks tab is rows', () => {
