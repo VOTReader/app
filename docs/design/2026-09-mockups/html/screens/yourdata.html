@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .hero { text-align: center; padding: 14px 12px 0; }
+  .hero .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 16px; }
+  .hero .body { margin-top: 8px; text-wrap: balance; }
+  .sum { margin-top: 28px; padding: 20px 20px 18px; }
+  .counts { display: grid; grid-template-columns: 1fr 1fr; row-gap: 20px; column-gap: 16px; }
+  .counts b { display: block; font: 700 28px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; }
+  .counts .meta { display: block; margin-top: 6px; }
+  .sum .divider { margin: 20px 0 14px; }
+  .sum .last { display: flex; align-items: center; gap: 8px; }
+  .acts { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .foot { margin: 22px 20px 0; text-align: center; text-wrap: balance; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Your data</span>
+  </div>
+  <div class="scroll">
+    <div class="hero">
+      <div class="badge"><i data-i="shield-check" class="lg"></i></div>
+      <div class="h2">Your data stays on this phone</div>
+      <div class="body">Nothing leaves this device unless you export it.</div>
+    </div>
+
+    <div class="card sum">
+      <div class="counts">
+        <div><b>124</b><span class="meta">Highlights</span></div>
+        <div><b>38</b><span class="meta">Notes</span></div>
+        <div><b>17</b><span class="meta">Bookmarks</span></div>
+        <div><b>9</b><span class="meta">Journal entries</span></div>
+        <div><b>12</b><span class="meta">Photos</span></div>
+        <div><b>3</b><span class="meta">Voice memos</span></div>
+      </div>
+      <div class="divider"></div>
+      <div class="meta last"><i data-i="history" class="xs"></i>Last backup: September 20</div>
+    </div>
+
+    <div class="acts">
+      <span class="btn primary block"><i data-i="download" class="sm"></i>Export a backup (.json)</span>
+      <span class="btn secondary block"><i data-i="upload" class="sm"></i>Import a backup</span>
+    </div>
+    <div class="meta foot">Android backup is off by design. This file is your backup.</div>
+  </div>
+</div>
+</body></html>

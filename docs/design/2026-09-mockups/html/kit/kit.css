@@ -8,6 +8,7 @@
 @font-face { font-family: 'Cormorant Garamond'; src: url('../../../../../app/src/main/assets/fonts/reading/cormorant-garamond-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Crimson Pro'; font-weight: 200 900; src: url('../../../../../app/src/main/assets/fonts/reading/crimson-pro-latin-wght-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Libre Baskerville'; src: url('../../../../../app/src/main/assets/fonts/reading/libre-baskerville-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'VOT Digits'; font-weight: 100 900; src: url('../../../../../app/src/main/assets/fonts/reading/lexend-latin-wght-normal.woff2') format('woff2'); unicode-range: U+0030-0039; }
 @font-face { font-family: 'Lexend'; font-weight: 100 900; src: url('../../../../../app/src/main/assets/fonts/reading/lexend-latin-wght-normal.woff2') format('woff2'); }
 
 :root, [data-theme="dark"] {
@@ -65,7 +66,7 @@ body[data-size] { width: auto; height: auto; }
 html:has(body[data-size]) { width: auto; height: auto; }
 body.landscape, html:has(body.landscape) { width: 915px; height: 412px; }
 body { background: var(--bg); color: var(--text); font: 400 15px/1.4 var(--sans); -webkit-font-smoothing: antialiased; position: relative; }
-:root { --serif: 'EB Garamond', Georgia, serif; --sans: 'Atkinson Hyperlegible', system-ui, sans-serif; --gutter: 20px; }
+:root { --serif: 'EB Garamond', Georgia, serif; /* digits from Lexend: Atkinson's slashed zero read as a typo in times and counts */ --sans: 'VOT Digits', 'Atkinson Hyperlegible', system-ui, sans-serif; --gutter: 20px; }
 
 /* icons */
 .i { width: 24px; height: 24px; flex: none; display: inline-block; vertical-align: middle; fill: none; stroke: currentColor; }

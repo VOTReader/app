@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .head { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .head .tt { display: flex; align-items: baseline; gap: 10px; }
+  .head .cnt { font-size: 15px; }
+  .sort { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 4px 0 12px; color: var(--text-2); font: 400 14px/1 var(--sans); }
+  .scroll > .chips { margin-top: 18px; }
+  .chip.cd { padding: 0 15px; }
+  .chip.cd .dot { width: 14px; height: 14px; border-radius: 7px; }
+  .hls { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .hl { position: relative; overflow: hidden; padding: 16px 18px 14px 22px; }
+  .hl::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+  .hl .q { font-size: 17px; line-height: 1.52; }
+  .hl .q.it { font-style: italic; }
+  .hl .ref { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .hl .ref span { flex: 1; }
+  .hl .ref .i { color: var(--text-2); }
+  /* further highlights, shown as placeholder bars on the 17px / 1.52 reading rhythm */
+  .phq { padding: 8px 0 4px; }
+  .phq .ph + .ph { margin-top: 16px; }
+  .phm { height: 8px; border-radius: 4px; background: var(--surface-3); margin-top: 16px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Highlights</span>
+  </div>
+  <div class="scroll">
+    <div class="head">
+      <div class="tt"><span class="h1">Highlights</span><span class="meta cnt">124</span></div>
+      <span class="sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span>
+    </div>
+
+    <div class="chips">
+      <span class="chip on">All</span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-honey)"></span></span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-sage)"></span></span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-sky)"></span></span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-rose)"></span></span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-lavender)"></span></span>
+      <span class="chip cd"><span class="dot" style="background:var(--dot-clay)"></span></span>
+    </div>
+
+    <div class="hls">
+      <div class="card hl" style="--c:var(--dot-honey)">
+        <div class="reading q">“Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”</div>
+        <div class="meta ref"><span>John 3:3 · NKJV</span></div>
+      </div>
+      <div class="card hl" style="--c:var(--dot-sage)">
+        <div class="reading q">“Every kingdom divided against itself is brought to desolation…”</div>
+        <div class="meta ref"><span>Matthew 12:25 · NKJV</span></div>
+      </div>
+      <div class="card hl" style="--c:var(--dot-rose)">
+        <div class="reading q it">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</div>
+        <div class="meta ref"><span>Volume One · Letter 15</span><i data-i="sticky-note" class="xs"></i></div>
+      </div>
+      <div class="card hl" style="--c:var(--dot-sky)">
+        <div class="reading q">“But He was wounded for our transgressions, He was bruised for our iniquities…”</div>
+        <div class="meta ref"><span>Isaiah 53:5 · NKJV</span></div>
+      </div>
+      <div class="card hl" style="--c:var(--dot-lavender)">
+        <div class="phq"><div class="ph" style="width:97%"></div><div class="ph" style="width:90%"></div><div class="ph" style="width:46%"></div></div>
+        <div class="phm" style="width:34%"></div>
+      </div>
+      <div class="card hl" style="--c:var(--dot-clay)">
+        <div class="phq"><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:61%"></div></div>
+        <div class="phm" style="width:40%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

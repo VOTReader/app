@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .hist { padding-top: 4px; }
+  .hist .label { margin: 28px 0 6px; }
+  .hist .label:first-child { margin-top: 8px; }
+  .ev { display: flex; align-items: flex-start; gap: 16px; padding: 10px 0; position: relative; }
+  .ev .ic { width: 40px; height: 40px; border-radius: 20px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  /* the quiet thread that joins one day's entries */
+  .ev:not(:last-child)::after { content: ''; position: absolute; left: 19px; top: 54px; bottom: -6px; width: 2px; border-radius: 1px; background: var(--surface-3); }
+  .ev .txt { flex: 1; min-width: 0; padding-top: 1px; }
+  .ev .t { font: 500 18px/1.3 var(--serif); color: var(--text); }
+  .ev .meta { margin-top: 3px; }
+  .clear { display: flex; justify-content: center; margin-top: 32px; }
+  .clear .btn { color: var(--text-2); font-weight: 400; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">History</span>
+  </div>
+  <div class="scroll hist">
+    <div class="label">Today</div>
+    <div class="tl">
+      <div class="ev">
+        <span class="ic"><i data-i="file-text" class="sm"></i></span>
+        <div class="txt"><div class="t">Know That Which Has Been Poured Out, The Word of God</div><div class="meta">Volume One · Letter 15 · 8:14 AM · 40% read</div></div>
+      </div>
+      <div class="ev">
+        <span class="ic"><i data-i="book-open" class="sm"></i></span>
+        <div class="txt"><div class="t">John 3</div><div class="meta">The Scriptures of Truth · NKJV · 7:52 AM</div></div>
+      </div>
+    </div>
+    <div class="label">Yesterday</div>
+    <div class="tl">
+      <div class="ev">
+        <span class="ic"><i data-i="book-open" class="sm"></i></span>
+        <div class="txt"><div class="t">Matthew 12</div><div class="meta">Opened from a footnote · 9:30 PM</div></div>
+      </div>
+      <div class="ev">
+        <span class="ic"><i data-i="scripture-web" class="sm"></i></span>
+        <div class="txt"><div class="t">Scripture Web</div><div class="meta">Isaiah 53:5 ↔ 1 Peter 2:24 · 9:12 PM</div></div>
+      </div>
+    </div>
+    <div class="label">This week</div>
+    <div class="tl">
+      <div class="ev">
+        <span class="ic"><i data-i="library" class="sm"></i></span>
+        <div class="txt"><div class="t">Volume One</div><div class="meta">Letter index · Tuesday</div></div>
+      </div>
+    </div>
+    <div class="clear"><span class="btn text">Clear history</span></div>
+  </div>
+</div>
+</body></html>

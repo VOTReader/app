@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .lock { position: relative; }
+  .lock > * { position: relative; }
+  /* wallpaper: near-black with a faint warm glow low (dark) / paper-to-sand (light), all from tokens */
+  .lock > .wall { position: absolute; inset: 0; background:
+      radial-gradient(130% 50% at 50% 106%, color-mix(in srgb, var(--accent) 28%, transparent) 0%, transparent 72%),
+      var(--bg); }
+  [data-theme="light"] .lock > .wall { background: linear-gradient(180deg, var(--bg) 0%, var(--bg) 20%, var(--surface-2) 62%, var(--surface-3) 100%); }
+  /* the lock screen shows the time in the clock, not in the status bar */
+  .lock .status > span:first-child { visibility: hidden; }
+
+  .lockic { display: flex; justify-content: center; margin-top: 46px; color: var(--text-2); }
+  .clock { margin-top: 14px; text-align: center; font: 400 88px/1 var(--sans); letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .date { margin-top: 12px; text-align: center; font: 400 17px/1.3 var(--sans); color: var(--text-2); }
+
+  .media { margin: 48px 16px 0; border-radius: 24px; padding: 18px 18px 12px;
+    background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
+  [data-theme="light"] .media { background: color-mix(in srgb, var(--surface) 80%, transparent); box-shadow: var(--shadow); }
+  .mtop { display: flex; gap: 14px; align-items: flex-start; }
+  .appic { width: 44px; height: 44px; flex: none; display: block; }
+  .mt { flex: 1; min-width: 0; }
+  .mtitle { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .mt .meta { margin-top: 4px; }
+  .media .slider { margin: 24px 4px 0; }
+  .times { display: flex; justify-content: space-between; margin-top: 12px; padding: 0 2px; font: 400 13px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .ctrls { display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 6px; }
+  .skip { position: relative; width: 52px; height: 52px; display: grid; place-items: center; color: var(--text); }
+  .skip b { position: absolute; inset: 0; display: grid; place-items: center; font: 700 9px/1 var(--sans); padding-top: 1px; }
+  .playbtn.big { width: 60px; height: 60px; border-radius: 30px; }
+</style></head>
+<body>
+<div class="screen lock">
+  <div class="wall"></div>
+  <div class="status" data-time="6:12"></div>
+  <div class="lockic"><i data-i="lock" class="sm"></i></div>
+  <div class="clock">6:12</div>
+  <div class="date">Friday, September 25</div>
+
+  <div class="media">
+    <div class="mtop">
+      <!-- VOTReader icon, direction A (book and flame) -->
+      <svg class="appic" viewBox="0 0 100 100" aria-hidden="true">
+        <rect width="100" height="100" rx="22" fill="#000000"/>
+        <g transform="translate(0 2)">
+          <path fill="#EFE8DA" d="M48.4 51C48.4 44 31 39.5 17 45V70C31 64.5 48.4 69 48.4 76ZM51.6 51C51.6 44 69 39.5 83 45V70C69 64.5 51.6 69 51.6 76Z"/>
+          <path fill="#D4AF5A" transform="translate(50 45) scale(.8) translate(-50 -45)" d="M52.5 12C52.8 19 56.4 24.5 56.4 33.5C56.4 40.5 53.6 45 50 45C46.4 45 43.6 41.5 43.6 36.5C43.6 31.5 45.8 28.2 48.4 25C50.6 22.2 52.3 17.5 52.5 12Z"/>
+        </g>
+      </svg>
+      <div class="mt">
+        <div class="mtitle">Know That Which Has Been Poured Out, The Word of God</div>
+        <div class="meta">Volume One · Letter 15 · VOTReader</div>
+      </div>
+    </div>
+    <div class="slider"><i style="width:44.1%"></i><b style="left:44.1%"></b></div>
+    <div class="times"><span>2:41</span><span>6:05</span></div>
+    <div class="ctrls">
+      <span class="skip"><i data-i="rotate-ccw" style="width:30px;height:30px"></i><b>15</b></span>
+      <span class="playbtn big"><i data-i="pause"></i></span>
+      <span class="skip"><i data-i="rotate-cw" style="width:30px;height:30px"></i><b>15</b></span>
+    </div>
+  </div>
+</div>
+</body></html>

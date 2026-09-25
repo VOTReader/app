@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .body { margin-top: 8px; text-wrap: balance; }
+
+  /* live preview with three quick controls */
+  .pv { margin-top: 24px; padding: 20px 20px 8px; }
+  .pv .reading { text-wrap: pretty; }
+  .pv .src { margin-top: 10px; }
+  .pv .divider { margin: 18px 0 16px; }
+  .q + .q { margin-top: 18px; }
+  .ql { display: block; font: 400 14px/1.2 var(--sans); color: var(--text-2); margin-bottom: 10px; }
+  /* the Theme control shows the theme this render is in */
+  [data-theme="dark"] .seg .s-dark, [data-theme="light"] .seg .s-light { background: var(--surface); color: var(--text); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+  [data-theme="light"] .seg .s-light { box-shadow: 0 1px 3px rgba(60,40,20,0.14); }
+  .size { display: flex; align-items: center; gap: 16px; height: 28px; padding: 0 2px; }
+  .size .slider { flex: 1; }
+  .size .a1 { font: 500 15px/1 var(--serif); color: var(--text-2); }
+  .size .a2 { font: 500 24px/1 var(--serif); color: var(--text); }
+  .font { display: flex; align-items: center; gap: 8px; min-height: 56px; margin-top: 12px; border-top: 1px solid var(--hairline); }
+  .font .k { flex: 1; font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .font .v { font: 400 18px/1 var(--serif); color: var(--text-2); }
+  .font .chev { color: var(--text-3); }
+
+  .find { margin-top: 24px; }
+
+  /* sections */
+  .secs { margin-top: 16px; }
+  .secs .item { gap: 14px; padding: 13px 14px 13px 16px; min-height: 64px; }
+  .ic { width: 36px; height: 36px; border-radius: 18px; flex: none; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; }
+  .secs .t { flex: 1; min-width: 0; }
+  .secs .t b { display: block; font: 400 16px/1.25 var(--sans); color: var(--text); }
+  .secs .t .meta { display: block; margin-top: 2px; }
+  .secs .chev { color: var(--text-3); }
+  .foot { margin: 20px 0 40px; text-align: center; }
+</style></head>
+<body data-size="412x1328">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="h1">Settings</div>
+      <div class="body">Shape the way you read, listen, and move through the library.</div>
+    </div>
+
+    <div class="card pv">
+      <div class="reading">In the beginning was the Word, and the Word was with God, and the Word was God.</div>
+      <div class="meta src">John 1:1 · NKJV</div>
+      <div class="divider"></div>
+      <div class="q"><span class="ql">Theme</span>
+        <div class="seg"><span class="s-dark">Dark</span><span class="s-light">Light</span><span>System</span></div></div>
+      <div class="q"><span class="ql">Text size</span>
+        <div class="size"><span class="a1">A</span><div class="slider"><i style="width:45%"></i><b style="left:45%"></b></div><span class="a2">A</span></div></div>
+      <div class="font"><span class="k">Reading font</span><span class="v">EB Garamond</span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+
+    <div class="search find"><i data-i="search" class="sm"></i>Find a setting</div>
+
+    <div class="group secs">
+      <div class="item"><span class="ic"><i data-i="sun" class="sm"></i></span><span class="t"><b>Appearance</b><span class="meta">Theme, text size and reading font</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="book-open" class="sm"></i></span><span class="t"><b>Reading</b><span class="meta">Translation, headings and reading aids</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="headphones" class="sm"></i></span><span class="t"><b>Listening</b><span class="meta">Voices, speed and read-along</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="arrow-up-down" class="sm"></i></span><span class="t"><b>Auto-scroll</b><span class="meta">Hands-free reading</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="sliders-horizontal" class="sm"></i></span><span class="t"><b>Navigation bar</b><span class="meta">Which buttons the reading bar shows</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="search" class="sm"></i></span><span class="t"><b>Search, tabs &amp; history</b><span class="meta">Find, multitask, revisit</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="sunrise" class="sm"></i></span><span class="t"><b>A Return to the Garden</b><span class="meta">Garden images</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="shield-check" class="sm"></i></span><span class="t"><b>Your data</b><span class="meta">Export and import a backup</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ic"><i data-i="file-text" class="sm"></i></span><span class="t"><b>About VOTReader</b><span class="meta">Version, sources and credits</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+
+    <div class="meta foot">Changes save on this device</div>
+  </div>
+</div>
+</body></html>

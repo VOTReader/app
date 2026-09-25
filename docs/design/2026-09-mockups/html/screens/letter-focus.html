@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* focus: a quieter status row, then only the page */
+  .status { color: var(--text-3); }
+  .rp { height: 14px; padding: 0 var(--gutter); display: flex; align-items: center; flex: none; }
+  .rp .bar { flex: 1; height: 2px; border-radius: 1px; background: var(--surface-3); overflow: hidden; }
+  .rp .bar i { display: block; height: 100%; background: var(--accent); }
+  .focus .reading { margin-top: 22px; }
+  .more { margin-top: 30px; }
+  .more .ph + .ph { margin-top: 20.8px; }
+  .more .gap { height: 34px; }
+
+  /* one small translucent pill, bottom right */
+  .fpill { position: absolute; right: 16px; bottom: 28px; height: 56px; padding: 0 6px; border-radius: 28px; display: flex; align-items: center; gap: 2px;
+    background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow); }
+  .fpill .fb { width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; color: var(--text); }
+  .fpill .fb.play { color: var(--accent); }
+  .fpill .vr { width: 1px; height: 24px; background: var(--hairline); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="rp"><div class="bar"><i style="width:35%"></i></div></div>
+  <div class="scroll focus">
+    <div class="reading">
+      <p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <mark class="hl-honey"><em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></mark> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth.</p>
+    </div>
+    <div class="more">
+      <div class="ph" style="width:100%"></div>
+      <div class="ph" style="width:96%"></div>
+      <div class="ph" style="width:99%"></div>
+      <div class="ph" style="width:58%"></div>
+      <div class="gap"></div>
+      <div class="ph" style="width:97%"></div>
+      <div class="ph" style="width:100%"></div>
+      <div class="ph" style="width:94%"></div>
+      <div class="ph" style="width:98%"></div>
+      <div class="ph" style="width:88%"></div>
+      <div class="ph" style="width:46%"></div>
+      <div class="gap"></div>
+      <div class="ph" style="width:99%"></div>
+      <div class="ph" style="width:95%"></div>
+      <div class="ph" style="width:100%"></div>
+    </div>
+  </div>
+  <div class="fpill">
+    <span class="fb"><i data-i="type"></i></span>
+    <span class="vr"></span>
+    <span class="fb play"><i data-i="play" class="fill"></i></span>
+  </div>
+</div>
+</body></html>

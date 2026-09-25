@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .preview { margin-top: 4px; padding: 18px 20px 16px; }
+  .preview .meta { margin-top: 10px; }
+  .sect { margin: 26px 0 10px; }
+  /* the Theme control shows the theme this render is in */
+  [data-theme="dark"] .seg .s-dark, [data-theme="light"] .seg .s-light { background: var(--surface); color: var(--text); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+  [data-theme="light"] .seg .s-light { box-shadow: 0 1px 3px rgba(60,40,20,0.14); }
+  .size { display: flex; align-items: center; gap: 18px; height: 60px; padding: 0 20px; }
+  .size .a1 { font: 400 14px/1 var(--sans); color: var(--text-2); }
+  .size .a2 { font: 400 24px/1 var(--sans); color: var(--text); }
+  .size .slider { flex: 1; }
+  .fonts .item { justify-content: space-between; }
+  .fonts .fname { color: var(--text); line-height: 1.2; }
+  .fonts .i { color: var(--accent); }
+  .f-ebg { font: 400 19px var(--serif); }
+  .f-cor { font: 400 21px 'Cormorant Garamond', serif; }
+  .f-cri { font: 400 19px 'Crimson Pro', serif; }
+  .f-lib { font: 400 16px 'Libre Baskerville', serif; }
+  .f-atk { font: 400 16px 'Atkinson Hyperlegible', sans-serif; }
+  .f-lex { font: 400 16px 'Lexend', sans-serif; }
+  .wc { margin-top: 16px; }
+  .wc .item { justify-content: space-between; color: var(--text); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Appearance</span>
+  </div>
+  <div class="scroll">
+    <div class="card preview">
+      <div class="reading">In the beginning was the Word, and the Word was with God, and the Word was God.</div>
+      <div class="meta">John 1:1 · NKJV</div>
+    </div>
+
+    <div class="label sect">Theme</div>
+    <div class="seg"><span class="s-dark">Dark</span><span class="s-light">Light</span><span>System</span></div>
+
+    <div class="label sect">Text size</div>
+    <div class="card size" style="padding:0 20px">
+      <span class="a1">A</span>
+      <div class="slider"><i style="width:45%"></i><b style="left:45%"></b></div>
+      <span class="a2">A</span>
+    </div>
+
+    <div class="label sect">Reading font</div>
+    <div class="group fonts">
+      <div class="item"><span class="fname f-ebg">EB Garamond</span><i data-i="check" class="sm"></i></div>
+      <div class="item"><span class="fname f-cor">Cormorant Garamond</span></div>
+      <div class="item"><span class="fname f-cri">Crimson Pro</span></div>
+      <div class="item"><span class="fname f-lib">Libre Baskerville</span></div>
+      <div class="item"><span class="fname f-atk">Atkinson Hyperlegible</span></div>
+      <div class="item"><span class="fname f-lex">Lexend</span></div>
+    </div>
+
+    <div class="group wc">
+      <div class="item"><span>Words of Christ in colour</span><span class="toggle on"></span></div>
+    </div>
+  </div>
+</div>
+</body></html>

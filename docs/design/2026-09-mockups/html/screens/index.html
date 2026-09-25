@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* pinned header; the list below is scrolled to the reader's place */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 22px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .prog { flex: 1; min-width: 0; }
+  .prog .progress { margin-top: 7px; }
+  /* square ends: the list runs on above and below the viewport */
+  .letters { border-radius: 0; }
+  .letters .item { align-items: flex-start; gap: 12px; padding: 19px 16px 19px 14px; }
+  .letters .ph.dt { width: 50px; height: 8px; margin-top: 9px; }
+  .letters .ttl .ph { margin-top: 7px; }
+  .letters .ttl .ph + .ph { margin-top: 14px; }
+  .num { width: 62px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .num .d { display: block; margin-top: 3px; font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .item.cur { background: var(--accent-soft); }
+  .item.cur .pill { margin-top: 12px; }
+  .sbar { position: absolute; right: 4px; top: 470px; width: 3px; height: 168px; border-radius: 2px; background: var(--text-3); opacity: .35; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">The Volumes of Truth</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">The Volumes of Truth</div>
+      <div class="h1">Volume One</div>
+      <div class="meta sub">29 letters · 2004–2006</div>
+      <div class="playrow">
+        <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+        <div class="prog"><span class="meta">15 of 29 read</span><div class="progress"><i style="width:52%"></i></div></div>
+      </div>
+    </div>
+    <div class="group letters">
+      <div class="item">
+        <div class="num"><b>11<span class="rd"></span></b><span class="d">11/15/04</span></div>
+        <div class="ttl">Death and Awakening</div>
+        <div class="dur">~3 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>12<span class="rd"></span></b><span class="d">11/17/04</span></div>
+        <div class="ttl">Regarding the Celebration of Christmas</div>
+        <div class="dur">~2 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>13<span class="rd"></span></b><span class="d">11/19/04</span></div>
+        <div class="ttl">Duty</div>
+        <div class="dur">~1 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>14<span class="rd"></span></b><span class="d">12/11/04</span></div>
+        <div class="ttl">I Shall Correct and Discipline All Those I Love</div>
+        <div class="dur">~2 min</div>
+      </div>
+      <div class="item cur">
+        <div class="num"><b>15</b><span class="d">12/13/04</span></div>
+        <div class="ttl">Know That Which Has Been Poured Out, The Word of God<div><span class="pill">Reading · 40%</span></div></div>
+        <div class="dur">~6 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>16</b><span class="d">12/23/04</span></div>
+        <div class="ttl">Run from the Forest and Loose All That Binds You</div>
+        <div class="dur">~3 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>17</b><span class="d">12/25/04</span></div>
+        <div class="ttl">Seek The Lord and He Will Open The Way</div>
+        <div class="dur">~2 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>18</b><div class="ph dt"></div></div>
+        <div class="ttl"><div class="ph" style="width:90%"></div><div class="ph" style="width:55%"></div></div>
+        <div class="dur"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sbar"></div>
+</body></html>

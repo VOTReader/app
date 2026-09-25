@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .feature { margin-top: 22px; padding: 14px; display: flex; gap: 16px; }
+  /* abstract, photo-like cover: soft light over a warm field, built from the tokens */
+  .art { width: 92px; height: 132px; flex: none; border-radius: 10px;
+    background:
+      radial-gradient(90% 60% at 70% 4%, color-mix(in srgb, var(--dot-honey) 42%, transparent), transparent 78%),
+      radial-gradient(110% 60% at 10% 106%, color-mix(in srgb, var(--dot-clay) 26%, transparent), transparent 72%),
+      linear-gradient(170deg, var(--surface-3), var(--surface-2)); }
+  .feature .ft { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .feature .meta { margin: 6px 0 12px; }
+  .feature .pill { margin-top: auto; }
+  .sect { margin: 26px 0 10px; }
+  .thumb {
+    background:
+      radial-gradient(100% 90% at 24% 18%, color-mix(in srgb, var(--tint) 40%, transparent), transparent 72%),
+      linear-gradient(150deg, color-mix(in srgb, var(--tint) 20%, var(--surface-3)), var(--surface-2)); }
+  .t1 { --tint: var(--dot-honey); } .t2 { --tint: var(--dot-sage); } .t3 { --tint: var(--dot-lavender); }
+  .t4 { --tint: var(--dot-sky); } .t5 { --tint: var(--dot-clay); }
+  .ttl { display: block; font: 500 17px/1.25 var(--serif); color: var(--text); }
+  .row .meta { display: block; margin-top: 3px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Studies</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="h1">Studies</div>
+      <div class="body">Bible and letter studies, and The Volumes of Truth Matthew Study Bible</div>
+    </div>
+
+    <div class="card feature">
+      <div class="art"></div>
+      <div class="ft">
+        <div class="h3">The Volumes of Truth New Testament Study Bible: The Book of Matthew</div>
+        <div class="meta">28 chapters · inline commentary</div>
+        <span class="pill"><i data-i="headphones" class="xs"></i>Read-along</span>
+      </div>
+    </div>
+
+    <div class="label sect">More studies</div>
+    <div class="list">
+      <div class="row"><span class="thumb t1"></span>
+        <span class="txt"><span class="ttl">YahuShua, More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy</span><span class="meta">3 parts · Bible and letter study</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="thumb t2"></span>
+        <span class="txt"><span class="ttl">Purity</span><span class="meta">6 parts</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="thumb t3"></span>
+        <span class="txt"><span class="ttl">The State of the Dead and The Fate of the Wicked</span><span class="meta">5 parts</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="thumb t4"></span>
+        <span class="txt"><span class="ttl">Grace AND The Law</span><span class="meta">7 parts</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="thumb t5"></span>
+        <span class="txt"><span class="ttl">YahuShua The Messiah, The Lamb of God</span><span class="meta">16 parts</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+  </div>
+</div>
+</body></html>
