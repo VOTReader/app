@@ -13,7 +13,7 @@
     "build:f": "esbuild app/src/main/assets/src/ui/_entry-f.js --bundle --format=iife --target=chrome108 --minify --outfile=app/src/main/assets/dist/bundle-f.js",
     "build:g": "esbuild app/src/main/assets/src/ui/_entry-g.js --bundle --format=iife --target=chrome108 --minify --outfile=app/src/main/assets/dist/bundle-g.js",
     "build:h": "esbuild app/src/main/assets/src/ui/_entry-h.js --bundle --format=iife --target=chrome108 --minify --outfile=app/src/main/assets/dist/bundle-h.js",
-    "build:css": "esbuild app/src/main/assets/app.css --minify --target=chrome108 --outfile=app/src/main/assets/dist/app.min.css",
+    "build:css": "esbuild app/src/main/assets/app.css --minify --target=chrome108 --outfile=app/src/main/assets/dist/app.min.css && node tools/split-lazy-css.mjs",
     "build:csp": "node tools/sync-csp-hashes.js",
     "build:sw": "node tools/sync-sw-version.js",
     "check:csp": "node tools/sync-csp-hashes.js --check",

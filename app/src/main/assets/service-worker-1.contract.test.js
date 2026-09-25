@@ -111,6 +111,11 @@ describe('service-worker-1 — a visible reader on old eager bundles after a new
     await vi.advanceTimersByTimeAsync(13000);
     window.__loadScreensE().catch(() => {});          // jsdom never fires onload; fine
     await vi.advanceTimersByTimeAsync(0);
+    // n7-08: the screen's stylesheet first (jsdom never loads it: fire its load by hand), then the script.
+    const css = document.head.querySelector('link[data-lazy-css]');
+    expect(css && css.getAttribute('href')).toBe('dist/screens-e.min.css');
+    css.onload();
+    await vi.advanceTimersByTimeAsync(0);
     expect(injectedLazyScripts()).toEqual(['dist/bundle-e.js']);
     expect(reload).not.toHaveBeenCalled();
   });
