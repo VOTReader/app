@@ -60,6 +60,19 @@ describe('StudiesHome -- the read-along badge', () => {
     renderHome();
     const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Lamb of God'));
     expect(card.querySelector('.coverage-badge').textContent).toBe('Read-along');
+    // n6-12: a study in parts counts its recorded CHAPTERS - the row already
+    // says "1 Part", and "1 of 2 parts" beside it contradicted it
+    expect(card.textContent).toContain('1 Part');
+    expect(card.textContent).toContain('1 of 2 chapters');
+  });
+
+  it('(n6-12) a study with no parts keeps "parts", which agrees with its row', () => {
+    window.AUDIO_MANIFEST = { 'study:trinity-ch1': [['t', 'V']] };
+    const two = [{ id: 'grace', slug: 'grace', title: 'Grace', chapters: [{ id: 'grace-ch1' }, { id: 'grace-ch2' }] }];
+    window.AUDIO_MANIFEST['study:grace-ch1'] = [['g', 'V']];
+    render(<StudiesHome studies={two} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
+    const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Grace'));
+    expect(card.textContent).toContain('2 Parts');
     expect(card.textContent).toContain('1 of 2 parts');
   });
 

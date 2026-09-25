@@ -71,7 +71,7 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
                       yet, so it carries no badge. */}
                   {s.locked ? null : (() => {
                     const coverage = studyCoverage(s);
-                    return <CoverageBadge state={coverage.state} detail={studyCoverageDetail(coverage)} />;
+                    return <CoverageBadge state={coverage.state} detail={studyCoverageDetail(coverage, s.parts ? 'chapters' : 'parts')} />;
                   })()}
                 </div>
               </button>

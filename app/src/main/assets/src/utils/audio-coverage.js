@@ -157,11 +157,16 @@ function studyChapterIds(study) {
  * chapter is recorded (the badge already says read-along) or when none is (the
  * badge says no recording), and the count when it is partial.
  *
+ * n6-12: the count is of chapters. A study without parts calls its chapters
+ * "Parts" on its row, so "parts" agrees there; a study in parts (More Than a
+ * Man, Lamb of God) names its parts on the row, so its caller passes 'chapters'.
+ *
  * @param {{ state: CoverageState, recorded: number, total: number }} coverage
+ * @param {string} [unit] - what the counted things are called (default 'parts')
  * @returns {string | null}
  */
-export function studyCoverageDetail(coverage) {
+export function studyCoverageDetail(coverage, unit) {
   if (!coverage || coverage.state !== COVERAGE_READ_ALONG) return null;
   if (!coverage.total || coverage.recorded >= coverage.total) return null;
-  return coverage.recorded + ' of ' + coverage.total + ' parts';
+  return coverage.recorded + ' of ' + coverage.total + ' ' + (unit || 'parts');
 }
