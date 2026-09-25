@@ -42,14 +42,9 @@ export function ExpandableVerse({ text, refStr }) {
           // that calls scrollToBubble(num) — without this, tapping Read more
           // ALSO scrolls the page up to the in-body footnote bubble.
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
-          style={{
-            display: "inline-block", marginLeft: "0.5em",
-            background: "none", border: "none", cursor: "pointer",
-            color: "var(--gold)", fontFamily: "'Cinzel', serif",
-            fontSize: "var(--fs-12)", letterSpacing: "0.1em",
-            textTransform: "uppercase", padding: "0",
-            verticalAlign: "middle", lineHeight: 1
-          }}
+          // .footnote-verse-toggle (app.css): the look it had inline, plus a
+          // 44 px-tall invisible halo — the label alone is 12 px tall.
+          className="footnote-verse-toggle"
         >
           {expanded ? "Show less ▲" : "Read more ▼"}
         </button>

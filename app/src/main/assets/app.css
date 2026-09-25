@@ -2531,6 +2531,14 @@
     .footnote-list-num { font-family:'Cinzel',serif; font-size:var(--fs-12); color:var(--gold); font-weight:600; min-width:1.2rem; padding-top:0.15rem; }
     .footnote-list-ref { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); display:inline; margin-right:0.4rem; }
     .footnote-list-verse { font-style:italic; color:var(--cream-dim); }
+    /* ExpandableVerse's "Read more / Show less" (styled inline until 2026-09-24). The label is 12 px tall
+       at the end of a line of verse, inside a card whose own tap scrolls up to the footnote's bubble, so a
+       near miss sent the reader away instead of opening the verse. The halo makes it a 44 px-tall target
+       without moving a pixel of text: 16 px up covers the end of the line above (same card), and 16 px down
+       stays inside the card's bottom padding plus the gap before the next card (0.5rem + 0.6rem here,
+       0.7rem + 1rem in the WTLB list), so it never takes a tap meant for the next footnote. */
+    .footnote-verse-toggle { display:inline-block; position:relative; margin-left:0.5em; background:none; border:none; cursor:pointer; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; padding:0; vertical-align:middle; line-height:1; }
+    .footnote-verse-toggle::before { content:''; position:absolute; inset:-16px -4px; }
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */
     .related-section { margin-top:2.5rem; padding-top:2.5rem; border-top:1px solid var(--gold-border); display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; }
@@ -7749,7 +7757,9 @@
 .answers-source { overflow-wrap:anywhere; margin:0.4rem 0 1rem; text-align:center; font-size:var(--fs-13); font-style:italic; line-height:1.45; color:var(--cream-muted); }
 /* Every Topic, A–Z */
 .answers-az-jump { display:flex; flex-wrap:wrap; justify-content:center; gap:0.15rem; width:100%; max-width:32.5rem; margin-bottom:1rem; }
-.answers-az-jump button { min-width:2.3rem; min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-15); }
+/* A full finger per letter (walker, 2026-09-24: 36.8 px wide at 360 px). 44 px costs a fourth row of
+   letters on a phone; 2.3rem still wins once the text grows past it. */
+.answers-az-jump button { min-width:max(44px, 2.3rem); min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-15); }
 @media (hover:hover) { .answers-az-jump button:hover { background:var(--gold-faint); } }
 .answers-az-letter { padding:0.2rem 0 0.25rem; border-bottom:1px solid var(--gold-border); scroll-margin-top:0.5rem; font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold); }
 /* A commandment's sheet: its verse, then its topics. */

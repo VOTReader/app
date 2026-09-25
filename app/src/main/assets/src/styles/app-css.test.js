@@ -532,3 +532,30 @@ describe('app.css — the selection toolbar is opaque in both themes', () => {
     expect(light).toMatch(/background:\s*rgb\(232,\s*222,\s*200\)/);
   });
 });
+
+/* The live Answers walk (2026-09-24, 360 px, both themes) measured two targets under a finger:
+   the A–Z jump letters (36.8 x 44 px) and ExpandableVerse's "Read more" (98 x 12 px), which sits in
+   a footnote card whose own tap scrolls away to the bubble. */
+describe('app.css — the Answers A–Z letters and the footnote "Read more" are full-finger targets', () => {
+  it('each A–Z jump letter is at least 44 x 44 px', () => {
+    const block = ruleBlock(CSS, '.answers-az-jump button {');
+    expect(block).toMatch(/min-width:\s*max\(44px,/);
+    expect(block).toMatch(/min-height:\s*44px/);
+  });
+
+  it('"Read more" keeps its 12 px label and gains a 44 px-tall halo (12 + 16 + 16)', () => {
+    const toggle = ruleBlock(CSS, '.footnote-verse-toggle {');
+    expect(toggle).toMatch(/font-size:\s*var\(--fs-12\)/);
+    expect(toggle).toMatch(/line-height:\s*1;/);
+    expect(toggle).toMatch(/position:\s*relative/);
+    const halo = ruleBlock(CSS, '.footnote-verse-toggle::before {');
+    expect(halo).toMatch(/content:\s*''/);
+    expect(halo).toMatch(/inset:\s*-16px -4px/);
+  });
+
+  it('ExpandableVerse wears that class rather than an inline style the halo cannot reach', () => {
+    const src = readFileSync(resolve(SRC_ROOT, 'ui', 'components', 'ExpandableVerse.jsx'), 'utf8');
+    expect(src).toContain('className="footnote-verse-toggle"');
+    expect(src).not.toMatch(/style=\{\{\s*display:\s*"inline-block"/);
+  });
+});
