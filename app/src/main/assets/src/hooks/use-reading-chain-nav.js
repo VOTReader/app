@@ -11,14 +11,16 @@
    NOT a "next book in BIBLE_BOOK_LIST" call.
 
    OWNED HELPERS (internal):
-     - _first(arr, volKey, scr)        Curried () → void: jump to the
-                                       first letter of a volume.
-     - _last(arr, volKey, scr)         Curried () → void: jump to the
-                                       last letter.
-     - _firstPreface(pref, arr, ...)   Curried () → void: jump to the
+     - _first(col)                     Curried () → void: jump to the
                                        preface (if present) or first
-                                       letter. Some volumes have a
-                                       preface; others don't.
+                                       letter of a collection.
+     - _last(col)                      Curried () → void: jump to the
+                                       last letter.
+                                       Both read the collection when
+                                       they run; an empty one (the lazy
+                                       VOT corpus not loaded yet) asks
+                                       for it and jumps when it lands,
+                                       within 8 s (_whenLettersLoad, as1b).
      - _goFirst / _goLast              Maps<volKey, () => void> built
                                        once per render by iterating
                                        COLLECTIONS. _goFirst.one is
@@ -126,6 +128,36 @@
                              scripture-resolution.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
+// as1b: at most one boundary jump waits for its letters at a time; a newer
+// jump (or any landed one) cancels it. After JUMP_WAIT_MS the wait is dropped,
+// so a slow load never pulls the reader off a page they went on to meanwhile.
+const JUMP_WAIT_MS = 8000;
+let _pendingJumpCancel = null;
+function _cancelPendingJump() {
+  if (_pendingJumpCancel) _pendingJumpCancel();
+}
+function _whenLettersLoad(col, jump) {
+  _cancelPendingJump();
+  if (typeof window.__loadVotCorpus === 'function') {
+    try { Promise.resolve(window.__loadVotCorpus()).catch(() => {}); } catch (_e) { /* the route shows the load error */ }
+  }
+  const corpus = window.__votCorpus;
+  if (!corpus || typeof corpus.subscribe !== 'function') return;
+  let unsub = null;
+  const cancel = () => {
+    clearTimeout(timer);
+    if (unsub) { unsub(); unsub = null; }
+    if (_pendingJumpCancel === cancel) _pendingJumpCancel = null;
+  };
+  const timer = setTimeout(cancel, JUMP_WAIT_MS);
+  _pendingJumpCancel = cancel;
+  unsub = corpus.subscribe(() => {
+    if (colLetterArr(col).length === 0 && !colPreface(col)) return;
+    cancel();
+    jump();
+  });
+}
+
 /**
  * Reading-chain boundary navigation. Owns the cross-volume chain
  * (Revelation → V1 → ... → Garden) AND the within-Bible book prev/next.
@@ -183,42 +215,34 @@ export function useReadingChainNav({
   };
 
   // First/last helpers — curried for direct use as onPrevBoundary /
-  // onNextBoundary props.
-  const _first = (arr, volKey, scr) => () => {
-    if (arr.length > 0) {
-      const id = arr[0].id;
-      setLetterId(id);
-      setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
-      setScreen(scr);
-    }
+  // onNextBoundary props. Each reads its collection when it RUNS, not at
+  // render (as1b): Revelation 22's Next Book is rendered before the lazy VOT
+  // corpus has loaded, and a letter list read then stays empty. With nothing
+  // to land on yet, the jump waits for the letters (_whenLettersLoad).
+  const _open = (col, id) => {
+    _cancelPendingJump();
+    setLetterId(id);
+    setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, id));
+    setScreen(col.letterScreen);
   };
-  const _last = (arr, volKey, scr) => () => {
-    if (arr.length > 0) {
-      const id = arr[arr.length - 1].id;
-      setLetterId(id);
-      setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
-      setScreen(scr);
-    }
+  const _first = (col) => function jump() {
+    const pref = colPreface(col), arr = colLetterArr(col);
+    const id = pref ? pref.id : arr.length > 0 ? arr[0].id : null;
+    if (id) _open(col, id); else _whenLettersLoad(col, jump);
   };
-  const _firstPreface = (preface, arr, volKey, scr) => () => {
-    const id = preface ? preface.id : arr.length > 0 ? arr[0].id : null;
-    if (id) {
-      setLetterId(id);
-      setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
-      setScreen(scr);
-    }
+  const _last = (col) => function jump() {
+    const arr = colLetterArr(col);
+    if (arr.length > 0) _open(col, arr[arr.length - 1].id); else _whenLettersLoad(col, jump);
   };
 
   // _goFirst / _goLast maps — built once per render by iterating
   // COLLECTIONS. Each entry is a curried () → void usable as a
-  // boundary-jump handler.
+  // boundary-jump handler; the preface comes first when a collection has one.
   var _goFirst = {}, _goLast = {};
   COLLECTIONS.forEach(function (col) {
     if (!col.letterScreen) return;
-    var arr = colLetterArr(col);
-    var pref = colPreface(col);
-    _goFirst[col.volKey] = pref ? _firstPreface(pref, arr, col.volKey, col.letterScreen) : _first(arr, col.volKey, col.letterScreen);
-    _goLast[col.volKey] = _last(arr, col.volKey, col.letterScreen);
+    _goFirst[col.volKey] = _first(col);
+    _goLast[col.volKey] = _last(col);
   });
 
   /* boundaryConfig(volKey, entry) → { prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary }
