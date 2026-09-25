@@ -1750,8 +1750,8 @@
         min-height: 44px; padding: 0.3rem 0.85rem;
         border: 1px solid var(--gold-border); border-radius: 999px;
         background: transparent; color: var(--cream-dim); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-11);
-        letter-spacing: 0.14em; text-transform: uppercase;
+        font-family: 'Cinzel', serif; font-size:var(--fs-12);
+        letter-spacing: 0.12em; text-transform: uppercase;
         transition: border-color 0.15s, background 0.15s, color 0.15s;
       }
       .milestones-filter.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold); }
@@ -1781,7 +1781,7 @@
       .milestones-cat { margin-top: 1.5rem; }
       .milestones-cat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; padding: 0 0.1rem 0.5rem; border-bottom: 1px solid var(--gold-border); }
       .milestones-cat-head div { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-      .milestones-cat-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.16em; text-transform: uppercase; }
+      .milestones-cat-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing: 0.12em; text-transform: uppercase; }
       .milestones-cat-head h2 { margin: 0; color: var(--cream); font-family: 'Cinzel', serif; font-size: var(--fs-16); font-weight: 500; }
       .milestones-cat-head > strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-13); font-weight: 500; white-space: nowrap; }
       .milestones-list { margin: 0; padding: 0; list-style: none; }
@@ -1795,7 +1795,7 @@
       .milestones-bar { display: block; width: min(100%, 14rem); height: 3px; border-radius: 3px; background: rgba(200, 164, 86, 0.14); overflow: hidden; }
       .milestones-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--gold-dim); }
       .milestones-value { flex: 0 0 auto; color: var(--cream-dim); font-size: var(--fs-11); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .milestones-value.is-earned { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-11); }
+      .milestones-value.is-earned { color: var(--gold); font-family: 'Cinzel', serif; font-size:var(--fs-12); }
       @media (max-width: 460px) {
         .milestones-screen { padding-left: 1rem; padding-right: 1rem; }
         .milestones-value { max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; }
@@ -1810,8 +1810,8 @@
         padding: 0.45em 1.1em; border-radius: 999px;
         background: linear-gradient(180deg, var(--gold-faint), transparent);
         border: 1px solid var(--gold-border); color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-11);
-        letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.2;
+        font-family: 'Cinzel', serif; font-size:var(--fs-12);
+        letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.2;
         transition: border-color 0.18s, transform 0.18s;
       }
       .hero-play-pill svg { width: 1.15em; height: 1.15em; flex-shrink: 0; }
@@ -2648,7 +2648,7 @@
       border:1px solid var(--gold-border);
       border-radius:999px;
       color:var(--gold-dim);
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.13em;
+      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase;
       cursor:pointer;
       transition:all 0.18s ease;
@@ -3697,7 +3697,7 @@
       gap:0.35rem; padding:0.85rem 0.95rem; width:100%; min-width:0;
     }
     .chapter-cards.two-col .two-col-num {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em;
+      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase; color:var(--gold-dim); font-weight:600; line-height:1;
     }
     .chapter-cards.two-col .chapter-card-btn.is-current .two-col-num { color:var(--gold); }
@@ -3759,13 +3759,13 @@
        never carries its meaning in colour alone (the word is the message; the
        title is the sentence behind it). */
     .coverage-badge-wrap { display:inline-flex; align-items:baseline; gap:0.45em; flex-wrap:wrap; margin-left:0.55em; vertical-align:middle; }
-    .coverage-badge { display:inline-block; padding:0.12em 0.6em; border:1px solid var(--gold-border,var(--gold-dim)); border-radius:999px; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; white-space:nowrap; color:var(--gold-dim); }
+    .coverage-badge { display:inline-block; padding:0.12em 0.6em; border:1px solid var(--gold-border,var(--gold-dim)); border-radius:999px; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; white-space:nowrap; color:var(--gold-dim); }
     .coverage-badge-read-along { border-color:var(--gold); background:var(--gold-faint); color:var(--gold); }
     .coverage-badge-listening-only { border-style:dashed; }
     .coverage-badge-no-recording { opacity:0.72; }
     /* A study with no recording yet opens to read (Codex critique 1, 2026-09-23): an ordinary outlined word, not dimmed. */
     .coverage-badge-read-study { color:var(--cream-dim); }
-    .coverage-badge-detail { font-size:var(--fs-10); font-style:italic; color:var(--gold-dim); white-space:nowrap; }
+    .coverage-badge-detail { font-size:var(--fs-12); font-style:italic; color:var(--gold-dim); white-space:nowrap; }
     /* In a study card, and on a shelf row, the badge sits on its own line
        under the title rather than stretching the one-line ellipsis. */
     .chapter-card-info .coverage-badge-wrap,
@@ -3789,7 +3789,7 @@
        width. */
     .idx-note-chip {
       display:inline-block; margin-top:0.3rem; white-space:nowrap;
-      font-family:'Cinzel',serif; font-size:var(--fs-10);
+      font-family:'Cinzel',serif; font-size:var(--fs-12);
       letter-spacing:0.06em; text-transform:uppercase;
       color:var(--gold-dim); border:1px solid var(--gold-border);
       border-radius:999px; padding:1px 7px;
@@ -3801,7 +3801,7 @@
     .part-group-card.is-expanded { background:var(--gold-faint); border-color:rgba(200,164,86,0.5); }
     body.light .part-group-card { background:var(--bg2); }
     body.light .part-group-card.is-expanded { background:var(--gold-faint); }
-    .part-group-num { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
+    .part-group-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
     .part-group-card.is-expanded .part-group-num { color:var(--gold); }
     .part-group-title { font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream); line-height:1.3; }
     .part-group-subtitle { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
@@ -3840,11 +3840,11 @@
     .history-empty-body {
       font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
     }
-    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
+    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
     /* Result tally under the search box — states the count in words so the
        filtered emptiness below it is never mistaken for a broken screen. */
     .history-search-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em;
+      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase; color:var(--gold-dim);
       margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
     }
@@ -5868,8 +5868,8 @@
       padding: 11px 12px 13px;
       background: transparent; border: none;
       border-bottom: 2px solid transparent;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.16em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: color 0.15s, border-color 0.15s;
@@ -5998,7 +5998,7 @@
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-muted);
       padding: 6px 10px; border-radius: 6px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       /* Own row now, so the label can carry a real touch target. */
@@ -6068,14 +6068,14 @@
     .notes-index-sort {
       margin-left: auto;
       display: flex; align-items: center; gap: 0.4rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
     .notes-index-sort-btn {
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       padding: 6px 11px; border-radius: 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -6132,8 +6132,8 @@
       cursor: pointer;
     }
     .note-row-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
       margin-left: auto;
       flex-shrink: 0;
@@ -6170,7 +6170,7 @@
     }
     .note-row-nb {
       display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-muted);
       padding: 2px 7px;
@@ -6474,8 +6474,8 @@
     @media (hover: hover) { .link-row-side:hover { background: var(--gold-faint); } }
     .link-row-source { border-bottom: 1px solid var(--gold-border); }
     .link-row-side-eyebrow {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.22em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--gold-dim); margin-bottom: 0.1rem;
     }
     .link-row-source .link-row-side-eyebrow { color: var(--gold); }
@@ -6488,7 +6488,7 @@
     .link-row-source .link-row-side-label { color: var(--gold-bright); }
     body.light .link-row-source .link-row-side-label { color: var(--gold); }
     .link-row-side-cat {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
@@ -6524,7 +6524,7 @@
       stroke: var(--gold-dim); flex-shrink: 0;
     }
     .link-row-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
@@ -6758,7 +6758,7 @@
     @media (hover: hover) { .bkm-row-content:hover:not(:disabled) { background: var(--gold-faint); } }
     .bkm-row-content:disabled { cursor: default; }
     .bkm-row-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--gold);
     }

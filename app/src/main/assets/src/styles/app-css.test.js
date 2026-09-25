@@ -733,6 +733,12 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.prg-section-head h2', '.prg-days-head', '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
     '.section-heading', '.compact-list-header',
+    // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
+    '.back-hint-pill', '.notes-tab', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
+    '.nb-drilled-action', '.coverage-badge', '.coverage-badge-detail', '.milestones-filter', '.milestones-cat-head span',
+    '.milestones-value.is-earned', '.history-entry-time', '.history-search-count', '.bkm-row-source', '.link-row-date',
+    '.link-row-side-eyebrow', '.link-row-side-cat', '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
+    '.part-group-num', '.idx-note-chip',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   const blocksOf = (sel) => {
