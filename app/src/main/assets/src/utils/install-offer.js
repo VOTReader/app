@@ -75,10 +75,15 @@ export function dismiss(state, how, now) {
 
 /* ── capture: Chromium fires beforeinstallprompt once, early; keep it ────── */
 
-/** @type {any} */ let _deferred = null;
-let _installed = false;
-/** @type {Set<() => void>} */ const _subs = new Set();
-const _notify = () => { _subs.forEach((f) => { try { f(); } catch (_e) { /* a listener's bug is its own */ } }); };
+/* The capture runs in bundle-b at boot and the card reads it from bundle-d: each bundle carries its own copy of
+   this module, so the captured event lives on the window, one slot both copies share. */
+/** @returns {{ deferred: any, installed: boolean, subs: Set<() => void> }} */
+function _slot() {
+  const g = /** @type {any} */ (globalThis);
+  if (!g.__votInstallSlot) g.__votInstallSlot = { deferred: null, installed: false, subs: new Set() };
+  return g.__votInstallSlot;
+}
+const _notify = () => { _slot().subs.forEach((f) => { try { f(); } catch (_e) { /* a listener's bug is its own */ } }); };
 
 /**
  * Listen for the browser's install event (call once, at boot). Idempotent per window.
@@ -89,24 +94,24 @@ export function attachInstallCapture(win) {
   win.__votInstallCapture = true;
   win.addEventListener('beforeinstallprompt', (/** @type {any} */ e) => {
     e.preventDefault();          // keep Chrome's mini-infobar away; our card asks at the right moment
-    _deferred = e; _notify();
+    _slot().deferred = e; _notify();
   });
-  win.addEventListener('appinstalled', () => { _deferred = null; _installed = true; _notify(); });
+  win.addEventListener('appinstalled', () => { const s = _slot(); s.deferred = null; s.installed = true; _notify(); });
 }
 
-/** @returns {boolean} */ export function hasInstallPrompt() { return !!_deferred; }
-/** @returns {boolean} */ export function wasInstalled() { return _installed; }
+/** @returns {boolean} */ export function hasInstallPrompt() { return !!_slot().deferred; }
+/** @returns {boolean} */ export function wasInstalled() { return _slot().installed; }
 /** @param {() => void} fn @returns {() => void} */
-export function subscribeInstall(fn) { _subs.add(fn); return () => { _subs.delete(fn); }; }
+export function subscribeInstall(fn) { const subs = _slot().subs; subs.add(fn); return () => { subs.delete(fn); }; }
 
 /**
  * Show the browser's own install dialog. The event is single-use.
  * @returns {Promise<'accepted' | 'dismissed' | 'unavailable'>}
  */
 export async function promptInstall() {
-  const e = _deferred;
+  const e = _slot().deferred;
   if (!e) return 'unavailable';
-  _deferred = null; _notify();
+  _slot().deferred = null; _notify();
   try {
     await e.prompt();
     const choice = await e.userChoice;
@@ -115,4 +120,4 @@ export async function promptInstall() {
 }
 
 /** Tests only. */
-export function _resetInstallCapture() { _deferred = null; _installed = false; _subs.clear(); }
+export function _resetInstallCapture() { const s = _slot(); s.deferred = null; s.installed = false; s.subs.clear(); }

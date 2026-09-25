@@ -141,6 +141,7 @@ import { measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSa
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
+import { attachInstallCapture } from '../utils/install-offer.js';
 import { announceUpdateIfAny } from '../utils/update-toast.js';
 import { installUsageStats } from '../utils/usage-stats.js';
 
@@ -310,6 +311,9 @@ registerServiceWorker();
 // after the controllerchange reload; on Android the next cold start with a
 // new APK. update-toast.test.js pins that nothing conditional sits here.
 announceUpdateIfAny();
+// ── Install as an app (ip1): keep Chromium's beforeinstallprompt from the first moment it fires; the card at a
+// chapter's end (InstallCard) offers it once the reader has finished a chapter. Never in the APK.
+if (typeof window !== 'undefined' && !(PlatformBridge && PlatformBridge.isAndroid)) attachInstallCapture(window);
 
 // ── Memory-pressure trim signal (Android onTrimMemory → JS) ─────────────
 // MainActivity.onTrimMemory calls window.__onTrimMemory on a moderate+ memory-

@@ -93,4 +93,12 @@ describe('capture', () => {
     expect(hasInstallPrompt()).toBe(false);
     expect(wasInstalled()).toBe(true);
   });
+
+  it('a second copy of this module (another bundle) sees the event the first copy captured', async () => {
+    attachInstallCapture(window);
+    window.dispatchEvent(/** @type {any} */ (new Event('beforeinstallprompt', { cancelable: true })));
+    vi.resetModules();
+    const other = await import('./install-offer.js');
+    expect(other.hasInstallPrompt()).toBe(true);
+  });
 });

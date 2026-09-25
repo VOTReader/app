@@ -11,6 +11,7 @@ import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx'
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { InstallCard } from '../components/InstallCard.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -505,6 +506,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 <div className="ornament-divider-line" />
               </div>
             )}
+
+            <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
 
             <div className="bottom-nav">
               {letter.prevLetter ? (
