@@ -82,12 +82,22 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
   );
   const [, setStudiesLanded] = React.useState(0);
+  // n6-09: loadBibleStudies resolves false when the fetch failed; say so, and
+  // let the reader try again (as StudiesHome does), not "Loading..." for good.
+  const [studiesFailed, setStudiesFailed] = React.useState(false);
+  const [attempt, setAttempt] = React.useState(0);
   React.useEffect(() => {
     let live = true;
     const load = /** @type {any} */ (window).loadBibleStudies;
-    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesLanded((n) => n + 1); }, () => {});
+    if (typeof load === 'function') {
+      Promise.resolve(load()).then((ok) => {
+        if (!live) return;
+        setStudiesFailed(ok === false);
+        setStudiesLanded((n) => n + 1);
+      }, () => { if (live) setStudiesFailed(true); });
+    }
     return () => { live = false; };
-  }, []);
+  }, [attempt]);
 
   const studies = studiesList();
   const withAudio = studies.filter((study) => studyRecordedCount(study) > 0).length;
@@ -140,6 +150,12 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
                   </button>
                 );
               })}
+            </div>
+          ) : studiesFailed ? (
+            <div className="audio-library-empty" role="alert">
+              Couldn’t load the studies.{' '}
+              <button type="button" className="audio-library-retry"
+                onClick={() => { setStudiesFailed(false); setAttempt((n) => n + 1); }}>Try again</button>
             </div>
           ) : (
             <div className="audio-library-empty">Loading the studies…</div>

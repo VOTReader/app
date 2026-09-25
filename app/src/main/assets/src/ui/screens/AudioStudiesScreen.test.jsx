@@ -6,7 +6,7 @@
    recording), the Studies screen lists every study in its reading order with an honest count and badge, and a
    study opens the same recordings screen a collection does, playing the study's chapters as one queue. */
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 const { player } = vi.hoisted(() => {
   const player = {
@@ -184,5 +184,30 @@ describe('a study in the recordings screen: many text-only chapters', () => {
     installGlobals({ studies: [...STUDIES, big], manifest: { ...MANIFEST, 'study:big-ch1': [['b1', 'B']], 'study:big-ch2': [['b2', 'B']] } });
     render(<AudioCollectionScreen volKey="study:big" onBack={noop} onOpenText={noop} {...common} />);
     expect(document.querySelector('.audio-collection-text-only').textContent).toBe('4 chapters are text only');
+  });
+});
+
+/* n6-09 (sweep 2, 09-25): loadBibleStudies resolves false on a failed fetch, and the
+   screen ignored it: "Loading the studies..." stayed up for good. It now says it
+   could not load them and offers Try again, as StudiesHome does. */
+describe('the Studies screen when the studies will not load (n6-09)', () => {
+  afterEach(() => { delete window.loadBibleStudies; });
+
+  it('says so and offers Try again, which loads them', async () => {
+    globalThis.BIBLE_STUDIES = undefined;
+    let ok = false;
+    window.loadBibleStudies = vi.fn(() => {
+      if (ok) globalThis.BIBLE_STUDIES = STUDIES;
+      return Promise.resolve(ok);
+    });
+    render(<AudioStudiesScreen onBack={noop} onOpenStudy={noop} onReadStudy={noop} {...common} />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText(/Loading the studies/)).toBeNull();
+    expect(screen.getByText(/Couldn.t load the studies/)).toBeTruthy();
+    ok = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(window.loadBibleStudies).toHaveBeenCalledTimes(2);
+    expect(document.querySelectorAll('.audio-library-shelf-row').length).toBeGreaterThan(0);
   });
 });
