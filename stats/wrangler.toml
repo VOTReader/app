@@ -1,0 +1,18 @@
+# VOTReader usage statistics Worker (us1). Deploy and operate: stats/README.md.
+name = "stats"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "votreader-stats"
+database_id = "995a0651-d169-458a-8ee1-c94db754251d"
+migrations_dir = "migrations"
+
+# Nightly rollup at 03:17 UTC (the free plan allows three cron triggers).
+[triggers]
+crons = ["17 3 * * *"]
+
+# DASH_KEY (the dashboard's secret link) is a Worker secret, never in this file:
+#   npx wrangler@4 secret put DASH_KEY
