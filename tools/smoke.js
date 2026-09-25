@@ -349,7 +349,7 @@
 
     var LEGS = [
       { bundle: '__screensG', label: 'Personal Study → My Notes (bundle-g)',
-        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes/); },
+        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
         there: function () { return /My Notes/.test(document.body.textContent || ''); } },
       { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
         open: async function () { await goHome(); return clickByText(/Audio Readings/); },
@@ -604,13 +604,15 @@
       const text = (credit && credit.textContent) || '';
       return /OpenBible\.info/.test(text) && /CC-BY/.test(text);
     });
-    await step('Library → Notes', async function () { return lib(/My Notes|^\s*Notes\b/, /My Notes/); });
-    await step('Library → Bookmarks', async function () { return lib(/My Bookmarks|^\s*Bookmarks\b/, /My Bookmarks/); });
+    // A row's textContent runs its title into its second line ("NotesLong-press
+    // text..."), so a title ends where a lowercase letter does not follow.
+    await step('Library → Notes', async function () { return lib(/My Notes|^\s*Notes(?![a-z])/, /My Notes/); });
+    await step('Library → Bookmarks', async function () { return lib(/My Bookmarks|^\s*Bookmarks(?![a-z])/, /My Bookmarks/); });
     await step('Library → Highlights', async function () { return lib(/My Marks|Highlights/, /Highlight|Underline/); });
-    await step('Library → Links', async function () { return lib(/My Links|^\s*Links\b/, /Link/); });
-    await step('Library → Journal', async function () { return lib(/My Journal|^\s*Journal\b/, /Journal/); });
+    await step('Library → Links', async function () { return lib(/My Links|^\s*Links(?![a-z])/, /Link/); });
+    await step('Library → Journal', async function () { return lib(/My Journal|^\s*Journal(?![a-z])/, /Journal/); });
     await step('Library → Progress', async function () {
-      await lib(/My Progress|^\s*Progress\b/);
+      await lib(/My Progress|^\s*Progress(?![a-z])/);
       return /Most Annotated/i.test(document.body.textContent || '');
     });
     await step('Library → Milestones', async function () {
