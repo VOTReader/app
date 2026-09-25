@@ -1779,6 +1779,73 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     }
   });
 
+  /* The Codex refutation of 2026-09-24 (out/offline-refute.md). */
+  it('Next onto a recording not on the phone stops the one playing (M1)', async () => {
+    await downloaded(['idA1']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+    expect(el().src).toBe(URL_OF('idA1'));
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 36;
+    el().dispatchEvent(new Event('timeupdate'));
+    AudioPlayer.next();   // part 2 is not on the phone, and nothing after it is
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
+    expect(s.status).toBe('paused');
+    // The element let go of part 1: it no longer plays under a bar that names part 2, so no clock of part 1 is
+    // filed as part 2's place (it went on playing, and its timeupdates saved 36 s under part 2).
+    expect(el().paused).toBe(true);
+    expect(el().src).toBe('');
+    expect(s.time).toBe(0);
+    const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect([snap.track.url, snap.time]).toEqual([URL_OF('idA2'), 0]);
+  });
+
+  it('a reading swapped in offline resumes on itself once the signal is back, not on the chosen voice (M2)', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      await downloaded(['idCv']);
+      setOnline(false);
+      // Letter C chosen in reader T; only its V reading is on the phone, so V plays.
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-c', startReader: 'T' });
+      expect(el().src).toBe(URL_OF('idCv'));
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 35;
+      el().dispatchEvent(new Event('timeupdate'));
+      const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect([snap.track.url, snap.time]).toEqual([URL_OF('idCv'), 35]);
+
+      await load();   // the next day, with a signal
+      setOnline(true);
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      // 35 s is a place in the V reading: it resumes there, not 35 s into T's.
+      expect(el().src).toBe(URL_OF('idCv'));
+    } finally {
+      delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
+    }
+  });
+
+  it('starting at part 2 offline plays part 2 of the reading that is on the phone (S6)', async () => {
+    await downloaded(['idA1v', 'idA2v']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a', startPartIndex: 1 });
+    expect(el().src).toBe(URL_OF('idA2v'));
+    // Forward-only: part 1 stays behind, as it did in the reading asked for.
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA2v'), URL_OF('idC')]);
+  });
+
+  it('a reading swapped in offline keeps the letter\'s title (N7)', async () => {
+    await downloaded(['idCv']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-c', startReader: 'T' });
+    expect(el().src).toBe(URL_OF('idCv'));
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].title).toBe('Letter C');
+  });
+
   it('a row downloads what its own Play plays: the chosen reader where that reader read it, else the primary', () => {
     AudioPlayer.setPreferredReader('V');
     try {

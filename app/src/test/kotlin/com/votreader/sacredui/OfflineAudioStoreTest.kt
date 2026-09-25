@@ -315,4 +315,58 @@ class OfflineAudioStoreTest {
         s.enqueue(listOf(item(url1)))
         assertEquals(JSONObject.NULL, activeAtDone)
     }
+
+    /** A body that runs [atEnd] as the worker reads its end: past the download loop's last cancellation check. */
+    private class EndHook(bytes: ByteArray, private val atEnd: () -> Unit) : InputStream() {
+        private val inner = ByteArrayInputStream(bytes)
+        private var fired = false
+        override fun read(): Int = inner.read().also { if (it < 0) fire() }
+        override fun read(b: ByteArray, off: Int, len: Int): Int = inner.read(b, off, len).also { if (it < 0) fire() }
+        private fun fire() { if (!fired) { fired = true; atEnd() } }
+    }
+
+    private fun endHookStore(atEnd: (OfflineAudioStore) -> Unit): OfflineAudioStore {
+        lateinit var s: OfflineAudioStore
+        s = OfflineAudioStore(tmp.root, opener = { OfflineAudioStore.Opened(EndHook(body) { atEnd(s) }, body.size.toLong()) },
+            executor = direct, freeBytes = { 10L shl 30 }, emit = { events += JSONObject(it) })
+        return s
+    }
+
+    // The Codex refutation of 2026-09-24 (M3): Remove all while the worker is past its last cancellation check (EOF,
+    // fsync) moved the file into place and indexed it after the shelf was emptied - the recording came back.
+    @Test
+    fun `remove all during a download's last read leaves nothing behind`() {
+        val s = endHookStore { it.removeAll() }
+        s.enqueue(listOf(item(url1)))
+        assertFalse(s.isSaved(url1), "removed while it finished: it must not come back")
+        assertEquals(0, JSONObject(s.stateJson()).getJSONArray("items").length())
+        val left = File(tmp.root, "offline-audio").listFiles { f -> f.name.endsWith(".mp3") || f.name.endsWith(".part") }
+        assertTrue(left.isNullOrEmpty(), "no bytes kept: ${left?.map { it.name }}")
+        assertFalse(events.any { it.getString("type") == "done" }, "never announced as done")
+    }
+
+    @Test
+    fun `a cancel during a download's last read is honoured too`() {
+        val s = endHookStore { it.cancel(listOf(url1)) }
+        s.enqueue(listOf(item(url1)))
+        assertFalse(s.isSaved(url1))
+        assertEquals("cancelled", events.last().getString("type"))
+    }
+
+    // M4: MainActivity's sink reaches a WebView that a re-created Activity may not have assigned yet; a throwing sink
+    // killed the download (its catch called fail(), which threw again) and escaped the size worker - a crash.
+    @Test
+    fun `an observer that throws never stops a download or escapes a worker`() {
+        val s = OfflineAudioStore(tmp.root, opener = { opened() }, executor = direct, freeBytes = { 10L shl 30 },
+            emit = { throw UninitializedPropertyAccessException("lateinit property webView has not been initialized") },
+            sizeLister = { mapOf("one-christmas-B.mp3" to 1000L) }, headSize = { null }, sizeExecutor = direct)
+        s.enqueue(listOf(item(url1)))
+        assertTrue(s.isSaved(url1), "the download finished despite the observer")
+        s.requestSizes(listOf(url1))
+        s.enqueue(listOf(item(url2)))
+        s.cancel(listOf(url2))
+        s.remove(listOf(url1))
+        s.removeAll()
+        assertFalse(s.isSaved(url1))
+    }
 }
