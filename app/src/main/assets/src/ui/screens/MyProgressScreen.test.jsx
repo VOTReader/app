@@ -2,7 +2,7 @@
 /* MyProgressScreen — the dashboard's render contract over stubbed stores.
    ──────────────────────────────────────────────────────────────────────
    The aggregation math lives in utils/progress-stats.js (tested there);
-   these cases pin the SCREEN's behavior: the hero cells, the
+   these cases pin the SCREEN's behavior: the summary sentence and rows, the
    historyEnabled=false row suppression, the markAsRead-off note, the
    zero-data empty states, and the most-annotated list. Real tallyGroup /
    mostAnnotatedSources / countReadFor are wired in ([[dont-over-mock]]);
@@ -104,24 +104,48 @@ const GROUP = {
   genres: [{ label: 'Gospels', books: [{ id: 'mark', label: 'Mark', total: 16 }] }],
 };
 
-describe('MyProgressScreen — hero + empty states (brand-new user)', () => {
-  it('renders zero-data as intentional: 0-value hero cells + the annotate hint', () => {
+/* The redesign (2026-09-25): the grid of stat boxes became one summary sentence and label / value
+   rows (.prg-fact) in the section each fact belongs to. `fact` reads a row's value by its label. */
+const fact = (container, label) => {
+  const row = [...container.querySelectorAll('.prg-fact')].find((r) => r.querySelector('dt').textContent === label);
+  return row ? row.querySelector('dd').textContent : null;
+};
+const summaryOf = (container) => container.querySelector('.prg-summary').textContent;
+
+describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
+  it('renders zero-data as intentional: a plain sentence, 0-value rows, the annotate hint', () => {
     setupGlobals();
     const { container } = renderScreen();
-    const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toEqual(['0', '0', '0', '0']);
+    expect(summaryOf(container)).toBe('Nothing read yet. The chapters and letters you read are counted here.');
+    expect(fact(container, 'Chapters & letters read')).toBe('0');
+    expect(fact(container, 'Reading streak')).toBe('0 days');
+    expect(fact(container, 'Entries')).toBe('0');
+    expect(fact(container, 'Journal streak')).toBe('0 days');
     expect(container.textContent).toContain('Nothing marked yet');
     expect(container.textContent).toContain('Loading your library…'); // corpora not loaded
   });
 
-  it('fills the hero from readItems + reading streak + journal stats + journal count', () => {
+  it('fills the sentence and the rows from readItems + reading streak + journal stats + journal count', () => {
     setupGlobals({ streak: 6, journal: 4, readStreak: 12 });
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1, 'v1:mark:2': 1 } });
-    const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toEqual(['2', '12', '6', '4']);
-    const labels = [...container.querySelectorAll('.prg-stat-label')].map((n) => n.textContent);
-    expect(labels).toEqual(['Read', 'Reading Streak', 'Journal Streak', 'Entries']);
-    expect(container.textContent).toContain('days of reading');
+    expect(summaryOf(container)).toBe('2 chapters and letters read, a 12-day reading streak and 4 journal entries.');
+    expect(fact(container, 'Chapters & letters read')).toBe('2');
+    expect(fact(container, 'Reading streak')).toBe('12 days');
+    expect(fact(container, 'Journal streak')).toBe('6 days');
+    expect(fact(container, 'Entries')).toBe('4');
+  });
+
+  it('says only what is true: one reading, no one-day "streak", no entries', () => {
+    setupGlobals({ readStreak: 1 });
+    const { container } = renderScreen({ readItems: { 'v1:mark:1': 1 } });
+    expect(summaryOf(container)).toBe('1 chapter or letter read.');
+    expect(fact(container, 'Reading streak')).toBe('1 day');
+  });
+
+  it('draws no gold-outlined stat boxes any more', () => {
+    setupGlobals({ stats: { words: 100, wpm: 214 } });
+    const { container } = renderScreen();
+    expect(container.querySelector('.prg-hero, .prg-stat, .settings-card')).toBeNull();
   });
 });
 
@@ -139,24 +163,27 @@ describe('_fmtWords — compact hero count', () => {
   });
 });
 
-describe('MyProgressScreen — reading measurement hero cells', () => {
-  it('shows Words Read compactly and hides Reading Pace while measuredWpm is null', () => {
+describe('MyProgressScreen — reading measurement rows', () => {
+  it('shows Words read compactly and hides Reading pace while measuredWpm is null', () => {
     setupGlobals({ stats: { words: 12440, wpm: null } });
     const { container } = renderScreen();
-    const labels = [...container.querySelectorAll('.prg-stat-label')].map((n) => n.textContent);
-    expect(labels).toContain('Words Read');
-    expect(labels).not.toContain('Reading Pace');
-    const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toContain('12.4k');
+    expect(fact(container, 'Words read')).toBe('12.4k');
+    expect(fact(container, 'Reading pace')).toBeNull();
   });
 
-  it('shows the measured pace cell once a pace exists', () => {
+  it('shows the measured pace once a pace exists', () => {
     setupGlobals({ stats: { words: 100, wpm: 214 } });
     const { container } = renderScreen();
-    const labels = [...container.querySelectorAll('.prg-stat-label')].map((n) => n.textContent);
-    expect(labels).toContain('Reading Pace');
-    const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toContain('214');
+    expect(fact(container, 'Reading pace')).toBe('214 words a minute');
+  });
+
+  it('hides every measured row, never shows a 0, when ReadingStatsStore is absent', () => {
+    setupGlobals();
+    const { container } = renderScreen();
+    expect(fact(container, 'Words read')).toBeNull();
+    expect(fact(container, 'Reading pace')).toBeNull();
+    expect(fact(container, 'Time spent reading')).toBeNull();
+    expect(fact(container, 'Re-reads')).toBeNull();
   });
 });
 
@@ -203,9 +230,7 @@ describe('MyProgressScreen — journaling section', () => {
     ] });
     const { container } = renderScreen();
     await flush();
-    const row = [...container.querySelectorAll('.progress-row')]
-      .find((r) => r.textContent.includes('Words written'));
-    expect(row.querySelector('.progress-row-tally').textContent).toBe('6');
+    expect(fact(container, 'Words written')).toBe('6');
   });
 
   it('shows voice-memo minutes from audio durations, ignoring images', async () => {
@@ -216,9 +241,7 @@ describe('MyProgressScreen — journaling section', () => {
     ] });
     const { container } = renderScreen();
     await flush();
-    const row = [...container.querySelectorAll('.progress-row')]
-      .find((r) => r.textContent.includes('Voice memos'));
-    expect(row.querySelector('.progress-row-tally').textContent).toBe('4 min');
+    expect(fact(container, 'Voice memos')).toBe('4 min');
   });
 
   it('omits the voice-memo row entirely at 0 minutes', async () => {
@@ -229,10 +252,11 @@ describe('MyProgressScreen — journaling section', () => {
     expect(container.textContent).not.toContain('Voice memos');
   });
 
-  it('hides the whole section when the word counter and media store are absent', () => {
+  it('hides the written-words row (not the section) when the word counter and media store are absent', () => {
     setupGlobals();
     const { container } = renderScreen();
     expect(container.textContent).not.toContain('Words written');
+    expect(fact(container, 'Entries')).toBe('0');   // entries and streak always answer
   });
 });
 
@@ -242,7 +266,7 @@ describe('MyProgressScreen — reading section', () => {
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1, 'v1:mark:2': 1, 'v1:mark:3': 1, 'v1:mark:4': 1 } });
     const row = container.querySelector('.prg-row');
     expect(row.textContent).toContain('New Testament');
-    expect(row.textContent).toContain('4 / 16');
+    expect(row.textContent).toContain('4 of 16');
     expect(container.querySelector('.prg-bar-fill').style.width).toBe('25%');
   });
 
@@ -257,7 +281,7 @@ describe('MyProgressScreen — reading section', () => {
     const empty = { id: 'studies', label: 'Studies', genres: [{ label: 'x', books: [] }] };
     setupGlobals({ groups: [GROUP, empty] });
     const { container } = renderScreen();
-    const labels = [...container.querySelectorAll('.prg-row-label')].map((n) => n.textContent);
+    const labels = [...container.querySelectorAll('.prg-row .prg-row-label')].map((n) => n.textContent);
     expect(labels).toEqual(['New Testament']);
   });
 });
@@ -282,7 +306,7 @@ describe('MyProgressScreen — library counts + most annotated', () => {
       'bible:psalms:23:1': [{ id: 'a', groupId: 'a', kind: 'highlight' }],
     } });
     const { container } = renderScreen();
-    const rows = [...container.querySelectorAll('.progress-row')].map((r) => r.textContent);
+    const rows = [...container.querySelectorAll('[aria-labelledby="prg-h-library"] .prg-fact')].map((r) => r.textContent);
     expect(rows).toEqual(['Notes3', 'Highlights & Underlines1', 'Bookmarks1', 'Links2']);
   });
 
@@ -305,22 +329,22 @@ describe('MyProgressScreen — library counts + most annotated', () => {
    the Listening Library, so hours of listening reported nothing. Three
    different acts, three cells — and no cell may invent a number. */
 describe('MyProgressScreen — listening block', () => {
-  const listenCells = (container) => {
-    const block = container.querySelector('.prg-listen-hero');
+  const listenRows = (container) => {
+    const block = container.querySelector('.prg-listening');
     if (!block) return null;
-    return [...block.querySelectorAll('.prg-stat')].map((s) => ({
-      num: s.querySelector('.prg-stat-num').textContent,
-      label: s.querySelector('.prg-stat-label').textContent,
+    return [...block.querySelectorAll('.prg-fact')].map((r) => ({
+      label: r.querySelector('dt').textContent,
+      value: r.querySelector('dd').textContent,
     }));
   };
 
   it('reports plays, completions and saves from the library store', () => {
     setupGlobals({ listening: { plays: 12, completions: 5, saved: 3 } });
     const { container } = renderScreen();
-    expect(listenCells(container)).toEqual([
-      { num: '12', label: 'Recordings Played' },
-      { num: '5', label: 'Heard to the End' },
-      { num: '3', label: 'Saved' },
+    expect(listenRows(container)).toEqual([
+      { label: 'Recordings played', value: '12' },
+      { label: 'Heard to the end', value: '5' },
+      { label: 'Saved', value: '3' },
     ]);
   });
 
@@ -328,30 +352,30 @@ describe('MyProgressScreen — listening block', () => {
     // Twenty starts, one finish: the block must not conflate the two.
     setupGlobals({ listening: { plays: 20, completions: 1, saved: 0 } });
     const { container } = renderScreen();
-    const cells = listenCells(container);
-    expect(cells[1]).toEqual({ num: '1', label: 'Heard to the End' });
-    expect(container.querySelector('.prg-listen-hero').textContent).toContain('recording finished');
+    const rows = listenRows(container);
+    expect(rows[0]).toEqual({ label: 'Recordings played', value: '20' });
+    expect(rows[1]).toEqual({ label: 'Heard to the end', value: '1' });
   });
 
   it('hides the whole block for a reader who has never played anything', () => {
     setupGlobals({ listening: { plays: 0, completions: 0, saved: 0 } });
     const { container } = renderScreen();
-    expect(listenCells(container)).toBeNull();
+    expect(listenRows(container)).toBeNull();
   });
 
   it('hides the block entirely when the library store is absent', () => {
     setupGlobals();
     const { container } = renderScreen();
-    expect(listenCells(container)).toBeNull();
-    // …and the top hero is untouched by its absence.
-    expect([...container.querySelectorAll('.prg-stat-num')].length).toBe(4);
+    expect(listenRows(container)).toBeNull();
+    // …and the reading rows are untouched by its absence.
+    expect(fact(container, 'Chapters & letters read')).toBe('0');
   });
 
-  it('omits a single cell whose reader the store cannot answer', () => {
+  it('omits a single row whose reader the store cannot answer', () => {
     setupGlobals();
     globalThis.AudioLibraryStore = mkStore({ getPlays: () => 4 });   // no saved(), no getCompletions()
     const { container } = renderScreen();
-    expect(listenCells(container)).toEqual([{ num: '4', label: 'Recordings Played' }]);
+    expect(listenRows(container)).toEqual([{ label: 'Recordings played', value: '4' }]);
   });
 });
 
@@ -415,6 +439,24 @@ describe('MyProgressScreen — the Milestones strip', () => {
     // 3 reading tiers (200 unreached) + 3 word tiers (1M unreached) + both
     // returns. Pinned so a silently-empty `expected` can't make this vacuous.
     expect(expected.length).toBe(8);
+  });
+
+  it('leads with the nearest unreached milestone as "Next", with its progress', () => {
+    setupGlobals();
+    globalThis.ReadingStatsStore = mkStore({
+      get: () => ({ totalWordsRead: 0, totalCompletions: 7, rereads: 0 }),
+      measuredWpm: () => null,
+      wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
+    });
+    const { container } = renderScreen();
+    const next = container.querySelector('.prg-next');
+    expect(next.querySelector('.prg-row-label').textContent).toBe('Next: 10 readings finished');
+    expect(next.querySelector('.prg-row-tally').textContent).toBe('7 of 10');
+    expect(next.querySelector('.prg-next-fill').style.width).toBe('70%');
+    // The section's figure counts the whole journey, the way the Milestones screen does.
+    const built = buildAchievements(collectAchievementSnapshot({}));
+    expect(container.querySelector('[aria-labelledby="prg-h-milestones"] .prg-section-meta').textContent)
+      .toBe(built.earned + ' of ' + built.total + ' reached');
   });
 
   it('keeps the "View all milestones" doorway to the full screen', () => {

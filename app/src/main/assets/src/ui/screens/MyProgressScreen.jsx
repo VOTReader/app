@@ -1,17 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════════════
    MyProgressScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   "My Progress" dashboard — one read-only screen unifying data that all
-   already exists elsewhere (zero new persistence):
-   - hero: chapters/letters read (mark-as-read), journal streak, entries,
-     lifetime words read + measured pace (ReadingStatsStore)
+   The Progress dashboard — one read-only screen unifying data that all
+   already exists elsewhere (zero new persistence). Since the redesign
+   (2026-09-25) it reads top to bottom as:
+   - one summary sentence (read, reading streak, journal entries)
    - last-14-days words-read mini bars (ReadingStatsStore.wordsForDays)
-   - per-collection reading progress (shared buildProgressGroups table)
-   - journaling: words written (journal text blocks) + voice-memo minutes
-     (JournalMediaStore durations)
-   - library counts (notes / marks / bookmarks / links)
-   - most-annotated books & letters (AnnotationStore, Hidden Manna
+   - Reading: chapters/letters read (mark-as-read), reading streak, words
+     read, measured pace, time, re-reads (ReadingStatsStore), then the
+     per-collection progress (shared buildProgressGroups table)
+   - Milestones: the nearest one as "Next", then the featured ten
+   - Journal: entries, streak, words written (journal text blocks) and
+     voice-memo minutes (JournalMediaStore durations)
+   - Listening, Your library (notes / marks / bookmarks / links), and
+     the most-annotated books & letters (AnnotationStore, Hidden Manna
      filtered by progress-stats — never surfaces here)
+   Each section is label / value rows on hairlines; no boxes.
 
    History-derived rows honor historyEnabled=false. The reading table
    honors settings.markAsRead the same way Settings does (hidden behind
@@ -231,27 +235,50 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
     });
   }
 
-  const heroStats = [
-    { num: totalRead, label: 'Read', sub: totalRead === 1 ? 'chapter or letter' : 'chapters & letters' },
-    { num: readStreak, label: 'Reading Streak', sub: readStreak === 1 ? 'day of reading' : 'days of reading' },
-    { num: streak, label: 'Journal Streak', sub: streak === 1 ? 'day of journaling' : 'days of journaling' },
-    { num: journalCount, label: journalCount === 1 ? 'Entry' : 'Entries', sub: 'in your journal' },
-    ...(readingStats ? [{ num: _fmtWords(readingStats.totalWordsRead || 0), label: 'Words Read', sub: 'across your reading' }] : []),
-    ...(measuredWpm ? [{ num: measuredWpm, label: 'Reading Pace', sub: 'words per minute' }] : []),
-    // Re-reads only appear once one exists — a zero here would just be noise.
-    ...(readingStats && readingStats.rereads > 0
-      ? [{ num: readingStats.rereads, label: 'Re-reads', sub: readingStats.rereads === 1 ? 'letter or chapter revisited' : 'letters & chapters revisited' }] : []),
+  /* ── The redesign (2026-09-25, Codex mockup r5 take 1) ─────────────────
+     This was a grid of up to eight gold-outlined stat boxes, then boxed cards
+     under spaced-capital labels: the busiest screen in the app. It now reads
+     as one sentence ("27 chapters and letters read, a 4-day reading streak and
+     5 journal entries."), the 14-day chart, and plain sections of label /
+     value rows on hairlines, each fact in the section it belongs to. The
+     guards are the ones the boxes had: a store that cannot answer hides its
+     row, it never reports 0. */
+  const plural = (n, one, many) => n.toLocaleString('en-US') + ' ' + (n === 1 ? one : many);
+  const summary = (() => {
+    const bits = [];
+    if (totalRead > 0) bits.push(plural(totalRead, 'chapter or letter read', 'chapters and letters read'));
+    if (readStreak >= 2) bits.push('a ' + readStreak + '-day reading streak');
+    if (journalCount > 0) bits.push(plural(journalCount, 'journal entry', 'journal entries'));
+    if (bits.length === 0) return 'Nothing read yet. The chapters and letters you read are counted here.';
+    const s = bits.length === 1 ? bits[0] : bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+  })();
+
+  const readingFacts = [
+    { label: 'Chapters & letters read', value: totalRead.toLocaleString('en-US') },
+    { label: 'Reading streak', value: plural(readStreak, 'day', 'days') },
+    ...(readingStats ? [{ label: 'Words read', value: _fmtWords(readingStats.totalWordsRead || 0) }] : []),
+    ...(measuredWpm ? [{ label: 'Reading pace', value: measuredWpm + ' words a minute' }] : []),
     // Lifetime reading time — the ledger's visibility-honest activeMs sum.
     ...(readingStats && readingStats.totalActiveMs > 60000
-      ? [{ num: _fmtDuration(readingStats.totalActiveMs), label: 'Reading Time', sub: 'time actually spent reading' }] : []),
+      ? [{ label: 'Time spent reading', value: _fmtDuration(readingStats.totalActiveMs) }] : []),
+    // Re-reads only appear once one exists — a zero here would just be noise.
+    ...(readingStats && readingStats.rereads > 0
+      ? [{ label: 'Re-reads', value: readingStats.rereads.toLocaleString('en-US') }] : []),
+  ];
+  const journalFacts = [
+    { label: 'Entries', value: journalCount.toLocaleString('en-US') },
+    { label: 'Journal streak', value: plural(streak, 'day', 'days') },
+    ...(journalWords !== null ? [{ label: 'Words written', value: _fmtWords(journalWords) }] : []),
+    ...(voiceMins > 0 ? [{ label: 'Voice memos', value: voiceMins + ' min' }] : []),
   ];
   /* Listening (2026-08-09). Three facts the Listening Library already keeps,
      each a DIFFERENT act: pressing play, finishing what you started, and
      keeping a recording. Every guard is independent — a store that cannot
-     answer a question contributes null and its cell is omitted rather than
-     reported as 0. The whole block hides while all three are zero: a reader
+     answer a question contributes null and its row is omitted rather than
+     reported as 0. The whole section hides while all three are zero: a reader
      who has never opened a recording is shown nothing, not three zeros. */
-  const listenStats = (() => {
+  const listenFacts = (() => {
     if (typeof AudioLibraryStore === 'undefined') return [];
     const num = (fn) => (typeof fn === 'function' ? Math.max(0, Math.floor(Number(fn()) || 0)) : null);
     const plays = num(AudioLibraryStore.getPlays && AudioLibraryStore.getPlays.bind(AudioLibraryStore));
@@ -260,18 +287,50 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
       ? (AudioLibraryStore.saved() || []).length : null;
     if (!plays && !done && !savedCount) return [];
     return [
-      ...(plays === null ? [] : [{ num: plays.toLocaleString('en-US'), label: 'Recordings Played', sub: plays === 1 ? 'time you pressed play' : 'times you pressed play' }]),
-      ...(done === null ? [] : [{ num: done.toLocaleString('en-US'), label: 'Heard to the End', sub: done === 1 ? 'recording finished' : 'recordings finished' }]),
-      ...(savedCount === null ? [] : [{ num: savedCount.toLocaleString('en-US'), label: 'Saved', sub: savedCount === 1 ? 'recording kept' : 'recordings kept' }]),
+      ...(plays === null ? [] : [{ label: 'Recordings played', value: plays.toLocaleString('en-US') }]),
+      ...(done === null ? [] : [{ label: 'Heard to the end', value: done.toLocaleString('en-US') }]),
+      ...(savedCount === null ? [] : [{ label: 'Saved', value: savedCount.toLocaleString('en-US') }]),
     ];
   })();
 
-  const libraryRows = [
-    { label: 'Notes', count: noteCount },
-    { label: 'Highlights & Underlines', count: markCount },
-    { label: 'Bookmarks', count: bookmarkCount },
-    { label: 'Links', count: linkCount },
+  const libraryFacts = [
+    { label: 'Notes', value: noteCount.toLocaleString('en-US') },
+    { label: 'Highlights & Underlines', value: markCount.toLocaleString('en-US') },
+    { label: 'Bookmarks', value: bookmarkCount.toLocaleString('en-US') },
+    { label: 'Links', value: linkCount.toLocaleString('en-US') },
   ];
+
+  /* BACKLOG [23] — reading milestones. ONE ENGINE since 2026-08-10: the rows
+     are the FEATURED subset of utils/achievements.js, the same items the
+     Milestones screen renders, so the two cannot disagree about what has been
+     earned. Locked rows are still shown — a milestone you cannot see is not a
+     goal — and since 2026-09-25 the nearest one leads as "Next". Unmemoized:
+     this screen already subscribes to every contributing store, and it
+     renders rarely enough that the snapshot walk is not worth a memo key. */
+  const built = buildAchievements(collectAchievementSnapshot(readItems));
+  const ms = built.featured || [];
+  const msEarned = ms.filter((m) => m.earned);
+  const next = ms.filter((m) => !m.earned)
+    .reduce((best, m) => (!best || m.fraction > best.fraction ? m : best), /** @type {any} */ (null));
+
+  /** Label / value rows on hairlines. @param {Array<{ label: string, value: string }>} rows */
+  const facts = (rows) => (
+    <dl className="prg-facts">
+      {rows.map((r) => (
+        <div key={r.label} className="prg-fact">
+          <dt>{r.label}</dt>
+          <dd>{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+  /** A section's small-capitals name, with an optional figure at the right. */
+  const head = (id, name, meta) => (
+    <div className="prg-section-head">
+      <h2 id={id}>{name}</h2>
+      {meta ? <span className="prg-section-meta">{meta}</span> : null}
+    </div>
+  );
 
   return (
     <ScreenLayout
@@ -283,15 +342,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
           <p className="study-head-sub">Your reading, journaling and study at a glance.</p>
         </header>
 
-        <div className="prg-hero">
-          {heroStats.map((s) => (
-            <div key={s.label} className="prg-stat">
-              <span className="prg-stat-num">{s.num}</span>
-              <span className="prg-stat-label">{s.label}</span>
-              <span className="prg-stat-sub">{s.sub}</span>
-            </div>
-          ))}
-        </div>
+        <p className="prg-summary">{summary}</p>
 
         {wordDays ? (() => {
           const max = Math.max(0, ...wordDays.map((d) => d.words));
@@ -319,153 +370,114 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
           );
         })() : null}
 
-        {/* BACKLOG [23] — reading milestones. ONE ENGINE since 2026-08-10:
-            these ten rows are the FEATURED subset of utils/achievements.js,
-            the same items the Milestones screen renders, so the strip and the
-            full screen cannot disagree about what has been earned. (They could
-            before: this strip read the store's persisted once-ever unlock
-            ledger while the screen recomputes earned-ness from the data.)
-            Locked rows are still shown — a milestone you cannot see is not a
-            goal. Unmemoized, like LibraryScreen's summary tile: this screen
-            already subscribes to every contributing store, and it renders
-            rarely enough that the snapshot walk is not worth a memo key. */}
-        {(() => {
-          const ms = buildAchievements(collectAchievementSnapshot(readItems)).featured;
-          if (!ms || ms.length === 0) return null;
-          const earned = ms.filter((m) => m.earned);
-          return (
-            <div className="settings-section prg-section">
-              <div className="settings-section-label">Milestones</div>
-              <span className="sr-only">{earned.length} of {ms.length} reading milestones reached.</span>
-              <div className="prg-milestones">
-                {ms.map((m) => (
-                  <div key={m.key} className={'prg-milestone' + (m.earned ? ' is-unlocked' : '')}>
-                    <span className="prg-milestone-mark" aria-hidden="true">{m.earned ? '✦' : '·'}</span>
-                    <span className="prg-milestone-label">{m.label}</span>
-                    <span className="sr-only">{m.earned ? ' — reached' : ' — not yet reached'}</span>
+        <section className="prg-section" aria-labelledby="prg-h-reading">
+          {head('prg-h-reading', 'Reading')}
+          {facts(readingFacts)}
+          {!markAsReadOn ? (
+            <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>
+          ) : groups.length === 0 ? (
+            <div className="prg-note">Loading your library…</div>
+          ) : (
+            groups.map((grp) => {
+              const t = tallyGroup(readItems, grp);
+              if (t.total === 0) return null;
+              const w = wordStats && wordStats[grp.id];
+              // Bar fill weighs WORDS once computed; item fraction until then.
+              const frac = (w && w.wordsTotal > 0) ? w.wordsRead / w.wordsTotal : t.read / t.total;
+              const pct = Math.min(100, Math.round(frac * 100));
+              return (
+                <div key={grp.id} className="prg-row">
+                  <div className="prg-row-head">
+                    <span className="prg-row-label">{grp.label}</span>
+                    <span className="prg-row-tally">
+                      {t.read.toLocaleString('en-US')} of {t.total.toLocaleString('en-US')}
+                      {w && w.wordsTotal > 0 && (
+                        <>{' · '}<span className="prg-words-note">{_fmtWords(w.wordsRead)} of {_fmtWords(w.wordsTotal)} words</span></>
+                      )}
+                    </span>
                   </div>
-                ))}
-              </div>
-              {/* The strip above is the compact featured 10; the full journey
-                  (chapters, letters, streaks, listening, …) lives one tap away. */}
-              {onOpenMilestones && (
-                <button type="button" className="prg-milestones-all" onClick={onOpenMilestones}>
-                  View all milestones ›
-                </button>
-              )}
+                  <div className="prg-bar" aria-hidden="true">
+                    <div className="prg-bar-fill" style={{ width: pct + '%' }} />
+                  </div>
+                </div>
+              );
+            })
+          )}
+          {historyEnabled && (
+            <div className="prg-history-row">
+              <span className="prg-history-label">Reading history</span>
+              <span className="prg-row-tally">{plural(historyCount, 'entry', 'entries')}</span>
             </div>
-          );
-        })()}
+          )}
+        </section>
 
-        <div className="settings-section prg-section">
-          <div className="settings-section-label">Reading</div>
-          <div className="settings-card">
-            {!markAsReadOn ? (
-              <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>
-            ) : groups.length === 0 ? (
-              <div className="prg-note">Loading your library…</div>
-            ) : (
-              groups.map((grp) => {
-                const t = tallyGroup(readItems, grp);
-                if (t.total === 0) return null;
-                const w = wordStats && wordStats[grp.id];
-                // Bar fill weighs WORDS once computed; item fraction until then.
-                const frac = (w && w.wordsTotal > 0) ? w.wordsRead / w.wordsTotal : t.read / t.total;
-                const pct = Math.min(100, Math.round(frac * 100));
-                return (
-                  <div key={grp.id} className="prg-row">
-                    <div className="prg-row-head">
-                      <span className="prg-row-label">{grp.label}</span>
-                      <span className="prg-row-tally">
-                        {t.read} / {t.total}
-                        {w && w.wordsTotal > 0 && (
-                          <span className="prg-words-note">{' · '}{_fmtWords(w.wordsRead)} / {_fmtWords(w.wordsTotal)} words</span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="prg-bar" aria-hidden="true">
-                      <div className="prg-bar-fill" style={{ width: pct + '%' }} />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            {historyEnabled && (
-              <div className="prg-history-row">
-                <span className="prg-history-label">Reading history</span>
-                <span className="prg-row-tally">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
+        {ms.length > 0 && (
+          <section className="prg-section" aria-labelledby="prg-h-milestones">
+            {head('prg-h-milestones', 'Milestones', built.earned + ' of ' + built.total + ' reached')}
+            {next && (
+              <div className="prg-next">
+                <div className="prg-row-head">
+                  <span className="prg-row-label">Next: {next.label}</span>
+                  <span className="prg-row-tally">{next.value.toLocaleString('en-US')} of {next.threshold.toLocaleString('en-US')}</span>
+                </div>
+                <div className="prg-next-bar" aria-hidden="true">
+                  <div className="prg-next-fill" style={{ width: Math.round(next.fraction * 100) + '%' }} />
+                </div>
               </div>
             )}
-          </div>
-        </div>
-
-        <div className="settings-section prg-section">
-          <div className="settings-section-label">My Library</div>
-          <div className="settings-card">
-            {libraryRows.map((r) => (
-              <div key={r.label} className="progress-row">
-                <span className="progress-row-label">{r.label}</span>
-                <span className="progress-row-tally">{r.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {(journalWords !== null || voiceMins > 0) && (
-          <div className="settings-section prg-section">
-            <div className="settings-section-label">Journaling</div>
-            <div className="settings-card">
-              {journalWords !== null && (
-                <div className="progress-row">
-                  <span className="progress-row-label">Words written</span>
-                  <span className="progress-row-tally">{_fmtWords(journalWords)}</span>
-                </div>
-              )}
-              {voiceMins > 0 && (
-                <div className="progress-row">
-                  <span className="progress-row-label">Voice memos</span>
-                  <span className="progress-row-tally">{voiceMins} min</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {listenStats.length > 0 && (
-          <div className="settings-section prg-section">
-            <div className="settings-section-label">Listening</div>
-            {/* Same hero-cell language as the top of the screen — these are
-                counts of what you did, not rows of a table. */}
-            <div className="prg-hero prg-listen-hero">
-              {listenStats.map((s) => (
-                <div key={s.label} className="prg-stat">
-                  <span className="prg-stat-num">{s.num}</span>
-                  <span className="prg-stat-label">{s.label}</span>
-                  <span className="prg-stat-sub">{s.sub}</span>
+            <span className="sr-only">{msEarned.length} of {ms.length} reading milestones reached.</span>
+            <div className="prg-milestones">
+              {ms.map((m) => (
+                <div key={m.key} className={'prg-milestone' + (m.earned ? ' is-unlocked' : '')}>
+                  <span className="prg-milestone-mark" aria-hidden="true">{m.earned ? '✦' : '·'}</span>
+                  <span className="prg-milestone-label">{m.label}</span>
+                  <span className="sr-only">{m.earned ? ' — reached' : ' — not yet reached'}</span>
                 </div>
               ))}
             </div>
-          </div>
+            {/* These are the featured ten; the full journey (chapters, letters,
+                streaks, listening, …) lives one tap away. */}
+            {onOpenMilestones && (
+              <button type="button" className="prg-milestones-all" onClick={onOpenMilestones}>
+                View all milestones ›
+              </button>
+            )}
+          </section>
         )}
 
-        <div className="settings-section prg-section">
-          <div className="settings-section-label">Most Annotated</div>
-          <div className="settings-card">
-            {topSources.length === 0 ? (
-              <div className="prg-note">Nothing marked yet — press and hold any text while reading to highlight it.</div>
-            ) : (
-              topSources.map((s) => (
-                <div key={s.key} className="prg-src-row">
-                  <div className="prg-src-main">
-                    <span className="prg-src-title">{s.label}</span>
-                    <span className="prg-src-col">{s.collection}</span>
-                  </div>
-                  <span className="prg-row-tally">{s.count} {s.count === 1 ? 'mark' : 'marks'}{s.per1k > 0 ? ' · ' + s.per1k + '/1k words' : ''}</span>
+        <section className="prg-section" aria-labelledby="prg-h-journal">
+          {head('prg-h-journal', 'Journal')}
+          {facts(journalFacts)}
+        </section>
+
+        {listenFacts.length > 0 && (
+          <section className="prg-section prg-listening" aria-labelledby="prg-h-listening">
+            {head('prg-h-listening', 'Listening')}
+            {facts(listenFacts)}
+          </section>
+        )}
+
+        <section className="prg-section" aria-labelledby="prg-h-library">
+          {head('prg-h-library', 'Your library')}
+          {facts(libraryFacts)}
+        </section>
+
+        <section className="prg-section" aria-labelledby="prg-h-annotated">
+          {head('prg-h-annotated', 'Most annotated')}
+          {topSources.length === 0 ? (
+            <div className="prg-note">Nothing marked yet — press and hold any text while reading to highlight it.</div>
+          ) : (
+            topSources.map((s) => (
+              <div key={s.key} className="prg-src-row">
+                <div className="prg-src-main">
+                  <span className="prg-src-title">{s.label}</span>
+                  <span className="prg-src-col">{s.collection}</span>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+                <span className="prg-row-tally">{plural(s.count, 'mark', 'marks')}{s.per1k > 0 ? ' · ' + s.per1k + '/1k words' : ''}</span>
+              </div>
+            ))
+          )}
+        </section>
       </div>
     </ScreenLayout>
   );

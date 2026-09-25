@@ -228,6 +228,33 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* PROGRESS IS SECTIONS OF ROWS (redesign, 2026-09-25, Codex mockup r5 take 1). Up to eight
+   gold-outlined stat boxes and boxed cards became one summary sentence and label / value rows on
+   hairlines; its 10 and 11 px labels grew to 12 or more, and "View all milestones ›" stopped
+   rendering in the browser's sans (a button has no face of its own). */
+describe('app.css — Progress is sections of rows, not boxes', () => {
+  it('has no stat-box rules left', () => {
+    expect(CSS).not.toMatch(/\.prg-hero|\.prg-stat|\.prg-listen-hero/);
+  });
+  it('sets its rows on hairlines', () => {
+    expect(ruleBlock(CSS, '.prg-fact {')).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+  });
+  it('gives the milestones link the body face', () => {
+    expect(ruleBlock(CSS, '.prg-milestones-all {')).toMatch(/font-family:\s*var\(--font-body\)/);
+  });
+  it('keeps every Progress type size at 12 px or more', () => {
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const re = /([^{}]*\.prg-[^{}]*)\{([^{}]*)\}/g;
+    const small = [];
+    let m;
+    while ((m = re.exec(bare))) {
+      const fs = /font-size:\s*var\(--fs-(\d+)\)/.exec(m[2]);
+      if (fs && Number(fs[1]) < 12) small.push(m[1].trim());
+    }
+    expect(small).toEqual([]);
+  });
+});
+
 /* THE LIBRARY IS A LIST (redesign, 2026-09-25, Codex mockup r4 take 1). Eight
    bordered cards in two columns became one column of rows on hairlines, in the
    Answers topic rows' language, with every count in one right-hand column. */
@@ -659,7 +686,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.hni-eyebrow', '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
     '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
     '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
-    '.prg-stat-label', '.footnote-list-header', '.related-card-title', '.settings-section-label',
+    '.prg-section-head h2', '.prg-days-head', '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
     '.section-heading', '.compact-list-header',
   ];
