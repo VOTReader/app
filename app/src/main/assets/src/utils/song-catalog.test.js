@@ -3,11 +3,12 @@
    adoption rules, the lookups, and THE queue order (seeded shuffle, one
    version per family). Contract: D:/Swarm/calls/ai-music/catalog-schema.md. */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { isVotAudioUrl, normalizeAudioTrack, isSongKey, songIdOfKey } from './audio-track.js';
 import {
   SONGS_HOST,
   adoptSongCatalog,
+  loadSongCatalog,
   familiesFor,
   familyById,
   featuredOf,
@@ -210,5 +211,89 @@ describe('order — the seeded shuffle and songQueue', () => {
     // Explicit ids keep their order; hidden and unknown ids drop out.
     expect(songQueue({ ids: ['ccccccccccc1', 'aaaaaaaaaaa3', 'ffffffffffff', 'bbbbbbbbbbb1'] }).map((s) => s.id))
       .toEqual(['ccccccccccc1', 'bbbbbbbbbbb1']);
+  });
+});
+
+describe('the loader — network first, the last good copy kept (landing B)', () => {
+  /** A fake IDBAdapter holding the last good copy in `meta`. */
+  function fakeIdb(initial) {
+    const map = new Map();
+    if (initial) map.set('meta/songs-catalog', initial);
+    return {
+      map,
+      get: vi.fn(async (store, key) => map.get(store + '/' + key)),
+      put: vi.fn(async (store, key, value) => { map.set(store + '/' + key, value); }),
+    };
+  }
+  const ok = (body) => Promise.resolve({ ok: true, status: 200, json: async () => body });
+  const v2 = { ...SONG_FIXTURE, version: '2026-09-25.6' };
+
+  afterEach(() => {
+    delete globalThis.IDBAdapter;
+    delete globalThis.fetch;
+  });
+
+  it('fetches the published catalog URL, adopts it and keeps it as the last good copy', async () => {
+    const idb = fakeIdb(SONG_FIXTURE);
+    globalThis.IDBAdapter = idb;
+    globalThis.fetch = vi.fn(() => ok(v2));
+    let notified = 0;
+    SongCatalog.subscribe(() => { notified++; });
+    const p = loadSongCatalog();
+    expect(notified).toBe(0);                                  // async-notify-only: nothing synchronous
+    expect(await p).toBe(true);
+    expect(globalThis.fetch.mock.calls[0][0]).toBe('https://votreader.github.io/songs/catalog.json');
+    expect(globalThis.fetch.mock.calls[0][1]).toMatchObject({ cache: 'no-cache', credentials: 'omit' });
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.6');   // the network wins over the stored copy
+    expect(idb.put).toHaveBeenCalledWith('meta', 'songs-catalog', v2);
+    expect(await loadSongCatalog()).toBe(true);                 // once per launch: no second fetch
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('offline: the last good copy is adopted', async () => {
+    globalThis.IDBAdapter = fakeIdb(SONG_FIXTURE);
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')));
+    expect(await loadSongCatalog()).toBe(true);
+    expect(SongCatalog.loaded).toBe(true);
+    expect(SongCatalog.error).toBe(false);
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-24.6');
+    expect(songById('aaaaaaaaaaa1')).toBeTruthy();
+  });
+
+  it('a 404 or a non-JSON body also falls back to the last good copy', async () => {
+    globalThis.IDBAdapter = fakeIdb(SONG_FIXTURE);
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 404, json: async () => ({}) }));
+    expect(await loadSongCatalog()).toBe(true);
+    _resetSongCatalogForTests();
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }));
+    expect(await loadSongCatalog()).toBe(true);
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-24.6');
+  });
+
+  it('an unknown schema major from the network is REFUSED: the old copy stays, and is not overwritten', async () => {
+    const idb = fakeIdb(SONG_FIXTURE);
+    globalThis.IDBAdapter = idb;
+    globalThis.fetch = vi.fn(() => ok({ ...SONG_FIXTURE, schema: 2, version: 'from-the-future' }));
+    expect(await loadSongCatalog()).toBe(true);
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-24.6');
+    expect(idb.put).not.toHaveBeenCalled();
+    expect(idb.map.get('meta/songs-catalog')).toBe(SONG_FIXTURE);
+  });
+
+  it('nothing anywhere: not loaded, error set — and the next ask tries again', async () => {
+    globalThis.IDBAdapter = fakeIdb(null);
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
+    expect(await loadSongCatalog()).toBe(false);
+    expect(SongCatalog.loaded).toBe(false);
+    expect(SongCatalog.error).toBe(true);
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    expect(await loadSongCatalog()).toBe(true);
+    expect(SongCatalog.error).toBe(false);
+  });
+
+  it('a stored copy of an unknown schema is not adopted either', async () => {
+    globalThis.IDBAdapter = fakeIdb({ ...SONG_FIXTURE, schema: 9 });
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
+    expect(await loadSongCatalog()).toBe(false);
   });
 });

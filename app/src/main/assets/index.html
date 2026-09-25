@@ -43,15 +43,21 @@
        INSTALLED APK's own copy (the App version row). Both are covered by 'self';
        the SW's own corpus fetch is same-origin + not page-CSP-governed.
        img-src KEEPS the GitHub hosts: the web Garden renders release-asset
-       <img>s cross-origin (the one online-only feature). -->
+       <img>s cross-origin (the one online-only feature).
+       https://votreader.github.io (2026-09-24, Songs of the Letters) is in
+       media-src, img-src and connect-src: the song shards (songs-<n>/<id>.mp3),
+       their catalog, covers and lyrics (songs/). It IS 'self' in the PWA, but
+       the APK's origin is appassets.androidplatform.net, so the host is named;
+       and media-src has no 'self' at all. What may PLAY from it is narrower
+       still: audio-track.js accepts one exact song pattern. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-OZZskKxH5d2nH7fpmheWhG0lWQwj2i4yj0e3WDqinZc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
-    img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
+    img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
-    connect-src 'self';
-    media-src blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
+    connect-src 'self' https://votreader.github.io;
+    media-src blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     object-src 'none';
     frame-src 'none';
     base-uri 'self';

@@ -66,7 +66,13 @@ function library(rate = 1) {
   };
 }
 
+const realFetch = globalThis.fetch;
+
 beforeEach(async () => {
+  // The boot rebuild asks the catalog loader, which is network-first: no test
+  // may reach the real network, so the network is down and the catalog adopted
+  // into the module instance stands.
+  globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('no network in tests')));
   FakeAudio.last = null;
   globalThis.Audio = FakeAudio;
   globalThis.AUDIO_MANIFEST = { 'vol1:letter-a': [['idA1', 'B']], 'vol1:letter-b': [['idB1', 'T']] };
@@ -82,6 +88,7 @@ afterEach(() => {
     'Audio', 'COLLECTIONS', 'COL_BY_KEY', 'colPreface', 'colLetterArr', 'MediaMetadata']) delete globalThis[k];
   delete window.navigator.mediaSession;
   delete window.AndroidBridge;
+  globalThis.fetch = realFetch;
 });
 
 describe('playSongs — a songs queue on the one engine', () => {
@@ -239,7 +246,7 @@ describe('the boot snapshot of a songs queue', () => {
     expect(restored.shuffle).toBe(true);
     expect(restored.repeat).toBe('all');
     AudioPlayer.toggle();                          // the first tap rebuilds
-    await new Promise((r) => setTimeout(r, 0));
+    await vi.waitFor(() => expect(AudioPlayer.getState().sourceMode).toBe('songs'));
     const s = AudioPlayer.getState();
     expect(s.restoring).toBe(false);
     expect(s.sourceMode).toBe('songs');

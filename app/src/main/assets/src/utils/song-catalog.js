@@ -228,14 +228,90 @@ export function adoptSongCatalog(value) {
   return true;
 }
 
+/* ── the loader: network first, the last good copy kept ───────────────────
+   Once per launch (catalog-schema.md "App side"): fetch the published catalog
+   from the network; adopt it and keep it as the LAST GOOD COPY in IDB (the
+   `meta` store, the one store the backup exempts: this is not user data).
+   When the network fails — offline, a 404, a timeout — or answers with a
+   catalog this build refuses (an unknown schema major), adopt the last good
+   copy instead, so a bad publish or a tunnel never empties the Songs shelf.
+   The PWA's service worker answers this URL stale-while-revalidate, so a
+   network-first fetch there returns the SW's copy at once and refreshes it for
+   the next launch.
+   Async-notify-only, like the lazy corpora (ARCHITECTURE "Lazy corpora"):
+   load() never bumps synchronously, so a render-phase kick is safe. */
+
+const LAST_GOOD_STORE = 'meta';
+const LAST_GOOD_KEY = 'songs-catalog';
+/** A wedged request must not hold the shelf hostage; the last good copy answers. */
+const FETCH_TIMEOUT_MS = 15000;
+/** @type {Promise<boolean> | null} */
+let _loadPromise = null;
+
+/** IDBAdapter is bundle-b, reached at call time (the audio snapshot's rule). */
+const _idb = () => /** @type {any} */ (globalThis).IDBAdapter || null;
+
+/** @returns {Promise<unknown>} the network's catalog JSON, or null */
+async function _fetchCatalog() {
+  const f = /** @type {any} */ (globalThis).fetch;
+  if (typeof f !== 'function') return null;
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS) : null;
+  try {
+    const res = await f(SONGS_HOST.catalogUrl, { cache: 'no-cache', credentials: 'omit', signal: ctrl ? ctrl.signal : undefined });
+    if (!res || !res.ok) return null;
+    return await res.json();
+  } catch (_e) {
+    return null;   // offline, blocked, aborted, or not JSON — the last good copy answers
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** @returns {Promise<unknown>} */
+async function _readLastGood() {
+  const idb = _idb();
+  if (!idb || typeof idb.get !== 'function') return null;
+  try { return await idb.get(LAST_GOOD_STORE, LAST_GOOD_KEY); } catch (_e) { return null; }
+}
+
+/** @param {unknown} raw */
+function _keepLastGood(raw) {
+  const idb = _idb();
+  if (!idb || typeof idb.put !== 'function') return;
+  try { Promise.resolve(idb.put(LAST_GOOD_STORE, LAST_GOOD_KEY, raw)).catch(() => {}); } catch (_e) { /* best-effort */ }
+}
+
 /**
- * Make the catalog available. Resolves true when one is loaded. The network
- * leg (fetch, last-good copy) is the loader landing's; until then this only
- * reports the catalog adopted so far.
+ * Make the catalog available: network first, then the last good copy.
+ * Resolves true when a catalog is loaded. Idempotent once it has succeeded;
+ * a load that found nothing anywhere (first launch, offline) is retried by the
+ * next call, and flags `error` meanwhile.
  * @returns {Promise<boolean>}
  */
 export function loadSongCatalog() {
-  return Promise.resolve(!!_catalog);
+  if (_loadPromise) return _loadPromise;
+  const run = (async () => {
+    const fresh = await _fetchCatalog();
+    if (fresh && adoptSongCatalog(fresh)) {
+      _keepLastGood(fresh);
+      return true;
+    }
+    // The network failed or published a catalog this build refuses: the copy
+    // already in memory stands; else the last good one from IDB.
+    if (!_catalog) {
+      const last = await _readLastGood();
+      if (last) adoptSongCatalog(last);
+    }
+    if (!_catalog) {
+      _error = true;
+      _bump();
+      _loadPromise = null;   // nothing anywhere: the next ask tries again
+    }
+    return !!_catalog;
+  })();
+  _loadPromise = run;
+  return run;
 }
 
 /* ── lookups ──────────────────────────────────────────────────────────── */
@@ -471,6 +547,7 @@ export function songTrack(song) {
 /** Test seam: forget the loaded catalog. */
 export function _resetSongCatalogForTests() {
   _catalog = null;
+  _loadPromise = null;
   _error = false;
   _version = 0;
   _listeners.clear();

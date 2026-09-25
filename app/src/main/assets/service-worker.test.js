@@ -476,6 +476,74 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
   });
 });
 
+describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
+  const songsCache = async (sw) => sw.caches.open('vot-songs-v1');
+
+  it('lets the mp3 shards pass straight through — never proxied, never cached', async () => {
+    const netCalls = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return { ok: true }; } });
+    expect(fetchEvent(sw, getReq('https://app.test/songs-1/3fa9c1d2e4b5.mp3'))).toBeUndefined();
+    expect(fetchEvent(sw, getReq('https://app.test/songs-12/000000000000.mp3'))).toBeUndefined();
+    expect(netCalls).toEqual([]);                    // the browser fetched it, not the worker
+    // A look-alike path is NOT a shard: it takes the ordinary route.
+    expect(fetchEvent(sw, getReq('https://app.test/app/songs-1/x.mp3'))).toBeDefined();
+  });
+
+  it('serves the catalog stale-while-revalidate: the cached copy at once, the fresh one stored for next time', async () => {
+    const fresh = { ok: true, redirected: false, body: 'catalog-v2', clone: () => ({ body: 'catalog-v2' }) };
+    const netCalls = [];
+    const waited = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return fresh; } });
+    const cache = await songsCache(sw);
+    const stale = { body: 'catalog-v1' };
+    await cache.put('https://app.test/songs/catalog.json', stale);
+    let p;
+    sw.handlers.fetch({
+      request: getReq('https://app.test/songs/catalog.json'),
+      respondWith: (promise) => { p = promise; },
+      waitUntil: (promise) => { waited.push(promise); },
+    });
+    expect(await p).toBe(stale);                    // stale, immediately
+    expect(waited).toHaveLength(1);                 // the refresh keeps the worker alive…
+    await waited[0];
+    expect(netCalls).toEqual(['https://app.test/songs/catalog.json']);
+    expect(await cache.match('https://app.test/songs/catalog.json')).toEqual({ body: 'catalog-v2' });   // …and lands
+  });
+
+  it('with nothing cached, answers from the network and keeps the copy (thumbs and lyrics too)', async () => {
+    const fresh = { ok: true, redirected: false, clone: () => ({ body: 'x' }) };
+    const sw = bootSW({ fetchImpl: async () => fresh });
+    for (const url of ['https://app.test/songs/catalog.json', 'https://app.test/songs/thumbs/512/3fa9c1d2e4b5.webp',
+      'https://app.test/songs/lyrics/3fa9c1d2e4b5.json']) {
+      expect(await fetchEvent(sw, getReq(url))).toBe(fresh);
+      expect(await (await songsCache(sw)).match(url)).toBeTruthy();
+    }
+  });
+
+  it('never stores a failed or redirected answer over the copy', async () => {
+    const sw = bootSW({ fetchImpl: async () => ({ ok: false, status: 404, clone: () => ({}) }) });
+    await fetchEvent(sw, getReq('https://app.test/songs/catalog.json'));
+    expect(await (await songsCache(sw)).match('https://app.test/songs/catalog.json')).toBeFalsy();
+    const sw2 = bootSW({ fetchImpl: async () => ({ ok: true, redirected: true, clone: () => ({}) }) });
+    await fetchEvent(sw2, getReq('https://app.test/songs/catalog.json'));
+    expect(await (await songsCache(sw2)).match('https://app.test/songs/catalog.json')).toBeFalsy();
+  });
+
+  it('offline with nothing cached: a 503, not a thrown fetch', async () => {
+    const sw = bootSW({ fetchImpl: async () => { throw new Error('offline'); } });
+    const res = await fetchEvent(sw, getReq('https://app.test/songs/catalog.json'));
+    expect(res.status).toBe(503);
+  });
+
+  it('activate keeps the songs bucket (it is not this build’s to evict)', async () => {
+    const sw = bootSW();
+    await install(sw);
+    await sw.caches.open('vot-songs-v1');
+    await activate(sw);
+    expect(await sw.caches.keys()).toContain('vot-songs-v1');
+  });
+});
+
 /* B5 (2026-09-22): an incomplete offline install is visible and repairable.
    The page asks CHECK_OFFLINE and gets the truth read back from the caches;
    REPAIR_OFFLINE refetches ONLY what is missing and reports complete only when

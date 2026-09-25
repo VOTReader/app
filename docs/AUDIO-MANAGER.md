@@ -249,6 +249,17 @@ boot rebuild both call.
   any queue that is not songs resets repeat, so a letter never loops.
 - The media card's artist line is `Songs of the Letters · <version>`, and the web
   `MediaMetadata` carries the song's 512 px cover.
+- The catalog is published by the songs sites, not shipped in the app:
+  `SongCatalog.load()` fetches `https://votreader.github.io/songs/catalog.json`
+  network-first once per launch, keeps the last good copy in IDB (`meta` /
+  `songs-catalog`, outside the backup), and refuses an unknown schema major
+  (the old copy stays). It is never a `src/data` corpus file, so it never moves
+  `CORPUS_VERSION`.
+- CSP names `https://votreader.github.io` in `media-src`, `img-src` and
+  `connect-src` (it is `'self'` in the PWA, not in the APK). The service worker
+  lets `/songs-<n>/` mp3s pass straight through and serves `/songs/catalog.json`,
+  `/songs/thumbs/` and `/songs/lyrics/` stale-while-revalidate from its own
+  unversioned `vot-songs-v1` bucket.
 
 ## One-audio policy
 

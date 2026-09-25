@@ -2116,6 +2116,9 @@ function _applySnapshot(s) {
     // The desk shows the songs session's shuffle and repeat before the rebuild.
     _state.shuffle = !!_pendingRestore.shuffle;
     _state.repeat = mode === 'songs' && (s.repeat === 'one' || s.repeat === 'all') ? s.repeat : 'off';
+    // The restored bar is a song: start the catalog on its way now (cover,
+    // version, the queue the first tap rebuilds). Idempotent and fail-quiet.
+    if (mode === 'songs') void loadSongCatalog();
     _followLibraryRate();
     _notify();
     return true;

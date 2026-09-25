@@ -7,6 +7,8 @@
  *   CORPUS_CACHE (stable) — lazy-loaded corpus bundles cached on first fetch.
  *     NOT cleared on version bump (corpus data rarely changes).
  *     Only cleared when CORPUS_VERSION changes.
+ *   SONGS_CACHE (unversioned) — the Songs of the Letters catalog, covers and
+ *     lyrics, stale-while-revalidate. The song mp3 shards are never cached here.
  *
  * Update lifecycle (fully automatic):
  *   New SW calls self.skipWaiting() on install → takes over immediately.
@@ -308,7 +310,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-g.js': '3b2ef5b7bb9270169179da31be3232d00a8463b7fd80366adf60fd7cc0b6f03c',
   './dist/bundle-h.js': 'cea92c1203dd84cdd3a64f5a12ab1d3ce7df69c7e53a2924e1b5ab96ccb6a934',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
-  './index.html': '87e0a06590b8f8eb98d1c3a0b2e6abb707a7818eb8a99c0de7426251f76bf1de',
+  './index.html': 'f2d1a3160ab23a8fb2a060c60235de5e5f502c851008d5b0bd4565fcb3804c30',
   './manifest.json': '5483690fc42f1d3738c0fbc96cd41b04eb3ce26ad15d9e5684a71c9e75745052',
   './offline.html': '9967acba6d8c0ec99a176ed1505e6298b0094208b1d6ad767567222bf736f8d1',
 };
@@ -655,6 +657,19 @@ self.addEventListener('fetch', (event) => {
   // is why the Garden is the one online-only feature on web; see offline.html.)
   if (url.origin !== self.location.origin) return;
 
+  // Songs of the Letters (2026-09-24, catalog-schema.md "App side"). On the
+  // PWA's own origin, beside /app/: the mp3 shards (/songs-<n>/) PASS THROUGH —
+  // 3 MB range-requested media the SW must not proxy or pin — and the catalog,
+  // covers and lyrics (/songs/) are stale-while-revalidate: shown at once from
+  // the last copy, refreshed for next time. (The APK never registers this
+  // worker; it reaches the same host cross-origin, straight to the network.)
+  if (/^\/songs-\d+\//.test(url.pathname)) return;
+  if (url.pathname === '/songs/catalog.json' || url.pathname.startsWith('/songs/thumbs/')
+      || url.pathname.startsWith('/songs/lyrics/')) {
+    event.respondWith(staleWhileRevalidate(event));
+    return;
+  }
+
   const filename = url.pathname.split('/').pop();
   // SW1: the dist corpus bundles AND the raw-injected corpus DATA files
   // (src/data/bible-studies.js + the bible-<code>.js alt-translations) are served
@@ -706,6 +721,33 @@ async function coreFirst(request) {
     }
     return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
   }
+}
+
+/* The songs bucket. Not versioned by CACHE_VERSION or CORPUS_VERSION, so a
+   deploy's activate leaves it alone (it deletes only stale vot-core-* /
+   vot-corpus-*): the catalog and covers belong to the songs sites, which
+   publish on their own day, not to this build. */
+const SONGS_CACHE = 'vot-songs-v1';
+
+async function staleWhileRevalidate(event) {
+  const request = event.request;
+  const cache = await caches.open(SONGS_CACHE);
+  const cached = await cache.match(request);
+  const network = fetch(request).then(async (response) => {
+    // Only a clean answer replaces the copy: never a 404, a 5xx, or a redirect
+    // (a captive portal's page would otherwise become "the catalog").
+    if (response && response.ok && !response.redirected) {
+      try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
+    }
+    return response;
+  }).catch(() => null);
+  if (cached) {
+    // The refresh outlives this response: keep the worker alive until it lands.
+    if (typeof event.waitUntil === 'function') event.waitUntil(network);
+    return cached;
+  }
+  const response = await network;
+  return response || new Response('Songs not available offline', { status: 503, statusText: 'Service Unavailable' });
 }
 
 async function corpusFirst(request) {
