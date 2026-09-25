@@ -23,6 +23,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { searchData } from './search-data.js';
+import { blockReadText, segmentsReadText } from '../utils/segment-dom-text.js';
 
 /** @param {string} bookId */
 function bookTestament(bookId) {
@@ -39,24 +40,13 @@ function bookGenre(bookId) {
   return '';
 }
 
-/** Flatten a letter's blocks/segments/lines into one body string. */
+/** Flatten a letter's blocks (prose segments, poetry lines) into one body
+    string, in the reader's text (utils/segment-dom-text.js): no footnote
+    numbers, a letter-link's label, the renderer's spacing. LetterView lands a
+    search excerpt in this same domain. */
 function letterText(letter) {
   if (!letter || !letter.blocks) return '';
-  const out = [];
-  for (let bk = 0; bk < letter.blocks.length; bk++) {
-    const b = letter.blocks[bk];
-    if (b.segments) {
-      for (let s = 0; s < b.segments.length; s++) out.push(b.segments[s].v || '');
-    } else if (b.lines) {
-      for (let li = 0; li < b.lines.length; li++) {
-        const line = b.lines[li];
-        if (Array.isArray(line)) {
-          for (let ls = 0; ls < line.length; ls++) out.push(line[ls].v || '');
-        }
-      }
-    }
-  }
-  return out.join(' ').replace(/\s+/g, ' ').trim();
+  return letter.blocks.map(blockReadText).join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Recursively collect text from a Bible-study chapter's nested content tree. */
@@ -65,11 +55,15 @@ function collectStudyText(node, out) {
   if (typeof node === 'string') { out.push(node); return; }
   if (Array.isArray(node)) { for (let i = 0; i < node.length; i++) collectStudyText(node[i], out); return; }
   if (typeof node === 'object') {
-    if (node.text) out.push(node.text);
+    // A heading shows a scripture ref as the bare reference ("The Sign of Jonah (Matthew 12:39-40)").
+    if (node.text) out.push(String(node.text).replace(/\{\{ref:([^}]+)\}\}/g, (_m, ref) => ref.trim()));
     if (node.content) collectStudyText(node.content, out);
     if (node.paragraphs) collectStudyText(node.paragraphs, out);
-    if (node.segments) collectStudyText(node.segments, out);
-    if (node.v) out.push(node.v);
+    // A run of segments reads as the reader reads it: walking into each
+    // segment's `v` put footnote numbers in the body and left out every
+    // letter-link's label (109 in study paragraphs).
+    if (node.segments) out.push(segmentsReadText(node.segments));
+    if (node.v && node.t !== 'fn') out.push(node.v);
   }
 }
 

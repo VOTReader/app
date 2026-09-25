@@ -63,3 +63,46 @@ export function segmentsDomText(segments) {
   }
   return out;
 }
+
+/**
+ * The text a READER reads in a run of segments: the rendered text above
+ * WITHOUT the footnote markers, which are superscript numbers, not words.
+ *
+ * This is the search index's text domain (search/index-builder.js): it is what
+ * a result's snippet shows, and LetterView lands a search excerpt on it, so
+ * both call in here. When the index pushed every segment's `v` instead, a
+ * footnote's number sat in the body text ("…know them. 2 And was I…") and a
+ * letter-link's label was missing. Dropping a footnote cannot glue its
+ * neighbours: the collision guard runs over the run without it. A stanza
+ * break reads as a space (the DOM draws it as a line break, which the flat
+ * text has no other way to keep).
+ * @param {Array<any>} segments
+ * @returns {string}
+ */
+export function segmentsReadText(segments) {
+  if (!segments || !segments.length) return '';
+  const run = segments.filter((seg) => seg && seg.t !== 'fn');
+  let out = '';
+  for (let i = 0; i < run.length; i++) {
+    const seg = run[i];
+    if (seg.t === RENDERS_NOTHING) { out += ' '; continue; }
+    if (seg.t === 'letter-link') { out += String(seg.label == null ? '' : seg.label); continue; }
+    out += String(segmentRenderText(run, i))
+      .replace(/\{\{ref:([^}]+)\}\}/g, (_m, ref) => ref.trim());
+  }
+  return out;
+}
+
+/**
+ * A letter block's reading text: its prose segments, or its poetry lines (one
+ * run per line, joined by a space). Any other block (a heading, an image)
+ * reads as ''.
+ * @param {any} block
+ * @returns {string}
+ */
+export function blockReadText(block) {
+  if (!block) return '';
+  if (block.segments) return segmentsReadText(block.segments);
+  if (block.lines) return block.lines.map((ln) => (Array.isArray(ln) ? segmentsReadText(ln) : '')).join(' ');
+  return '';
+}

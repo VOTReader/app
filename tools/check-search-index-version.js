@@ -24,6 +24,7 @@
  *   search-config.js      MS_FIELDS / MS_STORE_FIELDS / buildMiniSearchOptions
  *   tokenize.js           kjvEncode IS the index-time tokenizer (search-config.js:60)
  *   vendor/minisearch.js  the serialization format loadJSON has to read back
+ *   ../utils/segment-dom-text.js  the reader's text a letter or study body is flattened to
  *
  * Deliberately NOT fingerprinted: ranking.js, snippet.js, query-parse.js,
  * synonyms.js. Those run at QUERY time against whatever index exists, so a cached
@@ -52,6 +53,9 @@ const INDEX_SHAPING_FILES = [
   'search-config.js',
   'tokenize.js',
   'vendor/minisearch.js',
+  // index-builder flattens letter and study bodies through it (segmentsReadText /
+  // blockReadText), so a change there changes what goes into the index.
+  '../utils/segment-dom-text.js',
 ];
 
 const args = process.argv.slice(2);
