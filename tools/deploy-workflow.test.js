@@ -76,8 +76,16 @@ describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
     expect(gate, 'the gate no longer filters on the waking run: any CI completion on main re-picks').not.toMatch(/\n {4}if:/);
     const build = code(all.build || '');
     expect(build).toMatch(/needs: gate/);
-    expect(build).toContain("if: needs.gate.outputs.publish == 'true'");
+    expect(build).toContain("if: needs.gate.outputs.publish == 'true' && github.run_attempt == 1");
     expect(code(all.deploy || '')).toMatch(/needs: build/);
+  });
+
+  it('a re-run never publishes: "Re-run failed jobs" keeps the gate\'s old pick (the ci10 refutation)', () => {
+    // An older run whose build or deploy failed, re-run after a newer deploy, would publish its
+    // older commit over the newer one. Both jobs that can lead to a publish run on attempt 1 only.
+    const all = jobs();
+    expect(code(all.build || '')).toMatch(/\n {4}if: [^\n]*github\.run_attempt == 1/);
+    expect(code(all.deploy || '')).toMatch(/\n {4}if: github\.run_attempt == 1\n/);
   });
 
   it('runs one deploy at a time, gate to publish, so a later pick never lands before an earlier one', () => {

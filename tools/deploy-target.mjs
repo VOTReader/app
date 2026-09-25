@@ -63,41 +63,60 @@ async function gh(path) {
   return res.json();
 }
 
+/**
+ * The whole decision, with the GitHub API passed in (so tests can fake it).
+ * Returns the sha to publish, or null.
+ */
+export async function findTarget({ repo, api, dispatchSha = '', log = console.log }) {
+  const tip = (await api(`repos/${repo}/git/ref/heads/main`)).object.sha;
+  log(`main is at ${tip}`);
+
+  if (dispatchSha) {
+    const sha = dispatchTarget(dispatchSha, tip);
+    log(`manual deploy of ${dispatchSha}: ${sha ? 'it is the tip' : 'not the tip, skipped'}`);
+    return sha;
+  }
+
+  const shas = new Set();
+  // Green CI runs of pushes to main in this repository (the API's branch filter
+  // also matches a tag or a fork branch named main; the compare below drops
+  // anything not on main). 15 runs cover hours of a busy main and keep a gate
+  // near 20 API calls.
+  const ci = await api(`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=15`);
+  for (const r of ci.workflow_runs) if (r.head_repository?.full_name === repo) shas.add(r.head_sha);
+  // The newest manual override that actually published (its deploy job succeeded;
+  // a dispatch that skipped also ends 'success'). Overrides publish only the tip of
+  // their moment, so the newest one is the only one that can outrank green CI; a
+  // run of skipped dispatches must not push it out of view (the ci10 refutation).
+  const manual = await api(`repos/${repo}/actions/workflows/deploy-web.yml/runs?event=workflow_dispatch&status=success&per_page=30`);
+  for (const r of manual.workflow_runs) {
+    const jobs = await api(`repos/${repo}/actions/runs/${r.id}/jobs`);
+    if (jobs.jobs.some((j) => j.name === 'deploy' && j.conclusion === 'success')) { shas.add(r.head_sha); break; }
+  }
+
+  const candidates = [];
+  for (const s of shas) {
+    // One failed compare (GitHub gives up on a huge diff) drops that candidate,
+    // never the whole gate: a thrown gate would stop every deploy.
+    try {
+      const cmp = await api(`repos/${repo}/compare/${s}...${tip}?per_page=1`);
+      candidates.push({ sha: s, status: cmp.status, behind: cmp.ahead_by });
+    } catch (e) {
+      log(`::warning::compare ${s}...${tip} failed, candidate skipped: ${String(e.message).slice(0, 200)}`);
+    }
+  }
+  const sha = pickTarget(candidates);
+  const pick = candidates.find((c) => c.sha === sha);
+  log(sha
+    ? `newest green commit on main: ${sha} (${pick.behind} behind the tip)`
+    : 'no green commit on main among the recent CI runs');
+  return sha;
+}
+
 async function main() {
   const repo = process.env.REPO;
   if (!repo || !process.env.GH_TOKEN) throw new Error('REPO and GH_TOKEN are required');
-  const tip = (await gh(`repos/${repo}/git/ref/heads/main`)).object.sha;
-  console.log(`main is at ${tip}`);
-
-  let sha;
-  if (process.env.DISPATCH_SHA) {
-    sha = dispatchTarget(process.env.DISPATCH_SHA, tip);
-    console.log(`manual deploy of ${process.env.DISPATCH_SHA}: ${sha ? 'it is the tip' : 'not the tip, skipped'}`);
-  } else {
-    const shas = new Set();
-    // Green CI runs of pushes to main in this repository (the API's branch
-    // filter also matches a tag or a fork branch named main; the compare below
-    // drops anything not on main).
-    const ci = await gh(`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=30`);
-    for (const r of ci.workflow_runs) if (r.head_repository?.full_name === repo) shas.add(r.head_sha);
-    // Manual override deploys whose build job ran (a skipped gate is 'success' too).
-    const manual = await gh(`repos/${repo}/actions/workflows/deploy-web.yml/runs?event=workflow_dispatch&status=success&per_page=5`);
-    for (const r of manual.workflow_runs) {
-      const jobs = await gh(`repos/${repo}/actions/runs/${r.id}/jobs`);
-      if (jobs.jobs.some((j) => j.name === 'build' && j.conclusion === 'success')) shas.add(r.head_sha);
-    }
-    const candidates = [];
-    for (const s of shas) {
-      const cmp = await gh(`repos/${repo}/compare/${s}...${tip}`);
-      candidates.push({ sha: s, status: cmp.status, behind: cmp.ahead_by });
-    }
-    sha = pickTarget(candidates);
-    const pick = candidates.find((c) => c.sha === sha);
-    console.log(sha
-      ? `newest green commit on main: ${sha} (${pick.behind} behind the tip)`
-      : 'no green commit on main among the recent CI runs');
-  }
-
+  const sha = await findTarget({ repo, api: gh, dispatchSha: process.env.DISPATCH_SHA || '' });
   const out = `publish=${sha ? 'true' : 'false'}\nsha=${sha || ''}\n`;
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, out);
   else process.stdout.write(out);

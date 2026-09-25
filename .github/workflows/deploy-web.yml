@@ -91,7 +91,9 @@ permissions: {}
 # a newer waiting run replaces an older waiting one, which is harmless now: every
 # run picks the newest green commit when its gate starts, so the survivor
 # publishes at least what the replaced one would have. Serialized runs and a
-# target that only moves forward mean a deploy never goes backwards.
+# target that only moves forward mean a deploy never goes backwards. One cost: a
+# manual override still WAITING when a CI run completes is replaced by that run,
+# which publishes the newest green commit, not the red tip; dispatch it again.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -129,7 +131,11 @@ jobs:
 
   build:
     needs: gate
-    if: needs.gate.outputs.publish == 'true'
+    # First attempt only (the ci10 refutation): "Re-run failed jobs" keeps the gate's
+    # old pick, so a re-run of an older run whose build or deploy failed would publish
+    # its commit over a newer deploy. The next CI completion re-picks anyway; to retry
+    # by hand, dispatch the workflow (a fresh run, a fresh pick).
+    if: needs.gate.outputs.publish == 'true' && github.run_attempt == 1
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -157,7 +163,8 @@ jobs:
         # On the workflow_run path CI has already run every one of these, and
         # everything this list used to leave out (smoke:ci's black-screen walk, the
         # coverage floors, e2e:read, e2e:readalong, bible-sync, drive routing,
-        # check:s22, the budgets), on this exact SHA: the job's `if:` is that proof.
+        # check:s22, the budgets), on this exact SHA: the gate picked it from main's
+        # green CI runs, and that pick is the proof.
         # A manual dispatch has no CI run behind it - it is the override for a red
         # CI - so it re-proves the checks that decide whether the published bytes
         # are sound: the data gates (check_balance, schemas, corpus/search/audio
@@ -260,6 +267,9 @@ jobs:
     # no checkout, no npm - GitHub's own Pages actions, SHA-pinned, on the
     # artifact `build` uploaded.
     needs: build
+    # First attempt only, like build: re-running just this job would publish the
+    # older artifact the first attempt built.
+    if: github.run_attempt == 1
     runs-on: ubuntu-latest
     permissions:
       pages: write
