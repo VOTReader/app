@@ -364,7 +364,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
           <SearchIcon />
           <label>
             <span className="sr-only">Find a song, a letter, or a maker</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a song, a letter, or a maker" enterKeyHint="search" />
+            <input type="search" aria-label="Find a song" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a song, a letter, or a maker" enterKeyHint="search" />
           </label>
           {query ? <button type="button" className="songs-find-clear" onClick={() => setQuery('')} aria-label="Clear the song search"><CloseIcon /></button> : null}
         </div>
@@ -390,7 +390,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
 
       {filtering ? (
         <section className="songs-section" aria-labelledby="songs-results">
-          <SectionHead id="songs-results" title={style && !words.length ? (styles[style] || 'Songs') : 'Songs'} action={<span className="songs-section-count">{songCountLabel(results.length)}</span>} />
+          <SectionHead id="songs-results" title={style && !words.length ? (styles[style] || 'Songs') : 'Songs'} action={<span className="songs-section-count" aria-live="polite">{songCountLabel(results.length)}</span>} />
           {results.length ? (
             <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResults} onOpen={(f) => open({ k: 'song', v: f.id })} />)}</div>
           ) : (

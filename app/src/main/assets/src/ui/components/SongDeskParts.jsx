@@ -18,6 +18,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
 import { familyById, versionsOf } from '../../utils/song-catalog.js';
 import {
@@ -161,7 +162,7 @@ export function SongLyricsCard({ song, time }) {
     // The box is position:relative, so a line's offsetTop is measured from the box itself.
     const target = line.offsetTop - (box.clientHeight - line.offsetHeight) / 2;
     const top = Math.max(0, target);
-    if (typeof box.scrollTo === 'function') box.scrollTo({ top, behavior: 'smooth' }); else box.scrollTop = top;
+    if (typeof box.scrollTo === 'function') box.scrollTo({ top, behavior: scrollBehavior() }); else box.scrollTop = top;
   }, [now, follow]);
   if (!song) return null;
   if (song.dl === 'instrumental') {
@@ -182,7 +183,7 @@ export function SongLyricsCard({ song, time }) {
           <button type="button" className={'song-lyrics-follow' + (follow ? ' is-on' : '')} aria-pressed={follow} onClick={() => setFollow(!follow)}>Follow along</button>
         ) : null}
       </div>
-      <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} aria-label="Lyrics">
+      <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} role="region" aria-label="Lyrics">
         {lyrics.lines.map((line, i) => (
           <p key={i} className={'song-lyrics-line' + (i === now ? ' is-now' : '')} aria-current={i === now ? 'true' : undefined}>{line.t}</p>
         ))}

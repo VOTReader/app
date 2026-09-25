@@ -87,7 +87,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
       <p className="song-page-shelf">{letter ? letter.colLabel : shelfWords(fam.col)}</p>
       <p className="song-page-makers">{makersLine(versions)}</p>
       <div className="song-page-actions">
-        <button type="button" className="songs-shuffle song-page-play" onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))} aria-pressed={isCurrent && active}>
+        <button type="button" className="songs-shuffle song-page-play" onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))}>
           {isCurrent && active ? <PauseIcon /> : <PlayIcon />}<span>{isCurrent && active ? 'Pause' : 'Play'}</span>
         </button>
         <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} onClick={() => { if (library && typeof library.toggleSongSaved === 'function') library.toggleSongSaved(lead.id); }}>
