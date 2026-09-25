@@ -54,7 +54,17 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
 
   const letter = songLetterOf(fam) || songLetterOf(lead);
   const isCurrent = familyIsPlaying(fam.id, playingId);
-  const saved = !!(library && typeof library.isSongSaved === 'function' && library.isSongSaved(lead.id));
+  // n3-08: the desk saves the version playing, so the page counts ANY version
+  // saved (it looked at the first only, and its Save then made a second copy)
+  const savedIds = library && typeof library.isSongSaved === 'function'
+    ? versions.filter((v) => library.isSongSaved(v.id)).map((v) => v.id) : [];
+  const saved = savedIds.length > 0;
+  const toggleSave = () => {
+    if (!library || typeof library.toggleSongSaved !== 'function') return;
+    if (saved) { savedIds.forEach((id) => library.toggleSongSaved(id)); return; }
+    const playingHere = isCurrent && versions.some((v) => v.id === playingId);
+    library.toggleSongSaved(playingHere ? playingId : lead.id);
+  };
   const play = (song) => {
     if (playingId === song.id) { AudioPlayer.toggle(); return; }
     AudioPlayer.playSongs({ filter: { family: fam.id }, startId: song.id, label: fam.t });
@@ -90,7 +100,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
         <button type="button" className="songs-shuffle song-page-play" onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))}>
           {isCurrent && active ? <PauseIcon /> : <PlayIcon />}<span>{isCurrent && active ? 'Pause' : 'Play'}</span>
         </button>
-        <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} onClick={() => { if (library && typeof library.toggleSongSaved === 'function') library.toggleSongSaved(lead.id); }}>
+        <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} onClick={toggleSave}>
           <StarIcon filled={saved} /><span>{saved ? 'Saved' : 'Save'}</span>
         </button>
       </div>

@@ -217,6 +217,21 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
   });
   afterEach(() => { delete window.__openAudioText; });
 
+  /* n3-08 (sweep 2): the page's Save looked at and toggled the family's first
+     version only, while the desk saves the version playing. Saved from the desk
+     as its second version, the song showed "Save" on its page, and tapping it
+     saved a second copy. The page now counts any version saved, and unsaving
+     clears the ones it holds. */
+  it('(n3-08) the page shows Saved when any version is saved, and unsaving clears that version', () => {
+    library.isSongSaved = vi.fn((id) => id === 'aaaaaaaaaaa2');
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
+    const save = document.querySelector('.song-page-save');
+    expect(save.textContent).toBe('Saved');
+    fireEvent.click(save);
+    expect(library.toggleSongSaved).toHaveBeenCalledTimes(1);
+    expect(library.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa2');
+  });
+
   it('a row opens its song; the page names its versions, its letter and its makers', async () => {
     const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
     fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-main'));
