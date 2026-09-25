@@ -440,6 +440,28 @@ if [ -n "$preview_changed" ]; then
   echo ""
 fi
 
+# ─── Step 1c2: the Answers converter's guards (2026-09-25) ──────────
+# tools/fetch-answers.py refuses to write an answers.js whose kept paragraphs
+# move (highlights key on paragraph index) unless --accept-shift, and picks the
+# Blessed entry a bare The_Blessed link quotes. test_fetch_answers.py proves both
+# whenever the converter or the test is staged; ci.yml runs it on every push.
+answers_conv_changed=$(echo "$staged" | grep -E '^(tools/fetch-answers\.py|test_fetch_answers\.py)$' || true)
+if [ -n "$answers_conv_changed" ]; then
+  echo "[pre-commit] Answers converter changed — running test_fetch_answers.py..."
+  $PYBIN -m unittest test_fetch_answers
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Answers converter tests FAILED. Fix tools/fetch-answers.py,"
+    echo "re-stage, then retry."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Answers converter guards hold."
+  echo ""
+fi
+
 # ─── Step 1d: the read-along shipper never deletes what it did not run ───
 # tools/batch-align.py rebuilds src/data/audio-sync.js volume by volume from its
 # run report, so a letter that RAISED or that tools/align-supervisor.py skipped

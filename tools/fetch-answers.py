@@ -33,6 +33,7 @@ import argparse
 import html
 import json
 import os
+import difflib
 import re
 import subprocess
 import sys
@@ -464,7 +465,28 @@ class Matcher:
                 self.by_norm.setdefault(norm_title(e['title']), []).append((c, e))
         self.stats = {'matched': 0, 'unmatched': [], 'ambiguous': []}
 
-    def match(self, url):
+    def blessed_by_lines(self, passage):
+        """The Blessed entry holding the most of `passage`'s lines (12+ letters each), or None.
+
+        A bare The_Blessed link used to resolve to the Introduction every time; six passages quote
+        other entries ("Blessed Are Those Who Walk in My Ways" held 100 of one passage's 103 lines)
+        and their source taps opened the wrong page (improvement sweep n5-04, 2026-09-25)."""
+        lines = [line_key(x) for t in (passage or []) for x in str(t).split('\n')]
+        lines = [x for x in lines if len(x) >= 12]
+        if not lines:
+            return None
+        best, best_n = None, 0
+        for c in self.cols:
+            if c['volKey'] != 'blessed':
+                continue
+            for e in c['entries']:
+                body = line_key(e.get('text', ''))
+                n = sum(1 for x in lines if x in body)
+                if n > best_n:
+                    best, best_n = (c, e), n
+        return best
+
+    def match(self, url, passage=None):
         url = url.split('<')[0]  # the site leaves a stray <br> inside a few hrefs
         u = urllib.parse.urlsplit(url)
         if 'thevolumesoftruth.com' not in u.netloc.lower():
@@ -480,7 +502,12 @@ class Matcher:
             want_keys, title = ('wtlb1', 'wtlb2'), frag
         elif path.startswith('The_Blessed'):
             want_keys, title = ('blessed',), frag
-            if not frag:  # the bare page is The Blessed's introduction
+            if not frag:  # the bare page: the entry that holds the passage, else the introduction
+                hit = self.blessed_by_lines(passage)
+                if hit:
+                    c, e = hit
+                    self.stats['matched'] += 1
+                    return {'collection': c['label'], 'registryLabel': c['registryLabel'], 'title': e['title'], 'volKey': c['volKey']}
                 for c in self.cols:
                     if c['volKey'] == 'blessed':
                         for e in c['entries']:
@@ -505,6 +532,12 @@ class Matcher:
         return {'collection': c['label'], 'registryLabel': c['registryLabel'], 'title': e['title'], 'volKey': c['volKey']}
 
 
+def line_key(text):
+    """A line reduced for containment matching: markers and marks out, lower case, words only."""
+    t = re.sub(r'\{\{[^}]*\}\}', ' ', str(text or ''))
+    return re.sub(r'[^a-z0-9]+', ' ', t.lower()).strip()
+
+
 def attr_label(m):
     """Short collection label for the attribution tail; 'Volume 7' for the volumes."""
     mm = re.match(r'^Volume (One|Two|Three|Four|Five|Six|Seven)$', m['registryLabel'])
@@ -515,23 +548,26 @@ def attr_label(m):
 
 def blocks_to_paragraphs(blocks, bitly, matcher, stats):
     paras = []
+    passage_from = 0  # index in paras where the passage now being read began
     for b in blocks:
         if b.kind == 'hr':
             if paras and paras[-1]['text'] != '✦':
                 paras.append({'align': 'center', 'text': '✦'})
+            passage_from = len(paras)
             continue
         if b.kind == 'h2':
             t = b.text().strip()
             if not t or re.match(r'^section\s+(\w+)$', t, re.I):
                 continue
             paras.append({'align': 'center', 'text': '**' + t.replace('_', '‗') + '**'})
+            passage_from = len(paras)
             continue
         # attribution block?
         plain = re.sub(r'\s+', ' ', ''.join(r[0] for r in b.runs if not r[3])).strip()
         tvot = [r for r in b.runs if r[3] and 'thevolumesoftruth.com' in (r[3] or '')]
         if tvot and ATTR_RE.match(plain):
             href = tvot[0][3].split('<')[0]
-            m = matcher.match(href)
+            m = matcher.match(href, [p['text'] for p in paras[passage_from:]])
             sp = urllib.parse.urlsplit(href)
             if sp.fragment and ('Words_To_Live_By' in sp.path or 'The_Blessed' in sp.path):
                 site_title = mw_anchor(sp.fragment).replace('_', ' ').strip()
@@ -541,6 +577,7 @@ def blocks_to_paragraphs(blocks, bitly, matcher, stats):
                 paras.append({'align': 'right', 'text': '~ [From “%s” ~ %s]' % (m['title'].replace('_', '‗'), attr_label(m))})
             else:
                 paras.append({'align': 'right', 'text': '_From: %s_' % site_title.replace('_', '‗')})
+            passage_from = len(paras)
             continue
         # ordinary block -> tokens
         tokens = []
@@ -638,7 +675,10 @@ const ctx = {}; vm.createContext(ctx);
 for (const f of files) { try { vm.runInContext(fs.readFileSync(path.join(repo, 'app/src/main/assets', f), 'utf8'), ctx, { filename: f }); } catch (e) { } }
 const out = rows.map(r => {
   const arr = Array.isArray(ctx[r.globalName]) ? ctx[r.globalName] : [];
-  const entries = arr.filter(e => e && e.id && e.title).map(e => ({ id: e.id, title: e.title }));
+  // The Blessed's text rides along: a bare The_Blessed link is resolved by the passage's lines.
+  const entries = arr.filter(e => e && e.id && e.title).map(e => (r.volKey === 'blessed'
+    ? { id: e.id, title: e.title, text: (e.paragraphs || []).map(p => (p && p.text) || '').join('\n') }
+    : { id: e.id, title: e.title }));
   const pref = r.prefaceGlobal && ctx[r.prefaceGlobal]; if (pref && pref.id && pref.title) entries.unshift({ id: pref.id, title: pref.title });
   return Object.assign({}, r, { entries });
 });
@@ -662,6 +702,8 @@ def main():
     ap.add_argument('--repo', default=REPO)
     ap.add_argument('--out', default=None)
     ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--accept-shift', action='store_true',
+                    help='write even when a kept paragraph moves (it carries readers\' highlights with it)')
     a = ap.parse_args()
     if a.fetch:
         fill_cache(a.cache)
@@ -766,6 +808,16 @@ def main():
             url_index.setdefault(norm(frm), tgt['id'])
 
 
+    shifts = paragraph_shifts(out_path, entries)
+    if shifts:
+        print('\nPARAGRAPHS MOVE in %d topic(s) - highlights key on paragraph index (wtlb:<id>:<n>), so marks' % len(shifts))
+        print('made on these topics would sit on a different paragraph:')
+        for sid, old_i, new_i, n in shifts:
+            print('  %s: paragraph %d -> %d (%d kept paragraph(s) move)' % (sid, old_i, new_i, n))
+        if not a.accept_shift:
+            sys.exit('refusing to write %s: pass --accept-shift once the move is intended (and say so in the commit).' % out_path)
+        print('--accept-shift: writing anyway.')
+
     with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write('// GENERATED by tools/fetch-answers.py from answersonlygodcangive.com — do not hand-edit.\n')
         f.write('// %d topic pages, %d paragraphs, %d scripture refs. Format B (see CLAUDE.md).\n' % (len(entries), stats['paras'], stats['refs']))
@@ -807,6 +859,40 @@ def main():
     if stats['skipped']:
         print('skipped:', stats['skipped'])
     print('url index keys:', len(url_index), '| groups:', sorted(collections.Counter(e['group'] for e in entries).items()))
+
+
+def paragraph_shifts(out_path, entries):
+    """Topics whose KEPT paragraphs would move to a new index against the answers.js on disk.
+
+    Highlights, notes and links key on a paragraph's index, so a regeneration that inserts or drops
+    a paragraph above one a reader marked moves the mark onto different words; c62 (2026-09-25) did
+    it to Regarding Spiritual Gifts from paragraph 88 on and only a screenshot caught it (improvement
+    sweep n5-08). Edits in place, and changes after the last kept paragraph, move nothing.
+    Returns [(id, first old index, its new index, kept paragraphs that move)]."""
+    if not os.path.exists(out_path):
+        return []
+    old = {}
+    with open(out_path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('{'):
+                e = json.loads(line.rstrip(','))
+                old[e['id']] = [p.get('text', '') for p in e.get('paragraphs', [])]
+    out = []
+    for e in entries:
+        was = old.get(e['id'])
+        if was is None:
+            continue
+        now = [p.get('text', '') for p in e['paragraphs']]
+        moved, first = 0, None
+        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=was, b=now, autojunk=False).get_opcodes():
+            if tag == 'equal' and i1 != j1:
+                moved += i2 - i1
+                if first is None:
+                    first = (i1, j1)
+        if moved:
+            out.append((e['id'], first[0], first[1], moved))
+    return out
 
 
 def _heading_block(heading):

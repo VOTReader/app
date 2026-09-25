@@ -249,7 +249,7 @@ jobs:
         # identity control against the shipped manifest skips here (no listing in CI).
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_commit -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_commit test_fetch_answers -v
           python check_balance.py --strict
 
       - name: Check App() size budget (P11 canary)
