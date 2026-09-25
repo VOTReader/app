@@ -187,6 +187,28 @@ describe('app.css — a Settings group line shows its values whole', () => {
   });
 });
 
+/* THE BROWSE TILES KEEP GOLD TITLES, NOT GOLD BOXES (redesign, 2026-09-25). Volumes, Scriptures and
+   the Answers subjects were grids of gold outlines with 12 px italic counts; the tiles now sit on
+   the hairline with upright muted counts, and only hover lights the edge gold. */
+describe('app.css — browse tiles sit on the hairline', () => {
+  // The UNSCOPED rule: ruleBlock would find `.scriptures-landing .genre-tile-sub {` first.
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const base = (sel) => {
+    const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
+    return m ? m[1] : null;
+  };
+  it('outlines a tile with the hairline and keeps its title gold', () => {
+    expect(base('.genre-tile')).toMatch(/border:\s*1px solid var\(--border\)/);
+    expect(base('.genre-tile-title')).toMatch(/color:\s*var\(--gold\)/);
+  });
+  it('sets the count line upright and muted', () => {
+    const sub = base('.genre-tile-sub');
+    expect(sub).not.toBeNull();
+    expect(sub).not.toMatch(/font-style:\s*italic/);
+    expect(sub).toMatch(/color:\s*var\(--cream-muted\)/);
+  });
+});
+
 /* THE LIBRARY IS A LIST (redesign, 2026-09-25, Codex mockup r4 take 1). Eight
    bordered cards in two columns became one column of rows on hairlines, in the
    Answers topic rows' language, with every count in one right-hand column. */
