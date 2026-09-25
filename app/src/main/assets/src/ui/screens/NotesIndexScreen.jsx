@@ -354,15 +354,15 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
             }
           </>
         )}
-        {/* ── NOTEBOOKS TAB (cards) ── */}
+        {/* ── NOTEBOOKS TAB (rows since 2026-09-25) ── */}
         {!drilledNbId && tab === 'notebooks' && (
           <div className="nb-card-grid">
             <button
               className="nb-card uncategorized"
               onClick={() => setDrilledNbId('uncategorized')}
             >
-              <span className="nb-card-eyebrow">Default</span>
-              <span className="nb-card-name">Uncategorized</span>
+              {/* A hollow dot: no colour, and every name starts at one edge. */}
+              <span className="nb-card-name"><span className="nb-card-dot is-none" aria-hidden="true" />Uncategorized</span>
               <span className="nb-card-count">{counts.__uncategorized}{counts.__uncategorized === 1 ? " note" : " notes"}</span>
               <span className="nb-card-arrow">›</span>
             </button>
@@ -372,7 +372,6 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                 className="nb-card"
                 onClick={() => setDrilledNbId(nb.id)}
               >
-                <span className="nb-card-eyebrow">Notebook</span>
                 <span className="nb-card-name">
                   {/* [11] color-tag dot — absent color renders gold. */}
                   <span className="nb-card-dot" style={{ background: nb.color ? 'var(--hl-' + nb.color + ')' : 'var(--gold)' }} />
@@ -407,8 +406,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     className="nb-card new-notebook"
                     onClick={() => setNewNbInline(true)}
                   >
-                    <span className="nb-card-plus">+</span>
-                    <span className="nb-card-name">New Notebook</span>
+                    <span className="nb-card-name"><span className="nb-card-plus" aria-hidden="true">+</span>New notebook</span>
                   </button>
                 )
             }

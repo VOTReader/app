@@ -4117,6 +4117,7 @@
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
     /* [11] notebook color tags — card dot + drilled-header swatch row. */
     .nb-card-dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.4rem; vertical-align:0.02rem; box-shadow:0 0 0 1px rgba(0,0,0,0.35); }
+    .nb-card-dot.is-none { background:transparent; box-shadow:inset 0 0 0 1px var(--cream-muted); }
     .nb-color-row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; padding:0.4rem 0 0.7rem; }
     .nb-color-swatch { width:1.5rem; height:1.5rem; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
     .nb-color-swatch.selected { border-color:var(--cream); box-shadow:0 0 0 2px var(--gold-border); }
@@ -5879,72 +5880,57 @@
     @media (hover: hover) {
       .notes-tab:hover:not(.active) { color: var(--cream-dim); }
     }
-    /* Notebook card grid on the Notebooks tab */
+    /* The Notebooks tab: one row per notebook (the redesign, 2026-09-25, Codex
+       mockup r5 take 1). It was a grid of gold-outlined cards, each with a
+       10 px "DEFAULT" / "NOTEBOOK" eyebrow over a gold Cinzel name, and a
+       dashed box for New Notebook. Now: the colour dot and name, the count at
+       the right, a chevron, on hairlines; "New notebook" is a row too. */
     .nb-card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 0.85rem;
+      display: flex; flex-direction: column;
+      border-top: 1px solid var(--border);
     }
     .nb-card {
       position: relative;
-      display: flex; flex-direction: column;
-      gap: 0.4rem;
-      padding: 1.15rem 1.1rem 1rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
+      display: flex; align-items: center; gap: 0.75rem;
+      width: 100%; min-height: 3.5rem; box-sizing: border-box;
+      padding: 0.7rem 0.2rem;
+      background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
+      color: var(--cream-dim);
       cursor: pointer; text-align: left;
+      font-family: var(--font-body);
       -webkit-tap-highlight-color: transparent;
-      transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
-      min-height: 100px;
+      transition: background 0.18s ease;
     }
-    @media (hover: hover) { .nb-card:hover { border-color: var(--gold); background: var(--gold-faint); } }
-    .nb-card:active { transform: scale(0.985); }
-    .nb-card-eyebrow {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.20em; text-transform: uppercase;
-      color: var(--gold-dim);
+    @media (hover: hover) {
+      .nb-card:hover { background: var(--gold-faint); }
+      .nb-card:hover .nb-card-name { color: var(--gold-bright); }
     }
+    .nb-card:active { background: var(--gold-faint); }
     .nb-card-name {
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
-      color: var(--gold);
-      letter-spacing: 0.04em;
-      line-height: 1.25;
-      word-break: break-word;
+      flex: 1; min-width: 0;
+      font-family: var(--font-body); font-size: var(--fs-18);
+      color: var(--cream-dim); line-height: 1.3;
+      overflow-wrap: break-word;
     }
     .nb-card-count {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-      margin-top: auto;
+      flex: 0 0 auto;
+      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
     }
     .nb-card-arrow {
-      position: absolute; top: 1rem; right: 1rem;
-      font-family: var(--font-body); font-size: var(--fs-20);
-      color: var(--gold-dim); opacity: 0.6;
-      line-height: 1;
-    }
-    .nb-card.uncategorized {
-      border-style: dashed;
-    }
-    .nb-card.uncategorized .nb-card-name { color: var(--cream-dim); }
-    .nb-card.new-notebook {
-      background: transparent;
-      border-style: dashed; border-color: var(--gold-dim);
-      align-items: center; justify-content: center;
-      text-align: center;
+      flex: 0 0 auto;
+      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1;
       color: var(--gold-dim);
     }
-    .nb-card.new-notebook:hover { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
+    .nb-card.new-notebook { color: var(--gold); }
+    /* The + stands where a notebook's colour dot does (same width and gap), so
+       "New notebook" starts at the names' edge. */
     .nb-card.new-notebook .nb-card-plus {
-      font-family: 'Cinzel', serif; font-size: var(--fs-24); line-height: 1;
+      display: inline-block; width: 0.55rem; margin-right: 0.4rem; text-align: center;
+      font-weight: 400; line-height: 1;
     }
-    .nb-card.new-notebook .nb-card-name {
-      color: inherit;
-      font-size: var(--fs-12);
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-    .nb-card.new-notebook .nb-card-arrow { display: none; }
+    .nb-card.new-notebook .nb-card-name { color: inherit; }
+    @media (hover: hover) { .nb-card.new-notebook:hover .nb-card-name { color: var(--gold-bright); } }
     /* Inline-create card state: replaces card content with input + actions */
     .nb-card-create-form {
       display: flex; flex-direction: column; gap: 8px;

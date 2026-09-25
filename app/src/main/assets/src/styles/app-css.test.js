@@ -228,6 +228,22 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* THE NOTEBOOKS ARE ROWS (redesign, 2026-09-25, Codex mockup r5 take 1): gold-outlined cards with
+   10 px "DEFAULT" / "NOTEBOOK" eyebrows and a dashed New Notebook box became rows on hairlines. */
+describe('app.css — the Notebooks tab is rows', () => {
+  it('a notebook sits on a hairline, with no box', () => {
+    const row = ruleBlock(CSS, '.nb-card {');
+    expect(row).toMatch(/border:\s*0/);
+    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+    expect(row).toMatch(/background:\s*none/);
+    expect(ruleBlock(CSS, '.nb-card-grid {')).toMatch(/flex-direction:\s*column/);
+  });
+  it('no eyebrow and no dashed box are left', () => {
+    expect(CSS).not.toMatch(/\.nb-card-eyebrow/);
+    expect(CSS).not.toMatch(/\.nb-card\.(uncategorized|new-notebook)\s*\{[^}]*dashed/);
+  });
+});
+
 /* THE INDEX LISTS ARE ROWS (redesign, 2026-09-25). One column of .chapter-card-btn (a volume's
    letters, a book's chapters, a study's parts, a genre's books, History, Studies) was a stack of
    gold-outlined cards; it is rows on hairlines now. The two-column grids keep their cards, and a
