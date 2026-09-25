@@ -72,7 +72,7 @@ export function SongDeskHead({ current, song, saved, onToggleSave, onClose }) {
  * The versions of the song playing, as chips; "All N ›" opens every version in a sheet.
  * @param {{ song: any, state: any }} props
  */
-export function SongVersionsCard({ song, state }) {
+export function SongVersionsCard({ song, state: _state }) {
   const [sheet, setSheet] = React.useState(false);
   const fam = song ? familyById(song.f) : null;
   const versions = fam ? versionsOf(fam) : [];
