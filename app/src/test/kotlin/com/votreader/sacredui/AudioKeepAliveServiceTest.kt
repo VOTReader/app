@@ -1,10 +1,14 @@
 package com.votreader.sacredui
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.ContextWrapper
+import android.content.Intent
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -173,5 +177,41 @@ class AudioKeepAliveServiceTest {
         assertNotNull(shadowOf(app).nextStartedService)
         assertNotNull(shadowOf(app).nextStoppedService)
         assertNotNull(shadowOf(app).nextStoppedService)
+    }
+
+    // ─── sf1 (2026-09-24): screen-off playback on Android 17 ──────────
+
+    @Test
+    fun `setActive true on a service already in the foreground asks for no second foreground start`() {
+        // The player raises the keep-alive at every track seam. From the background (screen off) a
+        // startForegroundService is refused on API 31+, and its throw took the card down with it, so the
+        // next chapter played muted on Android 17 while its clock ran. Already in the foreground, there is
+        // nothing to start.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val controller = Robolectric.buildService(AudioKeepAliveService::class.java).create()
+        try {
+            controller.get().onStartCommand(Intent(app, AudioKeepAliveService::class.java), 0, 1)
+            while (shadowOf(app).nextStartedService != null) { /* drain what came before */ }
+            assertTrue(AudioKeepAliveService.setActive(app, true), "in the foreground: the keep-alive holds")
+            assertNull(shadowOf(app).nextStartedService, "no second startForegroundService")
+        } finally {
+            controller.destroy()
+            AudioKeepAliveService.setActive(app, false)   // companion state is shared across tests
+        }
+    }
+
+    @Test
+    fun `a refused foreground start says so, so the page can pause instead of playing muted`() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val refusing = object : ContextWrapper(app) {
+            override fun startForegroundService(service: Intent?): ComponentName? =
+                throw IllegalStateException("startForegroundService() not allowed due to mAllowStartForeground false")
+        }
+        try {
+            assertFalse(AudioKeepAliveService.setActive(refusing, true))
+            assertTrue(AudioKeepAliveService.setActive(app, true))
+        } finally {
+            AudioKeepAliveService.setActive(app, false)
+        }
     }
 }

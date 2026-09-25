@@ -66,6 +66,9 @@ class FakeBridgeHost(
     /** Records every setAudioKeepAlive(active) call, in order. */
     val audioKeepAliveCalls: MutableList<Boolean> = mutableListOf()
 
+    /** What setAudioKeepAlive answers: false = the service was refused (sf1). */
+    var keepAliveAnswer: Boolean = true
+
     /** Counts ensureNotificationsPermission() calls (media-card contextual ask). */
     var notificationsPermissionAskCount: Int = 0
 
@@ -109,7 +112,7 @@ class FakeBridgeHost(
 
     override fun clearGardenCache() { gardenCacheClearCount++ }
 
-    override fun setAudioKeepAlive(active: Boolean) { audioKeepAliveCalls.add(active) }
+    override fun setAudioKeepAlive(active: Boolean): Boolean { audioKeepAliveCalls.add(active); return keepAliveAnswer }
 
     override fun ensureNotificationsPermission() { notificationsPermissionAskCount++ }
 }

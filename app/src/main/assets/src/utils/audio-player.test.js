@@ -4006,3 +4006,106 @@ describe('audio-player — sectionLetterKeyAt / sectionOpeningKey (WTLB compilat
     expect(AudioPlayer.sectionOpeningKey({ key: 'vol1:letter-a', url: URL_OF('idA1') })).toBe(null);
   });
 });
+
+/* sf1 (hub 2026-09-24 22:14): screen-off playback on Android 17. At a recording's end the spec fires 'pause' (ended
+   already true) and then 'ended'; filing that pause as the listener's told native "not playing" at every seam, the
+   service left the foreground and, with the screen off, could not come back, so Android 17 muted the next chapter
+   while its clock ran (dumpsys audio: 'AudioHardening background playback muted'). Digest:
+   D:/AgentBackbone/reports/phone-audio-and-growth-2026-09-24/DIGEST.md, section 1, A1-A4. */
+describe('audio-player — screen-off playback: the seam, the re-arm, the honest pause (sf1)', () => {
+  function setVisibility(v) {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+  afterEach(() => { delete document.visibilityState; });
+
+  /** The spec's end of a recording: paused turns true, 'pause' fires with ended already true, then 'ended'. */
+  function endOfRecording() {
+    el().paused = true;
+    el().ended = true;
+    el().dispatchEvent(new Event('pause'));
+    el().dispatchEvent(new Event('ended'));
+    el().ended = false;   // the next src assignment resets it on a real element
+  }
+
+  it('a recording ending is a seam, not a pause: native never hears playing=false between tracks (A1)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    bridge.setAudioNowPlaying.mockClear();
+    bridge.setAudioActive.mockClear();
+    endOfRecording();
+    expect(el().src).toBe(URL_OF('idA2'));
+    expect(bridge.setAudioNowPlaying.mock.calls.map((c) => c[2])).not.toContain(false);
+    expect(bridge.setAudioActive).not.toHaveBeenCalledWith(false);
+    expect(AudioPlayer.getState().status).not.toBe('paused');
+  });
+
+  it('the end of the queue still stops, and a sleep set for the end of the recording still pauses (A1)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });   // one part
+    el().dispatchEvent(new Event('playing'));
+    AudioPlayer.setSleepAtTrackEnd(true);
+    endOfRecording();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toMatch(/Sleep timer ended/);
+    AudioPlayer.toggle();
+    el().dispatchEvent(new Event('playing'));
+    endOfRecording();
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(bridge.setAudioActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it('with the screen off, a refused playback service pauses the recording instead of playing it muted (A4)', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    setVisibility('hidden');
+    bridge.setAudioActive.mockReturnValue(false);   // Android refused the foreground service from the background
+    endOfRecording();                                // part 2 starts: the keep-alive rises, and is refused
+    await new Promise((r) => setTimeout(r, 0));
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
+    expect(s.status).toBe('paused');
+    expect(el().paused).toBe(true);
+    // Nothing was heard, so nothing is filed as heard: part 2 keeps its place at 0.
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(0);
+    // Back on screen, the listener is told why it stopped; Play goes on from there.
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+    bridge.setAudioActive.mockReturnValue(true);
+    setVisibility('visible');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toMatch(/Paused while the screen was off/);
+  });
+
+  it('a refusal with the app on screen changes nothing (A4)', async () => {
+    setVisibility('visible');
+    bridge.setAudioActive.mockReturnValue(false);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(el().paused).toBe(false);
+  });
+
+  it('native reporting the service lost while hidden pauses honestly too, and is no toggle on screen (A4)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    setVisibility('visible');
+    window.__votMediaCommand('refused', 0);   // on screen nothing is muted: not a pause, and never a toggle
+    expect(AudioPlayer.getState().status).toBe('playing');
+    setVisibility('hidden');
+    window.__votMediaCommand('refused', 0);
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(el().paused).toBe(true);
+    window.__votMediaCommand('refused', 0);   // paused already: it stays paused
+    expect(AudioPlayer.getState().status).toBe('paused');
+    setVisibility('visible');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toMatch(/Paused while the screen was off/);
+  });
+
+  it('coming back on screen while playing raises the keep-alive again (A3)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().dispatchEvent(new Event('playing'));
+    setVisibility('hidden');
+    bridge.setAudioActive.mockClear();
+    setVisibility('visible');
+    expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
+  });
+});
