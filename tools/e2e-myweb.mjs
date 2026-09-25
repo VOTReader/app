@@ -7,7 +7,7 @@
  * about PIXELS and one about TIME, and a unit test over the ink law cannot see
  * either: the law can be right and the screen can still draw one path (R1's
  * defect on main) or cover the web with a panel (R3). This walk reaches My Web
- * the way a reader does (Home -> Personal Study -> The Whole Counsel -> My
+ * the way a reader does (Home -> Personal Study -> Scripture Web -> My
  * web), makes five links THROUGH THE REAL UI (words selected in Genesis 1,
  * Link, a reference typed into the picker, Enter), and reads the 2D canvas.
  *
@@ -165,7 +165,7 @@ async function goHome(page) {
 async function toMyWeb(page) {
   await clickLabel(page, 'Personal Study');
   await sleep(400);
-  await clickLabel(page, 'The Whole Counsel');
+  await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });

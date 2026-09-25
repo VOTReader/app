@@ -121,9 +121,9 @@ try {
   await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][0]; b && b.click(); }); await sleep(900);
   await stop('bible-chapter');
   await click('Home'); await click('Personal Study'); await stop('library');
-  await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => /My Notes/.test(t.textContent)); t && t.click(); }); await sleep(700);
+  await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Notes'); t && t.click(); }); await sleep(700);
   await stop('notes-index');
-  await click('Back'); await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => /My Journal/.test(t.textContent)); t && t.click(); }); await sleep(700);
+  await click('Back'); await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Journal'); t && t.click(); }); await sleep(700);
   await stop('journal');
   await click('Home'); await click('App Configuration'); await sleep(300);
   await page.evaluate(() => { for (const h of document.querySelectorAll('.settings-group-head')) if (/Appearance|Your Data/.test(h.textContent)) h.click(); }); await sleep(500);

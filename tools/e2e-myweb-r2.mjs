@@ -150,7 +150,7 @@ async function boot(page, url) {
 }
 async function toMyWeb(page) {
   await clickLabel(page, 'Personal Study'); await sleep(400);
-  await clickLabel(page, 'The Whole Counsel');
+  await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });

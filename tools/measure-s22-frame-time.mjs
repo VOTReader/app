@@ -99,7 +99,7 @@ try {
     await clickLabel(page, 'Continue'); await clickLabel(page, 'Begin Reading'); await sleep(500);
     await clickIfPresent(page, 'Maybe later'); await sleep(200);
     await clickLabel(page, 'Personal Study'); await sleep(400);
-    await clickLabel(page, 'The Whole Counsel');
+    await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
     if (!(await waitFor(page, () => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), 60000))) throw new Error('no sw-root');
     if (await page.$('.sw-fallback')) throw new Error('sw-fallback: ' + await page.evaluate(() => (document.querySelector('.sw-fallback-body') || {}).textContent || ''));
     if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), 60000))) throw new Error('still loading');
