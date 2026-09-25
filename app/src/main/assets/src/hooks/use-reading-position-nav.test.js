@@ -70,6 +70,7 @@ const baseProps = () => ({
   setBookId: vi.fn(),
   setChapterNum: vi.fn(),
   setScreen: vi.fn(),
+  setGenreId: vi.fn(),
   setActiveReadKey: vi.fn(),
   setLastReadLetterMap: vi.fn(),
   setLastReadChapters: vi.fn(),
@@ -208,6 +209,97 @@ describe('useReadingPositionNav — selectBibleCh', () => {
     rerender(propsB);
     act(() => { result.current.selectBibleCh(3); });
     expect(propsB.setActiveReadKey).toHaveBeenCalledWith('exodus', expect.any(Function));
+  });
+});
+
+// ── selectScriptureBook ────────────────────────────────────────────────
+/* 2026-09-24: a book tile tapped before the ~5 MB Bible corpus (BOOKS) landed
+   was DROPPED — App's handler only knew how to open a book it could already
+   see. The tap now opens the book's index at once (the bible-idx route shows
+   "Loading Bible…" until the text lands); a one-chapter book goes on into its
+   chapter once loaded, but only if the reader is still waiting on it. */
+describe('useReadingPositionNav — selectScriptureBook', () => {
+  const GENRES = {
+    ot: [{ id: 'law', books: [{ id: 'genesis' }] }, { id: 'minor', books: [{ id: 'obadiah' }] }],
+    nt: [{ id: 'gospels', books: [{ id: 'matthew' }, { id: 'john' }] }],
+  };
+  let load;
+  beforeEach(() => {
+    window.SCRIPTURE_GENRES = GENRES;
+    delete window.BOOKS;
+    load = null;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((resolve, reject) => { load = { resolve, reject }; }));
+  });
+  afterEach(() => {
+    delete window.SCRIPTURE_GENRES;
+    delete window.BOOKS;
+    delete window.__loadBibleCorpus;
+  });
+  const LOADED = { genesis: { chapters: new Array(50) }, obadiah: { chapters: [{}] }, john: { chapters: new Array(21) } };
+
+  it('loaded: a many-chapter book opens its index, a one-chapter book its chapter, Matthew its study index', () => {
+    window.BOOKS = LOADED;
+    const { result, props } = setup();
+    act(() => { result.current.selectScriptureBook('genesis'); });
+    expect(props.setBookId).toHaveBeenLastCalledWith('genesis');
+    expect(props.setChapterNum).toHaveBeenLastCalledWith(null);
+    expect(props.setScreen).toHaveBeenLastCalledWith('bible-idx');
+    act(() => { result.current.selectScriptureBook('obadiah', true); });
+    expect(props.setGenreId).toHaveBeenCalledWith(null);
+    expect(props.setChapterNum).toHaveBeenLastCalledWith(1);
+    expect(props.setScreen).toHaveBeenLastCalledWith('bible-ch');
+    act(() => { result.current.selectScriptureBook('matthew'); });
+    expect(props.setScreen).toHaveBeenLastCalledWith('matthew-idx');
+    expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+  });
+
+  it('NOT loaded: the tap is not dropped — the book opens on its loading view at once, and the load starts', () => {
+    const { result, props } = setup({ screen: 'scripture-genre' });
+    act(() => { result.current.selectScriptureBook('genesis'); });
+    expect(props.setBookId).toHaveBeenCalledWith('genesis');
+    expect(props.setChapterNum).toHaveBeenCalledWith(null);
+    expect(props.setScreen, 'the bible-idx route shows "Loading Bible…" until BOOKS lands').toHaveBeenCalledWith('bible-idx');
+    expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
+  });
+
+  it('NOT loaded, a one-chapter book: once the text lands, a reader still on the loading view goes on into the chapter', async () => {
+    const props = { ...baseProps(), screen: 'scripture-genre' };
+    const { result, rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    act(() => { result.current.selectScriptureBook('obadiah'); });
+    rerender({ ...props, screen: 'bible-idx', bookId: 'obadiah' });      // App re-rendered onto the loading view
+    window.BOOKS = LOADED;
+    await act(async () => { load.resolve(); });
+    expect(props.setChapterNum).toHaveBeenLastCalledWith(1);
+    expect(props.setScreen).toHaveBeenLastCalledWith('bible-ch');
+  });
+
+  it('NOT loaded, a one-chapter book: a reader who left the loading view is not yanked back when the text lands', async () => {
+    const props = { ...baseProps(), screen: 'scripture-genre' };
+    const { result, rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    act(() => { result.current.selectScriptureBook('obadiah'); });
+    rerender({ ...props, screen: 'scripture-genre', bookId: 'obadiah' });   // back out before the load
+    window.BOOKS = LOADED;
+    await act(async () => { load.resolve(); });
+    expect(props.setScreen).toHaveBeenCalledTimes(1);                     // the loading view only
+    expect(props.setScreen).not.toHaveBeenCalledWith('bible-ch');
+  });
+
+  it('NOT loaded, a failed load leaves the loading view to show its retry, and throws nothing', async () => {
+    const props = { ...baseProps(), screen: 'scripture-genre' };
+    const { result, rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    act(() => { result.current.selectScriptureBook('obadiah'); });
+    rerender({ ...props, screen: 'bible-idx', bookId: 'obadiah' });
+    await act(async () => { load.reject(new Error('offline')); });
+    expect(props.setScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('an id that is not a Bible book opens nothing, loaded or not', () => {
+    const { result, props } = setup();
+    act(() => { result.current.selectScriptureBook('volume-one'); });
+    window.BOOKS = LOADED;
+    act(() => { result.current.selectScriptureBook('volume-one'); });
+    expect(props.setScreen).not.toHaveBeenCalled();
+    expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
   });
 });
 

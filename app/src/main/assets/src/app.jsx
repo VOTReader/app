@@ -356,12 +356,12 @@ function App() {
   const {
     prophecyCardStatesRef, saveProphecyCardStates,
     setLastReadForVol,
-    selectMatthewCh, selectBibleCh,
+    selectMatthewCh, selectBibleCh, selectScriptureBook: handleScriptureSelect,
     goToLastRead,
   } = useReadingPositionNav({
     bookId, screen, chapterNum, letterId, studyId, studyChapterId,
     activeReadKey, lastReadLetterMap, lastReadChapters,
-    setLetterId, setBookId, setChapterNum, setScreen,
+    setLetterId, setBookId, setChapterNum, setScreen, setGenreId,
     setActiveReadKey,
     setLastReadLetterMap, setLastReadChapters,
     getStudyById, selectStudy, selectStudyChapter,
@@ -513,12 +513,7 @@ function App() {
     goHome();
   };
 
-  /* ── Category → sub-section routing ── */
-  const handleScriptureSelect = (id, clearGenre) => {
-    if (clearGenre) setGenreId(null);
-    if (id === "matthew") {setBookId("matthew");setChapterNum(null);setScreen("matthew-idx");} else
-    if (typeof BOOKS !== 'undefined' && BOOKS[id]) {setBookId(id);if (BOOKS[id].chapters.length === 1) {setChapterNum(1);setScreen("bible-ch");} else {setChapterNum(null);setScreen("bible-idx");}}
-  };
+  /* ── Category → sub-section routing (handleScriptureSelect: useReadingPositionNav) ── */
   const handleVolumeSelect = (id) => {
     const col = COL_BY_CARD.get(id);
     if (col && col.indexScreen) { setScreen(col.indexScreen); return; }

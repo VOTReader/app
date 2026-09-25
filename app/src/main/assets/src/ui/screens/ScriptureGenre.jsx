@@ -3,6 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+  // Start the Bible download on arrival, as ScripturesHome does: this screen
+  // can be the first one a reader sees (a restored tab), and every tile on it
+  // opens a book. A tap before the text lands opens its loading view.
+  React.useEffect(() => {
+    if (typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
+    }
+  }, []);
   const genre = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].find((g) => g.id === genreId);
   if (!genre) return null;
   const testament = SCRIPTURE_GENRES.nt.some((g) => g.id === genreId) ? "New Testament" : "Old Testament";

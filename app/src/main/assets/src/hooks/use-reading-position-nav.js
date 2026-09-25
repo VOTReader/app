@@ -17,6 +17,11 @@
      - selectBibleCh(num)              Same shape for the generic Bible
                                        chapter view (uses bookId from
                                        props).
+     - selectScriptureBook(id, clear)  A book tile on Scriptures or a genre
+                                       screen: the book's index, or a
+                                       one-chapter book's chapter. Before
+                                       BOOKS loads it opens the loading view
+                                       at once instead of dropping the tap.
      - goToLastRead()                  The "global reading dot" entry
                                        point — resumes the user's most
                                        recent reading position. Branches
@@ -63,8 +68,9 @@
      lastReadChapters          goToLastRead reads it for the chapter
                                cursor lookup. Also written through
                                by the select* helpers.
-     setLetterId, setBookId,   Nav setters.
-       setChapterNum, setScreen
+     setLetterId, setBookId,   Nav setters (setGenreId: selectScriptureBook's
+       setChapterNum, setScreen,  clearGenre).
+       setGenreId
      setActiveReadKey          From useReadingDwell. Used by
                                select*Ch helpers to install the
                                dwell-timer gate + last-read commit.
@@ -81,7 +87,7 @@
    RETURNS: {
      prophecyCardStatesRef, saveProphecyCardStates,
      setLastReadForVol,
-     selectMatthewCh, selectBibleCh,
+     selectMatthewCh, selectBibleCh, selectScriptureBook,
      goToLastRead,
    }
 
@@ -96,9 +102,23 @@
      COL_BY_KEY                For goToLastRead's 'vol:' branch — maps
                                volKey → collection (gives the letter
                                screen to route to).
+     BOOKS, SCRIPTURE_GENRES,  selectScriptureBook: the lazy Bible corpus,
+       __loadBibleCorpus       the boot-time shelf list, and its loader.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
+
+/**
+ * Whether `id` names a book on the Scriptures shelves (SCRIPTURE_GENRES, an
+ * index.html constant present from boot), so it can be opened before BOOKS
+ * loads without risking a loading view that never resolves to a book.
+ * @param {string} id
+ * @returns {boolean}
+ */
+function _isBibleBookId(id) {
+  if (typeof SCRIPTURE_GENRES === 'undefined') return false;
+  return [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].some((g) => g.books.some((b) => b.id === id));
+}
 
 /**
  * Reading-cursor coordination hook. Owns setLastReadForVol +
@@ -121,6 +141,7 @@ import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
  *   setScreen: (v: any) => void,
+ *   setGenreId: (v: any) => void,
  *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
  *   setLastReadLetterMap: (updater: (prev: any) => any) => void,
  *   setLastReadChapters: (updater: (prev: any) => any) => void,
@@ -134,13 +155,14 @@ import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
  *   setLastReadForVol: (volKey: string, id: string) => void,
  *   selectMatthewCh: (num: number) => void,
  *   selectBibleCh: (num: number) => void,
+ *   selectScriptureBook: (id: string, clearGenre?: boolean) => void,
  *   goToLastRead: () => void
  * }}
  */
 export function useReadingPositionNav({
   bookId, screen, chapterNum, letterId, studyId, studyChapterId,
   activeReadKey, lastReadLetterMap, lastReadChapters,
-  setLetterId, setBookId, setChapterNum, setScreen,
+  setLetterId, setBookId, setChapterNum, setScreen, setGenreId,
   setActiveReadKey,
   setLastReadLetterMap, setLastReadChapters,
   getStudyById, selectStudy, selectStudyChapter,
@@ -206,6 +228,41 @@ export function useReadingPositionNav({
     setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));
   };
 
+  // ── selectScriptureBook — a book tile (Scriptures, a genre screen) ────
+  // BOOKS is the lazy ~5 MB Bible corpus. A tap before it landed used to be
+  // DROPPED (2026-09-24: the genre screen's book tiles, a restored genre tab):
+  // nothing happened, and only a second tap after the load worked. Now the tap
+  // opens the book at once: the bible-idx route shows "Loading Bible…" (and a
+  // retry on failure) until BOOKS lands, then the chapter tiles. A one-chapter
+  // book opens straight into its chapter, as it does when loaded — but only if
+  // the reader is still on that loading view when the text arrives, never a
+  // yank from wherever they went meanwhile. placeRef is the live place at the
+  // moment the load resolves (this render's closure would be stale by then).
+  const placeRef = React.useRef({ screen, bookId });
+  placeRef.current = { screen, bookId };
+  const selectScriptureBook = (id, clearGenre) => {
+    if (clearGenre) setGenreId(null);
+    if (id === 'matthew') { setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx'); return; }
+    const books = typeof BOOKS !== 'undefined' ? BOOKS : null;
+    if (books && books[id]) {
+      setBookId(id);
+      if (books[id].chapters.length === 1) { setChapterNum(1); setScreen('bible-ch'); } else { setChapterNum(null); setScreen('bible-idx'); }
+      return;
+    }
+    // Loaded and still unknown, not a Bible book, or no loader: nothing to open.
+    if (books || !_isBibleBookId(id) || typeof window.__loadBibleCorpus !== 'function') return;
+    setBookId(id);
+    setChapterNum(null);
+    setScreen('bible-idx');
+    window.__loadBibleCorpus().then(() => {
+      const book = typeof BOOKS !== 'undefined' ? BOOKS[id] : null;
+      const here = placeRef.current;
+      if (!book || book.chapters.length !== 1 || here.screen !== 'bible-idx' || here.bookId !== id) return;
+      setChapterNum(1);
+      setScreen('bible-ch');
+    }, () => { /* the loading view shows the failure and its retry */ });
+  };
+
   // ── goToLastRead — the "global reading dot" resume entry ─────────────
   // Branches on activeReadKey's prefix:
   //   'vol:<volKey>'        → volume letter (look up letterId in
@@ -245,7 +302,7 @@ export function useReadingPositionNav({
   return {
     prophecyCardStatesRef, saveProphecyCardStates,
     setLastReadForVol,
-    selectMatthewCh, selectBibleCh,
+    selectMatthewCh, selectBibleCh, selectScriptureBook,
     goToLastRead,
   };
 }

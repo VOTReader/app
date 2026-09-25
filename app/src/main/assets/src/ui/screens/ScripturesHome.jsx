@@ -24,26 +24,16 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
   }, []);
   const bibleLoaded = typeof window.__bibleCorpus !== 'undefined' && window.__bibleCorpus.loaded;
 
+  // Every tile answers at once, loaded or not. A genre needs no BOOKS; a book
+  // goes through onSelect (useReadingPositionNav's selectScriptureBook), which
+  // opens the "Loading Bible…" view until the text lands. These used to wait
+  // for the load in silence and then navigate — seconds with no sign the tap
+  // registered, then a jump from wherever the reader had gone meanwhile.
   const handleTile = (group) => {
-    // Block book-navigation tiles (single-book) until BOOKS is loaded —
-    // setScreen('bible-ch') would render a blank chapter view otherwise.
-    if (!bibleLoaded && typeof window.__loadBibleCorpus === 'function') {
-      window.__loadBibleCorpus().then(() => {
-        if (group.single) onSelect(group.books[0].id, true);
-        else onGenre(group.id);
-      });
-      return;
-    }
     if (group.single) {onSelect(group.books[0].id, true);} else
     onGenre(group.id);
   };
-  const handleBook = (id) => {
-    if (!bibleLoaded && typeof window.__loadBibleCorpus === 'function') {
-      window.__loadBibleCorpus().then(() => onSelect(id));
-      return;
-    }
-    onSelect(id);
-  };
+  const handleBook = (id) => onSelect(id);
 
   const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
   const allBooks = allGenres.flatMap((g) => g.books);
