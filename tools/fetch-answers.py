@@ -6,7 +6,7 @@ The site is a MediaWiki whose pages are compilations of excerpts from the
 letters the app already carries. Each page becomes ONE Format B entry
 (`paragraphs: [{align, text}]`, the WTLB / Holy Days shape):
 
-  * `==Heading==`            -> a centered **bold** paragraph (generic
+  * `==Heading==` / `=Heading=` -> a centered **bold** paragraph (generic
                                 "Section One" headings are dropped)
   * `----`                   -> a centered ornament paragraph (excerpt divider)
   * <p style="text-align">   -> a paragraph with that align; <br/> -> "\\n"
@@ -220,15 +220,19 @@ def jdump(p, obj):
 
 
 # ─── Wikitext -> HTML-ish ───────────────────────────────────────────────
-H2_RE = re.compile(r'^==\s*([^=].*?)\s*==\s*$', re.M)
+# Section headings: `==Heading==`, and on six pages the single-`=` form, which plays the same role there
+# (their "=Related Topics=" and "=Navigation=" too). Before 2026-09-24 only `==` matched, so those pages
+# shipped 37 raw "=Heading=" lines as body text, their related-topic links as prose and their
+# navigation boilerplate. The site uses no other level (surveyed: 642 at level 2, 37 at level 1).
+HEADING_RE = re.compile(r'^(={1,2})\s*([^=](?:.*[^=])?)\s*\1\s*$', re.M)
 
 
 def split_sections(wikitext):
     """[(heading or None, body), ...] in document order."""
     out, pos, heading = [], 0, None
-    for m in H2_RE.finditer(wikitext):
+    for m in HEADING_RE.finditer(wikitext):
         out.append((heading, wikitext[pos:m.start()]))
-        heading, pos = m.group(1).strip(), m.end()
+        heading, pos = m.group(2).strip(), m.end()
     out.append((heading, wikitext[pos:]))
     return out
 
@@ -704,7 +708,10 @@ def main():
             if h == 'related topics':
                 related.extend(re.findall(r'\[\[([^\]|]+)', body))
                 continue
-            if h in ('navigation', 'see also', 'external links'):
+            # 'videos': the site's YouTube playlist links, which the app does not carry, so the
+            # section rendered as a heading over a dead "(Video-Playlist)" line on 11 pages. It is
+            # always the page's last section, so dropping it moves no earlier paragraph.
+            if h in ('navigation', 'see also', 'external links', 'videos'):
                 continue
             p = Parser()
             if heading:
