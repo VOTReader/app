@@ -24,6 +24,7 @@
 
 import { searchData } from './search-data.js';
 import { blockReadText, segmentsReadText } from '../utils/segment-dom-text.js';
+import { splitFormatBInline } from '../utils/format-b-inline.js';
 
 /** @param {string} bookId */
 function bookTestament(bookId) {
@@ -47,6 +48,22 @@ function bookGenre(bookId) {
 function letterText(letter) {
   if (!letter || !letter.blocks) return '';
   return letter.blocks.map(blockReadText).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** A Format B paragraph (WTLB, The Blessed, Holy Days, Answers) in the words
+    its reader sees. The index used to strip only the {{…}} markers, so every
+    emphasis marker stayed in the body and the snippet showed it: Answers
+    carries about 16,000 `_italic_` runs and 3,800 `**bold**` ones. Split with
+    the renderer's own splitter, down WtlbEntryView.renderLine's branches, so a
+    marker that closes after a soft break pairs as it does on screen. The
+    {{ref:}}/{{nav:}} markers stay out of the body, as before. */
+function formatBReadText(text) {
+  return splitFormatBInline(text).map((seg) => {
+    if (!seg) return '';
+    if (seg.startsWith('**') && seg.endsWith('**')) return formatBReadText(seg.slice(2, -2));
+    if (seg.startsWith('_') && seg.endsWith('_')) return formatBReadText(seg.slice(1, -1));
+    return seg.replace(/\{\{[^}]+\}\}/g, ' ');
+  }).join('');
 }
 
 /** Recursively collect text from a Bible-study chapter's nested content tree. */
@@ -140,7 +157,7 @@ export function buildDocs(options) {
       const paragraphs = en.paragraphs || [];
       for (let p = 0; p < paragraphs.length; p++) {
         const ptxt = paragraphs[p] && paragraphs[p].text ? paragraphs[p].text : '';
-        body += ' ' + ptxt.replace(/\{\{[^}]+\}\}/g, ' ');
+        body += ' ' + formatBReadText(ptxt);
       }
       // Holy Days mixes shapes: 11 of its 16 entries are block-shaped letters with no
       // paragraphs, and indexed only their titles (v07-09).

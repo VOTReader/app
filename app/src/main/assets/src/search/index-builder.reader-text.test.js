@@ -40,6 +40,9 @@ const GLOBALS = {
   ...load('volume-one.js', ['LETTERS_V1_PREFACE', 'LETTERS_V1']),
   ...load('letters-flock.js', ['LETTERS_FLOCK_PREFACE', 'LETTERS_FLOCK']),
   ...load('bible-studies.js', ['BIBLE_STUDIES']),
+  ...load('wtlb-one.js', ['WTLB_ONE']),
+  ...load('the-blessed.js', ['THE_BLESSED']),
+  ...load('answers.js', ['ANSWERS']),
 };
 const MARKED = {
   letters: markFootnotes(GLOBALS.LETTERS_V1) + markFootnotes(GLOBALS.LETTERS_FLOCK),
@@ -97,5 +100,18 @@ describe("letter and study bodies are indexed as the reader reads them (no footn
     expect(all).toContain('"Without Spot or Blemish" - Volume Four');
     expect(all).not.toContain('{{ref:');
     expect(leaks('bible-study')).toEqual([]);
+  });
+
+  /* The Format B collections carry their emphasis as markup, and the index kept
+     it: "**_\"Thus says The Lord:_** From the beginning…" is what an Answers
+     result's snippet showed, underscores and asterisks included. */
+  it('WTLB, The Blessed and Answers bodies carry no emphasis markers', () => {
+    const entries = docs.filter((d) => d.kind === 'wtlb' || d.kind === 'blessed' || d.kind === 'answers');
+    expect(entries.length).toBeGreaterThan(200);
+    expect(entries.filter((d) => /\*\*|_/.test(d.text)).map((d) => d.ref + ' ' + d.title)).toEqual([]);
+    const all = entries.map((d) => d.text).join('\n');
+    expect(all).toContain('"Thus says The Lord: From the beginning I had written to you by the pen of My prophets');
+    expect(all).toContain('Blessed are those who never lost the pearl, But held it close their whole life.');
+    expect(all).not.toContain('{{');
   });
 });

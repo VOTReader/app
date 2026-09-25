@@ -25,6 +25,7 @@
  *   tokenize.js           kjvEncode IS the index-time tokenizer (search-config.js:60)
  *   vendor/minisearch.js  the serialization format loadJSON has to read back
  *   ../utils/segment-dom-text.js  the reader's text a letter or study body is flattened to
+ *   ../utils/format-b-inline.js   the renderer's markup splitter a Format B body is read through
  *
  * Deliberately NOT fingerprinted: ranking.js, snippet.js, query-parse.js,
  * synonyms.js. Those run at QUERY time against whatever index exists, so a cached
@@ -56,6 +57,9 @@ const INDEX_SHAPING_FILES = [
   // index-builder flattens letter and study bodies through it (segmentsReadText /
   // blockReadText), so a change there changes what goes into the index.
   '../utils/segment-dom-text.js',
+  // Format B entry bodies are read through the renderer's own splitter
+  // (formatBReadText), so a change to its grammar changes what is indexed.
+  '../utils/format-b-inline.js',
 ];
 
 const args = process.argv.slice(2);
