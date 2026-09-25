@@ -228,6 +228,34 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* THE INDEX LISTS ARE ROWS (redesign, 2026-09-25). One column of .chapter-card-btn (a volume's
+   letters, a book's chapters, a study's parts, a genre's books, History, Studies) was a stack of
+   gold-outlined cards; it is rows on hairlines now. The two-column grids keep their cards, and a
+   title still clamps at two lines (owner report 2026-08-09). */
+describe('app.css — one-column index lists are rows', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = (sel) => {
+    const i = bare.indexOf('\n    ' + sel + ' {');
+    if (i === -1) return null;
+    return bare.slice(bare.indexOf('{', i) + 1, bare.indexOf('}', i));
+  };
+  it('a row sits on a hairline, with no box', () => {
+    const row = block('.chapter-cards:not(.two-col) .chapter-card-btn');
+    expect(row).toMatch(/background:\s*none/);
+    expect(row).toMatch(/border:\s*0/);
+    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+    expect(row).toMatch(/border-radius:\s*0/);
+    expect(block('.chapter-cards:not(.two-col) .chapter-card-divider')).toMatch(/display:\s*none/);
+  });
+  it('titles are upright but still clamp at two lines', () => {
+    expect(block('.chapter-cards:not(.two-col) .chapter-card-title:not(.untitled)')).toMatch(/font-style:\s*normal/);
+    expect(block('.chapter-card-title')).toMatch(/-webkit-line-clamp:\s*2/);
+  });
+  it('the two-column grids keep their cards (the base rule still draws the box)', () => {
+    expect(block('.chapter-card-btn')).toMatch(/border:\s*1px solid var\(--gold-border\)/);
+  });
+});
+
 /* PROGRESS IS SECTIONS OF ROWS (redesign, 2026-09-25, Codex mockup r5 take 1). Up to eight
    gold-outlined stat boxes and boxed cards became one summary sentence and label / value rows on
    hairlines; its 10 and 11 px labels grew to 12 or more, and "View all milestones ›" stopped
