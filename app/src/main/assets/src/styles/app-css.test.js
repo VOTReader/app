@@ -607,4 +607,12 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
     expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*clamp\(var\(--fs-12\),/);
   });
+  it('a column label is tracked tight enough to stay on one line in half a phone', () => {
+    // 176 px at 360: "THE SEVEN VOLUMES" wrapped at 0.18em (the 09-25 walk, labels-volumes-home.png).
+    // blocksOf, not ruleBlock: the scoped `.volumes-landing .genre-col-label {` comes first in the file.
+    const [base] = blocksOf('.genre-col-label');
+    const ls = /letter-spacing:\s*([\d.]+)em/.exec(base);
+    expect(ls).not.toBeNull();
+    expect(Number(ls[1])).toBeLessThanOrEqual(0.1);
+  });
 });
