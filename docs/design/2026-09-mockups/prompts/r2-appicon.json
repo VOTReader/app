@@ -1,0 +1,25 @@
+{
+ "name": "r2-appicon",
+ "refs": [
+  "out/r1-appicon/appicon-A.png",
+  "/home/user/app/app/src/main/assets/icons/icon-512.png"
+ ],
+ "images": [
+  {
+   "file": "appicon-r2-final.png",
+   "prompt": "Image 1 is the chosen design (the EDIT TARGET). Keep its layout, palette, typography, spacing and overall look exactly; change ONLY what the numbered list says. Every text string must be crisp and correctly spelled. No blur, no vignette, no depth-of-field. Changes: turn this into a clean final icon spec sheet: the book-and-flame mark only, perfectly flat and vector-crisp, shown as (1) the adaptive icon on true black, (2) the Android 13 themed monochrome variant, (3) a 48 px size check, (4) the mark alone on transparent. Remove any blurred or decorative filler text; labels crisp and minimal.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "appicon-r2-continuity.png",
+   "prompt": "Asset: APP ICON evolution sheet. Start from the CURRENT VOTReader icon (Image 2) (a glowing four-pointed star rising over the dark curve of the earth) and simplify it into a flat, timeless adaptive Android icon: one antique-gold (#D4AF5A) four-pointed star above a single thin gold horizon arc on true black, no gradients, no globe continents, no glow halos. Show large, at 3 small sizes, and a monochrome themed variant. Clean spec-board layout, crisp labels, no blur.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "appicon-r2-combined.png",
+   "prompt": "Asset: APP ICON sheet. A flat adaptive icon on true black combining an open book (warm ivory #EFE8DA pages) with a small antique-gold (#D4AF5A) four-pointed star rising just above its spine like dawn light. Vector-flat, 2 colours plus black, no text, no cross, no glow. Show large, at 3 small sizes on a home-screen strip, and a monochrome themed variant. Crisp labels, no blur.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "base": "A",
+ "preamble": "Image 1 (attached) is the chosen app-icon sheet from round 1 (book-and-flame mark). Image 2 is the CURRENT VOTReader app icon (a glowing star over the earth). Use them exactly as each spec says.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

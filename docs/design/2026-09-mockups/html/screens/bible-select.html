@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .chapter { padding-top: 6px; }
+  .chapter .ctx { display: flex; align-items: center; gap: 8px; }
+  .sechead { margin: 22px 0 10px; }
+  .verses { position: relative; }
+  .sel { background: var(--accent-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 3px; }
+  .handle { display: inline-block; width: 2px; height: 26px; background: var(--accent); vertical-align: -6px; position: relative; }
+  .handle::after { content: ''; position: absolute; left: -5px; width: 12px; height: 12px; border-radius: 6px; background: var(--accent); }
+  .handle.a::after { top: -11px; } .handle.b::after { bottom: -11px; }
+  .toolbar { position: relative; margin: 14px -6px 16px; background: var(--surface-2); border-radius: 18px; padding: 12px 12px 8px; box-shadow: var(--shadow); }
+  .swatches { display: flex; justify-content: space-between; padding: 0 6px 12px; border-bottom: 1px solid var(--hairline); }
+  .sw { width: 30px; height: 30px; border-radius: 15px; }
+  .sw.on { box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text); }
+  .acts { display: flex; justify-content: space-around; padding-top: 8px; }
+  .act { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 400 12px/1 var(--sans); color: var(--text-2); width: 62px; padding: 4px 0; }
+  .toolbar::after { content: ''; position: absolute; left: 150px; bottom: -7px; width: 14px; height: 14px; background: var(--surface-2); transform: rotate(45deg); border-radius: 2px; }
+  .mini .t { flex: 1; min-width: 0; }
+  .mini .t b { display: block; font: 700 14px/1.2 var(--sans); color: var(--text); }
+  .mini .t span { font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">John 3 · NKJV</span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll chapter">
+    <div class="h1" style="font-size:40px">John 3</div>
+    <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+    <div class="reading verses">
+      <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+  <div class="toolbar">
+        <div class="swatches">
+          <span class="sw on" style="background:var(--dot-honey)"></span><span class="sw" style="background:var(--dot-sage)"></span><span class="sw" style="background:var(--dot-sky)"></span>
+          <span class="sw" style="background:var(--dot-rose)"></span><span class="sw" style="background:var(--dot-lavender)"></span><span class="sw" style="background:var(--dot-clay)"></span>
+        </div>
+        <div class="acts">
+          <span class="act"><i data-i="underline"></i>Underline</span><span class="act"><i data-i="notebook-pen"></i>Note</span>
+          <span class="act"><i data-i="link"></i>Link</span><span class="act"><i data-i="copy"></i>Copy</span><span class="act"><i data-i="share-2"></i>Share</span>
+        </div>
+      </div>
+      <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, <span class="handle a"></span><mark class="sel">unless one is born again, he cannot see the kingdom of God.</mark><span class="handle b"></span>”</p>
+      <p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+    </div>
+  </div>
+  <div class="mini">
+    <span class="playbtn"><i data-i="pause"></i></span>
+    <span class="t"><b>John 3 · KJV · Biblical Restoration</b><span>1:12 / 4:05</span>
+      <div class="progress" style="margin-top:6px"><i style="width:29%"></i></div></span>
+    <span class="chip" style="height:30px">1.00×</span>
+  </div>
+</div>
+</body></html>

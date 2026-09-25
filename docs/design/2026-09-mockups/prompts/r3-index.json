@@ -1,0 +1,21 @@
+{
+ "name": "r3-index",
+ "refs": [
+  "out/r2-home/home-r2-refined.png",
+  "out/r2-home/home-r2-light.png",
+  "../shots/35-chapter-index.png"
+ ],
+ "images": [
+  {
+   "file": "index-r3-dark.png",
+   "prompt": "Screen: VOLUME ONE letter index. Title 'Volume One', meta '29 letters \u00b7 2004-2006', a 'Play all' button and a progress summary '12 of 29 read'. Rows with a small number, date, title and duration, read letters marked by a small filled accent dot, the current letter highlighted: 'Preface - A Word of Warning \u00b7 ~1 min'; '1 \u00b7 8/31/04 \u00b7 Chosen by God \u00b7 ~1 min'; '2 \u00b7 10/6/04 \u00b7 Honor Not the Day of the Dead... Honor God \u00b7 ~1 min'; '3 \u00b7 10/7/04 \u00b7 Christmas \u00b7 ~4 min'; '4 \u00b7 10/16/04 \u00b7 Wisdom Regarding Those Who Killed The Messiah, Who Is Called Christ \u00b7 ~2 min'; '5 \u00b7 10/17/04 \u00b7 Humility and The Word of God \u00b7 ~1 min'.\nRender in the DARK theme exactly like Image 1.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "index-r3-light.png",
+   "prompt": "Screen: VOLUME ONE letter index. Title 'Volume One', meta '29 letters \u00b7 2004-2006', a 'Play all' button and a progress summary '12 of 29 read'. Rows with a small number, date, title and duration, read letters marked by a small filled accent dot, the current letter highlighted: 'Preface - A Word of Warning \u00b7 ~1 min'; '1 \u00b7 8/31/04 \u00b7 Chosen by God \u00b7 ~1 min'; '2 \u00b7 10/6/04 \u00b7 Honor Not the Day of the Dead... Honor God \u00b7 ~1 min'; '3 \u00b7 10/7/04 \u00b7 Christmas \u00b7 ~4 min'; '4 \u00b7 10/16/04 \u00b7 Wisdom Regarding Those Who Killed The Messiah, Who Is Called Christ \u00b7 ~2 min'; '5 \u00b7 10/17/04 \u00b7 Humility and The Word of God \u00b7 ~1 min'.\nRender in the LIGHT theme exactly like Image 2.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "preamble": "Image 1 is the approved VOTReader design system in its DARK theme ('Vesper'); Image 2 is the same system in its LIGHT theme ('Vellum'). Every new screen must match them exactly: palette, typography (book serif for titles, humanist sans for UI), spacing, 16 dp radii, filled surfaces instead of outlines, icon style, and the single antique-gold accent (oxblood in light). Any further attached image is a screenshot of the CURRENT app, for content only.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

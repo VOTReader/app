@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<style>
+  body.landscape { width: 915px; height: 412px; }
+  canvas { position: absolute; inset: 0; width: 915px; height: 412px; }
+  .chrome { position: absolute; left: 20px; right: 20px; top: 14px; display: flex; align-items: flex-start; gap: 14px; }
+  .brand .h2 { font-size: 26px; }
+  .chrome .seg { width: 300px; margin: 2px auto 0; }
+  .right { display: flex; gap: 8px; margin-top: 2px; }
+  .card.pop { position: absolute; width: 250px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .pop .ref { font: 500 18px/1.2 var(--serif); }
+  .pop .ref span { color: var(--accent); }
+  .pop q { display: block; font: italic 400 16px/1.4 var(--serif); color: var(--text-2); margin: 6px 0 10px; quotes: none; }
+  .foot { position: absolute; bottom: 10px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .legend { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 90px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, rgb(212,175,90), rgb(201,132,143), rgb(134,169,201)); }
+  [data-theme="light"] .legend i { background: linear-gradient(90deg, rgb(123,45,38), rgb(150,105,40), rgb(60,92,125)); }
+  .credit { font: 400 10.5px/1 var(--sans); color: var(--text-3); }
+</style>
+<style>
+  .dsheet { position: absolute; left: 0; right: 0; bottom: 0; height: 196px; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 22px 16px; box-shadow: var(--shadow); }
+  .dsheet .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 2px; }
+  .dsheet .ref { font: 500 19px/1.2 var(--serif); margin-bottom: 4px; }
+  .dsheet .ref small { font: 400 12px/1 var(--sans); color: var(--text-3); margin-left: 6px; }
+  .dsheet .reading { font-size: 15.5px; line-height: 1.45; color: var(--text-2); }
+  .dsheet .acts { display: flex; gap: 10px; margin-top: 10px; }
+  .dsheet .grabber { margin-bottom: 8px; }
+  .x { position: absolute; right: 16px; top: 12px; }
+  .layer { position: absolute; left: 20px; top: 84px; display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body class="landscape">
+<canvas id="c"></canvas>
+<div class="chrome">
+  <div class="brand"><div class="h2">Scripture Web</div><div class="meta">Messianic prophecy · 51 threads</div></div>
+  <div class="seg"><span class="on">Scripture</span><span>My Web</span><span>Nearby</span></div>
+  <div class="right"><span class="chip on"><i data-i="check" class="xs"></i> Prophecy</span><span class="chip"><i data-i="rotate-ccw" class="xs"></i> Reset</span></div>
+</div>
+<div class="layer"><span class="pill"><i data-i="graduation-cap" class="xs"></i> From the study “YahuShua, More Than a Man”</span></div>
+<div class="foot">
+  <span class="credit">Cross-references © OpenBible.info (CC-BY) · prophecy threads from the VOTReader studies</span>
+  <span class="legend meta">prophecy <i style="background:var(--accent)"></i> fulfilment</span>
+</div>
+<script type="module">
+  import { draw } from '../kit/data/web-draw.js';
+  draw(document.getElementById('c'), { mode: 'prophecy', top: 120, baseline: 346, dim: 0.45 });
+  document.documentElement.dataset.drawn = '1';
+</script>
+</body></html>

@@ -1,0 +1,67 @@
+/* Vesper, CSS-only preview on the real app (never shipped; injected by Playwright).
+   How far does the look move with token + a few component overrides alone? */
+@font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 400; src: url('fonts/reading/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 700; src: url('fonts/reading/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'EB Garamond'; font-weight: 400 800; src: url('fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: 'EB Garamond'; font-style: italic; font-weight: 400 800; src: url('fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); }
+
+:root {
+  --v-sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --v-serif: 'EB Garamond', Georgia, serif;
+  --font-body: var(--v-serif);
+  /* one accent, slightly quieter gold */
+  --ink-gold: #d4af5a; --ink-gold-bright: #e2c273; --ink-gold-dim: #b8995a;
+  --gold: var(--ink-gold); --gold-bright: var(--ink-gold-bright); --gold-dim: var(--ink-gold-dim);
+  /* THE lever: every gold outline becomes a quiet neutral hairline */
+  --gold-border: rgba(239, 232, 218, 0.07);
+  --ink-gold-border: rgba(239, 232, 218, 0.07);
+  --border: rgba(239, 232, 218, 0.07);
+  --gold-glow: transparent;
+  /* warm ivory text instead of pure white */
+  --cream: #efe8da; --cream-dim: #e4dccb; --cream-muted: #9c9488;
+  --ink-cream-dim: #e4dccb; --ink-cream-muted: #9c9488;
+  --bg2: #0f0f0e; --bg3: #161512;
+  --radius: 14px;
+}
+* { text-shadow: none !important; }
+
+/* chrome: icons ivory-muted, gold only when active */
+.top-nav { border-bottom-color: rgba(239,232,218,0.06) !important; }
+.top-nav svg, .top-nav button { color: #b9b1a3 !important; stroke: currentColor; }
+.top-nav button:active svg { color: var(--gold) !important; }
+
+/* Home title lockup: serif, ivory, no Cinzel Decorative, no glow */
+.home-main-title { font-family: var(--v-serif) !important; font-weight: 500 !important; font-size: 1.9rem !important; letter-spacing: -0.005em !important; color: var(--cream) !important; }
+.home-main-amp { color: var(--gold) !important; font-size: 1.1rem !important; }
+.home-main-title2 { color: #b9b1a3 !important; letter-spacing: 0 !important; font-size: 1.05rem !important; }
+.home-ornament { display: none !important; }
+
+/* shortcuts: filled chips, sans, ivory */
+.home-shortcuts button { background: #121211 !important; border: 0 !important; border-radius: 12px !important; color: var(--cream) !important; font-family: var(--v-sans) !important; font-size: 0.9rem !important; }
+.home-shortcuts .home-search-action { background: #161512 !important; color: #9c9488 !important; }
+
+/* collection cards: fills, not outlines; sans eyebrow in sentence case; serif ivory title */
+.home-nav-item { background: #0f0f0e !important; border: 0 !important; border-radius: 16px !important; box-shadow: none !important; padding: 0.95rem 1rem !important; }
+.hni-eyebrow { font-family: var(--v-sans) !important; text-transform: none !important; letter-spacing: 0 !important; font-size: 0.75rem !important; color: #8f877b !important; }
+.hni-title { font-family: var(--v-serif) !important; font-size: 1.2rem !important; letter-spacing: 0 !important; color: var(--cream) !important; font-weight: 500 !important; }
+.hni-detail { font-family: var(--v-sans) !important; font-style: normal !important; font-size: 0.82rem !important; color: #9c9488 !important; }
+.hni-arrow { color: #6f695f !important; }
+
+/* global: letter-spaced caps labels calm down; buttons use the sans */
+[class*="eyebrow"], [class*="-label"], [class*="kicker"] { letter-spacing: 0.02em !important; }
+button { font-family: var(--v-sans); }
+
+/* reading heroes: no navy/brown gradient panels, left-aligned editorial header */
+.hero, .hero-bg { background: none !important; background-image: none !important; min-height: 0 !important; border: 0 !important; }
+.hero-bg { display: none !important; }
+.hero-content { text-align: left !important; align-items: flex-start !important; padding-top: 1.2rem !important; }
+.hero-eyebrow { font-family: var(--v-sans) !important; letter-spacing: 0 !important; text-transform: none !important; color: #8f877b !important; font-size: 0.8rem !important; background: none !important; }
+.hero-title { font-family: var(--v-serif) !important; font-weight: 500 !important; color: var(--cream) !important; text-align: left !important; letter-spacing: -0.01em !important; }
+.hero-ornament { display: none !important; }
+.hero-play-row { justify-content: flex-start !important; }
+.hero-play-row button { border: 0 !important; background: #1a1814 !important; color: var(--gold) !important; letter-spacing: 0.02em !important; text-transform: none !important; font-family: var(--v-sans) !important; border-radius: 999px !important; }
+
+/* settings: sentence-case group labels in the sans */
+.settings-section-label { font-family: var(--v-sans) !important; text-transform: none !important; letter-spacing: 0 !important; font-size: 1rem !important; color: var(--cream) !important; }
+.settings-group-head { border: 0 !important; background: #0f0f0e !important; border-radius: 16px !important; }
+.settings-group-titles em, .settings-group-titles i, .settings-group-titles span + span { font-style: normal !important; font-family: var(--v-sans) !important; color: #9c9488 !important; }

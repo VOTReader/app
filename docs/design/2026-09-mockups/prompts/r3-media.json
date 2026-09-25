@@ -1,0 +1,20 @@
+{
+ "name": "r3-media",
+ "refs": [
+  "out/r2-home/home-r2-refined.png",
+  "out/r2-home/home-r2-light.png"
+ ],
+ "images": [
+  {
+   "file": "media-r3-dark.png",
+   "prompt": "Screen: the ANDROID LOCK SCREEN with VOTReader's media notification while a letter plays: clock 6:12, date 'Thursday, September 25'; a media card with the app's book-and-flame icon, title 'Know That Which Has Been Poured Out, The Word of God', subtitle 'Volume One \u00b7 Letter 15', a scrubber 2:41 / 6:05, and controls back 15 s, pause, forward 15 s. Calm dark wallpaper (soft abstract light, no people).\nRender in the DARK theme exactly like Image 1.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "media-r3-light.png",
+   "prompt": "Screen: the ANDROID LOCK SCREEN with VOTReader's media notification while a letter plays: clock 6:12, date 'Thursday, September 25'; a media card with the app's book-and-flame icon, title 'Know That Which Has Been Poured Out, The Word of God', subtitle 'Volume One \u00b7 Letter 15', a scrubber 2:41 / 6:05, and controls back 15 s, pause, forward 15 s. Calm dark wallpaper (soft abstract light, no people).\nRender in the LIGHT theme exactly like Image 2.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "preamble": "Image 1 is the approved VOTReader design system in its DARK theme ('Vesper'); Image 2 is the same system in its LIGHT theme ('Vellum'). Every new screen must match them exactly: palette, typography (book serif for titles, humanist sans for UI), spacing, 16 dp radii, filled surfaces instead of outlines, icon style, and the single antique-gold accent (oxblood in light). Any further attached image is a screenshot of the CURRENT app, for content only.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

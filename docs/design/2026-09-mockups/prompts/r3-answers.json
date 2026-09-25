@@ -1,0 +1,21 @@
+{
+ "name": "r3-answers",
+ "refs": [
+  "out/r2-home/home-r2-refined.png",
+  "out/r2-home/home-r2-light.png",
+  "../shots/31-answers.png"
+ ],
+ "images": [
+  {
+   "file": "answers-r3-dark.png",
+   "prompt": "Screen: ANSWERS ONLY GOD CAN GIVE. Title 'Answers Only God Can Give', one-line subtitle 'The Lord sets the record straight concerning topics, doctrines and traditions'. A search field 'Search the topics'. Section 'The Ten Commandments' as a neat 2-column grid of ten compact tiles with a roman numeral and a short name: I No other gods, II No idols, III His name in vain, IV The Sabbath, V Honor parents, VI Do not murder, VII No adultery, VIII Do not steal, IX No false witness, X Do not covet. Section 'Browse by subject \u00b7 102 topics' with rows: 'The Lord & His Messiah \u00b7 13 topics', 'His Word & His Prophets \u00b7 10 topics', 'Sin, Repentance & Salvation \u00b7 8 topics', 'Walking With God \u00b7 14 topics', 'The End of This Age \u00b7 17 topics'.\nRender in the DARK theme exactly like Image 1.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "answers-r3-light.png",
+   "prompt": "Screen: ANSWERS ONLY GOD CAN GIVE. Title 'Answers Only God Can Give', one-line subtitle 'The Lord sets the record straight concerning topics, doctrines and traditions'. A search field 'Search the topics'. Section 'The Ten Commandments' as a neat 2-column grid of ten compact tiles with a roman numeral and a short name: I No other gods, II No idols, III His name in vain, IV The Sabbath, V Honor parents, VI Do not murder, VII No adultery, VIII Do not steal, IX No false witness, X Do not covet. Section 'Browse by subject \u00b7 102 topics' with rows: 'The Lord & His Messiah \u00b7 13 topics', 'His Word & His Prophets \u00b7 10 topics', 'Sin, Repentance & Salvation \u00b7 8 topics', 'Walking With God \u00b7 14 topics', 'The End of This Age \u00b7 17 topics'.\nRender in the LIGHT theme exactly like Image 2.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, portrait orientation, no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "preamble": "Image 1 is the approved VOTReader design system in its DARK theme ('Vesper'); Image 2 is the same system in its LIGHT theme ('Vellum'). Every new screen must match them exactly: palette, typography (book serif for titles, humanist sans for UI), spacing, 16 dp radii, filled surfaces instead of outlines, icon style, and the single antique-gold accent (oxblood in light). Any further attached image is a screenshot of the CURRENT app, for content only.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

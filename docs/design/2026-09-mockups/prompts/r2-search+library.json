@@ -1,0 +1,20 @@
+{
+ "name": "r2-search+library",
+ "refs": [
+  "out/r1-search+library/search+library-A.png"
+ ],
+ "images": [
+  {
+   "file": "search+library-r2-refined.png",
+   "prompt": "Image 1 is the chosen design (the EDIT TARGET). Keep its layout, palette, typography, spacing and overall look exactly; change ONLY what the numbered list says. Every text string must be crisp and correctly spelled. No blur, no vignette, no depth-of-field. Changes: all text crisp and correctly spelled; in the Library phone, add a small line 'Kept on this device \u00b7 Back up in Settings' at the bottom.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "search+library-r2-light.png",
+   "prompt": "Recreate Image 1's exact screen - same layout, same components, same text, same spacing - as its LIGHT-THEME twin in the Vellum palette: warm paper background #F5F0E6, cream cards #FBF8F2 with barely-visible shadows, ink text #1E1A15, secondary #6B6257, ONE oxblood accent #7B2D26 (primary action, selection, verse numbers), gilt hairlines #B89A5B only as dividers. Same fonts as Image 1.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "base": "A",
+ "preamble": "Image 1 (attached) is the chosen mockup from round 1: the design to iterate on. Use it as the edit target or layout reference exactly as each spec says.",
+ "max_primary": 95,
+ "max_weekly": 60
+}
