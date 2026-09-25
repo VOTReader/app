@@ -491,6 +491,30 @@ describe('findEntryContext', () => {
     expect(findEntryContext('does-not-exist')).toBeNull();
     expect(findEntryContext(null)).toBeNull();
   });
+  describe('a wtlb: key on a Blessed or Holy Days entry (v05-03)', () => {
+    // WtlbEntryView paints The Blessed and Holy Days' paragraph entries too, and
+    // keys every one wtlb:<id>:<n>. With the wtlb hint only WTLB One / Two /
+    // Answers were searched: each such highlight, note and bookmark in the
+    // Library was labelled with its slug and opened nothing, retry or not.
+    beforeEach(() => {
+      window.THE_BLESSED = [{ id: 'blessed-are-those-who-mourn', title: 'Blessed Are Those Who Mourn', paragraphs: [] }];
+      window.HOLY_DAYS = [{ id: 'the-passover', title: 'The Passover', paragraphs: [] }];
+      window.WTLB_ONE = [{ id: 'matters-of-the-heart', title: 'Matters of the Heart', paragraphs: [] }];
+    });
+    afterEach(() => { delete window.THE_BLESSED; delete window.HOLY_DAYS; delete window.WTLB_ONE; });
+
+    it('finds a Blessed entry and routes to The Blessed', () => {
+      expect(findEntryContext('blessed-are-those-who-mourn', 'wtlb'))
+        .toMatchObject({ kind: 'blessed', screen: 'blessed-entry', title: 'Blessed Are Those Who Mourn' });
+    });
+    it('finds a Holy Days paragraph entry and routes to Holy Days', () => {
+      expect(findEntryContext('the-passover', 'wtlb')).toMatchObject({ kind: 'holy-days', screen: 'holy-days-entry', title: 'The Passover' });
+    });
+    it('a WTLB entry still resolves to WTLB, and a letter hint still never reaches these', () => {
+      expect(findEntryContext('matters-of-the-heart', 'wtlb')).toMatchObject({ kind: 'wtlb', screen: 'wtlb-one-entry' });
+      expect(findEntryContext('blessed-are-those-who-mourn', 'letter')).toBeNull();
+    });
+  });
   it('honors a kindHint that excludes the match', () => {
     // wide-path is a letter-kind entry; a wtlb hint should not find it (and the
     // study fallback is skipped for non-letter hints).

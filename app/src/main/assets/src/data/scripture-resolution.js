@@ -411,6 +411,23 @@ export function findEntryContext(id, kindHint) {
       }
     }
   }
+  // WtlbEntryView paints The Blessed and Holy Days' paragraph entries as well
+  // as WTLB One / Two, and keys every one of them wtlb:<id>:<n> (hl-keys.js
+  // wtlbHlKey) — so a Blessed or Holy Days highlight, note or bookmark arrives
+  // here with the wtlb hint. Searching only the wtlb-kind collections left each
+  // one labelled with its slug and a dead tap (v05-03). WTLB is searched first
+  // above, so an id both share still resolves where it always did.
+  if (kindHint === 'wtlb' && COL_BY_KEY && COL_BY_KEY.get) {
+    for (const volKey of ['blessed', 'holydays']) {
+      const col = COL_BY_KEY.get(volKey);
+      if (!col) continue;
+      const pref = colPreface(col);
+      if (pref && pref.id === id) return { kind: col.kind, screen: col.letterScreen, collection: col.label, title: pref.title || id, entry: pref };
+      const arr = colLetters(col);
+      const f = Array.isArray(arr) ? arr.find(e => e && e.id === id) : null;
+      if (f) return { kind: col.kind, screen: col.letterScreen, collection: col.label, title: f.title || id, entry: f };
+    }
+  }
   // An Answers topic before its lazy corpus has landed (a fresh session's
   // My Notes / Bookmarks / Links): the always-loaded title index
   // (utils/answers-url-index.js, published by utils/answers-links.js) still
