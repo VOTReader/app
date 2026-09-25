@@ -57,6 +57,7 @@ class AppInterfaceTest {
         override fun rate(rate: Double) { calls += "rate $rate" }
         override fun volume(volume: Double) { calls += "volume $volume" }
         override fun upcoming(json: String?) { calls += "upcoming $json" }
+        override fun meta(json: String?) { calls += "meta $json" }
         override fun release() { calls += "release" }
         override fun journal(): String = journalAnswer()
     }
@@ -73,6 +74,8 @@ class AppInterfaceTest {
         app.audioLoad("{\"url\":\"u\"}")
         app.audioPlay()
         verify { vm.streamAudioActive = true }
+        assertEquals(0, fake.notificationsPermissionAskCount)   // not at play: the page asks, tour-guarded
+        app.audioAskNotifications()
         assertEquals(1, fake.notificationsPermissionAskCount)
         app.audioSeek(1500.7)
         app.audioSeek(-3.0)
@@ -80,12 +83,13 @@ class AppInterfaceTest {
         app.audioRate(1.5)
         app.audioVolume(0.25)
         app.audioUpcoming("[]")
+        app.audioMeta("{}")
         app.audioPause()
         app.audioRelease()
         verify(exactly = 2) { vm.streamAudioActive = false }
         assertEquals(
             listOf("load {\"url\":\"u\"}", "play", "seek 1500", "seek 0", "seek 0", "rate 1.5", "volume 0.25",
-                "upcoming []", "pause", "release"),
+                "upcoming []", "meta {}", "pause", "release"),
             port.calls,
         )
         assertEquals("{\"last\":0}", app.audioJournal())
@@ -109,7 +113,7 @@ class AppInterfaceTest {
 
         val bare = AppInterface(FakeBridgeHost(), mockk(relaxed = true), mockk(relaxed = true))
         bare.audioLoad("{}"); bare.audioPlay(); bare.audioPause(); bare.audioSeek(1.0); bare.audioRate(1.0)
-        bare.audioVolume(1.0); bare.audioUpcoming("[]"); bare.audioRelease()
+        bare.audioVolume(1.0); bare.audioUpcoming("[]"); bare.audioMeta("{}"); bare.audioRelease()
         assertEquals("", bare.audioJournal())
     }
 

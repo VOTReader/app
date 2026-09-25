@@ -82,10 +82,8 @@ export function SongVersionsCard({ song, state }) {
   const shown = at >= VERSION_CHIPS ? [versions[at]].concat(versions.filter((s) => s.id !== song.id).slice(0, VERSION_CHIPS - 1)) : versions.slice(0, VERSION_CHIPS);
   const choose = (id) => {
     if (id === song.id) return;
-    // From the start, and the rest of the queue follows as it was (README §3.6).
-    const queue = Array.isArray(state.queue) ? state.queue : [];
-    const rest = queue.slice(state.qi + 1).map((t) => songIdOfKey(t && t.key)).filter((x) => x && x !== id);
-    AudioPlayer.playSongs({ ids: [id].concat(rest), startId: id, label: fam.t });
+    // From the start, in its place: the queue, its label, shuffle and what was heard all stay (README §3.6).
+    AudioPlayer.switchSongVersion(id);
   };
   return (
     <div className="audio-manager-tool audio-manager-voice audio-manager-voice-top song-desk-versions">

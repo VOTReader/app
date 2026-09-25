@@ -335,7 +335,12 @@ describe('repeat and shuffle', () => {
     expect(AudioPlayer.setShuffle(false)).toBe(true);
     s = AudioPlayer.getState();
     expect(s.shuffle).toBe(false);
-    expect(s.queue.map((t) => t.key)).toEqual(Songs.songQueue({ filter: {}, startKey: playing.key }).map((x) => 'song:' + x.id));
+    // Off is catalog order turned to begin at the playing song: ALL 40 still there (sweep n3-01: it cut to the
+    // songs after the playing one's catalog place, about half on average).
+    expect(s.queue).toHaveLength(40);
+    const catalog = Songs.songQueue({ filter: {} }).map((x) => 'song:' + x.id);
+    const at = catalog.indexOf(playing.key);
+    expect(s.queue.map((t) => t.key)).toEqual(catalog.slice(at).concat(catalog.slice(0, at)));
     // Not a songs queue: shuffle does nothing.
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     expect(AudioPlayer.setShuffle(true)).toBe(false);
@@ -363,6 +368,97 @@ describe('repeat and shuffle', () => {
     expect(s.queue.every((t, i, q) => q.findIndex((u) => Songs.songById(u.key.slice(5)).f === Songs.songById(t.key.slice(5)).f) === i)).toBe(true);
     AudioPlayer.toggle();                                     // the snapshot carries the rule
     expect(JSON.parse(localStorage.getItem('vot-audio-pos'))).toMatchObject({ mode: 'songs', one: true });
+  });
+});
+
+describe('songs - the sweep n3 paths', () => {
+  it('shuffle on then off, from a song late in the catalog, keeps every song (n3-01)', async () => {
+    await load(bigSongCatalog(30));
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 5 });
+    for (let i = 0; i < 7; i++) AudioPlayer.next();
+    expect(AudioPlayer.setShuffle(false)).toBe(true);
+    let s = AudioPlayer.getState();
+    expect(s.queue).toHaveLength(30);
+    expect(new Set(s.queue.map((t) => t.key)).size).toBe(30);
+    // and the rebuild after a restart agrees (the descriptor carries the rule)
+    AudioPlayer.toggle();
+    const saved = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(saved).toMatchObject({ mode: 'songs', wrap: true });
+    const order = s.queue.map((t) => t.key);
+    await load(bigSongCatalog(30));
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(AudioPlayer.getState().queue.length).toBe(30));
+    s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.key)).toEqual(order);
+  });
+
+  it('a version switch plays the other take in its place: queue, place, label, shuffle kept (n3-02)', () => {
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 3, label: 'My mix' });
+    let s = AudioPlayer.getState();
+    const famA = s.queue.findIndex((t) => Songs.songById(t.key.slice(5)).f === 'fam-a');
+    while (AudioPlayer.getState().qi < famA) AudioPlayer.next();
+    const before = AudioPlayer.getState();
+    const other = before.queue[before.qi].key === 'song:aaaaaaaaaaa1' ? 'aaaaaaaaaaa2' : 'aaaaaaaaaaa1';
+    expect(AudioPlayer.switchSongVersion(other)).toBe(true);
+    s = AudioPlayer.getState();
+    expect(s.queue).toHaveLength(before.queue.length);
+    expect(s.qi).toBe(before.qi);
+    expect(s.queue[s.qi].key).toBe('song:' + other);
+    expect(s.queue.filter((_t, i) => i !== s.qi)).toEqual(before.queue.filter((_t, i) => i !== before.qi));
+    expect(s.shuffle).toBe(true);
+    expect(el().src).toBe(SONG_URL(1, other));
+    // A restart replays the switch: the rebuild puts the chosen take in the same place.
+    AudioPlayer.toggle();
+    const saved = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(saved).toMatchObject({ mode: 'songs', label: 'My mix', shuffle: true, key: 'song:' + other });
+    expect(Object.values(saved.swaps)).toEqual([other]);
+    // Not another version of the same song, or nothing songs playing: refused.
+    expect(AudioPlayer.switchSongVersion('bbbbbbbbbbb1')).toBe(false);
+    expect(AudioPlayer.switchSongVersion('not-an-id')).toBe(false);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.switchSongVersion(other)).toBe(false);
+  });
+
+  it('switching back to the catalog take forgets the swap; an explicit list swaps the id', () => {
+    AudioPlayer.playSongs({ filter: { family: 'fam-c' }, onePerFamily: true });   // c2 featured
+    expect(AudioPlayer.getState().queue[0].key).toBe('song:ccccccccccc2');
+    expect(AudioPlayer.switchSongVersion('ccccccccccc1')).toBe(true);
+    expect(AudioPlayer.switchSongVersion('ccccccccccc2')).toBe(true);
+    AudioPlayer.toggle();
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).swaps).toBeUndefined();
+    AudioPlayer.playSongs({ ids: ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'], label: 'Two' });
+    expect(AudioPlayer.switchSongVersion('aaaaaaaaaaa2')).toBe(true);
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.key)).toEqual(['song:aaaaaaaaaaa2', 'song:bbbbbbbbbbb1']);
+    AudioPlayer.toggle();
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).ids).toEqual(['aaaaaaaaaaa2', 'bbbbbbbbbbb1']);
+  });
+
+  it('a song that will not play is passed over; three in a row, or offline, pause (n3-03)', () => {
+    AudioPlayer.playSongs({ filter: {} });
+    const s0 = AudioPlayer.getState();
+    expect(s0.queue.length).toBeGreaterThanOrEqual(4);
+    el().dispatchEvent(new Event('error'));
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(AudioPlayer.getState().status).toBe('loading');
+    el().dispatchEvent(new Event('playing'));          // it played: the count starts again
+    el().dispatchEvent(new Event('error'));
+    el().dispatchEvent(new Event('error'));
+    el().dispatchEvent(new Event('error'));
+    expect(s0.queue).toHaveLength(5);                   // a1 a2 b1 c1 c2 (a3 hidden, d1 unhosted)
+    expect(AudioPlayer.getState().qi).toBe(4);          // three passed over
+    expect(AudioPlayer.getState().status).toBe('loading');
+    el().dispatchEvent(new Event('error'));            // the fourth in a row: the network, not the song
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().qi).toBe(4);
+  });
+
+  it('offline, a failed song pauses with the offline notice instead of walking the queue', () => {
+    AudioPlayer.playSongs({ filter: {} });
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    el().dispatchEvent(new Event('error'));
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().status).toBe('paused');
   });
 });
 

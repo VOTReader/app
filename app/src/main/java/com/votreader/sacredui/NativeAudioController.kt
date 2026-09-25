@@ -114,6 +114,26 @@ class NativeAudioController(
         }
     }
 
+    override fun meta(json: String?) {
+        val o = parse(json) ?: return
+        val title = NativeAudioLogic.label(o.optString("title"))
+        val artist = NativeAudioLogic.label(o.optString("artist"))
+        val album = NativeAudioLogic.label(o.optString("album"))
+        onMain { c ->
+            val i = c.currentMediaItemIndex
+            val item = c.currentMediaItem ?: return@onMain
+            if (i < 0) return@onMain
+            // Same id and uri, new text: Media3 swaps it in place without re-preparing (the id keeps the seam
+            // dedupe quiet). The lock screen, notification, Bluetooth and car name the compilation's letter.
+            c.replaceMediaItem(
+                i,
+                item.buildUpon()
+                    .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist).setAlbumTitle(album.ifEmpty { null }).build())
+                    .build(),
+            )
+        }
+    }
+
     override fun release() = onMain { c ->
         c.stop()
         c.clearMediaItems()
@@ -211,6 +231,7 @@ class NativeAudioController(
             if (events.containsAny(
                     Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_PLAYBACK_STATE_CHANGED,
                     Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
+                    Player.EVENT_PLAYBACK_SUPPRESSION_REASON_CHANGED,
                 )
             ) state(c, "state")
             // At its end ExoPlayer keeps playWhenReady; an ended <audio> is paused, and the page files it so. Left
@@ -235,6 +256,8 @@ class NativeAudioController(
             "want" to c.playWhenReady,
             "buffering" to (c.playbackState == Player.STATE_BUFFERING),
             "ended" to (c.playbackState == Player.STATE_ENDED),
+            // Wanting to play but held silent: a phone call (transient focus loss). The page shows it paused.
+            "suppressed" to (c.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE),
             "idle" to (c.playbackState == Player.STATE_IDLE),
             "reason" to reason,
             "last" to journal.last(),

@@ -33,6 +33,7 @@ beforeEach(async () => {
   bridge = {
     audioLoad: vi.fn(), audioPlay: vi.fn(), audioPause: vi.fn(), audioSeek: vi.fn(), audioRate: vi.fn(),
     audioVolume: vi.fn(), audioUpcoming: vi.fn(), audioRelease: vi.fn(), audioJournal: vi.fn(() => ''),
+    audioMeta: vi.fn(),
   };
   window.AndroidBridge = bridge;
   localStorage.setItem('vot.audioEngine', 'native');
@@ -151,6 +152,49 @@ describe('native-audio - the <audio> surface', () => {
     state({ playing: true, want: true });
     expect(seen.slice(-3)).toEqual(['play', 'playing', 'timeupdate']);
     expect(el.paused).toBe(false);
+  });
+
+  it('a phone call holding native silent reads as a pause, and native going on after it as play (m3 N2)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ playing: true, want: true });
+    const seen = recorder(el);
+    state({ pos: 3000, playing: false, want: true, suppressed: true });   // the call: still wanting, held silent
+    expect(el.paused).toBe(true);
+    expect(seen).toContain('pause');
+    state({ pos: 3000, playing: false, want: true, suppressed: true });
+    expect(seen.filter((t) => t === 'pause')).toHaveLength(1);
+    state({ pos: 3000, playing: true, want: true, suppressed: false });  // the call ended: native plays on
+    expect(el.paused).toBe(false);
+    expect(seen.slice(-3)).toEqual(['play', 'playing', 'timeupdate']);
+  });
+
+  it('a page pause during the call reaches native, so it stays paused after it', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ playing: true, want: true });
+    state({ pos: 3000, playing: false, want: true, suppressed: true });
+    bridge.audioPause.mockClear();
+    el.pause();
+    expect(bridge.audioPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('new lock-screen text goes to native once per change; the load carried the first (n1-03)', () => {
+    const el = new NativeAudio({ meta: () => ({ title: 'Part 1', artist: 'The Volumes of Truth', album: 'WTLB' }) });
+    el.setMeta({ title: 'x' });                 // nothing loaded: nothing to name
+    expect(bridge.audioMeta).not.toHaveBeenCalled();
+    el.src = A;
+    el.play();
+    el.setMeta({ title: 'Part 1', artist: 'The Volumes of Truth', album: 'WTLB' });   // what the load said
+    expect(bridge.audioMeta).not.toHaveBeenCalled();
+    el.setMeta({ title: 'Letter Two', artist: 'The Volumes of Truth', album: 'WTLB · Part 1' });
+    el.setMeta({ title: 'Letter Two', artist: 'The Volumes of Truth', album: 'WTLB · Part 1' });
+    expect(bridge.audioMeta).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(bridge.audioMeta.mock.calls[0][0]).title).toBe('Letter Two');
+    delete bridge.audioMeta;                     // a shell without it: quiet
+    el.setMeta({ title: 'Letter Three' });
   });
 
   it('an end with nothing after it is a pause then an ended, once', () => {

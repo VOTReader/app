@@ -91,6 +91,7 @@ class NativeAudio extends EventTarget {
     this._anchorAt = 0;
     this._playing = false;        // native says it is producing sound
     this._want = false;           // native's playWhenReady
+    this._held = false;           // native wants to play but is held silent (a phone call: transient focus loss)
     this._buffering = false;
     this._rate = 1;
     this._default = 1;
@@ -98,6 +99,7 @@ class NativeAudio extends EventTarget {
     this._startMs = 0;
     this._lastSeq = 0;
     this._upcomingSent = '';
+    this._metaSent = '';
     /**
      * What the page last asked native for (true = play, false = pause), until native's playWhenReady says it heard:
      * events already in flight still carry the old wish and are not native's own play or pause. null = nothing asked.
@@ -218,6 +220,7 @@ class NativeAudio extends EventTarget {
       this._loadedAt = Date.now();
       this._nativeUrl = this._src;
       const meta = this._meta(this._src);
+      this._metaSent = JSON.stringify({ title: String(meta.title || ''), artist: String(meta.artist || ''), album: String(meta.album || '') });
       const upcoming = this._upcoming();
       this._upcomingSent = JSON.stringify(upcoming);
       b.audioLoad(JSON.stringify({
@@ -262,6 +265,20 @@ class NativeAudio extends EventTarget {
   /** @param {string} name */
   removeAttribute(name) { if (name === 'src') this.src = ''; }
 
+  /**
+   * New lock-screen text for the recording playing (a compilation's letter changed; sweep n1-03).
+   * @param {NativeMeta} meta
+   */
+  setMeta(meta) {
+    if (!this._loaded || !meta) return;
+    const m = { title: String(meta.title || ''), artist: String(meta.artist || ''), album: String(meta.album || '') };
+    const json = JSON.stringify(m);
+    if (json === this._metaSent) return;
+    this._metaSent = json;
+    const b = nativeBridge();
+    if (b && typeof b.audioMeta === 'function') b.audioMeta(json);
+  }
+
   /* ── the seam ────────────────────────────────────────────────────── */
 
   /** Tell native what plays after this recording (only when it changed). The player calls this at each start and
@@ -304,6 +321,7 @@ class NativeAudio extends EventTarget {
     if (url === this._nativeUrl && url !== this._src) return;   // crossed a seam the page has not adopted yet
     const wasPlaying = this._playing;
     const wasWant = this._want;
+    const wasHeld = this._held;
     const wasBuffering = this._buffering;
     const dur = Number(e.dur) > 0 ? Number(e.dur) / 1000 : NaN;
     this._pos = Math.max(0, Number(e.pos) || 0) / 1000;
@@ -312,6 +330,7 @@ class NativeAudio extends EventTarget {
     this._buf = Math.max(0, Number(e.buf) || 0) / 1000;
     this._playing = !!e.playing;
     this._want = !!e.want;
+    this._held = this._want && !!e.suppressed;
     this._buffering = !!e.buffering;
     if (dur > 0 && dur !== this._dur) {
       const first = !(this._dur > 0);
@@ -336,11 +355,13 @@ class NativeAudio extends EventTarget {
       // The page asked native to play or pause: events sent before native heard it still carry the old wish (a
       // fresh load's first state, too, says "not playing" before the play arrives: refutation M3).
       if (this._want === this._expect) this._expect = null;
-    } else if (wasWant && !this._want && !this._paused) {
-      // Native's own pause: audio focus lost, headphones out, the lock screen's button.
+    } else if (wasWant && (!this._want || (this._held && !wasHeld)) && !this._paused) {
+      // Native's own pause: audio focus lost, headphones out, the lock screen's button, or a phone call holding it
+      // silent (it still wants to play and will on its own after the call: the bar says paused meanwhile, not
+      // playing with a frozen clock; m3 N2).
       this._paused = true;
       this._fire('pause');
-    } else if (this._want && this._paused && (!wasWant || this._playing)) {
+    } else if (this._want && this._paused && !this._held && (!wasWant || wasHeld || this._playing)) {
       // Native's own play (the lock screen, a headset, Play at an end): the page follows.
       this._paused = false;
       this._ended = false;
@@ -375,6 +396,7 @@ class NativeAudio extends EventTarget {
     // Native consumed what it was told comes next: say it again for the new recording, even when it is the same
     // list (repeat one: A after A, refutation S1).
     this._upcomingSent = '';
+    this._metaSent = '';   // native shows the text it was given with the upcoming list
     this._ended = true;
     this._pos = this._dur > 0 ? this._dur : this._pos;
     this._fire('ended');

@@ -45,6 +45,7 @@ beforeEach(async () => {
     setAudioActive: vi.fn(() => true), setAudioNowPlaying: vi.fn(),
     audioLoad: vi.fn(), audioPlay: vi.fn(), audioPause: vi.fn(), audioSeek: vi.fn(), audioRate: vi.fn(),
     audioVolume: vi.fn(), audioUpcoming: vi.fn(), audioRelease: vi.fn(), audioJournal: vi.fn(() => ''),
+    audioAskNotifications: vi.fn(), audioMeta: vi.fn(),
   };
   window.AndroidBridge = bridge;
   vi.resetModules();
@@ -196,6 +197,20 @@ describe('audio-player on the native player (m3)', () => {
     send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 600000, playing: false, want: false });
     await flush();
     expect(AudioPlayer.getState().status).toBe('paused');
+  });
+
+  it('the media card\'s notification ask comes at playing, never over the tour card (n1-02)', async () => {
+    globalThis.TourController = { getState: () => ({ active: true }) };
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 60000, playing: true, want: true });
+      await flush();
+      expect(AudioPlayer.getState().status).toBe('playing');
+      expect(bridge.audioAskNotifications).not.toHaveBeenCalled();
+      globalThis.TourController = { getState: () => ({ active: false }) };
+      AudioPlayer.syncKeepAlive();               // the tour's end
+      expect(bridge.audioAskNotifications).toHaveBeenCalledTimes(1);
+    } finally { delete globalThis.TourController; }
   });
 
   it('a pause from the lock screen pauses the player; the page\'s pause goes to native', async () => {

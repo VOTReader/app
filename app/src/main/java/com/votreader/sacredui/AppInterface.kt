@@ -649,9 +649,18 @@ class AppInterface(
     fun audioPlay() {
         vm.streamAudioActive = true
         native { it.play() }
-        // The media card needs POST_NOTIFICATIONS on API 33+: asked at the first play, as setAudioActive did.
-        host.ensureNotificationsPermission()
     }
+
+    /**
+     * The media card needs POST_NOTIFICATIONS on API 33+. The page asks from its keep-alive edge, which holds back
+     * while the tour shows (asked at audioPlay, the dialog landed on the tour card; sweep n1-02). One-shot per process.
+     */
+    @JavascriptInterface
+    fun audioAskNotifications() { host.ensureNotificationsPermission() }
+
+    /** New lock-screen text for the recording playing: {title, artist, album}. */
+    @JavascriptInterface
+    fun audioMeta(json: String?) { native { it.meta(json) } }
 
     @JavascriptInterface
     fun audioPause() { vm.streamAudioActive = false; native { it.pause() } }

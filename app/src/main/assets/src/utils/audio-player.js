@@ -52,6 +52,7 @@ import {
   songIdOfKey,
 } from './audio-track.js';
 import {
+  cleanSongSwaps,
   loadSongCatalog,
   normalizeSongFilter,
   seededShuffle,
@@ -136,6 +137,10 @@ export function trackUrl(id) {
 let _el = null;
 /** True once _ensureEl chose the native stand-in (native-audio.js, m3). */
 let _native = false;
+/** Songs passed over in a row because they would not play (n3-03); a song that plays resets it. */
+let _songSkips = 0;
+const SONG_SKIP_CAP = 3;
+const SONG_SKIP_MSG = "Couldn't play this song. Skipping to the next.";
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
@@ -272,7 +277,7 @@ function _notify() {
 function _setStatus(next) {
   if (_state.status === next) return;
   _state.status = next;
-  if (next === 'playing') _clearStallWatchdog();
+  if (next === 'playing') { _clearStallWatchdog(); _songSkips = 0; }
   // Keep-alive tracks the listening SESSION, not the play state (media-card
   // rework 2026-08-09): 'paused' keeps the anchor so the system media card
   // survives a pause with its Play button LIVE — resuming from the card needs
@@ -427,8 +432,18 @@ function _toast(text) {
  * @returns {boolean} false only when the APK says Android refused the service (sf1)
  */
 function _setAudioActive(active) {
-  // The native player (m3) is its own media service: the WebView keep-alive stays out of it.
-  if (_native) return true;
+  // The native player (m3) is its own media service: the WebView keep-alive stays out of it. Its media card still
+  // needs POST_NOTIFICATIONS on Android 13+, asked here, where _raiseKeepAlive keeps it off the tour card (the
+  // bridge's audioPlay no longer asks; sweep n1-02).
+  if (_native) {
+    if (active) {
+      try {
+        const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
+        if (b && typeof b.audioAskNotifications === 'function') b.audioAskNotifications();
+      } catch (_e) { /* the ask is best-effort */ }
+    }
+    return true;
+  }
   try {
     const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
     // The APK answers whether the service holds (sf1); false is the one refusal. An older shell answers nothing,
@@ -652,6 +667,9 @@ function _setCardMetadata(ms, track) {
  */
 function _refreshCardMetadata(track) {
   _syncNative();
+  // Under the native player the lock screen, notification, Bluetooth and car read native's metadata: tell it the
+  // compilation's letter too (sweep n1-03).
+  if (_native && _el && track && _state.queue[_state.qi] === track) /** @type {any} */ (_el).setMeta(_nativeMeta(track.url));
   try {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     _setCardMetadata(/** @type {any} */ (navigator).mediaSession, track);
@@ -892,6 +910,15 @@ function _onError() {
   // Without this guard, every stop() would flash a failure toast.
   if (_state.status === 'idle' || !_state.queue.length) return;
   _clearStallWatchdog();
+  // A song that will not play is passed over, so hands-off listening goes on (songs README 3.5: "Couldn't play
+  // this song", then it skips; sweep n3-03). Not offline (nothing ahead would play either), and at most
+  // SONG_SKIP_CAP in a row: a run of failures is the network, and the player pauses on it as before.
+  if (_isSong(_state.queue[_state.qi]) && !_offline() && _songSkips < SONG_SKIP_CAP) {
+    _songSkips++;
+    _toast(SONG_SKIP_MSG);
+    next();
+    return;
+  }
   // Keep queue + qi + position: toggle() retries from here.
   _errorTime = _state.time;
   _setStatus('paused');
@@ -1777,7 +1804,7 @@ const PERSIST_KEY = 'vot-audio-pos';
  * is a few dozen bytes here, where a `custom` queue would re-serialize 900
  * tracks into IDB every second. song-catalog.js's songQueue() turns it back
  * into the same queue.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null } | null} */
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null, wrap?: boolean, swaps?: Record<string, string> | null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -2105,6 +2132,8 @@ function _snapshot() {
     seed: songs && songs.seed ? songs.seed : undefined,
     shuffle: songs && songs.shuffle ? true : undefined,
     ids: songs ? songs.ids : undefined,
+    wrap: songs && songs.wrap ? true : undefined,
+    swaps: songs && songs.swaps ? songs.swaps : undefined,
     repeat: songs && _state.repeat !== 'off' ? _state.repeat : undefined,
     at: Date.now(),   // which copy is newer, when the two channels disagree at boot
   };
@@ -2131,7 +2160,8 @@ function _songsSnapshotFields(src, track, qi) {
     startKey = null;
     qi = 0;
   }
-  return { filter: ids ? undefined : normalizeSongFilter(src.filter), one: !ids && !!src.one, seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi };
+  return { filter: ids ? undefined : normalizeSongFilter(src.filter), one: !ids && !!src.one, seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi,
+    wrap: !ids && !!src.wrap, swaps: ids ? null : cleanSongSwaps(src.swaps) };
 }
 
 function _clearPersist() {
@@ -2247,6 +2277,8 @@ function _applySnapshot(s) {
       seed: mode === 'songs' ? (Number(s.seed) >>> 0) : 0,
       shuffle: mode === 'songs' && s.shuffle === true,
       ids: songIds,
+      wrap: mode === 'songs' && !songIds && s.wrap === true,
+      swaps: mode === 'songs' && !songIds ? cleanSongSwaps(s.swaps) : null,
     });
     _restoredAt = typeof s.at === 'number' ? s.at : 0;
     _state.queue = [track];
@@ -2482,7 +2514,7 @@ async function _rebuildRestoredQueue() {
   // horizon it just replayed and the SECOND boot regrows part 1.
   // A songs source keeps the session's repeat (_applySnapshot restored it).
   _setSource(r.mode === 'songs'
-    ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, one: !!r.one, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids }
+    ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, one: !!r.one, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids, wrap: !!r.wrap, swaps: r.swaps || null }
     : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
@@ -2863,6 +2895,53 @@ function setRepeat(mode) {
 }
 
 /**
+ * Play another version of the song playing, from its start, IN ITS PLACE: the queue, its place in it (and so the
+ * songs already heard), its label, shuffle and repeat all stay (README 3.6; sweep n3-02 - the desk rebuilt the queue
+ * as a fresh list, which dropped shuffle, label and history and cut a restored queue to 50). A described queue keeps
+ * the choice as a swap its rebuild replays; an explicit list swaps the id. False when nothing songs is playing or
+ * `id` is not another version of the same song.
+ * @param {unknown} id
+ * @returns {boolean}
+ */
+function switchSongVersion(id) {
+  if (!isSongId(id)) return false;
+  if (_pendingRestore) {
+    // The restored bar stands in for a queue not built yet: build it, then switch in it.
+    void _rebuildRestoredQueue().then(() => { switchSongVersion(id); });
+    return true;
+  }
+  const src = _source;
+  const cur = _state.queue[_state.qi];
+  if (!src || src.mode !== 'songs' || !_isSong(cur)) return false;
+  const curId = songIdOfKey(cur.key);
+  const from = songById(curId);
+  const to = songById(id);
+  if (!from || !to || curId === id || to.f !== from.f) return false;
+  const track = _songTracks([to])[0];
+  if (!track) return false;
+  /** @type {any} */
+  let desc;
+  if (Array.isArray(src.ids)) {
+    desc = { ...src, ids: src.ids.map((x) => (x === curId ? /** @type {string} */ (id) : x)) };
+  } else {
+    // Keyed by the catalog's own version at this place, however many switches ago it was replaced.
+    const swaps = { ...(cleanSongSwaps(src.swaps) || {}) };
+    const orig = Object.keys(swaps).find((k) => swaps[k] === curId) || curId;
+    if (orig === id) delete swaps[orig]; else swaps[orig] = /** @type {string} */ (id);
+    desc = { ...src, swaps: Object.keys(swaps).length ? swaps : null };
+    if (songIdOfKey(src.startKey) === curId) desc.startKey = track.key;   // the queue begins at this song
+  }
+  _setSource(desc);
+  _state.queue = _state.queue.slice();
+  _state.queue[_state.qi] = track;
+  _forgetPosition(track.url);   // from the start
+  _start();
+  _lastPersistSec = -1;
+  _persist();
+  return true;
+}
+
+/**
  * Turn shuffle on or off for the songs queue that is playing. It REORDERS; it
  * never changes which songs are in the queue (one version per family stays
  * exactly as it was). The song playing keeps playing and becomes the head of a
@@ -2886,7 +2965,8 @@ function setShuffle(on) {
     const rest = src.ids.filter((id) => id !== curId);
     desc = { ...src, ids: [curId].concat(want ? seededShuffle(rest, seed) : rest), seed, shuffle: want, startKey: null };
   } else {
-    desc = { ...src, seed, shuffle: want, startKey: cur.key };
+    // Off, the whole list turns to begin at the song playing: nothing is dropped (sweep n3-01).
+    desc = { ...src, seed, shuffle: want, startKey: cur.key, wrap: true };
   }
   const queue = _songTracks(songQueue(desc));
   if (!queue.length || queue[0].url !== cur.url) return false;
@@ -3729,6 +3809,7 @@ export const AudioPlayer = {
   playBibleBook,
   playSongs,
   setShuffle,
+  switchSongVersion,
   setRepeat,
   bibleChapterStart,
   bibleChapterOfTrack,

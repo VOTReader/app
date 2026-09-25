@@ -485,14 +485,36 @@ export function shuffledFeatured(filter, seed) {
  * @param {Song[]} list @param {string} startId @param {boolean} shuffled @param {boolean} one
  * @returns {Song[]}
  */
-function _fromStart(list, startId, shuffled, one) {
+function _fromStart(list, startId, shuffled, one, wrap) {
   const start = startId ? songById(startId) : null;
   if (!_visible(start)) return list;
   const s = /** @type {Song} */ (start);
   const slot = (/** @type {Song} */ x) => (one ? x.f === s.f : x.id === s.id);
   if (shuffled) return [s].concat(list.filter((x) => !slot(x)));
   const at = list.findIndex(slot);
-  return at >= 0 ? [s].concat(list.slice(at + 1)) : [s].concat(list);
+  if (at < 0) return [s].concat(list);
+  // `wrap`: the whole list, rotated to begin here, the songs before it coming after the last (Shuffle off keeps
+  // every song it had; sweep n3-01). Otherwise forward-only.
+  return [s].concat(list.slice(at + 1), wrap ? list.slice(0, at).filter((x) => !slot(x)) : []);
+}
+
+/**
+ * The listener's version choices in a described queue: {catalog version id: chosen version id}, kept only where
+ * both are real songs of one family. At most 50.
+ * @param {unknown} swaps @returns {Record<string, string> | null}
+ */
+export function cleanSongSwaps(swaps) {
+  if (!swaps || typeof swaps !== 'object' || Array.isArray(swaps)) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  let n = 0;
+  for (const [from, to] of Object.entries(/** @type {Record<string, unknown>} */ (swaps))) {
+    if (n >= 50) break;
+    if (!isSongId(from) || !isSongId(to) || from === to) continue;
+    out[from] = /** @type {string} */ (to);
+    n++;
+  }
+  return n ? out : null;
 }
 
 /**
@@ -508,7 +530,9 @@ function _fromStart(list, startId, shuffled, one) {
  *   shuffle  a seeded permutation (`seed`) of that same list. Turning shuffle
  *            on or off reorders a queue; it never changes which songs are in it.
  *   startKey `song:<id>` the queue begins at (see _fromStart).
- * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown } | null | undefined} desc
+ *   wrap     with startKey and no shuffle: the whole list rotated to begin there (what Shuffle off asks).
+ *   swaps    {catalog version id: chosen version id}: the listener's version switches in a described queue.
+ * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown, wrap?: unknown, swaps?: unknown } | null | undefined} desc
  * @returns {Song[]}
  */
 export function songQueue(desc) {
@@ -533,7 +557,14 @@ export function songQueue(desc) {
     if (one) list.push(versions[0]); else for (const s of versions) list.push(s);
   }
   if (d.shuffle) list = seededShuffle(list, Number(d.seed) >>> 0);
-  return _fromStart(list, startId, !!d.shuffle, one);
+  const swaps = cleanSongSwaps(d.swaps);
+  if (swaps) {
+    list = list.map((s) => {
+      const to = swaps[s.id] ? songById(swaps[s.id]) : null;
+      return to && _visible(to) && to.f === s.f ? /** @type {Song} */ (to) : s;
+    });
+  }
+  return _fromStart(list, startId, !!d.shuffle, one, !!d.wrap);
 }
 
 /**

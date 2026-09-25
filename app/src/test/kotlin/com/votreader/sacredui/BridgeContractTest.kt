@@ -130,7 +130,9 @@ class BridgeContractTest {
         "audioVolume" to 1,
         "audioUpcoming" to 1,
         "audioRelease" to 0,
-        "audioJournal" to 0
+        "audioJournal" to 0,
+        "audioAskNotifications" to 0,
+        "audioMeta" to 1
     )
 
     @Test

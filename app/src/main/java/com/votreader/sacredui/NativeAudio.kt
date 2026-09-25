@@ -18,6 +18,8 @@ interface NativeAudioPort {
     fun volume(volume: Double)
     /** The recordings to play after the current one without the page: [{url, title, artist, album, rate}], or []. */
     fun upcoming(json: String?)
+    /** New lock-screen text for the recording playing: {title, artist, album} (a compilation's letter changed). */
+    fun meta(json: String?)
     /** Stop and let go of the recording (the element's removeAttribute('src') + load()). */
     fun release()
     /** A snapshot the page reads when it comes back on screen: position, state and the seams it may have missed. */
