@@ -91,6 +91,29 @@ describe('openSharedPassage', () => {
     expect(nav.mock.calls[0][0]).toMatchObject({ type: 'study-letter', screen: 'bible-study-chapter', studyChapterId: 'lamb-of-god-1', key: 'letter:lamb-of-god-1:3' });
   });
 
+  /* n6-03: a first-time visitor's first screen is the About welcome, and the jump
+     waited silently for the corpus: the passage replaced About seconds later
+     with nothing said. It now says so at once, and says so when it cannot open. */
+  it('(n6-03) says it is opening the shared passage at once, and says so when it cannot', async () => {
+    const toasts = [];
+    const showToast = (o) => toasts.push(o.text);
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    const nav = vi.fn();
+    let release;
+    const corpus = new Promise((r) => { release = r; });
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => corpus, showToast }).win, nav);
+    expect(toasts).toEqual(['Opening the shared passage…']);
+    release();
+    await flush();
+    expect(nav).toHaveBeenCalledTimes(1);
+    expect(toasts).toHaveLength(1);
+
+    toasts.length = 0;
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A30%3A1', { __loadBibleCorpus: () => Promise.resolve(), showToast }).win, vi.fn());
+    await flush();
+    expect(toasts).toEqual(['Opening the shared passage…', 'That shared passage could not be found.']);
+  });
+
   it('opens nothing for a letter the corpus does not know', async () => {
     const nav = vi.fn();
     /** @type {any} */ (globalThis).findEntryContext = () => null;

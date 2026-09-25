@@ -467,7 +467,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     >
       {backHint && (
         <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onBack} aria-label="Back to source letter">
+          <button className="back-hint-pill" onClick={onBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
             <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
             <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
           </button>

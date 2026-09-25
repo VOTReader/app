@@ -34,16 +34,27 @@ export function openSharedPassage(win, navigateToLink) {
     win.history.replaceState(win.history.state, '', u.pathname + u.search + u.hash);
   } catch (_e) { /* an address we cannot rewrite still opens the passage */ }
   const kind = key.split(':')[0];
+  // n6-03: a first visit's first screen is the About welcome, and the corpus
+  // can take seconds: say at once what is coming, and say it if it cannot.
+  const toast = typeof win.showToast === 'function' ? win.showToast
+    : (typeof showToast === 'function' ? showToast : null);
+  /** @param {string} text @param {number} ms */
+  const say = (text, ms) => {
+    if (!toast) return;
+    try { toast({ id: 'vot-toast-shared', className: 'vot-toast', text, durationMs: ms }); } catch (_e) { /* a toast never blocks the jump */ }
+  };
+  say('Opening the shared passage…', 4000);
   const go = () => {
     const ep = buildSourceEndpoint(key, null, null, null, null);
-    if (!ep) return;
-    if (ep.type === 'bible') {
+    let ok = !!ep;
+    if (ep && ep.type === 'bible') {
       const b = books();
       const book = b && b[ep.bookId];
-      if (!book || !(book.chapters || []).some((c) => c && c.num === ep.chapter)) return;
-    } else if (ep.type !== 'study' && !ep.screen) {
-      return;
+      ok = !!book && (book.chapters || []).some((c) => c && c.num === ep.chapter);
+    } else if (ep && ep.type !== 'study' && !ep.screen) {
+      ok = false;
     }
+    if (!ok) { say('That shared passage could not be found.', 4000); return; }
     navigateToLink(ep, { sourceLetterTitle: 'Shared passage', silent: true });
   };
   const load = kind === 'bible' ? win.__loadBibleCorpus

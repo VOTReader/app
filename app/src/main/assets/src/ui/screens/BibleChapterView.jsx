@@ -152,7 +152,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     >
       {backHint && (
         <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onTapThroughBack} aria-label="Back to source">
+          <button className="back-hint-pill" onClick={onTapThroughBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
             <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
             <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
           </button>
