@@ -45,6 +45,15 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
   const book = ch ? graph.books[ch[0]] : null;
   const label = book ? book.title + ' ' + ch[1] : '';
   const last = graph.chapters.length - 1;
+  // n6-06: the label opens a picker under the stepper (book select + chapter grid).
+  const [picking, setPicking] = React.useState(false);
+  const toggleRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const closePicker = React.useCallback(() => {
+    setPicking(false);
+    const el = toggleRef.current;
+    if (el) el.focus();
+  }, []);
+  const go = React.useCallback((/** @type {number} */ at) => { setCi(at); closePicker(); }, [closePicker]);
   return (
     <div className="sw-fallback-list" data-chapter={label}>
       <div className="swf-head">
@@ -56,10 +65,15 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-stepper" role="group" aria-label="Chapter">
         <button type="button" className="swf-step" aria-label="Previous chapter" disabled={ci <= 0}
           onClick={() => setCi((c) => Math.max(0, c - 1))}>‹</button>
-        <div className="swf-step-label" aria-live="polite">{label}</div>
+        <button type="button" ref={toggleRef} className="swf-step-label" aria-live="polite"
+          aria-label={label + ', choose a chapter'} aria-expanded={picking} aria-controls="swf-picker"
+          onClick={() => (picking ? closePicker() : setPicking(true))}>
+          {label}
+        </button>
         <button type="button" className="swf-step" aria-label="Next chapter" disabled={ci >= last}
           onClick={() => setCi((c) => Math.min(last, c + 1))}>›</button>
       </div>
+      {picking && ch && <ChapterPicker key={ci} graph={graph} ci={ci} onGo={go} onClose={closePicker} />}
       <div className="swf-note">
         <span>The map can’t be drawn on this device right now.</span>
         <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onRetry(); }}>Try again</button>
@@ -91,6 +105,57 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
         </section>
       ))}
       {data.total === 0 && <div className="swf-empty">Nothing in the Famous view connects to {label}.</div>}
+    </div>
+  );
+}
+
+/** The canon's first 39 books are the Old Testament (the graph keeps canonical order). */
+const OT_BOOKS = 39;
+
+/**
+ * n6-06: the chapter picker under the stepper. One select for the book (grouped
+ * Old/New Testament when the graph holds the 66), then that book's chapters as
+ * a grid; the current chapter is marked, a tap goes there. Choosing a book
+ * alone goes nowhere. Escape closes it.
+ * @param {{ graph: any, ci: number, onGo: (ci: number) => void, onClose: () => void, key?: number }} props
+ */
+function ChapterPicker({ graph, ci, onGo, onClose }) {
+  const [bi, setBi] = React.useState(() => graph.chapters[ci][0]);
+  const books = graph.books;
+  /** @type {number[]} chapter indexes of the chosen book, in order */
+  const own = React.useMemo(() => {
+    const out = [];
+    for (let i = 0; i < graph.chapters.length; i++) if (graph.chapters[i][0] === bi) out.push(i);
+    return out;
+  }, [graph, bi]);
+  const title = books[bi] ? books[bi].title : '';
+  // Psalms 119 sits far down a 150-chapter grid: open with the current chapter in view.
+  const gridRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  React.useLayoutEffect(() => {
+    const grid = gridRef.current;
+    const cur = grid && /** @type {HTMLElement | null} */ (grid.querySelector('[aria-current]'));
+    if (grid && cur) grid.scrollTop = Math.max(0, cur.offsetTop - grid.offsetTop - (grid.clientHeight - cur.offsetHeight) / 2);
+  }, []);
+  /** @param {number} from @param {number} to */
+  const options = (from, to) => books.slice(from, to).map((/** @type {any} */ b, /** @type {number} */ k) => (
+    <option key={b.id} value={String(from + k)}>{b.title}</option>
+  ));
+  return (
+    <div className="swf-picker" id="swf-picker" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+      <label className="swf-picker-cap" htmlFor="swf-picker-book">Book</label>
+      <select id="swf-picker-book" className="swf-picker-book" value={String(bi)} onChange={(e) => setBi(Number(e.target.value))}>
+        {books.length === 66
+          ? [<optgroup key="ot" label="Old Testament">{options(0, OT_BOOKS)}</optgroup>,
+            <optgroup key="nt" label="New Testament">{options(OT_BOOKS, 66)}</optgroup>]
+          : options(0, books.length)}
+      </select>
+      <div className="swf-picker-cap" aria-hidden="true">Chapter</div>
+      <div ref={gridRef} className="swf-picker-grid" role="group" aria-label={'Chapters of ' + title}>
+        {own.map((i) => (
+          <button key={i} type="button" className="swf-picker-ch" aria-label={title + ' ' + graph.chapters[i][1]}
+            aria-current={i === ci ? 'true' : undefined} onClick={() => onGo(i)}>{graph.chapters[i][1]}</button>
+        ))}
+      </div>
     </div>
   );
 }

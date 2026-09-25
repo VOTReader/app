@@ -7592,7 +7592,18 @@
     .swf-step:last-child { border-left: 1px solid var(--gold-border); }
     .swf-step:disabled { color: var(--gold-border); cursor: default; }
     .swf-step:focus-visible, .swf-retry:focus-visible, .swf-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-    .swf-step-label { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: var(--fs-24); font-weight: 600; color: var(--gold); }
+    .swf-step-label { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: var(--fs-24); font-weight: 600; color: var(--gold); background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; min-height: 48px; }
+/* n6-06: the label opens a chapter picker under the stepper (mockup lanes/myweb/out/mockups/n606/n606-r2-john.png). */
+.swf-step-label::after { content: '\25BE'; margin-left: 8px; font-size: var(--fs-16); color: var(--gold-dim); }
+.swf-step-label[aria-expanded="true"]::after { content: '\25B4'; }
+.swf-step-label:focus-visible, .swf-picker-book:focus-visible, .swf-picker-ch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.swf-picker { margin-top: 10px; padding: 12px 14px 14px; border: 1px solid var(--gold-border); border-radius: 14px; background: var(--bg3); }
+.swf-picker-cap { display: block; margin: 2px 0 6px; font-family: var(--font-cinzel); font-size: var(--fs-11); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
+.swf-picker-grid + .swf-picker-cap, .swf-picker-book + .swf-picker-cap { margin-top: 14px; }
+.swf-picker-book { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg); color: var(--cream); font-family: var(--font-body); font-size: var(--fs-18); }
+.swf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 7px; max-height: 262px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--gold-border) transparent; }
+.swf-picker-ch { min-height: 44px; border: 1px solid var(--gold-border); border-radius: 10px; background: none; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); cursor: pointer; }
+.swf-picker-ch[aria-current="true"] { background: var(--gold); border-color: var(--gold); color: var(--bg); font-weight: 600; }
     .swf-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: var(--fs-15); color: var(--cream-muted); }
     .swf-note > span { text-wrap: balance; } /* two even lines beside Try again, never 'now.' alone */
     .swf-retry {
