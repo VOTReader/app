@@ -79,7 +79,14 @@ export function describeTab(tab) {
     return { title, subtitle: book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id) ? 'Old Testament' : 'New Testament', resolved: !!book };
   }
   if (s === 'scriptures-home') return { title: 'Scriptures', subtitle: 'The Scriptures of Truth', resolved: true };
-  if (s === 'scripture-genre') return { title: tab.genreId || 'Scriptures', subtitle: 'Browse by genre', resolved: true };
+  if (s === 'scripture-genre') {
+    // The genre's own name ("The Law", "Minor Prophets"), not its raw id: the
+    // window title read "history — VOTReader" (the 2026-09-25 walk).
+    const _genres = (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES)
+      ? [...(SCRIPTURE_GENRES.ot || []), ...(SCRIPTURE_GENRES.nt || [])] : [];
+    const _genre = _genres.find((g) => g.id === tab.genreId);
+    return { title: _genre ? _genre.label : 'Scriptures', subtitle: 'Browse by genre', resolved: !!_genre };
+  }
 
   // Answers Only God Can Give — its landing is also the collection's
   // indexScreen, so it is named here before the generic index rule.
@@ -132,19 +139,20 @@ export function describeTab(tab) {
   // AND because that default is resolved:true, useTabTitleMemo trusted the
   // mislabel and burned "Home" into the tab's stored title, so the Tabs
   // overview called every journal/notes/library tab "Home" permanently.
-  // Titles match the screens' own H1s (My Journal, My Notes, My Links,
-  // My Bookmarks, Highlights & Underlines, Library, My Progress). All are
+  // Titles match the screens' own H1s (Journal, Notes, Links, Bookmarks,
+  // Highlights & Underlines, Library, Progress: the shared personal-study
+  // header's words since 2026-09-25, which dropped the "My"). All are
   // corpus-independent → resolved:true (journalEntryId is App-global, not
   // tab state, so viewer/editor get an honest generic 'Journal Entry').
-  if (s === 'journal-home') return { title: 'My Journal', subtitle: 'Journal entries', resolved: true };
-  if (s === 'journal-viewer') return { title: 'Journal Entry', subtitle: 'My Journal', resolved: true };
-  if (s === 'journal-editor') return { title: 'Journal Entry', subtitle: 'Editing · My Journal', resolved: true };
-  if (s === 'notes-index') return { title: 'My Notes', subtitle: 'Personal notes', resolved: true };
-  if (s === 'links-index') return { title: 'My Links', subtitle: 'Saved links', resolved: true };
-  if (s === 'bookmarks-index') return { title: 'My Bookmarks', subtitle: 'Saved places', resolved: true };
+  if (s === 'journal-home') return { title: 'Journal', subtitle: 'Journal entries', resolved: true };
+  if (s === 'journal-viewer') return { title: 'Journal Entry', subtitle: 'Journal', resolved: true };
+  if (s === 'journal-editor') return { title: 'Journal Entry', subtitle: 'Editing · Journal', resolved: true };
+  if (s === 'notes-index') return { title: 'Notes', subtitle: 'Personal notes', resolved: true };
+  if (s === 'links-index') return { title: 'Links', subtitle: 'Saved links', resolved: true };
+  if (s === 'bookmarks-index') return { title: 'Bookmarks', subtitle: 'Saved places', resolved: true };
   if (s === 'highlights-index') return { title: 'Highlights & Underlines', subtitle: 'Marked passages', resolved: true };
   if (s === 'library') return { title: 'Library', subtitle: 'Your saved content', resolved: true };
-  if (s === 'my-progress') return { title: 'My Progress', subtitle: 'Reading progress', resolved: true };
+  if (s === 'my-progress') return { title: 'Progress', subtitle: 'Reading progress', resolved: true };
   if (s === 'about') return { title: 'About', subtitle: 'VOTReader', resolved: true };
 
   // Default → Home

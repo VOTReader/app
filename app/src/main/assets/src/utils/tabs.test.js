@@ -128,18 +128,27 @@ describe('describeTab', () => {
   // overview labeled every journal/notes/library tab "Home" forever.
   describe('personal-content screens (P1-8: no more mislabeled "Home")', () => {
     it('labels every personal screen honestly (titles match the screen H1s)', () => {
-      expect(describeTab({ screen: 'journal-home' })).toEqual({ title: 'My Journal', subtitle: 'Journal entries', resolved: true });
-      expect(describeTab({ screen: 'journal-viewer' })).toEqual({ title: 'Journal Entry', subtitle: 'My Journal', resolved: true });
-      expect(describeTab({ screen: 'journal-editor' })).toEqual({ title: 'Journal Entry', subtitle: 'Editing · My Journal', resolved: true });
-      expect(describeTab({ screen: 'notes-index' })).toEqual({ title: 'My Notes', subtitle: 'Personal notes', resolved: true });
-      expect(describeTab({ screen: 'links-index' })).toEqual({ title: 'My Links', subtitle: 'Saved links', resolved: true });
-      expect(describeTab({ screen: 'bookmarks-index' })).toEqual({ title: 'My Bookmarks', subtitle: 'Saved places', resolved: true });
+      expect(describeTab({ screen: 'journal-home' })).toEqual({ title: 'Journal', subtitle: 'Journal entries', resolved: true });
+      expect(describeTab({ screen: 'journal-viewer' })).toEqual({ title: 'Journal Entry', subtitle: 'Journal', resolved: true });
+      expect(describeTab({ screen: 'journal-editor' })).toEqual({ title: 'Journal Entry', subtitle: 'Editing · Journal', resolved: true });
+      expect(describeTab({ screen: 'notes-index' })).toEqual({ title: 'Notes', subtitle: 'Personal notes', resolved: true });
+      expect(describeTab({ screen: 'links-index' })).toEqual({ title: 'Links', subtitle: 'Saved links', resolved: true });
+      expect(describeTab({ screen: 'bookmarks-index' })).toEqual({ title: 'Bookmarks', subtitle: 'Saved places', resolved: true });
       expect(describeTab({ screen: 'highlights-index' })).toEqual({ title: 'Highlights & Underlines', subtitle: 'Marked passages', resolved: true });
       expect(describeTab({ screen: 'library' })).toEqual({ title: 'Library', subtitle: 'Your saved content', resolved: true });
-      expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'My Progress', subtitle: 'Reading progress', resolved: true });
+      expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'Progress', subtitle: 'Reading progress', resolved: true });
       expect(describeTab({ screen: 'about' })).toEqual({ title: 'About', subtitle: 'VOTReader', resolved: true });
       expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true });
       expect(describeTab({ screen: 'audio-library-offline' })).toEqual({ title: 'Listening Library', subtitle: 'On this phone', resolved: true });
+    });
+
+    it('names a Scripture genre by its label, not its id (the 2026-09-25 walk)', () => {
+      const g = /** @type {any} */ (globalThis);   // a bare runtime global, not typed on globalThis
+      g.SCRIPTURE_GENRES = { ot: [{ id: 'history', label: 'History' }], nt: [{ id: 'gospels', label: 'Gospels' }] };
+      try {
+        expect(describeTab({ screen: 'scripture-genre', genreId: 'gospels' })).toEqual({ title: 'Gospels', subtitle: 'Browse by genre', resolved: true });
+        expect(describeTab({ screen: 'scripture-genre', genreId: 'gone' })).toEqual({ title: 'Scriptures', subtitle: 'Browse by genre', resolved: false });
+      } finally { delete g.SCRIPTURE_GENRES; }
     });
 
     it('names the Answers screens, a subject by its own title', () => {
