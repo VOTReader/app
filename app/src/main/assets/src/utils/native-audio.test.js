@@ -179,7 +179,7 @@ describe('native-audio - the <audio> surface', () => {
     expect(el.error.code).toBe(4);
   });
 
-  it('src \'\' and removeAttribute(\'src\') let the recording go; a new src stops the old one', () => {
+  it('src \'\' and removeAttribute(\'src\') let the recording go; a new src stops the old one', async () => {
     const el = new NativeAudio();
     el.src = A;
     el.play();
@@ -193,7 +193,7 @@ describe('native-audio - the <audio> surface', () => {
     expect(bridge.audioRelease).toHaveBeenCalled();
     expect(el.src).toBe('');
     el.src = '';
-    expect(el.play()).rejects.toThrow();
+    await expect(el.play()).rejects.toThrow();
   });
 
   it('ignores events for a recording it has left, and bad JSON', () => {
