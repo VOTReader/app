@@ -104,7 +104,8 @@ describe('settings preference folio', () => {
       { theme: 'light' },
       { expandGroups: false }
     );
-    const summary = document.querySelector('.settings-summary');
+    // The header strip retired 2026-09-25: the Appearance group's line carries its current values.
+    const summary = document.querySelector('[data-settings-group="appearance"] .settings-group-sub');
     expect(summary.textContent).toContain('Light');
     expect(summary.textContent).toContain('150%');
     expect(summary.textContent).toContain('Literata');
@@ -1092,7 +1093,7 @@ describe('settings groups — collapsible accordion', () => {
 describe('settings folio summary', () => {
   it('surfaces the active theme, text scale, and reading typeface', () => {
     renderSettings({ fontScale: '1.5', fontStyle: 'literata' }, { theme: 'light' }, { expandGroups: false });
-    const summary = document.querySelector('.settings-summary');
+    const summary = document.querySelector('[data-settings-group="appearance"] .settings-group-sub');
     expect(summary).toBeTruthy();
     expect(summary.textContent).toContain('Light');
     expect(summary.textContent).toContain('150%');

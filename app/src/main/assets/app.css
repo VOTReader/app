@@ -3199,11 +3199,6 @@
     .settings-header { width:100%; max-width:62rem; margin:0 auto 1.25rem; text-align:left; }
     .settings-title { font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
     .settings-intro { max-width:38rem; margin:0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-16); line-height:1.55; }
-    .settings-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:1rem 0 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
-    .settings-summary-item { min-width:0; padding:1rem clamp(0.8rem,2.5vw,1.6rem) 1.15rem; }
-    .settings-summary-item + .settings-summary-item { border-left:1px solid var(--border); }
-    .settings-summary dt { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-muted); letter-spacing:0.05em; margin:0 0 0.35rem; }
-    .settings-summary dd { margin:0; font-family:var(--font-body); font-size:clamp(var(--fs-18),2.4vw,var(--fs-24)); color:var(--gold); line-height:1.2; overflow-wrap:break-word; }
     .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
     .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
     .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
@@ -3229,23 +3224,17 @@
     .settings-group-titles { display:flex; flex-direction:column; gap:0.22rem; flex:1; min-width:0; }
     .settings-group-head .settings-section-label { margin:0; font-size:var(--fs-13); letter-spacing:0.12em; color:var(--cream); }
     .settings-group-head .settings-section-label::after { content:none; }
-    .settings-group-sub { font-family:var(--font-body); font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    /* The group's CURRENT values (utils/settings-glance.js, the redesign 2026-09-25): plain, and wrapped rather than cut. */
+    .settings-group-sub { font-family:var(--font-body); font-size:var(--fs-14); color:var(--cream-muted); line-height:1.4; overflow-wrap:break-word; }
     .settings-group-chevron { display:grid; place-items:center; flex:0 0 auto; width:1.6rem; height:1.6rem; color:var(--gold-dim); transition:transform 0.2s ease, color 0.2s ease; }
     .settings-group-chevron svg { width:1rem; height:1rem; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
     .settings-group-chevron.open { transform:rotate(180deg); color:var(--gold); }
     .settings-group-body { margin-top:0.65rem; }
     .settings-section.open { margin-bottom:1.3rem; }
-    .settings-screen.settings-large-type .settings-summary { display:block; }
     /* Large type stacks the pair: the two-column grid's 6rem label minimum scaled with Text Size and
        left the value 68 px at 36 px type, so "System Serif" broke twice mid-word (2026-09-05). */
-    .settings-screen.settings-large-type .settings-summary-item { display:block; border-left:none; border-bottom:1px solid var(--border); }
-    .settings-screen.settings-large-type .settings-summary-item:last-child { border-bottom:none; }
-    .settings-screen.settings-large-type .settings-summary dd { font-size:var(--fs-20); }
     @media (max-width:520px) {
       .settings-screen { padding-left:1rem; padding-right:1rem; }
-      .settings-summary-item { padding-left:0.7rem; padding-right:0.7rem; }
-      .settings-summary dt { font-size:var(--fs-13); }
-      .settings-summary dd { font-size:var(--fs-18); }
       .settings-group-head { padding-left:0.75rem; padding-right:0.75rem; }
     }
     /* ── Reading Font picker (2026-07-31) ─────────────────────────────────

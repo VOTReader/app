@@ -2,6 +2,8 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { settingsGlance } from '../../utils/settings-glance.js';
+
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
    numeric string, so old values "1"/"1.15"/"1.3"/"1.5" remain valid). The
@@ -1868,6 +1870,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     ? readingFontById(settings.fontStyle || 'classic')
     : null;
   const selectedFontLabel = selectedFont && selectedFont.label ? selectedFont.label : 'System Serif';
+  // Each group's current values, shown under its name (the redesign, 2026-09-25; utils/settings-glance.js).
+  const readerCode = settings.letterReader || 'auto';
+  const readersById = /** @type {any} */ (globalThis).AUDIO_READERS || {};
+  const readerLabel = readerCode !== 'auto' && Object.prototype.hasOwnProperty.call(readersById, readerCode)
+    ? String(readersById[readerCode]).replace(/^Read by /, '') : null;
+  const gardenTier = typeof GARDEN_TIERS !== 'undefined'
+    ? GARDEN_TIERS.find((t) => t.id === (settings.gardenTier || GARDEN_DEFAULT_TIER)) : null;
+  const glance = settingsGlance({
+    settings, theme, textPercent: textScalePercent, fontLabel: selectedFontLabel,
+    readerLabel, gardenLabel: gardenTier ? gardenTier.label + ' images' : null,
+  });
 
   return (
     <ScreenLayout
@@ -1882,20 +1895,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         <header className="settings-header">
           <h1 className="settings-title">Settings</h1>
           <p className="settings-intro">Shape the way you read, listen, and move through the library.</p>
-          <dl className="settings-summary" aria-label="Current reading preferences">
-            <div className="settings-summary-item">
-              <dt>Theme</dt>
-              <dd>{theme === 'light' ? 'Light' : 'Dark'}</dd>
-            </div>
-            <div className="settings-summary-item">
-              <dt>Text</dt>
-              <dd>{textScalePercent === 100 ? 'Standard' : textScalePercent + '%'}</dd>
-            </div>
-            <div className="settings-summary-item">
-              <dt>Typeface</dt>
-              <dd>{selectedFontLabel}</dd>
-            </div>
-          </dl>
           <p className="settings-save-note"><span aria-hidden="true" />Changes save on this device</p>
         </header>
 
@@ -1909,7 +1908,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           {searching && <p role="status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
         </div>
 
-        <SettingsGroup label="Appearance" sub="Theme, text size & reading font" {...groupProps('appearance')}>
+        <SettingsGroup label="Appearance" sub={glance.appearance} {...groupProps('appearance')}>
           <div className="settings-card">
             <SettingsRow
               label="Light Theme"
@@ -1936,7 +1935,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Reading" sub="Translation, headings & reading aids" {...groupProps('reading')}>
+        <SettingsGroup label="Reading" sub={glance.reading} {...groupProps('reading')}>
           <div className="settings-card">
             <SelectField
               eyebrow="Reading"
@@ -2056,7 +2055,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             voice pickers sat under Reading beside translation and headings,
             and the read-along toggles carried a comment promising this move.
             One group now owns every choice that shapes what you HEAR. */}
-        <SettingsGroup label="Listening" sub="Voices, speed & read-along" {...groupProps('listening')}>
+        <SettingsGroup label="Listening" sub={glance.listening} {...groupProps('listening')}>
           <div className="settings-card">
             <SelectField
               eyebrow="Listening"
@@ -2179,7 +2178,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Auto-Scroll" sub="Hands-free reading" {...groupProps('autoscroll')}>
+        <SettingsGroup label="Auto-Scroll" sub={glance.autoscroll} {...groupProps('autoscroll')}>
           <div className="settings-card">
             <SettingsRow
               label="Auto-Scroll"
@@ -2216,7 +2215,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Top-Nav Buttons" sub="Icons in the reading bar" {...groupProps('topnav')}>
+        <SettingsGroup label="Top-Nav Buttons" sub={glance.topnav} {...groupProps('topnav')}>
           <div className="settings-card">
             {/* The compact bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx). While
                 it is on, the three icons it moves live in the ⋯ menu, so their chips unmount
@@ -2247,7 +2246,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Search, Tabs & History" sub="Find, multitask, revisit" {...groupProps('features')}>
+        <SettingsGroup label="Search, Tabs & History" sub={glance.features} {...groupProps('features')}>
           <div className="settings-card">
             <SettingsRow
               label="Search"
@@ -2289,7 +2288,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
         </SettingsGroup>
 
-        <SettingsGroup label="A Return to The Garden" sub="Image quality" {...groupProps('garden')}>
+        <SettingsGroup label="A Return to The Garden" sub={glance.garden} {...groupProps('garden')}>
           <div className="settings-card">
             <SelectField
               eyebrow="A Return to The Garden"
@@ -2307,7 +2306,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Your Data" sub="Backup, storage & privacy" {...groupProps('data')}>
+        <SettingsGroup label="Your Data" sub={glance.data} {...groupProps('data')}>
           <div className="settings-card">
             <DataInfoRow label="App version" value={versionDisplayText}>
               <button
@@ -2492,7 +2491,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             );
           })()}
 
-        <SettingsGroup label="Mark as Read" sub="Reading progress by book" {...groupProps('progress')}>
+        <SettingsGroup label="Mark as Read" sub={glance.progress} {...groupProps('progress')}>
           <div className="settings-card">
             <SettingsRow
               label="Mark as Read"
@@ -2563,7 +2562,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         </SettingsGroup>
 
         {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
-        <SettingsGroup label="Help" sub="Show me around & About" {...groupProps('help')}>
+        <SettingsGroup label="Help" sub={glance.help} {...groupProps('help')}>
           <div className="settings-card">
             <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no

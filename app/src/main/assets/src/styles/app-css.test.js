@@ -169,25 +169,21 @@ describe('app.css — Scripture Web panel scrolling (scripture-web-2/8)', () => 
   });
 });
 
-/* WHOLE WORDS AT LARGE TYPE (design-perf, 2026-09-05). At Text Size 180 % the
-   Settings summary switches to its large-type layout, a two-column grid whose
-   label column had a 6rem minimum: rem scales with the reader's Text Size, so
-   the label took 173 px of a 246 px item and the value cell was 68 px wide at
-   36 px type. "System Serif" broke twice mid-word (Range line boxes: System 2,
-   Serif 2; measured through the real slider, --font-scale 1.8 asserted at the
-   site). At large type the pair stacks, the value gets the item's full width,
-   and a word breaks only when it cannot fit a line alone (break-word), never
-   as the first resort (anywhere). */
-describe('app.css — the Settings summary keeps whole words at large type', () => {
-  it('large-type summary items stack label over value instead of a rem-sized grid', () => {
-    const item = ruleBlock(CSS, '.settings-screen.settings-large-type .settings-summary-item {');
-    expect(item).toMatch(/display:\s*block/);
-    expect(item).not.toMatch(/grid-template-columns/);
+/* WHOLE WORDS IN A SETTINGS GROUP LINE (redesign, 2026-09-25). The header
+   summary strip (design-perf 09-05 fixed its mid-word breaks at 180 % type)
+   retired: each collapsed group's own line now carries its current values
+   ("Dark · Standard text · System Serif", utils/settings-glance.js). Those
+   are the facts a reader opened Settings to check, so the line wraps at a
+   word and is never cut off with an ellipsis, at any Text Size. */
+describe('app.css — a Settings group line shows its values whole', () => {
+  it('wraps rather than truncating', () => {
+    const sub = ruleBlock(CSS, '.settings-group-sub {');
+    expect(sub).toMatch(/overflow-wrap:\s*break-word/);
+    expect(sub).not.toMatch(/white-space:\s*nowrap/);
+    expect(sub).not.toMatch(/text-overflow:\s*ellipsis/);
   });
-  it('the value breaks a word only as a last resort', () => {
-    const dd = ruleBlock(CSS, '.settings-summary dd {');
-    expect(dd).toMatch(/overflow-wrap:\s*break-word/);
-    expect(dd).not.toMatch(/overflow-wrap:\s*anywhere/);
+  it('the strip is gone, rules and all', () => {
+    expect(CSS).not.toMatch(/\.settings-summary/);
   });
 });
 
