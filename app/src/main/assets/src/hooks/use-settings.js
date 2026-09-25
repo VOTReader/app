@@ -182,6 +182,11 @@ export function useSettings({ savedSettings, theme }) {
       historyInNav: true,
       showBookmarkNav: true,
       showThemeBtn: true,
+      // The compact top bar (the redesign, 2026-09-25): Settings, History and the theme switch
+      // leave the bar for its ⋯ menu (ui/components/MoreMenu.jsx), with Text size beside them.
+      // A NEW key, so `...savedS` cannot shadow it and every existing profile gets the calmer bar;
+      // off restores the old icon row exactly (the three toggles above govern it again).
+      compactTopBar: true,
       showScrollNotch: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
@@ -250,6 +255,7 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
     document.body.classList.toggle("no-bookmark-nav", settings.showBookmarkNav === false);
     document.body.classList.toggle("no-theme-nav", settings.showThemeBtn === false);
+    document.body.classList.toggle("compact-topbar", settings.compactTopBar !== false);
     document.body.classList.toggle("arrows-right", settings.arrowLayout === 'right');
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');

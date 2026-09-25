@@ -596,6 +596,59 @@
       .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
       @media (hover: hover) { .nav-theme-btn:hover { color: var(--gold-bright); } }
       .nav-theme-btn svg { width: 22px; height: 22px; }
+
+      /* ── THE COMPACT TOP BAR + its ⋯ menu (the redesign, 2026-09-25; ui/components/MoreMenu.jsx) ──
+         The bar carried six to eight equal-weight gold icons; a UX walk ranked "a newcomer cannot tell
+         them apart" the #1 friction, and every direction of the Codex mockups folded them into one menu.
+         With settings.compactTopBar on (body.compact-topbar, the default) Settings, History and the theme
+         switch leave the bar — matched the way the per-icon toggles above match them — and the ⋯ menu
+         names them, beside a Text size stepper. Back, Home, Search, the bookmark and Tabs stay. Off
+         restores the old row exactly: nothing here applies and the ⋯ button renders nothing. */
+      body.compact-topbar .top-nav .settings-gear-btn,
+      body.compact-topbar .top-nav .nav-search-btn[title="History"],
+      body.compact-topbar .top-nav .nav-theme-btn { display: none; }
+      .nav-more-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); min-width: 44px; min-height: 44px; flex-shrink: 0; transition: color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
+      .nav-more-btn svg { width: 22px; height: 22px; }
+      .nav-more-btn.open, .nav-more-btn:active { background: var(--gold-faint); color: var(--gold-bright); }
+      @media (hover: hover) { .nav-more-btn:hover { color: var(--gold-bright); } }
+      .more-menu {
+        position: fixed; z-index: 400;
+        width: max-content; min-width: min(248px, calc(100vw - 16px)); max-width: calc(100vw - 16px);
+        padding: 6px 0; background: var(--bg3); color: var(--cream);
+        border: 1px solid var(--gold-border); border-radius: 12px;
+        box-shadow: 0 14px 36px rgba(0,0,0,0.55);
+        font-family: 'EB Garamond', Georgia, serif;
+        animation: moreMenuIn 0.14s ease-out;
+      }
+      @keyframes moreMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+      @media (prefers-reduced-motion: reduce) { .more-menu { animation: none; } }
+      .more-menu-item {
+        display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 18px;
+        background: none; border: none; color: var(--cream); font: inherit; font-size: var(--fsc-18);
+        text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+      }
+      .more-menu-item svg { width: 20px; height: 20px; color: var(--gold); flex-shrink: 0; }
+      .more-menu-item:focus-visible, .more-menu-seg button:focus-visible, .more-menu-step button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+      .more-menu-item:active { background: var(--gold-faint); }
+      @media (hover: hover) { .more-menu-item:hover { background: var(--gold-faint); } }
+      .more-menu-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        min-height: 52px; padding: 0 12px 0 18px; border-top: 1px solid var(--border);
+      }
+      .more-menu-row + .more-menu-item, .more-menu-row + .more-menu-row { border-top: 1px solid var(--border); }
+      .more-menu-row:first-child { border-top: none; }   /* History hidden: the Theme row opens the menu */
+      .more-menu-row-label { font-size: var(--fsc-18); color: var(--cream); }
+      .more-menu-seg, .more-menu-step { display: inline-flex; align-items: center; gap: 2px; }
+      .more-menu-seg button, .more-menu-step button {
+        min-width: 44px; min-height: 40px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 999px;
+        background: none; color: var(--cream-muted); font: inherit; font-size: var(--fsc-15); cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .more-menu-seg button.on { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
+      .more-menu-step button { color: var(--gold); }
+      .more-menu-step button:disabled { opacity: 0.35; cursor: default; }
+      .more-menu-step-value { min-width: 5.2em; text-align: center; font-size: var(--fsc-15); color: var(--cream-muted); font-variant-numeric: tabular-nums; }
+      body.light .more-menu { box-shadow: 0 14px 36px rgba(60,40,10,0.22); }
     
       html { scroll-behavior: smooth; }
       html { overflow-x: hidden; }

@@ -1141,14 +1141,27 @@ describe('dependency-gated rows unmount with their dependency', () => {
     expect(row('Restored Names')).toBeTruthy();
   });
 
-  it('the History nav chip vanishes while History itself is off', () => {
-    renderSettings({ historyEnabled: false });
+  it('the History nav chip vanishes while History itself is off (the old icon row)', () => {
+    renderSettings({ historyEnabled: false, compactTopBar: false });
     // Only the feature row remains under the "History" name…
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);
     cleanup();
-    renderSettings({});
+    renderSettings({ compactTopBar: false });
     // …with History on, the Top-Nav chip joins it.
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(2);
+  });
+
+  it('the compact top bar (the default) unmounts the chips of the icons it moves into ⋯', () => {
+    renderSettings({});
+    expect(screen.getByRole('switch', { name: 'Compact Top Bar' })).toBeTruthy();
+    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
+    expect(screen.queryByRole('switch', { name: 'Settings Gear' })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Theme' })).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Bookmark' })).toBeTruthy();
+    cleanup();
+    renderSettings({ compactTopBar: false });
+    expect(screen.getByRole('switch', { name: 'Settings Gear' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Theme' })).toBeTruthy();
   });
 });
 

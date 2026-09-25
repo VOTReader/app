@@ -529,7 +529,7 @@ const SETTINGS_TOPICS = {
   reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
-  topnav: 'top nav buttons icons settings gear history theme bookmark',
+  topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
   features: 'search synonyms synonym filter stop words tabs history',
   garden: 'a return to the garden image quality pictures',
   data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
@@ -1907,7 +1907,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           <div className="settings-card">
             <SettingsRow
               label="Light Theme"
-              desc="Switch between the dark (default) and light reading themes. Also available as the sun/moon icon in the top nav, unless you hide it under Top-Nav Buttons."
+              desc="Switch between the dark (default) and light reading themes. Also in the top bar: the ⋯ menu with the compact bar (the default), or the sun/moon icon without it (Top-Nav Buttons)."
               checked={theme === "light"}
               onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
             />
@@ -2212,16 +2212,31 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <SettingsGroup label="Top-Nav Buttons" sub="Icons in the reading bar" {...groupProps('topnav')}>
           <div className="settings-card">
-            <div className="settings-chip-note">Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px.</div>
+            {/* The compact bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx). While
+                it is on, the three icons it moves live in the ⋯ menu, so their chips unmount
+                (the dependent-rows-unmount discipline) and only Bookmark is left to choose. */}
+            <SettingsRow
+              label="Compact Top Bar"
+              desc="On (default): Settings, History and the light/dark switch move into the ⋯ menu at the end of the bar, with Text size beside them; Back, Home, Search, Bookmark and Tabs stay. Off: every icon sits in the bar, chosen below."
+              checked={settings.compactTopBar !== false}
+              onToggle={() => onToggle("compactTopBar")}
+            />
+            <div className="settings-chip-note">{settings.compactTopBar !== false
+              ? "Which optional icon appears in the bar beside Search."
+              : "Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px."}</div>
             <div className="settings-chips">
-              <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
+              {settings.compactTopBar === false && (
+                <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
+              )}
               {/* Hidden (not greyed) while History itself is off — the chip
                   returns with the feature (Search, Tabs & History group). */}
-              {settings.historyEnabled !== false && (
+              {settings.compactTopBar === false && settings.historyEnabled !== false && (
                 <NavChip label="History" checked={!!settings.historyInNav} onToggle={() => onToggle("historyInNav")} />
               )}
               <NavChip label="Bookmark" checked={settings.showBookmarkNav !== false} onToggle={() => onToggle("showBookmarkNav")} />
-              <NavChip label="Theme" checked={settings.showThemeBtn !== false} onToggle={() => onToggle("showThemeBtn")} />
+              {settings.compactTopBar === false && (
+                <NavChip label="Theme" checked={settings.showThemeBtn !== false} onToggle={() => onToggle("showThemeBtn")} />
+              )}
             </div>
           </div>
         </SettingsGroup>

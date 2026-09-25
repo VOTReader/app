@@ -707,7 +707,7 @@ function App() {
         (top nav, ResumeReadingNavBtn owns its eligibility list) and the
         autoscroll transport (portaled pill). Config only — per-screen wiring
         reaches the pill from ScreenLayout, where it exists. */}
-    <ReadingChromeProvider screen={screen} dotEnabled={!!(settings.showReadingDot && activeReadKey)} onGo={goToLastRead} settings={settings} updateSetting={updateSetting}>
+    <ReadingChromeProvider screen={screen} dotEnabled={!!(settings.showReadingDot && activeReadKey)} onGo={goToLastRead} settings={settings} updateSetting={updateSetting} nav={{ theme, onThemeChange: setTheme, onSettings: goSettings, onHistory: goHistory }}>
       {null}
 
       {/* All 4 ephemeral overlays (welcome modal, tabs overview +

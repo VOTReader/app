@@ -14,6 +14,7 @@
 
 import { ReadingDotContext } from './ResumeReadingNavBtn.jsx';
 import { AutoScrollContext } from './AutoScrollControl.jsx';
+import { NavMenuContext } from './MoreMenu.jsx';
 import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
 
 // The dwell clamp moved next to clampLpm in the transport module (the pill's
@@ -21,7 +22,7 @@ import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
 // Re-exported here because this is the seam everything else already imports.
 export { clampEndDwell };
 
-export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, children }) {
+export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, nav, children }) {
   const s = settings || {};
   // Deliberately un-memoized (carried over from app.jsx): goToLastRead reads
   // live nav state from its closure, and the sole consumer is one tiny button.
@@ -38,10 +39,27 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, upda
     onDwellChange: (ms) => { if (updateSetting) updateSetting('autoScrollEndMs', String(clampEndDwell(ms))); },
   }), [s.autoScroll, s.autoScrollLpm, s.autoScrollNext, s.autoScrollEndMs, s.keepScreenOn, updateSetting]);
 
+  // The top bar's ⋯ menu (MoreMenu.jsx): App's theme and two destinations, the
+  // compact-bar and history switches, and the text size it steps. Un-memoized
+  // for the same reason as dotValue: `nav` is a fresh object each App render.
+  const n = nav || {};
+  const menuValue = {
+    enabled: s.compactTopBar !== false,
+    historyEnabled: s.historyEnabled !== false,
+    theme: n.theme || 'dark',
+    onThemeChange: n.onThemeChange || (() => {}),
+    onSettings: n.onSettings || (() => {}),
+    onHistory: n.onHistory || (() => {}),
+    fontScale: String(s.fontScale || '1'),
+    onFontScale: (v) => { if (updateSetting) updateSetting('fontScale', v); },
+  };
+
   return (
     <ReadingDotContext.Provider value={dotValue}>
       <AutoScrollContext.Provider value={autoValue}>
-        {children}
+        <NavMenuContext.Provider value={menuValue}>
+          {children}
+        </NavMenuContext.Provider>
       </AutoScrollContext.Provider>
     </ReadingDotContext.Provider>
   );

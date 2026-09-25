@@ -136,6 +136,19 @@ describe('useSettings — body-class mirror', () => {
     }
   });
 
+  /* The compact top bar (the redesign, 2026-09-25): a NEW key, so a profile saved before it
+     existed (every settings key but this one present) still gets the calmer bar, and only an
+     explicit false brings the old icon row back. */
+  it('compactTopBar is on for a profile saved before it existed, and off only when set off', () => {
+    document.body.className = '';
+    const { unmount } = mount({ savedSettings: { showSettingsGear: true, historyInNav: true, showThemeBtn: true } });
+    expect(cls().contains('compact-topbar')).toBe(true);
+    unmount();
+    document.body.className = '';
+    mount({ savedSettings: { compactTopBar: false } });
+    expect(cls().contains('compact-topbar')).toBe(false);
+  });
+
   it('arrowLayout maps to exactly one arrows-* class', () => {
     for (const layout of ['right', 'left', 'nav', 'off']) {
       document.body.className = '';

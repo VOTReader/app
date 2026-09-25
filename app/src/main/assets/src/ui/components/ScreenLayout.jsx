@@ -6,6 +6,7 @@ import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 import { AnnotationHint } from './AnnotationHint.jsx';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
+import { MoreMenuBtn } from './MoreMenu.jsx';
 import { AutoScrollControl } from './AutoScrollControl.jsx';
 
 /** The document's selected text; '' when nothing is selected or it cannot be read. */
@@ -299,6 +300,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
         {navChildren}
         <ResumeReadingNavBtn />
         {hideTabsBtn ? null : <TabsNavBtn />}
+        <MoreMenuBtn />
       </nav>
       {pager ? (
         <div className="pager-viewport">

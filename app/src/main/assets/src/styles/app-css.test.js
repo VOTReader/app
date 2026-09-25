@@ -560,3 +560,21 @@ describe('app.css — the Answers A–Z letters and the footnote "Read more" are
     expect(src).not.toMatch(/style=\{\{\s*display:\s*"inline-block"/);
   });
 });
+
+/* The compact top bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx): the three icons it
+   moves into the ⋯ menu leave the bar only under body.compact-topbar, matched the way the per-icon
+   toggles match them, and the menu's rows keep a full finger. */
+describe('app.css — the compact top bar and its ⋯ menu', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  it('hides exactly Settings, History and the theme switch in the bar, and only in compact mode', () => {
+    const m = bare.match(/body\.compact-topbar \.top-nav \.settings-gear-btn,\s*body\.compact-topbar \.top-nav \.nav-search-btn\[title="History"\],\s*body\.compact-topbar \.top-nav \.nav-theme-btn\s*\{\s*display:\s*none;\s*\}/);
+    expect(m, 'the three compact-bar hides').toBeTruthy();
+    expect(bare).not.toMatch(/body\.compact-topbar [^{]*(nav-bookmark-btn|tabs-nav-btn|\[title="Search"\]|\[title="Home"\])[^{]*\{\s*display:\s*none/);
+  });
+  it('the ⋯ button and every menu row are at least 44 px', () => {
+    expect(ruleBlock(CSS, '.nav-more-btn {')).toMatch(/min-width:\s*44px;[^}]*min-height:\s*44px/);
+    expect(ruleBlock(CSS, '.more-menu-item {')).toMatch(/min-height:\s*48px/);
+    expect(ruleBlock(CSS, '.more-menu-row {')).toMatch(/min-height:\s*52px/);
+    expect(ruleBlock(CSS, '.more-menu-seg button, .more-menu-step button {')).toMatch(/min-width:\s*44px;\s*min-height:\s*40px/);
+  });
+});
