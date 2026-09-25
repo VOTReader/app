@@ -15,7 +15,14 @@ function _homeDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
+/** The Songs card's italic line: "1,082 songs from the words of the letters" once the catalog is loaded. */
+function songsDetail() {
+  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  const n = cat && cat.loaded ? cat.songs().filter((s) => !s.hid && s.sh).length : 0;
+  return n ? n.toLocaleString('en-US') + ' songs from the words of the letters' : 'Songs from the words of the letters';
+}
+
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -37,6 +44,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     answers: { id: "answers", eyebrow: "Topics & Doctrines", title: "Answers Only God Can Give", detail: "The Lord sets the record straight" },
     studies: { id: "studies", eyebrow: "Study Editions", title: "Studies", detail: "Letter Studies · Matthew Study Bible" },
     listening: { id: "listening", eyebrow: "Audio Readings", title: "Listening Library", detail: "The Letters & Scriptures, read aloud" },
+    // Songs of the Letters (L2): the count only once the catalog is in; Home never fetches it on its own.
+    songs: { id: "songs", eyebrow: "Sung by the Flock", title: "Songs of the Letters", detail: songsDetail() },
     library: { id: "library", eyebrow: "Personal Study", title: "Library", detail: "Notes, journal & bookmarks" },
     settings: { id: "settings", eyebrow: "App Configuration", title: "Settings", detail: "Display, themes & preferences" },
     history: { id: "history", eyebrow: "Recently Visited", title: "History", detail: "Resume where you left off" }
@@ -70,7 +79,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     const load = id === 'scriptures' ? window.__loadBibleCorpus
       : id === 'settings' ? window.__loadScreensE
       : id === 'answers' ? window.__loadAnswersCorpus
-      : ['volumes', 'studies', 'library', 'listening'].includes(id) ? window.__loadVotCorpus : null;
+      : ['volumes', 'studies', 'library', 'listening', 'songs'].includes(id) ? window.__loadVotCorpus : null;
     if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));
   };
   const [surpriseBusy, setSurpriseBusy] = React.useState(false);
@@ -243,6 +252,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     // Like settings/history, the Listening Library needs origin-aware Back,
     // so it takes its own capture-and-switch callback rather than onSelect.
     if (id === "listening") {if (onOpenAudio) onOpenAudio();return;}
+    if (id === "songs") {if (onOpenSongs) onOpenSongs();return;}
     // The Home card is a fresh visit: the landing forgets a query or an open
     // commandment left from before (Back from a topic keeps them).
     if (id === "answers") resetAnswersLanding();

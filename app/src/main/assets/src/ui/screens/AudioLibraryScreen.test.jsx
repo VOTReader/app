@@ -281,4 +281,28 @@ describe('AudioLibraryScreen -- the read-along badge', () => {
     renderScreen();
     expect(badgeIn('The Volumes of Truth').textContent).toBe('Read-along');
   });
+
+  /* Songs of the Letters (L2): one Browse row under the Volumes, badge SONGS, the real count once the catalog is in. */
+  it('offers Songs of the Letters as a Browse row that names its songs and opens the hub', () => {
+    const load = vi.fn(() => Promise.resolve(true));
+    const visible = { hid: false, sh: 1 };
+    globalThis.SongCatalog = { loaded: false, subscribe: () => () => {}, getVersion: () => 0, load, songs: () => [] };
+    globalThis.songCountLabel = (n) => n.toLocaleString('en-US') + (n === 1 ? ' song' : ' songs');
+    const onOpenSongs = vi.fn();
+    const first = renderScreen({ onOpenSongs });
+    expect(load).toHaveBeenCalledTimes(1);                        // the Library warms the catalog a tap before the hub
+    let row = screen.getByRole('button', { name: /Songs of the Letters/ });
+    expect(row.textContent).toContain('Made by the flock');
+    expect(badgeIn('Songs of the Letters').textContent).toBe('Songs');
+    first.unmount();
+
+    globalThis.SongCatalog = { loaded: true, subscribe: () => () => {}, getVersion: () => 1, load, songs: () => Array.from({ length: 1083 }, (_, i) => (i === 0 ? { hid: true, sh: 1 } : visible)) };
+    renderScreen({ onOpenSongs });
+    row = screen.getByRole('button', { name: /Songs of the Letters/ });
+    expect(row.textContent).toContain('1,082 songs · made by the flock');   // hidden rows never count
+    fireEvent.click(row);
+    expect(onOpenSongs).toHaveBeenCalledTimes(1);
+    delete globalThis.SongCatalog;
+    delete globalThis.songCountLabel;
+  });
 });

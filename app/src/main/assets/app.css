@@ -1482,6 +1482,90 @@
       @media (prefers-reduced-motion:reduce) { .audio-library-now.is-active .audio-library-now-art span { animation:none; }.audio-library-search,.audio-library-row,.audio-library-shelf-row,.audio-library-disclosure svg,.audio-collection-voices svg { transition:none; } }
       @media (max-width:560px) { .audio-library-screen { padding-left:1rem; padding-right:1rem; }.audio-library-now,.audio-library-empty-now { grid-template-columns:54px minmax(0,1fr); gap:.7rem; padding:.82rem; }.audio-library-now-art { width:54px; height:54px; border-radius:15px; }.audio-library-now-copy h2 { font-size:var(--fs-18); }.audio-library-now-actions { grid-column:2; justify-content:flex-start; margin-top:-.18rem; }.audio-library-progress-wrap { grid-column:1 / -1; margin-top:-.12rem; }.audio-library-row { grid-template-columns:44px minmax(0,1fr); gap:.54rem; padding:.46rem .45rem; }.audio-library-row-actions { grid-column:2; justify-content:flex-start; margin-top:-.22rem; }.audio-library-row-actions > span { max-width:none; padding-left:0; text-align:left; }.audio-library-section-head { align-items:flex-start; }.audio-library-section-head > strong, .audio-library-section-tail > strong { padding-top:.35rem; }.audio-collection-voice-list { padding-left:1.1rem; } }
       @media (max-width:360px) { .audio-library-primary-action { padding:.34rem .58rem; }.audio-library-now-actions { gap:.12rem; }.audio-library-shelf-row { grid-template-columns:30px minmax(0,1fr) auto; padding:.55rem .55rem; }.audio-library-shelf-mark { width:28px; height:28px; } }
+      /* ── SONGS OF THE LETTERS: the hub and its lists (L2, 2026-09-25). The approved pictures final-01/02/07 and their
+         build rules: primary actions FILLED gold, secondary OUTLINED, 56 px covers, one 44 px round play per row that
+         fills gold while its song plays, navigation rows with a plain chevron (never circled). Tokens only. ── */
+      .songs-screen { width:100%; max-width:860px; margin:0 auto; padding:.9rem min(1.45rem,5vw) 2.5rem; background:var(--bg); }
+      @media (max-width:560px) { .songs-screen { padding-left:1rem; padding-right:1rem; } }
+      .songs-hero { padding:.55rem 0 1rem; }
+      .songs-eyebrow { color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
+      .songs-screen h1 { margin:.2rem 0 0; color:var(--cream); font-family:inherit; font-size:var(--fs-30); font-weight:500; line-height:1.15; }
+      .songs-intro { margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-16); font-style:italic; line-height:1.45; }
+      .songs-controls { display:grid; gap:.7rem; }
+      .songs-shuffle, .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+      .songs-shuffle { width:100%; background:var(--gold); color:var(--bg); }
+      .songs-outline-action { background:transparent; color:var(--gold); }
+      .songs-shuffle svg, .songs-outline-action svg { width:22px; height:22px; flex:none; }
+      .songs-find { display:flex; align-items:center; gap:.6rem; min-height:48px; padding:0 .25rem 0 1rem; border:1px solid var(--gold-border); border-radius:999px; background:var(--bg3); }
+      .songs-find:focus-within { border-color:var(--gold); }
+      .songs-find > svg { width:20px; height:20px; flex:none; color:var(--cream-dim); }
+      .songs-find label { flex:1; min-width:0; display:flex; }
+      .songs-find input { width:100%; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; }
+      .songs-find input::placeholder { color:var(--cream-dim); opacity:.85; }
+      .songs-find-clear { width:44px; height:44px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--cream); cursor:pointer; }
+      .songs-find-clear svg { width:20px; height:20px; }
+      .songs-chips { display:flex; flex-wrap:wrap; gap:.5rem; }
+      .songs-chip { position:relative; min-height:40px; display:inline-flex; align-items:center; gap:.35rem; padding:.3rem 1.1rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .songs-chip::before { content:""; position:absolute; inset:-2px 0; }
+      .songs-chip.is-on { border-color:var(--gold); background:var(--gold); color:var(--bg); }
+      .songs-chip-more span { font-size:var(--fs-12); color:var(--gold); }
+      .songs-chip-more.is-on span { color:var(--bg); }
+      .songs-section { margin-top:1.4rem; }
+      .songs-section-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; min-height:32px; margin:0 0 .45rem; }
+      .songs-section-head h2 { margin:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-14); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
+      .songs-section-count { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+      .songs-see-all { display:inline-flex; align-items:center; gap:.1rem; min-height:44px; padding:0 .15rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; }
+      .songs-see-all svg, .songs-nav-row > svg, .songs-tile > svg, .songs-shelf > svg { width:20px; height:20px; flex:none; color:var(--gold); }
+      .songs-card { border:1px solid var(--border); border-radius:10px; background:var(--bg3); overflow:hidden; }
+      .songs-row { display:flex; align-items:center; gap:.6rem; padding:.55rem .1rem; border-bottom:1px solid var(--border); }
+      .songs-card .songs-row { padding:.55rem .7rem .55rem .55rem; border-bottom:0; border-top:1px solid var(--border); }
+      .songs-card .songs-row:first-child { border-top:0; }
+      .songs-row-main { flex:1; min-width:0; display:flex; align-items:center; gap:.85rem; min-height:56px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .song-cover { position:relative; flex:none; width:56px; height:56px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; background:var(--bg3); }
+      .song-cover-note { color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
+      .song-cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+      .songs-row-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
+      .songs-row-copy strong { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; color:var(--cream); font-size:var(--fs-18); font-weight:400; line-height:1.25; }
+      .songs-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-15); font-style:italic; white-space:nowrap; text-overflow:ellipsis; }
+      .songs-row.is-current .songs-row-copy strong { color:var(--gold); }
+      .songs-row-len { flex:none; color:var(--cream-dim); font-size:var(--fs-15); font-style:italic; font-variant-numeric:tabular-nums; }
+      .song-play { flex:none; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1.5px solid var(--gold); border-radius:50%; background:transparent; color:var(--gold); cursor:pointer; }
+      .song-play svg { width:20px; height:20px; }
+      .song-play:not(.is-playing) svg { margin-left:2px; }
+      .song-play.is-playing { background:var(--gold); color:var(--bg); }
+      .songs-nav-row { display:flex; align-items:center; gap:.9rem; width:100%; min-height:60px; padding:.5rem .8rem; border:0; border-top:1px solid var(--border); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .songs-card > .songs-nav-row:first-child { border-top:0; }
+      .songs-nav-mark { width:40px; height:40px; flex:none; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--gold-border); border-radius:50%; color:var(--gold); }
+      .songs-nav-mark svg { width:20px; height:20px; }
+      .songs-nav-label { flex:1; min-width:0; color:var(--cream); font-size:var(--fs-18); }
+      .songs-nav-count { color:var(--cream-dim); font-size:var(--fs-16); font-variant-numeric:tabular-nums; }
+      .songs-tiles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+      .songs-tile { display:flex; align-items:center; gap:.6rem; min-height:76px; padding:.45rem .4rem .45rem .45rem; border:1px solid var(--border); border-radius:10px; background:var(--bg3); color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .songs-mosaic { flex:none; display:grid; grid-template-columns:repeat(2,28px); grid-template-rows:repeat(2,28px); gap:2px; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; }
+      .songs-mosaic .song-cover { width:28px; height:28px; border:0; border-radius:0; }
+      .songs-mosaic .song-cover-note { font-size:var(--fs-12); }
+      .songs-tile-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.1rem; }
+      .songs-tile-copy strong { color:var(--cream); font-size:var(--fs-16); font-weight:400; line-height:1.25; }
+      .songs-tile-copy small { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+      .songs-shelves { display:grid; gap:.55rem; }
+      .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold-border); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .songs-shelf-title { flex:1; min-width:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); white-space:nowrap; }
+      .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
+      .songs-list-actions .songs-play-all { width:auto; flex:1 1 10rem; }
+      .songs-empty { margin:.5rem 0; color:var(--cream-dim); font-style:italic; }
+      .songs-state { padding:1.5rem 0; color:var(--cream-dim); text-align:center; }
+      .songs-state p { margin:0 0 1rem; font-size:var(--fs-18); font-style:italic; }
+      .songs-skeleton { display:grid; gap:.8rem; margin-top:1rem; }
+      .songs-skeleton-row { display:flex; align-items:center; gap:.85rem; }
+      .songs-skeleton-row > span:first-child { width:56px; height:56px; flex:none; border-radius:7px; background:var(--gold-faint); }
+      .songs-skeleton-row > span:last-child { flex:1; display:grid; gap:.45rem; }
+      .songs-skeleton-row i { display:block; height:.8rem; border-radius:4px; background:var(--gold-faint); }
+      .songs-skeleton-row i + i { width:55%; }
+      .coverage-badge.coverage-badge-songs { border-color:var(--gold); color:var(--gold); }
+      .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-chip:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible, .songs-nav-row:focus-visible, .songs-tile:focus-visible, .songs-shelf:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .songs-chip:not(.is-on):hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-nav-row:hover, .songs-tile:hover, .songs-shelf:hover, .songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
+      @media (max-width:360px) { .songs-tiles { grid-template-columns:minmax(0,1fr); }.songs-row-len { display:none; } }
 
       /* Milestones — the full achievements ledger. Same restrained shelf
          language as the Listening Library screens; earned rows carry the ✦. */

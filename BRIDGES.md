@@ -122,6 +122,11 @@ setup effect.
 - **Cleanup:** `window.__goSearch = null` on effect re-run
 - **Consumers:** `ui/sheets/SelectionToolbar.js:488` (Search-selection action)
 
+### `__songsBack`
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: the Songs screen's Back while `screen === 'audio-library-songs'`, else `null`)
+- **Cleanup:** the next build overwrites it (null off the Songs screen)
+- **Consumers:** `hooks/use-android-back.js` (the `audio-library-songs` arm: pop one Songs frame from `audioColKey`, else leave by the navOrigin)
+
 ---
 
 ## 4. Reading-state bridges

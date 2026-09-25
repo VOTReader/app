@@ -105,6 +105,7 @@ export function describeTab(tab) {
   if (s === 'audio-library-saved') return { title: 'Listening Library', subtitle: 'Saved recordings', resolved: true };
   if (s === 'audio-library-studies') return { title: 'Listening Library', subtitle: 'Bible/Letter Studies', resolved: true };
   if (s === 'audio-library-offline') return { title: 'Listening Library', subtitle: 'On this phone', resolved: true };
+  if (s === 'audio-library-songs') return { title: 'Songs of the Letters', subtitle: 'Sung by the flock', resolved: true };
   if (s === 'milestones') return { title: 'Milestones', subtitle: 'Your journey', resolved: true };
   if (s === 'scripture-web') return { title: 'The Scripture Web', subtitle: 'Cross-reference atlas', resolved: true };
 

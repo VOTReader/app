@@ -142,7 +142,12 @@ const BUDGETS = [
   // (OfflineAudioControls: the row line, Download all and its size confirm). The
   // downloads STORE stays in bundle-d beside the player (bundle-h-membership pins
   // '__votOfflineAudio' out of bundle-h). 40,780 x 1.15 = 46,897 -> the hundred above.
-  { file: 'bundle-h.js', measured: 40780, max: 46900 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone
+  // 2026-09-25 (ai-music, songs-U1 / L2): +16,178 B for a SEVENTH screen, Songs of the
+  // Letters (AudioSongsScreen: the hub, its Find box and chips, the collection tiles and
+  // shelves, the list screen). The catalog store, the song pieces (cover, round play,
+  // choice sheet) and the route helpers stay in bundle-d beside the player that the bar
+  // and desk share. 57,506 x 1.15 = 66,132 -> the hundred above.
+  { file: 'bundle-h.js', measured: 57506, max: 66200 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

@@ -29,7 +29,7 @@ const read = (p) => readFileSync(p, 'utf-8');
    identifier: esbuild minifies each screen's function to a one-letter name, and
    the identifier still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
-const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen'];
+const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen', 'AudioSongsScreen'];
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
    writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
    — and that colon reads exactly like a definition. A definition is a KEY in
@@ -77,9 +77,15 @@ describe('bundle-h carries the Listening Library, and bundle-d no longer does', 
       expect(defines(d, name), `bundle-d.js no longer defines ${name} for the shell`).toBe(true);
       expect(defines(h, name), `bundle-h.js ships its own ${name}`).toBe(false);
     }
+    // Songs of the Letters (2026-09-25): ONE catalog store and one set of song pieces, the shell's (the bar and
+    // the desk draw songs too). A literal of each survives only where the module was bundled.
+    expect(d.includes('songs-catalog'), 'bundle-d.js lost song-catalog.js').toBe(true);
+    expect(h.includes('songs-catalog'), 'bundle-h.js ships a SECOND song catalog').toBe(false);
+    expect(d.includes('song-choice-'), 'bundle-d.js lost SongParts').toBe(true);
+    expect(h.includes('song-choice-'), 'bundle-h.js ships its own SongParts').toBe(false);
     // A bundle-h that stayed small is the cheap proof of all of the above. The player alone is far over this;
-    // 47,000 tracks check-bundle-budget's ceiling (46,900 since item 8's sixth screen, 2026-09-24).
-    expect(h.length < 47000, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
+    // 66,300 tracks check-bundle-budget's ceiling (66,200 since the seventh screen, Songs of the Letters, 2026-09-25).
+    expect(h.length < 66300, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
   });
 
   it('the loader, the routes, the precache and the build all know the bundle', () => {

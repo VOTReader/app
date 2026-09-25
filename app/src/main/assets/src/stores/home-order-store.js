@@ -45,10 +45,11 @@ import { CachedStore, extendStore } from './cached-store.js';
 
 /** Canonical default home-tile order. 'listening' joined 2026-08-09 (the
  *  Listening Library moved home from the Library + Volumes entry points);
- *  'answers' (Answers Only God Can Give) joined 2026-09-22. An existing
+ *  'answers' (Answers Only God Can Give) joined 2026-09-22; 'songs' (Songs of
+ *  the Letters) joined 2026-09-25, right after 'listening'. An existing
  *  saved order keeps its arrangement and gains each beside its neighbour. */
 export const DEFAULT_HOME_ORDER = Object.freeze([
-  'volumes', 'scriptures', 'answers', 'studies', 'listening', 'library', 'settings', 'history',
+  'volumes', 'scriptures', 'answers', 'studies', 'listening', 'songs', 'library', 'settings', 'history',
 ]);
 
 /**

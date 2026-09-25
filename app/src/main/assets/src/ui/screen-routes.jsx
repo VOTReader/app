@@ -43,6 +43,7 @@
 import { AudioPlayer } from '../utils/audio-player.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { textKeyOf } from './components/AudioShelf.jsx';
+import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById } from '../utils/answers-shelves.js';
@@ -460,6 +461,19 @@ export function buildScreenRoutes({
     setNavOrigin({ screen: 'audio-library', returnOrigin: navOrigin || null });
     setScreen(destination);
   };
+  // Songs of the Letters (L2): ONE routed screen whose stack of frames (hub, a list, a song) rides the tab's
+  // audioColKey (utils/songs-route.js), so no tab field and no app.jsx line. Opening it sets the stack and the
+  // origin Back leaves by; Back pops a frame first. Android Back reaches the same pop through __songsBack.
+  const _openSongs = (frames, origin) => {
+    setAudioColKey(encodeSongsRoute(frames));
+    setNavOrigin({ ...origin, returnOrigin: navOrigin || null });
+    setScreen(SONGS_SCREEN);
+  };
+  const _songsBack = () => {
+    const popped = popSongsFrame(audioColKey);
+    if (popped) setAudioColKey(popped); else goNavOrigin();
+  };
+  window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
@@ -739,6 +753,7 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
+        onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
         onNotes={goNotesIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
@@ -1054,6 +1069,7 @@ export function buildScreenRoutes({
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
         onOpenStudies={() => _enterAudioSub('audio-library-studies')}
         onOpenOffline={() => _enterAudioSub('audio-library-offline')}
+        onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1127,6 +1143,22 @@ export function buildScreenRoutes({
           : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Studies'
           : 'Listening Library'}
         onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    [SONGS_SCREEN]: () => typeof AudioSongsScreen !== 'undefined' ? (
+      <AudioSongsScreen
+        route={decodeSongsRoute(audioColKey)}
+        onPush={(frame) => setAudioColKey(pushSongsFrame(audioColKey, frame))}
+        onReplaceTop={(frame) => setAudioColKey(replaceSongsTop(audioColKey, frame))}
+        onBack={_songsBack}
+        rootBackLabel={!navOrigin || navOrigin.screen === 'home' ? 'Home'
+          : navOrigin.screen === 'audio-library' ? 'Listening Library'
+          : navOrigin.screen === 'search' ? 'Search'
+          : 'Back'}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

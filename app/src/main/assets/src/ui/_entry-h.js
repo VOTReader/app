@@ -26,7 +26,9 @@ import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
 import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
+// Songs of the Letters (L2, 2026-09-25): the hub and its lists; the catalog, the song pieces and the route helpers stay in bundle-d.
+import { AudioSongsScreen } from './screens/AudioSongsScreen.jsx';
 
 Object.assign(window, {
-  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen,
+  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
 });

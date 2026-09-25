@@ -80,6 +80,7 @@ function bibleReaderCode(volKey) {
  *   onOpenSaved: () => void,
  *   onOpenStudies?: () => void,
  *   onOpenOffline?: () => void,
+ *   onOpenSongs?: () => void,
  *   onOpenTrack: (track: any) => void,
  *   onSearch: () => void,
  *   onHistory: () => void,
@@ -88,7 +89,7 @@ function bibleReaderCode(volKey) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenSongs, onOpenTrack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -135,6 +136,15 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   const studies = studiesSummary();
   // Downloads to the phone (item 8): the shelf row appears once something is on it (Android only).
   const offline = useOfflineAudio();
+  // Songs of the Letters (L2): the Browse row names the real count once the catalog is in; it is fetched once
+  // per launch and kept, so opening the Library warms it for the hub a tap away.
+  const songs = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (songs ? songs.subscribe(cb) : () => {}), [songs]),
+    React.useCallback(() => (songs ? songs.getVersion() : 0), [songs])
+  );
+  React.useEffect(() => { if (songs && !songs.loaded) void songs.load(); }, [songs]);
+  const songTotal = songs && songs.loaded ? songs.songs().filter((s) => !s.hid && s.sh).length : 0;
   const downloads = offline ? offline.items() : [];
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
@@ -301,6 +311,17 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               </span>
               <span className="audio-library-shelf-tail"><ArrowIcon /></span>
             </button>
+            {onOpenSongs ? (
+              <button type="button" className="audio-library-shelf-row" onClick={() => onOpenSongs()}>
+                <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
+                <span className="audio-library-shelf-copy">
+                  <strong>Songs of the Letters</strong>
+                  <small>{songTotal ? songCountLabel(songTotal) + ' · made by the flock' : 'Made by the flock'}</small>
+                  <span className="coverage-badge-wrap"><span className="coverage-badge coverage-badge-songs">Songs</span></span>
+                </span>
+                <span className="audio-library-shelf-tail"><ArrowIcon /></span>
+              </button>
+            ) : null}
             {studies.recorded > 0 ? (
               <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenStudies) onOpenStudies(); }}>
                 <span className="audio-library-shelf-mark" aria-hidden="true">♪</span>
