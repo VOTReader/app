@@ -115,10 +115,17 @@ describe('e2e:read serves its own tree', () => {
     await expect(assertServingOwnTree(base)).resolves.toBeUndefined();
   });
 
-  it('refuses loudly when the served tree is not this one', async () => {
+  it('refuses loudly when the served tree is not this one', async (ctx) => {
     decoy = await startDecoy();
     // Whatever holds 8097 answers — but it is not serving this tree's
     // service worker, so the run must abort rather than report on it.
+    // Unless a real squatter holds 8097 AND serves this very CACHE_VERSION
+    // (another checkout at the same commit, e.g. a preview of the main
+    // checkout, 2026-09-24): then "not this tree" is false and this case has
+    // nothing to refuse. Skip it rather than fail every tools/ commit.
+    if (!decoy && (await servedCacheVersion('http://127.0.0.1:8097').catch(() => null)) === treeCacheVersion()) {
+      ctx.skip();
+    }
     await expect(assertServingOwnTree('http://127.0.0.1:8097')).rejects.toThrow(/CACHE_VERSION/);
   });
 });
