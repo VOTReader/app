@@ -30,7 +30,7 @@ git -C D:/VOTReader-studio worktree add .claude/worktrees/<name> -b <branch> ori
 cd D:/VOTReader-studio/.claude/worktrees/<name>
 
 git config core.hooksPath || git config core.hooksPath .githooks   # the pre-commit gate: shows it, or turns it on
-npm ci                        # Node 20+ (.nvmrc pins 24); Python 3 must be on PATH too
+npm ci                        # Node 22+ (.nvmrc pins 24); Python 3 must be on PATH too
 npm run build                 # every bundle, the CSS, the CSP hashes, the service-worker version
 python tools/preview-server.py 8090 app/src/main/assets    # then open http://127.0.0.1:8090/
 npm run test                  # vitest: the *.test.js(x) files under src/, the assets root and tools/
