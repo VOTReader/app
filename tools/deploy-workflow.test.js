@@ -64,40 +64,35 @@ describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
     expect(on, 'the manual override stays').toMatch(/\n {2}workflow_dispatch:/);
   });
 
-  it('goes on only for a SUCCESSFUL CI run of a PUSH to main in THIS repository (a fork PR from a branch named main must not reach the token)', () => {
-    const gate = code(jobs().gate || '');
-    expect(gate).toContain("github.event.workflow_run.conclusion == 'success'");
-    expect(gate).toContain("github.event.workflow_run.event == 'push'");
-    expect(gate).toContain("github.event.workflow_run.head_branch == 'main'");
-    expect(gate).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
-  });
-
-  it('publishes only a commit that is still main\'s tip (an older green run must never replace a newer deploy)', () => {
-    // The ci9 refutation's MED finding (lanes/docs/out/ci9-refute.md): re-running an old
-    // commit's CI, or a dispatch while an older CI ran, published it over the newer one.
-    // The same check stops a TAG named main (CI runs on tags, and reports the tag as the branch).
+  it('publishes the newest green commit on main, picked by tools/deploy-target.mjs (ci10)', () => {
+    // ci9 published only the triggering commit, and only while it was main's tip; a busy main
+    // starved the site for over an hour on 2026-09-25. The ci9 refutation's cases (an old CI
+    // re-run publishing over a newer build; a tag named main) are pinned in deploy-target.test.js.
     const all = jobs();
     const gate = code(all.gate || '');
-    expect(gate).toMatch(/git ls-remote [^\n]*refs\/heads\/main/);
-    expect(gate).toMatch(/publish=true/);
-    expect(gate).toMatch(/outputs:\n\s+publish: \$\{\{ steps\.tip\.outputs\.publish \}\}/);
+    expect(gate).toContain('run: node tools/deploy-target.mjs');
+    expect(gate, 'the picker comes from main, never from the run that woke the deploy').toMatch(/ref: main\n/);
+    expect(gate).toMatch(/outputs:\n\s+publish: \$\{\{ steps\.target\.outputs\.publish \}\}\n\s+sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
+    expect(gate, 'the gate no longer filters on the waking run: any CI completion on main re-picks').not.toMatch(/\n {4}if:/);
     const build = code(all.build || '');
     expect(build).toMatch(/needs: gate/);
     expect(build).toContain("if: needs.gate.outputs.publish == 'true'");
     expect(code(all.deploy || '')).toMatch(/needs: build/);
   });
 
-  it('the pages concurrency group sits on the deploy job, so a skipped run cannot cancel a waiting deploy', () => {
-    // The refutation's LOW: at the workflow level every CI completion - red, cancelled, a fork PR -
-    // queued a run that then skipped, and a newer queued run replaces a waiting one.
-    expect(topBlock('concurrency'), 'no workflow-level concurrency').toBe('');
-    expect(code(jobs().deploy || '')).toMatch(/concurrency:\n\s+group: pages\n\s+cancel-in-progress: false/);
+  it('runs one deploy at a time, gate to publish, so a later pick never lands before an earlier one', () => {
+    // A job-level group (ci9) serialized only the publish step: two gates could pick in one order
+    // and publish in the other. At the workflow level a newer waiting run replaces an older
+    // waiting one, which is harmless now that every run re-picks the newest green commit.
+    expect(topBlock('concurrency')).toMatch(/^concurrency:\n {2}group: pages\n {2}cancel-in-progress: false/);
+    expect(code(jobs().deploy || ''), 'no second, job-level group').not.toMatch(/concurrency:/);
   });
 
-  it('checks out exactly the SHA CI proved, without leaving a token in .git', () => {
+  it('checks out exactly the SHA the gate picked, without leaving a token in .git', () => {
     const build = code(jobs().build || '');
-    expect(build).toMatch(/ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/);
+    expect(build).toMatch(/ref: \$\{\{ needs\.gate\.outputs\.sha \}\}/);
     expect(build).toContain('persist-credentials: false');
+    expect(code(jobs().gate || '')).toContain('persist-credentials: false');
   });
 });
 
@@ -106,12 +101,13 @@ describe('deploy-web.yml - no repository code runs beside the Pages token (v10-0
     expect(topBlock('permissions').trim()).toBe('permissions: {}');
   });
 
-  it('every job that runs a command or checks out the repo holds contents: read and nothing that publishes', () => {
+  it('every job that runs a command or checks out the repo holds read-only permissions and nothing that publishes', () => {
     const all = jobs();
     const runners = Object.entries(all).filter(([, t]) => /\n\s+run:|actions\/checkout@/.test(code(t)));
     expect(runners.length, 'the build job was not found - this measured nothing').toBeGreaterThan(0);
     for (const [id, t] of runners) {
-      expect(permissionsOf(t), `${id} permissions`).toBe('contents: read');
+      // The gate also lists CI runs (actions: read, ci10); the build needs only the code.
+      expect(permissionsOf(t), `${id} permissions`).toBe(id === 'gate' ? 'contents: read, actions: read' : 'contents: read');
     }
   });
 

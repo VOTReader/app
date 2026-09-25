@@ -50,13 +50,16 @@ on:
   # black-screen walk, e2e:read, e2e:readalong, bible-sync, drive routing) guarded
   # nothing that shipped. workflow_run is the cross-workflow `needs:` the old
   # comments said did not exist: this workflow starts when a CI run on main
-  # COMPLETES, and the build job below goes on only if that run succeeded, came
-  # from a push to main in THIS repository (a fork's pull request from a branch
-  # named main completes a CI run too, and must never reach the Pages token), and
-  # checks out exactly the SHA that CI proved. Cost: a change goes live about ten
-  # minutes after its push instead of about four. A superseded main push whose CI
-  # was replaced while pending (see ci.yml's concurrency block) is not deployed;
-  # the push that replaced it is.
+  # COMPLETES, and publishes the NEWEST commit on main whose CI is green (the gate
+  # job, tools/deploy-target.mjs), whatever run woke it: green, red or cancelled.
+  # The published commit comes from main's green CI history, never from the run
+  # that triggered this one, so a fork's pull request from a branch named main
+  # can wake a deploy but cannot choose what it builds. Cost: a change goes live
+  # about ten minutes after its push instead of about four.
+  #
+  # ci10 (2026-09-25): ci9 published only the triggering commit, and only while it
+  # was still main's tip. On a busy main no green run was ever the tip, and nothing
+  # went live for over an hour (runs 36100134740, 36100861220, 36102158492).
   #
   # Every push to main still deploys once its CI is green (owner directive
   # 2026-08-11: "any kind of change should always automatically deploy"). There is
@@ -84,44 +87,45 @@ on:
 # code at all: no checkout, no npm, only GitHub's own Pages actions (SHA-pinned).
 permissions: {}
 
+# ONE deploy at a time, gate to publish (ci10). A run waits while another runs;
+# a newer waiting run replaces an older waiting one, which is harmless now: every
+# run picks the newest green commit when its gate starts, so the survivor
+# publishes at least what the replaced one would have. Serialized runs and a
+# target that only moves forward mean a deploy never goes backwards.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   gate:
-    # A green CI run of a PUSH to main in THIS repository, or the manual override
-    # (see `on:`). `head_repository` is the guard that matters: a fork's pull
-    # request from its own branch named main also completes a CI run on this repo.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     outputs:
-      publish: ${{ steps.tip.outputs.publish }}
+      publish: ${{ steps.target.outputs.publish }}
+      sha: ${{ steps.target.outputs.sha }}
     steps:
-      - name: Publish only main's tip (an older green run must never replace a newer deploy)
-        # The ci9 refutation (2026-09-24): re-running an older commit's CI, or a
-        # dispatch while an older CI ran, published that commit over a newer one, and
-        # every client then installed the older build. A tag named main (CI also runs
-        # on tags, and reports the tag as the branch) could publish a commit that is
-        # not on main at all. Both end here: this run publishes only if the commit it
-        # would build IS main's tip right now. A newer commit deploys through its own
-        # green CI run.
-        id: tip
+      - name: Checkout the picker from main (never from the run that woke this one)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: tools/deploy-target.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Pick the newest commit on main whose CI is green
+        # The ci9 refutation (2026-09-24) still holds: an older commit's CI re-run
+        # must never publish over a newer build, and a tag or fork branch named main
+        # must never publish at all. The picker takes only commits on main (an
+        # ancestor of the tip) and the newest of them, so the re-run picks the newer
+        # commit and the tag picks nothing. The manual path publishes its own commit
+        # only when it is main's tip.
+        id: target
         env:
-          WANT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: |
-          tip=$(git ls-remote "https://github.com/$REPO" refs/heads/main | cut -f1)
-          echo "main is at $tip; this run would publish $WANT"
-          if [ -n "$tip" ] && [ "$tip" = "$WANT" ]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Deploy skipped::$WANT is not main's tip ($tip). The newer commit deploys through its own green CI run."
-          fi
+          DISPATCH_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
+        run: node tools/deploy-target.mjs
 
   build:
     needs: gate
@@ -130,10 +134,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout (exactly the SHA CI proved; the dispatched ref on the manual path)
+      - name: Checkout (exactly the SHA the gate picked; the dispatched tip on the manual path)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ needs.gate.outputs.sha }}
           persist-credentials: false
       - name: Set up Node (pinned via .nvmrc)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -260,13 +264,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    # One deployment at a time; let an in-flight deploy finish (don't cancel). On
-    # this job, not the workflow: there, every CI completion (red, cancelled, a
-    # fork's PR) queued a run that then skipped, and a newer queued run replaces a
-    # waiting one, so a skip could cancel a real deploy waiting its turn.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
+    # One deployment at a time: the workflow-level `concurrency` above.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
