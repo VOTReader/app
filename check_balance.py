@@ -12,6 +12,7 @@ that brace-balance alone can't detect.
 Usage:
     python check_balance.py [file ...]      # specific files (no .js suffix)
     python check_balance.py                  # all standard files
+    python check_balance.py --strict [...]   # also FAIL when esprima is missing (the hook and CI)
 """
 import sys, re, os
 
@@ -91,7 +92,11 @@ def esprima_check(text):
         return str(e)[:120]
 
 def main():
-    files = sys.argv[1:] if len(sys.argv) > 1 else DEFAULT_FILES
+    args = sys.argv[1:]
+    # v12-06: the hook and CI pass --strict, so a machine without esprima FAILS
+    # instead of passing on the brace count below with only a warning.
+    strict = '--strict' in args
+    files = [a for a in args if a != '--strict'] or DEFAULT_FILES
     # B5: esprima is the AUTHORITATIVE JS-validity check; the brace/quote counter
     # is only a weak heuristic. Without esprima a real syntax error that still
     # balances braces (e.g. an unescaped " inside a JSON value) slips through
@@ -105,6 +110,9 @@ def main():
             "  brace/quote heuristic only; a real JS syntax error can slip through.\n"
             "  Install it:  pip install -r requirements-dev.txt   (or: pip install esprima)\n\n"
         )
+        if strict:
+            sys.stderr.write("  --strict: failing - without esprima this gate cannot see a real syntax error.\n\n")
+            sys.exit(1)
     all_ok = True
     for f in files:
         path = DATA_DIR + f + '.js'

@@ -125,6 +125,13 @@ fi
 
 staged=$(git diff --cached --name-only "$against")
 
+# ─── Python: the 3.13 requirements-dev.txt is measured on, not the first `python` on PATH (v12-06) ──
+# On this machine the Hermes agent's venv (3.11) sits ahead of Python313 in PATH, so a bare
+# `python` ran the data gate and every unittest suite below on whatever an unrelated tool had put
+# first. The py launcher picks by version; a machine without it (CI's Linux runners, where
+# setup-python pins 3.13) keeps `python`. Every Python step below runs $PYBIN.
+if command -v py >/dev/null 2>&1 && py -3.13 -c "" >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
+
 # ─── Step 0b: the commit is the INDEX; every gate reads the WORKING TREE (v12-04) ──
 # Lint, tsc, vitest and Step 5's rebuild all read files on disk, and Step 5
 # stages the dist/ it builds from them. A bundle source with UNSTAGED edits
@@ -183,7 +190,7 @@ schema_tool_changed=$(echo "$staged" | grep -E '^tools/validate-schemas' || true
 if [ -n "$data_changed" ]; then
   echo "[pre-commit] Data files changed — running check_balance.py..."
   echo ""
-  python check_balance.py
+  $PYBIN check_balance.py --strict
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
@@ -285,7 +292,6 @@ fi
 bible_sync_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/data/bible-(sync-[a-z-]+|kjv|web|asv|bsb|hnv|lsv|ylt)\.js|tools/(validate-bible-sync|batch-align-bible|hone-bible|_alignlib|extract-bible-verses)\.(py|mjs))$' || true)
 if [ -n "$bible_sync_changed" ]; then
   echo "[pre-commit] Checking Bible verse timings — tools/validate-bible-sync.py..."
-  if command -v py >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
   # --all-editions, because this block's trigger already matches ANY
   # bible-sync-<edition>.js while the command named none: it ran the brm-kjv
   # default. Staging a new edition's timings fired the gate and the gate read a
@@ -343,13 +349,12 @@ fi
 # gate's unit tests so a regression in the GATE — the front-line black-screen
 # / white-verse detector — fails at the commit prompt rather than silently
 # ceasing to catch the bug class it exists for. Stdlib unittest, no dep beyond
-# esprima (already used by Step 1). python is assumed on PATH (Step 1 invokes
-# it directly).
+# esprima (already used by Step 1). Runs on $PYBIN, like Step 1.
 gate_changed=$(echo "$staged" | grep -E '^(check_balance\.py|test_check_balance\.py)$' || true)
 
 if [ -n "$gate_changed" ]; then
   echo "[pre-commit] Data gate changed — running test_check_balance.py (T6)..."
-  python -m unittest test_check_balance
+  $PYBIN -m unittest test_check_balance
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
@@ -382,7 +387,7 @@ fi
 reqs_changed=$(echo "$staged" | grep -E '\.py$|^requirements-(dev|ocr)\.txt$' || true)
 if [ -n "$reqs_changed" ]; then
   echo "[pre-commit] Checking the scheduled pipeline's Python pins (test_requirements.py)..."
-  python -m unittest test_requirements
+  $PYBIN -m unittest test_requirements
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
@@ -408,7 +413,7 @@ fi
 preview_changed=$(echo "$staged" | grep -E '^(tools/preview-server\.py|test_preview_server\.py)$' || true)
 if [ -n "$preview_changed" ]; then
   echo "[pre-commit] Preview server changed — proving it binds loopback only (test_preview_server.py)..."
-  python -m unittest test_preview_server
+  $PYBIN -m unittest test_preview_server
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
@@ -441,7 +446,7 @@ fi
 ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py|test_batch_align_bible_drive_index\.py|tools/batch-align-sections\.py|test_batch_align_sections\.py|tools/check-audio-sync\.js|tools/fixtures/audio-sync-sections\.fixture\.js|tools/_alignlib\.py)$' || true)
 if [ -n "$ship_changed" ]; then
   echo "[pre-commit] Read-along shipper changed — running the shipper tests..."
-  python -m unittest test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections
+  $PYBIN -m unittest test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
@@ -471,7 +476,7 @@ fi
 mem_changed=$(echo "$staged" | grep -E '^(tools/_alignlib\.py|tools/align-supervisor\.py|test_align_commit\.py)$' || true)
 if [ -n "$mem_changed" ]; then
   echo "[pre-commit] Memory instrumentation changed — running test_align_commit.py..."
-  python -m unittest test_align_commit
+  $PYBIN -m unittest test_align_commit
   status=$?
   if [ $status -ne 0 ]; then
     echo ""

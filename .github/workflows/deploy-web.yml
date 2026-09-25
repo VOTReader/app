@@ -144,7 +144,7 @@ jobs:
       - name: Set up Python (tools/build.py emits bundle-a)
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.x'
+          python-version: '3.13'   # the version requirements-dev.txt is measured on (v12-06)
 
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
@@ -163,7 +163,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           pip install -r requirements-dev.txt   # esprima — check_balance's authoritative JS parse
-          python check_balance.py        # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
+          python check_balance.py --strict   # BLD3 — black-screen data gate (parse / en-dash / smart-quote)
           npm run smoke-lite             # BLD3 — globals mirror + COLLECTIONS linkage + module cycles
           npm run check:runtime-assets   # every runtime src/ asset is derivable (the staging gate's first half)
           npm run check:search-index     # MS_INDEX_VERSION bumped if index-shaping code changed (stale IDB index)

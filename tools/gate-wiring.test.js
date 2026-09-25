@@ -32,3 +32,40 @@ describe('tools/validate-bible-sync.py is wired into the gates', () => {
     expect(hook).toMatch(/NEVER hand-edit src\/data\/bible-sync-\*\.js/);
   });
 });
+
+/* v12-06 (improvement sweep 2026-09-22): CI's `python-version: '3.x'` floated to 3.14 while
+   requirements-dev.txt is measured on 3.13, pip re-downloaded everything on every run, and the
+   data gate without esprima only warned. Every place that runs the gate pins 3.13 and runs it
+   --strict, so a runner that lost esprima fails instead of passing on the brace count. CI
+   installs requirements-dev.txt on every run, so it caches pip; the deploy installs it only on
+   its manual path, where a cache would have nothing to save. The hook's own interpreter is
+   proven by running it (pre-commit-wiring). */
+const deploy = readFileSync(resolve(ROOT, '.github', 'workflows', 'deploy-web.yml'), 'utf-8');
+const setupPython = (wf) => {
+  const at = wf.indexOf('actions/setup-python');
+  expect(at).toBeGreaterThan(-1);
+  return wf.slice(at, at + 400);
+};
+describe('the data gate runs strict on the pinned Python 3.13 (v12-06)', () => {
+  it('ci.yml caches pip, keyed on requirements-dev.txt', () => {
+    expect(setupPython(ci)).toMatch(/cache:\s*'pip'/);
+    expect(setupPython(ci)).toMatch(/cache-dependency-path:\s*requirements-dev\.txt/);
+  });
+
+  for (const [name, wf] of [['ci.yml', ci], ['deploy-web.yml', deploy]]) {
+    it(`${name} sets up Python 3.13`, () => {
+      expect(setupPython(wf)).toMatch(/python-version:\s*'3\.13'/);
+    });
+
+    it(`${name} runs check_balance.py --strict`, () => {
+      expect(wf).toMatch(/python check_balance\.py --strict/);
+      expect(wf).not.toMatch(/python check_balance\.py(?! --strict)/);
+    });
+  }
+
+  it('the hook runs check_balance.py --strict', () => {
+    const calls = hook.split('\n').filter((l) => /check_balance\.py/.test(l) && !/^\s*(#|echo\b)/.test(l));
+    expect(calls.length).toBeGreaterThan(0);
+    for (const l of calls) expect(l.trim()).toMatch(/check_balance\.py --strict/);
+  });
+});

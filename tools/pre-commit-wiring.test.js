@@ -23,9 +23,9 @@
  * run real paths through it, which is behaviour, not formatting.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, unlinkSync, mkdtempSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, mkdtempSync } from 'fs';
 import { execFileSync, spawnSync } from 'child_process';
-import { resolve, dirname, join } from 'path';
+import { resolve, dirname, join, delimiter } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 
@@ -66,12 +66,17 @@ function runHookWithStaged(paths) {
  * Run the real hook with ONE path staged at `content` in a private index (HEAD
  * plus that blob) - the working tree is never touched, so what is on disk and
  * what is staged differ for that path by construction. `guard: false` sets the
- * test-only skip for Step 0b. Returns the combined output and the exit status.
+ * test-only skip for Step 0b; `pathFirst` puts a directory at the front of PATH.
+ * Returns the combined output and the exit status.
  */
-function runHookWithBlob(path, content, { guard = true } = {}) {
+function runHookWithBlob(path, content, { guard = true, pathFirst = null } = {}) {
   const idx = join(mkdtempSync(join(tmpdir(), 'vot-hook-')), 'index');
   const env = { ...process.env, GIT_INDEX_FILE: idx };
   if (!guard) env.VOT_HOOK_TEST_NO_STAGE_GUARD = '1';
+  if (pathFirst) {
+    const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';   // Windows spells it Path
+    env[key] = pathFirst + delimiter + (env[key] || '');
+  }
   try {
     execFileSync('git', ['read-tree', 'HEAD'], { cwd: root, env });
     const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: root, env, input: content, encoding: 'utf8' }).trim();
@@ -209,4 +214,24 @@ describe('pre-commit gate wiring', () => {
     // Still narrow: a web-only change must not cold-start Gradle.
     expect(kotlin.test('app/src/main/assets/index.html')).toBe(false);
   });
+});
+
+/* v12-06 (improvement sweep 2026-09-22): the hook called a bare `python`, and on this
+   machine the first one on PATH is the Hermes agent's venv (3.11), not the Python 3.13 that
+   requirements-dev.txt was measured on. So the data gate and the unittest suites ran on
+   whichever interpreter an unrelated tool had put first. A fake `python` at the front of
+   PATH proves no step reaches it. It needs the py launcher with 3.13, which this Windows
+   machine has; CI's Linux runners have neither, and there `python` is the pinned one. */
+const hasPy313 = spawnSync('py', ['-3.13', '-c', ''], { encoding: 'utf8' }).status === 0;
+describe('pre-commit: Python steps run the pinned 3.13, not the first python on PATH (v12-06)', () => {
+  it.skipIf(!hasPy313)('the data-gate and pin self-tests never reach a python earlier on PATH', () => {
+    const fake = mkdtempSync(join(tmpdir(), 'vot-fakepy-'));
+    writeFileSync(join(fake, 'python'), '#!/bin/sh\necho "FAKE-PYTHON-RAN $*"\nexit 3\n', { mode: 0o755 });
+    const path = 'test_check_balance.py';   // arms Step 1c (the gate's self-test) and the pin check, nothing heavier
+    const onDisk = readFileSync(resolve(root, path), 'utf8');
+    const { out, status } = runHookWithBlob(path, onDisk + '\n', { guard: false, pathFirst: fake });
+    expect(out).toContain('running test_check_balance.py');
+    expect(out).not.toContain('FAKE-PYTHON-RAN');
+    expect(status, out.slice(-800)).toBe(0);
+  }, 120_000);
 });

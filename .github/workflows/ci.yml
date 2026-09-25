@@ -107,11 +107,16 @@ jobs:
           key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       # `npm run build` invokes `python tools/build.py` (which generates
-      # bundle-a.js) — setup-python guarantees a `python` on PATH.
+      # bundle-a.js) — setup-python guarantees a `python` on PATH. 3.13, not
+      # '3.x' (which floated to 3.14): requirements-dev.txt's pins are measured
+      # on 3.13, like the pre-commit hook's `py -3.13` (v12-06). The pip cache
+      # saves re-downloading requirements-dev.txt on every run.
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.x'
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
@@ -245,7 +250,7 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_commit -v
-          python check_balance.py
+          python check_balance.py --strict
 
       - name: Check App() size budget (P11 canary)
         # `npm run check:app-size` fails if app.jsx exceeds its line budget.

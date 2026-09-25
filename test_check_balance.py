@@ -151,5 +151,46 @@ class MainExitCodeTest(unittest.TestCase):
             self._run_main_over('bad', 'var X = { "p": ""bad"" };\n'), 1)
 
 
+class StrictModeTest(unittest.TestCase):
+    """v12-06: without esprima the gate falls back to the weak brace count and only
+    WARNS, so a machine missing it passes files esprima would fail. The hook and CI
+    pass --strict, which turns a missing esprima into a failure."""
+
+    def _run(self, argv, esprima_missing):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'clean.js'), 'w', encoding='utf-8') as fh:
+                fh.write('var X = { "a": "ok" };\n')
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(mock.patch.object(cb, 'DATA_DIR', d + os.sep))
+                stack.enter_context(mock.patch.object(cb, 'DEFAULT_FILES', ['clean']))
+                stack.enter_context(mock.patch.object(sys, 'argv', argv))
+                if esprima_missing:   # a None entry makes `import esprima` raise ImportError
+                    stack.enter_context(mock.patch.dict(sys.modules, {'esprima': None}))
+                stack.enter_context(contextlib.redirect_stdout(out))
+                stack.enter_context(contextlib.redirect_stderr(err))
+                with self.assertRaises(SystemExit) as ctx:
+                    cb.main()
+            return ctx.exception.code, out.getvalue(), err.getvalue()
+
+    def test_strict_fails_when_esprima_is_missing(self):
+        code, _out, err = self._run(['check_balance.py', '--strict'], esprima_missing=True)
+        self.assertEqual(code, 1)
+        self.assertIn('esprima', err)
+
+    def test_without_strict_a_missing_esprima_only_warns(self):
+        code, _out, err = self._run(['check_balance.py'], esprima_missing=True)
+        self.assertEqual(code, 0)
+        self.assertIn('WARNING', err)
+
+    def test_strict_is_a_flag_not_a_file_name(self):
+        if not _esprima_present():
+            self.skipTest('esprima not installed')
+        code, out, _err = self._run(['check_balance.py', '--strict'], esprima_missing=False)
+        self.assertEqual(code, 0)
+        self.assertIn('clean: OK', out)       # the default files were scanned
+        self.assertNotIn('--strict', out)     # and the flag was not read as a data file
+
+
 if __name__ == '__main__':
     unittest.main()
