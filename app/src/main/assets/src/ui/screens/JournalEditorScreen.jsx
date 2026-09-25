@@ -24,6 +24,15 @@ function _clearJournalDraft() {
 function _journalSig(o) {
   return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
 }
+/* v05-05 — the editor flushes on every blur, background, unmount and auto-save tick, and
+   JournalStore.update stamps `updated` to now, which is how the hub dates and orders its
+   cards. So write only when the content differs from what the store holds: opening an
+   old entry and leaving it (Back, switching apps, typing then undoing) keeps its date. */
+function _saveIfChanged(eid, title, blocks, mood) {
+  var stored = JournalStore.get(eid);
+  if (stored && _journalSig({ title: title, blocks: blocks, mood: mood }) === _journalSig(stored)) return;
+  JournalStore.update(eid, { title: title, blocks: blocks, mood: mood });
+}
 
 /* P1-5/P1-7 — the New-Entry flow (use-journal-mutations) no longer records
    stats at creation: the milestone toast fired on the New-Entry tap before a
@@ -236,13 +245,13 @@ export function JournalEditorScreen(props) {
       // entry reference NOW, not after the 1.2s debounce, so a background-kill
       // in the window can't lose the block (and orphan its already-durable blob).
       immediateSaveRef.current = false;
-      JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
+      _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
       setSavedLabel('Saved');
       return;
     }
     var t = setTimeout(function() {
-      JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
+      _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
       setSavedLabel('Saved');
     }, 1200);
@@ -275,7 +284,7 @@ export function JournalEditorScreen(props) {
         if (d && d.entryId === eid) _clearJournalDraft();
         return;
       }
-      JournalStore.update(eid, { title: t, blocks: bs, mood: moodRef.current });
+      _saveIfChanged(eid, t, bs, moodRef.current);
     };
   }, []);
 
@@ -343,7 +352,7 @@ export function JournalEditorScreen(props) {
     // (mount-time) listener whose closure would otherwise be stale.
     var eid = entryIdRef.current;
     if (!eid) return;
-    JournalStore.update(eid, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
+    _saveIfChanged(eid, titleRef.current, blocksRef.current, moodRef.current);
     _maybeRecordNewEntryStats(eid, titleRef.current, blocksRef.current);
     setSavedLabel('Saved');
   }

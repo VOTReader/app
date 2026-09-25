@@ -33,6 +33,7 @@ import { BookmarkStore } from './bookmark-store.js';
 import { LinkStore } from './link-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
+import { mergeListStore } from './store-merge.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -489,5 +490,66 @@ describe('JournalStore — query + scan paths (TEST-5)', () => {
     /** @type {any} */ (JournalStore.get(older.id)).created = 1000;
     /** @type {any} */ (JournalStore.get(newer.id)).created = 2000;
     expect(JournalStore.allByCreated().map((e) => e.title)).toEqual(['newer', 'older']);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────
+   v05-05 — a pin is not an edit. setPinned/togglePin went through
+   update(), which stamps `updated: Date.now()`, and the hub dates and
+   sorts its cards by `updated`: pinning a year-old entry showed today's
+   date on it and moved it to the top. But every save also merges the
+   cache onto the stored copy by `updated` (a tie keeps the stored copy),
+   so a pin that left `updated` alone was dropped by the next save - the
+   real app showed it; an in-memory store cannot. update(..., { keepDate:
+   true }) moves the stamp 1 ms past the entry's own, and the option rides
+   the deferred-hydration queue (the replay re-invokes update with the
+   same arguments).
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore — pinning keeps the entry\'s date (v05-05)', () => {
+  const YEAR_AGO = Date.now() - 365 * 24 * 3600 * 1000;
+  const keptDate = (e) => e.updated > YEAR_AGO && e.updated < YEAR_AGO + 1000;
+
+  it('setPinned and togglePin keep the entry\'s date', () => {
+    const e = JournalStore.add({ title: 'old', created: YEAR_AGO, updated: YEAR_AGO });
+    JournalStore.setPinned(e.id, true);
+    expect(JournalStore.get(e.id).pinned).toBe(true);
+    expect(keptDate(JournalStore.get(e.id))).toBe(true);
+    JournalStore.togglePin(e.id);
+    expect(JournalStore.get(e.id).pinned).toBe(false);
+    expect(keptDate(JournalStore.get(e.id))).toBe(true);
+  });
+
+  it('the pin survives the save-time merge with the stored copy', () => {
+    const e = JournalStore.add({ title: 'old', created: YEAR_AGO, updated: YEAR_AGO });
+    const stored = { list: [JSON.parse(JSON.stringify(JournalStore.get(e.id)))] };   // on disk before the pin
+    JournalStore.setPinned(e.id, true);
+    // What _saveMerged does on the next save: merge the cache (ours) onto the committed copy (theirs).
+    const merged = mergeListStore(stored, { list: [JournalStore.get(e.id)] }, stored);
+    expect(merged.list[0].pinned).toBe(true);
+  });
+
+  it('pinning an old entry does not move it above a newer one', () => {
+    const old = JournalStore.add({ title: 'old', created: YEAR_AGO, updated: YEAR_AGO });
+    JournalStore.add({ title: 'recent' });
+    JournalStore.togglePin(old.id);
+    expect(JournalStore.all().map((e) => e.title)).toEqual(['recent', 'old']);
+  });
+
+  it('an edit still re-dates the entry', () => {
+    const e = JournalStore.add({ title: 'old', created: YEAR_AGO, updated: YEAR_AGO });
+    JournalStore.update(e.id, { title: 'edited' });
+    expect(JournalStore.get(e.id).updated).toBeGreaterThan(YEAR_AGO);
+  });
+
+  it('a pin made while the store is still loading keeps the date after the replay', () => {
+    JournalStore._resetForTests();            // idb-backed, no forceLoaded → 'pending'
+    expect(JournalStore.getState()).toBe('pending');
+    JournalStore.setPinned('j_old', true);    // queued: the entry is still only on disk
+    JournalStore._rebaseAndPromote({ list: [{
+      id: 'j_old', title: 'old', blocks: [], mood: null, tags: [], notebookIds: [], pinned: false,
+      created: YEAR_AGO, updated: YEAR_AGO,
+    }] });
+    expect(JournalStore.get('j_old').pinned).toBe(true);
+    expect(keptDate(JournalStore.get('j_old'))).toBe(true);
   });
 });

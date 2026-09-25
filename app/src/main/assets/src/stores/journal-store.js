@@ -29,10 +29,10 @@
      JournalStore.allByCreated()        → entries sorted by created desc
      JournalStore.get(id)               → entry | null
      JournalStore.add(seed?)            → newly-created entry
-     JournalStore.update(id, patch)     → bumps `updated`, rebuilds index
+     JournalStore.update(id, patch, opts?) → bumps `updated` (1 ms with { keepDate: true }), rebuilds index
      JournalStore.remove(id)            → cascades index + stats
-     JournalStore.setPinned(id, bool)
-     JournalStore.togglePin(id)
+     JournalStore.setPinned(id, bool)   → keeps the entry's date (a pin is not an edit)
+     JournalStore.togglePin(id)         → keeps the entry's date
      JournalStore.toggleNotebook(id, nbId)
      JournalStore.pruneNotebook(nbId)   → called by JournalNotebookStore.remove
      JournalStore.count()
@@ -200,22 +200,33 @@ export var JournalStore = extendStore(
     },
 
     /**
-     * Apply a patch to an entry. `updated` is auto-bumped. When `blocks`
-     * is in the patch, the reverse-link index is rebuilt for this entry.
-     * Returns the updated entry or null when id is unknown.
+     * Apply a patch to an entry. `updated` is auto-bumped to now. When
+     * `blocks` is in the patch, the reverse-link index is rebuilt for this
+     * entry. Returns the updated entry or null when id is unknown.
+     *
+     * `opts.keepDate` (v05-05) is for a change that is not an edit (a pin).
+     * `updated` serves two readers: the hub dates and sorts its cards by
+     * it, and every save merges the cache onto the stored copy by it
+     * (store-merge.js: the newer `updated` wins, a tie goes to the stored
+     * copy). So a pin cannot leave it alone (the next save would drop the
+     * pin) and must not set it to now (a year-old entry would show today's
+     * date at the top of the list): it moves 1 ms past the entry's stamp.
      *
      * @param {string} id
      * @param {Partial<JournalEntry>} patch
+     * @param {{ keepDate?: boolean }} [opts]
      * @returns {JournalEntry | null}
      */
-    update(id, patch) {
+    update(id, patch, opts) {
       if (!id || !patch) return null;
-      if (this._shouldDefer('update', id, patch)) return null;
+      if (this._shouldDefer('update', id, patch, opts)) return null;
       var data = this._load();
       var list = data.list || [];
       var idx = list.findIndex(function(e) { return e.id === id; });
       if (idx < 0) return null;
-      list[idx] = Object.assign({}, list[idx], patch, { updated: Date.now() });
+      var cur = list[idx];
+      var stamp = (opts && opts.keepDate) ? (cur.updated || cur.created || 0) + 1 : Date.now();
+      list[idx] = Object.assign({}, cur, patch, { updated: stamp });
       this._save();
       this._bump();
       if (patch.blocks) this._reindex(list[idx]);
@@ -389,22 +400,23 @@ export var JournalStore = extendStore(
     },
 
     /**
-     * Set the pin flag explicitly.
+     * Set the pin flag explicitly. Keeps the entry's date: a pin is not an
+     * edit (update's keepDate).
      * @param {string} id
      * @param {boolean} pinned
      * @returns {JournalEntry | null}
      */
-    setPinned(id, pinned) { return this.update(id, { pinned: !!pinned }); },
+    setPinned(id, pinned) { return this.update(id, { pinned: !!pinned }, { keepDate: true }); },
 
     /**
-     * Toggle the pin flag.
+     * Toggle the pin flag. Keeps the entry's date (update's keepDate).
      * @param {string} id
      * @returns {JournalEntry | null}
      */
     togglePin(id) {
       var e = this.get(id);
       if (!e) return null;
-      return this.update(id, { pinned: !e.pinned });
+      return this.update(id, { pinned: !e.pinned }, { keepDate: true });
     },
 
     /**

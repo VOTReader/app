@@ -306,6 +306,82 @@ describe('JournalEditorScreen — P1-7: blank entries prune on exit', () => {
   });
 });
 
+/* v05-05 — opening an old entry must not re-date it. The editor flushes on
+   every blur, background (pagehide / visibilitychange:hidden), unmount and
+   auto-save tick, and each flush called JournalStore.update unconditionally,
+   which stamps `updated` to now. The hub dates and sorts its cards by
+   `updated`, so Edit -> Back with no change, or switching apps with the editor
+   open, showed a year-old entry with today's date at the top of the list. */
+describe('JournalEditorScreen — v05-05: leaving an entry unchanged keeps its date', () => {
+  const YEAR_AGO = Date.now() - 365 * 24 * 3600 * 1000;
+  const oldEntry = () => JournalStore.add({
+    title: 'Old thoughts', created: YEAR_AGO, updated: YEAR_AGO,
+    blocks: [JournalHelpers.newBlock('p', { text: 'written last year' })],
+  });
+
+  it('Edit -> Back with no change keeps the old date', () => {
+    const entry = oldEntry();
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id).updated).toBe(YEAR_AGO);
+  });
+
+  it('switching apps with the editor open keeps the old date', () => {
+    const entry = oldEntry();
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(JournalStore.get(entry.id).updated).toBe(YEAR_AGO);
+  });
+
+  it('leaving the title or a paragraph without typing keeps the old date', () => {
+    const entry = oldEntry();
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    fireEvent.blur(document.querySelector('.jrn-editor-title'));
+    fireEvent.blur(document.querySelector('.jrn-block-textarea'));
+    expect(JournalStore.get(entry.id).updated).toBe(YEAR_AGO);
+  });
+
+  it('typing and then undoing it keeps the old date, through the auto-save too', () => {
+    vi.useFakeTimers();
+    try {
+      const entry = oldEntry();
+      const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+      const ta = document.querySelector('.jrn-block-textarea');
+      fireEvent.change(ta, { target: { value: 'written last year!' } });
+      fireEvent.change(ta, { target: { value: 'written last year' } });
+      act(() => { vi.advanceTimersByTime(1500); });   // the 1.2 s auto-save runs
+      unmount();
+      expect(JournalStore.get(entry.id).updated).toBe(YEAR_AGO);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a real edit still saves the words and re-dates the entry', () => {
+    const entry = oldEntry();
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    fireEvent.change(document.querySelector('.jrn-block-textarea'), { target: { value: 'and again today' } });
+    unmount();
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.find((b) => b.type === 'p').text).toBe('and again today');
+    expect(saved.updated).toBeGreaterThan(YEAR_AGO);
+  });
+
+  it('a recovered background draft is still written on Back (its words never reached the store)', () => {
+    const entry = oldEntry();
+    localStorage.setItem('vot-journal-draft', JSON.stringify({
+      entryId: entry.id, title: 'Old thoughts',
+      blocks: [JournalHelpers.newBlock('p', { text: 'the words a kill lost' })], mood: null,
+      ts: Date.now(),
+    }));
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id).blocks.find((b) => b.type === 'p').text).toBe('the words a kill lost');
+  });
+});
+
 describe('JournalEditorScreen — P1-5: milestone/stats wait for the first non-empty save', () => {
   afterEach(() => {
     delete globalThis.JournalStatsStore;
