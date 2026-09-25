@@ -61,12 +61,12 @@ describe('journal marks are keyed by block id, not position', () => {
     try {
       const block = {
         id: 'b_all', type: 'p',
-        text: 'See **this**, _that_, {{ref:John 3:16}}, [[letter:wtlb/the-wide-path]], [[bookmark:bk_1]] and [[journal:j_9]].',
+        text: 'See **this**, _that_, {{ref:John 3:16}}, [[letter:wtlb/the-wide-path]], [[bookmark:bk_1]], [[bookmark:bk_gone]] and [[journal:j_9]].',
       };
       const { container, unmount } = render(<JournalBlockView block={block} callbacks={{}} entryId="j_1" blockIndex={0} />);
       const drawn = container.textContent;
       unmount();
-      expect(drawn).toBe('See this, that, John 3:16, The Wide Path, My place and Morning.');
+      expect(drawn).toBe('See this, that, John 3:16, The Wide Path, My place, bk_gone and Morning.');   // a gone target reads as its data
       expect(blockPlainText(block, inlineLinkLabel)).toBe(drawn);
     } finally {
       saved.forEach(([k, v]) => { if (v === undefined) delete G[k]; else G[k] = v; });

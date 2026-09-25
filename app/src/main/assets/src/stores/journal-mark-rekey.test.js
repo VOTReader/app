@@ -4,7 +4,7 @@
    keys the photo took position 0 and every mark slid one paragraph up; the
    re-key has to put each mark back on the words it was made on. */
 import { describe, it, expect } from 'vitest';
-import { rekeyJournalMarks, pickBlock, blockPlainText, journalBlockKey } from './journal-mark-rekey.js';
+import { rekeyJournalMarks, pickBlock, blockPlainText, journalBlockKey, inlineLinkLabel } from './journal-mark-rekey.js';
 
 // The entry AFTER the photo went in above: the marks were made on [A, B, C] at 0, 1, 2.
 const ENTRY = {
@@ -223,7 +223,7 @@ describe('journal marks: the refutation of the first cut', () => {
     expect(tie.annotations['journal:j_1:b_a']).toEqual([green]);   // a tie: the copy already on its block
   });
 
-  it("F1: a note, bookmark or link the pass changes is stamped one ms past its own stamp, so the stores' merge keeps it", () => {
+  it("F1 + B5: a note, bookmark or link the pass changes is stamped half a ms past its own stamp: the merge keeps it, a later real edit beats it", () => {
     const r = rekeyJournalMarks(ENTRIES, {
       annotations: { 'journal:j_1:1': [ann('n1', 'Grace to you', { kind: 'note' })] },
       notes: {
@@ -233,10 +233,11 @@ describe('journal marks: the refutation of the first cut', () => {
       bookmarks: [{ id: 'k1', hlKey: 'journal:j_1:1', label: 'Grace to you', created: 3, updated: 4 }],
       links: [{ id: 'l1', source: { key: 'journal:j_1:1', text: 'Grace to you' }, target: { key: 'bible:john:3:16' }, created: 9 }],
     });
-    expect(r.notes.n1.updated).toBe(8);
+    // newer than the copy on disk (the merge keeps the move), older than any edit at a later whole ms (Date.now())
+    expect(r.notes.n1.updated).toBe(7.5);
     expect(r.notes.n2.updated).toBe(7);   // untouched
-    expect(r.bookmarks[0].updated).toBe(5);
-    expect(r.links[0].updated).toBe(10);
+    expect(r.bookmarks[0].updated).toBe(4.5);
+    expect(r.links[0].updated).toBe(9.5);
     expect(r.links[0].created).toBe(9);
   });
 
@@ -248,5 +249,47 @@ describe('journal marks: the refutation of the first cut', () => {
     // made on b_0 at 0-5 when b_0 sat at position 1; b_1 (now at 1) holds 'Grace' at 13-18
     const r = rekeyJournalMarks([{ id: 'j_o', blocks }], { annotations: { 'journal:j_o:1': [ann('h1', 'Grace')] } });
     expect(Object.keys(r.annotations)).toEqual(['journal:j_o:b_0']);
+  });
+});
+
+/* The second refutation (Codex, 2026-09-24, lanes/myweb/out/refute-v0501b-repro.mjs): B1-B3 and B6 pinned here, B5 in the
+   F1 case above. B4 and B7 are left alone on purpose (journal-mark-rekey.js header says why). */
+describe('journal marks: the second refutation', () => {
+  it("B1: a whole-entry key is never read as a position, even when the entry's id ends in ':<digits>'", () => {
+    const other = { id: 'j_1:0', blocks: [{ id: 'b_o', type: 'p', text: 'Other words' }] };
+    const r = rekeyJournalMarks([ENTRY, other], {
+      bookmarks: [{ id: 'whole', hlKey: 'journal:j_1:0', label: 'Other entry' }],
+      links: [{ id: 'l', source: { type: 'journal', key: 'journal:j_1:0', label: 'Other entry' }, target: { key: 'bible:john:3:16' } }],
+    });
+    expect(r).toEqual({ moved: 0, left: 0 });
+  });
+
+  it("B2: a block id holding a ':' is an id key under its own entry, not another entry's position", () => {
+    const a = { id: 'j_1', blocks: [{ id: '0:1', type: 'p', text: 'Grace' }] };
+    const b = { id: 'j_1:0', blocks: [{ id: 'x', type: 'p', text: 'Other' }, { id: 'y', type: 'p', text: 'Grace' }] };
+    const r = rekeyJournalMarks([a, b], { annotations: { 'journal:j_1:0:1': [ann('h1', 'Grace')] } });
+    expect(r).toEqual({ moved: 0, left: 0 });
+  });
+
+  it('B3: two different marks that share an id (in different groups) both survive moving into one block', () => {
+    const entry = { id: 'j_s', blocks: [{ id: 'b_a', type: 'p', text: 'Grace Peace' }, { id: 'b_img', type: 'image' }] };
+    const grace = ann('same', 'Grace', { groupId: 'g_grace', kind: 'note' });
+    const peace = ann('same', 'Peace', { groupId: 'g_peace', kind: 'note', start: 6, end: 11 });
+    const r = rekeyJournalMarks([entry], { annotations: { 'journal:j_s:0': [grace], 'journal:j_s:1': [peace] } });
+    expect(r.annotations['journal:j_s:b_a']).toEqual([grace, peace]);
+  });
+
+  it("B6: an inline link whose target is gone reads as its own data, as the view draws it", () => {
+    const G = /** @type {any} */ (globalThis);
+    const had = G.BookmarkStore;
+    G.BookmarkStore = { get: () => null };
+    try {
+      expect(inlineLinkLabel('bookmark', 'deleted')).toBe('deleted');
+      const blocks = [{ id: 'b_link', type: 'p', text: 'Read [[bookmark:deleted]] today' }, { id: 'b_same', type: 'p', text: 'Read deleted today' }];
+      const r = rekeyJournalMarks([{ id: 'j_g', blocks }], { annotations: { 'journal:j_g:0': [ann('h1', 'Read deleted today')] } });
+      expect(Object.keys(r.annotations)).toEqual(['journal:j_g:b_link']);
+    } finally {
+      if (had === undefined) delete G.BookmarkStore; else G.BookmarkStore = had;
+    }
   });
 });

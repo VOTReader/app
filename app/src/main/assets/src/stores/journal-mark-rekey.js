@@ -27,14 +27,24 @@
    marks can be painted there. Otherwise the key stays as it is: listed in the
    Library, painted nowhere, never on the wrong words.
 
-   The refutation of the first cut (Codex, 2026-09-24) shaped the rest: a
-   changed note, bookmark or link is stamped one ms past its own stamp, or
-   the stores' cross-tab merge (store-merge.js: a tie keeps the copy already
-   on disk) put the old key back on save; an empty bucket never replaces
-   one a moved mark went into; an entry id is matched against the entries
-   that exist, so an id holding a ':' is never read as another entry plus a
-   position; a segment found both under its old key and under its block's
-   comes out once, the newer.
+   Two Codex refutations (2026-09-24) shaped the rest: a changed note,
+   bookmark or link is stamped half a millisecond past its own stamp, or the
+   stores' cross-tab merge (store-merge.js: a tie keeps the copy already on
+   disk) put the old key back on save, and a real edit, made at a later whole
+   millisecond, still beats it; an empty bucket never replaces one a moved
+   mark went into; a key is split against the entries that exist, so a
+   whole-entry key or a block id is never read as a position whatever the
+   ids hold; a segment (its id within its group) found both under its old key
+   and under its block's comes out once, the newer.
+
+   Left alone, on purpose: a segment whose WORDS an older tab changed under
+   its old key would move apart from this tab's copy (the app never edits a
+   segment's words or offsets in place: recolorGroup and convertGroup change
+   color and kind only); and an id key of a block whose id is a whole number,
+   once that block is deleted, reads as a position (the app has never made
+   such an id: journal-helpers blockId is b_<time>_<random>, only an import
+   can). Keeping the block-at-the-old-position fallback serves a real reader
+   who edited a marked paragraph's words since.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** journal:<entryId>:<n> - an old POSITION key as the app made it (jrnId never puts a ':' in an id). */
@@ -68,17 +78,18 @@ export function journalBlockKey(entryId, blockId) {
  */
 export function inlineLinkLabel(kind, data) {
   try {
+    // Like the view, a link whose target is gone (or not loaded) reads as its own data.
     if (kind === 'letter') {
       var ctx = typeof findEntryContext === 'function' ? findEntryContext(data.split('/')[1], 'letter') : null;
-      return ctx && ctx.title ? String(ctx.title) : null;
+      return ctx && ctx.title ? String(ctx.title) : data;
     }
     if (kind === 'bookmark') {
       var b = typeof BookmarkStore !== 'undefined' ? BookmarkStore.get(data) : null;
-      return b ? String(b.label || 'Bookmark') : null;
+      return b ? String(b.label || 'Bookmark') : data;
     }
     if (kind === 'journal') {
       var je = typeof JournalStore !== 'undefined' ? JournalStore.get(data) : null;
-      return je && typeof JournalHelpers !== 'undefined' ? String(JournalHelpers.entryDisplayTitle(je) || 'Journal Entry') : null;
+      return je && typeof JournalHelpers !== 'undefined' ? String(JournalHelpers.entryDisplayTitle(je) || 'Journal Entry') : data;
     }
   } catch (_e) { /* not knowable here */ }
   return null;
@@ -109,6 +120,14 @@ export function blockPlainText(block, labelOf) {
 function squash(s) {
   return typeof s === 'string' ? s.replace(/\s+/g, ' ').trim() : '';
 }
+
+/**
+ * How far past its own stamp a record the pass changes is stamped: enough for
+ * the stores' cross-tab merge to keep the change over the untouched copy on
+ * disk (a tie keeps that copy), and short of the next whole millisecond, so a
+ * real edit made later (Date.now() is whole) always wins over the re-key.
+ */
+var STAMP_STEP = 0.5;
 
 /**
  * A record's change stamp, read the way the stores' cross-tab merge reads it
@@ -177,9 +196,12 @@ export function pickBlock(blocks, idx, text, opts) {
 
 /**
  * One copy of each segment in a bucket a moved mark went into: a tab on an
- * older version can edit a segment under its old key after this one moved it,
- * and the merge then keeps both. The newer stays; on a tie the copy that was
- * already on its block. Two copies neither of which moved are left alone.
+ * older version can recolor or convert a segment under its old key after this
+ * one moved it, and the merge then keeps both. A segment is its id within its
+ * group (hlId mints one per segment; a group's segments share the groupId), so
+ * two marks that only share an id are two marks. The newer copy stays; on a
+ * tie the one that was already on its block. Two copies neither of which moved
+ * are left alone.
  * @param {any[]} list @param {Set<any>} moved
  * @returns {any[]}
  */
@@ -187,7 +209,7 @@ function oneEach(list, moved) {
   /** @type {Record<string, number>} */ var at = Object.create(null);
   /** @type {any[]} */ var kept = [];
   list.forEach(function(a) {
-    var sid = a && a.id != null ? String(a.id) : null;
+    var sid = a && a.id != null ? String(a.id) + '\n' + String(a.groupId) : null;
     var i = sid === null ? undefined : at[sid];
     if (i === undefined) {
       if (sid !== null) at[sid] = kept.length;
@@ -250,24 +272,27 @@ export function rekeyJournalMarks(entries, data) {
       var r = RANGE.exec(k);
       if (r) { range = r[0]; k = k.slice(0, r.index); }
     }
-    var rest = k.slice(8), eid = null;
+    var rest = k.slice(8);
+    if (blocksOf[rest]) return null;                      // a whole-entry key, journal:<id>, whatever the id holds
+    // Every way the key splits into an entry that exists and a block part: at the first ':' (every id the app
+    // makes), and after each existing id holding a ':' that begins it (only an import can make those).
+    /** @type {string[]} */ var owners = [];
+    var c = rest.indexOf(':');
+    if (c > 0 && blocksOf[rest.slice(0, c)]) owners.push(rest.slice(0, c));
     for (var i = 0; i < colonIds.length; i++) {
       var cid = colonIds[i];
-      if (rest.length > cid.length + 1 && rest.charAt(cid.length) === ':' && rest.lastIndexOf(cid, 0) === 0
-          && (eid === null || cid.length > eid.length)) eid = cid;
+      if (rest.length > cid.length + 1 && rest.charAt(cid.length) === ':' && rest.lastIndexOf(cid, 0) === 0) owners.push(cid);
     }
-    if (eid === null) {
-      var c = rest.indexOf(':');
-      if (c > 0 && blocksOf[rest.slice(0, c)]) eid = rest.slice(0, c);
+    if (!owners.length) return POSITION_KEY.test(k) ? GONE : null;
+    // Under any split, a block part that is a block's id (a number included) makes it an id key, never a position.
+    for (var o = 0; o < owners.length; o++) {
+      var own = blocksOf[owners[o]], part = rest.slice(owners[o].length + 1);
+      for (var j = 0; j < own.length; j++) if (own[j] && String(own[j].id) === part) return null;
     }
-    if (eid === null) return POSITION_KEY.test(k) ? GONE : null;
+    var eid = owners.reduce(function(a, b) { return b.length > a.length ? b : a; });   // the longest owner
     var tail = rest.slice(eid.length + 1);
     if (!/^\d+$/.test(tail)) return null;                 // a block id already
-    var blocks = blocksOf[eid];
-    for (var j = 0; j < blocks.length; j++) {
-      if (blocks[j] && String(blocks[j].id) === tail) return null;   // a block whose id IS this number: an id key
-    }
-    return { entryId: eid, n: Number(tail), range: range, blocks: blocks };
+    return { entryId: eid, n: Number(tail), range: range, blocks: blocksOf[eid] };
   }
 
   /**
@@ -359,7 +384,7 @@ export function rekeyJournalMarks(entries, data) {
         if (nk) changed = true;
         keep(nk || k);
       });
-      nextNotes[gid] = changed ? Object.assign({}, n, { keys: nextKeys, updated: stamp(n) + 1 }) : n;
+      nextNotes[gid] = changed ? Object.assign({}, n, { keys: nextKeys, updated: stamp(n) + STAMP_STEP }) : n;
       if (changed) notesChanged = true;
     });
     if (notesChanged) out.notes = nextNotes;
@@ -374,7 +399,7 @@ export function rekeyJournalMarks(entries, data) {
       var nk = move(b.hlKey, b.label, r ? wordsAt(Number(r[1]), Number(r[2]), b.label) : null, true);
       if (!nk) return b;
       bkChanged = true;
-      return Object.assign({}, b, { hlKey: nk, updated: stamp(b) + 1 });
+      return Object.assign({}, b, { hlKey: nk, updated: stamp(b) + STAMP_STEP });
     });
     if (bkChanged) out.bookmarks = nextBk;
   }
@@ -394,7 +419,7 @@ export function rekeyJournalMarks(entries, data) {
       var s = end(ln.source), t = end(ln.target);
       if (s === ln.source && t === ln.target) return ln;
       lnChanged = true;
-      return Object.assign({}, ln, { source: s, target: t, updated: stamp(ln) + 1 });
+      return Object.assign({}, ln, { source: s, target: t, updated: stamp(ln) + STAMP_STEP });
     });
     if (lnChanged) out.links = nextLinks;
   }
