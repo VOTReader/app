@@ -39,16 +39,20 @@ a device.
 
 **Search**
 - The direct-hit card writes chapter ranges with an en dash ("Matthew 5–7", `SearchScreen.jsx:279`); CLAUDE.md's Permanent Rule 1 asks for the ASCII hyphen.
-- Snippets for Answers, Words To Live By, The Blessed and Bible Studies show raw formatting marks (`**`, `_`, `=…=`, `{{ref:…}}`), and some carry stray footnote numbers ("…know them. 2 And was I…").
+- *Fixed on this branch.* Snippets for Answers, Words To Live By, The Blessed and Bible Studies showed raw formatting marks (`**`, `_`, `{{ref:…}}`), and some carried stray footnote numbers ("…know them. 2 And was I…"). (The first draft of this list also named `=…=` marks. The corpus has none.)
 - A Letters from Timothy result reads "Letter ?". A group header says "400 matches" while the summary says "400+".
 - Suggestions capitalise every word ("Mark Of The Beast", "Lord'S Prayer"). Badges and group labels still say "WTLB".
 - The Beatitudes quick pick also returns Job 13:12 with "platitudes" marked (a typo correction). "tithe" doesn't match the topic "Tithing" by name. A search started from a selection keeps punctuation inside words ("again,").
 - On a phone the suggestion list can't be dismissed: picking a suggestion brings it straight back. *(traced)*
 
 **Links**
-- The link picker's Browse › The Holy Bible lists books in `books.js` declaration order: Ephesians first, the Gospels after the General Epistles, Genesis 27th. `buildNavTree()` (`utils/nav-index.js`) trusts a comment saying `_allBooks()` "iterates in canonical book order", but `ALL_BOOKS` is `{matthew, ...BOOKS}` and nothing sorts it.
-- Browse shows "?" as Holy Days' badge and "1 chapters".
-- The excerpt picker runs letter segments together ("Lord:It is written,that…"), which can misplace the link icon, and shows raw `{{ref:…}}` tokens in study chapters.
+- *Fixed on this branch.* The link picker's Browse › The Holy Bible listed books in `books.js` declaration order: Ephesians first, the Gospels after the General Epistles, Genesis 27th. `buildNavTree()` (`utils/nav-index.js`) trusts a comment saying `_allBooks()` "iterates in canonical book order", but `ALL_BOOKS` is `{matthew, ...BOOKS}` and nothing sorts it.
+- *Fixed on this branch.* Browse showed "?" as Holy Days' badge and "1 chapters".
+- *Fixed on this branch.* The excerpt picker ran letter segments together ("Lord:It is written,that…") and showed raw `{{ref:…}}` tokens in study chapters. Its offsets were measured in that text rather than the reader's, so the link icon did land off the picked words. The picker now draws the reader's own text.
+
+*Found while fixing the links (2026-09-25), outside the original fifty:*
+- Links into block-shaped Holy Days entries and into Answers topics never paint their chain icon. `navItemToEndpoint` (`utils/nav-index.js`) keys Holy Days targets `wtlb:` and Answers targets `letter:`, the opposite of the hl-keys their readers render (LetterView uses `letter:`, WtlbEntryView uses `wtlb:`). A fix needs a decision on migrating the links already stored.
+- Excerpt links made before the picker fix keep the offsets measured in the picker's old text, so their icons stay where they drifted. Each link stores its quote, so it could be re-anchored.
 
 **Scripture Web**
 - The guide says "Pinch or press + to zoom in", but the on-screen +/− buttons were removed; + works only on a keyboard.
