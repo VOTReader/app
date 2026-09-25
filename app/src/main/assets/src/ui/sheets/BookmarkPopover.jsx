@@ -22,6 +22,17 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
   React.useEffect(function() {
     if (bkmIds && bkmIds.length && bookmarks.length === 0) onClose();
   }, [bkmIds, bookmarks.length, onClose]);
+  // n6-13: a bookmark near the bottom opened its popover off the screen. Once
+  // drawn, it is measured; one that would not fit below the tap opens above it.
+  var _ft = useState(null); var fitTop = _ft[0]; var setFitTop = _ft[1];
+  React.useLayoutEffect(function() {
+    var el = trapRef.current;
+    if (!popoverOpen || !el) return;
+    var h = el.getBoundingClientRect().height;
+    var room = window.innerHeight - 8;
+    var next = Math.max(8, y) + h > room ? Math.max(8, Math.min(y - h - 8, room - h)) : null;
+    if (next !== fitTop) setFitTop(next);
+  }, [popoverOpen, y, bookmarks.length, confirmingId, fitTop, setFitTop, trapRef]);
   if (!popoverOpen) return null;
 
   function doDelete(bkm) {
@@ -32,7 +43,7 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
   }
 
   var popX = Math.max(8, Math.min(x - 80, window.innerWidth - 320));
-  var popY = Math.max(8, y);
+  var popY = fitTop != null ? fitTop : Math.max(8, y);
 
   return (
     <>
