@@ -27,12 +27,28 @@
    (use-lazy-bundles), so the overlay appears without anyone polling.
 
    Leaving — skip(), finish(), dismissPrompt('never') — records
-   TourDoneFlagStore, the one durable byte. dismissPrompt('later') is
-   session-only by design: "Maybe later" means later.
+   TourDoneFlagStore, the one durable byte. dismissPrompt('later') snoozes
+   the Home offer for TOUR_LATER_MS (three days) across launches: it was
+   session-only, and for the PWA a reload IS a launch, so "Maybe later" came
+   back on the next reload (a UX walk of seven journeys, 2026-09-25, ranked
+   it the #3 friction). The snooze is a plain localStorage stamp, like the
+   tabs hint: not precious, and a lost stamp only means the offer returns.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { TOUR_STEPS, TOUR_STOPS_WORD, TOUR_MINUTES_WORD, HIGHLIGHT_GESTURE_WORDS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
+
+/** How long "Maybe later" keeps the Home offer away, across launches. */
+export const TOUR_LATER_MS = 3 * 24 * 60 * 60 * 1000;
+const TOUR_LATER_KEY = 'vot-tour-later-at';
+
+/** True while a "Maybe later" stamp is younger than TOUR_LATER_MS (a stamp from the future does not count). */
+function laterSnoozed(now = Date.now()) {
+  try {
+    const at = Number(localStorage.getItem(TOUR_LATER_KEY));
+    return at > 0 && at <= now && now - at < TOUR_LATER_MS;
+  } catch (_e) { return false; }
+}
 
 const listeners = new Set();
 let version = 0;
@@ -322,16 +338,18 @@ export const TourController = {
   skip() { if (state.active) end(); },
   finish() { if (state.active) end(); },
 
-  /** The Home strip: 'later' hides it for this launch; 'never' records the flag. */
+  /** The Home strip: 'later' snoozes it for TOUR_LATER_MS across launches; 'never' records the flag. */
   dismissPrompt(how) {
     state = { ...state, promptDismissed: true };
     if (how === 'never') { try { TourDoneFlagStore.set(); } catch (_e) { /* bare host */ } }
+    else { try { localStorage.setItem(TOUR_LATER_KEY, String(Date.now())); } catch (_e) { /* storage off: this launch only */ } }
     bump();
   },
 
-  /** Home only, after About, not once the flag is set, not while running, not after Maybe later. */
+  /** Home only, after About, not once the flag is set, not while running, not within three days of Maybe later. */
   shouldPrompt(/** @type {{screen?: string}} */ { screen } = {}) {
     if (screen !== 'home' || state.active || state.promptDismissed) return false;
+    if (laterSnoozed()) return false;
     try {
       if (!AboutSeenFlagStore.is()) return false;
       if (TourDoneFlagStore.is()) return false;

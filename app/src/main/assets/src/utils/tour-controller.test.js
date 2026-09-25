@@ -17,7 +17,7 @@
         with useSyncExternalStore like every other store).
 */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TourController } from './tour-controller.js';
+import { TourController, TOUR_LATER_MS } from './tour-controller.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 const nav = () => ({ goHome: vi.fn(), openLetter: vi.fn(), openBible: vi.fn(), goJournalHub: vi.fn(), openSettingsData: vi.fn() });
@@ -207,13 +207,30 @@ describe('TourController — leaving', () => {
     expect(TourDoneFlagStore.is()).toBe(true);
   });
 
-  it('dismissPrompt("later") is session-only; dismissPrompt("never") is durable', () => {
+  it('dismissPrompt("later") is never the durable flag; dismissPrompt("never") is', () => {
     TourController.dismissPrompt('later');
     expect(TourDoneFlagStore.is()).toBe(false);
     expect(TourController.getState().promptDismissed).toBe(true);
     TourController._resetForTests();
     TourController.dismissPrompt('never');
     expect(TourDoneFlagStore.is()).toBe(true);
+  });
+
+  /* 2026-09-25: "Maybe later" was session-only, and a PWA reload is a new launch, so the offer
+     came straight back (a UX walk ranked it the #3 friction). It now snoozes for three days. */
+  it('"Maybe later" survives a relaunch for three days, then the offer returns', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-09-25T02:00:00Z'));
+      AboutSeenFlagStore.set();
+      TourController.dismissPrompt('later');
+      TourController._resetForTests();                       // the reload: a fresh launch, same storage
+      expect(TourController.shouldPrompt({ screen: 'home' }), 'a reload keeps the snooze').toBe(false);
+      vi.setSystemTime(new Date(Date.now() + TOUR_LATER_MS - 1000));
+      expect(TourController.shouldPrompt({ screen: 'home' })).toBe(false);
+      vi.setSystemTime(new Date(Date.now() + 2000));
+      expect(TourController.shouldPrompt({ screen: 'home' }), 'three days on, it offers again').toBe(true);
+    } finally { vi.useRealTimers(); }
   });
 });
 

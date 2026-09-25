@@ -7,8 +7,8 @@
    lazy bundle-e and is loaded by TourController.start().
 
    Shows only when TourController.shouldPrompt says so: Home, About seen,
-   the durable flag unset, the tour not running, and not after Maybe later
-   this launch. Nothing is dimmed and nothing is trapped: it is a strip, not
+   the durable flag unset, the tour not running, and not within three days
+   of Maybe later (TOUR_LATER_MS). Nothing is dimmed and nothing is trapped: it is a strip, not
    a dialog — a reader who ignores it loses nothing.
    ═══════════════════════════════════════════════════════════════════════ */
 
