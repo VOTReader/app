@@ -58,6 +58,14 @@ updates:
       - dependency-name: esbuild
         update-types: ["version-update:semver-major"]
 
+      # React under test = the vendored React readers run (react.min.js,
+      # react-dom.min.js: 18.2.0). A react/react-dom bump here would test a React
+      # no reader has (n7-03: the minor group took the tests to 19.3 on
+      # 2026-09-24). Moving React is one deliberate change: the vendored files and
+      # these pins together. tools/react-version.test.js holds them equal.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+
       # ── eslint 10: BLOCKED UPSTREAM, not declined (2026-08-11) ──
       # eslint-plugin-react's newest published release (7.37.5, and it IS the
       # latest — the `next` tag points at 7.8.0-rc.0, an OLDER prerelease that

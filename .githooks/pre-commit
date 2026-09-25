@@ -168,6 +168,16 @@ if [ -z "$VOT_HOOK_TEST_NO_STAGE_GUARD" ]; then
   fi
 fi
 
+# ─── Step 0b2: this checkout's node_modules match the lockfile (n7-02) ──
+# Worktrees do not share node_modules. After main moved to vitest 5 the older
+# worktrees kept vitest 4, so their hooks passed what CI failed (92f0b90a).
+# Every commit that runs gates first proves the installed direct dependencies
+# are the ones package-lock.json pins; the fix it names is `npm ci`. (A branch
+# older than the tool skips it: core.hooksPath runs this file for every worktree.)
+if [ -n "$gate_heavy" ] && [ -f tools/check-node-modules.js ]; then
+  node tools/check-node-modules.js || exit 1
+fi
+
 # ─── Step 0c: Scripture Web source vs its S22 measurement (v12-05) ──
 # CI's check:s22 was the first to say the Scripture Web source had moved past
 # its S22 frame-time measurement (2026-09-24: a one-sentence guide edit, with

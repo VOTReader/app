@@ -2,6 +2,8 @@
    ScriptureSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { inertAttr } from '../../utils/inert-attr.js';
+
 export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef != null;
   const rail = useRailMode();   // companion-rail fork — see FootnoteSheet
@@ -16,7 +18,7 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   return ReactDOM.createPortal(
     <>
       {!rail && <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />}
-      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-live={rail ? 'polite' : undefined} aria-atomic={rail ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={activeRef ? `Scripture ${activeRef.cite}` : 'Scripture'}>
+      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-live={rail ? 'polite' : undefined} aria-atomic={rail ? 'true' : undefined} aria-hidden={!isOpen} {...inertAttr(!isOpen)} aria-label={activeRef ? `Scripture ${activeRef.cite}` : 'Scripture'}>
         <SheetHandle onClose={onClose} />
         {activeRef && (
           <>

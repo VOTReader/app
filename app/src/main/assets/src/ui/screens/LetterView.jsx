@@ -2,6 +2,7 @@
    LetterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { inertAttr } from '../../utils/inert-attr.js';
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { answersIdForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
@@ -672,7 +673,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       {ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} aria-hidden="true" onClick={() => setScripRef(null)} />}
-        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scripRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scripRef} inert={!scripRef ? true : undefined} aria-label={scripRef ? `Scripture ${scripRef}` : "Scripture"}>
+        <div className={`fn-sheet${scripRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scripRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scripRef} {...inertAttr(!scripRef)} aria-label={scripRef ? `Scripture ${scripRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScripRef(null)} />
           {scripRef && (
             <>

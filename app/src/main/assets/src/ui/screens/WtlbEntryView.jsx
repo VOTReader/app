@@ -2,6 +2,7 @@
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { inertAttr } from '../../utils/inert-attr.js';
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
 import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
@@ -627,7 +628,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {!inert && ReactDOM.createPortal(
       <>
         {!railMode && <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} aria-hidden="true" onClick={() => setScriptureRef(null)} />}
-        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scriptureRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scriptureRef} inert={!scriptureRef ? true : undefined} aria-label={scriptureRef ? `Scripture ${scriptureRef}` : "Scripture"}>
+        <div className={`fn-sheet${scriptureRef ? " open" : ""}${railMode ? " rail" : ""}`} ref={scripTrapRef} role={railMode ? "complementary" : "dialog"} aria-modal={!railMode && scriptureRef ? "true" : undefined} aria-live={railMode ? "polite" : undefined} aria-atomic={railMode ? "true" : undefined} aria-hidden={!scriptureRef} {...inertAttr(!scriptureRef)} aria-label={scriptureRef ? `Scripture ${scriptureRef}` : "Scripture"}>
           <SheetHandle onClose={() => setScriptureRef(null)} />
           {scriptureRef && (
             <>

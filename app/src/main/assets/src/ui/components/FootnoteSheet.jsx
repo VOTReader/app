@@ -2,6 +2,8 @@
    FootnoteSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { inertAttr } from '../../utils/inert-attr.js';
+
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;
   // Companion rail (2026-08-03): on wide viewports the sheet docks in the
@@ -33,7 +35,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   return ReactDOM.createPortal(
     <>
       {!rail && <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />}
-      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-live={rail ? 'polite' : undefined} aria-atomic={rail ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
+      <div className={`fn-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role={rail ? 'complementary' : 'dialog'} aria-modal={!rail && isOpen ? 'true' : undefined} aria-live={rail ? 'polite' : undefined} aria-atomic={rail ? 'true' : undefined} aria-hidden={!isOpen} {...inertAttr(!isOpen)} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
         <SheetHandle onClose={onClose} />
         {fn && (
           <>
