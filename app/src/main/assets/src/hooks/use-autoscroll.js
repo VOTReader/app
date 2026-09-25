@@ -67,15 +67,25 @@
    the reading zone rather than halting at the bottom edge. Pressing play
    again scrolls on through the footnotes to true bottom.
 
-   AUTO-ADVANCE reuses the pager's own neighbor descriptor, so the
-   boundary policy is inherited rather than reimplemented:
+   AUTO-ADVANCE turns the page wherever a swipe would (Corbin 2026-09-24:
+   auto-scroll carries on into the next book or volume the way a swipe
+   does). It reads the pager's own neighbor descriptor, so the policy is
+   the swipe's rather than a second one:
      peek('next') === null        → dead end, cannot advance
-     desc.kind === 'boundary'     → cross-collection edge, do not auto-cross
-     desc.kind === 'screen'       → advance freely
+     desc.kind === 'screen'       → advance; the same screen reconciles in
+                                    place (the next chapter, the next book,
+                                    the next volume of letters)
+     desc.kind === 'boundary'     → advance too, across an edge into another
+                                    screen (Revelation into Volume One, a
+                                    Holy Days entry of the other format, a
+                                    volume into WTLB or a study); a swipe
+                                    commits these instantly
    The navigation runs through commitReadingNav (the same atomic
    flushSync + annotation-apply contract the swipe commit uses), so the
    new page is painted WITH its highlights before the first frame of
-   resumed motion.
+   resumed motion. Across a boundary the page is another screen with its
+   own controller, so this one hands its run over (`carried`, below): the
+   new screen's controller picks it up where this one's advance left off.
 
    NO skipRestore PLUMBING. After an advance the controller waits out
    body.scroll-restoring and then RESYNCS its accumulator from whatever
@@ -245,7 +255,8 @@ function smoothstep(t) {
  *   autoNext: () => boolean,
  *   endDwellMs: () => number,
  *   canAdvance: () => boolean,
- *   advance: () => void,
+ *   advance: (chain?: number) => void,
+ *   onAdvanced?: () => void,
  *   isRestoring: () => boolean,
  *   isModalOpen: () => boolean,
  *   hasSelection: () => boolean,
@@ -461,7 +472,7 @@ export function createAutoScroll(io) {
     chain += 1;
     setState('advancing');
     try {
-      io.advance();
+      io.advance(chain);
     } catch (e) {
       trace('advance threw: ' + e);
       setState('ended', 'advance-failed');
@@ -486,6 +497,7 @@ export function createAutoScroll(io) {
         if (timedOut) trace('post-advance restore did not settle within ' + SETTLE_MAX_MS + 'ms');
         resetForPage(el);
         beginRunning();
+        try { if (io.onAdvanced) io.onAdvanced(); } catch (_e) { /* bookkeeping only */ }
         return;
       }
       if (!el && timedOut) { setState('ended', 'no-container'); return; }
@@ -574,6 +586,19 @@ export function createAutoScroll(io) {
       if (io.isModalOpen() || io.hasSelection()) { setState('paused', 'blocked'); return; }
       chain = 0;
       beginRunning();
+    },
+    /**
+     * Pick up a run the previous screen's controller was advancing when the
+     * page it turned to is another screen (a boundary: the next book, volume
+     * or study). Waits out that screen's scroll restore like any advance, and
+     * keeps the run's chain count so the runaway cap still holds.
+     * @param {number} n - the advances already chained
+     */
+    resumeAdvance(n) {
+      if (destroyed || state === 'running' || state === 'advancing') return;
+      chain = n > 0 ? n : 0;
+      setState('advancing');
+      waitForSettle();
     },
     /** Deliberate stop — this one decelerates. */
     stop() {
@@ -676,6 +701,22 @@ export function createAutoScroll(io) {
 }
 
 /**
+ * A run handed across a boundary: the controller that advanced sets it just
+ * before the page turns, and the controller mounting on the new screen picks
+ * it up. Only for CARRY_MS, so a stale hand-over never starts motion on a page
+ * the reader opened by hand later.
+ * @type {{ at: number, chain: number } | null}
+ */
+let carried = null;
+const CARRY_MS = 3000;
+
+/** The pager's next neighbor, or null (no pager, a dead end, a peek that throws). @param {any} p */
+function peekNext(p) {
+  if (!p || typeof p.peek !== 'function') return null;
+  try { return p.peek('next') || null; } catch (_e) { return null; }
+}
+
+/**
  * React wrapper. Owns the listeners and the browser-side I/O; the
  * controller owns every decision.
  *
@@ -719,24 +760,25 @@ export function useAutoScroll(scrollRef, opts) {
       getSpeedLpm: () => optsRef.current.speedLpm,
       autoNext: () => !!optsRef.current.autoNext,
       endDwellMs: () => optsRef.current.endDwellMs,
-      canAdvance: () => {
-        const p = optsRef.current.pager;
-        if (!p || typeof p.peek !== 'function') return false;
-        let desc = null;
-        try { desc = p.peek('next'); } catch (_e) { return false; }
-        // A boundary card is a cross-collection edge (end of a book, of a
-        // volume, of a study) — stop there rather than silently crossing.
-        return !!(desc && desc.kind === 'screen');
-      },
-      advance: () => {
+      // Wherever a swipe turns the page, so does auto-scroll: any next
+      // neighbor, a boundary card included (see AUTO-ADVANCE in the header).
+      canAdvance: () => !!peekNext(optsRef.current.pager),
+      advance: (chain) => {
         const p = optsRef.current.pager;
         if (!p || !p.onNext) return;
         selfNavRef.current = true;
+        // A boundary's page is another screen: this controller unmounts with
+        // this one, so the run is handed to the controller that mounts there.
+        const desc = peekNext(p);
+        carried = desc && desc.kind === 'boundary' ? { at: Date.now(), chain: chain || 0 } : null;
         // Same atomic contract as the swipe commit: the new DOM plus its
         // annotation layers land in ONE task, so motion never resumes over
         // an unmarked page that then reflows as note icons inject.
         commitReadingNav(() => p.onNext());
       },
+      // This controller outlived its advance (the page reconciled in place):
+      // nothing is waiting to be picked up on another screen.
+      onAdvanced: () => { carried = null; },
       isRestoring: () => typeof document !== 'undefined'
         && !!document.body && document.body.classList.contains('scroll-restoring'),
       isModalOpen: () => {
@@ -778,6 +820,14 @@ export function useAutoScroll(scrollRef, opts) {
       },
     });
     ctrlRef.current = ctrl;
+
+    // The screen before advanced across a boundary into this one: carry on.
+    const hand = carried;
+    carried = null;
+    if (hand && Date.now() - hand.at < CARRY_MS) {
+      selfNavRef.current = true;   // the first placeKey pass below is that advance, not the reader's own nav
+      ctrl.resumeAdvance(hand.chain);
+    }
 
     const onDown = () => ctrl.pointerDown();
     const onUp = () => ctrl.pointerUp();

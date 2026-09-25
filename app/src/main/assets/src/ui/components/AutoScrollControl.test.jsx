@@ -8,7 +8,7 @@
    stand down. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { AutoScrollControl, AutoScrollContext, measureWordsPerLine } from './AutoScrollControl.jsx';
 
@@ -293,6 +293,63 @@ describe('dwell control during the countdown', () => {
     expect(cfg.onDwellChange).toHaveBeenCalledWith(3000);
     fireEvent.click(screen.getByLabelText('Shorter pause before the next page'));
     expect(cfg.onDwellChange).toHaveBeenCalledWith(2000);
+  });
+});
+
+/* as1 (Corbin 2026-09-24, improvement sweep v01-06): auto-scroll carries on into the next book or volume the way a
+   swipe does. A swipe commits a boundary card (use-pager-gesture: instantCommit), so auto-next turns it too, and
+   when the page it turns to is another screen the run goes on there. */
+describe('auto-next across a book or volume edge', () => {
+  const BOUNDARY = { kind: 'boundary', eyebrow: 'Next Book', title: 'Volume One' };
+
+  it('counts down to the next page at a boundary card, as a swipe would turn it', async () => {
+    const pager = { peek: () => BOUNDARY, onNext: vi.fn(), onPrev: vi.fn() };
+    mount(makeCfg({ autoNext: true, endDwellMs: 2500 }), { pager });
+    fireEvent.click(screen.getByLabelText('Start auto-scroll'));
+    await waitFor(() => expect(screen.getByLabelText('Cancel auto-advance')).toBeTruthy());
+  });
+
+  it('turns into the next screen and keeps reading there', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'requestAnimationFrame', 'cancelAnimationFrame'] });
+    try {
+      const cfg = makeCfg({ autoNext: true, endDwellMs: 0 });
+      const refA = { current: document.createElement('div') };
+      const refB = { current: document.createElement('div') };
+      document.body.append(refA.current, refB.current);
+      // Revelation 22's page is empty, so it ends on its first frame; Volume One's is a long letter, so a run
+      // that carried on is still running when the test looks.
+      Object.defineProperty(refB.current, 'scrollHeight', { configurable: true, value: 5000 });
+      Object.defineProperty(refB.current, 'clientHeight', { configurable: true, value: 800 });
+      const nextB = vi.fn();
+      // Two different screen components, as Revelation 22 and Volume One are: turning the page unmounts the one
+      // and mounts the other, each with its own control and controller.
+      function Revelation({ turn }) {
+        const pager = React.useMemo(() => ({ peek: () => BOUNDARY, onNext: turn, onPrev: () => {} }), [turn]);
+        return <section><AutoScrollControl scrollRef={refA} pager={pager} placeKey="bible:revelation:22" /></section>;
+      }
+      function VolumeOne() {
+        const pager = React.useMemo(() => ({ peek: () => null, onNext: nextB, onPrev: () => {} }), []);
+        return <article><AutoScrollControl scrollRef={refB} pager={pager} placeKey="letter:vol1:1" /></article>;
+      }
+      function App() {
+        const [page, setPage] = React.useState('rev');
+        const turn = React.useCallback(() => setPage('vol1'), []);
+        return (
+          <AutoScrollContext.Provider value={cfg}>
+            {page === 'rev' ? <Revelation turn={turn} /> : <VolumeOne />}
+          </AutoScrollContext.Provider>
+        );
+      }
+      render(<App />);
+      fireEvent.click(screen.getByLabelText('Start auto-scroll'));
+      // the empty page ends on its first frame; the minimum time on a page (4 s) runs out; the page turns
+      await act(async () => { vi.advanceTimersByTime(4200); });
+      await act(async () => { vi.advanceTimersByTime(100); });
+      expect(screen.getByLabelText('Pause auto-scroll')).toBeTruthy();   // Volume One's own control, running
+      expect(document.body.classList.contains('autoscroll-running')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

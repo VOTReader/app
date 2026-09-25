@@ -2189,7 +2189,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 />
                 <SettingsRow
                   label="Auto-Continue"
-                  desc="When auto-scroll reaches the end of the text, count down and move to the next chapter or letter on its own. It stops at the end of a book, a volume, or a study rather than crossing into a different collection — and it stops after a long unattended run."
+                  desc="When auto-scroll reaches the end of the text, count down and turn to the next page on its own, the way a swipe does: on into the next chapter, letter, book, volume or study. It stops at the very end, and after a long unattended run."
                   checked={!!settings.autoScrollNext}
                   onToggle={() => onToggle("autoScrollNext")}
                 />
