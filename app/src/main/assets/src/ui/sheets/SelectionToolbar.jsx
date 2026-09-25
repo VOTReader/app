@@ -8,6 +8,8 @@ import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 import { listenFromTarget, startListenFrom } from '../../utils/listen-from.js';
+// The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
+import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 
 /** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
     bookmark decoration chrome (marker digit or icon glyph), not reading text.
@@ -19,7 +21,7 @@ import { listenFromTarget, startListenFrom } from '../../utils/listen-from.js';
 function isAnnotationChrome(n, container) {
   var el = n.parentElement;
   while (el && el !== container) {
-    if (el.matches && el.matches('.fn-ref, .hl-note-icon, .verse-link-icon, .inline-bookmark-icon, .inline-link-icon')) return true;
+    if (el.matches && el.matches(ANNOTATION_CHROME)) return true;
     el = el.parentElement;
   }
   return false;

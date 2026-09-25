@@ -32,6 +32,7 @@
    CROSS-cluster dep here is still a bare global by design; this one is
    internal to the renderer, so it stays a real import. */
 import { resolveAnchor } from './anchor-resolve.js';
+import { chromeAwareView, viewIndexOf } from './anchor-view.js';
 
 /* Snap an annotation's range to whole WORDS — so a highlight/underline/note never
    lands mid-word, and never swallows the trailing comma/colon/period the drag
@@ -663,10 +664,25 @@ export function applyDOMHighlights() {
     // clamped on the React path but used raw here, so the two paths diverged (and
     // the imperative path could leave a stray/empty mark). `container.textContent`
     // is the clean text now (marks were just unwrapped + normalized above).
+    //
+    // v05-02: then re-anchor, as the React path does (resolveAnchor), so text
+    // edited in front of a mark (a journal entry, a corpus correction) does not
+    // slide it onto other words. The stored text was recorded in hlDisplayText's
+    // form, so it is searched for in the same form of this container
+    // (anchor-view.js: footnote digits and icons left out, a line break between
+    // blocks) and mapped back to textContent offsets. Unlike the React path, a
+    // mark whose text is nowhere keeps its clamped offsets: dropping it here
+    // would hide the reader's mark on the very page they edited.
     var fullLen = container.textContent.length;
+    var view = null;
     sorted = sorted.map(function(a) {
       var s = Math.max(0, Math.min(a.start, fullLen));
       var e = Math.max(0, Math.min(a.end, fullLen));
+      if (typeof a.text === 'string' && a.text) {
+        if (!view) view = chromeAwareView(container);
+        var r = resolveAnchor(view.text, { start: viewIndexOf(view.at, s), end: viewIndexOf(view.at, e), text: a.text });
+        if (r && r.end > r.start) { s = view.at[r.start]; e = view.at[r.end - 1] + 1; }
+      }
       return s < e ? Object.assign({}, a, { start: s, end: e }) : null;
     }).filter(Boolean);
     if (!sorted.length) { container.setAttribute('data-hl-sig', sig); return; }
