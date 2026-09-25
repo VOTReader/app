@@ -23,6 +23,9 @@
  * @returns {TextQuery}
  */
 export function parseTextQuery(q) {
+  // Curly double quotes are quotes: a phone keyboard types “love one another”,
+  // and a phrase in them used to be read as loose words (v07-02).
+  q = String(q).replace(/[\u201C\u201D\u201E\u201F]/g, '"');
   const phraseMatch = q.match(/^"([^"]+)"$/);
   if (phraseMatch) {
     const ph = phraseMatch[1].trim();

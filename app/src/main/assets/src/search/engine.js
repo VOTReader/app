@@ -63,6 +63,17 @@ const NAV_TEXT_LIMIT = 5;
    one verse each that outrank a common word on BM25. searchCorrected() below. */
 const FUZZY = 0.2;
 
+/** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
+function hasTokenRun(toks, run) {
+  if (!run.length) return true;
+  for (let i = 0; i + run.length <= toks.length; i++) {
+    let j = 0;
+    while (j < run.length && toks[i + j] === run[j]) j++;
+    if (j === run.length) return true;
+  }
+  return false;
+}
+
 /**
  * The typo fallback for one literal unit that found nothing as typed.
  *
@@ -343,9 +354,15 @@ async function search(query, options) {
   // Post-ranking filters + dedup + cap.
   const out = [];
   const seen = Object.create(null);
-  const phraseLower = p.phrase ? p.phrase.toLowerCase() : null;
+  // A quoted phrase and +/- words match WORDS, on the index's own tokens
+  // (kjvEncode folds case, accents and both apostrophes, and splits on every
+  // punctuation mark). The raw substring test this replaces missed "shepherd; I"
+  // and the curly "Lord’s", and read "heart" as containing "art" (v07-02).
+  const phraseToks = p.phrase ? kjvEncode(p.phrase) : null;
   const hasMust = !!(p.must && p.must.length);
   const hasMustNot = !!(p.mustNot && p.mustNot.length);
+  const mustToks = hasMust ? p.must.map((t) => kjvEncode(t)) : [];
+  const mustNotToks = hasMustNot ? p.mustNot.map((t) => kjvEncode(t)).filter((run) => run.length) : [];
   const scope = options.scope || null;
   const scopeBookId = scope && scope.bookId ? scope.bookId : null;
   const scopeVolumeId = scope && scope.volumeId ? scope.volumeId : null;
@@ -358,20 +375,11 @@ async function search(query, options) {
     if (corpusFilter && doc.corpus !== corpusFilter) continue;
     if (scopeBookId && doc.bookId !== scopeBookId) continue;
     if (scopeVolumeId && doc.volumeId !== scopeVolumeId) continue;
-    let combined = null;
-    if (phraseLower || hasMust || hasMustNot) {
-      combined = ((doc.text || '') + ' ' + (doc.title || '') + ' ' + (doc.heading || '') + ' ' + (doc.ref || '')).toLowerCase();
-    }
-    if (phraseLower && combined.indexOf(phraseLower) < 0) continue;
-    if (hasMust) {
-      let ok = true;
-      for (let mi = 0; mi < p.must.length; mi++) if (combined.indexOf(p.must[mi]) < 0) { ok = false; break; }
-      if (!ok) continue;
-    }
-    if (hasMustNot) {
-      let ok = true;
-      for (let mn = 0; mn < p.mustNot.length; mn++) if (combined.indexOf(p.mustNot[mn]) >= 0) { ok = false; break; }
-      if (!ok) continue;
+    if (phraseToks || hasMust || hasMustNot) {
+      const toks = kjvEncode((doc.text || '') + ' ' + (doc.title || '') + ' ' + (doc.heading || '') + ' ' + (doc.ref || ''));
+      if (phraseToks && !hasTokenRun(toks, phraseToks)) continue;
+      if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) continue;
+      if (mustNotToks.some((run) => hasTokenRun(toks, run))) continue;
     }
     const dedupKey = doc.kind + '|' + (doc.ref || '') + '|' + (doc.text || '').slice(0, 60);
     if (seen[dedupKey]) continue;
