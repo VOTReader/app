@@ -84,8 +84,8 @@ describe('bundle-h carries the Listening Library, and bundle-d no longer does', 
     expect(d.includes('song-choice-'), 'bundle-d.js lost SongParts').toBe(true);
     expect(h.includes('song-choice-'), 'bundle-h.js ships its own SongParts').toBe(false);
     // A bundle-h that stayed small is the cheap proof of all of the above. The player alone is far over this;
-    // 66,300 tracks check-bundle-budget's ceiling (66,200 since the seventh screen, Songs of the Letters, 2026-09-25).
-    expect(h.length < 66300, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
+    // 76,600 tracks check-bundle-budget's ceiling (76,500 since the Songs screen's song page and read-with-music frames, 2026-09-25).
+    expect(h.length < 76600, `bundle-h.js is ${h.length} B — something big came along`).toBe(true);
   });
 
   it('the loader, the routes, the precache and the build all know the bundle', () => {

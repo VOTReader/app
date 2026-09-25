@@ -220,7 +220,7 @@ export const AUDIO_READERS = Object.freeze({
   B: 'Read by Benjamin',
   T: 'Read by Timothy',
   V: 'Text-to-speech',
-  M: 'AI reading with music',
+  M: 'Read with music',
 });
 
 /**

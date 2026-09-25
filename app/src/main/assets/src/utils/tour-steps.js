@@ -165,6 +165,17 @@ const STOPS = [
     tip: 'Tap a thread to read both ends.',
     primary: 'Next',
   },
+  /* SONGS OF THE LETTERS GET A STOP (ai-music L8, 2026-09-25): the Home card, after the listening stops. It sits
+     after the Scripture Web stop, not straight after Listen, so the tour does not go Home and back to the letter
+     for the highlight stop: it is the second of the Home stops that follow the letter stops. Rings the card; the words are the design's (README §3.10). */
+  {
+    id: 'songs', screen: 'home', enter: 'goHome',
+    target: { selector: '.home-nav-item', text: 'Songs of the Letters' }, act: null,
+    label: 'Songs of the Letters',
+    title: 'Songs from the letters',
+    text: 'Songs made by the flock from the letters. Tap to listen.',
+    primary: 'Next',
+  },
   {
     id: 'journal', screen: 'journal-home', enter: 'goJournalHub',
     target: { selector: '.jrn-fab-newentry' }, act: null,

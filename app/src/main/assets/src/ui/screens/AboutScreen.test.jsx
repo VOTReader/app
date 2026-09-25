@@ -88,3 +88,18 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
     expect(page2()).toMatch(/Listening Library/);
   });
 });
+
+describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
+  it('credits the songs and names the consented makers the catalog publishes, most songs first', async () => {
+    const Songs = await import('../../utils/song-catalog.js');
+    const { songMakers } = await import('./AboutScreen.jsx');
+    Songs._resetSongCatalogForTests();
+    /** @type {any} */ (globalThis).SongCatalog = Songs.SongCatalog;
+    expect(songMakers()).toEqual([]);                      // before the catalog: no names, never a guess
+    const song = (id, cr, hid = false) => ({ id, t: 'S', f: 'f' + id, v: '', st: [], dl: 'sung', lang: 'en', src: { k: 'none' }, d: 1, b: 1, sh: 1, cr, lyr: 0, rd: null, fs: '', hid, dup: null });
+    Songs.adoptSongCatalog({ schema: 1, songs: [song('aaaaaaaaaaa1', 'Sky of Sapphire'), song('aaaaaaaaaaa2', 'hmarie777'), song('aaaaaaaaaaa3', 'hmarie777'), song('aaaaaaaaaaa4', 'Hidden One', true), song('aaaaaaaaaaa5', null)], families: [] });
+    expect(songMakers()).toEqual(['hmarie777', 'Sky of Sapphire']);
+    Songs._resetSongCatalogForTests();
+    delete /** @type {any} */ (globalThis).SongCatalog;
+  });
+});

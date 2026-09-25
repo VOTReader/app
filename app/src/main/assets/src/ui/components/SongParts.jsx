@@ -13,7 +13,7 @@
    plays, tokens only.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { songThumbUrl, songById, familyById, SONGS_HOST } from '../../utils/song-catalog.js';
+import { songThumbUrl, songById, familyById, SONGS_HOST, SongCatalog } from '../../utils/song-catalog.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -266,4 +266,51 @@ export function lyricLineAt(lines, time) {
   const next = lines[at + 1];
   const end = Math.max(lines[at].e, next ? Math.min(next.s, lines[at].e + 2) : lines[at].e + 2);
   return time < end ? at : -1;
+}
+
+/* ── finding a song (the hub's Find box and Search's shortcut row) ─────── */
+
+/** @type {{ key: string, map: Map<string, string> } | null} */
+let _hay = null;
+
+/**
+ * Everything a search looks through, per family: its title, each version's
+ * label and maker, the letter it came from and that letter's collection.
+ * Rebuilt only when the catalog or the (lazy) letters change.
+ * @returns {Map<string, string>}
+ */
+function songHaystacks() {
+  const corpus = /** @type {any} */ (globalThis).__votCorpus;
+  const key = SongCatalog.getVersion() + ':' + (corpus && typeof corpus.getVersion === 'function' ? corpus.getVersion() : 0);
+  if (_hay && _hay.key === key) return _hay.map;
+  const reg = /** @type {any} */ (globalThis).COL_BY_KEY;
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (const fam of SongCatalog.families()) {
+    const parts = [fam.t];
+    for (const s of SongCatalog.versionsOf(fam)) parts.push(s.t, s.v, s.cr || '');
+    const letter = songLetterOf(fam);
+    if (letter) parts.push(letter.title, letter.colLabel);
+    const col = fam.col && reg && typeof reg.get === 'function' ? reg.get(fam.col) : null;
+    if (col && col.label) parts.push(col.label);
+    map.set(fam.id, parts.join(' ').toLocaleLowerCase());
+  }
+  _hay = { key, map };
+  return map;
+}
+
+/**
+ * The song families a query finds (every word must appear somewhere in the
+ * song's words: its title, a version, a maker, its letter), optionally within
+ * one style. An in-memory filter over the loaded catalog; no index, nothing
+ * fetched. [] before the catalog is in.
+ * @param {unknown} query @param {string} [style] @returns {any[]}
+ */
+export function findSongFamilies(query, style) {
+  if (!SongCatalog.loaded) return [];
+  const words = String(query || '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const list = SongCatalog.familiesFor(style ? { style } : {});
+  if (!words.length) return list;
+  const hay = songHaystacks();
+  return list.filter((fam) => { const h = hay.get(fam.id) || ''; return words.every((w) => h.indexOf(w) >= 0); });
 }

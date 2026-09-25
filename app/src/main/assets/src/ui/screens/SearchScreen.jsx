@@ -86,7 +86,18 @@ export function useImeHideBlur(inputRef) {
   }, []);
 }
 
-export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
+export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null }) {
+  // Songs of the Letters (L8): ONE shortcut row at the top when the LOADED song catalog matches the query — a
+  // pure in-memory filter (findSongFamilies, bundle-d). Songs never join the MiniSearch index, so a daily catalog
+  // change never forces the index rebuild; a catalog not yet loaded shows nothing and is not fetched from here.
+  const songCatalog = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (songCatalog ? songCatalog.subscribe(cb) : () => {}), [songCatalog]),
+    React.useCallback(() => (songCatalog ? songCatalog.getVersion() : 0), [songCatalog])
+  );
+  const songQuery = (query || '').trim();
+  // Re-read on every render (the catalog's version re-renders this screen): findSongFamilies caches its words.
+  const songsFound = songQuery.length >= 2 && typeof findSongFamilies === 'function' ? findSongFamilies(songQuery).length : 0;
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
@@ -522,6 +533,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             </div>
           </div>
         )}
+
+        {songsFound > 0 && typeof onOpenSongs === 'function' ? (
+          <button type="button" className="srch-songs-row" onClick={() => onOpenSongs(songQuery)}>
+            <span aria-hidden="true">♪</span>
+            <span className="srch-songs-row-text">{songsFound.toLocaleString('en-US')} {songsFound === 1 ? 'song matches' : 'songs match'} “{songQuery}”</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        ) : null}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 615 distinct identifiers.
+// Total: 616 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ACHIEVEMENT_STORE_NAMES: any;
@@ -439,6 +439,7 @@ declare const fetchServerBuildVersion: any;
 declare const findBook: any;
 declare const findEntryContext: any;
 declare const findNoteIconInsertionPoint: any;
+declare const findSongFamilies: any;
 declare const firstVerseOfRef: any;
 declare const formatBDomText: any;
 declare const formatBOffsetMap: any;

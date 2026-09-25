@@ -1713,6 +1713,16 @@
       .song-page-more { width: 100%; margin-top: .75rem; font-size: var(--fs-18); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .song-page-lyrics p { margin: 0; color: var(--cream); font-size: var(--fs-18); font-style: italic; line-height: 1.5; }
       .song-version-main:focus-visible, .song-page-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */
+      .reading-list { display: grid; gap: .6rem; }
+      .reading-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem .95rem; border: 1px solid var(--gold-border); border-radius: 10px; }
+      .reading-row.is-current { border-color: var(--gold); }
+      .reading-row .songs-row-main { gap: .6rem; }
+      .reading-row .songs-row-copy small { white-space: normal; }
+      .reading-along { position: relative; flex: none; min-height: 34px; padding: 0 .7rem; border: 1px solid var(--gold); border-radius: 8px; background: transparent; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-11); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+      .reading-along::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px); }
+      .reading-along:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      @media (max-width: 380px) { .reading-row .songs-row-len { display: none; } }
 
       /* Milestones — the full achievements ledger. Same restrained shelf
          language as the Listening Library screens; earned rows carry the ✦. */
@@ -3596,6 +3606,10 @@
     .srch-suggest-hint { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; color:var(--gold-dim); flex-shrink:0; }
 
     .srch-top-results { border-bottom:2px solid var(--gold-border); padding-bottom:0.3rem; margin-bottom:0.2rem; }
+    /* Songs of the Letters (L8): the one shortcut row above the results when the loaded song catalog matches. */
+    .srch-songs-row { display:flex; align-items:center; gap:.6rem; width:100%; min-height:48px; padding:.55rem 1rem; border:0; border-bottom:1px solid var(--gold-border); background:var(--bg2); color:var(--gold); font:inherit; font-size:var(--fs-15); text-align:left; cursor:pointer; }
+    .srch-songs-row-text { flex:1; min-width:0; color:var(--cream); }
+    .srch-songs-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
     .srch-results-summary { padding:0.55rem 1rem; font-family:var(--font-body); font-size:var(--fs-12); color:var(--gold); background:var(--bg2); border-bottom:1px solid var(--gold-border); font-style:italic; }
     .srch-results-summary strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
     .srch-groups { display:block; }

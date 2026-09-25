@@ -147,7 +147,10 @@ const BUDGETS = [
   // shelves, the list screen). The catalog store, the song pieces (cover, round play,
   // choice sheet) and the route helpers stay in bundle-d beside the player that the bar
   // and desk share. 57,506 x 1.15 = 66,132 -> the hundred above.
-  { file: 'bundle-h.js', measured: 57506, max: 66200 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
+  // 2026-09-25 (ai-music, songs-U2..U4): +8,934 B over U1 — the song page (U2) and the Letters read with music
+  // screen (U4), both frames of the same Songs screen. The desk's song mode, the bar's song skin, the lyrics loader
+  // and the song finder landed in bundle-d beside the player, not here. 66,440 x 1.15 = 76,406 -> the hundred above.
+  { file: 'bundle-h.js', measured: 66440, max: 76500 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

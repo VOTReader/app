@@ -522,3 +522,57 @@ describe('SearchScreen — the index waits for the Bible Studies (v09-perf-01)',
     expect(init).toHaveBeenCalled();
   });
 });
+
+/* Songs of the Letters (L8): ONE shortcut row at the top when the LOADED catalog matches the query — an
+   in-memory filter, never a MiniSearch document (the index is not rebuilt, the catalog not fetched). */
+describe('SearchScreen — the songs shortcut row', () => {
+  const noop = () => {};
+  let Songs;
+  let Parts;
+  beforeEach(async () => {
+    Songs = await import('../../utils/song-catalog.js');
+    Parts = await import('../components/SongParts.jsx');
+    const { SONG_FIXTURE } = await import('../../utils/song-catalog.fixture.js');
+    Songs._resetSongCatalogForTests();
+    Songs.adoptSongCatalog(SONG_FIXTURE);
+    /** @type {any} */ (globalThis).ScreenLayout = ({ children }) => <div>{children}</div>;
+    /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+    /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
+    /** @type {any} */ (globalThis).SongCatalog = Songs.SongCatalog;
+    /** @type {any} */ (globalThis).findSongFamilies = Parts.findSongFamilies;
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).getRecentSearches = () => [];
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: false }), init: vi.fn(() => new Promise(() => {})), suggest: () => [], fuzzyBookSuggest: () => null,
+      search: vi.fn(() => Promise.resolve({ parsed: null, results: [], parsedTerms: [] })),
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    Songs._resetSongCatalogForTests();
+    for (const k of ['SongCatalog', 'findSongFamilies']) delete /** @type {any} */ (globalThis)[k];
+    delete /** @type {any} */ (window).VotSearchMini;
+  });
+  const renderAt = (query, onOpenSongs) => render(<SearchScreen query={query} onQueryChange={noop} settings={{}} onSettingsChange={noop}
+    onSelect={noop} onBack={noop} searchScope={null} searchContext={null} onToggleScope={noop} onCommand={noop} onOpenSongs={onOpenSongs} />);
+
+  it('"love awaits" shows the row, which opens the Songs hub with the filter filled', () => {
+    const onOpenSongs = vi.fn();
+    renderAt('love awaits', onOpenSongs);
+    const row = screen.getByRole('button', { name: /1 song matches “love awaits”/ });
+    fireEvent.click(row);
+    expect(onOpenSongs).toHaveBeenCalledWith('love awaits');
+  });
+
+  it('no match, a one-letter query, or no catalog loaded: no row', () => {
+    renderAt('zzzz', vi.fn());
+    expect(screen.queryByText(/songs? match/)).toBeNull();
+    cleanup();
+    renderAt('l', vi.fn());
+    expect(screen.queryByText(/songs? match/)).toBeNull();
+    cleanup();
+    Songs._resetSongCatalogForTests();
+    renderAt('love awaits', vi.fn());
+    expect(screen.queryByText(/songs? match/)).toBeNull();
+  });
+});

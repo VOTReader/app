@@ -215,7 +215,7 @@ describe('audio-track — display registries the listening UI renders from', () 
   it('names every reader code and refuses anything else', () => {
     expect(Object.keys(AUDIO_READERS)).toEqual(['B', 'T', 'V', 'M']);
     expect(audioReaderLabel('B')).toBe('Read by Benjamin');
-    expect(audioReaderLabel('M')).toBe('AI reading with music');
+    expect(audioReaderLabel('M')).toBe('Read with music');
     expect(audioReaderLabel('Z')).toBe(null);
     expect(audioReaderLabel('')).toBe(null);
     expect(audioReaderLabel(undefined)).toBe(null);

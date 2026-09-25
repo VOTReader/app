@@ -141,7 +141,7 @@ describe('audio-player — trackUrl + readerLabel', () => {
     expect(AudioPlayer.readerLabel('B')).toBe('Read by Benjamin');
     expect(AudioPlayer.readerLabel('T')).toBe('Read by Timothy');
     expect(AudioPlayer.readerLabel('V')).toBe('Text-to-speech');
-    expect(AudioPlayer.readerLabel('M')).toBe('AI reading with music');
+    expect(AudioPlayer.readerLabel('M')).toBe('Read with music');
     expect(AudioPlayer.readerLabel('Z')).toBe(null);
     expect(AudioPlayer.readerLabel(undefined)).toBe(null);
   });

@@ -103,7 +103,7 @@ import { SongCatalog } from '../utils/song-catalog.js';
 import {
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
-  loadSongLyrics, useSongLyrics, lyricLineAt,
+  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
 } from './components/SongParts.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 /* The Listening Library screens went lazy (bundle-h, landing 24) while all of
@@ -278,7 +278,7 @@ Object.assign(window, {
   AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
-  loadSongLyrics, useSongLyrics, lyricLineAt,
+  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
   // …and the shelf parts + audio tables bundle-h reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,

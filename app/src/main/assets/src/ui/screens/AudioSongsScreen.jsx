@@ -18,6 +18,7 @@
 */
 
 import { SongPage } from './SongPage.jsx';
+import { ReadWithMusic, readingLetters } from './ReadWithMusic.jsx';
 
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
@@ -108,26 +109,6 @@ function songLine(song) {
 }
 
 /**
- * Everything the Find box looks through, per family: its title, each
- * version's label and maker, the letter it came from, its collection.
- * @returns {Map<string, string>}
- */
-function buildHaystacks() {
-  const cat = catalog();
-  /** @type {Map<string, string>} */
-  const out = new Map();
-  for (const fam of cat.families()) {
-    const parts = [fam.t];
-    for (const s of cat.versionsOf(fam)) parts.push(s.t, s.v, s.cr || '');
-    const letter = songLetterOf(fam);
-    if (letter) parts.push(letter.title, letter.colLabel);
-    if (fam.col) parts.push(colLabel(fam.col));
-    out.set(fam.id, parts.join(' ').toLocaleLowerCase());
-  }
-  return out;
-}
-
-/**
  * What a list frame shows: its words, and either families or single songs.
  * @param {string} v @param {any} library
  * @returns {{ eyebrow: string, title: string, families: any[] | null, songs: any[] | null, empty: string }}
@@ -168,7 +149,7 @@ export function listContent(v, library) {
 /** The title a frame shows, for the back pill of the frame above it. @param {any} frame @param {any} library */
 export function songsFrameTitle(frame, library) {
   if (!frame || frame.k === 'hub') return 'Songs of the Letters';
-  if (frame.k === 'readings') return 'Read with music';
+  if (frame.k === 'readings') return 'Letters read with music';
   const cat = catalog();
   if (frame.k === 'song') { const fam = cat && cat.loaded ? cat.familyById(frame.v) : null; return (fam && fam.t) || 'Song'; }
   return cat && cat.loaded ? listContent(frame.v, library).title : 'Songs';
@@ -260,7 +241,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   // The letters' titles (the Find box and "From the letter") ride the lazy VOT corpus.
-  const corpusVersion = React.useSyncExternalStore(
+  React.useSyncExternalStore(
     React.useCallback((cb) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}, []),
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
   );
@@ -288,12 +269,14 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
         {[0, 1, 2, 3, 4].map((i) => <div key={i} className="songs-skeleton-row"><span /><span><i /><i /></span></div>)}
       </div>
     );
+  } else if (top.k === 'readings') {
+    body = <ReadWithMusic state={state} />;
   } else if (top.k === 'song') {
     body = <SongPage familyId={top.v} library={library} playingId={playingId} active={active} onPush={onPush} FamilyRow={FamilyRow} />;
   } else if (top.k === 'list') {
     body = <SongsList frame={top} library={library} playingId={playingId} active={active} onPush={onPush} />;
   } else {
-    body = <SongsHub frame={top} library={library} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} corpusVersion={corpusVersion} />;
+    body = <SongsHub frame={top} library={library} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} />;
   }
 
   return (
@@ -314,9 +297,9 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
 
 /**
  * The hub: Shuffle all, Find, style chips, then either the results or the shelves.
- * @param {{ frame: any, library: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void, corpusVersion: number }} props
+ * @param {{ frame: any, library: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void }} props
  */
-function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, corpusVersion }) {
+function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const cat = catalog();
   const version = cat.getVersion();
   const [query, setQuery] = React.useState(frame.q || '');
@@ -334,20 +317,15 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
-  const haystacks = React.useMemo(buildHaystacks, [version, corpusVersion]);
   const primary = PRIMARY_STYLES.filter((k) => styles[k]);
   const more = Object.keys(styles).filter((k) => primary.indexOf(k) < 0 && styleCounts[k] > 0)
     .sort((a, b) => styleCounts[b] - styleCounts[a]);
 
-  const q = query.trim().toLocaleLowerCase();
-  const words = q ? q.split(/\s+/) : [];
+  const words = query.trim() ? query.trim().split(/\s+/) : [];
   const filtering = !!(words.length || style);
-  const results = filtering
-    ? cat.familiesFor(style ? { style } : {}).filter((fam) => {
-      const hay = haystacks.get(fam.id) || '';
-      return words.every((w) => hay.indexOf(w) >= 0);
-    })
-    : [];
+  // A letter's title joins the words once the letters land: the screen re-renders on the corpus, and
+  // findSongFamilies rebuilds its cache by the corpus version.
+  const results = filtering ? findSongFamilies(query, style) : [];
   const leadOf = (fam) => (style ? cat.versionsOf(fam).find((s) => s.st.indexOf(style) >= 0 || s.dl === style || (style === 'spanish' && s.lang === 'es')) : null) || cat.featuredOf(fam);
 
   const shuffleCount = style ? styleCounts[style] || 0 : 0;
@@ -368,6 +346,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
   };
 
   const newest = newestSongs(NEW_TOTAL);
+  const readings = readingLetters();
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
   const recentCount = library ? songsOfIds(library.songRecent()).length : 0;
   // The biggest collections first (ties keep reading order); the rest one tap away.
@@ -482,6 +461,13 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, cor
                 </button>
               );
             })}
+            {readings.length ? (
+              <button type="button" className="songs-shelf" onClick={() => open({ k: 'readings' })}>
+                <span className="songs-shelf-title">Letters read with music</span>
+                <span className="songs-shelf-count">{songCountLabel(readings.length, 'letter', 'letters')}</span>
+                <ChevronRightIcon />
+              </button>
+            ) : null}
           </section>
         </>
       )}

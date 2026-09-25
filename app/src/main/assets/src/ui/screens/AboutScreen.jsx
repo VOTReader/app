@@ -8,6 +8,16 @@
    look caught it.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/** The credited song makers in the loaded catalog, most songs first; [] before it loads. @returns {string[]} */
+export function songMakers() {
+  const cat = typeof SongCatalog !== 'undefined' && SongCatalog.loaded ? SongCatalog : null;
+  if (!cat) return [];
+  /** @type {Map<string, number>} */
+  const count = new Map();
+  for (const s of cat.songs()) if (s.cr && !s.hid) count.set(s.cr, (count.get(s.cr) || 0) + 1);
+  return Array.from(count.keys()).sort((a, b) => count.get(b) - count.get(a));
+}
+
 export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   const [page, setPage] = React.useState(1);
 
@@ -52,6 +62,12 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                     Cross-reference data from{" "}
                     <a href="https://www.openbible.info/labs/cross-references/" target="_blank" rel="noopener noreferrer"><em>OpenBible.info</em></a>
                     , used under CC-BY.
+                  </p>
+                  {/* Songs of the Letters (L8): the credit the songs owe. The makers are the consented credits the
+                      catalog itself publishes (never an email), most songs first; none are named before it loads. */}
+                  <p className="about-credit about-songs-credit">
+                    AI Songs of the Letters: songs made by members of the flock with Suno (suno.com), from the words of The Volumes of Truth. Shared freely, never sold.
+                    {songMakers().length ? ' With songs by ' + songMakers().join(', ') + ', and others of the flock.' : null}
                   </p>
                 </div>
               </>

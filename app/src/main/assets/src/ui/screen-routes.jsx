@@ -746,6 +746,7 @@ export function buildScreenRoutes({
         searchScope={searchScope}
         searchContext={searchContext}
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
+        onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
       />
     ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
     'home': () => (

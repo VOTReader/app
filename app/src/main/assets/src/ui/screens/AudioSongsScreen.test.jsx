@@ -12,6 +12,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
     getState: () => playerState,
     toggle: vi.fn(),
     playSongs: vi.fn(() => true),
+    playLetter: vi.fn(),
   };
   return { player, setPlayerState: (next) => { playerState = next; } };
 });
@@ -63,6 +64,7 @@ beforeEach(() => {
   setPlayerState({ queue: [], qi: 0, status: 'idle', time: 0, duration: 0 });
   player.toggle.mockClear();
   player.playSongs.mockClear();
+  player.playLetter.mockClear();
   installGlobals();
 });
 
@@ -139,7 +141,7 @@ describe('AudioSongsScreen -- the hub', () => {
     fireEvent.click(tile);
     expect(props.onReplaceTop).toHaveBeenCalledWith({ k: 'hub' });
     expect(props.onPush).toHaveBeenCalledWith({ k: 'list', v: 'col:wtlb1' });
-    expect([...document.querySelectorAll('.songs-shelf')].map((b) => b.textContent)).toEqual(['Inspired by the letters1 song', 'Bible songs'].slice(0, 1));
+    expect([...document.querySelectorAll('.songs-shelf')].map((b) => b.textContent)).toEqual(['Inspired by the letters1 song', 'Letters read with music1 letter']);
     // fam-d's only song has no shard: nothing to hear, so no shelf that opens onto it.
     expect(screen.queryByRole('button', { name: /Flock originals and prayers/ })).toBeNull();
   });
@@ -228,6 +230,36 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
     expect(screen.getByText('Inspired by the letters')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /From the letter/ })).toBeNull();
     expect(screen.getByText('Made with Suno · by members of the flock')).toBeTruthy();
+  });
+});
+
+describe('AudioSongsScreen -- letters read with music (final-06)', () => {
+  beforeEach(() => {
+    globalThis.AUDIO_ALTERNATES = { 'wtlb1:come-love-awaits-you': [['M', [['x']]]], 'one:the-letter': [['T', [['y']]]] };
+    window.__openAudioText = vi.fn();
+  });
+  afterEach(() => { delete globalThis.AUDIO_ALTERNATES; delete window.__openAudioText; });
+
+  it('lists the catalog readings and the reader-M letters in reading order; play is the READING in reader M', () => {
+    renderScreen([{ k: 'hub' }, { k: 'readings' }]);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Letters read with music');
+    const rows = [...document.querySelectorAll('.reading-row')];
+    expect(rows.map((r) => r.querySelector('strong').textContent)).toEqual(['Come, Love Awaits You (the letter)', 'Blessed Are Those Who Worship Me']);
+    expect(rows[1].textContent).toContain('3:16');                                   // the catalog's length
+    fireEvent.click(within(rows[0]).getByRole('button', { name: /Play Come, Love Awaits You \(the letter\), read with music/ }));
+    expect(player.playLetter).toHaveBeenCalledWith({ volKey: 'wtlb1', letter: { id: 'come-love-awaits-you', title: 'Come, Love Awaits You (the letter)' }, collectionLabel: 'Words to Live By, Part One', reader: 'M' });
+    fireEvent.click(within(rows[1]).getByRole('button', { name: /Read along with/ }));
+    expect(player.playLetter).toHaveBeenCalledTimes(2);
+    expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'blessed:blessed-are-those-who-worship-me', title: 'Blessed Are Those Who Worship Me' });
+    expect(player.playSongs).not.toHaveBeenCalled();                                   // a reading, never a song
+  });
+
+  it('the hub shelf counts the letters and opens the list', () => {
+    const { props } = renderScreen();
+    const shelf = [...document.querySelectorAll('.songs-shelf')].find((b) => b.textContent.includes('Letters read with music'));
+    expect(shelf.textContent).toContain('2 letters');
+    fireEvent.click(shelf);
+    expect(props.onPush).toHaveBeenCalledWith({ k: 'readings' });
   });
 });
 
