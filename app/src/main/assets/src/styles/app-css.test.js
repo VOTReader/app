@@ -578,3 +578,37 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
     expect(ruleBlock(CSS, '.more-menu-seg button, .more-menu-step button {')).toMatch(/min-width:\s*44px;\s*min-height:\s*40px/);
   });
 });
+
+/* The label pass (the redesign, 2026-09-25): the most visible letter-spaced capital labels sit at
+   the 12 px step or more, with their tracking capped at 0.18em. */
+describe('app.css — labels in spaced capitals are 12 px or more', () => {
+  const LABELS = [
+    '.hni-eyebrow', '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
+    '.volumes-landing .genre-col-label', '.library-eyebrow', '.library-tile-eyebrow', '.audio-library-eyebrow',
+    '.audio-library-section-head span', '.milestones-eyebrow', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
+    '.prg-stat-label', '.footnote-list-header', '.related-card-title', '.settings-section-label',
+    '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
+    '.section-heading', '.compact-list-header',
+  ];
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocksOf = (sel) => {
+    const out = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    let m;
+    while ((m = re.exec(bare))) if (m[1].trim().split(/\s+/).join(' ') === sel) out.push(m[2]);
+    return out;
+  };
+  it.each(LABELS)('%s', (sel) => {
+    const blocks = blocksOf(sel);
+    expect(blocks.length, 'rule present').toBeGreaterThan(0);
+    for (const b of blocks) {
+      const fs = /font-size:\s*var\(--fs-(\d+)\)/.exec(b);
+      if (fs) expect(Number(fs[1])).toBeGreaterThanOrEqual(12);
+      const ls = /letter-spacing:\s*([\d.]+)em/.exec(b);
+      if (ls) expect(Number(ls[1])).toBeLessThanOrEqual(0.18);
+    }
+  });
+  it('the letter hero eyebrow never drops under 12 px on a phone', () => {
+    expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*clamp\(var\(--fs-12\),/);
+  });
+});

@@ -454,7 +454,12 @@
            misorder in a diff.
 
            --fs-10 is the FLOOR: nothing in the app renders type below 10px
-           at scale 1. That floor is the point of the exercise (the owner's
+           at scale 1. LABELS IN SPACED CAPITALS sit at --fs-12 or more (the
+           redesign's label pass, 2026-09-25): at 10 px with 0.22-0.30em of
+           tracking the eyebrows over Home's cards, the index headers, the
+           sheet headers, Footnotes and Related Topics were the hardest type
+           in the app to read; their tracking is capped at 0.18em so they
+           grow in height, barely in width (app-css.test.js pins the set). That floor is the point of the exercise (the owner's
            audience is older readers) and it is the one snap that moved a
            lot of type UP.
 
@@ -1042,7 +1047,7 @@
       }
       .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
       .vol-index-eyebrow {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.28em;
+        font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing:0.18em;
         text-transform: uppercase; color: var(--gold); opacity: 0.8; margin-bottom: 0.5rem;
       }
       .vol-index-title {
@@ -1488,7 +1493,7 @@
       .audio-library-screen { width:100%; max-width:860px; margin:0 auto; padding:1.4rem min(1.45rem,5vw) 3rem; background:var(--bg); }
       .audio-library-hero { position:relative; padding:.55rem 0 1.35rem; overflow:hidden; }
       .audio-library-hero::after { content:""; position:absolute; width:20rem; height:20rem; right:-11rem; top:-13rem; border:1px solid rgba(200,164,86,.16); border-radius:50%; box-shadow:0 0 0 1.2rem rgba(200,164,86,.025),0 0 0 3.1rem rgba(200,164,86,.018); pointer-events:none; }
-      .audio-library-eyebrow { position:relative; z-index:1; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.22em; text-transform:uppercase; }
+      .audio-library-eyebrow { position:relative; z-index:1; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; }
       .audio-library-screen h1 { position:relative; z-index:1; margin:.27rem 0 0; color:var(--cream); font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4.6vw,var(--fs-30)); font-weight:400; line-height:1.16; }
       .audio-library-intro { position:relative; z-index:1; margin:.58rem 0 0; max-width:38rem; color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; line-height:1.55; }
       .audio-library-hero .audio-library-primary-action { position:relative; z-index:1; margin-top:.9rem; }
@@ -1571,7 +1576,7 @@
       .audio-library-saved-row { margin-top:1.15rem; }
       .audio-library-section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:.75rem; padding:0 .1rem .63rem; }
       .audio-library-section-head > div { display:flex; flex-direction:column; gap:.1rem; min-width:0; }
-      .audio-library-section-head span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.18em; text-transform:uppercase; }
+      .audio-library-section-head span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
       .audio-library-section-head h2 { margin:.12rem 0 0; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:400; }
       .audio-library-section-head p { margin:.18rem 0 0; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; line-height:1.35; }
       .audio-library-section-head > strong, .audio-library-section-tail > strong { min-width:34px; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:500; text-align:right; }
@@ -1730,7 +1735,7 @@
       /* Milestones — the full achievements ledger. Same restrained shelf
          language as the Listening Library screens; earned rows carry the ✦. */
       .milestones-screen { width: 100%; max-width: 720px; margin: 0 auto; padding: 1.65rem min(1.35rem, 5vw) 2.5rem; }
-      .milestones-eyebrow { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.22em; text-transform: uppercase; }
+      .milestones-eyebrow { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform: uppercase; }
       .milestones-screen > h1 { margin: 0.28rem 0 0; color: var(--cream); font-family: 'Cinzel Decorative', serif; font-size: var(--fs-24); font-weight: 400; line-height: 1.2; }
       .milestones-intro { max-width: 39rem; margin: 0.6rem 0 1.35rem; color: var(--cream-dim); font-size: var(--fs-13); font-style: italic; line-height: 1.55; }
       .milestones-summary { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem; border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); background: rgba(200, 164, 86, 0.045); }
@@ -1889,8 +1894,8 @@
         font-family: 'Cinzel', serif;
         /* Fluid: the ENDS are scale tokens, the vw term between them is the
            point (see the type-scale block's documented clamp exception). */
-        font-size: clamp(var(--fs-10), 2.3vw, var(--fs-12));
-        letter-spacing: 0.3em; text-transform: uppercase;
+        font-size: clamp(var(--fs-12), 2.3vw, var(--fs-13));   /* was 10-12: every phone got the 10 px floor */
+        letter-spacing: 0.2em; text-transform: uppercase;
         color: var(--gold); opacity: 0.85; margin-bottom: 0.85rem;
         overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
       }
@@ -2760,7 +2765,7 @@
       transition:color 0.18s ease;
     }
     @media (hover: hover) { .wtlb-cite:hover, .wtlb-cite:active { color:var(--gold-bright); } }
-    .footnote-list-header { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
+    .footnote-list-header { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
     /* The body beside the number may shrink below its longest line and wraps:
        a verse quote ran 570 px wide in a 360 px phone at Text Size 3. */
     .footnote-list-item > :not(.footnote-list-num) { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
@@ -2803,7 +2808,7 @@
     .letter-songs-all svg { width:18px; height:18px; }
     .letter-songs-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem min(1.4rem, 6vw); }
-    .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
+    .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
     .related-link { display:block; min-height:44px; box-sizing:border-box; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.6rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
     @media (hover: hover) { .related-link:hover { color:var(--gold-bright); border-bottom-color:var(--gold-dim); } }
     /* External-link affordance: every target="_blank" anchor (audio/video
@@ -2829,7 +2834,7 @@
     .volumes-landing .home-ornament { margin-bottom:0.8rem; }
     .volumes-landing .genre-columns { gap:0.5rem; }
     .volumes-landing .genre-tile { padding:0.55rem 0.85rem; }
-    .volumes-landing .genre-col-label { margin-bottom:0.3rem; font-size:var(--fs-10); }
+    .volumes-landing .genre-col-label { margin-bottom:0.3rem; font-size:var(--fs-12); }
     .volumes-landing .genre-col { gap:0.35rem; }
     .volumes-landing .genre-col-stretch .genre-tile { flex:1; display:flex; flex-direction:column; justify-content:center; }
     .volumes-landing .genre-full-width { padding:0.7rem 0.85rem !important; }
@@ -2843,7 +2848,7 @@
     .scriptures-landing .genre-tile-title { font-size:var(--fs-16); }
     .scriptures-landing .genre-tile-sub { font-size:var(--fs-13); }
     .scriptures-landing .genre-col { gap:0.55rem; }
-    .scriptures-landing .genre-col-label { margin-bottom:0.4rem; font-size:var(--fs-10); }
+    .scriptures-landing .genre-col-label { margin-bottom:0.4rem; font-size:var(--fs-12); }
     .scriptures-landing .genre-col-stretch .genre-tile { flex:1; display:flex; flex-direction:column; justify-content:center; }
     .scriptures-landing .genre-full-width { background:rgba(200,164,86,0.03); border-color:var(--gold-border); box-shadow:0 0 12px rgba(200,164,86,0.04); }
     .scriptures-landing .genre-full-width .genre-tile-title { font-size:var(--fs-18); }
@@ -3043,8 +3048,8 @@
     .hni-eyebrow {
       display: block;
       font-family: 'Cinzel', serif;
-      font-size: var(--fs-10);
-      letter-spacing: 0.25em;
+      font-size:var(--fs-12);
+      letter-spacing:0.18em;
       text-transform: uppercase;
       color: var(--gold-dim);
       margin-bottom: 0.2rem;
@@ -3082,7 +3087,7 @@
        grid can never show three columns on a wide phone and never clips the second column
        under overflow:hidden at a large size (a11y-ux-6, measured at 1.8 and 2.0). */
     .genre-columns { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(6.5rem, calc(50% - 0.5rem))), 1fr)); gap:0.75rem; width:100%; max-width:32.5rem; }
-    .genre-col-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
+    .genre-col-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
     .genre-tile { background:var(--bg2); border:1px solid var(--gold-border); border-radius:8px; padding:0.9rem 1rem; cursor:pointer; text-align:left; transition:all var(--transition); }
     @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .genre-tile.locked { opacity:0.38; pointer-events:none; }
@@ -3210,7 +3215,7 @@
     .settings-find button { min-height:44px; padding:0.5rem 0.75rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font:inherit; cursor:pointer; }
     .settings-find p { margin:0.5rem 0 0; color:var(--cream-muted); }
     .settings-section { width:100%; margin-bottom:0.75rem; }
-    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
+    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
     /* ── Accordion groups ───────────────────────────────────────────────────
        The header is a folio index row: a quiet hairline, one icon, a title,
@@ -3397,7 +3402,7 @@
     .select-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
     @keyframes selectSheetSlideUp { to { transform:translateY(0); } }
     /* (.select-sheet-handle RETIRED — see the SheetHandle block by .fn-sheet.) */
-    .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
+    .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
     .select-sheet-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
     .select-sheet-ornament { display:flex; align-items:center; justify-content:center; gap:0.6rem; margin:0.55rem 0 1.1rem; }
     .select-sheet-ornament-line { height:1px; width:56px; background:linear-gradient(to right, transparent, var(--gold-dim)); }
@@ -3429,7 +3434,7 @@
     /* ── COMPACT LIST LAYOUT ── */
     .compact-list { width:100%; max-width:32.5rem; }
     .compact-list-group { margin-bottom:1rem; }
-    .compact-list-header { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 0; border-bottom:1px solid var(--gold-border); margin-bottom:0.35rem; }
+    .compact-list-header { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 0; border-bottom:1px solid var(--gold-border); margin-bottom:0.35rem; }
     .compact-list-item { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.8rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; text-align:left; margin-bottom:0.3rem; position:relative; }
     .compact-list-item:active { background:var(--gold-faint); }
     .compact-list-title { font-family:'Cinzel',serif; font-size:var(--fs-13); color:var(--gold); flex:1; letter-spacing:0.03em; }
@@ -3550,7 +3555,7 @@
        real height after its first paint, so the placeholder estimate only affects
        the very first scroll past it (minimal jank). chrome108 floor supports it. */
     .section-block { margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 500px; }
-    .section-heading { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
+    .section-heading { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
     /* Poetic books (Psalms, Proverbs, etc.) render each verse on its own line */
     .verses-block.is-poetry .verse { display:block; margin-bottom:0.5rem; text-indent:0; padding-left:1.8rem; position:relative; }
     .verses-block.is-poetry .verse .verse-num { position:absolute; left:0; top:0.15rem; }
@@ -3618,7 +3623,7 @@
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
     .srch-group-count-inline { color:var(--gold-bright); font-weight:600; letter-spacing:0.1em; }
-    .srch-group-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; background:var(--bg2); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
+    .srch-group-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; background:var(--bg2); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
     .srch-group-header:active { background:var(--gold-faint); }
     .srch-group-count { color:var(--gold-dim); font-size:var(--fs-10); }
     .srch-group-items { display:block; }
@@ -3674,7 +3679,7 @@
     .srch-clear-btn { background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:var(--fs-20); padding:0 0.35rem; font-family:'Cinzel',serif; flex-shrink:0; }
     .srch-clear-btn:active { color:var(--gold); }
 
-    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
@@ -3730,7 +3735,7 @@
     .chapter-card-info { flex:1; min-width:0; }
     /* Long study/letter names must not eat the card (owner report 2026-08-09):
        the eyebrow label ellipsizes on one line, the title clamps at two. */
-    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:var(--fs-14); }
     /* Coverage badge (hub order 2026-09-22) — one word per work: can it be
@@ -3971,7 +3976,7 @@
     .tabs-overview { max-width:55rem; margin:0 auto; padding:calc(1.5rem + var(--inset-top, 0px)) 1rem calc(5rem + var(--inset-bottom, 0px)); }
     .tabs-overview-header { text-align:center; margin-bottom:1.8rem; padding:0 0.5rem; }
     .tabs-overview-eyebrow {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em;
+      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em;
       text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.4rem;
     }
     .tabs-overview-title {
@@ -5554,8 +5559,8 @@
       width: 100%;
     }
     .library-eyebrow {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.30em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing:0.18em; text-transform: uppercase;
       color: var(--gold-dim); text-align: center;
       margin-bottom: 0.4rem;
     }
@@ -5610,8 +5615,8 @@
     .library-tile-icon svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     .library-tile.placeholder .library-tile-icon { color: var(--cream-muted); }
     .library-tile-eyebrow {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.22em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing:0.1em; text-transform: uppercase;
       color: var(--gold-dim);
     }
     .library-tile.placeholder .library-tile-eyebrow { color: var(--cream-muted); }
@@ -5711,8 +5716,8 @@
       color: var(--gold);
     }
     .prg-stat-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.22em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      letter-spacing:0.18em; text-transform: uppercase;
       color: var(--gold-dim);
       margin-top: 0.1rem;
     }
@@ -8010,7 +8015,7 @@
 .answers-hit-card { display:flex; flex-direction:column; gap:0.5rem; width:100%; margin-bottom:0.6rem; padding:0.8rem 1rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
 .answers-hit-head { display:flex; align-items:center; gap:0.75rem; }
 .answers-hit-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
-.answers-hit-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold-dim); }
+.answers-hit-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
 .answers-hit-title { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.04em; color:var(--gold); }
 .answers-hit-snippet { font-size:var(--fs-16); line-height:1.5; color:var(--cream-dim); }
 .answers-hit-mark { background:transparent; color:var(--gold-bright); font-weight:600; }
