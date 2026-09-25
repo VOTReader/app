@@ -1383,10 +1383,10 @@
       .offline-row-bar > span { display:block; height:100%; background:var(--gold); transition:width .3s ease; }
       .audio-collection-item.is-unavailable .audio-library-row-play { opacity:.45; }
       .audio-collection-item.is-unavailable .audio-library-row-copy strong { color:var(--cream-dim); }
-      /* A compilation in the phone app: its chip, and beside it the rows' line (item 8 follow-up). The chip rules above
-         reach only the chip (the first child), never the line's own Download / Cancel / Retry buttons. */
-      .audio-collection-chips.has-offline { flex-direction:column; align-items:flex-start; gap:.4rem; }
-      .audio-collection-compilation { display:flex; flex-wrap:wrap; align-items:center; gap:.15rem .75rem; }
+      /* A compilation in the phone app: its chip, and beside it the rows' line (item 8 follow-up). Chips in one column, lines
+         in the next. The chip rules (with .audio-collection-chips, below) reach only the chip (the first child), never the line's own Download / Cancel / Retry buttons. */
+      .audio-collection-chips.has-offline { display:grid; grid-template-columns:max-content minmax(0,1fr); align-items:center; gap:.4rem .75rem; }
+      .audio-collection-compilation { display:contents; }
       .audio-collection-compilation > .offline-row { margin:0; }
       .audio-collection-compilation.is-unavailable > button:first-child { opacity:.45; }
       .audio-library-hero-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .6rem; margin-top:.9rem; }
