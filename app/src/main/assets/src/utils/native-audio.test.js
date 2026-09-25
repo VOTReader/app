@@ -47,12 +47,12 @@ afterEach(() => {
 });
 
 describe('native-audio - which engine', () => {
-  it('is native only in an APK whose bridge carries the player, and only when chosen (until m3 step e)', () => {
+  it('is native in an APK whose bridge carries the player, unless the way back (html) is chosen', () => {
     expect(nativeAudioAvailable()).toBe(true);
     localStorage.setItem('vot.audioEngine', 'html');
     expect(nativeAudioAvailable()).toBe(false);
     localStorage.removeItem('vot.audioEngine');
-    expect(nativeAudioAvailable()).toBe(false);
+    expect(nativeAudioAvailable()).toBe(true);
     localStorage.setItem('vot.audioEngine', 'native');
     window.AndroidBridge = { setAudioActive() {} };   // an older shell
     expect(nativeAudioAvailable()).toBe(false);

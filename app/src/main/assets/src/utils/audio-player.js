@@ -727,6 +727,7 @@ function _ensureEl() {
   el.addEventListener('timeupdate', () => {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
+    if (_state.sleepEndsAt && Date.now() >= _state.sleepEndsAt) { _sleepTimerFire(); return; }   // an overdue timeout
     _syncSleepVolume();       // the sleep fade (a no-op unless a sleep mode is in its last stretch)
     _followSectionLetter();   // a compilation: name the letter, credit the one heard (cheap: ~30 keys)
     // timeupdate fires ~4x/second. Only re-render subscribers when the
@@ -799,8 +800,15 @@ function _nativeUpcoming() {
   if (!cur) return [];
   let t = null;
   if (_repeatMode() === 'one') t = cur;
-  else if (_state.qi + 1 < _state.queue.length) t = _state.queue[_state.qi + 1];
-  else if (_repeatMode() === 'all') t = _state.queue[0];
+  else if (_state.qi + 1 < _state.queue.length) {
+    // Offline, _start passes over what is not on the phone to the next recording that is; one with a downloaded
+    // reading to put in its place is the page's to substitute, so native stops there and the page takes over.
+    for (let j = _state.qi + 1; j < _state.queue.length && !t; j++) {
+      const q = _state.queue[j];
+      if (!_unreachable(q)) t = q;
+      else if (_downloadedReading(q)) return [];
+    }
+  } else if (_repeatMode() === 'all') t = _state.queue[0];
   if (!t || !isVotAudioUrl(t.url) || _unreachable(t)) return [];
   return [{ url: t.url, title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t), rate: _isSong(t) ? 1 : _readingRate }];
 }
@@ -3283,6 +3291,26 @@ function getSleepRemainingSeconds() {
  * @param {number} minutes
  * @returns {boolean}
  */
+/**
+ * The countdown's end: pause (never stop, so the queue and the resume point survive) at the bottom of the fade.
+ * The timeout calls it, and so does the clock when the timeout is overdue: a hidden page's timers may run late, and
+ * under the native player (m3) the page is silent, so a late timeout would leave the listener in faded silence while
+ * the recording, and the resume point, ran on (native's 1 Hz ticks keep the clock running with the screen off).
+ * @returns {void}
+ */
+function _sleepTimerFire() {
+  if (_sleepTimer) { clearTimeout(_sleepTimer); }
+  _sleepTimer = null;
+  _state.sleepEndsAt = 0;
+  _state.sleepMinutes = 0;
+  const wasLive = _state.status === 'playing' || _state.status === 'loading';
+  if (wasLive && _el) _el.pause();
+  _markPaused();
+  _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
+  if (!wasLive) _notify();
+  if (wasLive) _toast('Sleep timer ended. Playback paused.');
+}
+
 function setSleepTimer(minutes) {
   const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
   if (_state.status === 'idle' || !_state.queue.length) return false;
@@ -3293,17 +3321,7 @@ function setSleepTimer(minutes) {
   // and the remaining seconds cannot answer that (a 30-minute timer with 15
   // minutes left is not the 15-minute chip).
   _state.sleepMinutes = mins;
-  _sleepTimer = setTimeout(() => {
-    _sleepTimer = null;
-    _state.sleepEndsAt = 0;
-    _state.sleepMinutes = 0;
-    const wasLive = _state.status === 'playing' || _state.status === 'loading';
-    if (wasLive && _el) _el.pause();
-    _markPaused();
-    _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
-    if (!wasLive) _notify();
-    if (wasLive) _toast('Sleep timer ended. Playback paused.');
-  }, mins * 60000);
+  _sleepTimer = setTimeout(_sleepTimerFire, mins * 60000);
   _syncSleepVolume();     // a re-arm in the middle of a fade: full voice until the new last stretch
   _notify();
   return true;

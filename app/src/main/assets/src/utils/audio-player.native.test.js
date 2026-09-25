@@ -25,6 +25,15 @@ let bridge;
 const send = (e) => window.__votNativeAudio(JSON.stringify(e));
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const loads = () => bridge.audioLoad.mock.calls.map((c) => JSON.parse(c[0]));
+const ITEMS = [{ id: 'letter-a', title: 'Letter A' }, { id: 'letter-c', title: 'Letter C' }];
+function setOnline(value) {
+  Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => value });
+}
+async function downloaded(ids) {
+  bridge.offlineAudioState = () => JSON.stringify({ items: ids.map((id) => ({ url: URL_OF(id), key: '', title: '', bytes: 1, savedAt: 1 })), totalBytes: ids.length, freeBytes: 1e9, active: null, queued: [] });
+  const { OfflineAudio } = await import('./offline-audio.js');
+  OfflineAudio.refresh();
+}
 
 beforeEach(async () => {
   FakeAudio.last = null;
@@ -52,6 +61,8 @@ afterEach(() => {
   delete window.AndroidBridge;
   delete window.__votNativeAudio;
   localStorage.removeItem('vot.audioEngine');
+  setOnline(true);
+  vi.restoreAllMocks();
 });
 
 describe('audio-player on the native player (m3)', () => {
@@ -100,6 +111,41 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioUpcoming).toHaveBeenCalledWith('[]');
   });
 
+  it('offline, native passes over what is not on the phone to the next recording that is, as the page would', async () => {
+    await downloaded(['idA1', 'idC']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    expect(loads()[0].url).toBe(URL_OF('idA1'));
+    expect(loads()[0].upcoming.map((t) => t.url)).toEqual([URL_OF('idC')]);   // idA2 is not on the phone
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 60000, playing: true, want: true });
+    send({ type: 'transition', from: URL_OF('idA1'), url: URL_OF('idC'), seq: 1, pos: 50, dur: 40000, playing: true, want: true });
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].url).toBe(URL_OF('idC'));
+    expect(s.status).toBe('playing');
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(1);   // the page skipped the same way and adopted idC
+  });
+
+  it('offline with nothing on the phone ahead, native is told to stop at the end of this one', async () => {
+    await downloaded(['idA1']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    expect(loads()[0].upcoming).toEqual([]);
+  });
+
+  it('a sleep timeout that runs late fires from the clock: paused at its time, not a minute of silence later', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 600000, playing: true, want: true });
+    await flush();
+    const t0 = Date.now();
+    expect(AudioPlayer.setSleepTimer(5)).toBe(true);
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 5 * 60000 + 200);   // the timeout has not run (a hidden page's timers)
+    send({ type: 'tick', url: URL_OF('idC'), pos: 300200, dur: 600000, playing: true, want: true });
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().sleepEndsAt).toBe(0);
+    expect(bridge.audioPause).toHaveBeenCalled();
+  });
+
   it('a pause from the lock screen pauses the player; the page\'s pause goes to native', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     send({ type: 'state', url: URL_OF('idC'), pos: 5000, dur: 60000, playing: true, want: true });
@@ -115,8 +161,8 @@ describe('audio-player on the native player (m3)', () => {
     expect(AudioPlayer.getState().status).toBe('paused');
   });
 
-  it('without the choice (or in the PWA) it is the WebView\'s <audio>, keep-alive and all', async () => {
-    localStorage.removeItem('vot.audioEngine');
+  it('with the way back chosen (html), it is the WebView <audio>, keep-alive and all', async () => {
+    localStorage.setItem('vot.audioEngine', 'html');
     vi.resetModules();
     AudioPlayer = (await import('./audio-player.js')).AudioPlayer;
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });

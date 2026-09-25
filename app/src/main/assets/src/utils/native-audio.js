@@ -54,15 +54,15 @@ function nativeBridge() {
 }
 
 /**
- * Does this page play through the native player? Only in an APK whose bridge carries it, and (until m3 step e flips
- * the default) only when `vot.audioEngine` is 'native'. 'html' always keeps the WebView's <audio>.
+ * Does this page play through the native player? In an APK whose bridge carries it, yes, unless `vot.audioEngine`
+ * is 'html': the WebView's <audio> kept for one release as the way back (m3 step e).
  * @returns {boolean}
  */
 function nativeAudioAvailable() {
   if (!nativeBridge()) return false;
   let choice = null;
   try { choice = typeof localStorage !== 'undefined' ? localStorage.getItem('vot.audioEngine') : null; } catch (_e) { /* storage off */ }
-  return choice === 'native';
+  return choice !== 'html';
 }
 
 /** The one live instance (the player makes one element per page). */
