@@ -3,17 +3,25 @@
    AudioLibraryStore — durable Listening Library metadata
 
    This store owns only small metadata: saved recordings, a bounded recent
-   list, the user's playback-rate preference, and two monotonic lifetime
-   counters (recordings started / recordings finished). Audio bytes remain
+   list, the user's playback-rate preference, two monotonic lifetime
+   counters (recordings started / recordings finished), and the Songs of the
+   Letters shelves (saved and recent song IDS — songs count in neither
+   counter). Audio bytes remain
    streamed from the app's immutable GitHub release assets; there is
    deliberately no local-media cache or arbitrary URL field here.
 */
 
 import { CachedStore, extendStore } from './cached-store.js';
-import { normalizeAudioRate, normalizeAudioTrack } from '../utils/audio-track.js';
+import { isSongId, normalizeAudioRate, normalizeAudioTrack } from '../utils/audio-track.js';
 
 export const MAX_SAVED_AUDIO_TRACKS = 100;
 export const MAX_RECENT_AUDIO_TRACKS = 30;
+/** Songs of the Letters keep their OWN two shelves, by song id (never URL: a
+ *  song's shard can be re-hosted, its id cannot change). Separate from the
+ *  recordings' shelves on purpose: one evening of shuffle must not flush the
+ *  letters a reader was hearing off the 30-row recent shelf. */
+export const MAX_SAVED_SONGS = 500;
+export const MAX_RECENT_SONGS = 30;
 
 /**
  * @typedef {{
@@ -30,7 +38,7 @@ export const MAX_RECENT_AUDIO_TRACKS = 30;
 /** @typedef {SavedAudioTrack & { playedAt: number }} RecentAudioTrack */
 
 /**
- * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number, completions: number }} AudioLibraryData
+ * @typedef {{ v: 1, saved: SavedAudioTrack[], recent: RecentAudioTrack[], rate: number, plays: number, completions: number, songSaved: string[], songRecent: string[] }} AudioLibraryData
  */
 
 /** Lifetime counters are monotonic and bounded — one ceiling for both. */
@@ -47,7 +55,25 @@ function _empty() {
   // with NO lower-bound inference: a pre-counter library holds no evidence
   // about which of its recordings ever reached their last second, and an
   // invented number would be a lie about the reader's own listening.
-  return { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0 };
+  // `songSaved` / `songRecent` (2026-09-24): song ids, newest first. Additive
+  // to v1 like the counters: an older record simply has none.
+  return { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [] };
+}
+
+/**
+ * An imported or stored id list, reduced to valid song ids, deduplicated
+ * (first — newest — occurrence wins) and bounded.
+ * @param {unknown} value @param {number} maximum @returns {string[]}
+ */
+function _songIds(value, maximum) {
+  /** @type {string[]} */
+  const out = [];
+  if (!Array.isArray(value)) return out;
+  for (const id of value) {
+    if (isSongId(id) && out.indexOf(id) < 0) out.push(id);
+    if (out.length >= maximum) break;
+  }
+  return out;
 }
 
 /** @param {unknown} value @returns {number} */
@@ -137,6 +163,8 @@ export function normalizeAudioLibrary(value) {
     // No lower-bound sibling: the recent shelf records that a recording was
     // STARTED, which says nothing about whether it was finished.
     completions: _lifetimeCount(raw.completions),
+    songSaved: _songIds(raw.songSaved, MAX_SAVED_SONGS),
+    songRecent: _songIds(raw.songRecent, MAX_RECENT_SONGS),
   };
 }
 
@@ -304,6 +332,67 @@ export const AudioLibraryStore = extendStore(
       this._cache = data;
       this._save();
       this._bump();
+    },
+
+    /** Saved song ids, newest first. @returns {string[]} */
+    songSaved() { return this.get().songSaved.slice(); },
+
+    /** Recently played song ids, newest first. @returns {string[]} */
+    songRecent() { return this.get().songRecent.slice(); },
+
+    /** @param {unknown} id @returns {boolean} */
+    isSongSaved(id) { return isSongId(id) && this.get().songSaved.indexOf(/** @type {string} */ (id)) >= 0; },
+
+    /**
+     * Save a song, or remove it if already saved. True when it is saved after.
+     * @param {unknown} id
+     * @returns {boolean}
+     */
+    toggleSongSaved(id) {
+      if (!isSongId(id)) return false;
+      const songId = /** @type {string} */ (id);
+      const wasSaved = this.isSongSaved(songId);
+      if (this._shouldDefer('toggleSongSaved', songId)) return !wasSaved;
+      const data = _writeableData(this);
+      const at = data.songSaved.indexOf(songId);
+      if (at >= 0) data.songSaved.splice(at, 1);
+      else data.songSaved = [songId].concat(data.songSaved).slice(0, MAX_SAVED_SONGS);
+      this._cache = data;
+      this._save();
+      this._bump();
+      return at < 0;
+    },
+
+    /**
+     * A song the listener put on goes to the top of the songs shelf. Like
+     * recordPlayed it records a DECISION (the player calls it from its entry
+     * points only), and it counts no lifetime play: songs are not readings.
+     * @param {unknown} id
+     * @returns {void}
+     */
+    recordSongPlayed(id) {
+      if (!isSongId(id)) return;
+      const songId = /** @type {string} */ (id);
+      if (this._shouldDefer('recordSongPlayed', songId)) return;
+      const data = _writeableData(this);
+      data.songRecent = [songId].concat(data.songRecent.filter((x) => x !== songId)).slice(0, MAX_RECENT_SONGS);
+      this._cache = data;
+      this._save();
+      this._bump();
+    },
+
+    /** @param {unknown} id @returns {boolean} true when a row was removed */
+    removeSongRecent(id) {
+      if (!isSongId(id)) return false;
+      if (this._shouldDefer('removeSongRecent', id)) return true;
+      const data = _writeableData(this);
+      const remaining = data.songRecent.filter((x) => x !== id);
+      if (remaining.length === data.songRecent.length) return false;
+      data.songRecent = remaining;
+      this._cache = data;
+      this._save();
+      this._bump();
+      return true;
     },
 
     /** @param {unknown} rate @returns {number} */

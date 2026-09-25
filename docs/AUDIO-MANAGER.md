@@ -143,6 +143,13 @@ Only immutable VOT release assets are accepted:
 https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/<asset>.mp3
 ```
 
+plus the other frozen release tags in `RELEASE_PREFIXES`, and ONE exact pattern
+for the Songs of the Letters shard sites (not a prefix):
+
+```text
+^https://votreader\.github\.io/songs-\d+/[0-9a-f]{12}\.mp3$
+```
+
 `normalizeAudioTrack()` applies that policy to every stored or imported track.
 An imported favorite cannot turn VOTReader into a generic remote-media loader.
 Display strings are also bounded and copied before use.
@@ -150,8 +157,12 @@ Display strings are also bounded and copied before use.
 `vot-audio-library` is an IndexedDB-backed metadata record:
 
 ```js
-{ v: 1, saved: [], recent: [], rate: 1 }
+{ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [] }
 ```
+
+- `songSaved` (<= 500) and `songRecent` (<= 30) are song IDS, newest first,
+  additive to v1. Songs never touch `saved`, `recent`, `plays` or
+  `completions`.
 
 - Saved recordings are capped at 100; recent recordings at 30. `removeRecent(url)`
   drops one recent row by its immutable release URL — an in-place mutator like
@@ -213,6 +224,31 @@ passed and evict the real places. Writes are otherwise throttled to at most one
 a second and always land at a boundary: a track change, a stop, and a NEW queue
 replacing the old one. The outgoing track's clock is written BEFORE the queue
 index moves, or the position would be filed under the recording just starting.
+
+## Songs of the Letters (2026-09-24)
+
+The flock's songs ride this same player (design: `D:\Swarm\callsi-music\README.md`;
+catalog contract: `catalog-schema.md` beside it). `utils/song-catalog.js` (bundle-d,
+the `SongCatalog` global for lazy screens) holds the host, the catalog lookups and
+THE queue order (`songQueue`), which a fresh `AudioPlayer.playSongs(...)` and the
+boot rebuild both call.
+
+- A song is a Track keyed `song:<id>`; its URL is derived from `{ id, sh }`.
+  Cover, lyrics, letter and duration are looked up by id, never carried on the Track.
+- `playSongs({ ids | filter, startId, shuffle, seed, label })` sets the source to
+  `mode: 'songs'` with a COMPACT descriptor (filter + seed + start, or an explicit
+  ids list). The boot snapshot of a 900-song shuffle is well under 2 KB; an
+  explicit list persists at most 50 ids, from the playing song forward. An edited
+  songs queue stays a songs descriptor (its ids), never a `custom` queue.
+- Songs are gated OUT of: `__votAudioListened` (read credit, streaks), the lifetime
+  play and completion counters, the recent shelf (they have their own), the
+  per-recording resume map (songs start at 0), and the reading speed (songs play
+  at 1x; `setPlaybackRate` during a song stores the READING speed for the next
+  reading). A songs queue never auto-continues into letters.
+- `setShuffle(on)` and `setRepeat('off' | 'one' | 'all')` govern songs queues only;
+  any queue that is not songs resets repeat, so a letter never loops.
+- The media card's artist line is `Songs of the Letters · <version>`, and the web
+  `MediaMetadata` carries the song's 512 px cover.
 
 ## One-audio policy
 

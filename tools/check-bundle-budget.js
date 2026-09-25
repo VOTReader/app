@@ -67,7 +67,13 @@ const BUDGETS = [
   // weight. Landing 24: the Listening Library's four screens (-22,732 B) - the
   // PLAYER stayed, which is why bundle-h is only 24 KB. Ceiling down by the same
   // rule (469,286 x 1.15 = 539,679 -> the hundred above).
-  { file: 'bundle-d.js', measured: 469286, max: 539700 },   // most screens/sheets/utils
+  // 2026-09-24, Songs of the Letters landing A: the songs engine joins the player
+  // it rides (utils/song-catalog.js 3.7 KB + the player's songs arm ~3.5 KB +
+  // audio-track's exact song pattern), deliberately in bundle-d because the bar
+  // and the desk read it on every screen (README section 6.3). The rest of the
+  // 469,286 -> 536,115 drift since landing 24 was the month's shell work. Re-
+  // baselined UP by the same rule: 543,676 x 1.15 = 625,227.4 -> the hundred above.
+  { file: 'bundle-d.js', measured: 543676, max: 625300 },   // most screens/sheets/utils
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   { file: 'app.min.css', measured: 292190, max: 336000 },   // render-blocking <link> in index.html

@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AudioLibraryStore,
   MAX_RECENT_AUDIO_TRACKS,
+  MAX_RECENT_SONGS,
   MAX_SAVED_AUDIO_TRACKS,
+  MAX_SAVED_SONGS,
   normalizeAudioLibrary,
 } from './audio-library-store.js';
 import { AUDIO_RELEASE_PREFIX } from '../utils/audio-track.js';
@@ -32,7 +34,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('AudioLibraryStore — normalized metadata', () => {
   it('starts with a conservative empty library and normal playback speed', () => {
-    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0 });
+    expect(AudioLibraryStore.get()).toEqual({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [] });
   });
 
   it('recordPlayed keeps the recent shelf without crediting a lifetime play', () => {
@@ -141,7 +143,7 @@ describe('normalizeAudioLibrary — import boundary', () => {
       recent: [{ ...track(2), url: 'javascript:alert(1)', playedAt: 30 }],
       rate: 2,
     });
-    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0, completions: 0 });
+    expect(data).toEqual({ v: 1, saved: [], recent: [], rate: 2, plays: 0, completions: 0, songSaved: [], songRecent: [] });
   });
 
   it('bounds an imported plays counter', () => {
@@ -205,5 +207,58 @@ describe('normalizeAudioLibrary — import boundary', () => {
       recent: [{ url: track(5).url, playedAt: 73 }],
       rate: 0.75,
     });
+  });
+});
+
+describe('AudioLibraryStore — Songs of the Letters shelves (2026-09-24)', () => {
+  const sid = (n) => n.toString(16).padStart(12, '0');
+
+  it('saves songs by id, newest first, and toggles a save off', () => {
+    expect(AudioLibraryStore.toggleSongSaved(sid(1))).toBe(true);
+    expect(AudioLibraryStore.toggleSongSaved(sid(2))).toBe(true);
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(2), sid(1)]);
+    expect(AudioLibraryStore.isSongSaved(sid(1))).toBe(true);
+    expect(AudioLibraryStore.toggleSongSaved(sid(1))).toBe(false);
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(2)]);
+    // Not a song id: refused, nothing stored.
+    expect(AudioLibraryStore.toggleSongSaved('https://example.test/a.mp3')).toBe(false);
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(2)]);
+  });
+
+  it('records played songs on their OWN shelf — never the recordings shelf, never a lifetime play', () => {
+    AudioLibraryStore.recordSongPlayed(sid(1));
+    AudioLibraryStore.recordSongPlayed(sid(2));
+    AudioLibraryStore.recordSongPlayed(sid(1));   // a repeat moves forward, no duplicate row
+    expect(AudioLibraryStore.songRecent()).toEqual([sid(1), sid(2)]);
+    expect(AudioLibraryStore.recent()).toEqual([]);
+    expect(AudioLibraryStore.getPlays()).toBe(0);
+    expect(AudioLibraryStore.removeSongRecent(sid(2))).toBe(true);
+    expect(AudioLibraryStore.removeSongRecent(sid(2))).toBe(false);
+    expect(AudioLibraryStore.songRecent()).toEqual([sid(1)]);
+  });
+
+  it('bounds both shelves (500 saved, 30 recent)', () => {
+    for (let i = 0; i < MAX_RECENT_SONGS + 5; i++) AudioLibraryStore.recordSongPlayed(sid(i + 1));
+    expect(AudioLibraryStore.songRecent()).toHaveLength(MAX_RECENT_SONGS);
+    expect(AudioLibraryStore.songRecent()[0]).toBe(sid(MAX_RECENT_SONGS + 5));
+    const many = Array.from({ length: MAX_SAVED_SONGS + 20 }, (_u, i) => sid(i + 1));
+    expect(normalizeAudioLibrary({ songSaved: many }).songSaved).toHaveLength(MAX_SAVED_SONGS);
+  });
+
+  it('normalizes imported song lists: ids only, deduplicated, newest occurrence kept', () => {
+    const data = normalizeAudioLibrary({
+      songSaved: [sid(3), 'not-an-id', sid(3), 42, 'ABCDEF123456', sid(4)],
+      songRecent: 'nope',
+    });
+    expect(data.songSaved).toEqual([sid(3), sid(4)]);   // upper-case hex is not a catalog id
+    expect(data.songRecent).toEqual([]);
+    // An older record without the fields reads as empty shelves (additive to v1).
+    expect(normalizeAudioLibrary({ saved: [] })).toMatchObject({ songSaved: [], songRecent: [] });
+  });
+
+  it('carries the song shelves through replaceAll (the backup/import path)', () => {
+    AudioLibraryStore.replaceAll({ songSaved: [sid(9)], songRecent: [sid(8), sid(9)] });
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(9)]);
+    expect(AudioLibraryStore.songRecent()).toEqual([sid(8), sid(9)]);
   });
 });

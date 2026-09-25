@@ -53,6 +53,43 @@ const RELEASE_PREFIXES = Object.freeze([
   AUDIO_WEB_NT_PREFIX,
 ]);
 
+/* ── Songs of the Letters (2026-09-24) ─────────────────────────────────────
+   The flock's songs live on GitHub Pages shard sites (Corbin, 2026-09-24:
+   "Songs yes on repos"; contract D:/Swarm/calls/ai-music/catalog-schema.md),
+   one URL per recording: https://votreader.github.io/songs-<shard>/<id>.mp3,
+   where <id> is the 12-hex frame-hash id the catalog names. The boundary is
+   ONE EXACT PATTERN, not a prefix: a prefix would let anything under those
+   sites play, and ARCHITECTURE §23.1 calls widening the release list the one
+   change that can turn this app into a generic remote loader. A song's
+   identity in every store is its id, never its URL (a shard can be re-hosted);
+   the URL is derived from { id, sh } by utils/song-catalog.js. */
+const SONG_URL = /^https:\/\/votreader\.github\.io\/songs-\d+\/[0-9a-f]{12}\.mp3$/;
+const SONG_ID = /^[0-9a-f]{12}$/;
+/** The queue-key namespace of a song: `song:<id>`. Never a letter's key, so a
+ *  song can never earn read credit, drive "Turn the Page" or paint read-along. */
+export const SONG_KEY_PREFIX = 'song:';
+
+/** @param {unknown} id @returns {boolean} a catalog song id (12 lowercase hex) */
+export function isSongId(id) {
+  return typeof id === 'string' && SONG_ID.test(id);
+}
+
+/** @param {unknown} key @returns {boolean} a `song:<id>` queue key */
+export function isSongKey(key) {
+  return typeof key === 'string' && key.lastIndexOf(SONG_KEY_PREFIX, 0) === 0
+    && isSongId(key.slice(SONG_KEY_PREFIX.length));
+}
+
+/** @param {unknown} key @returns {string} the song id inside a `song:<id>` key, or '' */
+export function songIdOfKey(key) {
+  return isSongKey(key) ? /** @type {string} */ (key).slice(SONG_KEY_PREFIX.length) : '';
+}
+
+/** @param {unknown} url @returns {boolean} exactly one song mp3 on a shard site */
+export function isSongUrl(url) {
+  return typeof url === 'string' && SONG_URL.test(url);
+}
+
 /** Recorded Bible editions the app knows how to stream. Registry lives here
  *  (not in the lazy manifest) so Settings can list editions before the Bible
  *  corpus loads. `volKey` prefixes every BIBLE_AUDIO_MANIFEST key; anything
@@ -504,14 +541,16 @@ export function resolveBibleAudio(opts) {
 }
 
 /**
- * Is this exactly one of VOT's immutable release audio assets? The
- * RELEASE_PREFIXES list IS the boundary — nothing else qualifies.
+ * Is this exactly one of VOT's immutable audio assets? The RELEASE_PREFIXES
+ * list plus the one exact song pattern IS the boundary — nothing else
+ * qualifies.
  *
  * @param {unknown} url
  * @returns {boolean}
  */
 export function isVotAudioUrl(url) {
   if (typeof url !== 'string') return false;
+  if (isSongUrl(url)) return true;
   const prefix = RELEASE_PREFIXES.find((p) => url.indexOf(p) === 0);
   return !!prefix && ASSET_NAME.test(url.slice(prefix.length));
 }

@@ -95,6 +95,9 @@ import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js
 // Downloads to the phone (listening item 8): ONE store, here beside the player that consults it offline; bundle-h's
 // rows and "On this phone" read it as the OfflineAudio global (tools/bundle-h-membership.test.js pins that).
 import { OfflineAudio } from '../utils/offline-audio.js';
+// Songs of the Letters (2026-09-24): ONE catalog store, here beside the player that queues from it; the lazy Songs
+// screens read it as the SongCatalog global, never by import (a second bundled copy would be a second catalog).
+import { SongCatalog } from '../utils/song-catalog.js';
 /* The Listening Library screens went lazy (bundle-h, landing 24) while all of
    this stayed here, because AudioPlayerBar and AudioManagerSheet are mounted in
    the always-present shell and play on every screen. The library reads these
@@ -264,7 +267,7 @@ Object.assign(window, {
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
-  AudioPlayer, audioTrackUrl, OfflineAudio,
+  AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
   // …and the shelf parts + audio tables bundle-h reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
   COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,

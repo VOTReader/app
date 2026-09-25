@@ -7,7 +7,10 @@
    bundle-a-vot) and the recorded Bible editions, which are PER-CHAPTER —
    1,189 tracks each (src/data/bible-audio-manifest.js, rides bundle-a). Both
    map ids to asset ids; this module turns either into a queue and drives ONE
-   <audio> element. Deep reference: ARCHITECTURE.md § Audio subsystem.
+   <audio> element. A third source, the flock's Songs of the Letters, comes
+   from a catalog (utils/song-catalog.js) and rides the same element as
+   `song:<id>` tracks — see playSongs. Deep reference: ARCHITECTURE.md § Audio
+   subsystem; docs/AUDIO-MANAGER.md.
 
    Store contract (the repo's useSyncExternalStore idiom):
      subscribe(cb) -> unsubscribe · getVersion() -> number · getState()
@@ -39,10 +42,22 @@ import {
   audioReaderLabel,
   bibleAudioAssetUrl,
   bibleReleaseTagFor,
+  isSongId,
+  isSongKey,
   isVotAudioUrl,
   normalizeAudioRate,
   normalizeAudioTrack,
+  songIdOfKey,
 } from './audio-track.js';
+import {
+  loadSongCatalog,
+  normalizeSongFilter,
+  seededShuffle,
+  songById,
+  songQueue,
+  songThumbUrl,
+  songTrack,
+} from './song-catalog.js';
 
 /**
  * @typedef {Object} Track
@@ -73,8 +88,11 @@ import {
  * @property {boolean} sleepAtTrackEnd - stop when the CURRENT recording ends
  * @property {boolean} restoring - the bar is a boot placeholder; the real queue
  *   has not been rebuilt yet, so its SHAPE is unknown (see _pendingRestore)
- * @property {'letter'|'collection'|'section'|'custom'|''} sourceMode - how this
+ * @property {'letter'|'collection'|'section'|'custom'|'songs'|''} sourceMode - how this
  *   queue was built; 'custom' means a user-edited queue or a lone recording
+ * @property {boolean} shuffle - a songs queue plays in a seeded shuffle (songs only)
+ * @property {'off'|'one'|'all'} repeat - a songs queue replays its song or wraps
+ *   at its end; reset to 'off' by any queue that is not songs, so a letter never loops
  */
 
 /** Shared DOM id so every audio message replaces the previous one. */
@@ -121,7 +139,12 @@ let _seekGen = 0;
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|''} */ ('') };
+const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off') };
+/** The READING speed — the listener's chosen rate for letters and chapters.
+ *  `_state.rate` is the EFFECTIVE rate of what is playing, which is 1 for a
+ *  song: the reader's 1.5× must not warp music (W3-05), and it must come back
+ *  unchanged on the next reading. */
+let _readingRate = 1;
 /** Last whole second notified — the timeupdate re-render storm guard. */
 let _lastTick = -1;
 /** Position to resume from after a load error (see toggle()). */
@@ -157,6 +180,9 @@ const _bibleManifest = () => _g().BIBLE_AUDIO_MANIFEST || null;
  *  that edition's own OT/NT release tags (the retired whole-book tracks on
  *  audio-bible-v1 resolve through the same routing). */
 const _isBibleVol = (volKey) => typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
+/** A Songs of the Letters track (`song:<id>`). Songs are not readings: they
+ *  earn no read credit, no lifetime counts, no resume point, and play at 1×. */
+const _isSong = (track) => !!track && isSongKey(track.key);
 /** The manifest a volKey's entries live in. */
 const _mapFor = (volKey) => (_isBibleVol(volKey) ? _bibleManifest() : _manifest());
 /** Release-aware asset → stream URL for a volKey's tracks. */
@@ -498,6 +524,9 @@ function _clearMediaSession() {
  * @returns {string}
  */
 function _cardArtist(track) {
+  // A song's line names the shelf and the VERSION (the version label rides
+  // partLabel), because eleven takes of one song share its title.
+  if (_isSong(track)) return 'Songs of the Letters' + (track.partLabel ? ' · ' + track.partLabel : '');
   const key = track && typeof track.key === 'string' ? track.key : '';
   const divider = key.indexOf(':');
   if (divider > 0 && _isBibleVol(key)) {
@@ -516,6 +545,7 @@ function _cardArtist(track) {
  * @param {Track} track @returns {string}
  */
 function _cardTitle(track) {
+  if (_isSong(track)) return track.title;   // the version is the artist line's
   const live = track.key == null && _secKey && _state.queue[_state.qi] === track ? _letterTitleOf(_secKey) : null;
   return live || track.title + (track.partLabel ? ' — ' + track.partLabel : '');
 }
@@ -534,7 +564,14 @@ function _cardAlbum(track) {
 function _setCardMetadata(ms, track) {
   const MM = _g().MediaMetadata;
   if (typeof MM !== 'function') return;
-  ms.metadata = new MM({ title: _cardTitle(track), artist: _cardArtist(track), album: _cardAlbum(track) });
+  /** @type {any} */
+  const meta = { title: _cardTitle(track), artist: _cardArtist(track), album: _cardAlbum(track) };
+  // A song the catalog knows has a cover: the publisher cuts a 512 px thumb for
+  // every song. Desktop Chrome, iPhone and the lock screen read it from here.
+  const song = _isSong(track) ? songById(songIdOfKey(track.key)) : null;
+  const art = song ? songThumbUrl(song, 512) : '';
+  if (art) meta.artwork = [{ src: art, sizes: '512x512', type: 'image/webp' }];
+  ms.metadata = new MM(meta);
 }
 
 /**
@@ -664,6 +701,7 @@ function _ensureEl() {
       // "stop when this recording ends" has no computable moment (playback
       // rate and buffering both move it), so the END EVENT is the trigger.
       if (_state.sleepAtTrackEnd) _sleepAtTrackEndFire();
+      else if (_repeatMode() === 'one') _replayCurrent();
       else next();
     } finally { _finishedUrl = null; }
   });
@@ -1050,6 +1088,11 @@ function _followSectionLetter() {
 function _notifyListened() {
   try {
     const track = _state.queue[_state.qi];
+    // A SONG IS NOT A READING (README §1.1): a finished song marks no letter
+    // read, feeds no streak or milestone, and is no "recording heard" in My
+    // Progress. Its `song:` key would credit nothing at the bridge anyway;
+    // returning here keeps the lifetime counter out of it too.
+    if (_isSong(track)) return;
     if (track && track.key == null && _sectionTableFor(track)) {
       // A COMPILATION'S END (2026-09-22): its last letter is credited like any
       // other heard through (the follower's rule, spanning to the file's end),
@@ -1152,9 +1195,12 @@ function _start() {
   try {
     const library = _library();
     if (library && typeof library.getPlaybackRate === 'function') {
-      _state.rate = normalizeAudioRate(library.getPlaybackRate());
+      _readingRate = normalizeAudioRate(library.getPlaybackRate());
     }
   } catch (_e) { /* library metadata is an enhancement, never a playback dependency */ }
+  // A song plays at 1× whatever the reading speed; the next reading gets that
+  // speed back because it is read afresh here, at every start.
+  _state.rate = _isSong(track) ? 1 : _readingRate;
   _state.time = 0;
   _state.duration = el.src === track.url ? (el.duration || 0) : 0;
   _lastTick = -1;
@@ -1561,7 +1607,13 @@ const PERSIST_KEY = 'vot-audio-pos';
  * parts, so `startKey` alone rebuilds at part 1 however far in the listener
  * actually began. Recorded here, written by _persist and replayed by the boot
  * rebuild through the same slice playCollection uses.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null } | null} */
+ *
+ * A SONGS queue (`mode: 'songs'`) is described, never listed: a `filter` plus a
+ * `seed` (shuffle) or an explicit `ids` list, and `startKey`. A 900-song shuffle
+ * is a few dozen bytes here, where a `custom` queue would re-serialize 900
+ * tracks into IDB every second. song-catalog.js's songQueue() turns it back
+ * into the same queue.
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, seed?: number, shuffle?: boolean, ids?: string[] | null } | null} */
 let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 let _pendingRestore = /** @type {any} */ (null);
@@ -1579,6 +1631,10 @@ let _lastPersistSec = -1;
 function _setSource(next) {
   _source = next;
   _state.sourceMode = next ? next.mode : '';
+  // Shuffle is a fact about the songs descriptor; repeat is a songs-session
+  // setting that no other queue may inherit (a letter must never loop).
+  _state.shuffle = !!(next && next.mode === 'songs' && next.shuffle);
+  if (!next || next.mode !== 'songs') _state.repeat = 'off';
 }
 
 /** @param {any} next @returns {void} */
@@ -1631,7 +1687,10 @@ let _finishedUrl = /** @type {string | null} */ (null);
 function _rememberPosition(track, time, duration, force) {
   try {
     const t = Number(time) || 0;
-    if (!track || !track.url || !(t >= AUDIO_RESUME_MIN_SEC)) return;
+    // Songs start from the top, always: a three-minute song is not a place to
+    // return to, and 1,000 of them would evict every real place from the
+    // 200-slot map a reading needs.
+    if (!track || !track.url || _isSong(track) || !(t >= AUDIO_RESUME_MIN_SEC)) return;
     if (_finishedUrl && track.url === _finishedUrl) return;
     const now = Date.now();
     if (!force && now - _lastPositionWriteAt < POSITION_WRITE_MS) return;
@@ -1686,7 +1745,7 @@ function _forgetPosition(url) {
 function _resumeAt(track) {
   try {
     const store = _positions();
-    if (!track || !track.url || !store || typeof store.getPosition !== 'function') return 0;
+    if (!track || !track.url || _isSong(track) || !store || typeof store.getPosition !== 'function') return 0;
     const saved = store.getPosition(track.url);
     if (!saved) return 0;
     const t = Number(saved.t) || 0;
@@ -1864,20 +1923,50 @@ function _snapshot() {
   const customQueue = src.mode === 'custom'
     ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
     : undefined;
+  const songs = src.mode === 'songs' ? _songsSnapshotFields(src, savedTrack, qi) : null;
   return {
     v: 2,
     mode: src.mode, volKey: src.volKey, label: src.label,
-    qi,
+    qi: songs ? songs.qi : qi,
     key: savedTrack.key,
     time,
     track: savedTrack,
     customQueue,
-    startKey: src.startKey || undefined,
+    startKey: (songs ? songs.startKey : src.startKey) || undefined,
     startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
     startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
     startReader: src.startReader || undefined,
+    filter: songs ? songs.filter : undefined,
+    seed: songs && songs.seed ? songs.seed : undefined,
+    shuffle: songs && songs.shuffle ? true : undefined,
+    ids: songs ? songs.ids : undefined,
+    repeat: songs && _state.repeat !== 'off' ? _state.repeat : undefined,
     at: Date.now(),   // which copy is newer, when the two channels disagree at boot
   };
+}
+
+/** How many ids an explicit songs list may persist. Longer lists persist the
+ *  window FROM the playing song forward — the forward-only horizon every other
+ *  rebuild keeps — so the snapshot stays small whatever the list. */
+const SONG_IDS_PERSIST = 50;
+
+/**
+ * The songs half of a snapshot: the compact descriptor, never the queue. An
+ * explicit ids list longer than SONG_IDS_PERSIST is cut to the window that
+ * starts at the playing song, and the snapshot's startKey and qi move with it.
+ * @param {any} src @param {Track} track @param {number} qi
+ * @returns {{ filter: any, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number }}
+ */
+function _songsSnapshotFields(src, track, qi) {
+  let ids = Array.isArray(src.ids) ? src.ids.filter(isSongId) : undefined;
+  let startKey = src.startKey || null;
+  if (ids && ids.length > SONG_IDS_PERSIST) {
+    const at = Math.max(0, ids.indexOf(songIdOfKey(track.key)));
+    ids = ids.slice(at, at + SONG_IDS_PERSIST);
+    startKey = null;
+    qi = 0;
+  }
+  return { filter: ids ? undefined : normalizeSongFilter(src.filter), seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi };
 }
 
 function _clearPersist() {
@@ -1960,10 +2049,14 @@ function _applySnapshot(s) {
   try {
     if (!s || (s.v !== 1 && s.v !== 2)) return false;
     const track = normalizeAudioTrack(s.track);
-    const mode = s.mode === 'letter' || s.mode === 'collection' || s.mode === 'section' || s.mode === 'custom'
+    const mode = s.mode === 'letter' || s.mode === 'collection' || s.mode === 'section' || s.mode === 'custom' || s.mode === 'songs'
       ? s.mode
       : null;
     if (!track || !mode) return false;
+    // A songs snapshot must name a song, and its descriptor is re-validated key
+    // by key: it is stored data, and it decides what the rebuild will queue.
+    if (mode === 'songs' && !_isSong(track)) return false;
+    const songIds = mode === 'songs' && Array.isArray(s.ids) ? s.ids.filter(isSongId).slice(0, SONG_IDS_PERSIST) : null;
     const customQueue = mode === 'custom' && Array.isArray(s.customQueue)
       ? s.customQueue.map(normalizeAudioTrack).filter(Boolean)
       : [];
@@ -1984,6 +2077,10 @@ function _applySnapshot(s) {
       // null keeps the two readings from being confused later.
       startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
+      filter: mode === 'songs' && !songIds ? normalizeSongFilter(s.filter) : null,
+      seed: mode === 'songs' ? (Number(s.seed) >>> 0) : 0,
+      shuffle: mode === 'songs' && s.shuffle === true,
+      ids: songIds,
     });
     _restoredAt = typeof s.at === 'number' ? s.at : 0;
     _state.queue = [track];
@@ -1991,6 +2088,9 @@ function _applySnapshot(s) {
     _state.time = _pendingRestore.time;
     _state.duration = 0;
     _state.status = 'paused';
+    // The desk shows the songs session's shuffle and repeat before the rebuild.
+    _state.shuffle = !!_pendingRestore.shuffle;
+    _state.repeat = mode === 'songs' && (s.repeat === 'one' || s.repeat === 'all') ? s.repeat : 'off';
     _followLibraryRate();
     _notify();
     return true;
@@ -2009,7 +2109,8 @@ function _followLibraryRate() {
     if (!_pendingRestore) return;
     const library = _library();
     if (!library || typeof library.getPlaybackRate !== 'function') return;
-    const next = normalizeAudioRate(library.getPlaybackRate());
+    _readingRate = normalizeAudioRate(library.getPlaybackRate());
+    const next = isSongKey(_pendingRestore.key) ? 1 : _readingRate;   // a restored song still plays at 1×
     if (next !== _state.rate) { _state.rate = next; _notify(); }
   };
   pull();
@@ -2106,7 +2207,9 @@ async function _rebuildRestoredQueue() {
   if (_offline() && !(typeof r.url === 'string' && OfflineAudio.isSaved(r.url))) { _toast(OFFLINE_MSG); return; }
   _setPendingRestore(null);
   const g = _g();
-  if (r.mode !== 'custom') {
+  if (r.mode === 'songs') {
+    try { await loadSongCatalog(); } catch (_e) { /* no catalog — fall through to the placeholder track */ }
+  } else if (r.mode !== 'custom') {
     try {
     if (_isBibleVol(r.volKey)) {
       if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
@@ -2117,6 +2220,9 @@ async function _rebuildRestoredQueue() {
   let queue = [];
   if (r.mode === 'custom') {
     queue = Array.isArray(r.queue) ? r.queue.map(normalizeAudioTrack).filter(Boolean) : [];
+  } else if (r.mode === 'songs') {
+    // The same pure order a fresh playSongs used, replayed from the descriptor.
+    queue = _songTracks(songQueue(r));
   } else if (r.mode === 'section') {
     // Forward-only horizon: rebuild only from the section the listener chose.
     const sections = (sectionsFor(r.volKey) || []).slice(r.startIndex || 0);
@@ -2149,7 +2255,7 @@ async function _rebuildRestoredQueue() {
   // a chosen letter must rebuild from that letter, never regrowing the tracks
   // deliberately left behind it. Legacy snapshots without a startKey keep the
   // full rebuilt queue (a one-time transition; the next fresh queue records it).
-  if (r.startKey && r.mode !== 'custom' && r.mode !== 'section') {
+  if (r.startKey && r.mode !== 'custom' && r.mode !== 'section' && r.mode !== 'songs') {
     const horizon = queue.findIndex((item) => item.key === r.startKey);
     if (horizon > 0) queue = queue.slice(horizon);
     // …and INTO its parts, which is the level this rebuild used to lose. The
@@ -2204,7 +2310,10 @@ async function _rebuildRestoredQueue() {
   }
   // startPartIndex rides along, or the first persist after a restore drops the
   // horizon it just replayed and the SECOND boot regrows part 1.
-  _setSource({ mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
+  // A songs source keeps the session's repeat (_applySnapshot restored it).
+  _setSource(r.mode === 'songs'
+    ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids }
+    : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
   _start();
@@ -2238,6 +2347,13 @@ function _countPlay() {
     const library = _library();
     if (!library) return;
     const track = _state.queue[_state.qi];
+    // A song goes on the SONGS shelf, by id, and counts no lifetime play: the
+    // 30-row recent shelf is where a reader finds the letter they were hearing,
+    // and one evening of shuffle must not flush it or inflate My Progress.
+    if (_isSong(track)) {
+      if (typeof library.recordSongPlayed === 'function') library.recordSongPlayed(songIdOfKey(track.key));
+      return;
+    }
     try {
       if (track && typeof library.recordPlayed === 'function') library.recordPlayed(track);
     } catch (_e) { /* recent-history failures must not interfere with listening */ }
@@ -2310,6 +2426,7 @@ function _locateTrack(track) {
   if (divider < 1 || divider >= key.length - 1) return null;
   const volKey = key.slice(0, divider);
   const id = key.slice(divider + 1);
+  if (isSongKey(key)) return null;   // songs live in the catalog, not in any manifest (playTrack's song arm)
   if (_isBibleVol(volKey)) {
     const manifest = _bibleManifest();
     const parts = manifest && manifest[key];
@@ -2472,6 +2589,141 @@ function playSection(volKey, index, collectionLabel) {
   _seekOnMetadata(_resumeAt(_state.queue[0]));
 }
 
+/* ── Songs of the Letters (2026-09-24) ──────────────────────────────────────
+   The flock's songs ride this one player (README §1.2) under `song:<id>` keys.
+   A songs queue is DESCRIBED by `_source` (filter + seed, or explicit ids, and
+   a start), so the boot snapshot of a 900-song shuffle stays tiny, and
+   song-catalog.js's songQueue() is the one order both a fresh start and the
+   boot rebuild use. What songs are kept OUT of lives beside each gate:
+   _notifyListened (read credit, streaks, completions), _countPlay (recent
+   shelf, lifetime plays), _rememberPosition/_resumeAt (the resume map), _start
+   (the reading speed) and _extendQueue (no auto-continue into letters). */
+
+/** Most ids a caller may hand playSongs — "every saved song" is the longest (500). */
+const SONG_IDS_MAX = 1000;
+
+/** @param {any[]} songs @returns {Track[]} */
+function _songTracks(songs) {
+  /** @type {Track[]} */
+  const out = [];
+  for (const song of songs) { const t = songTrack(song); if (t) out.push(t); }
+  return out;
+}
+
+/** A fresh shuffle seed (uint32, never 0 so a seeded source reads as one). @returns {number} */
+function _newSeed() {
+  return ((Math.floor(Math.random() * 0xffffffff) ^ Date.now()) >>> 0) || 1;
+}
+
+/**
+ * Play songs from the catalog. Either `ids` (an explicit list: a family's
+ * versions, the saved songs) or a `filter` ({ col, style, letter, family, q,
+ * lang, dl }; `{}` is every song). `shuffle` plays ONE version per family in a
+ * seeded order (`seed` makes it reproducible; one is drawn when absent);
+ * `startId` is the song to begin with. False when nothing started (no catalog,
+ * nothing matched, or offline).
+ *
+ * @param {{ ids?: string[], filter?: any, startId?: string, shuffle?: boolean, seed?: number, label?: string }} opts
+ * @returns {boolean}
+ */
+function playSongs(opts) {
+  const o = opts || /** @type {any} */ ({});
+  const shuffle = !!o.shuffle;
+  const seed = shuffle ? ((Number.isInteger(o.seed) ? /** @type {number} */ (o.seed) >>> 0 : 0) || _newSeed()) : 0;
+  const startKey = isSongId(o.startId) ? 'song:' + o.startId : null;
+  const label = typeof o.label === 'string' && o.label.trim() ? o.label.trim().slice(0, 120) : 'Songs of the Letters';
+  /** @type {any} */
+  let desc;
+  if (Array.isArray(o.ids)) {
+    // An explicit list is ordered ONCE, here, and stored as played: shuffling
+    // ids at every rebuild would reorder a queue the listener already hears.
+    // A shuffled list opens on the chosen song, the rest in the seeded order; a
+    // plain one is forward-only from it, like every other queue.
+    const ids = o.ids.filter(isSongId).slice(0, SONG_IDS_MAX);
+    const startId = startKey ? /** @type {string} */ (o.startId) : '';
+    const order = shuffle ? (startId ? [startId] : []).concat(seededShuffle(ids.filter((id) => id !== startId), seed)) : ids;
+    const list = songQueue({ ids: order, startKey: shuffle ? null : startKey });
+    desc = { mode: 'songs', volKey: 'song', label, ids: list.map((s) => s.id), filter: null, seed, shuffle, startKey: null };
+  } else {
+    desc = { mode: 'songs', volKey: 'song', label, ids: null, filter: normalizeSongFilter(o.filter), seed, shuffle, startKey };
+  }
+  const queue = _songTracks(songQueue(desc));
+  if (!queue.length) return false;
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
+  _rememberOutgoingPosition();   // R8b — the reading being left keeps its place
+  _setPendingRestore(null);
+  _setSource(desc);
+  _state.queue = queue;
+  _state.qi = 0;
+  _countPlay();
+  _start();
+  return true;
+}
+
+/** The repeat mode in force — songs queues only; every other queue plays through. @returns {'off'|'one'|'all'} */
+function _repeatMode() {
+  return _source && _source.mode === 'songs' ? _state.repeat : 'off';
+}
+
+/** Repeat 'one': the song that just ended starts again from its top. @returns {void} */
+function _replayCurrent() {
+  if (_el) { try { _el.currentTime = 0; } catch (_e) { /* the load below restarts it anyway */ } }
+  _start();
+}
+
+/**
+ * Set the repeat mode: 'off', 'one' (replay the song at its end) or 'all'
+ * (wrap to the top of the queue at its end). It governs songs queues only, and
+ * any queue that is not songs resets it, so a letter never loops.
+ * @param {unknown} mode
+ * @returns {'off'|'one'|'all'}
+ */
+function setRepeat(mode) {
+  const next = mode === 'one' || mode === 'all' ? mode : 'off';
+  if (_state.repeat !== next) {
+    _state.repeat = next;
+    _persist();
+    _notify();
+  }
+  return next;
+}
+
+/**
+ * Turn shuffle on or off for the songs queue that is playing. The song playing
+ * keeps playing and becomes the head of a queue rebuilt from the descriptor:
+ * on, the rest in a fresh seeded order, one version per family; off, the
+ * catalog order onward from it. An explicit list reshuffles its rest on, and
+ * keeps its order off (the order before the shuffle is not kept). False when
+ * the queue is not songs.
+ * @param {unknown} on
+ * @returns {boolean}
+ */
+function setShuffle(on) {
+  const src = _source;
+  const cur = _state.queue[_state.qi];
+  if (_pendingRestore || !src || src.mode !== 'songs' || !_isSong(cur)) return false;
+  const want = !!on;
+  const seed = want ? _newSeed() : 0;
+  /** @type {any} */
+  let desc;
+  if (Array.isArray(src.ids)) {
+    const curId = songIdOfKey(cur.key);
+    const rest = src.ids.filter((id) => id !== curId);
+    desc = { ...src, ids: [curId].concat(want ? seededShuffle(rest, seed) : rest), seed, shuffle: want, startKey: null };
+  } else {
+    desc = { ...src, seed, shuffle: want, startKey: cur.key };
+  }
+  const queue = _songTracks(songQueue(desc));
+  if (!queue.length || queue[0].url !== cur.url) return false;
+  _setSource(desc);
+  _state.queue = queue;
+  _state.qi = 0;
+  _syncMediaSessionActions();
+  _persist();
+  _notify();
+  return true;
+}
+
 /**
  * Play one previously-saved or recently-played recording. Only normalized VOT
  * release assets can become a queue, including after a backup import, so this
@@ -2501,6 +2753,15 @@ function playTrack(track) {
   // track below is checked before any state changes - "On this phone", the shelves and Resume last play through here.
   const normalized = normalizeAudioTrack(track);
   if (!normalized) return;
+  if (_isSong(normalized)) {
+    // A song row is a PLACE in its family: the versions from this one on. A
+    // taken-down song (hid) never plays; a hidden duplicate plays its kept
+    // twin. Without a catalog the row still plays alone, below.
+    const own = songById(songIdOfKey(normalized.key));
+    const song = own && own.hid && own.dup ? songById(own.dup) : own;
+    if (song && song.hid) { _toast(LOAD_FAIL_MSG); return; }
+    if (song && playSongs({ filter: { family: song.f }, startId: song.id, label: normalized.sub || undefined })) return;
+  }
   const at = _locateTrack(normalized);
   if (at && at.bible) {
     // partIndex + 1 IS the chapter for a per-chapter edition, and 1 for a
@@ -2679,6 +2940,8 @@ function _booksAfter(volKey, bookId) {
  * @returns {boolean}
  */
 function _extendQueue() {
+  // A songs queue is refused here like a custom one: songs never continue into
+  // letters (README §1.1) — a songs queue ends, or wraps under repeat 'all'.
   if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return false;
   const last = _state.queue[_state.queue.length - 1];
   // A section run's tracks carry key null (one file, many letters); the run
@@ -2718,8 +2981,13 @@ function next() {
   // _extendQueue refuses. So a queue that still ends here has nowhere to go: stop().
   // (A second _extendQueue() call lived here until 2026-09-12; verifier-2 measured that nothing
   // exercised it and its comment's reason was false.)
-  if (_state.qi + 1 >= _state.queue.length) { stop(); return; }
-  _state.qi++;
+  // …unless a songs queue repeats: 'all' wraps to its top instead of ending.
+  if (_state.qi + 1 >= _state.queue.length) {
+    if (_repeatMode() !== 'all') { stop(); return; }
+    _state.qi = 0;
+  } else {
+    _state.qi++;
+  }
   _start();
   _lastPersistSec = -1;
   _persist();   // track boundary — remember the new position immediately
@@ -2845,11 +3113,15 @@ function skip(seconds) {
  */
 function setPlaybackRate(rate) {
   const next = normalizeAudioRate(rate);
-  const changed = _state.rate !== next;
-  _state.rate = next;
+  _readingRate = next;
+  // The READING speed moves; a song playing now stays at 1× and the new speed
+  // takes effect at the next reading.
+  const effective = _isSong(_state.queue[_state.qi]) ? 1 : next;
+  const changed = _state.rate !== effective;
+  _state.rate = effective;
   if (_el) {
     // Default too: the next load algorithm resets playbackRate to default.
-    try { _el.defaultPlaybackRate = next; _el.playbackRate = next; } catch (_e) { /* unsupported engines retain normal speed */ }
+    try { _el.defaultPlaybackRate = effective; _el.playbackRate = effective; } catch (_e) { /* unsupported engines retain normal speed */ }
   }
   _syncMediaSessionPosition();
   _syncNative();   // rate feeds the card's position interpolation
@@ -2947,7 +3219,14 @@ function playAt(index) {
 function _commitQueueEdit(queue) {
   _state.queue = queue;
   const current = queue[_state.qi];
-  _setSource({ mode: 'custom', volKey: '', label: current ? current.sub : null });
+  // An edited SONGS queue stays a songs descriptor — its explicit ids, in the
+  // edited order — never a `custom` queue: a custom queue persists every track
+  // on every tick, which is the hazard a 900-song shuffle cannot afford.
+  if (_source && _source.mode === 'songs' && queue.every(_isSong)) {
+    _setSource({ ..._source, ids: queue.map((t) => songIdOfKey(t.key)), filter: null, startKey: null });
+  } else {
+    _setSource({ mode: 'custom', volKey: '', label: current ? current.sub : null });
+  }
   // A queue edit is the one queue-SHAPE change with no track start behind it,
   // so the host media card's skip handlers have to be re-decided here.
   _syncMediaSessionActions();
@@ -3263,6 +3542,9 @@ export const AudioPlayer = {
   playCollection,
   playSection,
   playBibleBook,
+  playSongs,
+  setShuffle,
+  setRepeat,
   bibleChapterStart,
   bibleChapterOfTrack,
   sectionLetterKeyAt,
