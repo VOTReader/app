@@ -1,0 +1,257 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* Transient reading states: the tap-through back pill (use-from-letter-stack), the landing flash, the
+     swipe peek (pager-preview), fullscreen (use-fullscreen-gesture) and the journal chip (dom-journal-chip). */
+  .board-grid { grid-template-columns: repeat(5, 309px); }
+  .span2 { grid-column: span 2; }
+  .cell > .cap { min-height: 46px; }
+  .endmark { text-align: center; margin: 30px 0 0; font: 400 15px/1 var(--serif); color: var(--text-3); }
+  .phone-m > .screen { overflow: hidden; }
+  .lt .scroll { position: relative; }
+  .txt { margin-top: 16px; }
+  .txt p { text-wrap: pretty; }
+  /* back-to-source band under the top chrome */
+  .bh-row { padding: 6px 20px 10px; border-bottom: 1px solid var(--hairline); background: var(--bg); flex: none; }
+  .bh-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 38px; padding: 0 16px 0 10px; border-radius: 19px;
+    background: var(--surface-2); font: 400 14px/1 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .bh-pill .i { color: var(--accent); flex: none; }
+  .bh-pill b { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .lt .bh-row + .scroll .ctx { margin-top: 14px; }
+  /* bible chapter (bible-select chrome) */
+  .chapter { padding-top: 10px; }
+  .chapter .reading p + p { margin-top: 12px; }
+  .sechead { margin: 22px 0 10px; }
+  .landing { background: var(--wash); border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; padding: 1px 0; }
+  .landing.peak { background: color-mix(in srgb, var(--accent) 36%, transparent); }
+  /* swipe: the live page slides out while the real neighbour slides in */
+  .pager { position: relative; flex: 1; min-height: 0; overflow: hidden; margin-bottom: 16px; }
+  .pane { position: absolute; top: 0; bottom: 0; left: 0; width: 412px; padding: 0 var(--gutter); background: var(--bg); }
+  .pane.peek { box-shadow: -18px 0 30px rgba(0,0,0,0.45); }
+  [data-theme="light"] .pane.peek { box-shadow: -14px 0 26px rgba(60,40,20,0.14); }
+  .touch { position: absolute; z-index: 6; width: 46px; height: 46px; border-radius: 23px; background: color-mix(in srgb, var(--text) 16%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--text) 6%, transparent); }
+  .bpeek { height: 100%; display: flex; align-items: center; justify-content: center; }
+  .bpeek .card { width: 100%; padding: 16px 18px 18px; }
+  .bpeek .meta { display: flex; align-items: center; gap: 2px; }
+  .bpeek .bt { display: block; margin-top: 6px; font: 500 22px/1.25 var(--serif); color: var(--text); }
+  .more .ph + .ph { margin-top: 20.8px; }
+  /* fullscreen: system bars gone, a toast explains the gesture */
+  .fs .rp { margin-top: 12px; }
+  .toast { position: absolute; left: 24px; right: 24px; bottom: 98px; z-index: 6; padding: 14px 18px; border-radius: 12px; background: var(--surface-3); color: var(--text);
+    font: 400 15px/1.45 var(--sans); box-shadow: var(--shadow); text-wrap: pretty; }
+  /* row 2 cells */
+  .hops { display: flex; flex-direction: column; gap: 10px; }
+  .hop { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border-radius: 16px; padding: 14px 16px; }
+  [data-theme="light"] .hop { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .hop .k { width: 28px; height: 28px; border-radius: 14px; flex: none; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); font: 700 13px/1 var(--sans); }
+  .hop .b { flex: 1; min-width: 0; }
+  .hop .tt { font: 500 17px/1.3 var(--serif); color: var(--text); }
+  .hop .m { margin-top: 3px; font: 400 13px/1.4 var(--sans); color: var(--text-3); }
+  .hop .bh-pill { margin-top: 10px; height: 32px; font-size: 13px; padding: 0 14px 0 8px; }
+  .hop .bh-pill .i { width: 14px; height: 14px; }
+  .flash { display: flex; flex-direction: column; gap: 10px; }
+  .fl { background: var(--bg); border-radius: 14px; padding: 12px 16px; box-shadow: 0 0 0 1px var(--hairline); }
+  .fl .lbl { font: 700 12px/1.2 var(--sans); color: var(--text-3); margin-bottom: 6px; }
+  .fl .reading { font-size: 18px; line-height: 1.6; }
+  .note-s { font: 400 13px/1.45 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  .note-s b { font-weight: 700; color: var(--text-2); }
+  .navcrop { width: 412px; border-radius: 18px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline); }
+  .navcrop .topbar { background: var(--bg); }
+  .chips2 { display: flex; gap: 22px; align-items: center; margin-top: 4px; }
+  .chips2 .one { display: flex; align-items: center; gap: 10px; }
+  .chips2 .iconbtn { background: var(--surface); }
+</style></head>
+<body data-size="1724x1368">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Reading flows</div>
+    <div class="meta">Transient states of a letter or chapter: where back will take you, where a link lands, what a swipe reveals, fullscreen, and the journal chip.</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 · back pill, first hop -->
+    <div class="cell">
+      <div class="cap">Back pill · hop 1 <small>Opened from “Addendum to …” in The Wide Path.</small></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:0%"></i></div><span class="pc">0%</span></div>
+        <div class="bh-row"><span class="bh-pill"><i data-i="chevron-left" class="xs"></i>Back to <b>Volume Two · The Wide Path</b></span></div>
+        <div class="scroll" style="margin-bottom:16px">
+          <div class="meta ctx">Volume One · Letter 29 · 3/28/05</div>
+          <div class="display">Embrace The Cornerstone, Wherein Flows Springs of Living Water</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From The Lord, Our God and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For All Those Who Have Ears to Hear</div></div>
+          <div class="reading txt"><p><span class="lead">Thus says The Lord to this generation, the last of these kingdoms of men:</span> Why do you kick your foot against The Stone, and shake your fists at Heaven when faced with The Truth? You are like a lost traveler without a home, and like the beast of the field you have no shelter.</p></div>
+          <div class="more" style="margin-top:14px"><div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:91%"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:64%"></div></div>
+        </div>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 28</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Volume Two</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 · back pill, second hop + landing flash -->
+    <div class="cell">
+      <div class="cap">Back pill · hop 2 <small>Footnote 3 opened Ephesians 2; verse 20 lands in a gold wash.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Ephesians 2 · NKJV</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="bh-row"><span class="bh-pill"><i data-i="chevron-left" class="xs"></i>Back to <b>Volume One · Embrace The Cornerstone, Wherein Flows Springs of Living Water</b></span></div>
+        <div class="scroll chapter">
+          <div class="reading"><p><span class="vnum">16</span>and that He might reconcile them both to God in one body through the cross, thereby putting to death the enmity. <span class="vnum">17</span>And He came and preached peace to you who were afar off and to those who were near. <span class="vnum">18</span>For through Him we both have access by one Spirit to the Father.</p></div>
+          <div class="eyebrow sechead">The Messiah Our Cornerstone</div>
+          <div class="reading"><p><span class="vnum">19</span>Now, therefore, you are no longer strangers and foreigners, but fellow citizens with the saints and members of the household of God, <span class="vnum">20</span><span class="landing">having been built on the foundation of the apostles and prophets, Jesus Christ Himself being the chief cornerstone,</span> <span class="vnum">21</span>in whom the whole building, being fitted together, grows into a holy temple in the Lord, <span class="vnum">22</span>in whom you also are being built together for a dwelling place of God in the Spirit.</p></div>
+          <div class="endmark">✦</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 · swipe peek -->
+    <div class="cell">
+      <div class="cap">Swipe to the next letter <small>The real next page slides in under the finger, already laid out.</small></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:14%"></i></div><span class="pc">14%</span></div>
+        <div class="pager">
+          <div class="pane" style="transform:translateX(-46%)">
+            <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+            <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="divider"></div>
+            <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+            <div class="reading txt"><p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side.</p></div>
+          </div>
+          <div class="pane peek" style="transform:translateX(54%)">
+            <div class="meta ctx">Volume One · Letter 16 · 12/23/04</div>
+            <div class="display">Run from the Forest and Loose All That Binds You</div>
+            <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="divider"></div>
+            <div class="ded"><div class="from">From The Lord, Our God and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For All Those Who Have Ears to Hear</div></div>
+            <div class="reading txt"><p>Timothy, write as I speak. For the time has come, and is already upon you, when the children of God must be cleansed and set apart for My glory, says The Lord.</p></div>
+          </div>
+          <span class="touch" style="left:236px; top:420px"></span>
+        </div>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 14</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 16</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 · boundary peek -->
+    <div class="cell">
+      <div class="cap">Swipe across a boundary <small>After The Lord's Rebuke the chain enters Words To Live By, a different kind of page, so a card peeks in.</small></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:100%"></i></div><span class="pc">100%</span></div>
+        <div class="pager">
+          <div class="pane" style="transform:translateX(-46%)">
+            <div class="meta ctx">The Lord's Rebuke · Letter 30 · 6/27/22</div>
+            <div class="display">Overthrow</div>
+            <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="divider"></div>
+            <div class="ded"><div class="from">From The Lord, Our God and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For All Those Who Have Ears to Hear</div></div>
+            <div class="more" style="margin-top:24px"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:90%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:58%"></div></div>
+          </div>
+          <div class="pane peek" style="transform:translateX(54%)">
+            <div class="bpeek"><div class="card"><span class="meta">Next · Words To Live By<i data-i="chevron-right" class="xs"></i></span><span class="bt">Introduction</span></div></div>
+          </div>
+          <span class="touch" style="left:236px; top:420px"></span>
+        </div>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 29</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Words To Live By</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 · fullscreen -->
+    <div class="cell">
+      <div class="cap">Fullscreen <small>A double-tap on an open part of the page hides the system bars. The hint shows the first three times.</small></div>
+      <div class="phone-m"><div class="screen lt fs">
+        <div class="rp"><div class="bar"><i style="width:28%"></i></div><span class="pc">28%</span></div>
+        <div class="scroll" style="margin-bottom:16px">
+          <div class="reading txt"><p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth.</p></div>
+          <div class="more" style="margin-top:22px"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div></div>
+        </div>
+        <div class="toast">Fullscreen on. Double-tap or double-click an open area to return to regular view.</div>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 14</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 16</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 6 · the stack -->
+    <div class="cell span2">
+      <div class="cap">The back pill, hop by hop <small>Each tap-through pushes the page you came from; the pill always names the newest one.</small></div>
+      <div class="hops">
+        <div class="hop"><span class="k">1</span><div class="b"><div class="tt">The Wide Path</div><div class="m">Volume Two · Letter 1. Tap its “Addendum to” link.</div></div></div>
+        <div class="hop"><span class="k">2</span><div class="b"><div class="tt">Embrace The Cornerstone, Wherein Flows Springs of Living Water</div><div class="m">Volume One · Letter 29. Tap footnote 3, then Open Ephesians 2.</div><span class="bh-pill"><i data-i="chevron-left" class="xs"></i>Back to <b>Volume Two · The Wide Path</b></span></div></div>
+        <div class="hop"><span class="k">3</span><div class="b"><div class="tt">Ephesians 2</div><div class="m">NKJV, verse 20 washed gold.</div><span class="bh-pill"><i data-i="chevron-left" class="xs"></i>Back to <b>Volume One · Embrace The Cornerstone, Wherein Flows Springs of Living Water</b></span></div></div>
+      </div>
+      <div class="note-s">The pill or the phone's back unwinds one hop at a time: 3, then 2 (its pill still pointing to 1), then 1. Pages opened from History or a shared link carry no pill, although back still returns.</div>
+    </div>
+
+    <!-- 7 · landing flash -->
+    <div class="cell">
+      <div class="cap">Landing flash <small>Two quick pulses, then the wash settles.</small></div>
+      <div class="flash">
+        <div class="fl"><div class="lbl">Pulse</div><div class="reading"><p><span class="vnum">20</span><span class="landing peak">having been built on the foundation of the apostles and prophets, Jesus Christ Himself being the chief cornerstone,</span></p></div></div>
+        <div class="fl"><div class="lbl">Between pulses</div><div class="reading"><p><span class="vnum">20</span><span class="landing">having been built on the foundation of the apostles and prophets, Jesus Christ Himself being the chief cornerstone,</span></p></div></div>
+      </div>
+      <div class="note-s">A verse clears after four seconds. A passage in a letter, opened from a link, keeps its wash and pulses again every few seconds.</div>
+    </div>
+
+    <!-- 8 · journal chip -->
+    <div class="cell span2">
+      <div class="cap">Journal chip in the nav <small>Appears when journal entries mention this letter; tap it to see them.</small></div>
+      <div class="navcrop">
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn jchip"><i data-i="rd-journal"></i><span class="bdg">2</span></span>
+          <span class="iconbtn"><i data-i="headphones"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+      </div>
+      <div class="chips2">
+        <span class="one"><span class="iconbtn jchip"><i data-i="rd-journal"></i><span class="bdg">1</span></span><span class="note-s">“1 journal entry”</span></span>
+        <span class="one"><span class="iconbtn jchip"><i data-i="rd-journal"></i><span class="bdg">2</span></span><span class="note-s">“2 journal entries”</span></span>
+      </div>
+      <div class="note-s">Named “Journal entries” for screen readers. <b>Not mounted in the current build:</b> JournalChip is defined and tested, but no screen renders it.</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

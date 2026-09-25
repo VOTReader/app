@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* The first pixel: the page background and one quiet word, nothing that moves.
+     Centred exactly where Android's own launch splash puts the icon, so the hand-off is a fade in place. */
+  .splash { position: absolute; inset: 0; display: grid; place-items: center; }
+  .word { font: 500 32px/1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+</div>
+<div class="splash" role="status" aria-live="polite"><div class="word">VOTReader</div></div>
+</body></html>

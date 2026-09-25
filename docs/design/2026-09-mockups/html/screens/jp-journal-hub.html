@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .head { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .head .tt { display: flex; align-items: baseline; gap: 10px; }
+  .head .cnt { font-size: 15px; }
+  .sort { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 4px 0 12px; color: var(--text-2); font: 400 14px/1 var(--sans); }
+  .scroll > .seg { margin-top: 14px; }
+  .scroll > .search { margin-top: 12px; }
+  .entries { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .entry { padding: 14px 8px 16px 18px; }
+  .entry .top { display: flex; align-items: flex-start; gap: 4px; }
+  .entry .ttl { flex: 1; min-width: 0; padding-top: 3px; font: 500 20px/1.25 var(--serif); color: var(--text); }
+  .entry .more { width: 40px; height: 40px; margin-top: -6px; color: var(--text-3); }
+  .entry .when { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .entry .when .pin { color: var(--accent); }
+  .entry .pv { margin: 14px 10px 0 0; }
+  .entry .pv .ph { height: 8px; }
+  .entry .pv .ph + .ph { margin-top: 11px; }
+  .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .att { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 9px; border-radius: 14px; background: var(--surface-2); color: var(--text-2); font: 400 13px/1 var(--sans); white-space: nowrap; }
+  .att .i { color: var(--text-3); }
+  .fab { position: absolute; right: 20px; bottom: 26px; padding: 0 22px 0 18px; box-shadow: var(--shadow); }
+</style></head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+</svg>
+<div class="screen" style="position:relative">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Library</span>
+  </div>
+  <div class="scroll">
+    <div class="head">
+      <div class="tt"><span class="h1">My Journal</span><span class="meta cnt">9 entries</span></div>
+      <span class="sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span>
+    </div>
+
+    <div class="seg"><span class="on">All entries</span><span>Pinned</span></div>
+    <div class="search"><i data-i="search" class="sm"></i>Search entries…</div>
+
+    <div class="entries">
+      <div class="card entry">
+        <div class="top"><div class="ttl">Morning reading</div><span class="iconbtn more"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+        <div class="meta when"><svg class="i xs pin"><use href="#x-pin"/></svg>Sep 24 · 7:12 AM</div>
+        <div class="pv"><div class="ph" style="width:100%"></div><div class="ph" style="width:74%"></div></div>
+        <div class="atts">
+          <span class="att"><i data-i="book-open" class="xs"></i>1 scripture</span>
+          <span class="att"><i data-i="image" class="xs"></i>1 image</span>
+          <span class="att"><i data-i="mic" class="xs"></i>Voice · 0:42</span>
+        </div>
+      </div>
+
+      <div class="card entry">
+        <div class="top"><div class="ttl">Evening prayer</div><span class="iconbtn more"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+        <div class="meta when">Sep 22 · 9:05 PM</div>
+        <div class="pv"><div class="ph" style="width:96%"></div><div class="ph" style="width:52%"></div></div>
+        <div class="atts">
+          <span class="att"><i data-i="mic" class="xs"></i>Voice · 1:36</span>
+        </div>
+      </div>
+
+      <div class="card entry">
+        <div class="top"><div class="ttl">Notes on Letter 15</div><span class="iconbtn more"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+        <div class="meta when">Sep 19 · 6:48 AM</div>
+        <div class="pv"><div class="ph" style="width:98%"></div><div class="ph" style="width:81%"></div></div>
+        <div class="atts">
+          <span class="att"><i data-i="scroll-text" class="xs"></i>1 letter</span>
+          <span class="att"><i data-i="book-open" class="xs"></i>2 scriptures</span>
+          <span class="att"><i data-i="sticky-note" class="xs"></i>1 note</span>
+        </div>
+      </div>
+
+      <div class="card entry">
+        <div class="top"><div class="ttl">Sabbath</div><span class="iconbtn more"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+        <div class="meta when">Sep 13 · 8:30 PM</div>
+        <div class="pv"><div class="ph" style="width:92%"></div><div class="ph" style="width:66%"></div></div>
+        <div class="atts">
+          <span class="att"><i data-i="image" class="xs"></i>3 images</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="btn primary fab"><i data-i="square-pen" class="sm"></i>New entry</span>
+</div>
+</body></html>

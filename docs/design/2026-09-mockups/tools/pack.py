@@ -25,6 +25,14 @@ def webp(src, name, portrait):
     return 'img/' + name + '.webp'
 
 
+made = set()
+_webp = webp
+
+
+def webp(src, name, portrait):  # remember every image this run writes, so stale ones can be pruned
+    out = _webp(src, name, portrait); made.add(os.path.basename(out)); return out
+
+
 cfg = json.load(open(os.path.join(MOCK, 'gallery', 'rounds.json')))
 sections = []
 for it in cfg['items']:
@@ -38,7 +46,7 @@ for it in cfg['items']:
     for rd in it['rounds']:
         cells = []
         for im in rd['images']:
-            src = os.path.join(MOCK, 'out', rd['job'], im['file'])
+            src = os.path.join(MOCK, 'out', im.get('job', rd['job']), im['file'])
             if os.path.exists(src):
                 name = it['key'].replace('+', '-') + '-' + rd['id'] + '-' + im['id']
                 cells.append((im['label'], webp(src, name, portrait), im.get('why', '')))
@@ -46,11 +54,19 @@ for it in cfg['items']:
             rounds.append((rd['title'], cells))
     sections.append((it, cur, rounds))
 
+for f in glob.glob(os.path.join(IMG, '*.webp')):  # prune images no round produces any more
+    if os.path.basename(f) not in made:
+        os.remove(f); print('pruned', os.path.basename(f))
+
 # prompts + tools
 for j in glob.glob(os.path.join(MOCK, 'jobs', '*.json')):
     shutil.copy(j, os.path.join(DEST, 'prompts'))
-for t in ['cxgen.py', 'runqueue.sh', 'board.py', 'dirs.py', 'items.py', 'texts.py', 'mkjobs_r1b.py', 'mkjobs_r2.py', 'vesper-preview.css', 'pack.py']:
+for t in ['cxgen.py', 'runqueue.sh', 'board.py', 'dirs.py', 'items.py', 'texts.py', 'mkjobs_r1b.py', 'mkjobs_r2.py', 'mkjobs_r4.py',
+          'vesper-preview.css', 'pack.py', 'sync_html.py', 'pack_fullapp.py']:
     shutil.copy(os.path.join(MOCK, t), os.path.join(DEST, 'tools'))
+os.makedirs(os.path.join(DEST, 'tools', 'atlas'), exist_ok=True)
+for t in ['build_atlas.py', 'areas.py', 'build_sheets.py', 'template.html', 'titles.json']:
+    shutil.copy(os.path.join(os.path.dirname(MOCK), 'atlas', t), os.path.join(DEST, 'tools', 'atlas'))
 shutil.copy(os.path.join(MOCK, 'usage.log'), os.path.join(DEST, 'tools', 'codex-usage.log'))
 
 # README: the hand-written intro + every item inline
@@ -69,32 +85,4 @@ open(os.path.join(DEST, 'README.md'), 'w').write(''.join(md))
 total = sum(os.path.getsize(f) for f in glob.glob(os.path.join(IMG, '*.webp')))
 print(f'pack: {len(glob.glob(os.path.join(IMG, "*.webp")))} images, {total/1e6:.1f} MB, README {os.path.getsize(os.path.join(DEST, "README.md"))} bytes')
 
-# ---- HTML kit: committed with repo-relative fonts/data (no duplicated binaries) ----
-HSRC = os.path.join(os.path.dirname(MOCK), 'html')
-HDST = os.path.join(DEST, 'html')
-for sub in ('kit/data', 'screens'):
-    os.makedirs(os.path.join(HDST, sub), exist_ok=True)
-css = open(os.path.join(HSRC, 'kit', 'kit.css')).read()
-ROOT_FROM_KIT = '../../../../../'          # docs/design/2026-09-mockups/html/kit -> repo root
-fontmap = {'eb-garamond-latin-wght-normal.woff2': 'fonts/', 'eb-garamond-latin-wght-italic.woff2': 'fonts/'}
-import re
-def fontpath(m):
-    f = m.group(1)
-    sub = fontmap.get(f, 'fonts/reading/')
-    return f"url('{ROOT_FROM_KIT}app/src/main/assets/{sub}{f}')"
-css = re.sub(r"url\('fonts/([^']+)'\)", fontpath, css)
-open(os.path.join(HDST, 'kit', 'kit.css'), 'w').write(css)
-for f in ('kit.js', 'icons.svg'):
-    shutil.copy(os.path.join(HSRC, 'kit', f), os.path.join(HDST, 'kit', f))
-wd = open(os.path.join(HSRC, 'kit', 'data', 'web-draw.js')).read().replace(
-    "from './decode.js'", "from '../../../../../../app/src/main/assets/src/utils/scripture-web/decode.js'")
-open(os.path.join(HDST, 'kit', 'data', 'web-draw.js'), 'w').write(wd)
-for f in glob.glob(os.path.join(HSRC, 'screens', '*.html')):
-    s = open(f).read().replace('../kit/data/scripture-web-data.js', '../../../../../app/src/main/assets/src/data/scripture-web-data.js')
-    open(os.path.join(HDST, 'screens', os.path.basename(f)), 'w').write(s)
-r = open(os.path.join(HSRC, 'render.mjs')).read().replace(
-    "`http://127.0.0.1:8095/screens/${n}.html?theme=${t}`",
-    "`http://127.0.0.1:8095/docs/design/2026-09-mockups/html/screens/${n}.html?theme=${t}`")
-open(os.path.join(HDST, 'render.mjs'), 'w').write(r)
-shutil.copy(os.path.join(HSRC, 'KIT.md'), os.path.join(HDST, 'KIT.md'))
-print('html kit:', len(glob.glob(os.path.join(HDST, 'screens', '*.html'))), 'screens')
+# The HTML kit and every screen are synced by sync_html.py (run from pack_fullapp.py).

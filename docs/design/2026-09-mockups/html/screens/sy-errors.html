@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  [data-theme="dark"] .for-light, [data-theme="light"] .for-dark { display: none; }
+  .state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 36px 110px; }
+  .state .glyph { width: 72px; height: 72px; border-radius: 36px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; margin-bottom: 22px; }
+  .state .glyph .i { width: 30px; height: 30px; }
+  .state .h2 { font-size: 24px; text-wrap: balance; }
+  .state .body { margin-top: 10px; text-wrap: balance; }
+  .state .btn { margin-top: 24px; min-width: 190px; }
+  .splash { flex: 1; display: grid; place-items: center; padding-bottom: 60px; }
+  .splash .word { font: 500 34px/1 var(--serif); letter-spacing: 0.01em; color: var(--text); }
+  .loading { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding-bottom: 110px; }
+  .loading .spin { width: 30px; height: 30px; border-radius: 15px; border: 3px solid var(--surface-3); border-top-color: var(--accent); border-right-color: var(--accent); transform: rotate(30deg); }
+  .loading .body { color: var(--text-2); }
+  .blank-bar { height: 56px; }
+  .offline .word { font: 500 30px/1 var(--serif); color: var(--text); }
+  .offline .body { margin-top: 14px; }
+</style></head>
+<body data-size="1072x1680">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">System states · loading, missing, offline</div>
+    <div class="meta">What the reader sees when something is not there yet, or not there at all, redrawn calm: one quiet glyph, the app’s own sentence, and the one way on as the primary button. The crash screen (“Something went wrong”, Reset to Home) is drawn by the yd- area.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 309px); column-gap: 32px; row-gap: 30px">
+
+    <div class="cell">
+      <div class="cap">Starting up<small>The first pixel, before anything loads</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="splash"><div class="word">VOTReader</div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A section on its way<small>“Loading Bible…”, “Loading Matthew…” or “Loading…”</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="blank-bar"></div>
+        <div class="loading"><div class="spin"></div><div class="body">Loading Bible…</div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A section that could not load<small>Offline, missing, or too old a WebView; Try again re-asks</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="blank-bar"></div>
+        <div class="state">
+          <div class="glyph"><i data-i="sy-cloud-off"></i></div>
+          <div class="h2">Couldn’t load this section.</div>
+          <span class="btn primary">Try again</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A letter that is gone<small>A saved tab pointing at a letter the library no longer has</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span><span class="tabcount">2</span>
+        </div>
+        <div class="state">
+          <div class="glyph"><i data-i="sy-book-x"></i></div>
+          <div class="h2">This letter is no longer available.</div>
+          <span class="btn primary">Back to the list</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A chapter that does not exist<small>“John 30:1” from a search or an old link</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span><span class="tabcount">2</span>
+        </div>
+        <div class="state">
+          <div class="glyph"><i data-i="book-open"></i></div>
+          <div class="h2">John has 21 chapters, so there is no chapter 30.</div>
+          <span class="btn primary">Open John</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Offline before anything was saved<small>offline.html: a first visit with no connection</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="state offline">
+          <div class="glyph"><i data-i="sy-wifi-off"></i></div>
+          <div class="word">VOTReader</div>
+          <p class="body">You are offline. Open the app while connected to the internet to cache content for offline use.</p>
+          <span class="btn primary">Try Again</span>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

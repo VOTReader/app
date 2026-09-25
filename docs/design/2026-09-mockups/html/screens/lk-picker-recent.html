@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(3, 412px); }
+  .np-net .ep .t .ph { display: inline-block; width: 64px; height: 9px; vertical-align: middle; margin-left: 2px; }
+  .np-net .ep.pressed { background: var(--accent-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .np-empty.rec { padding-top: 70px; }
+</style></head>
+<body data-size="1364x1100">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Create a link: the Recent tab</div>
+    <div class="meta">LinkPicker.jsx · your link network, newest first (up to 25): each link's two ends, either one reusable as the new target in a single tap · linking from John 3:3</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 populated -->
+    <div class="cell">
+      <div class="cap">Recent links<small>Ends keep their exact verse or excerpt, so no picker follows</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span>Browse</span><span class="on">Recent</span></div>
+          <div class="meta np-hint">Tap either end of a link to use that place again.</div>
+          <div class="np-body" style="margin-top:6px">
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Born Again</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">John 15:2</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">The True Baptism</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">John 3:5</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Matthew 7:20</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Bear Much Fruit, the Harvest Is Near</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">The Wide Path</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Matthew 7:13</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Journal ·<span class="ph"></span></div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Isaiah 53:5</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 tap an end -->
+    <div class="cell">
+      <div class="cap">Tap an end: linked at once<small>“John 3:5” becomes this link's target; the sheet stays open</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="btn text">Done</span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="np-ok"><i data-i="circle-check" class="sm"></i><span class="tx">Link created · <b>John 3:5</b></span><span class="btn text">Undo</span></div>
+          <div class="seg np-tabs"><span>Search</span><span>Browse</span><span class="on">Recent</span></div>
+          <div class="meta np-hint">Tap either end of a link to use that place again.</div>
+          <div class="np-body" style="margin-top:6px">
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">John 3:3</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">John 3:5</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Born Again</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">John 15:2</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">The True Baptism</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep pressed"><div class="m">To</div><div class="t">John 3:5</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Matthew 7:20</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div></div><i data-i="lk-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Bear Much Fruit, the Harvest Is Near</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 empty -->
+    <div class="cell">
+      <div class="cap">No links yet<small>The first link fills this tab</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span>Browse</span><span class="on">Recent</span></div>
+          <div class="np-body">
+            <div class="np-empty rec">
+              <div class="ic"><i data-i="link"></i></div>
+              <div class="h3">No links yet</div>
+              <div class="body">Links you create will appear here, so you can link to the same places again in one tap.</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

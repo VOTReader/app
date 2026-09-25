@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .pick { padding-bottom: 22px; }
+  .pr .t.note { font-style: italic; font-weight: 400; }
+  .pr .q { color: var(--text-3); flex: none; }
+  .bph { margin: 10px 0 8px; }
+  .bph .h3 { flex: 1; min-width: 0; }
+  .bph .meta { flex: none; }
+  .search.typed-s { color: var(--text); }
+  .pr .m .ph { flex: none; max-width: none; }
+</style></head>
+<body data-size="1721x1640">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · the pickers Insert opens</div>
+    <div class="meta">Each replaces the Insert sheet in place: ‹ goes back to Insert, × closes. Top row filled, bottom row empty, in the app's own words. The reader's own writing is shown as bars.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(5, 309px)"></div>
+</div>
+<script>
+  const B = JN.blk;
+  const BG = B('text', JN.para([100, 96, 99, 93, 57])) + B('text focus', JN.para([98, 100, 90, 41], true)) + B('media', JN.photo(''), { noDel: true });
+  const ph = (w) => `<span class="ph" style="width:${w}px"></span>`;
+  const row = (code, t, m, o = {}) => `<div class="pr"><span class="bdg ${o.on ? 'on' : ''}">${code}</span><div class="tx"><div class="t ${o.cls || ''}">${t}</div><div class="m">${m}</div></div></div>`;
+  const search = (ph, typed) => typed
+    ? `<div class="search pk typed-s"><i data-i="search" class="sm"></i><span class="typed">${typed}<span class="tcaret"></span></span><i data-i="x" class="sm x"></i></div>`
+    : `<div class="search pk"><i data-i="search" class="sm"></i>${ph}</div>`;
+  const picker = (title, inner) => JN.phone('m', JN.editor({ body: BG, fab: false, over: JN.sheet(JN.shead(title, { back: true }) + inner, 'pick') }));
+  const empty = (t) => `<div class="pempty">${t}</div>`;
+  const noteBar = (w) => `<span class="ph" style="width:${w}%; display:block"></span>`;
+
+  const WHOLE = row('JR', 'Link the whole entry', 'Inserts a card that opens this entry', { on: true, cls: 'ui' });
+  const DRILL_HEAD = (t, d) => `<div class="bph"><span class="h3">${t}</span><span class="meta">${d}</span></div>`;
+
+  const cells = [
+    // populated
+    ['Pick a bookmark', 'Newest first; the label is the words you marked', picker('Pick a bookmark', search('Search bookmarks…') +
+      row('BK', 'My son, I am The Answer you search for, I am The Truth you seek.', 'Seek The Lord and He Will Open The Way') +
+      row('BK', 'But those who wait on the LORD Shall renew their strength', 'Isaiah 40:31') +
+      row('BK', 'each word a glistening drop from Heaven, every letter a shining jewel', 'Humility and The Word of God') +
+      row('BK', 'For God so loved the world that He gave His only begotten Son', 'John 3:16') +
+      row('BK', 'John 3', 'John 3'))],
+    ['Pick a note', 'Your note leads; with no words, the marked text does', picker('Pick a note', search('Search notes…') +
+      row('NT', noteBar(92), 'John 3:16-17', { cls: 'note' }) +
+      row('NT', noteBar(78), 'Humility and The Word of God', { cls: 'note' }) +
+      row('NT', 'For God so loved the world that He gave His only begotten Son, that whoever believ', 'John 3:16', { cls: 'note' }) +
+      row('NT', noteBar(84), 'Journal · Evening prayer', { cls: 'note' }) +
+      row('NT', noteBar(66), 'Isaiah 40:31', { cls: 'note' }))],
+    ['Link a journal entry', 'Every entry but this one; tap one to go inside it', picker('Link a journal entry', search('Search journal entries…') +
+      row('JR', 'Evening prayer', 'Sep 22 · ' + ph(150)) +
+      row('JR', 'Notes on Letter 15', 'Sep 19 · ' + ph(170)) +
+      row('JR', 'Sabbath', 'Sep 13 · ' + ph(130)) +
+      row('JR', '[Voice recording]', 'Sep 4 · [Voice recording]'))],
+    ['Pick from entry', 'The whole entry as a card, or one block of it', picker('Pick from entry', DRILL_HEAD('Evening prayer', 'Sep 22') + WHOLE +
+      '<div class="or">or pick a specific block</div>' +
+      row('H', 'Text excerpt', ph(120), { cls: 'ui' }) +
+      row('TXT', 'Text excerpt', ph(200), { cls: 'ui' }) +
+      row('REC', 'Voice recording', '[Voice memo · 1:36]', { cls: 'ui' }) +
+      row('“ ”', 'Text excerpt', `<span class="q">“</span>${ph(170)}<span class="q">”</span>`, { cls: 'ui' }) +
+      row('IMG', 'Image', '[Image]', { cls: 'ui' }))],
+    ['Link a notebook', 'Uncategorized is always first', picker('Link a notebook', search('Search notebooks…') +
+      row('NB', 'Uncategorized', '12 notes', { cls: 'ui' }) +
+      row('NB', 'Sabbath', '5 notes', { cls: 'ui' }) +
+      row('NB', 'Prayer', '8 notes', { cls: 'ui' }) +
+      row('NB', 'Word studies', '1 note', { cls: 'ui' }))],
+    // empty
+    ['No bookmarks', 'A search that finds nothing says “No matches.”', picker('Pick a bookmark', search('Search bookmarks…') + empty('No bookmarks yet.'))],
+    ['No notes', 'A search that finds nothing says “No matches.”', picker('Pick a note', search('Search notes…') + empty('No notes yet.'))],
+    ['No other entries', 'This entry is the only one', picker('Link a journal entry', search('Search journal entries…') + empty('No other journal entries yet.'))],
+    ['Nothing to embed', 'Only cards and dividers inside; the whole entry still links', picker('Pick from entry', DRILL_HEAD('Readings for the week', 'Sep 7') + WHOLE +
+      '<div class="or">or pick a specific block</div>' + empty('This entry has no embeddable blocks yet.'))],
+    ['No notebooks', 'Shown when a search hides Uncategorized too', picker('Link a notebook', search('', 'grace') + empty('No notebooks yet — Uncategorized is always available.'))],
+  ];
+  JN.fill('grid', cells);
+</script>
+</body></html>

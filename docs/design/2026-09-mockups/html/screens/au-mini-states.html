@@ -1,0 +1,102 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(3, 412px); column-gap: 32px; row-gap: 30px; }
+  .stage { position: relative; width: 412px; border-radius: 24px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline); }
+  .stage .ctx { padding: 22px 20px 0; }
+  .stage .ctx .ph + .ph { margin-top: 20px; }
+  .stage .toastpos { position: absolute; left: 20px; right: 20px; bottom: 128px; z-index: 6; }
+  .au-tab.press { background: var(--surface-3); color: var(--accent); }
+  .row4 { display: contents; }
+  .tcol { display: flex; flex-direction: column; gap: 14px; }
+  .au-toast.tap { justify-content: space-between; }
+  .tapi { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); flex: none; }
+  .tapi .i { width: 15px; height: 15px; }
+  
+  .ltop { position: relative; z-index: 3; background: var(--bg); }
+  .page { position: relative; flex: 1; overflow: hidden; }
+  .body-t { padding: 0 var(--gutter); }
+  .body-t p { margin: 0; }
+  .poem { margin-top: 18px; padding-left: 22px; }
+  .poem + .poem { margin-top: 14px; }
+  .reading .fn { margin-left: 3px; }
+  mark.au-wash { color: inherit; }
+  .safe { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: var(--bg); z-index: 4; }
+
+</style></head>
+<body data-size="1380x1590">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">The docked mini-player · states</div>
+    <div class="meta">One bar for every recording, drawn over whatever page is open. Words are the app's own; the audio toasts sit just above the bar.</div>
+  </div>
+  <div class="board-grid">
+<div class="cell"><div class="cap">Playing<small>The seek is the one scrubber; the position lands on release</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div>
+<div class="cell"><div class="cap">Paused<small>Play resumes from the same place</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="play"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div>
+<div class="cell"><div class="cap">Buffering<small>Counts as playing: it pulses and still offers Pause</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn busy"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek off"><span>0:00</span><div class="slider"><i style="width:0%"></i><b style="left:0%"></b></div><span></span></div></div></div></div>
+<div class="cell"><div class="cap">Couldn't load<small>The bar pauses where it was; Play tries again from there</small></div><div class="stage" style="height:236px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="toastpos"><div class="au-toast">Couldn’t load this track.</div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="play"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div>
+<div class="cell"><div class="cap">No connection<small>Nothing of this queue is on the phone</small></div><div class="stage" style="height:236px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="toastpos"><div class="au-toast">Playing audio requires an internet connection.</div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="play"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div>
+<div class="cell"><div class="cap">One recording on its own<small>Back restarts it; no next, no place in a queue</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Elect and Precious</div><div class="au-bs"><span class="src">Words To Live By: Part One · Text-to-speech</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>0:36</span><div class="slider"><i style="width:22%"></i><b style="left:22%"></b></div><span>2:41</span></div></div></div></div>
+<div class="cell"><div class="cap">Into the next collection<small>The first track after the crossing names the collection it entered</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Volume Two · The Wide Path</div><div class="au-bs"><span class="src">Volume Two · Text-to-speech</span><span class="pos">· 16 of 44</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>0:08</span><div class="slider"><i style="width:3%"></i><b style="left:3%"></b></div><span>4:12</span></div></div></div></div>
+<div class="cell"><div class="cap">A compilation<small>The letter under the clock takes the title; the part moves beside it</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Elect and Precious<span class="part"> · Part 4 · 60–80</span></div><div class="au-bs"><span class="src">Words To Live By: Part One · Text-to-speech</span><span class="pos">· 1 of 4</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>58:12</span><div class="slider"><i style="width:51.6%"></i><b style="left:51.6%"></b></div><span>112:40</span></div></div></div></div>
+<div class="cell"><div class="cap">The pull-tab, pressed<small>The tab and the title open the listening desk</small></div><div class="stage" style="height:170px"><div class="ctx"><div class="ph" style="width:92%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:70%"></div></div><div class="au-bar "><span class="au-tab press"><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div>
+    <div class="cell"><div class="cap">Read-along on<small>Settings › Listening › Read-Along Highlight. The page carries the wash; the bar is unchanged</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar ltop"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div><div class="page"><div class="body-t reading" style="margin-top:-796px"><p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion. Therefore listen, and you will also know, for by the Spirit of God are all things revealed to the chosen. Search your heart, My son, and you will find Me; embrace My words, and you will begin to know Me. For indeed, there are many gifts of the Spirit which I bestow upon all those who love Me, many gifts given to those who are willing to give up everything and follow Me. Thus Timothy is just one among many who hear My voice, one voice in a great chorus growing ever louder, of the number I am sending. Yet to him did I say, <em>“Write that which I speak, and place it in a book”;</em> also commanding him to share that which the Spirit causes him to understand. For the latter is that which My people call inspired of God or inspired in the Spirit; and the former, that which the prophets hear, the voice of The Living God. Therefore listen to Timothy, for he speaks for Me, he hears My voice. <mark class="au-wash">Behold, he has sat in My presence and strives to obey all I ask of him.</mark> Do not say then, nor conceive any notion within your heart, that he may be deceived by the devil. Or have you never read these Scriptures: <em>Every kingdom divided against itself will surely be brought to ruin, and every house divided against itself will collapse. If satan also is divided against himself, how then will his kingdom stand?</em><span class="fn">1</span></p><div class="poem"><em>Do men gather grapes of thorns, or figs of thistles?...</em></div>
+<div class="poem"><em>For a good tree brings forth good fruit,<br>But a corrupt tree brings forth evil fruit;<br>Neither can a corrupt tree bring forth good fruit...</em></div>
+<div class="poem"><em>And every tree that does not bring forth<br>Good fruit is hewn down and cast into the fire...</em></div>
+<div class="poem"><em>Thus by their fruits you shall know them.</em><span class="fn">2</span></div></div></div><div class="safe"></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div></div>
+    <div class="cell"><div class="cap">Read-along off<small>The same recording and bar, with no wash on the page</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar ltop"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div><div class="page"><div class="body-t reading" style="margin-top:-796px"><p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion. Therefore listen, and you will also know, for by the Spirit of God are all things revealed to the chosen. Search your heart, My son, and you will find Me; embrace My words, and you will begin to know Me. For indeed, there are many gifts of the Spirit which I bestow upon all those who love Me, many gifts given to those who are willing to give up everything and follow Me. Thus Timothy is just one among many who hear My voice, one voice in a great chorus growing ever louder, of the number I am sending. Yet to him did I say, <em>“Write that which I speak, and place it in a book”;</em> also commanding him to share that which the Spirit causes him to understand. For the latter is that which My people call inspired of God or inspired in the Spirit; and the former, that which the prophets hear, the voice of The Living God. Therefore listen to Timothy, for he speaks for Me, he hears My voice. Behold, he has sat in My presence and strives to obey all I ask of him. Do not say then, nor conceive any notion within your heart, that he may be deceived by the devil. Or have you never read these Scriptures: <em>Every kingdom divided against itself will surely be brought to ruin, and every house divided against itself will collapse. If satan also is divided against himself, how then will his kingdom stand?</em><span class="fn">1</span></p><div class="poem"><em>Do men gather grapes of thorns, or figs of thistles?...</em></div>
+<div class="poem"><em>For a good tree brings forth good fruit,<br>But a corrupt tree brings forth evil fruit;<br>Neither can a corrupt tree bring forth good fruit...</em></div>
+<div class="poem"><em>And every tree that does not bring forth<br>Good fruit is hewn down and cast into the fire...</em></div>
+<div class="poem"><em>Thus by their fruits you shall know them.</em><span class="fn">2</span></div></div></div><div class="safe"></div><div class="au-bar "><span class="au-tab "><i data-i="chevron-down"></i></span>
+  <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div></div></div></div></div>
+    <div class="cell"><div class="cap">Other audio toasts<small>The last one carries the tap that resumes after an update</small></div><div class="tcol">
+  <div class="au-toast">Paused while the screen was off: the phone would have played it silently. Press play to go on.</div>
+  <div class="au-toast">Sleep timer ended. Playback paused.</div>
+  <div class="au-toast tap">VOTReader was just updated. Tap to continue listening.<span class="tapi"><i data-i="play" class="fill"></i></span></div>
+</div></div>
+  </div>
+</div>
+</body></html>

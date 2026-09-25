@@ -1,0 +1,195 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  [data-theme="dark"] .for-light, [data-theme="light"] .for-dark { display: none; }
+  .phone-s .screen { overflow: hidden; }
+  .lines .ph { height: 9px; } .lines .ph + .ph { margin-top: 14px; } .lines .gap { height: 26px; }
+  .pillpos { position: absolute; left: 50%; transform: translateX(-50%); z-index: 5; }
+  .hintpill.pillpos { bottom: 22px; }
+  .toast.pillpos { bottom: 150px; }
+  .hintrow { display: grid; grid-template-columns: 256px 256px 412px 256px; column-gap: 24px; align-items: start; }
+  .crop2 { height: 250px; }
+  .crop2 .bubble { position: absolute; right: 10px; top: 96px; z-index: 5; }
+  .rearr .cols .row { padding: 10px 16px; min-height: 60px; }
+  .rearr .hold { text-align: center; margin-top: 14px; font: 400 13px/1 var(--sans); color: var(--text-3); }
+  .strips { display: grid; grid-template-columns: repeat(3, 412px); gap: 24px 36px; }
+  .strip-crop { height: 190px; }
+  .strip-crop .slice { padding: 14px 20px 0; }
+  .strip-crop .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(to bottom, transparent, var(--bg)); }
+  .tcols { display: grid; grid-template-columns: repeat(3, 420px); gap: 0 38px; align-items: start; }
+  .tgroup + .tgroup { margin-top: 26px; }
+  .tgroup .label { margin-bottom: 12px; }
+  .tgroup .toast + .toast { margin-top: 12px; }
+  .toast .spin { width: 18px; height: 18px; border-radius: 9px; border: 2.5px solid color-mix(in srgb, var(--text-3) 40%, transparent); border-top-color: var(--accent); border-right-color: var(--accent); flex: none; }
+  .toast .glyph { font: 400 16px/1 var(--serif); color: var(--accent); }
+  .dlgphone .dialog { position: absolute; left: 20px; right: 20px; top: 220px; z-index: 5; }
+  .dlgphone .dialog .acts { flex-direction: row; }
+  .dlgphone .dialog .acts .btn { flex: 1; padding: 0 12px; }
+</style></head>
+<body data-size="1456x2560">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Hints, toasts and the offline strip</div>
+    <div class="meta">Every first-run hint and every toast, in the app’s own words. Toasts rise from the bottom (the journal milestone drops from the top), stay a few seconds, and only the ones carrying an action take a tap. Storage-health banners and the update toasts are drawn by the yd- area.</div>
+  </div>
+
+  <div class="sy-sec">Hints and one-time prompts</div>
+  <div class="hintrow">
+    <div class="cell">
+      <div class="cap">First-run tip on a reading screen<small>Until your first mark; ✕ ends it for good</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lpage">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lines">
+            <div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:61%"></div><div class="gap"></div>
+            <div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:92%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:44%"></div><div class="gap"></div>
+            <div class="ph" style="width:100%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:90%"></div>
+          </div>
+        </div>
+        <div class="hintpill pillpos"><i data-i="hand"></i><span class="txt">Hold your finger on any line for a moment. A small bar appears: Highlight, or Note.</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A toast while the tip is up<small>It rises above the tip instead of covering it</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lpage">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lines">
+            <div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:61%"></div><div class="gap"></div>
+            <div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:92%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:44%"></div><div class="gap"></div>
+            <div class="ph" style="width:100%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:90%"></div>
+          </div>
+        </div>
+        <div class="toast pillpos"><i data-i="check" class="sm"></i><span class="txt">Copied</span></div>
+        <div class="hintpill pillpos"><i data-i="hand"></i><span class="txt">Hold your finger on any line for a moment. A small bar appears: Highlight, or Note.</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Tabs, the first time two are open<small>Tapping the count, or ✕, retires it</small></div>
+      <div class="frame crop-top crop2">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span><span class="iconbtn q"><i data-i="history" class="sm"></i></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span><span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">2</span></div>
+        <span class="bubble">Tap to switch tabs<span class="iconbtn"><i data-i="x" class="xs"></i></span></span>
+        <div style="padding:10px 20px 0"><div class="eyebrow">Volume One · Letter 15</div><div class="h1" style="font-size:28px;margin-top:6px">Know That Which Has Been Poured Out, The Word of God</div></div>
+      </div>
+      <div class="cap" style="margin-top:22px">Home, under the collection list<small>The only sign that the rows can be reordered</small></div>
+      <div class="frame rearr" style="padding:14px 20px 18px">
+        <div class="list cols" style="margin-top:0">
+          <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+        </div>
+        <div class="hold">Hold to rearrange</div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Third close of the last tab<small>An offer, never a trap: Keep Tabs On is one tap</small></div>
+      <div class="phone-s dlgphone"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span></div>
+        <div class="scroll"><div class="h1" style="font-size:26px">1 tab</div></div>
+        <div class="scrim" style="z-index:4"></div>
+        <div class="dialog">
+          <div class="eyebrow">You keep closing your last tab</div>
+          <div class="h2">Disable tabs?</div>
+          <p class="body">Tabs let you juggle multiple reading places — a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings — your open tabs will be waiting.</p>
+          <div class="acts"><span class="btn secondary">Keep Tabs On</span><span class="btn primary">Disable Tabs</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="sy-sec">The offline-library strip · between the top bar and the page</div>
+  <div class="strips">
+    <div class="cell"><div class="cap">Some files did not download<small>Retry fetches only what is missing</small></div>
+      <div class="frame crop-top strip-crop"><div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="banner gold"><i data-i="download" class="sm"></i><span class="txt"><b>Offline library incomplete.</b> 3 files did not download.</span><span class="acts"><span class="btn primary sm">Retry</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></span></div>
+        <div class="slice"><div class="eyebrow">The Volumes of Truth</div></div><div class="fade"></div></div></div>
+    <div class="cell"><div class="cap">Retrying<small>The count, not a spinner</small></div>
+      <div class="frame crop-top strip-crop"><div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="banner gold"><i data-i="download" class="sm"></i><span class="txt"><b>Downloading 3 missing files…</b></span><span class="acts"><span class="iconbtn"><i data-i="x" class="sm"></i></span></span></div>
+        <div class="slice"><div class="eyebrow">The Volumes of Truth</div></div><div class="fade"></div></div></div>
+    <div class="cell"><div class="cap">Fixed<small>Says so, then leaves</small></div>
+      <div class="frame crop-top strip-crop"><div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="banner gold"><i data-i="circle-check" class="sm"></i><span class="txt"><b>Offline library complete.</b></span></div>
+        <div class="slice"><div class="eyebrow">The Volumes of Truth</div></div><div class="fade"></div></div></div>
+    <div class="cell"><div class="cap">Still missing after a retry<small>Offline: the way on is a connection</small></div>
+      <div class="frame crop-top strip-crop"><div class="status"></div>
+        <div class="topbar"><span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span><span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="tabcount">1</span></div>
+        <div class="banner gold"><i data-i="sy-wifi-off" class="sm"></i><span class="txt"><b>Offline library incomplete.</b> 3 files are still missing. Connect to the internet, then retry.</span><span class="acts"><span class="btn primary sm">Retry</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></span></div>
+        <div class="slice"><div class="eyebrow">The Volumes of Truth</div></div><div class="fade"></div></div></div>
+  </div>
+
+  <div class="sy-sec">Every toast</div>
+  <div class="tcols">
+    <div>
+      <div class="tgroup"><div class="label">Undo · six seconds to take it back</div>
+        <div class="toast"><i data-i="sy-undo-2" class="sm"></i><span class="txt">Tab closed.</span><span class="act">Undo</span></div>
+        <div class="toast"><i data-i="sy-undo-2" class="sm"></i><span class="txt">Block deleted.</span><span class="act">Undo</span></div>
+        <div class="toast"><i data-i="sy-undo-2" class="sm"></i><span class="txt">Image removed.</span><span class="act">Undo</span></div>
+        <div class="toast"><i data-i="sy-undo-2" class="sm"></i><span class="txt">Voice memo removed.</span><span class="act">Undo</span></div>
+      </div>
+      <div class="tgroup"><div class="label">With a way out</div>
+        <div class="toast wrap-act"><i data-i="clock" class="sm"></i><span class="txt">Still waiting for the save dialog.</span><span class="act" style="flex-basis:100%;padding-left:36px">Save the file the usual way</span></div>
+      </div>
+      <div class="tgroup"><div class="label">Done</div>
+        <div class="toast"><i data-i="check" class="sm"></i><span class="txt">Copied</span></div>
+        <div class="toast"><i data-i="check" class="sm"></i><span class="txt">Copied instead. Paste the passage where you want to share it.</span></div>
+        <div class="toast"><i data-i="check" class="sm"></i><span class="txt">Copied instead. Paste the note where you want to share it.</span></div>
+        <div class="toast"><i data-i="check" class="sm"></i><span class="txt">Notes exported.</span></div>
+        <div class="toast"><i data-i="check" class="sm"></i><span class="txt">Backup saved.</span></div>
+        <div class="toast top"><span class="glyph">✦</span><span class="txt">Milestone: 7-day streak</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="tgroup"><div class="label">Working · they stay until done</div>
+        <div class="toast"><span class="spin"></span><span class="txt">Preparing export…</span></div>
+        <div class="toast"><span class="spin"></span><span class="txt">Saving backup…</span></div>
+        <div class="toast"><span class="spin"></span><span class="txt">Importing… please wait.</span></div>
+        <div class="toast"><span class="spin"></span><span class="txt">Checking backup…</span></div>
+        <div class="toast"><span class="spin"></span><span class="txt">Import complete. Reloading…</span></div>
+        <div class="toast"><span class="spin"></span><span class="txt">All personal data cleared. Reloading…</span></div>
+      </div>
+      <div class="tgroup"><div class="label">Reading and listening</div>
+        <div class="toast"><i data-i="sy-maximize-2" class="sm"></i><span class="txt">Fullscreen on. Double-tap or double-click an open area to return to regular view.</span></div>
+        <div class="toast"><i data-i="chevron-left" class="sm"></i><span class="txt">Press back again to exit</span></div>
+        <div class="toast"><i data-i="timer" class="sm"></i><span class="txt">Sleep timer ended. Playback paused.</span></div>
+        <div class="toast"><i data-i="pause" class="sm"></i><span class="txt">Paused while the screen was off: the phone would have played it silently. Press play to go on.</span></div>
+        <div class="toast"><i data-i="layers" class="sm"></i><span class="txt">Tab limit reached (50). Close a tab to open a new one.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="tgroup"><div class="label">Something went wrong · read aloud at once</div>
+        <div class="toast"><i data-i="sy-wifi-off" class="sm bad"></i><span class="txt">Playing audio requires an internet connection.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">Couldn’t load this track.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">Couldn’t share or copy. Select the note’s text to copy it by hand.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">Could not save that image.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">That panel hit a problem and closed — your data is safe.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm warn"></i><span class="txt">Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup.</span></div>
+      </div>
+      <div class="tgroup"><div class="label">Backups</div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm warn"></i><span class="txt">Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">This file does not look like a VOTReader backup.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">This backup file is corrupt or incomplete and could not be read.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?</span></div>
+        <div class="toast"><i data-i="clock" class="sm"></i><span class="txt">Another backup operation is running in a different tab. Please wait for it to finish.</span></div>
+        <div class="toast"><i data-i="sy-circle-alert" class="sm bad"></i><span class="txt">Export failed. Please try again.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,228 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .chapter { padding-top: 6px; }
+  .sechead { margin: 22px 0 10px; }
+  .reading p + p { margin-top: 10px; }
+  .reading em { font-style: italic; }
+  .reading .lead { font-weight: 700; font-style: italic; }
+  /* note icon at the end of a noted passage */
+  .nmk { display: inline-block; width: 17px; height: 17px; vertical-align: -2px; margin: 0 1px 0 3px; color: var(--c, var(--accent)); position: relative; }
+  .nmk .i { width: 17px; height: 17px; }
+  .nmk b { position: absolute; top: -7px; right: -10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: 700 10px/16px var(--sans); text-align: center; }
+  .nmk.lit { z-index: 6; }
+  /* note sheet */
+  .ns-head { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+  .ns-head .h3 { flex: 1; }
+  .ns-head .iconbtn { margin-right: -10px; }
+  .ns-dot { width: 26px; height: 26px; border-radius: 13px; background: var(--c); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px color-mix(in srgb, var(--text) 30%, transparent); flex: none; margin-left: 2px; }
+  .ns-anchor { position: relative; margin-top: 10px; padding-left: 14px; font: italic 400 18px/1.5 var(--serif); color: var(--text-2); }
+  .ns-anchor::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--c); }
+  .ns-anchor.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ns-date { margin-top: 10px; }
+  .ns-tags { margin-top: 12px; }
+  .ns-body { margin-top: 18px; }
+  .ns-body .ph { height: 11px; }
+  .ns-body .ph + .ph { margin-top: 17px; }
+  .ns-lab { margin: 16px 0 8px; }
+  .ns-styles { display: flex; gap: 6px; }
+  .ns-styles .lb-sty { width: 48px; height: 44px; background: var(--surface-2); }
+  .ns-styles .lb-sty.on { background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--text-2); }
+  /* the ten mark colours in the app's order (blank first while the style is Highlight), spread edge to edge as an-note-sub */
+  .ns-sws { justify-content: space-between; gap: 0; height: 34px; margin-top: 12px; }
+  .ns-sws .lb-sw { width: 26px; height: 26px; border-radius: 13px; }
+  .ns-sws .lb-sw.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+  .ta { margin-top: 16px; min-height: 140px; padding: 16px; border-radius: 14px; background: var(--surface-2); }
+  .ta .ph { height: 10px; background: color-mix(in srgb, var(--text-3) 30%, transparent); }
+  .ta .ph + .ph { margin-top: 16px; }
+  .ta .last { display: flex; align-items: center; gap: 3px; margin-top: 12px; }
+  .ta .last .ph { flex: none; }
+  .ta .plc { font: 400 16px/1.4 var(--sans); color: var(--text-3); display: flex; align-items: center; gap: 2px; }
+  .nbrow { display: flex; align-items: center; gap: 12px; height: 52px; margin-top: 10px; padding: 0 14px; border-radius: 14px; background: var(--surface-2); font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .nbrow .i { color: var(--text-2); }
+  .nbrow span { flex: 1; }
+  .nbrow.empty span { color: var(--text-2); }
+  .foot { display: flex; gap: 10px; margin-top: 16px; }
+  .foot .btn { flex: 1; }
+  /* multi-note popover */
+  .mn { width: 320px; }
+  .mn .phd { font: 700 13px/1.2 var(--sans); color: var(--text-2); padding: 16px 16px 8px; }
+  .mn .row { display: flex; gap: 12px; align-items: flex-start; background: none; border-radius: 0; padding: 12px 16px; min-height: 0; box-shadow: none !important; }
+  .mn .row + .row { border-top: 1px solid var(--hairline); }
+  .mn .row .dot { width: 12px; height: 12px; border-radius: 6px; margin-top: 4px; }
+  .mn .row .tx { flex: 1; min-width: 0; }
+  .mn .row .tx .ph { height: 9px; }
+  .mn .row .tx .ph + .ph { margin-top: 11px; }
+  .mn .row .q { font: italic 400 15px/1.4 var(--serif); color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mn .row .meta { margin-top: 8px; }
+  /* annotation chip */
+  .chip-a { display: flex; align-items: stretch; padding: 6px; border-radius: 18px; }
+  .chip-a .b { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 66px; height: 60px; border-radius: 12px; font: 400 12px/1 var(--sans); color: var(--text-2); }
+  .chip-a .b .i { color: var(--text); }
+  .chip-a .sep { width: 1px; margin: 10px 4px; background: var(--hairline); }
+  .chip-a .b.lb-danger .i { color: var(--lb-danger); }
+  .comp-chip { position: static; display: inline-flex; }
+  .sample .reading { font-size: 19px; }
+  .emptyread { width: 372px; background: var(--surface); border-radius: 24px 24px 0 0; padding: 10px 20px 24px; box-shadow: var(--shadow); }
+  [data-theme="light"] .emptyread { box-shadow: 0 0 0 1px var(--hairline), 0 18px 40px rgba(60,40,20,.14); }
+  .addtext { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; height: 48px; padding: 0 18px; border-radius: 24px; background: var(--surface-2); font: 700 15px/1 var(--sans); color: var(--text); }
+  .addtext .i { color: var(--text-2); }
+</style></head>
+<body data-size="1456x1060">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Notes on a passage: the note sheet, several notes, a tapped mark</div>
+    <div class="meta">NoteSheet.jsx (__openNote) · MultiNotePopover.jsx (__showMultiNote) · AnnotationActionChip.jsx (__showAnnChip) at rest. Its colour, style and remove steps, the ⋯ menu, colour picker, discard and notebook picker are drawn by an-.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(5, 256px)">
+
+    <!-- 1 read -->
+    <div class="cell">
+      <div class="cap">1 · A note, opened<small>Tap the note's mark; ⋯ holds Edit and the rest</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading"><p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, <mark class="hl-honey">unless one is born of water and the Spirit, he cannot enter the kingdom of God.</mark><span class="nmk" style="--c:var(--dot-honey)"><i data-i="sticky-note"></i></span></p></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet" style="--c: var(--dot-honey)">
+          <div class="grabber"></div>
+          <div class="ns-head"><span class="ns-dot"></span><span class="h3">Note</span><span class="iconbtn"><i data-i="ellipsis-vertical"></i></span></div>
+          <div class="ns-anchor">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>
+          <div class="meta ns-date">2d ago</div>
+          <div class="lb-tags ns-tags"><span class="lb-tag"><i data-i="lb-folder" style="color:var(--dot-honey)"></i>Devotional</span><span class="lb-tag"><i data-i="lb-folder" style="color:var(--dot-sage)"></i>Sabbath study</span></div>
+          <div class="ns-body" data-lb-ph="5"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 edit -->
+    <div class="cell">
+      <div class="cap">2 · Editing<small>Style, colour, words and notebooks; Save or Cancel</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll chapter"><div class="h1" style="font-size:40px">John 3</div><div class="eyebrow sechead">Nicodemus and the New Birth</div></div>
+        <div class="scrim"></div>
+        <div class="sheet" style="--c: var(--dot-honey)">
+          <div class="grabber"></div>
+          <div class="ns-head"><span class="ns-dot"></span><span class="h3">Edit note</span></div>
+          <div class="ns-anchor clamp">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>
+          <div class="label ns-lab">Style and colour</div>
+          <div class="ns-styles"><span class="lb-sty hl on"><span>A</span></span><span class="lb-sty ul"><span>A</span></span><span class="lb-sty sq"><span>A</span></span></div>
+          <div class="lb-sws ns-sws"><span class="lb-sw blank"></span><span class="lb-sw honey on"></span><span class="lb-sw sage"></span><span class="lb-sw rose"></span><span class="lb-sw red"></span><span class="lb-sw clay"></span><span class="lb-sw sky"></span><span class="lb-sw lavender"></span><span class="lb-sw teal"></span><span class="lb-sw brown"></span><span class="lb-sw gray"></span></div>
+          <div class="ta">
+            <div class="ph" style="width:96%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:94%"></div>
+            <div class="last"><div class="ph" style="width:41%"></div><span class="lb-caret"></span></div>
+          </div>
+          <div class="nbrow"><i data-i="lb-folder" class="sm"></i><span>Devotional, Sabbath study</span><i data-i="chevron-right" class="sm"></i></div>
+          <div class="foot"><span class="btn secondary">Cancel</span><span class="btn primary">Save</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 new -->
+    <div class="cell">
+      <div class="cap">3 · A new note<small>From Note in the toolbar; blank notes are allowed</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div></div>
+        <div class="scrim"></div>
+        <div class="sheet" style="--c: var(--dot-sage)">
+          <div class="grabber"></div>
+          <div class="ns-head"><span class="ns-dot"></span><span class="h3">New note</span></div>
+          <div class="ns-anchor clamp">“Search your heart, My son, and you will find Me; embrace My words, and you will begin to know Me.”</div>
+          <div class="label ns-lab">Style and colour</div>
+          <div class="ns-styles"><span class="lb-sty hl"><span>A</span></span><span class="lb-sty ul on"><span>A</span></span><span class="lb-sty sq"><span>A</span></span></div>
+          <div class="lb-sws ns-sws"><span class="lb-sw honey"></span><span class="lb-sw sage on"></span><span class="lb-sw rose"></span><span class="lb-sw red"></span><span class="lb-sw clay"></span><span class="lb-sw sky"></span><span class="lb-sw lavender"></span><span class="lb-sw teal"></span><span class="lb-sw brown"></span><span class="lb-sw gray"></span></div>
+          <div class="ta"><div class="plc"><span class="lb-caret" style="margin:0 2px 0 0"></span>Write your note…</div></div>
+          <div class="nbrow empty"><i data-i="lb-folder" class="sm"></i><span>Add to notebook…</span><i data-i="chevron-right" class="sm"></i></div>
+          <div class="foot"><span class="btn secondary">Cancel</span><span class="btn primary">Save</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 multi-note -->
+    <div class="cell">
+      <div class="cap">4 · Several notes here<small>A mark with a count lists every note ending there</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="reading" style="margin-top:22px"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. <mark class="hl-honey">Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight...</mark><span class="nmk lit" id="stack" style="--c:var(--dot-honey)"><i data-i="sticky-note"></i><b>3</b></span> <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></div>
+        </div>
+        <div class="scrim" style="background: color-mix(in srgb, var(--bg) 35%, transparent)"></div>
+        <div class="lb-pop mn" data-lb-below="#stack" data-lb-x="center" data-lb-gap="12">
+          <div class="phd">3 notes here</div>
+          <div class="row"><span class="dot" style="background:var(--dot-honey)"></span><div class="tx"><div class="ph" style="width:96%"></div><div class="ph" style="width:62%"></div><div class="meta">2d ago · Devotional</div></div></div>
+          <div class="row"><span class="dot" style="background:var(--dot-sage)"></span><div class="tx"><div class="ph" style="width:74%"></div><div class="meta">1w ago · Questions</div></div></div>
+          <div class="row"><span class="dot" style="background:var(--dot-rose)"></span><div class="tx"><div class="q">“Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight...”</div><div class="meta">3w ago</div></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 chip at rest -->
+    <div class="cell">
+      <div class="cap">5 · A mark, tapped<small>Colour, style, make it a note, or remove it</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="reading" style="margin-top:22px"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><mark class="hl-rose" id="tapped">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</mark>, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you?</div>
+        </div>
+        <div class="scrim" style="background: color-mix(in srgb, var(--bg) 35%, transparent)"></div>
+        <div class="lb-pop chip-a" data-lb-below="#tapped" data-lb-x="center" data-lb-gap="10">
+          <span class="b"><i data-i="lb-palette"></i>Color</span>
+          <span class="b"><i data-i="type"></i>Style</span>
+          <span class="b"><i data-i="sticky-note"></i>Note</span>
+          <span class="sep"></span>
+          <span class="b lb-danger"><i data-i="x"></i>Remove</span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- row 2 components -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">On a note<small>A mark that is already a note has no Note button</small></div>
+      <div style="display:flex; gap:24px; align-items:center">
+        <div class="lb-pop chip-a comp-chip">
+          <span class="b"><i data-i="lb-palette"></i>Color</span>
+          <span class="b"><i data-i="type"></i>Style</span>
+          <span class="sep"></span>
+          <span class="b lb-danger"><i data-i="x"></i>Remove</span>
+        </div>
+        <div class="sample"><div class="reading">…in My sight...<span class="nmk" style="--c:var(--dot-honey)"><i data-i="sticky-note"></i></span></div><div class="meta">One note ends here</div></div>
+        <div class="sample"><div class="reading">…in My sight...<span class="nmk" style="--c:var(--dot-honey)"><i data-i="sticky-note"></i><b>3</b></span></div><div class="meta">Three notes end here</div></div>
+      </div>
+    </div>
+
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">A note with no words yet<small>Read mode offers to add them</small></div>
+      <div class="emptyread" style="--c: var(--dot-sky)">
+        <div class="grabber"></div>
+        <div class="ns-head"><span class="ns-dot"></span><span class="h3">Note</span><span class="iconbtn"><i data-i="ellipsis-vertical"></i></span></div>
+        <div class="ns-anchor">“Therefore by their fruits you will know them.”</div>
+        <div class="meta ns-date">Just now</div>
+        <span class="addtext"><i data-i="lb-pencil" class="sm"></i>Add note text</span>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">If a sheet fails<small>Any of these sheets; the others reopen normally</small></div>
+      <div class="lb-toast solo">That panel hit a problem and closed — your data is safe.</div>
+    </div>
+
+  </div>
+</div>
+<script src="lb-common.js"></script>
+</body></html>

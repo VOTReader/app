@@ -1,0 +1,179 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="mt-common.css">
+<style>
+  /* studies-home states and card metas (StudiesHome.jsx). Hero, feature card and rows are studies.html's. */
+  .cell > .cap { min-height: 52px; }
+  .intro { padding-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .feature { margin-top: 22px; padding: 14px; display: flex; gap: 16px; }
+  .art { width: 92px; height: 132px; flex: none; border-radius: 10px;
+    background:
+      radial-gradient(90% 60% at 70% 4%, color-mix(in srgb, var(--dot-honey) 42%, transparent), transparent 78%),
+      radial-gradient(110% 60% at 10% 106%, color-mix(in srgb, var(--dot-clay) 26%, transparent), transparent 72%),
+      linear-gradient(170deg, var(--surface-3), var(--surface-2)); }
+  .feature .ft { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .feature .meta { margin: 6px 0 12px; }
+  .feature .pill { margin-top: auto; }
+  .sect { margin: 26px 0 10px; }
+  .thumb {
+    background:
+      radial-gradient(100% 90% at 24% 18%, color-mix(in srgb, var(--tint) 40%, transparent), transparent 72%),
+      linear-gradient(150deg, color-mix(in srgb, var(--tint) 20%, var(--surface-3)), var(--surface-2)); }
+  .t2 { --tint: var(--dot-sage); } .t5 { --tint: var(--dot-clay); } .t6 { --tint: var(--dot-rose); }
+  .ttl { display: block; font: 500 17px/1.25 var(--serif); color: var(--text); }
+  .row .meta { display: block; margin-top: 3px; }
+
+  /* external site: leaves the app */
+  .ext { margin-top: 16px; }
+  .thumb.xt { background: var(--surface-2); display: grid; place-items: center; color: var(--text-2); }
+  .thumb.xt .i { width: 26px; height: 26px; }
+
+  /* the states */
+  .state { padding: 56px 12px 44px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .state .ld { font: 400 16px/1.3 var(--sans); color: var(--text-2); }
+  .bar { width: 96px; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .bar i { display: block; width: 40%; height: 100%; margin-left: 30%; border-radius: 2px; background: var(--accent); }
+  .state .msg { font: 500 21px/1.35 var(--serif); color: var(--text); text-wrap: balance; }
+  .state .soon { font: italic 400 20px/1.4 var(--serif); color: var(--text-2); }
+  .errc { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; }
+  .errc .body { flex: 1; color: var(--text); }
+
+  /* card metas, full size */
+  .metas { width: 372px; }
+  .badges { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .badges .pill { height: 24px; font-size: 12px; }
+  .nb { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 12px; background: var(--surface-2); color: var(--text-3); font: 700 12px/1 var(--sans); }
+  .badges .meta { margin: 0; }
+  .locked { opacity: .5; }
+  .locked .thumb { background: var(--surface-2); }
+  .phs { padding: 4px 0 2px; }
+  .phs .ph { display: block; }
+  .phs .ph + .ph { margin-top: 9px; }
+  .phs .meta { margin-top: 10px; }
+  .mcap { font: 400 13px/1.35 var(--sans); color: var(--text-3); margin: 14px 0 6px; }
+  .mcap:first-child { margin-top: 0; }
+</style></head>
+<body data-size="1400x1515">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Studies home: states and card metas</div>
+    <div class="meta">The populated screen is studies.html. These are the component’s other states, in the app’s own words; the notes say which a reader can meet today.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 309px)">
+
+    <!-- ───────── loading ───────── -->
+    <div class="cell">
+      <div class="cap">Loading<small>“Loading studies…” while the list is empty and the studies are downloading.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Studies</span></div>
+        <div class="scroll">
+          <div class="intro"><div class="h1">Studies</div><div class="body">Bible and letter studies, and The Volumes of Truth Matthew Study Bible</div></div>
+          <div class="state"><div class="ld">Loading studies…</div><div class="bar"><i></i></div></div>
+          <div class="row ext"><span class="thumb xt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+            <span class="txt"><span class="ttl">AnswersOnlyGodCanGive.com</span><span class="meta">External site</span></span>
+            <svg class="i sm chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── coming soon ───────── -->
+    <div class="cell">
+      <div class="cap">Nothing to list<small>Empty, not loading and no error.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Studies</span></div>
+        <div class="scroll">
+          <div class="intro"><div class="h1">Studies</div><div class="body">Bible and letter studies, and The Volumes of Truth Matthew Study Bible</div></div>
+          <div class="state"><div class="soon">Letter Studies coming soon.</div></div>
+          <div class="row ext"><span class="thumb xt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+            <span class="txt"><span class="ttl">AnswersOnlyGodCanGive.com</span><span class="meta">External site</span></span>
+            <svg class="i sm chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── could not load, empty ───────── -->
+    <div class="cell">
+      <div class="cap">Couldn’t load<small>The download failed and nothing is listed. Try again retries it.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Studies</span></div>
+        <div class="scroll">
+          <div class="intro"><div class="h1">Studies</div><div class="body">Bible and letter studies, and The Volumes of Truth Matthew Study Bible</div></div>
+          <div class="state"><div class="msg">Couldn’t load studies.</div><span class="btn primary">Try again</span></div>
+          <div class="row ext"><span class="thumb xt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+            <span class="txt"><span class="ttl">AnswersOnlyGodCanGive.com</span><span class="meta">External site</span></span>
+            <svg class="i sm chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── some could not load ───────── -->
+    <div class="cell">
+      <div class="cap">Some couldn’t load<small>The Matthew Study Bible still opens; the letter studies failed to download.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Studies</span></div>
+        <div class="scroll">
+          <div class="intro"><div class="h1">Studies</div><div class="body">Bible and letter studies, and The Volumes of Truth Matthew Study Bible</div></div>
+          <div class="card feature">
+            <div class="art"></div>
+            <div class="ft">
+              <div class="h3">The Volumes of Truth New Testament Study Bible: The Book of Matthew</div>
+              <div class="meta">28 chapters · inline commentary</div>
+              <span class="pill"><i data-i="headphones" class="xs"></i>Read-along</span>
+            </div>
+          </div>
+          <div class="label sect">More studies</div>
+          <div class="card errc"><span class="body">Some studies couldn’t load.</span><span class="btn secondary sm">Try again</span></div>
+          <div class="row ext"><span class="thumb xt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+            <span class="txt"><span class="ttl">AnswersOnlyGodCanGive.com</span><span class="meta">External site</span></span>
+            <svg class="i sm chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── card metas ───────── -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Card metas, full size<small>What each row says under its title, with its recording badge (“Read-along”, “No recording”, or a count when some parts are recorded).</small></div>
+      <div class="metas">
+        <div class="mcap">A study in parts, partly recorded</div>
+        <div class="row"><span class="thumb t5"></span>
+          <span class="txt"><span class="ttl">YahuShua The Messiah, The Lamb of God</span><span class="meta">16 parts · Bible study</span>
+            <span class="badges"><span class="pill"><i data-i="headphones" class="xs"></i>Read-along</span><span class="meta">14 of 16 parts</span></span></span>
+          <i data-i="chevron-right" class="chev sm"></i></div>
+        <div class="mcap">A one-page reference, no recording</div>
+        <div class="row"><span class="thumb t6"></span>
+          <span class="txt"><span class="ttl">Odds Chart</span><span class="meta">Reference</span>
+            <span class="badges"><span class="nb">No recording</span></span></span>
+          <i data-i="chevron-right" class="chev sm"></i></div>
+        <div class="mcap">A locked study (none is locked today)</div>
+        <div class="row locked"><span class="thumb"></span>
+          <span class="txt phs"><span class="ph" style="width:78%"></span><span class="ph" style="width:44%"></span><span class="meta">Coming soon</span></span></div>
+        <div class="mcap">Always last: the external site</div>
+        <div class="row"><span class="thumb xt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="txt"><span class="ttl">AnswersOnlyGodCanGive.com</span><span class="meta">External site</span></span>
+          <svg class="i sm chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
+      </div>
+    </div>
+
+    <!-- ───────── reachability ───────── -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Which of these a reader meets<small>From StudiesHome.jsx, use-bible-studies.js and app.jsx</small></div>
+      <div class="note">
+        <ul>
+          <li>The list always holds the Matthew Study Bible, so the three empty-list states (<b>Loading</b>, <b>Nothing to list</b>, <b>Couldn’t load</b>) do not appear today. While the letter studies download, the screen shows Matthew and the external site, with no loading line.</li>
+          <li><b>Some couldn’t load</b> is the error a reader can meet. Try again restarts the download.</li>
+          <li><b>Coming soon</b> is written for a locked study or one with no parts yet, but the list leaves both out, so it does not appear either.</li>
+          <li>Rows run heaviest first: More Than a Man, Matthew, Purity, State of the Dead, Grace and the Law, Lamb of God, Trinity, Odds Chart. Odds Chart is the one “Reference”.</li>
+          <li>Recordings today: Matthew and Purity read along in full, Lamb of God in 14 of 16 parts; the other five have none.</li>
+          <li>The external card opens AnswersOnlyGodCanGive.com in the browser.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

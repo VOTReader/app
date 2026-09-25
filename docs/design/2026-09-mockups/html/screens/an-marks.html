@@ -1,0 +1,137 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="an-common.css"><script src="an-icons.js"></script>
+<style>
+  .sec { display: flex; align-items: baseline; gap: 14px; margin-top: 6px; }
+  .sec .meta { flex: 1; }
+  /* ten colours x three styles */
+  .tbl { display: grid; grid-template-columns: 150px 330px 330px 330px 1fr; column-gap: 20px; }
+  .nw { white-space: nowrap; }
+  .tbl .th { padding: 0 0 10px; }
+  .tbl .td { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--hairline); }
+  .tbl .nm { gap: 12px; }
+  .tbl .nm .an-sw { width: 22px; height: 22px; border-radius: 11px; }
+  .tbl .nm b { display: block; font: 700 14px/1.2 var(--sans); color: var(--text); }
+  .tbl .nm .meta { font-size: 12px; }
+  .tbl .sp { font: 400 19px/1.62 var(--serif); color: var(--text); white-space: nowrap; }
+  .tbl .val { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; font: 400 12px/1.3 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tbl .val b { font: 700 13px/1.3 var(--sans); color: var(--text-2); letter-spacing: .02em; }
+  /* note states */
+  .notes .reading { font-size: 19px; }
+  .notes .reading em { font-style: italic; }
+  .why { background: var(--surface); border-radius: 16px; padding: 16px 18px; }
+  [data-theme="light"] .why { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .why .body { font-size: 14px; }
+  .why ul { margin: 10px 0 0 18px; }
+  .why li { font: 400 14px/1.45 var(--sans); color: var(--text-2); }
+  .why li + li { margin-top: 6px; }
+</style></head>
+<body data-size="1480x1500">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Marks in reading text</div>
+    <div class="meta">annotation-engine.jsx (HighlightableText, note icons) and the .hl-* styles. Every line is verbatim NKJV or Volume One, Letter 15, at the reading size. The verse number is never marked.</div>
+  </div>
+
+  <div class="sec"><span class="h3">Ten colours, three styles</span><span class="meta">A highlight fills; an underline and a squiggle draw a line in the colour. Right: this theme’s values.</span></div>
+  <div class="tbl" id="tbl">
+    <span class="th"></span><span class="th label">Highlight</span><span class="th label">Underline</span><span class="th label">Squiggle underline</span><span class="th label">Values</span>
+  </div>
+
+  <div class="sec" style="margin-top:14px"><span class="h3">Notes, overlaps and edges</span><span class="meta">A note is any mark with words attached; its icon sits where the passage ends.</span></div>
+  <div class="board-grid notes" style="grid-template-columns: repeat(4, 1fr); gap: 26px 28px">
+
+    <div class="cell">
+      <div class="cap">A note on a highlight<small>The icon follows the passage, in the note’s colour</small></div>
+      <p class="reading"><span class="vnum">3</span><mark class="mk hl c-green">You will keep him in perfect peace</mark><span class="nmk c-green"><i data-i="sticky-note"></i></span>, Whose mind is stayed on You, Because he trusts in You.</p>
+    </div>
+    <div class="cell">
+      <div class="cap">A note on an underline<small>Any of the three styles can carry a note</small></div>
+      <p class="reading"><span class="vnum">24</span><mark class="mk ul c-blue">This is the day the LORD has made;</mark><span class="nmk c-blue"><i data-i="sticky-note"></i></span> We will rejoice and be glad in it.</p>
+    </div>
+    <div class="cell">
+      <div class="cap">A note on a squiggle<small>Same icon, same place</small></div>
+      <p class="reading"><span class="vnum">22</span>Through the LORD’s mercies we are not consumed, <mark class="mk sq c-purple">Because His compassions fail </mark><span class="nw"><mark class="mk sq c-purple">not.</mark><span class="nmk c-purple"><i data-i="sticky-note"></i></span></span></p>
+    </div>
+    <div class="cell">
+      <div class="cap">No color (icon only)<small>The first note’s default: no mark, the icon alone</small></div>
+      <p class="reading"><span class="vnum">105</span>Your word is a lamp to my feet And a light to my path.<span class="nmk c-blank"><i data-i="sticky-note"></i></span></p>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Two notes end here<small>One icon with a count; a tap lists them</small></div>
+      <p class="reading"><span class="vnum">12</span>This is My commandment, <mark class="mk hl c-yellow">that you love one another as I have loved you.</mark><span class="nmk c-yellow"><i data-i="sticky-note"></i><b>2</b></span></p>
+    </div>
+    <div class="cell">
+      <div class="cap">While its note is open<small>A faint wash shows which words the open note belongs to</small></div>
+      <p class="reading"><span class="vnum">8</span>He has shown you, O man, what is good; And what does the LORD require of you But to do justly, <mark class="mk ul c-teal open">To love mercy,</mark><span class="nmk c-teal"><i data-i="sticky-note"></i></span> And to walk humbly with your God?</p>
+    </div>
+    <div class="cell">
+      <div class="cap">Filed in a coloured notebook<small>The icon takes the notebook’s colour; the mark keeps its own</small></div>
+      <p class="reading"><span class="vnum">6</span><mark class="mk hl c-yellow">In all your ways acknowledge Him,</mark><span class="nmk c-teal"><i data-i="sticky-note"></i></span> And He shall direct your paths.</p>
+    </div>
+    <div class="cell">
+      <div class="cap">Words not in this translation<small>A note made on other wording keeps to its verse, dotted</small></div>
+      <p class="reading"><span class="vnum">7</span><mark class="mk approx">Do not marvel that I said to you, ‘You must be born again.’</mark><span class="nmk c-green"><i data-i="sticky-note"></i></span></p>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Marks that overlap<small>No blending: the newer mark shows where they meet</small></div>
+      <p class="reading"><span class="vnum">16</span><mark class="mk hl c-yellow">For God so </mark><mark class="mk ul c-blue">loved the world</mark><mark class="mk hl c-yellow"> that He gave His only begotten Son,</mark> that whoever believes in Him should not perish</p>
+    </div>
+    <div class="cell">
+      <div class="cap">Across two verses<small>One mark; the number stays clear; one icon, at the end</small></div>
+      <p class="reading"><span class="vnum">1</span>A Psalm of David. <mark class="mk hl c-orange">The LORD is my shepherd; I shall not want.</mark> <span class="vnum">2</span><mark class="mk hl c-orange">He makes me to lie down in green pastures;</mark><span class="nmk c-orange"><i data-i="sticky-note"></i></span> He leads me beside the still waters.</p>
+    </div>
+    <div class="cell">
+      <div class="cap">In a letter<small>The same marks; italic and bold emphasis are kept</small></div>
+      <p class="reading"><span class="lead" style="font-weight:700;font-style:italic">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? … <em><mark class="mk hl c-pink">Like a gemstone shining in the midst of all this darkness</mark>, easily found by the eyes of God,</em></p>
+    </div>
+    <div class="cell">
+      <div class="cap">Why these ten<small>Calm, and still told apart</small></div>
+      <div class="why">
+        <div class="body">Today’s marks are highlighter ink (#FFD700, #76FF03, #FF4081 at 30-55% over black). These are the kit’s six calm tones plus four new ones, checked in both themes:</div>
+        <ul>
+          <li>every pair of washes at least ΔE 6.5 apart (the kit’s own closest pair: 6.8)</li>
+          <li>text on any wash at 9.5:1 or better</li>
+          <li>every line and icon at 3:1 or better; Vellum deepens yellow, green and blue lines</li>
+          <li>closest pairs: pink and red, yellow and brown</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var ROWS = [
+      ['yellow', 'John 3:16', '16', '', 'For God so loved the world'],
+      ['green', 'Psalm 23:2', '2', '', 'He leads me beside the still waters.'],
+      ['pink', 'Psalm 119:105', '105', '', 'Your word is a lamp to my feet'],
+      ['red', 'John 1:1', '1', '', 'In the beginning was the Word,'],
+      ['orange', 'Lamentations 3:23', '23', '', 'They are new every morning;'],
+      ['blue', 'Psalm 46:10', '10', '', 'Be still, and know that I am God;'],
+      ['purple', 'John 14:6', '6', '“', 'I am the way, the truth, and the life.'],
+      ['teal', 'Proverbs 3:5', '5', '', 'Trust in the LORD with all your heart,'],
+      ['brown', 'Psalm 23:3', '3', '', 'He restores my soul;'],
+      ['gray', 'Philippians 4:13', '13', '', 'I can do all things through Christ']
+    ];
+    var h = '';
+    ROWS.forEach(function (r) {
+      h += '<div class="td nm"><span class="an-sw c-' + r[0] + '"></span><div><b>' + r[0] + '</b><span class="meta">' + r[1] + '</span></div></div>';
+      ['hl', 'ul', 'sq'].forEach(function (s) {
+        h += '<div class="td sp"><span class="vnum">' + r[2] + '</span>' + r[3] + '<mark class="mk ' + s + ' c-' + r[0] + '">' + r[4] + '</mark></div>';
+      });
+      h += '<div class="td val" data-val="' + r[0] + '"></div>';
+    });
+    document.getElementById('tbl').insertAdjacentHTML('beforeend', h);
+    // Each theme shows its own values, read off the resolved custom properties.
+    var cs = getComputedStyle(document.documentElement);
+    document.querySelectorAll('[data-val]').forEach(function (el) {
+      var c = el.getAttribute('data-val');
+      var dot = cs.getPropertyValue('--an-' + c).trim(), wash = cs.getPropertyValue('--anw-' + c).trim(), line = cs.getPropertyValue('--ans-' + c).trim();
+      var a = parseFloat((wash.match(/,\s*([\d.]+)\s*\)$/) || [0, 0])[1]);
+      el.innerHTML = '<b>' + dot.toUpperCase() + '</b><span>wash ' + Math.round(a * 100) + '%' + (line.toLowerCase() !== dot.toLowerCase() ? ' · line ' + line.toUpperCase() : '') + '</span>';
+    });
+  })();
+</script>
+</body></html>

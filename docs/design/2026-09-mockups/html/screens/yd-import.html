@@ -1,0 +1,152 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  /* the Your Data page behind the sheet, exactly as screens/yourdata.html draws it */
+  .ydp .hero { text-align: center; padding: 14px 12px 0; }
+  .ydp .hero .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 16px; }
+  .ydp .hero .body { margin-top: 8px; text-wrap: balance; }
+  .ydp .sum { margin-top: 28px; padding: 20px 20px 18px; }
+  .ydp .counts { display: grid; grid-template-columns: 1fr 1fr; row-gap: 20px; column-gap: 16px; }
+  .ydp .counts b { display: block; font: 700 28px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; }
+  .ydp .counts .meta { display: block; margin-top: 6px; }
+  .ydp .sum .divider { margin: 20px 0 14px; }
+  .ydp .sum .last { display: flex; align-items: center; gap: 8px; }
+  .ydp .acts { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .ydp .foot { margin: 22px 20px 0; text-align: center; text-wrap: balance; }
+  /* a toast that arrives while the sheet is up rises above the sheet, never over its buttons */
+  .cell > .cap { min-height: 48px; }
+  .sheet .toast.above { position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); }
+</style></head>
+<body data-size="1064x888">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · Import from Backup</div>
+    <div class="meta">Settings › Your Data › Import. After the file is chosen and read, nothing changes until Import &amp; Overwrite. Cancel, Back, Escape or a tap outside close it untouched.</div>
+  </div>
+
+  <div class="ycols">
+    <div class="cell">
+      <div class="cap">Confirm<small>The backup’s date and what it holds, then the one choice.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll ydp">
+          <div class="hero">
+            <div class="badge"><i data-i="shield-check" class="lg"></i></div>
+            <div class="h2">Your data stays on this phone</div>
+            <div class="body">Nothing leaves this device unless you export it.</div>
+          </div>
+          <div class="card sum">
+            <div class="counts">
+              <div><b>124</b><span class="meta">Highlights</span></div>
+              <div><b>38</b><span class="meta">Notes</span></div>
+              <div><b>17</b><span class="meta">Bookmarks</span></div>
+              <div><b>9</b><span class="meta">Journal entries</span></div>
+              <div><b>12</b><span class="meta">Photos</span></div>
+              <div><b>3</b><span class="meta">Voice memos</span></div>
+            </div>
+            <div class="divider"></div>
+            <div class="meta last"><i data-i="history" class="xs"></i>Last backup: September 20</div>
+          </div>
+          <div class="acts">
+            <span class="btn primary block"><i data-i="download" class="sm"></i>Export a backup (.json)</span>
+            <span class="btn secondary block"><i data-i="upload" class="sm"></i>Import a backup</span>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet yds">
+          <div class="grabber"></div>
+          <div class="h2">Import from Backup</div>
+          <div class="p">Importing the backup from 9/20/2026, 8:14:03 PM will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.</div>
+          <div class="p soft">This backup contains 118 marked passages, 17 bookmarks, 9 journal entries, 15 media items.</div>
+          <div class="warnline"><i data-i="yd-triangle-alert" class="sm"></i>This cannot be undone.</div>
+          <div class="stack-btns">
+            <span class="btn danger block">Import &amp; Overwrite</span>
+            <span class="btn secondary block">Cancel</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Low on space<small>When the backup’s photos and recordings may not fit. A heads-up only; it blocks nothing.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll ydp">
+          <div class="hero">
+            <div class="badge"><i data-i="shield-check" class="lg"></i></div>
+            <div class="h2">Your data stays on this phone</div>
+            <div class="body">Nothing leaves this device unless you export it.</div>
+          </div>
+          <div class="card sum">
+            <div class="counts">
+              <div><b>124</b><span class="meta">Highlights</span></div>
+              <div><b>38</b><span class="meta">Notes</span></div>
+              <div><b>17</b><span class="meta">Bookmarks</span></div>
+              <div><b>9</b><span class="meta">Journal entries</span></div>
+              <div><b>12</b><span class="meta">Photos</span></div>
+              <div><b>3</b><span class="meta">Voice memos</span></div>
+            </div>
+            <div class="divider"></div>
+            <div class="meta last"><i data-i="history" class="xs"></i>Last backup: September 20</div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet yds">
+          <div class="grabber"></div>
+          <div class="h2">Import from Backup</div>
+          <div class="p">Importing the backup from 9/20/2026, 8:14:03 PM will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.</div>
+          <div class="p soft">This backup contains 118 marked passages, 17 bookmarks, 9 journal entries, 15 media items.</div>
+          <div class="callout"><i data-i="yd-hard-drive" class="sm"></i><span>Note: this backup’s media is about 41.6 MB, but only about 22.4 MB appears free on this device. The import may not complete; free up space first if you can.</span></div>
+          <div class="warnline"><i data-i="yd-triangle-alert" class="sm"></i>This cannot be undone.</div>
+          <div class="stack-btns">
+            <span class="btn danger block">Import &amp; Overwrite</span>
+            <span class="btn secondary block">Cancel</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">After a warning<small>A damaged file is flagged before this sheet opens, so there is still time to cancel.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll ydp">
+          <div class="hero">
+            <div class="badge"><i data-i="shield-check" class="lg"></i></div>
+            <div class="h2">Your data stays on this phone</div>
+            <div class="body">Nothing leaves this device unless you export it.</div>
+          </div>
+          <div class="card sum">
+            <div class="counts">
+              <div><b>124</b><span class="meta">Highlights</span></div>
+              <div><b>38</b><span class="meta">Notes</span></div>
+              <div><b>17</b><span class="meta">Bookmarks</span></div>
+              <div><b>9</b><span class="meta">Journal entries</span></div>
+              <div><b>12</b><span class="meta">Photos</span></div>
+              <div><b>3</b><span class="meta">Voice memos</span></div>
+            </div>
+            <div class="divider"></div>
+            <div class="meta last"><i data-i="history" class="xs"></i>Last backup: September 20</div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet yds">
+          <div class="toast above"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Warning: this backup was cut short — the media past that point could not be read. Everything else can still be imported.</span></div>
+          <div class="grabber"></div>
+          <div class="h2">Import from Backup</div>
+          <div class="p">Importing the backup from 9/20/2026, 8:14:03 PM will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.</div>
+          <div class="p soft">This backup contains 118 marked passages, 17 bookmarks, 9 journal entries, 15 media items.</div>
+          <div class="warnline"><i data-i="yd-triangle-alert" class="sm"></i>This cannot be undone.</div>
+          <div class="stack-btns">
+            <span class="btn danger block">Import &amp; Overwrite</span>
+            <span class="btn secondary block">Cancel</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sx-icons.js"></script><script src="sy-icons.js"></script><script src="sx-kbd.js"></script>
+<link rel="stylesheet" href="sx-common.css">
+<style>
+  .none { padding-top: 44px; }
+</style></head>
+<body data-size="1396x1124">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search · slash commands</div>
+    <div class="meta">A “/” turns the suggestion list into the command list. The list stops at eight rows, and nine commands exist, so the ninth (Rebuild search index) appears only once more letters narrow it. A tap puts the row’s key in the box and the command runs. The app’s hint reads “Command” on every row; drawn here with the key each row types, as in the sy- typing board.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 412px); column-gap: 40px">
+
+    <div class="cell">
+      <div class="cap">Typing “/” · the first eight<small>Commands are listed in the order the app keeps them</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">/<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sugg">
+            <div class="it"><i data-i="sy-dice" class="sm"></i><span class="l">Random verse or letter</span><span class="h key">/random</span></div>
+            <div class="it"><i data-i="house" class="sm"></i><span class="l">Go home</span><span class="h key">/home</span></div>
+            <div class="it"><i data-i="settings" class="sm"></i><span class="l">Open settings</span><span class="h key">/settings</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l">Go to scriptures</span><span class="h key">/scriptures</span></div>
+            <div class="it"><i data-i="library" class="sm"></i><span class="l">Go to volumes</span><span class="h key">/volumes</span></div>
+            <div class="it"><i data-i="history" class="sm"></i><span class="l">Clear search history</span><span class="h key">/clear history</span></div>
+            <div class="it"><i data-i="x" class="sm"></i><span class="l">Clear current search</span><span class="h key">/clear</span></div>
+            <div class="it"><i data-i="sx-circle-help" class="sm"></i><span class="l">Show search help</span><span class="h key">/help</span></div>
+          </div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Typing “/r” · the ninth appears<small>Rebuild search index is reachable only by narrowing</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">/r<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sugg">
+            <div class="it"><i data-i="sy-dice" class="sm"></i><span class="l">Random verse or letter</span><span class="h key">/random</span></div>
+            <div class="it"><i data-i="sx-refresh-cw" class="sm"></i><span class="l">Rebuild search index</span><span class="h key">/rebuild index</span></div>
+          </div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">After tapping “Show search help”<small>Nothing handles /help: the list returns and the page reads No results</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">/help<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sugg">
+            <div class="it"><i data-i="sx-circle-help" class="sm"></i><span class="l">Show search help</span><span class="h key">/help</span></div>
+          </div>
+          <div class="none">
+            <div class="glyph"><i data-i="search"></i></div>
+            <div class="h2">No results for “/help”</div>
+          </div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

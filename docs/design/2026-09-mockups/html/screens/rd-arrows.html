@@ -1,0 +1,130 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* The five Chapter & Letter Arrows layouts (ARROW_LAYOUT_OPTIONS in index.html; StickyChapterNav and
+     LibraryNav's nav arrows), each on the same letter page. */
+  .board-grid { grid-template-columns: repeat(5, 309px); gap: 28px 24px; }
+  .opt { min-height: 64px; }
+  .opt .t { font: 700 15px/1.3 var(--sans); color: var(--text); }
+  .opt .d { margin-top: 3px; font: 400 13px/1.4 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  .lt .scroll { position: relative; }
+  .band { height: 60px; }               /* room the floating arrows keep clear at the top of the page */
+  .more { margin-top: 20px; }
+  .more .ph + .ph { margin-top: 20.8px; }
+  /* floating arrows, pinned just under the top bar */
+  .sarrows { position: absolute; left: 0; right: 0; top: 98px; display: flex; justify-content: space-between; padding: 0 14px; z-index: 3; }
+  .sarrows.right { justify-content: flex-end; gap: 10px; }
+  .sarrows.left { justify-content: flex-start; gap: 10px; }
+  .sarrow { width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; color: var(--text); flex: none;
+    background: color-mix(in srgb, var(--surface-2) 94%, transparent); box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 0 0 1px var(--hairline); }
+  [data-theme="light"] .sarrow { background: color-mix(in srgb, var(--surface) 95%, transparent); box-shadow: 0 3px 10px rgba(60,40,20,0.16), inset 0 0 0 1px var(--hairline); }
+  /* small bubble arrows inside the top bar */
+  .navarrows { display: flex; gap: 6px; margin-left: 2px; }
+  .navarrow { width: 34px; height: 34px; border-radius: 17px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; }
+  .foot { margin-top: 2px; font: 400 13px/1.45 var(--sans); color: var(--text-3); }
+  .foot b { font-weight: 700; color: var(--text-2); }
+</style></head>
+<body data-size="1720x956">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Chapter &amp; Letter Arrows</div>
+    <div class="meta">Settings › Reading: “Where the previous/next arrows live in a chapter or letter view.” The buttons are named “Previous letter” and “Next letter” (“Previous chapter” and “Next chapter” in the Bible) and dim at either end. Shown on the same page, at the top.</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 · split -->
+    <div class="cell">
+      <div class="opt"><div class="t">Split · Left + Right</div><div class="d">Arrows on opposite edges of the content. Default.</div></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="sarrows"><span class="sarrow"><i data-i="chevron-left"></i></span><span class="sarrow"><i data-i="chevron-right"></i></span></div>
+        <div class="scroll">
+          <div class="band"></div>
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+          <div class="more"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:90%"></div><div class="ph" style="width:52%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:95%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:92%"></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 · right-handed -->
+    <div class="cell">
+      <div class="opt"><div class="t">Right-handed</div><div class="d">Both arrows tucked on the right for one-thumb reach.</div></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="sarrows right"><span class="sarrow"><i data-i="chevron-left"></i></span><span class="sarrow"><i data-i="chevron-right"></i></span></div>
+        <div class="scroll">
+          <div class="band"></div>
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+          <div class="more"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:90%"></div><div class="ph" style="width:52%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:95%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:92%"></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 · left-handed -->
+    <div class="cell">
+      <div class="opt"><div class="t">Left-handed</div><div class="d">Both arrows tucked on the left for one-thumb reach.</div></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="sarrows left"><span class="sarrow"><i data-i="chevron-left"></i></span><span class="sarrow"><i data-i="chevron-right"></i></span></div>
+        <div class="scroll">
+          <div class="band"></div>
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+          <div class="more"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:90%"></div><div class="ph" style="width:52%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:95%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:92%"></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 · in top nav -->
+    <div class="cell">
+      <div class="opt"><div class="t">In Top Nav</div><div class="d">Small bubble arrows inside the top nav bar.</div></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="navarrows"><span class="navarrow"><i data-i="chevron-left" class="sm"></i></span><span class="navarrow"><i data-i="chevron-right" class="sm"></i></span></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll">
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+          <div class="more"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:47%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:90%"></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 · hidden -->
+    <div class="cell">
+      <div class="opt"><div class="t">Hidden</div><div class="d">Hide both arrows. Use the bottom prev/next cards.</div></div>
+      <div class="phone-m"><div class="screen lt">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll">
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="divider"></div>
+          <div class="ded"><div class="from">From YahuShua HaMashiach, Our Lord and Savior</div><div>The Word of The Lord Spoken to Timothy</div><div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div></div>
+          <div class="more"><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:61%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:99%"></div><div class="ph" style="width:93%"></div><div class="ph" style="width:47%"></div><div class="ph" style="width:0;height:14px;background:none"></div><div class="ph" style="width:98%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:90%"></div></div>
+        </div>
+      </div></div>
+      <div class="foot">New profiles start here: the stored default is <b>Hidden</b>, although the Split row's description says “Default.”</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

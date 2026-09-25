@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: 686px 686px; }
+  .cell > .cap small { max-width: 640px; }
+</style></head>
+<body data-size="1480x908">
+<div class="board">
+  <div class="board-head"><div class="h2">Scripture Web · the sky</div>
+    <div class="meta">Zoomed in on Isaiah 53 (about 1,100 times the overview), then dragged down to look up. Real OpenBible threads, drawn with the app’s own height law: a thread is the half-ellipse of its own span.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">At the baseline<small>The lens lights Isaiah 53, the chapter under the middle, and the rest stands back. A count pill stands under each verse; each far end is named where its thread leaves the sky.</small></div>
+      <div class="lf f75"><div class="ls" id="fA" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">A chapter up<small>The height ruler names the height (30 · a chapter) and reads the middle row live. The height bar’s thumb turns gold once the view leaves the baseline; the web’s own feet and pills sink below the ruler.</small></div>
+      <div class="lf f75"><div class="ls" id="fB" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">A book up<small>1,000 · a book. Only threads a book long or longer still reach this high: the lit chapter’s long threads rise through it.</small></div>
+      <div class="lf f75"><div class="ls" id="fC" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">A testament up<small>15,000 · a testament, halfway up the bar. The fourth mark (31,102 · the canon) never shows: at the bar’s top its crown sits under the top bar.</small></div>
+      <div class="lf f75"><div class="ls" id="fD" data-theme="dark"></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawZoom, chromeHTML, footHTML, iconize, vid, done } from './sw-lib.js';
+  const camX = vid('Isaiah 53:1') + 6;
+  const frames = [
+    { id: 'fA', camY: 0, pills: true },
+    { id: 'fB', camY: 150 },
+    { id: 'fC', camY: 10700, ink: 1.1 },
+    { id: 'fD', camY: 161400, ink: 1.5 },
+  ];
+  for (const f of frames) document.getElementById(f.id).innerHTML = '<canvas></canvas>' + chromeHTML({}) + footHTML('canon');
+  iconize();
+  const log = [];
+  for (const f of frames) {
+    const r = drawZoom(document.querySelector('#' + f.id + ' canvas'), { camX, ppv: 32, camY: f.camY, base: 322, inset: 72,
+      pills: f.pills, ink: f.ink, labels: true, altitude: true, elevator: true });
+    log.push(f.id + ' vis ' + r.visible + ' anchored ' + r.anchored + ' labels ' + r.labels + ' pills ' + r.pills.length + ' marks ' + r.marks.map((m) => m.span).join('/') + ' readout ' + r.readout + ' at ' + (r.elevator && r.elevator.at.toFixed(4)));
+  }
+  done();
+</script>
+</body></html>

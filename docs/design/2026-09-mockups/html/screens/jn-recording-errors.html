@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .groups { display: flex; flex-direction: column; gap: 34px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grp .gh { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--hairline); }
+  .grp .gh .gi { width: 36px; height: 36px; border-radius: 18px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .grp .gh .h3 { font-size: 21px; }
+  .grp .gh .meta { margin-left: 6px; }
+  .esheet { background: var(--surface); border-radius: 24px; padding: 10px 20px 22px; box-shadow: var(--shadow); }
+  .esheet .grabber { margin-bottom: 8px; }
+  .esheet .shead .h2 { font-size: 20px; }
+  .ebody { text-align: center; padding: 10px 6px 0; }
+  .ebadge { width: 56px; height: 56px; border-radius: 28px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; margin: 0 auto 14px; }
+  .ebody .h3 { text-wrap: balance; }
+  .ebody .body { margin-top: 6px; text-wrap: balance; }
+  .eacts { display: flex; gap: 10px; margin-top: 22px; }
+  .eacts .btn { flex: 1; }
+  .cell > .cap small { max-width: 380px; }
+</style></head>
+<body data-size="1672x1460">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · when a recording can't be made or kept</div>
+    <div class="meta">Every error the recording sheet can show, grouped by cause. The words are the app's own, set as a heading and a line of advice. Close is always there; Try again appears only where the app offers it.</div>
+  </div>
+  <div class="groups" id="groups"></div>
+</div>
+<script>
+  const ICON = { permission: 'jn-mic-off', device: 'jn-phone', storage: 'jn-drive', nothing: 'jn-flat' };
+  const panel = (kind, head, advice, retry) => `<div class="esheet">
+      <div class="grabber"></div>
+      ${JN.shead('Voice recording')}
+      <div class="ebody"><div class="ebadge">${JN.ic(ICON[kind], 'lg')}</div><div class="h3">${head}</div>${advice ? `<div class="body">${advice}</div>` : ''}</div>
+      <div class="eacts"><span class="btn secondary">Close</span>${retry ? '<span class="btn primary">Try again</span>' : ''}</div>
+    </div>`;
+  const cell = (cap, sub, p) => `<div class="cell"><div class="cap">${cap}<small>${sub}</small></div>${p}</div>`;
+  const group = (kind, title, sub, cells, cols) => `<div class="grp">
+      <div class="gh"><span class="gi">${JN.ic(ICON[kind], 'sm')}</span><span class="h3">${title}</span><span class="meta">${sub}</span></div>
+      <div class="board-grid" style="grid-template-columns: repeat(${cols}, 380px)">${cells.join('')}</div>
+    </div>`;
+
+  document.getElementById('groups').innerHTML =
+    group('permission', 'Permission', 'The microphone was refused, or the request never settled. Nothing was recorded, so only Close.', [
+      cell('Permission refused', 'The prompt was answered No, or mic access is off for the app', panel('permission', 'Microphone permission denied.', 'Enable mic access for this app, then try again.')),
+      cell('No microphone stream', 'Access never reached the recorder', panel('permission', 'Microphone access was not granted.')),
+      cell('No answer in 20 seconds', 'A permission prompt that never closed', panel('permission', 'Microphone request timed out.', 'If a permission prompt appeared, please try again.')),
+      cell('The request failed', 'The app could not ask for the microphone at all', panel('permission', 'Could not request microphone access.')),
+    ], 4) +
+    group('device', 'Device', 'The recorder would not run here, or the finished take could not be read back.', [
+      cell('No usable format', 'This browser offers no way to record', panel('device', 'Recording is not supported in this browser.')),
+      cell('Recorder would not start', 'Nothing was recorded; Close only', panel('device', 'Could not start the recorder.', 'Please try again.')),
+      cell('The take could not be read', 'Try again reads the same saved file once more', panel('device', 'Could not read the recording from the device.', '', true)),
+      cell('No reason given', 'The fallback line; Try again appears on Android', panel('device', 'Recording failed.', '', true)),
+    ], 4) +
+    `<div class="pair">` +
+    group('storage', 'Storage', 'The device had no room.', [
+      cell('Full before starting', 'Checked before a take begins; Close only', panel('storage', 'Storage is full.', 'Free up space before recording.')),
+      cell('The take could not be saved', 'On Android, Try again reads and saves it again', panel('storage', 'Failed to save recording.', '', true)),
+    ], 2) +
+    group('nothing', 'Nothing captured', 'The take came back with no sound in it.', [
+      cell('An empty take', 'On Android, Try again re-reads the file; it does not record again', panel('nothing', 'Nothing was recorded.', 'Try again and speak after the timer starts.', true)),
+      cell('The device reports an empty file', 'Android only, after one Try again', panel('nothing', 'That recording is empty&nbsp;— nothing was captured.', 'Try again and speak after the timer starts.', true)),
+    ], 2) +
+    `</div>`;
+</script>
+</body></html>

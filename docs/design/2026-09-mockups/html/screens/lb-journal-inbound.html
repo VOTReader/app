@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .jchip { position: relative; }
+  .jchip .i { color: var(--accent); }
+  .jchip b { position: absolute; top: 5px; right: 3px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 700 11px/17px var(--sans); text-align: center; box-shadow: 0 0 0 2px var(--bg); }
+  .jchip.lit { z-index: 6; }
+  .ji .jhead { display: flex; align-items: flex-start; gap: 8px; }
+  .ji .jhead > div { flex: 1; min-width: 0; }
+  .ji .jhead .iconbtn { margin: -4px -10px 0 0; }
+  .ji .jhead .meta { margin-top: 2px; }
+  .ji .list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .ji .it { padding: 14px 16px; border-radius: 16px; background: var(--surface-2); display: flex; gap: 10px; align-items: center; }
+  .ji .it .tx { flex: 1; min-width: 0; }
+  .ji .it .t { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .ji .it .t.ph-t { padding-top: 6px; }
+  .ji .it .t .ph { height: 13px; border-radius: 7px; }
+  .ji .it .meta { margin-top: 4px; }
+  .ji .it .pv { margin-top: 12px; }
+  .ji .it .pv .ph { height: 9px; background: color-mix(in srgb, var(--text-3) 30%, transparent); }
+  .ji .it .chev { color: var(--text-3); }
+  .ji .none { text-align: center; padding: 44px 16px 36px; }
+  .chipdemo { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 18px; background: var(--surface); width: max-content; color: var(--text-2); }
+  [data-theme="light"] .chipdemo { box-shadow: 0 1px 2px rgba(60,40,20,.08); }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+</style></head>
+<body data-size="1120x900">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal entries that point to this passage</div>
+    <div class="meta">JournalInboundSheet.jsx via __openJournalInbound · the journal mark in the top bar shows how many entries reference the letter or chapter</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 309px 309px 1fr">
+
+    <div class="cell">
+      <div class="cap">Two entries<small>Newest first; an entry opens with a way back here</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn jchip lit"><i data-i="lb-journal"></i><b>2</b></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume Two · Letter 1</div><div class="h1">The Wide Path</div><div data-lb-paras="5,4,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet ji">
+          <div class="grabber"></div>
+          <div class="jhead"><div><div class="h3">2 journal entries</div><div class="meta">The Wide Path</div></div><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="list">
+            <div class="it"><div class="tx"><div class="t">Morning reading</div><div class="meta">September 24, 2026</div><div class="pv"><div class="ph" style="width:92%"></div></div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="it"><div class="tx"><div class="t ph-t"><div class="ph" style="width:78%"></div></div><div class="meta">August 30, 2026</div><div class="pv"><div class="ph" style="width:86%"></div></div></div><i data-i="chevron-right" class="sm chev"></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">None left<small>If the entries were deleted after the count</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume Two · Letter 1</div><div class="h1">The Wide Path</div><div data-lb-paras="5,4,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet ji">
+          <div class="grabber"></div>
+          <div class="jhead"><div><div class="h3">0 journal entries</div><div class="meta">The Wide Path</div></div><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="none body">No journal entries reference this yet.</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">The journal mark<small>In the top bar only when entries point here</small></div>
+      <div class="col">
+        <div class="chipdemo"><span class="iconbtn"><i data-i="chevron-left"></i></span><span style="width:120px"></span><span class="iconbtn jchip"><i data-i="lb-journal"></i><b>2</b></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span></div>
+        <div class="meta" style="max-width:320px">The number counts entries that reference this letter or chapter. An untitled entry is named by its first words, which stay private in these mockups.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="lb-common.js"></script>
+</body></html>

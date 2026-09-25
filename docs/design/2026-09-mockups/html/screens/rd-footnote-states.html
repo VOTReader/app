@@ -1,0 +1,164 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* FootnoteSheet, GoToRefButton, InAppLinkButton and LetterView's inline scripture sheet, in the states
+     sheet.html does not show. Same header, arrows, type and actions as sheet.html. */
+  .board-grid { grid-template-columns: repeat(4, 412px); }
+  .col { display: flex; flex-direction: column; gap: 28px; }
+  .cell > .cap { min-height: 46px; }
+  .sheet.static { border-radius: 24px; padding-bottom: 24px; box-shadow: 0 0 0 1px var(--hairline); }
+  [data-theme="light"] .sheet.static { box-shadow: 0 0 0 1px var(--hairline), 0 1px 2px rgba(60,40,20,0.06); }
+  .callout { margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--surface-2); font: 400 15px/1.5 var(--sans); color: var(--text-2); text-wrap: pretty; }
+  .callout b { color: var(--text); font-weight: 700; }
+  .callout.only { margin-top: 10px; }
+  .ntx { margin-top: 12px; font: italic 400 18px/1.5 var(--serif); color: var(--text-2); }
+  .sheet .xlink { margin-top: 16px; }
+  .sheet .extl { margin-top: 16px; }
+  .part { display: block; margin-top: 14px; font: 700 12px/1.2 var(--sans); color: var(--text-3); }
+  .part + .reading.verse { margin-top: 4px; }
+  .gogrp { margin-top: 22px; }
+  .gogrp .meta { margin-bottom: 8px; }
+  .gogrp .group { background: var(--surface-2); }
+  .gogrp .item { min-height: 52px; padding: 0 12px 0 16px; }
+  .gogrp .item + .item { border-top-color: color-mix(in srgb, var(--text) 10%, transparent); }
+  .gogrp .item span { flex: 1; font: 700 15px/1.2 var(--sans); color: var(--text); }
+  .gogrp .item .i { color: var(--text-3); }
+  .seealso { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+  .seealso .xlink { margin-top: 8px; }
+  .tagline { display: flex; align-items: center; min-height: 44px; }
+  .missing-v { margin-top: 14px; font: italic 400 17px/1.5 var(--serif); color: var(--text-3); }
+</style></head>
+<body data-size="1800x1222">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Footnote sheet: the other states</div>
+    <div class="meta">The sheet from sheet.html, in the states it has not been drawn in. On a phone each one rises over the dimmed letter; on a wide screen it docks beside it (rd-rail).</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- column 1 -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Verse text missing <small>Volume Six, Letter 13, whose only footnote points at a whole chapter the letter does not carry, before the Bible has loaded. One footnote, so no arrows.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="fnhead"><span class="meta">Footnote 1</span></div>
+          <div class="refrow"><span class="h2">1 Kings 22</span></div>
+          <div class="meta cited">Cited in Volume Six · Letter 13</div>
+          <div class="callout">Verse text isn’t available for this reference. The footnote points to <b>1 Kings 22</b>, but no matching entry was found in this letter’s scripture dictionary.</div>
+          <div class="acts"><span class="btn primary block">Open 1 Kings 22</span></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">No content <small>A note footnote with no text, link or address.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="fnhead">
+            <span class="meta">Footnote 2 of 3</span>
+            <span class="navs"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span></span>
+          </div>
+          <div class="callout only">This footnote has no content attached.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- column 2 -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">One footnote, several passages <small>Volume Two, Letter 4, footnote 12. A compound reference gets one button per passage.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="fnhead">
+            <span class="meta">Footnote 12 of 12</span>
+            <span class="navs"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn off"><i data-i="chevron-right" class="sm"></i></span></span>
+          </div>
+          <div class="refrow"><span class="h2">Revelation 1:4, Revelation 1:8, Revelation 11:17</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+          <div class="meta cited">Cited in Volume Two · Letter 4</div>
+          <span class="part">1:4</span>
+          <div class="reading verse"><p>John, to the seven churches which are in Asia: Grace to you and peace from Him who is and who was and who is to come, and from the seven Spirits who are before His throne.</p></div>
+          <span class="part">1:8</span>
+          <div class="reading verse"><p>“I am the Alpha and the Omega, the Beginning and the End,” says the Lord, “who is and who was and who is to come, the Almighty.”</p></div>
+          <span class="part">11:17</span>
+          <div class="reading verse"><p>saying: “We give You thanks, O Lord God Almighty, the One who is and who was and who is to come, because You have taken Your great power and reigned.”</p></div>
+          <div class="gogrp">
+            <div class="meta">Go to Scripture</div>
+            <div class="group">
+              <div class="item"><span>Revelation 1:4</span><i data-i="chevron-right" class="sm"></i></div>
+              <div class="item"><span>Revelation 1:8</span><i data-i="chevron-right" class="sm"></i></div>
+              <div class="item"><span>Revelation 11:17</span><i data-i="chevron-right" class="sm"></i></div>
+            </div>
+          </div>
+          <div class="acts" style="margin-top:10px"><span class="btn secondary block"><i data-i="copy" class="sm"></i>Copy</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- column 3 -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Open in App <small>Volume One, Letter 11, footnote 1: a note that points to another page in the app, and to the website.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="fnhead">
+            <span class="meta">Footnote 1 of 8</span>
+            <span class="navs"><span class="rbtn off"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span></span>
+          </div>
+          <div class="ntx">See: "Q &amp; A: What is the State of the Dead?"</div>
+          <div class="xlink"><span class="b"><span class="e">Open in App</span><span class="t">The State of the Dead and The Fate of the Wicked: The False Doctrine of Hell and Eternal Torment Exposed</span></span><i data-i="chevron-right" class="sm"></i></div>
+          <div class="extl">Open external link<i data-i="rd-arrow-up-right"></i></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Also see <small>Footnote 8 of the same letter: scripture, then a letter to read with it.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="fnhead">
+            <span class="meta">Footnote 8 of 8</span>
+            <span class="navs"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn off"><i data-i="chevron-right" class="sm"></i></span></span>
+          </div>
+          <div class="refrow"><span class="h2">1 Thessalonians 4:16-17</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+          <div class="meta cited">Cited in Volume One · Letter 11</div>
+          <div class="reading verse"><p><span class="vnum">16</span>For the Lord Himself will descend from heaven with a shout, with the voice of an archangel, and with the trumpet of God. And the dead in Christ will rise first. <span class="vnum">17</span>Then we who are alive and remain shall be caught up together with them in the clouds to meet the Lord in the air. And thus we shall always be with the Lord.</p></div>
+          <div class="acts">
+            <span class="btn primary block">Open 1 Thessalonians 4</span>
+            <span class="btn secondary block"><i data-i="copy" class="sm"></i>Copy</span>
+          </div>
+          <div class="seealso">
+            <div class="meta">Also see</div>
+            <div class="xlink"><span class="b"><span class="e">Open in App</span><span class="t">The Judgment of God Is True and Without Question, Yet the Error of the People Is Great</span></span><i data-i="chevron-right" class="sm"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- column 4 -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">A reference inside the text <small>The lighter sheet a scripture reference in a letter or study opens. The Lamb of God study, chapter 2.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="tagline"><span class="meta">Scripture Reference</span></div>
+          <div class="refrow"><span class="h2">John 12:12-15</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+          <div class="reading verse"><p><span class="vnum">12</span>The next day a great multitude that had come to the feast, when they heard that Jesus was coming to Jerusalem, took branches of palm trees and went out to meet Him, and cried out: “Hosanna! ‘Blessed is He who comes in the name of the LORD!’ The King of Israel!” Then Jesus, when He had found a young donkey, sat on it; as it is written: “Fear not, daughter of Zion; Behold, your King is coming, Sitting on a donkey’s colt.”</p></div>
+          <div class="acts">
+            <span class="btn primary block">Open John 12</span>
+            <span class="btn secondary block"><i data-i="copy" class="sm"></i>Copy</span>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Its text missing <small>The same sheet when neither the page's own verses nor the loaded Bible has the passage.</small></div>
+        <div class="sheet static">
+          <div class="grabber"></div>
+          <div class="tagline"><span class="meta">Scripture Reference</span></div>
+          <div class="refrow"><span class="h2">John 12:12-15</span></div>
+          <div class="missing-v">Verse text not available in app data</div>
+          <div class="acts"><span class="btn primary block">Open John 12</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

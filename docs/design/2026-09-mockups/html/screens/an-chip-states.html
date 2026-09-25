@@ -1,0 +1,173 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="an-common.css"><script src="an-icons.js"></script>
+<style>
+  .an-letter { padding-top: 8px; }
+  .an-letter .h1 { margin-top: 8px; }
+  .an-letter .reading { margin-top: 22px; }
+  .an-letter .reading em { font-style: italic; }
+  .an-letter .reading .lead { font-weight: 700; font-style: italic; }
+  .reading .an-tb.flow-a { margin: 14px -6px 16px; }
+  .ctx { width: 412px; padding: 0 20px; }
+  .ctx .an-tb { margin: 0 -6px; }
+  .ctx .reading { margin-top: 18px; }
+  .ctx .reading em { font-style: italic; }
+  .ctx .an-chip { margin-top: 12px; }
+  .flow { font: 400 14px/1.5 var(--sans); color: var(--text-2); }
+  .flow p + p { margin-top: 10px; }
+  .flow ul { margin: 8px 0 0 18px; }
+  .flow li + li { margin-top: 6px; }
+  .row-note { margin-top: -6px; }
+</style></head>
+<body data-size="1456x1370">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">A tapped mark: colour, style and remove, and the toolbar’s remove questions</div>
+    <div class="meta">AnnotationActionChip.jsx (its colour, style and confirm modes) and SelectionToolbar.jsx (the ✕ confirm). The chip at rest, over this same letter, is drawn by lb-.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(5, 256px)">
+
+    <!-- 1 colour -->
+    <div class="cell">
+      <div class="cap">Color<small>‹ goes back; a tap recolours and closes</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-letter">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="reading"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><mark class="mk hl c-pink" id="t1">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</mark>, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion.</div>
+        </div>
+        <div class="scrim lite"></div>
+        <div class="an-pop an-chip" data-an-below="#t1" data-an-x="center" data-an-gap="10">
+          <span class="back"><i data-i="chevron-left"></i></span>
+          <div class="row"><span class="an-sw c-yellow"></span><span class="an-sw c-green"></span><span class="an-sw c-pink on"></span><span class="an-sw c-red"></span><span class="an-sw c-orange"></span><span class="an-sw c-blue"></span><span class="an-sw c-purple"></span><span class="an-sw c-teal"></span><span class="an-sw c-brown"></span><span class="an-sw c-gray"></span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 style -->
+    <div class="cell">
+      <div class="cap">Style<small>Highlight, underline or squiggle; the current one is marked</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-letter">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="reading"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><mark class="mk hl c-pink" id="t2">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</mark>, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion.</div>
+        </div>
+        <div class="scrim lite"></div>
+        <div class="an-pop an-chip" data-an-below="#t2" data-an-x="center" data-an-gap="10">
+          <span class="back"><i data-i="chevron-left"></i></span>
+          <div class="row"><span class="an-sty hl on"><span>A</span></span><span class="an-sty ul"><span>A</span></span><span class="an-sty sq"><span>A</span></span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 remove -->
+    <div class="cell">
+      <div class="cap">Remove, asked first<small>The row becomes the question; Cancel returns to it</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-letter">
+          <div class="eyebrow">Volume One · Letter 15</div>
+          <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="reading"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><mark class="mk hl c-pink" id="t3">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</mark>, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion.</div>
+        </div>
+        <div class="scrim lite"></div>
+        <div class="an-pop an-chip cf" data-an-below="#t3" data-an-x="center" data-an-gap="10">
+          <div class="q">Remove this highlight?</div>
+          <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 toolbar remove, noted -->
+    <div class="cell">
+      <div class="cap">Toolbar: remove a noted mark<small>The toolbar turns into the question; the note goes too</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-page">
+          <div class="reading" style="padding-top:12px">
+            <p><span class="vnum">13</span>No one has ascended to heaven but He who came down from heaven, that is, the Son of Man who is in heaven. <span class="vnum">14</span>And as Moses lifted up the serpent in the wilderness, even so must the Son of Man be lifted up, <span class="vnum">15</span>that whoever believes in Him should not perish but have eternal life.</p>
+            <div class="an-tb cf flow-a" data-an-ax="#p4-sel">
+              <div class="q">Remove this highlight and its note?<span class="cq">The note text will be deleted.</span></div>
+              <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div>
+            </div>
+            <p><span class="vnum">16</span><span class="an-h a"></span><mark class="mk hl c-blue"><mark class="an-sel" id="p4-sel">For God so loved the world</mark></mark><span class="an-h b"></span><span class="nmk c-blue"><i data-i="sticky-note"></i></span> that He gave His only begotten Son, that whoever believes in Him should not perish but have everlasting life. <span class="vnum">17</span>For God did not send His Son into the world to condemn the world, but that the world through Him might be saved.</p>
+            <p><span class="vnum">18</span>“He who believes in Him is not condemned; but he who does not believe is condemned already, because he has not believed in the name of the only begotten Son of God. <span class="vnum">19</span>And this is the condemnation, that the light has come into the world, and men loved darkness rather than light, because their deeds were evil.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 flow notes -->
+    <div class="cell">
+      <div class="cap">How the chip moves<small>From the chip at rest</small></div>
+      <div class="flow">
+        <p>A brief tap on a mark that is not a note opens the chip where you tapped: Color, Style, Note and Remove.</p>
+        <ul>
+          <li>Color and Style swap the row in place; ‹ goes back.</li>
+          <li>Choosing a colour or a style applies it and closes the chip.</li>
+          <li>Remove never acts at once; it asks, naming the kind of mark.</li>
+          <li>A tap outside, or Back, closes it.</li>
+        </ul>
+        <p>The toolbar’s ✕ asks too, and says so when a note would go with the mark.</p>
+      </div>
+    </div>
+
+    <!-- row 2: the toolbar's three questions -->
+    <div class="cell" style="grid-column: span 5">
+      <div class="cap">The toolbar’s three remove questions<small>The whole toolbar collapses to one question, so nothing else can be tapped by mistake</small></div>
+      <div style="display:flex; gap:24px; align-items:flex-start">
+        <div class="ctx">
+          <div class="an-tb cf" data-an-ax="#r1">
+            <div class="q">Remove this highlight?</div>
+            <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div>
+          </div>
+          <p class="reading"><span class="vnum">16</span><span class="an-h a"></span><mark class="mk hl c-blue"><mark class="an-sel" id="r1">For God so loved the world</mark></mark><span class="an-h b"></span> that He gave His only begotten Son,</p>
+        </div>
+        <div class="ctx">
+          <div class="an-tb cf" data-an-ax="#r2">
+            <div class="q">Remove this highlight and its note?<span class="cq">The note text will be deleted.</span></div>
+            <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div>
+          </div>
+          <p class="reading"><span class="vnum">16</span><span class="an-h a"></span><mark class="mk hl c-blue"><mark class="an-sel" id="r2">For God so loved the world</mark></mark><span class="an-h b"></span><span class="nmk c-blue"><i data-i="sticky-note"></i></span> that He gave His only begotten Son,</p>
+        </div>
+        <div class="ctx">
+          <div class="an-tb cf" data-an-ax="#r3">
+            <div class="q">Remove this highlight and 2 notes?<span class="cq">The note text will be deleted.</span></div>
+            <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div>
+          </div>
+          <p class="reading"><span class="vnum">16</span><span class="an-h a"></span><mark class="an-sel" id="r3"><mark class="mk hl c-blue">For God so loved the world</mark><span class="nmk c-blue"><i data-i="sticky-note"></i></span> that He gave <mark class="mk ul c-green">His only begotten Son,</mark><span class="nmk c-green"><i data-i="sticky-note"></i></span></mark><span class="an-h b"></span></p>
+        </div>
+      </div>
+      <div class="meta row-note">The question always says “highlight”, even over an underline or a squiggle; the chip below names the kind.</div>
+    </div>
+
+    <!-- row 3: the chip asks by kind -->
+    <div class="cell" style="grid-column: span 5">
+      <div class="cap">The chip asks by kind<small>Under the tapped mark, in place of Color, Style, Note and Remove</small></div>
+      <div style="display:flex; gap:24px; align-items:flex-start">
+        <div class="ctx">
+          <p class="reading"><span class="vnum">1</span><mark class="mk hl c-red">In the beginning was the Word,</mark> and the Word was with God, and the Word was God.</p>
+          <div class="an-pop an-chip cf static"><div class="q">Remove this highlight?</div><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div></div>
+        </div>
+        <div class="ctx">
+          <p class="reading"><span class="vnum">10</span><mark class="mk ul c-blue">Be still, and know that I am God;</mark> I will be exalted among the nations, I will be exalted in the earth!</p>
+          <div class="an-pop an-chip cf static"><div class="q">Remove this underline?</div><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div></div>
+        </div>
+        <div class="ctx">
+          <p class="reading"><span class="vnum">23</span><mark class="mk sq c-orange">They are new every morning;</mark> Great is Your faithfulness.</p>
+          <div class="an-pop an-chip cf static"><div class="q">Remove this squiggle?</div><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, remove</span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="an-common.js"></script>
+</body></html>

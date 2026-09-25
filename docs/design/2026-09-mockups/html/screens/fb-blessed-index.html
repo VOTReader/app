@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* The Blessed: eight entries, one list (the Volume index rows, without dates: these entries carry none) */
+  .idx { padding-top: 8px; }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { margin-top: 20px; }
+  .entries { margin-top: 22px; }
+  .entries .item { align-items: flex-start; gap: 12px; padding: 18px 16px 18px 14px; }
+  .num { width: 44px; flex: none; padding-top: 3px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .item.cur { background: var(--accent-soft); }
+  .item.cur .pill { margin-top: 12px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">The Volumes of Truth</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">Blessings &amp; Promises</div>
+      <div class="h1">The Blessed</div>
+      <div class="meta sub">8 entries</div>
+      <div class="playrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span></div>
+    </div>
+    <div class="group entries">
+      <div class="item"><div class="num"><b>1<span class="rd"></span></b></div><div class="ttl">Introduction</div><div class="dur">~1 min</div></div>
+      <div class="item cur"><div class="num"><b>2</b></div><div class="ttl">Blessed Are Those Who Seek Me<div><span class="pill">Reading · 40%</span></div></div><div class="dur">~1 min</div></div>
+      <div class="item"><div class="num"><b>3</b></div><div class="ttl">Blessed Are Those Who Believe in Me</div><div class="dur">~2 min</div></div>
+      <div class="item"><div class="num"><b>4</b></div><div class="ttl">Blessed Are Those Who Receive of Me</div><div class="dur">~2 min</div></div>
+      <div class="item"><div class="num"><b>5</b></div><div class="ttl">Blessed Are Those Who Worship Me</div><div class="dur">~1 min</div></div>
+      <div class="item"><div class="num"><b>6</b></div><div class="ttl">Blessed Are Those Who Walk in My Ways</div><div class="dur">~3 min</div></div>
+      <div class="item"><div class="num"><b>7</b></div><div class="ttl">Blessed Are Those Who Overcome</div><div class="dur">~2 min</div></div>
+      <div class="item"><div class="num"><b>8</b></div><div class="ttl">Blessed Are Those Who Serve Me as I Have Loved Them</div><div class="dur">~2 min</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

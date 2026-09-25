@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+</style></head>
+<body data-size="1721x880">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · deleting an entry</div>
+    <div class="meta">Entry options, then three confirmations in the same sheet. Cancel at any step goes back to the options. The copy is the app's own.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(5, 309px)"></div>
+</div>
+<script>
+  const CASC = 'This will also permanently delete 2 highlights, 1 underline and 1 note you placed inside this entry.';
+  const step = (n, q, yes, last, casc = CASC) => JN.sheet(`<div class="meta">Step ${n} of 3</div>
+      <div class="steps">${[1, 2, 3].map(i => `<b class="${i <= n ? 'on' : ''}"></b>`).join('')}</div>
+      <div class="h2 q">${q}</div>
+      ${casc ? `<div class="meta casc">${casc}</div>` : ''}
+      <div class="acts"><span class="btn secondary">Cancel</span><span class="btn ${last ? 'btn-danger' : 'secondary'}">${yes}</span></div>`, 'dsheet');
+  const hub = (over) => JN.phone('m', JN.hub({ fab: false, over }));
+  const cells = [
+    ['Entry options', 'From a card’s ⋮ button; inside an entry, Open is hidden', hub(JN.sheet(`
+        <div class="item"><i data-i="eye"></i>Open entry</div>
+        <div class="item"><i data-i="square-pen"></i>Edit entry</div>
+        <div class="item">${JN.ic('jn-pin')}Pin entry</div>
+        <div class="item danger"><i data-i="trash-2"></i>Delete entry</div>`, 'dsheet'))],
+    ['Step 1 of 3', 'Names what goes with the entry', hub(step(1, 'Delete this entry?', 'Continue'))],
+    ['Step 2 of 3', 'Cancel returns to the options, never deletes', hub(step(2, 'Are you sure? This cannot be undone.', 'I am sure'))],
+    ['Step 3 of 3', 'Only the last step is the danger action', hub(step(3, 'Last step: permanently remove this entry?', 'Delete forever', true))],
+    ['Nothing placed inside', 'With no marks, notes or links in it, the extra line is left out', hub(step(1, 'Delete this entry?', 'Continue', false, ''))],
+  ];
+  JN.fill('grid', cells);
+</script>
+</body></html>

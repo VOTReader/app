@@ -1,0 +1,116 @@
+/* st- (Settings area): shared pieces for every Settings page and board, built on kit.css tokens.
+   Two semantic colours join the one accent, used ONLY for consequences. They are the kit's own
+   (--warn, --danger), always tinted, never solid:
+   warn   = a clear that removes progress or history (recoverable by reading again), cautionary results;
+   danger = removes personal data or overwrites it (Clear All, Delete Everything, Import & Overwrite). */
+:root, [data-theme] {
+  --st-danger: var(--danger);
+  --st-danger-soft: var(--danger-soft);
+  --st-danger-line: var(--danger-line);
+  --st-warn: var(--warn);
+  --st-warn-soft: var(--warn-soft);
+  --st-warn-line: var(--warn-line);
+}
+:root, [data-theme="dark"] { --st-ok: #9dbb8e; }
+[data-theme="light"] { --st-ok: #4f7a45; }
+
+/* page rhythm (matches screens/appearance.html: .label section heads, filled groups) */
+.scroll.st { padding-bottom: 44px; }
+.sect { margin: 30px 0 10px; }
+.sect.first { margin-top: 8px; }
+.lead-help { font: 400 14px/1.5 var(--sans); color: var(--text-2); margin: 4px 2px 0; text-wrap: pretty; }
+
+/* one setting: head line (label [+ value] + control), then its helper copy */
+.set { padding: 16px; }
+.group > .set + .set, .group > .deps + .set, .group > .set + .deps { border-top: 1px solid var(--hairline); }
+.set .hd { display: flex; align-items: center; gap: 14px; }
+.set .txt { flex: 1; min-width: 0; }
+.set .lbl { font: 400 16px/1.3 var(--sans); color: var(--text); }
+.set .val { font: 400 15px/1.35 var(--sans); color: var(--text-2); margin-top: 3px; }
+.set .num { font: 700 15px/1 var(--sans); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.set .chev { color: var(--text-3); flex: none; }
+.set .help { font: 400 13.5px/1.5 var(--sans); color: var(--text-3); margin-top: 8px; text-wrap: pretty; }
+.set .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+.set .dv { font: 400 14px/1.5 var(--sans); color: var(--text-2); margin-top: 8px; text-wrap: pretty; }
+
+/* dependent rows: shown only while the row above them is on (the app unmounts them otherwise) */
+.deps { position: relative; padding-left: 20px; border-top: 1px solid var(--hairline); }
+.deps::before { content: ''; position: absolute; left: 22px; top: 18px; bottom: 18px; width: 2px; border-radius: 2px; background: var(--surface-3); }
+.deps > .set { padding-left: 20px; }
+.deps > .set + .set, .deps > .set + .deps, .deps > .deps + .set { border-top: 1px solid var(--hairline); }
+.deps .deps { margin-left: -20px; padding-left: 40px; }
+.deps .deps::before { left: 42px; }
+
+/* sliders with a readout, a scale and Reset */
+.set .sl { display: flex; align-items: flex-start; gap: 14px; margin-top: 14px; }
+.set .slc { flex: 1; min-width: 0; }
+.set .track { height: 22px; display: flex; align-items: center; padding: 0 2px; }
+.set .track .slider { flex: 1; }
+.set .scale { display: flex; justify-content: space-between; margin-top: 6px; font: 400 12px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.set .sl > .btn { flex: none; margin-top: -7px; }
+.set .sl + .help { margin-top: 14px; }
+
+/* buttons that live inside rows and dialogs */
+.btn.quiet { background: var(--surface-3); color: var(--text); }
+.btn.ghost { background: none; color: var(--text-2); }
+.btn.is-off { opacity: 0.4; }
+.btn.danger { background: var(--st-danger-soft); color: var(--st-danger); box-shadow: inset 0 0 0 1px var(--st-danger-line); }
+.btn.warn { background: var(--st-warn-soft); color: var(--st-warn); box-shadow: inset 0 0 0 1px var(--st-warn-line); }
+.btn.text.sm.reset { padding: 0 10px; }
+
+/* info disclosure (the app's (i) button, drawn open) */
+.more { display: flex; align-items: center; gap: 6px; margin-top: 12px; font: 700 14px/1.35 var(--sans); color: var(--accent); }
+.more .i { flex: none; }
+.note { margin-top: 12px; background: var(--surface-2); border-radius: 12px; padding: 14px 16px 16px; font: 400 14px/1.55 var(--sans); color: var(--text-2); }
+.note > * + * { margin-top: 10px; }
+.note ul { padding-left: 18px; }
+.note li + li { margin-top: 7px; }
+.note li::marker { color: var(--text-3); }
+.note b { color: var(--text); font-weight: 700; }
+
+/* result / status panels inside a row */
+.panel { margin-top: 12px; border-radius: 12px; padding: 12px 14px; font: 400 14px/1.5 var(--sans); color: var(--text-2); background: var(--surface-2); }
+.panel.ok { background: color-mix(in srgb, var(--st-ok) 12%, transparent); }
+.panel.warn { background: var(--st-warn-soft); box-shadow: inset 0 0 0 1px var(--st-warn-line); }
+.panel.danger { background: var(--st-danger-soft); box-shadow: inset 0 0 0 1px var(--st-danger-line); }
+.panel .ph-line { display: flex; gap: 10px; align-items: flex-start; }
+.panel .ph-line .i { flex: none; margin-top: 1px; }
+.panel.ok .ph-line .i { color: var(--st-ok); }
+.panel.warn .ph-line .i { color: var(--st-warn); }
+.panel.danger .ph-line .i { color: var(--st-danger); }
+
+/* picker sheet (SelectField) */
+.psheet { background: var(--surface); border-radius: 24px 24px 0 0; padding: 10px 20px 22px; box-shadow: var(--shadow); }
+.psheet .eyebrow { margin-top: 2px; }
+.psheet .h2 { margin: 2px 0 8px; }
+.opt { display: flex; align-items: center; gap: 12px; padding: 13px 0; min-height: 54px; }
+.opt + .opt { border-top: 1px solid var(--hairline); }
+.opt .ot { flex: 1; min-width: 0; }
+.opt .ol { font: 400 16px/1.3 var(--sans); color: var(--text); }
+.opt .od { font: 400 13px/1.4 var(--sans); color: var(--text-3); margin-top: 3px; text-wrap: pretty; }
+.opt .om { font: 400 13px/1 var(--sans); color: var(--text-3); white-space: nowrap; }
+.opt .ck { color: var(--accent); flex: none; }
+.opt.on .ol { color: var(--accent); font-weight: 700; }
+
+/* inline confirm (ConfirmStrip) */
+.confirm { border-radius: 14px; padding: 14px 16px; background: var(--st-warn-soft); box-shadow: inset 0 0 0 1px var(--st-warn-line); }
+.confirm.danger { background: var(--st-danger-soft); box-shadow: inset 0 0 0 1px var(--st-danger-line); }
+.confirm .q { display: flex; gap: 10px; align-items: flex-start; font: 400 15px/1.45 var(--sans); color: var(--text); text-wrap: pretty; }
+.confirm .q .i { flex: none; margin-top: 1px; color: var(--st-warn); }
+.confirm.danger .q .i { color: var(--st-danger); }
+.confirm .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* toast */
+.toast { display: flex; align-items: center; gap: 12px; background: var(--surface-3); border-radius: 14px; padding: 13px 16px; font: 400 15px/1.4 var(--sans); color: var(--text); box-shadow: var(--shadow); text-wrap: pretty; }
+.toast > .i { flex: none; align-self: flex-start; margin-top: 1px; color: var(--text-2); }
+.toast > .i.warn { color: var(--st-warn); }
+.toast > .i.err { color: var(--st-danger); }
+.toast > .i.ok { color: var(--st-ok); }
+.toast .grow { flex: 1; min-width: 0; }
+.toast .act { font: 700 15px/1.3 var(--sans); color: var(--accent); white-space: nowrap; }
+.toast .act.block { display: block; margin-top: 8px; white-space: normal; }
+
+/* spinner-free progress hint for "Checking…" states */
+.dots { display: inline-flex; gap: 4px; vertical-align: middle; margin-left: 6px; }
+.dots i { width: 5px; height: 5px; border-radius: 3px; background: var(--text-3); display: block; }
+.dots i:nth-child(2) { opacity: .6; } .dots i:nth-child(3) { opacity: .3; }

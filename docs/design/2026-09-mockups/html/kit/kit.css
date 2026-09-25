@@ -33,6 +33,13 @@
   --hl-lavender: rgba(163, 147, 196, 0.26);
   --hl-clay: rgba(201, 143, 107, 0.26);
   --dot-honey: #d9b45a; --dot-sage: #8fae8b; --dot-sky: #86a9c9; --dot-rose: #c9848f; --dot-lavender: #a393c4; --dot-clay: #c98f6b;
+  /* the app has ten mark colours: the calm six above plus these four, chosen so every wash pair stays >= dE 6.5 apart */
+  --hl-red: rgba(199, 93, 77, 0.26); --hl-teal: rgba(114, 182, 182, 0.28); --hl-brown: rgba(142, 126, 103, 0.42); --hl-gray: rgba(176, 174, 171, 0.20);
+  --dot-red: #c75d4d; --dot-teal: #72b6b6; --dot-brown: #8e7e67; --dot-gray: #b0aeab;
+  /* warn: a recoverable clear (progress, history). danger: deletes or overwrites the reader's own data.
+     Both are always tinted, never solid, so they never read as the primary action. */
+  --warn: #e8995a; --warn-soft: rgba(232, 153, 90, 0.11); --warn-line: rgba(232, 153, 90, 0.32);
+  --danger: #d4919b; --danger-soft: rgba(212, 145, 155, 0.13); --danger-line: rgba(212, 145, 155, 0.34);
   color-scheme: dark;
 }
 [data-theme="light"] {
@@ -57,6 +64,10 @@
   --hl-lavender: rgba(140, 120, 190, 0.24);
   --hl-clay: rgba(200, 125, 85, 0.26);
   --dot-honey: #c79a2e; --dot-sage: #6f9a6b; --dot-sky: #5f8fbd; --dot-rose: #b9606f; --dot-lavender: #8573b3; --dot-clay: #b8744c;
+  --hl-red: rgba(201, 73, 54, 0.30); --hl-teal: rgba(79, 176, 176, 0.26); --hl-brown: rgba(112, 96, 72, 0.34); --hl-gray: rgba(128, 121, 107, 0.16);
+  --dot-red: #ab4536; --dot-teal: #498d8d; --dot-brown: #7f6c56; --dot-gray: #83817c;
+  --warn: #8c500b; --warn-soft: rgba(160, 96, 20, 0.10); --warn-line: rgba(140, 80, 11, 0.30);
+  --danger: #8f3a4a; --danger-soft: rgba(143, 58, 74, 0.08); --danger-line: rgba(143, 58, 74, 0.30);
   color-scheme: light;
 }
 
@@ -186,3 +197,7 @@ mark { color: inherit; border-radius: 3px; padding: 1px 0; -webkit-box-decoratio
 .phone-s > .screen, .phone-m > .screen { position: relative; width: 412px; }
 /* tall pages: body[data-size="412xNNNN"] + .screen.tall */
 .screen.tall { height: auto; min-height: 915px; }
+
+/* destructive and warning buttons: tinted, verb-first labels (Delete, Remove, Discard, Clear) */
+.btn-danger { background: var(--danger-soft); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger-line); }
+.btn-warn { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn-line); }

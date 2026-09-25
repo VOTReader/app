@@ -1,0 +1,160 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: 412px 309px 309px 300px; }
+  .stackc { display: flex; flex-direction: column; gap: 26px; }
+  .sub { font: 700 12px/1.3 var(--sans); color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; }
+  .sub small { display: block; font-weight: 400; text-transform: none; letter-spacing: 0; margin-top: 2px; }
+  .sorts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .sortrow { display: flex; align-items: center; gap: 10px; }
+  .sortrow .n { width: 14px; font: 700 12px/1 var(--sans); color: var(--text-3); text-align: right; flex: none; }
+  .sortrow .lk-head { flex: 1; background: var(--surface); border-radius: 14px; padding: 2px 6px 2px 14px; }
+  [data-theme="light"] .sortrow .lk-head { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .sortrow .lk-head .h3 { font-size: 20px; }
+  .sortrow .lk-sort { height: 40px; }
+  .sortrow.cur .lk-sort { color: var(--text); font-weight: 700; }
+  .lcard { background: var(--surface-2); border-radius: 16px; padding: 14px 16px 6px; margin-top: 10px; }
+  .lcard .dir { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .lcard .ref { font: 500 18px/1.28 var(--serif); color: var(--text); margin-top: 2px; }
+  .lcard .mm { font: 400 13px/1.35 var(--sans); color: var(--text-3); margin-top: 2px; }
+  .lcard .pv { font: 400 16px/1.5 var(--serif); color: var(--text-2); margin-top: 8px; }
+  .lcard .top { opacity: .45; }
+  .lcard .lk-confirm { margin: 12px -8px 10px; background: var(--surface-3); }
+  .lcard .lk-confirm .btn.secondary { background: var(--surface-2); }
+  .sheet.acts { padding-bottom: 24px; }
+  .sheet.acts .lk-confirm { margin: 6px 0 4px; }
+</style></head>
+<body data-size="1482x1100">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Links in depth: broken ends, sorting and removal</div>
+    <div class="meta">LinksScreen.jsx (callout, “(unknown)”, sort cycle, row options) and LinkCard.jsx (remove from the reading view)</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- A broken links -->
+    <div class="cell">
+      <div class="cap">Broken links<small>Sorted oldest first; the notice hides while searching</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Links</span></div>
+        <div class="scroll">
+          <div class="lk-head"><div class="tt"><span class="h1">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Oldest</span></div>
+          <div class="search lk-search"><i data-i="search" class="sm"></i>Search links…</div>
+          <div class="lk-callout"><i data-i="lk-unlink" class="sm"></i><div class="body">2 links point to content that can no longer be found (a source or target was deleted). Long-press a link to remove it.</div></div>
+          <div class="lks">
+            <div class="lk">
+              <div class="ep src"><div class="m">Source</div><div class="t unk">(unknown)</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">Jul 2</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · Old Testament</div><div class="t">Psalms 23:4</div><div class="q">I will fear no evil; For You are with me</div></div>
+            </div>
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · Journal</div><div class="t">Journal · <span class="ph"></span></div>
+                <div class="q ph-q"><div class="ph" style="width:94%"></div><div class="ph" style="width:61%"></div></div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">Aug 14</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · Old Testament</div><div class="t">Isaiah 53:5</div><div class="q">But He was wounded for our transgressions, He was bruised for our iniquities; The chastisement for our peace was upon Him, And by His stripes we are healed.</div></div>
+            </div>
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · Volume Two</div><div class="t">The Wide Path</div><div class="q">holding fast to the wide path which leads to destruction</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">2w ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · New Testament</div><div class="t">Matthew 7:13</div><div class="q">“Enter by the narrow gate; for wide is the gate and broad is the way that leads to destruction, and there are many who go in by it.</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- B row options -->
+    <div class="cell">
+      <div class="cap">Row options<small>⋯ on a row, or a long-press</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Links</span></div>
+        <div class="scroll">
+          <div class="lk-head"><div class="tt"><span class="h1">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="search lk-search"><i data-i="search" class="sm"></i>Search links…</div>
+          <div class="lks">
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · New Testament</div><div class="t">John 3:3</div><div class="q">unless one is born again, he cannot see the kingdom of God.</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">Just now</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · Volume Three</div><div class="t">Born Again</div><div class="q">that none shall enter The Kingdom of Heaven, unless they are born again.</div></div>
+            </div>
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · Volume Two</div><div class="t">The True Baptism</div><div class="q">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">2h ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · New Testament</div><div class="t">John 3:5</div><div class="q">Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet acts">
+          <div class="lk-grab"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="bar"><span></span></span></div>
+          <div class="lk-acts">
+            <div class="a"><i data-i="lk-arrow-left"></i>Open Source</div>
+            <div class="a"><i data-i="lk-arrow-right"></i>Open Target</div>
+            <div class="a lk-danger"><i data-i="trash-2"></i>Delete Link</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- C delete confirm -->
+    <div class="cell">
+      <div class="cap">Delete, confirmed<small>The same sheet asks before anything goes</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Links</span></div>
+        <div class="scroll">
+          <div class="lk-head"><div class="tt"><span class="h1">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="search lk-search"><i data-i="search" class="sm"></i>Search links…</div>
+          <div class="lks">
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · New Testament</div><div class="t">John 3:3</div><div class="q">unless one is born again, he cannot see the kingdom of God.</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">Just now</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · Volume Three</div><div class="t">Born Again</div><div class="q">that none shall enter The Kingdom of Heaven, unless they are born again.</div></div>
+            </div>
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · Volume Two</div><div class="t">The True Baptism</div><div class="q">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">2h ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · New Testament</div><div class="t">John 3:5</div><div class="q">Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet acts">
+          <div class="lk-grab"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="bar"><span></span></span></div>
+          <div class="lk-confirm"><div class="q">Delete this link?</div>
+            <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm danger">Yes, delete</span></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- D + E components -->
+    <div class="cell">
+      <div class="cap">Sort and remove<small>One sort button; a second confirm in the reading view</small></div>
+      <div class="stackc comp">
+        <div>
+          <div class="sub">The sort cycle<small>Each tap moves on; a fifth returns to Newest</small></div>
+          <div class="sorts">
+            <div class="sortrow cur"><span class="n">1</span><div class="lk-head"><div class="tt"><span class="h3">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div></div>
+            <div class="sortrow"><span class="n">2</span><div class="lk-head"><div class="tt"><span class="h3">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Oldest</span></div></div>
+            <div class="sortrow"><span class="n">3</span><div class="lk-head"><div class="tt"><span class="h3">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Source A-Z</span></div></div>
+            <div class="sortrow"><span class="n">4</span><div class="lk-head"><div class="tt"><span class="h3">Links</span><span class="meta cnt">12</span></div><span class="lk-sort"><i data-i="arrow-up-down" class="xs"></i>Target A-Z</span></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="sub">Remove from the reading view<small>A link card in the Links panel on John 3:3</small></div>
+          <div class="lcard">
+            <div class="top"><div class="dir">to</div><div class="ref">Born Again</div><div class="mm">Volume Three · Just now</div>
+              <div class="pv">that none shall enter The Kingdom of Heaven, unless they are born again.</div></div>
+            <div class="lk-confirm"><div class="q">Remove this link?</div>
+              <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm danger">Yes, remove</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

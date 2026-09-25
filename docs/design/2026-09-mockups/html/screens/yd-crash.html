@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .cell > .cap { min-height: 64px; }
+  /* one calm centred block per state: no chrome, because none survives these states */
+  .mid { position: absolute; left: 0; right: 0; top: 34px; bottom: 0; padding: 0 36px 96px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .mid .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; margin-bottom: 20px; }
+  .mid .h1 { font-size: 30px; }
+  .mid .body { margin-top: 12px; max-width: 320px; text-wrap: balance; }
+  .mid .safe { display: inline-flex; align-items: center; gap: 6px; }
+  .mid .btns { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 30px; }
+  .mid .fine { margin-top: 18px; font: 400 13.5px/1.5 var(--sans); color: var(--text-3); max-width: 320px; text-wrap: balance; }
+  .mid.loading .word { font: 400 16px/1.3 var(--sans); color: var(--text-2); }
+  .mid.loading .track { width: 120px; height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 14px; position: relative; overflow: hidden; }
+  .mid.loading .track i { position: absolute; top: 0; bottom: 0; left: 28px; width: 44px; border-radius: 2px; background: var(--accent); }
+  .mid.err .word { font: 400 18px/1.4 var(--sans); color: var(--text); }
+  .mid.err .btn { margin-top: 22px; }
+</style></head>
+<body data-size="1400x908">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">When something goes wrong · crash, loading, a section that will not load</div>
+    <div class="meta">A crash replaces only the screen it happened on; the notes and data underneath are untouched. None of these states keeps the page’s top bar.</div>
+  </div>
+
+  <div class="ycols">
+    <div class="cell">
+      <div class="cap">The crash screen<small>A page fails while drawing. Reload App starts the app again where you were.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="mid">
+          <div class="badge"><i data-i="yd-circle-alert" class="lg"></i></div>
+          <div class="h1">Something went wrong</div>
+          <div class="body">This page hit an unexpected problem and could not finish loading. Your notes and data are safe.</div>
+          <div class="btns">
+            <span class="btn primary block"><i data-i="yd-refresh-cw" class="sm"></i>Reload App</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">It keeps happening<small>The second failure within 20 seconds: the same page would fail again after a reload, so Reset to Home leads the way out.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="mid">
+          <div class="badge"><i data-i="yd-circle-alert" class="lg"></i></div>
+          <div class="h1">Something went wrong</div>
+          <div class="body">This page hit an unexpected problem and could not finish loading. Your notes and data are safe.</div>
+          <div class="btns">
+            <span class="btn primary block"><i data-i="house" class="sm"></i>Reset to Home</span>
+            <span class="btn secondary block"><i data-i="yd-refresh-cw" class="sm"></i>Reload App</span>
+          </div>
+          <div class="fine">This screen keeps failing. Use Reset to Home to return to the home screen — your saved notes and data are not affected.</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Loading a section<small>The first visit to Settings, Search, the Garden, the Scripture Web, Personal Study or the Listening Library fetches its part of the app.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="mid loading">
+          <div class="word">Loading…</div>
+          <div class="track"><i></i></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A section that will not load<small>Offline, or its files could not be fetched. Try again asks for them once more.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="mid err">
+          <div class="badge"><i data-i="yd-cloud-off" class="lg"></i></div>
+          <div class="word">Couldn’t load this section.</div>
+          <span class="btn secondary"><i data-i="yd-refresh-cw" class="sm"></i>Try again</span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(3, 412px); }
+  .pk-find .search { padding-right: 10px; }
+  .scrolled { margin-top: -118px; }
+</style></head>
+<body data-size="1364x1100">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Select Text: the letter excerpt picker</div>
+    <div class="meta">LetterExcerptPickerScreen.jsx · opens when a link's target is a letter, an entry or a study chapter · here the reader links John 3:3 to “Born Again” (Volume Three), whose first footnote cites John 3:3-5</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- A: find, nothing held -->
+    <div class="cell">
+      <div class="cap">Find in this letter<small>1 of 3 paragraphs hold “born again”; the current one is washed</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Born Again</div><div class="meta">Volume Three</div></div>
+          <div class="pk-find">
+            <div class="search"><i data-i="search" class="sm"></i><span class="typed">born again</span><span class="cnt">1 of 3</span></div>
+            <span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span>
+          </div>
+          <div class="pk-hint"><i data-i="lk-text-select" class="sm"></i>Long-press and drag to select an excerpt — or use the button below to link the whole letter.</div>
+          <div class="pk-letter">
+            <p class="hit"><span class="lead">Thus says The Lord:</span> It is written, <em>that none shall enter The Kingdom of Heaven, unless they are born again. For all are born physically, of human parents, by great travail into a world of sin. So then to enter The Kingdom of Heaven, one must also be born again, of the Spirit,</em> set apart from this world and from all that is sin. My son, you are being born again even now, from the first moment you came to Me in repentance, even to this day. For I am faithful. And yet you ask, <em>“How can this be?”</em> questioning My words spoken to My servant, where I said, <em>“You must be born again and again.”</em> My son, I have spoken, and all I have written through My servant Timothy stands; no contradiction found. Rather it is the understanding of men, which remains lacking. Therefore if one comes to Me in repentance, with sincere remorse over their sins, they shall surely be born again - even again and again, as they strive to make their repentance full.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link the whole letter</span></div>
+      </div></div>
+    </div>
+
+    <!-- B: excerpt held -->
+    <div class="cell">
+      <div class="cap">An excerpt, held by long-press<small>The preview quotes it; the button now links just these words</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Born Again</div><div class="meta">Volume Three</div></div>
+          <div class="pk-find">
+            <div class="search"><i data-i="search" class="sm"></i><span class="typed">born again</span><span class="cnt">1 of 3</span></div>
+            <span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span>
+          </div>
+          <div class="pk-prev">“that none shall enter The Kingdom of Heaven, unless they are born again.”</div>
+          <div class="pk-letter">
+            <p class="hit"><span class="lead">Thus says The Lord:</span> It is written, <em><span class="lk-handle a"></span><mark class="lk-sel">that none shall enter The Kingdom of Heaven, unless they are born again.</mark><span class="lk-handle b"></span> For all are born physically, of human parents, by great travail into a world of sin. So then to enter The Kingdom of Heaven, one must also be born again, of the Spirit,</em> set apart from this world and from all that is sin. My son, you are being born again even now, from the first moment you came to Me in repentance, even to this day. For I am faithful. And yet you ask, <em>“How can this be?”</em> questioning My words spoken to My servant, where I said, <em>“You must be born again and again.”</em> My son, I have spoken, and all I have written through My servant Timothy stands; no contradiction found. Rather it is the understanding of men, which remains lacking. Therefore if one comes to Me in repentance, with sincere remorse over their sins, they shall surely be born again - even again and again, as they strive to make their repentance full.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link this excerpt</span></div>
+      </div></div>
+    </div>
+
+    <!-- C: stepping -->
+    <div class="cell">
+      <div class="cap">› to 2 of 3, centred and washed<small>Proposed: the find row stays pinned while searching</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-find pin">
+            <div class="search"><i data-i="search" class="sm"></i><span class="typed">born again</span><span class="cnt">2 of 3</span></div>
+            <span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span>
+          </div>
+          <div class="pk-letter scrolled">
+            <p>Yet I tell you a mystery: It has been appointed to those who are born twice to die once, but by no means shall they die a second time. Yet those who do not come to Me in repentance shall be born once and die twice. Yet there are some among this generation who shall never taste death, having already passed from judgment into life. Thus to My chosen elect, there is a death of the body unto resurrection. Yet for those still living at My return, there is a death of another kind - <em>the crucifying of your old man with his sinful ways, the putting on of the new man who is renewed in the knowledge of the Truth, restored in the image of Him who created him.</em></p>
+            <p class="poem">Thus when one is born into this world,
+The child and the mother suffer the pangs
+Of childbirth, until the birth is complete...</p>
+            <p class="poem">In the same way, those born of the Spirit shall suffer travail;
+For they are not yet separated from their flesh
+Or this world, in which they continually stumble...</p>
+            <p class="poem hit">So then being born again is the process by which
+You are restored in the image of God,
+A continual washing, until you come into glory.</p>
+            <p>My son, I died for the forgiveness of your sins - those of today, yesterday, and those sins of tomorrow. Yet man does continually stumble over his flesh, being tempted in a world filled with sin. And so he must continually come to Me, and even seventy times seven times shall I cleanse him and lift him up.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link the whole letter</span></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

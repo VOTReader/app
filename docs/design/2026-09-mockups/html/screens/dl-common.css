@@ -1,0 +1,160 @@
+/* dl- area (tabs, first-run and platform flows, the Garden gate, rearranging Home): shared pieces built on kit.css tokens.
+   The Tabs overview below is copied value-for-value from screens/tabs.html (approved); the one addition is the
+   "Tab actions" (⋮) button, which the source keeps on every card. Confirm, toast, dialog and bubble values follow
+   the st- and sy- areas so the whole app reads as one system. */
+
+/* closing tabs is a recoverable clear: the kit's warn, tinted, never solid (as .btn-warn) */
+:root, [data-theme] {
+  --dl-warn: var(--warn);
+  --dl-warn-soft: var(--warn-soft);
+  --dl-warn-line: var(--warn-line);
+}
+
+/* ---------- a full-size phone on a board ---------- */
+.phone-l { position: relative; width: 412px; height: 915px; border-radius: 34px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 1px var(--hairline), var(--shadow); flex: none; }
+.phone-l > .screen, .phone-s > .screen, .phone-m > .screen { position: relative; width: 412px; overflow: hidden; }
+.cell > .cap small { max-width: 420px; }
+
+/* a fingertip, drawn only to show where a press or drag is happening */
+.touch { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 22px; z-index: 30; pointer-events: none;
+  background: color-mix(in srgb, var(--text) 14%, transparent); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 32%, transparent); }
+
+/* ---------- Tabs overview (from tabs.html) ---------- */
+.tabs-top .title { padding-left: 12px; }
+.tabs-top .btn.text { height: 44px; font-size: 15px; }
+.tabs-top .btn.text.off { opacity: .4; }
+.tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 8px; position: relative; }
+.tab { height: 260px; border-radius: 16px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+[data-theme="light"] .tab { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.tab.cur, [data-theme="light"] .tab.cur { box-shadow: 0 0 0 2px var(--accent); }
+.pv { flex: 1; min-height: 0; padding: 14px 12px 0; position: relative; overflow: hidden; }
+.strip { height: 48px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; background: var(--surface-2); position: relative; }
+.strip .nm { flex: 1; min-width: 0; font: 700 13px/1.25 var(--sans); color: var(--text); text-wrap: balance; }
+.strip .x { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--text-3); flex: none; }
+.strip .pin { color: var(--text-2); flex: none; margin-right: 2px; }
+/* ⋮ Tab actions: top-right of the preview, far from the × (the source moved them apart after mis-taps) */
+.tmenu { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; z-index: 2;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text-2); }
+
+/* mini page vocabulary (tabs.html) */
+.mph { height: 5px; border-radius: 3px; background: var(--surface-3); }
+.mph + .mph { margin-top: 7px; }
+.mph.r { background: color-mix(in srgb, var(--dot-rose) 55%, var(--surface-3)); }
+.mph.h { background: color-mix(in srgb, var(--dot-honey) 55%, var(--surface-3)); }
+.mm { font: 400 8px/1.2 var(--sans); color: var(--text-3); }
+.mt { font: 500 17px/1.1 var(--serif); color: var(--text); margin-top: 3px; }
+.mt.big { font-size: 24px; margin-top: 0; }
+.mb { margin-top: 12px; }
+.mb + .mb { margin-top: 12px; }
+.ln { display: flex; align-items: center; gap: 3px; height: 5px; }
+.ln + .ln { margin-top: 7px; }
+.ln .mph { flex: none; }
+.ln .mph + .mph { margin-top: 0; }
+.vn { font: 700 6px/1 var(--sans); color: var(--accent); width: 5px; flex: none; }
+.mcont { margin-top: 12px; background: var(--surface-2); border-radius: 10px; padding: 8px 9px 9px; }
+.mcont .ms { font: 500 13px/1.1 var(--serif); color: var(--text); margin-top: 2px; }
+.mprog { height: 2px; border-radius: 1px; background: var(--surface-3); margin-top: 8px; overflow: hidden; }
+.mprog i { display: block; height: 100%; background: var(--accent); }
+.mtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.mtiles span { height: 40px; border-radius: 8px; background: var(--surface-2); position: relative; }
+.mtiles span b { position: absolute; left: 7px; bottom: 7px; width: 52%; height: 4px; border-radius: 2px; background: var(--surface-3); }
+.mtiles span b::before { content: ''; position: absolute; left: 0; top: -14px; width: 9px; height: 9px; border-radius: 5px; background: var(--accent-soft); }
+.arcs { position: absolute; left: 12px; top: 46px; width: 156px; height: 154px; }
+.arcs path { fill: none; stroke-width: 1.2; stroke-linecap: round; }
+.arcs .a { stroke: var(--accent); }
+.arcs .b { stroke: var(--text-3); opacity: .6; }
+.arcs .base { stroke: var(--text-3); stroke-width: 1; opacity: .45; }
+.arcs .n { fill: var(--text-2); }
+.arcs .n.on { fill: var(--accent); }
+.newtab { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 0 26px 0 20px; }
+
+/* ---------- bottom-sheet action rows ---------- */
+.sheet .eyebrow { margin-top: 2px; }
+.sheet .h2 { margin: 2px 0 6px; }
+.acts-list .ai { display: flex; align-items: flex-start; gap: 14px; padding: 13px 0; }
+.acts-list .ai + .ai, .acts-list .rename + .ai, .acts-list .ai + .confirm-wrap, .acts-list .confirm-wrap + .ai { border-top: 1px solid var(--hairline); }
+.ai > .i { color: var(--text-2); margin-top: 1px; flex: none; }
+.ai .at { flex: 1; min-width: 0; }
+.ai .al { font: 400 16px/1.3 var(--sans); color: var(--text); }
+.ai .ad { font: 400 13px/1.4 var(--sans); color: var(--text-3); margin-top: 3px; text-wrap: pretty; }
+.ai.off { opacity: .42; }
+.sheet .btn.block.cancel { margin-top: 12px; }
+
+/* text field (focused = accent ring + caret) */
+.flabel { font: 400 13px/1.3 var(--sans); color: var(--text-3); margin-bottom: 6px; }
+.field { height: 48px; border-radius: 12px; background: var(--surface-2); display: flex; align-items: center; padding: 0 14px;
+  font: 400 16px/1 var(--sans); color: var(--text); }
+.field.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.field .phx { color: var(--text-3); }
+.caret { display: inline-block; width: 2px; height: 22px; background: var(--accent); margin-left: 1px; border-radius: 1px; flex: none; }
+.rename { padding: 10px 0 14px; }
+.rename .racts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* ---------- buttons used inside rows and dialogs ---------- */
+.btn.ghost { background: none; color: var(--text-2); }
+.btn.quiet { background: var(--surface-3); color: var(--text); }
+.btn.warn { background: var(--dl-warn-soft); color: var(--dl-warn); box-shadow: inset 0 0 0 1px var(--dl-warn-line); }
+.btn.off { opacity: .4; }
+
+/* ---------- inline confirm (ConfirmStrip), warn tone as in Settings ---------- */
+.confirm-wrap { padding: 12px 0; }
+.confirm { border-radius: 14px; padding: 14px 16px; background: var(--dl-warn-soft); box-shadow: inset 0 0 0 1px var(--dl-warn-line); }
+.confirm .q { display: flex; gap: 10px; align-items: flex-start; font: 400 15px/1.45 var(--sans); color: var(--text); text-wrap: pretty; }
+.confirm .q .i { flex: none; margin-top: 1px; color: var(--dl-warn); }
+.confirm .cacts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* ---------- toast (kit + sy-) ---------- */
+.toast { display: flex; align-items: center; gap: 12px; max-width: 380px; min-height: 52px; padding: 12px 10px 12px 18px; border-radius: 14px;
+  background: var(--surface-3); color: var(--text); font: 400 15px/1.4 var(--sans); box-shadow: var(--shadow); }
+.toast .txt { flex: 1; min-width: 0; text-wrap: pretty; }
+.toast .act { flex: none; padding: 8px 8px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.toast .i { color: var(--text-2); flex: none; align-self: flex-start; margin-top: 1px; }
+
+/* ---------- centred dialog (sy-) ---------- */
+.dialog { background: var(--surface); border-radius: 22px; padding: 22px 20px 18px; box-shadow: var(--shadow); }
+[data-theme="dark"] .dialog { background: var(--surface-2); }
+.dialog .eyebrow { margin-bottom: 6px; }
+.dialog .h2 { font-size: 23px; }
+.dialog .body { margin-top: 10px; text-wrap: pretty; }
+.dialog .dacts { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+/* in Vesper the dialog is already surface-2, so its secondary button steps up one surface */
+[data-theme="dark"] .dialog .btn.secondary { background: var(--surface-3); }
+
+/* ---------- coach-mark bubble (sy-) ---------- */
+.bubble { position: absolute; display: inline-flex; align-items: center; gap: 8px; padding: 10px 6px 10px 14px; border-radius: 14px; background: var(--surface-3);
+  color: var(--text); font: 400 14px/1.3 var(--sans); box-shadow: var(--shadow); white-space: nowrap; z-index: 12; }
+.bubble::before { content: ''; position: absolute; top: -6px; width: 12px; height: 12px; background: var(--surface-3); transform: rotate(45deg); border-radius: 2px; }
+.bubble .iconbtn { width: 30px; height: 30px; color: var(--text-3); }
+.ringed { box-shadow: 0 0 0 2px var(--accent); }
+
+/* ---------- on-screen keyboards (look follows sy-) ---------- */
+.kbd { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; height: 286px; background: var(--surface-2); padding: 10px 4px 26px; border-top: 1px solid var(--hairline); }
+.kbd .kr { display: flex; gap: 6px; padding: 0 3px; }
+.kbd .kr + .kr { margin-top: 11px; }
+.kbd .kr.mid { padding: 0 22px; }
+.kbd .k { flex: 1; height: 46px; border-radius: 8px; background: var(--surface); display: grid; place-items: center; font: 400 20px/1 var(--sans); color: var(--text); }
+[data-theme="dark"] .kbd .k { background: var(--surface-3); }
+.kbd .k.fn { flex: 1.35; font-size: 15px; color: var(--text-2); background: var(--surface-3); }
+[data-theme="dark"] .kbd .k.fn { background: color-mix(in srgb, var(--surface-3) 60%, var(--surface-2)); }
+.kbd .kr:last-child .k.fn { flex: 1.2; }
+.kbd .k.space { flex: 5; }
+.kbd .k.go { flex: 1.35; background: var(--accent); color: var(--accent-ink); border-radius: 23px; }
+.kbd .k .i { width: 20px; height: 20px; }
+.kbd.num { height: 262px; padding-top: 12px; }
+.kbd.num .kr { gap: 8px; padding: 0 8px; }
+.kbd.num .kr + .kr { margin-top: 8px; }
+.kbd.num .k { height: 50px; font-size: 22px; }
+.kbd.num .k.go { flex: 1; border-radius: 25px; }
+.kbd.num .k.fn { flex: 1; }
+
+/* ---------- spinner (jp-garden) ---------- */
+.spin { width: 30px; height: 30px; border-radius: 15px; border: 3px solid var(--surface-3); border-top-color: var(--accent); flex: none; }
+
+/* ---------- iPhone chrome (no Android status icons) ---------- */
+.ios-status { height: 54px; position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 26px 0 46px; flex: none;
+  font: 700 16px/1 var(--sans); color: var(--text); z-index: 25; }
+.ios-status .island { position: absolute; left: 50%; top: 11px; width: 122px; height: 35px; margin-left: -61px; border-radius: 18px; background: #000; }
+.ios-status .sys { display: flex; align-items: center; gap: 6px; }
+.ios-status .sys svg { display: block; fill: currentColor; }
+.ios-home { position: absolute; bottom: 8px; left: 50%; width: 140px; height: 5px; margin-left: -70px; border-radius: 3px; background: var(--text); z-index: 26; }

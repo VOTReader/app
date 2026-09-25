@@ -9,16 +9,31 @@
   .handle { display: inline-block; width: 2px; height: 26px; background: var(--accent); vertical-align: -6px; position: relative; }
   .handle::after { content: ''; position: absolute; left: -5px; width: 12px; height: 12px; border-radius: 6px; background: var(--accent); }
   .handle.a::after { top: -11px; } .handle.b::after { bottom: -11px; }
-  .toolbar { position: relative; margin: 14px -6px 16px; background: var(--surface-2); border-radius: 18px; padding: 12px 12px 8px; box-shadow: var(--shadow); }
-  .swatches { display: flex; justify-content: space-between; padding: 0 6px 12px; border-bottom: 1px solid var(--hairline); }
-  .sw { width: 30px; height: 30px; border-radius: 15px; }
-  .sw.on { box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text); }
-  .acts { display: flex; justify-content: space-around; padding-top: 8px; }
-  .act { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 400 12px/1 var(--sans); color: var(--text-2); width: 62px; padding: 4px 0; }
-  .toolbar::after { content: ''; position: absolute; left: 150px; bottom: -7px; width: 14px; height: 14px; background: var(--surface-2); transform: rotate(45deg); border-radius: 2px; }
+  /* the selection toolbar with the app's real controls, as screens/an-toolbar.html draws them:
+     three styles, the ten colours in toolbar order, Listen from here (John 3 has a recording), six actions */
+  .toolbar { position: relative; margin: 14px -6px 16px; background: var(--surface-2); border-radius: 18px; padding: 10px 12px 6px; box-shadow: var(--shadow); }
+  .toolbar::after { content: ''; position: absolute; left: 214px; bottom: -7px; width: 14px; height: 14px; background: var(--surface-2); transform: rotate(45deg); border-radius: 2px; }
+  .styles { display: flex; align-items: center; gap: 4px; }
+  .st { width: 44px; height: 40px; border-radius: 12px; display: grid; place-items: center; font: 500 21px/1 var(--serif); color: var(--text-2); flex: none; }
+  .st.on { background: var(--surface-3); color: var(--text); }
+  .st span { padding: 0 2px; line-height: 1.1; }
+  .st.hl span { background: var(--hl-honey); border-radius: 3px; }
+  .st.ul span { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .st.sq span { text-decoration: underline wavy; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+  .swatches { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-top: 4px; padding: 0 2px 8px; border-bottom: 1px solid var(--hairline); box-sizing: content-box; }
+  .sw { width: 28px; height: 28px; border-radius: 14px; flex: none; }
+  .lfh { display: flex; align-items: center; justify-content: center; gap: 9px; height: 44px; margin-top: 10px; border-radius: 22px; background: var(--accent-soft); color: var(--accent); font: 700 15px/1 var(--sans); }
+  .lfh .i { width: 17px; height: 17px; fill: currentColor; }
+  .acts { display: grid; grid-template-columns: repeat(6, 1fr); padding-top: 6px; }
+  .act { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 0 6px; border-radius: 12px; font: 400 12px/1 var(--sans); color: var(--text-2); white-space: nowrap; }
   .mini .t { flex: 1; min-width: 0; }
   .mini .t b { display: block; font: 700 14px/1.2 var(--sans); color: var(--text); }
   .mini .t span { font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  /* second line as the app's bar has it: the edition (it ellipsizes), then the clock */
+  .mini .t .sub { display: flex; gap: 6px; }
+  .mini .t .src { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .mini .t .tm { flex: none; font-variant-numeric: tabular-nums; }
+  .mini .iconbtn { width: 36px; height: 40px; }
 </style></head>
 <body>
 <div class="screen">
@@ -35,14 +50,16 @@
     <div class="eyebrow sechead">Nicodemus and the New Birth</div>
     <div class="reading verses">
       <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
-  <div class="toolbar">
+      <div class="toolbar">
+        <div class="styles"><span class="st hl on"><span>A</span></span><span class="st ul"><span>A</span></span><span class="st sq"><span>A</span></span></div>
         <div class="swatches">
-          <span class="sw on" style="background:var(--dot-honey)"></span><span class="sw" style="background:var(--dot-sage)"></span><span class="sw" style="background:var(--dot-sky)"></span>
-          <span class="sw" style="background:var(--dot-rose)"></span><span class="sw" style="background:var(--dot-lavender)"></span><span class="sw" style="background:var(--dot-clay)"></span>
+          <span class="sw" style="background:var(--dot-honey)"></span><span class="sw" style="background:var(--dot-sage)"></span><span class="sw" style="background:var(--dot-rose)"></span><span class="sw" style="background:var(--dot-red)"></span><span class="sw" style="background:var(--dot-clay)"></span>
+          <span class="sw" style="background:var(--dot-sky)"></span><span class="sw" style="background:var(--dot-lavender)"></span><span class="sw" style="background:var(--dot-teal)"></span><span class="sw" style="background:var(--dot-brown)"></span><span class="sw" style="background:var(--dot-gray)"></span>
         </div>
+        <div class="lfh"><i data-i="play"></i>Listen from here</div>
         <div class="acts">
-          <span class="act"><i data-i="underline"></i>Underline</span><span class="act"><i data-i="notebook-pen"></i>Note</span>
-          <span class="act"><i data-i="link"></i>Link</span><span class="act"><i data-i="copy"></i>Copy</span><span class="act"><i data-i="share-2"></i>Share</span>
+          <span class="act"><i data-i="notebook-pen"></i>Note</span><span class="act"><i data-i="link"></i>Link</span><span class="act"><i data-i="copy"></i>Copy</span>
+          <span class="act"><i data-i="share-2"></i>Share</span><span class="act"><i data-i="search"></i>Search</span><span class="act"><i data-i="bookmark"></i>Bookmark</span>
         </div>
       </div>
       <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, <span class="handle a"></span><mark class="sel">unless one is born again, he cannot see the kingdom of God.</mark><span class="handle b"></span>”</p>
@@ -51,9 +68,10 @@
   </div>
   <div class="mini">
     <span class="playbtn"><i data-i="pause"></i></span>
-    <span class="t"><b>John 3 · KJV · Biblical Restoration</b><span>1:12 / 4:05</span>
+    <span class="t"><b>John 3</b><span class="sub"><span class="src">KJV · Biblical Restoration Ministries</span><span class="tm">1:12 / 4:05</span></span>
       <div class="progress" style="margin-top:6px"><i style="width:29%"></i></div></span>
-    <span class="chip" style="height:30px">1.00×</span>
+    <span class="iconbtn"><i data-i="chevron-right" class="sm"></i></span>
+    <span class="iconbtn"><i data-i="x" class="sm"></i></span>
   </div>
 </div>
 </body></html>

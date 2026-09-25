@@ -1,0 +1,238 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .tabs { margin-top: 16px; }
+  .ctl { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .ctl .btn { height: 36px; padding: 0 14px; font-size: 14px; }
+  .ctl .btn .i { width: 16px; height: 16px; }
+  .ctl .btn.pressed { background: var(--surface-3); }
+  .nrs { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .nbhead { padding-top: 4px; }
+  .nbhead .eyebrow { display: flex; align-items: center; gap: 8px; }
+  .nbhead .h1 { margin-top: 4px; }
+  .nbacts { display: flex; gap: 8px; margin-top: 16px; }
+  .nbacts .btn { height: 36px; padding: 0 14px; font-size: 14px; }
+  .nbacts .btn .i { width: 16px; height: 16px; }
+  .nbs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+  .nbc { position: relative; min-height: 124px; padding: 16px; border-radius: 18px; background: var(--surface); display: flex; flex-direction: column; }
+  [data-theme="light"] .nbc { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .nbc .ic { color: var(--c, var(--accent)); }
+  .nbc .chev { position: absolute; right: 12px; top: 15px; color: var(--text-3); }
+  .nbc .eb { position: absolute; left: 50px; top: 18px; }
+  .nbc .nm { margin-top: auto; padding-top: 14px; font: 500 20px/1.2 var(--serif); color: var(--text); }
+  .nbc .dt { margin-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .nbc.form { min-height: 0; padding: 12px; }
+  .nbc.form .field { height: 46px; padding: 0 12px; font-size: 16px; }
+  .nbc.form .formacts { gap: 6px; margin-top: 10px; }
+  .nbc.form .formacts .btn { flex: 1; padding: 0 8px; font-size: 13px; }
+  .field { height: 52px; border-radius: 14px; background: var(--surface-2); display: flex; align-items: center; padding: 0 16px; font: 400 17px/1 var(--sans); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .field.ph-t { color: var(--text-3); }
+  .formacts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  /* components at full size */
+  .comp { width: 372px; }
+  .compcol { display: flex; flex-direction: column; gap: 16px; }
+  .rename { display: flex; align-items: center; gap: 10px; }
+  .rename .field { flex: 1; font: 500 22px/1 var(--serif); }
+  /* gold default + the ten mark colours, in the app's order (NotesIndexScreen: HL_COLORS) */
+  .colors { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 14px 12px; border-radius: 16px; background: var(--surface); }
+  .colors .lb-sw { width: 26px; height: 26px; border-radius: 13px; }
+  .colors .lb-sw.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+  [data-theme="light"] .colors { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .doc { width: 372px; border-radius: 16px; background: var(--surface); overflow: hidden; }
+  [data-theme="light"] .doc { box-shadow: 0 1px 2px rgba(60,40,20,.08); }
+  .doc .fh { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface-2); }
+  .doc .fh .i { color: var(--text-2); }
+  .doc .fh b { display: block; font: 700 14px/1.3 var(--sans); color: var(--text); }
+  .doc .md { padding: 14px 16px 16px; font: 400 13px/1.55 var(--sans); color: var(--text-2); }
+  .doc .md .h { font-weight: 700; color: var(--text); }
+  .doc .md .bq { font-family: var(--serif); font-style: italic; font-size: 15px; padding-left: 10px; border-left: 2px solid var(--surface-3); margin: 6px 0; }
+  .doc .md .gap { height: 10px; }
+  .doc .md .ph { height: 8px; }
+  .doc .md .ph + .ph { margin-top: 9px; }
+  .pill-back { display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 14px 0 8px; border-radius: 18px; background: var(--surface-2); font: 400 14px/1 var(--sans); color: var(--text-2); }
+  .pill-back b { color: var(--text); font-weight: 700; }
+</style></head>
+<body data-size="1456x1400">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Notes: all notes, sharing, empty states and notebook tools</div>
+    <div class="meta">NotesIndexScreen.jsx · the note sheet, its ⋯ menu and the notebook picker are drawn elsewhere (lb-note-sheet, an-)</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(5, 256px)">
+
+    <!-- 1 all notes -->
+    <div class="cell">
+      <div class="cap">All notes<small>Every note, newest first, with its notebooks</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Notes</span></div>
+        <div class="scroll">
+          <div class="lb-head"><div class="tt"><span class="h1">Notes</span><span class="meta cnt">23</span></div></div>
+          <div class="seg tabs"><span>Notebooks</span><span class="on">All notes</span></div>
+          <div class="search lb-search"><i data-i="search" class="sm"></i>Search notes…</div>
+          <div class="ctl"><span class="btn secondary"><i data-i="lb-share"></i>Share as text</span><span class="lb-sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="nrs" style="margin-top:10px">
+            <div class="nr" style="--c: var(--dot-honey)">
+              <div class="src"><span>John 3:5</span><span class="d">2d ago</span></div>
+              <div class="nb-body" data-lb-ph="3"></div>
+              <div class="anc">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>
+              <div class="lb-tags"><span class="lb-tag"><i data-i="lb-folder" style="color:var(--dot-honey)"></i>Devotional</span><span class="lb-tag"><i data-i="lb-folder" style="color:var(--dot-sage)"></i>Sabbath study</span></div>
+            </div>
+            <div class="nr" style="--c: var(--dot-clay)">
+              <div class="src"><span>The Wide Path</span><span class="d">3d ago</span></div>
+              <div class="nb-body" data-lb-ph="2"></div>
+              <div class="anc">“Peoples of the earth, why do you corrupt and pollute My garden?!”</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 all notes empty -->
+    <div class="cell">
+      <div class="cap">No notes yet<small>All notes tab on a first visit</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Notes</span></div>
+        <div class="scroll">
+          <div class="lb-head"><div class="tt"><span class="h1">Notes</span><span class="meta cnt">0</span></div></div>
+          <div class="seg tabs"><span>Notebooks</span><span class="on">All notes</span></div>
+          <div class="lb-empty" style="padding-top:110px">
+            <div class="ic"><i data-i="sticky-note"></i></div>
+            <div class="h3">No notes yet</div>
+            <div class="body">Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 notebook empty -->
+    <div class="cell">
+      <div class="cap">An empty notebook<small>Uncategorized says: notes in no notebook appear here</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Notes</span></div>
+        <div class="scroll">
+          <div class="nbhead">
+            <div class="eyebrow"><span class="dot" style="background:var(--dot-lavender)"></span>Notebook · 0 notes</div>
+            <div class="h1">Proverbs</div>
+            <div class="nbacts"><span class="btn secondary">Rename</span><span class="btn secondary">Color</span><span class="btn danger">Delete</span></div>
+          </div>
+          <div class="search lb-search" style="margin-top:18px"><i data-i="search" class="sm"></i>Search notes…</div>
+          <div class="lb-empty" style="padding-top:70px">
+            <div class="ic"><i data-i="lb-folder-open"></i></div>
+            <div class="h3">Nothing here yet</div>
+            <div class="body">Add notes to this notebook from the ⋯ menu on any note.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 no matches -->
+    <div class="cell">
+      <div class="cap">Search, no matches<small>Searches your words, the passage and its place</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Notes</span></div>
+        <div class="scroll">
+          <div class="nbhead">
+            <div class="eyebrow"><span class="dot" style="background:var(--dot-honey)"></span>Notebook · 8 notes</div>
+            <div class="h1">Devotional</div>
+            <div class="nbacts"><span class="btn secondary"><i data-i="lb-share"></i>Share</span><span class="btn secondary">Rename</span><span class="btn secondary">Color</span><span class="btn danger">Delete</span></div>
+          </div>
+          <div class="search lb-search" style="margin-top:18px"><i data-i="search" class="sm"></i><span class="typed">harvest</span><i data-i="x" class="sm x"></i></div>
+          <div class="lb-empty" style="padding-top:70px">
+            <div class="ic"><i data-i="search"></i></div>
+            <div class="h3">No matches</div>
+            <div class="body">Try a different search term.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 new notebook -->
+    <div class="cell">
+      <div class="cap">New notebook<small>Named in place; Create waits for a name</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Notes</span></div>
+        <div class="scroll">
+          <div class="lb-head"><div class="tt"><span class="h1">Notes</span><span class="meta cnt">23</span></div></div>
+          <div class="seg tabs"><span class="on">Notebooks</span><span>All notes</span></div>
+          <div class="nbs">
+            <div class="nbc" style="--c: var(--text-3)"><i data-i="lb-folder-open" class="ic"></i><span class="meta eb">Default</span><i data-i="chevron-right" class="sm chev"></i><div class="nm">Uncategorized</div><div class="dt">5 notes</div></div>
+            <div class="nbc" style="--c: var(--dot-honey)"><i data-i="lb-folder" class="ic"></i><i data-i="chevron-right" class="sm chev"></i><div class="nm">Devotional</div><div class="dt">8 notes</div></div>
+            <div class="nbc" style="--c: var(--dot-sage)"><i data-i="lb-folder" class="ic"></i><i data-i="chevron-right" class="sm chev"></i><div class="nm">Sabbath study</div><div class="dt">6 notes</div></div>
+            <div class="nbc" style="--c: var(--dot-sky)"><i data-i="lb-folder" class="ic"></i><i data-i="chevron-right" class="sm chev"></i><div class="nm">Prophecy</div><div class="dt">4 notes</div></div>
+            <div class="nbc"><i data-i="lb-folder" class="ic"></i><i data-i="chevron-right" class="sm chev"></i><div class="nm">Questions</div><div class="dt">2 notes</div></div>
+            <div class="nbc form">
+              <div class="field">Proverbs<span class="lb-caret"></span></div>
+              <div class="formacts"><span class="btn sm secondary">Cancel</span><span class="btn sm primary">Create</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- components -->
+    <div class="cell" style="grid-column: span 5">
+      <div class="cap">Notebook tools<small>Rename, colour tag and delete sit under the notebook's name (user notebooks only; Uncategorized has only Share)</small></div>
+      <div style="display:flex; gap:24px; align-items:flex-start">
+        <div class="comp">
+          <div class="meta" style="margin-bottom:8px">Rename</div>
+          <div class="rename"><div class="field">Devotional<span class="lb-caret"></span></div></div>
+          <div class="formacts"><span class="btn sm secondary">Cancel</span><span class="btn sm primary">Save</span></div>
+        </div>
+        <div class="comp">
+          <div class="meta" style="margin-bottom:8px">Colour tag</div>
+          <div class="nbacts" style="margin-top:0"><span class="btn secondary"><i data-i="lb-share"></i>Share</span><span class="btn secondary">Rename</span><span class="btn secondary" style="background:var(--surface-3)">Color</span><span class="btn danger">Delete</span></div>
+          <div class="colors">
+            <span class="lb-sw gold"></span><span class="lb-sw honey on"></span><span class="lb-sw sage"></span><span class="lb-sw rose"></span><span class="lb-sw red"></span><span class="lb-sw clay"></span><span class="lb-sw sky"></span><span class="lb-sw lavender"></span><span class="lb-sw teal"></span><span class="lb-sw brown"></span><span class="lb-sw gray"></span>
+          </div>
+          <div class="meta" style="margin-top:8px">The first swatch is the default and clears the tag.</div>
+        </div>
+        <div class="comp">
+          <div class="meta" style="margin-bottom:8px">Delete</div>
+          <div class="lb-confirm"><div class="q">Delete “Devotional”? Notes will move to Uncategorized.</div>
+            <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm danger">Yes, delete</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell" style="grid-column: span 5">
+      <div class="cap">Share as text<small>The list you are looking at becomes one document, sent to the share sheet or saved as a file</small></div>
+      <div style="display:flex; gap:24px; align-items:flex-start">
+        <div class="doc">
+          <div class="fh"><i data-i="file-text"></i><div><b>My Notes 2026-09-25.md</b><span class="meta">Plain text, grouped by passage</span></div></div>
+          <div class="md">
+            <div class="h"># My Notes</div>
+            <div>23 notes · Exported September 25, 2026 · VOTReader</div>
+            <div class="gap"></div>
+            <div class="h">## John 3:5</div>
+            <div class="bq">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>
+            <div data-lb-ph="2" style="margin:10px 0"></div>
+            <div>— September 23, 2026</div>
+            <div class="gap"></div>
+            <div class="h">## The Wide Path</div>
+            <div class="bq">“Peoples of the earth, why do you corrupt and pollute My garden?!”</div>
+          </div>
+        </div>
+        <div class="compcol comp">
+          <div class="meta">After saving</div>
+          <div class="lb-toast solo">Notes exported.</div>
+          <div class="lb-toast solo">Export failed. Please try again.</div>
+          <div class="meta" style="margin-top:6px">A cancelled save stays quiet. A notebook shares as “Devotional notes 2026-09-25.md”.</div>
+        </div>
+        <div class="compcol comp">
+          <div class="meta">Opened from a journal card</div>
+          <div><span class="pill-back"><i data-i="chevron-left" class="sm"></i>Back to <b>Morning reading</b></span></div>
+          <div class="meta">Sits above the title and returns to the entry in one tap.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="lb-common.js"></script>
+</body></html>

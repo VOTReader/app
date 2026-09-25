@@ -1,0 +1,124 @@
+<title>VOTReader Atlas</title>
+<meta name="description" content="Every VOTReader screen, sheet and state redrawn in the Vesper system, dark and light side by side.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* A dim review room (single theme by choice) so dark and light renders both read true. */
+  :root {
+    color-scheme: dark;
+    --ground: #121110; --surface: #1a1917; --raise: #23221f; --line: #2f2d29;
+    --text: #ece7dd; --muted: #a8a194; --faint: #756f65; --accent: #d2ad5f; --accent-ink: #1a1408;
+    --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --sans: 'IBM Plex Sans', 'Segoe UI', Roboto, Arial, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    --gutter: clamp(16px, 4vw, 40px);
+  }
+  [hidden] { display: none !important; }
+  html { background: var(--ground); }
+  body { background: var(--ground); color: var(--text); font: 15px/1.55 var(--sans); padding-inline: var(--gutter); padding-block: 0 72px; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .wrap { max-width: 1320px; margin: 0 auto; }
+  .mast { padding-block: 40px 26px; display: grid; gap: 16px; border-bottom: 1px solid var(--line); }
+  .mast h1 { margin: 0; font: 500 clamp(34px, 6vw, 56px)/1.05 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .mast h1 em { color: var(--accent); font-weight: 400; }
+  .lede { margin: 0; max-width: 66ch; color: var(--muted); font-size: 16px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 10px; }
+  .facts span { background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 500 12.5px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .facts b { color: var(--text); font-weight: 500; }
+  .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--ground) 92%, transparent); backdrop-filter: blur(8px); padding-block: 12px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; width: max-content; }
+  .nav a { display: inline-flex; gap: 6px; align-items: center; text-decoration: none; color: var(--muted); font-size: 13px; padding: 6px 11px; border-radius: 999px; background: var(--surface); white-space: nowrap; }
+  .nav a:hover { color: var(--text); }
+  .nav a small { font-family: var(--mono); color: var(--faint); }
+  section.area { padding-block: 40px 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 64px; }
+  .area-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 18px; }
+  .area-head h2 { margin: 0; font: 500 clamp(24px, 3.4vw, 32px)/1.15 var(--serif); }
+  .area-head .count { font: 500 12.5px/1 var(--mono); color: var(--faint); }
+  .area-head p { flex-basis: 100%; margin: 0; color: var(--muted); max-width: 72ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 28px 24px; }
+  .card { margin: 0; display: grid; gap: 10px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  .shot { display: block; width: 100%; padding: 0; border: 0; background: var(--surface); border-radius: 12px; overflow: hidden; cursor: zoom-in; box-shadow: 0 0 0 1px var(--line); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .meta-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  .card h3 { margin: 0; font: 500 18px/1.25 var(--serif); }
+  .card p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; max-width: 70ch; }
+  .card code { display: block; margin-top: 4px; font: 400 11.5px/1.4 var(--mono); color: var(--faint); overflow-wrap: anywhere; }
+  .cbtn { flex: none; font: 500 12.5px/1 var(--sans); color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; min-height: 34px; cursor: pointer; }
+  .cbtn:hover { border-color: var(--faint); }
+  .lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(8,8,7,.95); display: grid; grid-template-rows: auto 1fr auto; padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  .lightbox header { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+  .lightbox header b { color: var(--text); font-weight: 500; }
+  .stage { min-height: 0; display: grid; place-items: center; overflow: auto; }
+  .stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; }
+  .lightbox footer { display: flex; justify-content: center; gap: 10px; }
+  .lb { font: 500 13px/1 var(--sans); color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px; min-height: 40px; cursor: pointer; }
+  footer.page { margin-top: 36px; color: var(--faint); font: 12.5px/1.5 var(--mono); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>VOTReader, <em>every screen</em></h1>
+    <p class="lede">Every surface of the app redrawn in the Vesper system, from Home to the deepest settings, sheets and error states. Dark and light sit side by side. Each is an HTML render using the app's own fonts and real content, so every screen here can be built as drawn. Tap a screen to see it large, or use <b>Comment</b> to leave a note on it.</p>
+    <div class="facts" id="facts"></div>
+  </header>
+  <nav class="nav" aria-label="Areas"><ol id="nav"></ol></nav>
+  <main id="areas"></main>
+  <footer class="page" id="foot"></footer>
+</div>
+
+<div class="lightbox" id="lbx" hidden role="dialog" aria-modal="true" aria-labelledby="lbx-t">
+  <header><span><b id="lbx-t"></b> <span id="lbx-s"></span></span><button class="lb" id="lbx-close" type="button">Close</button></header>
+  <div class="stage"><img id="lbx-img" alt=""></div>
+  <footer><button class="lb" id="lbx-prev" type="button">‹ Previous</button><button class="lb" id="lbx-next" type="button">Next ›</button></footer>
+</div>
+
+<script id="manifest" type="application/json">/*MANIFEST*/</script>
+<script>
+(() => {
+  const M = JSON.parse(document.getElementById('manifest').textContent);
+  const $ = s => document.querySelector(s);
+  const el = (t, a = {}, ...k) => { const n = document.createElement(t); for (const [x, v] of Object.entries(a)) { if (x === 'class') n.className = v; else if (x === 'text') n.textContent = v; else if (v != null && v !== false) n.setAttribute(x, v); } k.flat().forEach(c => c != null && n.append(c)); return n; };
+  const total = M.areas.reduce((s, a) => s + a.screens.length, 0);
+  $('#facts').append(el('span', {}, 'screens ', el('b', { text: String(total) })), el('span', {}, 'areas ', el('b', { text: String(M.areas.length) })),
+    el('span', {}, 'each in ', el('b', { text: 'dark + light' })));
+  $('#foot').textContent = `Built ${M.built} · exploration only, nothing here is implemented · design branches and picks: see the VOTReader Design Branches page.`;
+  const flat = [];
+  let comments = null;
+  for (const a of M.areas) {
+    if (!a.screens.length) continue;
+    $('#nav').append(el('li', {}, el('a', { href: '#a-' + a.key }, a.title, el('small', { text: String(a.screens.length) }))));
+    const grid = el('div', { class: 'grid' });
+    for (const s of a.screens) {
+      const idx = flat.length; flat.push({ ...s, area: a.title });
+      const wide = s.wide || s.w / s.h > 1.6;
+      const shot = el('button', { class: 'shot', type: 'button', 'aria-label': 'Enlarge ' + s.title }, el('img', { src: s.src, width: s.w, height: s.h, loading: 'lazy', decoding: 'async', alt: s.title + (s.pair ? ' (dark and light)' : '') }));
+      shot.addEventListener('click', () => open(idx));
+      const cb = el('button', { class: 'cbtn', type: 'button', hidden: '' }, 'Comment');
+      const card = el('figure', { class: 'card' + (wide ? ' wide' : '') }, shot,
+        el('figcaption', { class: 'meta-row' }, el('div', {}, el('h3', { text: s.title }), s.note ? el('p', { text: s.note }) : null, s.source ? el('code', { text: s.source }) : null), cb));
+      cb.addEventListener('click', async () => { if (!comments) return; try { await comments.openComposer({ element: card }); } catch (e) { if (e && e.code === 'forbidden') document.querySelectorAll('.cbtn').forEach(b => b.hidden = true); } });
+      grid.append(card);
+    }
+    $('#areas').append(el('section', { class: 'area', id: 'a-' + a.key },
+      el('div', { class: 'area-head' }, el('h2', { text: a.title }), el('span', { class: 'count', text: `${a.screens.length} ${a.screens.length === 1 ? 'screen' : 'screens'}` }), a.blurb ? el('p', { text: a.blurb }) : null), grid));
+  }
+  // lightbox
+  const lb = $('#lbx'); let at = 0, last = null;
+  function show() { const s = flat[at]; $('#lbx-img').src = s.src; $('#lbx-img').alt = s.title; $('#lbx-t').textContent = s.title; $('#lbx-s').textContent = `${s.area} · ${at + 1} of ${flat.length}`; }
+  function open(i) { last = document.activeElement; at = i; lb.hidden = false; show(); $('#lbx-close').focus(); }
+  function close() { lb.hidden = true; last && last.focus(); }
+  $('#lbx-close').addEventListener('click', close);
+  $('#lbx-prev').addEventListener('click', () => { at = (at - 1 + flat.length) % flat.length; show(); });
+  $('#lbx-next').addEventListener('click', () => { at = (at + 1) % flat.length; show(); });
+  lb.addEventListener('click', e => { if (e.target === lb || e.target.classList.contains('stage')) close(); });
+  document.addEventListener('keydown', e => { if (lb.hidden) return; if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') $('#lbx-next').click(); if (e.key === 'ArrowLeft') $('#lbx-prev').click(); });
+  // comments (composer only): light up the buttons when the shell can open a composer
+  (async () => { try { comments = window.claude && window.claude.use ? await window.claude.use('comments') : null; } catch (_) { comments = null; }
+    if (comments) document.querySelectorAll('.cbtn').forEach(b => b.hidden = false); })();
+})();
+</script>

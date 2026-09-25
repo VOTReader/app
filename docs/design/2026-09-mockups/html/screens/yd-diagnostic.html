@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .ycols > .cell > .cap, .ycol > .cell:first-child > .cap { min-height: 48px; }
+  .sect { margin: 26px 0 10px; }
+  .sect.first { margin-top: 8px; }
+  .dz-head { display: flex; align-items: center; gap: 10px; }
+  .dz-head .i { color: var(--yd-danger); flex: none; }
+  .absent { border-radius: 16px; border: 1.5px dashed var(--hairline); padding: 18px 16px; font: 400 14px/1.5 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  [data-theme="light"] .absent { border-color: rgba(30,26,21,0.18); }
+  .seq { display: flex; flex-direction: column; gap: 10px; }
+  .seq .label { margin-top: 6px; }
+  .facts { display: flex; flex-direction: column; gap: 12px; }
+  .fact { display: flex; gap: 12px; align-items: flex-start; font: 400 14px/1.5 var(--sans); color: var(--text-2); text-wrap: pretty; }
+  .fact .i { flex: none; color: var(--text-3); margin-top: 1px; }
+  .fact b { color: var(--text); font-weight: 700; }
+</style></head>
+<body data-size="1270x892">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · Diagnostic Log</div>
+    <div class="meta">The row opens nothing beyond its own description: no entry is ever listed in the app. The entries go only into the next Export file.</div>
+  </div>
+
+  <div class="ycols">
+    <div class="cell">
+      <div class="cap">In place<small>Between This app and the Danger zone.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll">
+          <div class="label sect first">This app</div>
+          <div class="group">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+              <div class="dv">v1.0.2 · c1c091ff9f · corpus c61 — up to date with the published version.</div>
+            </div>
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">Platform</div></div><span class="val">Chrome</span></div>
+            </div>
+          </div>
+          <div class="label sect">Diagnostics</div>
+          <div class="group">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">Diagnostic Log</div></div><span class="val">4 entries</span></div>
+              <div class="help">4 recent entries captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: 9/25/2026, 7:02:18 AM.</div>
+            </div>
+          </div>
+          <div class="label sect">Danger zone</div>
+          <div class="group danger-card"><div class="set">
+            <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+            <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.</div>
+            <span class="btn danger block">Clear All My Data</span>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="ycol w412">
+      <div class="cell">
+        <div class="cap">Several entries<small>The count is taken when Your Data opens: what the next Export would carry.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Diagnostic Log</div></div><span class="val">4 entries</span></div>
+          <div class="help">4 recent entries captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: 9/25/2026, 7:02:18 AM.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">One entry</div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Diagnostic Log</div></div><span class="val">1 entry</span></div>
+          <div class="help">1 recent entry captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: 9/25/2026, 6:48:02 AM.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">What is kept, and where</div>
+        <div class="facts">
+          <div class="fact"><i data-i="yd-clipboard-list" class="sm"></i><span>Each entry is a time, a level, a short tag and a message. The newest <b>200</b> are kept; on the Android app its own log joins them.</span></div>
+          <div class="fact"><i data-i="lock" class="sm"></i><span>Content URIs, file paths and web query strings are blanked out before an entry is kept.</span></div>
+          <div class="fact"><i data-i="yd-file-down" class="sm"></i><span>They live in memory only and are gone when the app restarts. They leave the app only inside an Export you make.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ycol w412">
+      <div class="cell">
+        <div class="cap">A clean session<small>With nothing captured the row is not drawn, and with it the Diagnostics heading.</small></div>
+        <div class="seq">
+          <div class="label">This app</div>
+          <div class="group frag">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+              <div class="dv">v1.0.2 · c1c091ff9f · corpus c61 — up to date with the published version.</div>
+            </div>
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">Platform</div></div><span class="val">Chrome</span></div>
+            </div>
+          </div>
+          <div class="absent">No Diagnostics group</div>
+          <div class="label">Danger zone</div>
+          <div class="group danger-card frag"><div class="set">
+            <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+            <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.</div>
+            <span class="btn danger block">Clear All My Data</span>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

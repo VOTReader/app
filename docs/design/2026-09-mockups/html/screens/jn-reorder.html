@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  /* mid-drag: the gap the block will drop into, and the lifted block following the finger */
+  .slot-blk { position: relative; padding: 0 36px 0 28px; }
+  .slot { height: 81px; border-radius: 16px; border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-soft); }
+  .flying { position: absolute; left: 6px; right: -6px; top: -14px; margin: 0 !important; }
+  .flying .card { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 65%, transparent), var(--shadow); transform: scale(1.03); }
+  .flying > .grip { color: var(--accent); opacity: 1; }
+  .blk .cstrip.wide { margin-right: -36px; }
+  .blk.strip-top .cstrip { margin-bottom: 18px; }
+  .comp2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .comp2 .label { margin-bottom: 2px; }
+  .field { background: var(--surface); border-radius: 16px; padding: 16px; }
+  [data-theme="light"] .field { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .field .hint-t { font-size: 18px; }
+  .saverow { display: flex; align-items: center; gap: 18px; padding: 4px 2px; }
+  .saverow .meta { display: flex; align-items: center; gap: 6px; }
+  .capf.full { width: 100%; }
+</style></head>
+<body data-size="1388x1640">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · moving and removing blocks</div>
+    <div class="meta">Every block has a grip on the left and a delete on the right. A removed block can be brought back for six seconds. The copy is the app's own.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 309px)"></div>
+</div>
+<script>
+  const B = JN.blk;
+  const P = JN.para;
+  const LETTER = `<div class="card emb"><div class="top"><span class="meta">Volume One</span><span class="meta">11/15/04</span></div><div class="h3">Death and Awakening</div><i data-i="chevron-right" class="sm chev"></i></div>`;
+  const strip = (q, yes) => `<div class="cstrip wide"><span class="q">${q}</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">${yes}</span></div>`;
+  const toast = (t, undo) => `<div class="toast ${undo ? '' : 'solo'}"><span>${t}</span>${undo ? '<span class="btn text">Undo</span>' : ''}</div>`;
+
+  const DRAG = B('text', P([100, 96, 99, 57])) + B('media', JN.photo('', false), { noDel: true })
+    + `<div class="blk slot-blk"><div class="slot"></div>${B('card-blk', LETTER, { style: '' }).replace('class="blk card-blk', 'class="blk card-blk flying')}</div>`
+    + B('text', P([98, 100, 71])) + B('memo-blk', JN.memo('0:42', 7), { noDel: true });
+
+  const cells = [
+    ['Dragging a block', 'Hold the grip: the card lifts, the others slide apart', JN.phone('m', JN.editor({ body: DRAG }))],
+    ['Delete this block?', 'The × asks first; a tap anywhere else cancels', JN.phone('m', JN.editor({
+      body: B('text focus strip-top', strip('Delete this block?', 'Yes, delete') + P([100, 96, 99, 93, 57]), { noDel: true })
+        + B('media', JN.photo(''), { noDel: true }) + B('memo-blk', JN.memo('0:42', 7), { noDel: true }) }))],
+    ['Remove this voice memo?', 'The memo folds into its own question', JN.phone('m', JN.editor({
+      body: B('text', P([100, 96, 99, 93, 57])) + B('media', JN.photo(''), { noDel: true })
+        + B('memo-blk', strip('Remove this voice memo?', 'Yes, remove'), { noDel: true }) }))],
+    ['Block deleted.', 'Six seconds to undo, even after Done', JN.phone('m', JN.editor({ saved: 'saving',
+      body: B('media', JN.photo(''), { noDel: true }) + B('memo-blk', JN.memo('0:42', 7), { noDel: true }) + B('text', P([98, 100, 64])),
+      extra: `<div class="ptoast">${toast('Block deleted.', true)}</div>` }))],
+    ['An image that could not be saved', 'Nothing is inserted; the writing is untouched', JN.phone('m', JN.editor({
+      body: B('text', P([100, 96, 99, 93, 57])) + B('text focus', P([98, 100, 90, 41], true)),
+      extra: `<div class="ptoast">${toast('Could not save that image.', false)}</div>` }))],
+    ['A new entry', 'Hints until you type; left blank, it is removed on Done', JN.phone('m', JN.editor({ title: '', date: 'September 25, 2026 · 9:41 AM',
+      body: B('text', '<div class="hint-t">Start writing…</div>', { noGrip: true }) }))],
+    ['Toasts, the save line and empty fields', 'Each removal names what went; a failed photo gets a plain line', `<div class="comp2">
+        <div class="comp">
+          <div class="label">Undo toasts</div>
+          ${toast('Block deleted.', true)}${toast('Image removed.', true)}${toast('Voice memo removed.', true)}
+          <div class="label" style="margin-top:10px">When a photo fails</div>
+          ${toast('Could not save that image.', false)}
+          <div class="label" style="margin-top:10px">Save line</div>
+          <div class="saverow"><span class="meta"><span class="spin"></span>Saving…</span><span class="meta"><i data-i="circle-check" class="xs"></i>Saved on this device</span></div>
+        </div>
+        <div class="comp">
+          <div class="label">Title and first line</div>
+          <div class="field"><div class="h1 hint-t" style="font:500 30px/1.12 var(--serif)">Title</div><div class="hint-t" style="margin-top:14px">Start writing…</div></div>
+          <div class="label" style="margin-top:10px">An empty quote</div>
+          <div class="field"><div class="quote"><div class="hint-q">Quoted text…</div><div class="cite">Citation (optional)</div></div></div>
+          <div class="label" style="margin-top:10px">A photo without a caption</div>
+          <div class="field"><div class="photo" style="width:100%; height:120px"></div><div class="capf full">Caption (optional)</div></div>
+        </div>
+      </div>`, 'span2'],
+  ];
+  JN.fill('grid', cells);
+</script>
+</body></html>

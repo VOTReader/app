@@ -1,0 +1,178 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .bdg .i { color: var(--text-2); }
+  .jr .h1 { margin-top: 6px; }
+  .jr .meta { margin-top: 6px; }
+</style></head>
+<body data-size="1736x790">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Create a link: browse and recent</div>
+    <div class="meta">LinkPicker.jsx · Browse walks the app's own menus · Recent reuses either end of a link you made · the Journal opens the same sheet to embed a card (__openLinkPickerForTarget)</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(6, 256px)">
+
+    <!-- 1 browse root -->
+    <div class="cell">
+      <div class="cap">1 · Browse<small>Every section, in the Home menu's order</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="6,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="q">“Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span class="on">Browse</span><span>Recent</span></div>
+          <div class="np-body" style="margin-top:8px">
+            <div class="pr"><span class="bdg"><i data-i="book-open" class="sm"></i></span><div class="tx"><div class="t">The Holy Bible</div><div class="m">66 books</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">SB</span><div class="tx"><div class="t">Matthew Study Bible</div><div class="m">28 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">V1</span><div class="tx"><div class="t">Volume One</div><div class="m">30 entries</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">Volume Two</div><div class="m">29 entries</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">V3</span><div class="tx"><div class="t">Volume Three</div><div class="m">30 entries</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">V4</span><div class="tx"><div class="t">Volume Four</div><div class="m">29 entries</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">V5</span><div class="tx"><div class="t">Volume Five</div><div class="m">29 entries</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 bible books -->
+    <div class="cell">
+      <div class="cap">2 · The Holy Bible<small>Books in canonical order</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="6,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="q">“Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span class="on">Browse</span><span>Recent</span></div>
+          <div class="np-crumb"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="t">The Holy Bible</span></div>
+          <div class="np-body" style="margin-top:6px">
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Genesis</div><div class="m">50 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Exodus</div><div class="m">40 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Leviticus</div><div class="m">27 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Numbers</div><div class="m">36 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Deuteronomy</div><div class="m">34 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Joshua</div><div class="m">24 chapters</div></div><i data-i="chevron-right" class="sm chev"></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 chapter grid -->
+    <div class="cell">
+      <div class="cap">3 · A book's chapters<small>A chapter goes on to the verse picker (lk-)</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="6,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="q">“Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span class="on">Browse</span><span>Recent</span></div>
+          <div class="np-crumb"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="t">John</span></div>
+          <div class="np-grid">
+            <span>1</span><span>2</span><span class="pressed">3</span><span>4</span><span>5</span><span>6</span>
+            <span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+            <span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span>
+            <span>19</span><span>20</span><span>21</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 volume entries -->
+    <div class="cell">
+      <div class="cap">4 · A volume's letters<small>A letter goes on to the excerpt picker (lk-)</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="6,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="q">“Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span class="on">Browse</span><span>Recent</span></div>
+          <div class="np-crumb"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="t">Volume Two</span></div>
+          <div class="np-body" style="margin-top:6px">
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">The Wide Path</div><div class="m">Volume Two</div></div></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">The Seventh Day</div><div class="m">Volume Two</div></div></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">A Day in The Lord</div><div class="m">Volume Two</div></div></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">I Am The Passover and The Lamb, The New Covenant with Men</div><div class="m">Volume Two</div></div></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">The Holy Spirit</div><div class="m">Volume Two</div></div></div>
+            <div class="pr pressed"><span class="bdg">V2</span><div class="tx"><div class="t">Bear Much Fruit, the Harvest Is Near</div><div class="m">Volume Two</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 recent network -->
+    <div class="cell">
+      <div class="cap">5 · Recent<small>Either end of an earlier link, in one tap</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="6,5"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="q">“Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God”</div></div>
+          <div class="seg np-tabs"><span>Search</span><span>Browse</span><span class="on">Recent</span></div>
+          <div class="meta np-hint">Tap either end of a link to use that place again.</div>
+          <div class="np-body" style="margin-top:6px">
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">The True Baptism</div></div><i data-i="lb-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">John 3:5</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Know That Which Has Been Poured Out, The Word of God</div></div><i data-i="lb-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Matthew 7:20</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">John 3:3</div></div><i data-i="lb-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Born Again</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">The Wide Path</div></div><i data-i="lb-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Matthew 7:13</div></div></div>
+            <div class="np-net"><div class="ep"><div class="m">From</div><div class="t">Journal · Morning reading</div></div><i data-i="lb-swap" class="sm sw"></i><div class="ep"><div class="m">To</div><div class="t">Isaiah 53:5</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 6 embed a card -->
+    <div class="cell">
+      <div class="cap">6 · From the Journal<small>Embed a card: no source, the pick returns to the entry</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Journal</span><span class="btn text">Done</span></div>
+        <div class="scroll jr"><div class="h1">Morning reading</div><div class="meta">Thursday, September 24</div><div data-lb-paras="5,4"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lb-shead"><span class="h2">Embed a card</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="seg np-tabs" style="margin-top:8px"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i>Search titles &amp; references…</div>
+          <div class="np-scope"><div class="seg"><span class="on">Titles &amp; refs</span><span>Full text</span></div></div>
+          <div class="np-body">
+            <div class="label">Recent</div>
+            <div class="pr"><span class="bdg">NT</span><div class="tx"><div class="t">John 3</div><div class="m">New Testament</div></div></div>
+            <div class="pr"><span class="bdg">V2</span><div class="tx"><div class="t">Bear Much Fruit, the Harvest Is Near</div><div class="m">Volume Two</div></div></div>
+            <div class="pr"><span class="bdg">NT</span><div class="tx"><div class="t">Matthew 7</div><div class="m">New Testament</div></div></div>
+            <div class="pr"><span class="bdg">V3</span><div class="tx"><div class="t">Born Again</div><div class="m">Volume Three</div></div></div>
+            <div class="pr"><span class="bdg">OT</span><div class="tx"><div class="t">Isaiah 53</div><div class="m">Old Testament</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+<script src="lb-common.js"></script>
+</body></html>

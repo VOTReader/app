@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="mt-common.css">
+<style>
+  /* ScriptureSheet.jsx over matthew-ch (Inline mode). Sheet anatomy follows sheet.html (the footnote sheet).
+     Verse text from matthew-nkjv.js (MATTHEW_NKJV[cite]); the numbers come from its superscripts. */
+  .cell > .cap { min-height: 52px; }
+  .scrim { z-index: 1; }
+  .lit { position: relative; z-index: 2; }
+  [data-theme="dark"] .lit { background: var(--surface-3); }
+  .sheet { z-index: 3; }
+  .tag { margin-bottom: 4px; }
+  .verse { font-size: 18px; line-height: 1.6; margin-top: 12px; }
+  .part + .part { margin-top: 14px; }
+  .part .pl { font: 700 13px/1.3 var(--sans); color: var(--text-2); }
+  .part .verse { margin-top: 4px; }
+  .acts { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .acts.two { flex-direction: row; }
+  .acts.two .btn { flex: 1; padding: 0 12px; }
+</style></head>
+<body data-size="1256x1110">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Matthew Study Bible: the scripture sheet</div>
+    <div class="meta">Opens from a scripture reference in the study notes, in PDF or Inline. The tapped row stays lit above the dimmed page.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 412px 412px 312px">
+
+    <!-- ───────── one reference, two verses ───────── -->
+    <div class="cell">
+      <div class="cap">One reference<small>“Scripture Reference · 23:37”, the citation, and its verses with their numbers.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 23 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading">
+            <div class="vrow">
+              <p><span class="vnum">37</span>"O Jerusalem, Jerusalem, the one who kills the prophets and stones those who are sent to her! How often I wanted to gather your children together, as a hen gathers her chicks under her wings, but you were not willing!</p>
+              <div class="inotes">
+                <div class="iref lit"><span class="ref">23:37</span><span class="cite">2 Chronicles 36:15-16</span><i data-i="chevron-right" class="sm chev"></i></div>
+                <div class="vn">
+                  <div class="hd"><span class="ref">23:34-37</span><span class="vol">Volume Six</span><i data-i="chevron-right" class="sm chev"></i></div>
+                  <div class="lt">“A Heavy Stone, a Bitter Burden”</div>
+                  <div class="ex">Jerusalem, O Jerusalem, why have you forsaken Me?! Even to this day, O Israel, you have not ceased from walking in the ways of your forefathers, stoning My prophets in word and by deed, seeking always to kill or imprison those sent to you. Have I not gathered you with a mighty hand from among the nations, restoring you to your own land, even granting you great increase? Yet you do not embrace Me, for you yet push out the hand against My Holy One; you refuse to drink from His cup. How long shall you seek to murder your King?! How long will you deny The Way I have set before you?! How long shall you blaspheme The Truth, which I sent into the world to testify?! YOU HAVE FORSAKEN LIFE! You refuse the blood I poured out for you! O Jerusalem, Jerusalem, how long will you let His blood drip from your fingers?!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="meta tag">Scripture Reference · 23:37</div>
+          <div class="h2">2 Chronicles 36:15-16</div>
+          <div class="reading verse">
+            <p><span class="vnum">15</span>And the Lord God of their fathers sent warnings to them by His messengers, rising up early and sending them, because He had compassion on His people and on His dwelling place. <span class="vnum">16</span>But they mocked the messengers of God, despised His words, and scoffed at His prophets, until the wrath of the Lord arose against His people, till there was no remedy.</p>
+          </div>
+          <div class="acts">
+            <span class="btn primary block">Open 2 Chronicles 36</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── a compound citation ───────── -->
+    <div class="cell">
+      <div class="cap">A citation of two passages<small>Each passage is labelled and gets its own button. Beside it, a commentary line with no verse behind it stays plain.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 1 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading">
+            <div class="vrow">
+              <p><span class="vnum">21</span>And she will bring forth a Son, and you shall call His name YAHUSHUA, for He will save His people from their sins.”</p>
+              <div class="inotes">
+                <div class="iref plain"><span class="ref">1:21</span><span class="cite">“YAHUSHUA” means “God’s Salvation” or “God Saves”</span></div>
+                <div class="iref lit"><span class="ref">1:21</span><span class="cite">Psalm 118:14; Isaiah 12:2</span><i data-i="chevron-right" class="sm chev"></i></div>
+                <div class="vn">
+                  <div class="hd"><span class="ref">1:18-21</span><span class="vol">Volume Two</span><i data-i="chevron-right" class="sm chev"></i></div>
+                  <div class="lt">“To the Church Who Dwells in the Midst Of and Sits Upon Seven Hills”</div>
+                  <div class="ex">Mary was My beloved servant and vessel, who also was in need of redemption by Him who created her and through whom she was made. Mary sleeps, she is dead, and her sepulcher remains with you to this day. Is she assured of life in the Kingdom? She is. Because though she bore The Victory, she humbled herself before Him, knowing in herself that The Son she bore first bore her; being both her Son and her Father, her Lord and her God from Heaven; also being her brother, both being children of David and of God in the earthly places.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="meta tag">Scripture Reference · 1:21</div>
+          <div class="h2">Psalm 118:14; Isaiah 12:2</div>
+          <div class="part" style="margin-top:14px">
+            <div class="pl">Psalm 118:14</div>
+            <div class="reading verse">The Lord is my strength and song, and He has become my salvation.</div>
+          </div>
+          <div class="part">
+            <div class="pl">Isaiah 12:2</div>
+            <div class="reading verse">Behold, God is my salvation, I will trust and not be afraid; “For Yah, the Lord, is my strength and song; He also has become my salvation.”</div>
+          </div>
+          <div class="acts two">
+            <span class="btn secondary">Open Psalm 118</span>
+            <span class="btn secondary">Open Isaiah 12</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── notes ───────── -->
+    <div class="cell">
+      <div class="cap">Behaviour notes<small>From ScriptureSheet.jsx, GoToRefButton.jsx and ChapterView.jsx</small></div>
+      <div class="note">
+        <ul>
+          <li>Only references whose verse text is in the app open the sheet. So its fallback line, “Verse text not available in app data”, never shows.</li>
+          <li>The text is always the NKJV, whichever Bible translation is chosen.</li>
+          <li><b>Open …</b> closes the sheet and opens that chapter with the verses flashed. A “Back to Study Bible · Matthew 23” pill returns to the notes.</li>
+          <li>Close by tapping the grab bar or the dimmed page, or with Back or Escape. The app also puts a ‹ close at the top left; sheet.html leaves it out, and so do these.</li>
+          <li>On a screen 1640 px wide or more the sheet docks as a panel on the right, and the page stays live beside it.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

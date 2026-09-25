@@ -1,8 +1,8 @@
 <!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
 <style>
-  /* focus: a quieter status row, then only the page */
-  .status { color: var(--text-3); }
+  /* focus = the app's Double-Tap Fullscreen: the phone's own status and navigation bars are hidden;
+     the app's top bar stays, then only the page */
   .rp { height: 14px; padding: 0 var(--gutter); display: flex; align-items: center; flex: none; }
   .rp .bar { flex: 1; height: 2px; border-radius: 1px; background: var(--surface-3); overflow: hidden; }
   .rp .bar i { display: block; height: 100%; background: var(--accent); }
@@ -11,18 +11,25 @@
   .more .ph + .ph { margin-top: 20.8px; }
   .more .gap { height: 34px; }
 
-  /* one small translucent pill, bottom right */
-  .fpill { position: absolute; right: 16px; bottom: 28px; height: 56px; padding: 0 6px; border-radius: 28px; display: flex; align-items: center; gap: 2px;
+  /* one small translucent pill at the foot: the Auto-Scroll control (Settings › Auto-Scroll) */
+  .fpill { position: absolute; left: 50%; transform: translateX(-50%); bottom: 28px; height: 56px; padding: 0 16px 0 6px; border-radius: 28px; display: flex; align-items: center; gap: 2px; white-space: nowrap;
     background: color-mix(in srgb, var(--surface-2) 78%, transparent);
     -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow); }
-  .fpill .fb { width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; color: var(--text); }
+  .fpill .fb { width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; color: var(--text); font: 400 22px/1 var(--sans); }
   .fpill .fb.play { color: var(--accent); }
-  .fpill .vr { width: 1px; height: 24px; background: var(--hairline); }
+  .fpill .vr { width: 1px; height: 24px; background: var(--hairline); margin: 0 8px 0 4px; }
+  .fpill .ro { font: 400 13px/1 var(--sans); color: var(--text-2); font-variant-numeric: tabular-nums; }
 </style></head>
 <body>
 <div class="screen">
-  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="headphones"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
   <div class="rp"><div class="bar"><i style="width:35%"></i></div></div>
   <div class="scroll focus">
     <div class="reading">
@@ -47,9 +54,11 @@
     </div>
   </div>
   <div class="fpill">
-    <span class="fb"><i data-i="type"></i></span>
-    <span class="vr"></span>
+    <span class="fb">−</span>
     <span class="fb play"><i data-i="play" class="fill"></i></span>
+    <span class="fb">+</span>
+    <span class="vr"></span>
+    <span class="ro">~150 wpm · 16 lines/min</span>
   </div>
 </div>
 </body></html>

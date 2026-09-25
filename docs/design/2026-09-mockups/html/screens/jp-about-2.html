@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .ab { padding-top: 6px; }
+  .sect { margin: 20px 0 8px; }
+  .feat .item { align-items: flex-start; gap: 12px; padding: 10px 14px 10px 12px; min-height: 0; }
+  .feat .ic { width: 28px; height: 28px; border-radius: 14px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .feat .tx { flex: 1; padding-top: 4px; font: 400 14.5px/1.38 var(--sans); color: var(--text); }
+  .feat em { font-family: var(--serif); font-size: 15.5px; }
+  .foot { position: absolute; left: 20px; right: 20px; bottom: 26px; }
+  .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .dots b { width: 8px; height: 8px; border-radius: 4px; background: var(--surface-3); }
+  .dots b.on { width: 22px; background: var(--accent); }
+</style></head>
+<body>
+<div class="screen" style="position:relative">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+  </div>
+  <div class="scroll ab">
+    <div class="h1">What You Can Do</div>
+
+    <div class="label sect">The Library</div>
+    <div class="group feat">
+      <div class="item"><span class="ic"><i data-i="library" class="xs"></i></span><span class="tx">The complete Volumes of Truth corpus.</span></div>
+      <div class="item"><span class="ic"><i data-i="book-open" class="xs"></i></span><span class="tx">The entire Bible in ten translations, including two custom Restored Name editions.</span></div>
+      <div class="item"><span class="ic"><i data-i="graduation-cap" class="xs"></i></span><span class="tx">Every PDF, Bible study, and letter study.</span></div>
+      <div class="item"><span class="ic"><i data-i="headphones" class="xs"></i></span><span class="tx">A Listening Library — the Letters and the Bible, read aloud.</span></div>
+    </div>
+
+    <div class="label sect">Your Tools</div>
+    <div class="group feat">
+      <div class="item"><span class="ic"><i data-i="highlighter" class="xs"></i></span><span class="tx">Highlight, underline, bookmark, and note — anywhere.</span></div>
+      <div class="item"><span class="ic"><i data-i="notebook-pen" class="xs"></i></span><span class="tx">A private journal with photos, voice memos, and a full feature suite — kept on your device.</span></div>
+      <div class="item"><span class="ic"><i data-i="search" class="xs"></i></span><span class="tx">Full-text search across the entire library.</span></div>
+      <div class="item"><span class="ic"><i data-i="lock" class="xs"></i></span><span class="tx">Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app’s own release files — your own data never leaves this device.</span></div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="dots"><b></b><b class="on"></b></div>
+    <span class="btn primary block">Begin Reading</span>
+  </div>
+</div>
+</body></html>

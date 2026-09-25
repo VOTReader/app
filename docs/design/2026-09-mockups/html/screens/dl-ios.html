@@ -1,0 +1,157 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: 412px 412px 364px; gap: 28px 32px; }
+  .cell > .cap { min-height: 36px; }
+  .sidecol { display: flex; flex-direction: column; gap: 30px; }
+
+  /* ---- behind the modal: a letter open in a Safari tab ---- */
+  .page { position: absolute; left: 0; right: 0; top: 0; bottom: 128px; overflow: hidden; }
+  .page .topbar { margin-top: 54px; }
+  .page .scroll { padding-top: 4px; }
+  .page .h1 { margin-top: 8px; }
+  .page .lines { margin-top: 26px; }
+  .page .lines .ph + .ph { margin-top: 20px; }
+  .page .scrim { z-index: 10; }
+
+  /* Safari's own bottom bar: not the app's, drawn plainly */
+  .safari { position: absolute; left: 0; right: 0; bottom: 0; height: 128px; padding: 8px 12px 0; background: var(--surface-2); border-top: 1px solid var(--hairline); z-index: 22; }
+  .safari .addr { height: 44px; border-radius: 12px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--text-2); }
+  [data-theme="dark"] .safari .addr { background: var(--surface-3); }
+  .safari .url { display: inline-flex; align-items: center; gap: 6px; font: 400 15px/1 var(--sans); color: var(--text); }
+  .safari .url .i { color: var(--text-3); }
+  .safari .tools { height: 48px; display: flex; align-items: center; justify-content: space-around; color: var(--text-2); }
+  .safari .tools .dim { opacity: .35; }
+
+  /* the modal */
+  .dwrap { position: absolute; left: 0; right: 0; top: 54px; bottom: 128px; z-index: 11; display: grid; place-items: center; padding: 0 24px; }
+  .dialog.w { width: 364px; }
+  .howto { margin-top: 16px; border-radius: 14px; padding: 12px 16px 14px; background: var(--surface-2); }
+  [data-theme="dark"] .howto { background: var(--surface-3); }
+  .howto .hh { display: flex; align-items: center; justify-content: space-between; font: 700 15px/1.3 var(--sans); color: var(--text); }
+  .howto .hh .i { color: var(--text-3); transform: rotate(180deg); }
+  .howto .how { margin-top: 8px; font: 400 15px/1.6 var(--sans); color: var(--text-2); }
+  .howto .how b { color: var(--text); font-weight: 700; }
+  .howto .how .i { color: var(--text); vertical-align: -2px; margin: 0 1px; }
+  .howto .how .sep { color: var(--text-3); margin: 0 3px; }
+
+  /* ---- the Home Screen app's first open (onboarding.html rhythm) ---- */
+  .ob { display: flex; flex-direction: column; padding-top: 84px; padding-bottom: 36px; }
+  .mark { width: 72px; height: 72px; border-radius: 36px; background: var(--surface); color: var(--accent); display: grid; place-items: center; }
+  [data-theme="light"] .mark { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .mark .i { width: 32px; height: 32px; }
+  .ob .display { margin-top: 32px; }
+  .lede { margin-top: 14px; font-size: 16px; text-wrap: pretty; }
+  .steps { list-style: none; margin-top: 30px; display: flex; flex-direction: column; gap: 20px; }
+  .steps li { display: flex; gap: 14px; align-items: flex-start; font: 400 16px/1.4 var(--sans); color: var(--text); }
+  .steps .n { width: 28px; height: 28px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font: 700 14px/1 var(--sans); display: grid; place-items: center; flex: none; margin-top: -3px; }
+  .steps b { font-weight: 700; }
+  .steps .sep { color: var(--text-3); margin: 0 3px; }
+  .steps .aside { color: var(--text-2); }
+  .grow { flex: 1; }
+  .ob .btn.text { margin-top: 6px; }
+</style></head>
+<body data-size="1340x1132">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ios-signal" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></symbol>
+  <symbol id="ios-wifi" viewBox="0 0 16 12"><path d="M8 11.6 5.7 9.3a3.3 3.3 0 0 1 4.6 0z"/><path d="M3.4 7a6.5 6.5 0 0 1 9.2 0l-1.35 1.35a4.6 4.6 0 0 0-6.5 0z"/><path d="M1.1 4.7a9.7 9.7 0 0 1 13.8 0l-1.35 1.35a7.8 7.8 0 0 0-11.1 0z"/></symbol>
+  <symbol id="ios-battery" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="20" height="9" rx="2"/><path d="M25 4.6v3.8a1.9 1.9 0 0 0 0-3.8z" opacity=".45"/></symbol>
+</svg>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">iPhone · keeping what you save</div>
+    <div class="meta">Two screens only an iPhone or iPad sees. Safari can clear a website's saved data after 7 days away; the Home Screen app keeps it, but starts empty.</div>
+  </div>
+  <div class="board-grid">
+
+    <div class="cell">
+      <div class="cap">In Safari · Before you start saving<small>At the first save of each visit in a Safari tab; How to add to Home Screen opened</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="ios-status"><span>9:41</span><span class="island"></span><span class="sys"><svg width="18" height="12"><use href="#ios-signal"/></svg><svg width="16" height="12"><use href="#ios-wifi"/></svg><svg width="27" height="13"><use href="#ios-battery"/></svg></span></div>
+        <div class="page">
+          <div class="topbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <span class="spacer"></span>
+            <span class="iconbtn"><i data-i="headphones"></i></span>
+            <span class="iconbtn"><i data-i="bookmark"></i></span>
+            <span class="tabcount">1</span>
+          </div>
+          <div class="scroll">
+            <div class="eyebrow">Volume One · Letter 15</div>
+            <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+            <div class="lines">
+              <div class="ph" style="width:100%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:99%"></div>
+              <div class="ph" style="width:88%"></div><div class="ph" style="width:57%"></div><div class="ph" style="width:98%"></div>
+              <div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:72%"></div>
+              <div class="ph" style="width:100%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:40%"></div>
+            </div>
+          </div>
+          <div class="scrim"></div>
+        </div>
+        <div class="dwrap">
+          <div class="dialog">
+            <div class="h2">Before you start saving</div>
+            <p class="body">Safari may delete your saved notes and highlights if you don’t visit for 7 days. To keep your data safe, add VOTReader to your Home Screen.</p>
+            <div class="howto">
+              <div class="hh"><span>How to add to Home Screen</span><i data-i="chevron-down" class="xs"></i></div>
+              <p class="how">Tap the <b>Share</b> <i data-i="dl-share" class="xs"></i> button <span class="sep">›</span> <b>Add to Home Screen</b> <i data-i="dl-square-plus" class="xs"></i></p>
+            </div>
+            <div class="dacts"><span class="btn secondary block">I understand the risk</span></div>
+          </div>
+        </div>
+        <div class="safari">
+          <div class="addr"><i data-i="dl-a-large-small" class="sm"></i><span class="url"><i data-i="lock" class="xs"></i>votreader.github.io</span><i data-i="rotate-cw" class="sm"></i></div>
+          <div class="tools"><i data-i="chevron-left"></i><i data-i="chevron-right" class="dim"></i><i data-i="dl-share"></i><i data-i="book-open"></i><i data-i="copy"></i></div>
+        </div>
+        <div class="ios-home"></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Home Screen app · first open<small>Opened from the Home Screen with nothing saved yet; shown once</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="ios-status"><span>9:41</span><span class="island"></span><span class="sys"><svg width="18" height="12"><use href="#ios-signal"/></svg><svg width="16" height="12"><use href="#ios-wifi"/></svg><svg width="27" height="13"><use href="#ios-battery"/></svg></span></div>
+        <div class="scroll ob">
+          <div class="mark"><i data-i="book-open"></i></div>
+          <div class="display">Welcome to VOTReader!</div>
+          <p class="body lede">If you’ve been using VOTReader in Safari, your saved data didn’t transfer automatically. To bring your data over:</p>
+          <ol class="steps">
+            <li><span class="n">1</span><span>Open VOTReader in <b>Safari</b> <span class="aside">(not this app)</span></span></li>
+            <li><span class="n">2</span><span>Go to <b>Settings</b><span class="sep">›</span><b>Export</b></span></li>
+            <li><span class="n">3</span><span>Come back here<span class="sep">›</span><b>Settings</b><span class="sep">›</span><b>Import</b></span></li>
+          </ol>
+          <div class="grow"></div>
+          <span class="btn primary block">I’ll import my data</span>
+          <span class="btn text block">I’m new — skip this</span>
+        </div>
+        <div class="ios-home"></div>
+      </div></div>
+    </div>
+
+    <div class="sidecol">
+      <div class="cell">
+        <div class="cap">Before the steps are opened<small>How to add to Home Screen leads; it gives way to the steps</small></div>
+        <div class="dialog w">
+          <div class="h2">Before you start saving</div>
+          <p class="body">Safari may delete your saved notes and highlights if you don’t visit for 7 days. To keep your data safe, add VOTReader to your Home Screen.</p>
+          <div class="dacts">
+            <span class="btn primary block">How to add to Home Screen</span>
+            <span class="btn secondary block">I understand the risk</span>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">The steps on a Mac<small>Safari on a Mac shows its own menu path</small></div>
+        <div class="dialog w" style="padding-top:16px">
+          <div class="howto" style="margin-top:0">
+            <div class="hh"><span>How to add to Home Screen</span><i data-i="chevron-down" class="xs"></i></div>
+            <p class="how">In Safari: <b>File</b> <span class="sep">›</span> <b>Add to Dock</b></p>
+          </div>
+          <div class="dacts"><span class="btn secondary block">I understand the risk</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

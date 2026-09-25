@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-study-chapter, the study's Preface: its cover-image block, then the front matter
+     (LetterView.jsx study mode; the cover is the only place study-cover-lamb.jpg appears) */
+  .letter { padding-top: 8px; padding-bottom: 40px; }
+  .letter .h1 { margin-top: 8px; }
+  .cover { margin: 22px 0 6px; aspect-ratio: 921 / 709; border-radius: 16px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 0 24px;
+    background:
+      radial-gradient(70% 60% at 50% 58%, color-mix(in srgb, var(--text) 7%, transparent), transparent 75%),
+      linear-gradient(170deg, var(--surface-3), var(--surface-2)); }
+  [data-theme="light"] .cover { box-shadow: 0 1px 2px rgba(60,40,20,0.08); }
+  .cover .i { color: var(--text-3); }
+  .cover .cap { font: italic 400 15px/1.35 var(--serif); color: var(--text-2); }
+  .cover .file { font: 400 11px/1.2 var(--sans); color: var(--text-3); }
+  .reading { margin-top: 22px; }
+  .star { text-align: center; margin: 26px 0 22px; font: 400 15px/1 var(--serif); color: var(--text-3); }
+  .endmark { text-align: center; margin: 32px 0 22px; font: 400 15px/1 var(--serif); color: var(--text-3); }
+  .turns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .turn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; }
+  [data-theme="light"] .turn { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .turn .meta { display: flex; align-items: center; gap: 2px; }
+  .turn.next { text-align: right; }
+  .turn.next .meta { justify-content: flex-end; }
+  .turn .t { margin-top: 6px; font: 500 17px/1.25 var(--serif); color: var(--text); }
+</style></head>
+<body data-size="412x1350">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll letter">
+    <div class="eyebrow">YahuShua The Messiah, The Lamb of God · Preface</div>
+    <div class="h1">Preface</div>
+
+    <div class="cover">
+      <i data-i="image" class="lg"></i>
+      <div class="cap">Study cover</div>
+      <div class="file">study-cover-lamb.jpg</div>
+    </div>
+
+    <div class="reading">
+      <p>YAHUSHUA THE MESSIAH, THE LAMB OF GOD: THE TRUE CHRONOLOGY OF THE MESSIAH’S CRUCIFIXION AND RESURRECTION, THE VOLUMES OF TRUTH™ and TRUMPET CALL OF GOD™</p>
+      <p>By YAHUSHUA-YAHUWAH, Through His Servant Timothy</p>
+      <p>Copyright © 2004-2024. All rights reserved.</p>
+    </div>
+    <div class="star">✦</div>
+    <div class="reading" style="margin-top:0">
+      <p><em>This study presents the true chronology of The Messiah’s crucifixion and resurrection, tracing the events from the anointing at Bethany through His glorious rising on the Feast of Firstfruits. The standard traditional account of a Friday crucifixion and Sunday morning resurrection does not fulfill the sign of the prophet Jonah — three days and three nights in the heart of the earth. The true chronology honors both The Scriptures and The Sign.</em></p>
+    </div>
+
+    <div class="endmark">✦</div>
+    <div class="turns">
+      <div class="turn"><span class="meta"><i data-i="chevron-left" class="xs"></i>Previous study</span><div class="t">Grace AND The Law</div></div>
+      <div class="turn next"><span class="meta">Next<i data-i="chevron-right" class="xs"></i></span><div class="t">I Am The Passover and The Lamb, The New Covenant With Men</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

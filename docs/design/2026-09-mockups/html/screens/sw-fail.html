@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sw-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: repeat(3, 309px); gap: 30px 24px; }
+  .cell > .cap { min-height: 64px; }
+  /* immersive: the Scripture Web hides the system bars, so no status bar on these screens */
+  .dead { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 36px 80px; }
+  .dead .ic { width: 56px; height: 56px; border-radius: 28px; background: var(--surface-2); display: grid; place-items: center; color: var(--text-3); margin-bottom: 20px; }
+  .dead .ic .i { width: 26px; height: 26px; }
+  .dead .h2 { font-size: 24px; }
+  .dead .body { margin-top: 10px; text-wrap: pretty; }
+  .dead .acts { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 26px; }
+  .topbar.bare { height: 52px; margin-top: 8px; }
+  /* the list */
+  .fl { padding: 0 20px; }
+  .fl .h1 { font-size: 30px; }
+  .fl .sub { margin-top: 4px; font: 400 15px/1.35 var(--sans); color: var(--text-2); }
+  .step { display: flex; align-items: center; height: 52px; margin-top: 16px; background: var(--surface-2); border-radius: 16px; padding: 0 4px; }
+  .step .iconbtn { color: var(--accent); }
+  .step .iconbtn.off { color: var(--text-3); opacity: .45; }
+  .step .lbl { flex: 1; text-align: center; font: 500 20px/1 var(--serif); color: var(--text); }
+  .note { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .note span { flex: 1; font: 400 14px/1.4 var(--sans); color: var(--text-2); text-wrap: balance; }
+  .note .btn { flex: none; }
+  .cnt { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 0 10px; }
+  .cnt .h3 { font-size: 20px; }
+  .vc { background: var(--surface); border-radius: 16px; padding: 0 16px 4px; margin-bottom: 12px; }
+  [data-theme="light"] .vc { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .vc .vh { padding: 13px 0 11px; border-bottom: 1px solid var(--hairline); font: 400 15px/1.2 var(--sans); color: var(--text-3); }
+  .vc .vh b { color: var(--text); font-weight: 700; }
+  .vc .vr { padding: 11px 0 12px; }
+  .vc .vr + .vr { border-top: 1px solid var(--hairline); }
+  .vc .top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .vc .ref { font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .tier { font: 700 11px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); flex: none; }
+  .tier.e { color: var(--accent); }
+  .vc .snip { margin-top: 4px; font: 400 14px/1.35 var(--sans); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* scrolled: the verse heading pinned at the very top, opaque, the rows passing under it */
+  .pinned { position: relative; z-index: 2; margin: 0 -16px; padding: 13px 16px 11px; background: var(--surface); border-bottom: 1px solid var(--hairline);
+    box-shadow: 0 6px 14px rgba(0,0,0,.35); font: 400 15px/1.2 var(--sans); color: var(--text-3); }
+  [data-theme="light"] .pinned { box-shadow: 0 4px 10px rgba(60,40,20,.12); }
+  .pinned b { color: var(--text); }
+  .emptyl { margin: 6px 2px; font: 400 16px/1.5 var(--sans); color: var(--text-2); }
+  .prop { margin-top: 14px; background: var(--surface); border-radius: 16px; padding: 16px; }
+  .prop .t { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .prop .body { margin-top: 6px; font-size: 14.5px; }
+  .prop .btn { margin-top: 14px; }
+  .prop + .prop { margin-top: 12px; }
+</style></head>
+<body data-size="1060x1716">
+<div class="board">
+  <div class="board-head"><div class="h2">Scripture Web · when it can’t be drawn</div>
+    <div class="meta">The load error, the dead-end panel, and the list the web becomes on a device that cannot draw it. These screens are not rotated: the list reads in portrait.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">The load error<small>The data never arrived (offline before it was cached). The body is the error’s own message.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="topbar bare"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="dead"><div class="ic"><i data-i="sw-wifi-off"></i></div>
+          <div class="h2">The Scripture Web couldn’t load.</div>
+          <div class="body">Couldn’t fetch the cross-reference data.</div>
+          <div class="acts"><span class="btn primary block">Try again</span></div></div>
+      </div></div></div>
+    <div class="cell"><div class="cap">The dead end<small>No WebGL2 and no graph. Nothing in the code can reach this now: the list below replaced it.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="topbar bare"></div>
+        <div class="dead"><div class="ic"><i data-i="sw-monitor-off"></i></div>
+          <div class="h2">The web can’t be drawn right now.</div>
+          <div class="body">This needs WebGL2. If the device just recovered from a graphics reset, trying again usually works; otherwise every cross-reference is still reachable from the reader’s footnotes and links.</div>
+          <div class="acts"><span class="btn primary block">Try again</span><span class="btn secondary block">Go back</span></div></div>
+      </div></div></div>
+    <div class="cell"><div class="cap">The web as a list<small>It opens on the reader’s last Bible chapter. One card per verse, strongest first; every row opens that passage.</small></div>
+      <div class="phone-m"><div class="screen" id="pList"></div></div></div>
+    <div class="cell"><div class="cap">Scrolled<small>A long card keeps its verse heading pinned while its rows pass under it.</small></div>
+      <div class="phone-m"><div class="screen" id="pScroll"></div></div></div>
+    <div class="cell"><div class="cap">Nothing connects<small>A chapter no thread in the Famous view touches (7 of 1,189 chapters).</small></div>
+      <div class="phone-m"><div class="screen" id="pEmpty"></div></div></div>
+    <div class="cell"><div class="cap">Proposed: one design<small>Retire the dead end. The list’s frame carries every failure: the way back at the top, the reason and Try again in one note, and where the cross-references still are.</small></div>
+      <div class="phone-m"><div class="screen" id="pProp"></div></div></div>
+  </div>
+</div>
+<script>
+  const D = window.SW_DATA, F = D.fallback, T = D.text;
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const plural = (n, one) => n.toLocaleString('en-US') + ' ' + one + (n === 1 ? '' : 's');
+  const head = (label, prevOff) => `<div class="topbar bare"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+    <div class="fl"><div class="h1">Scripture Web</div><div class="sub">Connections from ${label}</div>
+    <div class="step"><span class="iconbtn${prevOff ? ' off' : ''}"><i data-i="chevron-left"></i></span><span class="lbl">${label}</span><span class="iconbtn"><i data-i="chevron-right"></i></span></div>
+    <div class="note"><span>The map can’t be drawn on this device right now.</span><span class="btn secondary sm">Try again</span></div>`;
+  const row = (r) => `<div class="vr"><div class="top"><span class="ref">${r.other}</span><span class="tier${r.tier === 'essential' ? ' e' : ''}">${r.tier === 'essential' ? 'Essential' : 'Famous'}</span></div><div class="snip">${esc(T[r.other] || '')}</div></div>`;
+  const card = (g, from = 0, to = 99) => `<div class="vc"><div class="vh"><b>Verse ${g.verse}</b> · ${plural(g.count, 'connection')}</div>${g.rows.slice(from, to).map(row).join('')}</div>`;
+  document.getElementById('pList').innerHTML = head(F.chapter) + `<div class="cnt"><span class="h3">Connected passages</span><span class="meta">${plural(F.total, 'connection')}</span></div>`
+    + card(F.groups[0], 0, 8) + '</div>';
+  const g7 = F.groups[6];
+  document.getElementById('pScroll').innerHTML = `<div class="fl"><div class="vc" style="border-radius:0 0 16px 16px"><div class="pinned"><b>Verse ${g7.verse}</b> · ${plural(g7.count, 'connection')}</div>`
+    + g7.rows.slice(4, 12).map(row).join('') + `</div>` + card(F.groups[7], 0, 4) + '</div>';
+  document.getElementById('pEmpty').innerHTML = head('Numbers 2') + `<div class="cnt"><span class="h3">Connected passages</span><span class="meta">0 connections</span></div>
+    <div class="emptyl">Nothing in the Famous view connects to Numbers 2.</div></div>`;
+  document.getElementById('pProp').innerHTML = `<div class="topbar bare"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+    <div class="fl"><div class="h1">Scripture Web</div>
+      <div class="prop"><div class="t">The Scripture Web couldn’t load.</div><div class="body">Couldn’t fetch the cross-reference data.</div><span class="btn primary sm">Try again</span></div>
+      <div class="emptyl" style="margin-top:18px">Every cross-reference is still reachable from the reader’s footnotes and links.</div></div>`;
+</script>
+</body></html>

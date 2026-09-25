@@ -1,0 +1,145 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* The translation and recorded-edition pickers: SettingsScreen.jsx SelectField sheets.
+     Options are TRANSLATION_OPTIONS (index.html) and BIBLE_AUDIO_EDITIONS (utils/audio-track.js) + Off. */
+  .board-head .meta { max-width: 900px; }
+  /* dimmed Settings behind each sheet */
+  .set { padding-top: 6px; }
+  .set .label { margin: 8px 0 10px; }
+  .set .group .item { justify-content: space-between; }
+  .set .v { display: flex; align-items: center; gap: 2px; font: 400 14px/1.2 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .set .n { font: 400 15px/1.2 var(--sans); color: var(--text); }
+  /* sheet */
+  .sheet { z-index: 2; }
+  /* select sheets stop at 75% of the screen and scroll (app.css .select-sheet max-height:75vh) */
+  .sheet.capped { max-height: 686px; overflow: hidden; padding-bottom: 0; }
+  .sheet.capped .thumb { position: absolute; right: 6px; top: 150px; width: 3px; height: 150px; border-radius: 2px; background: var(--text-3); opacity: .4; }
+  .sheet .meta.eb { margin-top: 2px; }
+  .sheet .h2 { margin: 2px 0 8px; }
+  .opt { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; }
+  .opt + .opt { border-top: 1px solid var(--hairline); }
+  .opt .t { flex: 1; min-width: 0; }
+  .opt .lb { font: 700 16px/1.25 var(--sans); color: var(--text); }
+  .opt .ds { margin-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .opt.on .lb { color: var(--accent); }
+  .opt .i { color: var(--accent); margin-top: 1px; }
+  /* the Bible Translation row with its (i) note open, drawn full size */
+  .row-card { background: var(--surface); border-radius: 16px; padding: 4px 18px 18px; width: 420px; }
+  [data-theme="light"] .row-card { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .rhead { display: flex; align-items: center; gap: 10px; min-height: 56px; }
+  .rhead .n { font: 400 16px/1.2 var(--sans); color: var(--text); }
+  .info { width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 13px/1 var(--serif); font-style: italic; }
+  .rhead .grow { flex: 1; }
+  .rhead .v { display: flex; align-items: center; gap: 2px; font: 700 15px/1 var(--sans); color: var(--text-2); }
+  .note { padding-top: 12px; border-top: 1px solid var(--hairline); font: 400 13.5px/1.5 var(--sans); color: var(--text-2); }
+  .note p { margin-top: 10px; }
+  .note strong { color: var(--text); }
+  .note ul { margin: 8px 0 0 18px; }
+  .note li + li { margin-top: 5px; }
+</style></head>
+<body data-size="1180x1043">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Translation and recorded editions</div>
+    <div class="meta">Both live in Settings. Reading › Bible Translation sets the verse text of the 66 books; Listening › Bible Audio sets the recorded voice behind every Bible Listen button, independent of the reading translation.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 309px 309px 420px">
+
+    <!-- Bible Translation -->
+    <div class="cell">
+      <div class="cap">Bible Translation<small>Settings › Reading. The sheet scrolls past three-quarters height.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Settings</span>
+        </div>
+        <div class="scroll set">
+          <div class="label">Reading</div>
+          <div class="group">
+            <div class="item"><span class="n">Bible Translation</span><span class="v">NKJV<i data-i="chevron-right" class="xs"></i></span></div>
+            <div class="item"><span class="n">Chapter Titles</span><span class="toggle on"></span></div>
+            <div class="item"><span class="n">Section Headings</span><span class="toggle on"></span></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet capped"><span class="thumb"></span>
+          <div class="grabber"></div>
+          <div class="meta eb">Reading</div>
+          <div class="h2">Bible Translation</div>
+          <div class="opts">
+            <div class="opt on"><span class="t"><div class="lb">NKJV</div><div class="ds">New King James Version — default</div></span><i data-i="check" class="sm"></i></div>
+            <div class="opt"><span class="t"><div class="lb">NKJV-R</div><div class="ds">NKJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">WEB</div><div class="ds">World English Bible — modern, public domain · ~2% shorter than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">BSB</div><div class="ds">Berean Standard Bible — modern literal · ~6% shorter than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">HNV</div><div class="ds">Hebrew Names Version — names restored (Yeshua, Mattityahu) · ~2% shorter than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">KJV</div><div class="ds">King James Version 1769 — traditional · ~2% longer than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">KJV-R</div><div class="ds">KJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">ASV</div><div class="ds">American Standard Version 1901 — classical literal · ~2% longer than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">LSV</div><div class="ds">Literal Standard Version — uses YHWH for the Name · ~3% longer than NKJV</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">YLT</div><div class="ds">Young's Literal Translation 1898 — hyper-literal · ~3% longer than NKJV</div></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Bible Audio -->
+    <div class="cell">
+      <div class="cap">Bible Audio<small>Settings › Listening. Each edition is recorded a chapter at a time.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Settings</span>
+        </div>
+        <div class="scroll set">
+          <div class="label">Listening</div>
+          <div class="group">
+            <div class="item"><span class="n">Bible Audio</span><span class="v">KJV · Biblical Restoration…<i data-i="chevron-right" class="xs"></i></span></div>
+            <div class="item"><span class="n">Letter Voice</span><span class="v">Automatic<i data-i="chevron-right" class="xs"></i></span></div>
+            <div class="item"><span class="n">Default Speed</span><span class="v">1×<i data-i="chevron-right" class="xs"></i></span></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="meta eb">Listening</div>
+          <div class="h2">Bible Audio</div>
+          <div class="opts">
+            <div class="opt on"><span class="t"><div class="lb">KJV · Biblical Restoration Ministries</div><div class="ds">Per-chapter audiobook · KJV text</div></span><i data-i="check" class="sm"></i></div>
+            <div class="opt"><span class="t"><div class="lb">NKJV · The Word of Promise (Dramatized)</div><div class="ds">Per-chapter audiobook · NKJV text</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">WEB · World English Bible</div><div class="ds">Per-chapter audiobook · WEB text</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">Matthew · The Scriptures of Truth (read by Benjamin)</div><div class="ds">Per-chapter audiobook · Corrected Version by Timothy, with The Lord</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">John · The Gospel of John (film audio, no read-along)</div><div class="ds">Per-chapter audiobook · Film audio, listening only</div></span></div>
+            <div class="opt"><span class="t"><div class="lb">Off</div><div class="ds">Hide the Bible Listen button</div></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- the (i) note on the Bible Translation row -->
+    <div class="cell">
+      <div class="cap">The Restored Name editions<small>The Bible Translation row with its ⓘ note open, full size.</small></div>
+      <div class="row-card">
+        <div class="rhead"><span class="n">Bible Translation</span><span class="info">i</span><span class="grow"></span><span class="v">NKJV<i data-i="chevron-right" class="xs"></i></span></div>
+        <div class="note">
+          Verse text for the 66-book reading flow. Section headings stay in place across translations. Does not affect the Matthew Study Bible, which uses its own curated text.
+          <p><strong>NKJV-R / KJV-R — the Restored Name editions.</strong> “His name is YahuShua HaMashiach” (“Death and Deliverance”; “Proclaim The Name of The Lord”). These editions restore the Name across the New Testament — 1,212 NKJV and 1,217 KJV verses, each checked against the Textus Receptus, the Greek text behind both versions. The Old Testament is not yet restored.</p>
+          <ul>
+            <li>Jesus → YahuShua, “YAH Is Salvation” (Zechariah 6:11). The naming verses and the cross inscription keep their capitals: YAHUSHUA (Matthew 1:21; John 19:19).</li>
+            <li>Jesus Christ and Christ Jesus → YahuShua HaMashiach — always in the commanded order of the Name.</li>
+            <li>Christ standing alone → HaMashiach. “Ha” is Hebrew for “the,” so “the Christ” becomes simply HaMashiach (Matthew 16:16).</li>
+            <li>Hebrew never puts “Ha” on a possessed title: “His Mashiach” (Acts 4:26), “the Lord’s Mashiach” (Luke 2:26), “called Mashiach” (Matthew 1:16), “both Lord and Mashiach” (Acts 2:36).</li>
+            <li>“False christs” becomes “false messiahs” — a generic plural, not His title. “Antichrist” and “Christian” are unchanged.</li>
+            <li>John’s translation notes render the meaning, “the Anointed,” so they don’t repeat themselves (John 1:41; 4:25).</li>
+            <li>Other bearers of the name are untouched — Bar-Jesus (Acts 13:6), Jesus called Justus (Colossians 4:11) — and the KJV’s two Joshua verses (Acts 7:45; Hebrews 4:8) now read “Joshua,” as in the NKJV.</li>
+          </ul>
+          <p><strong>Please note:</strong> the Restored Name editions were prepared with AI assistance (Claude Fable 5, 2026). Every change was rule-generated and machine-checked against the Greek, but errors are possible — where a rendering matters, compare the base NKJV or KJV.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

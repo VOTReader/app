@@ -1,0 +1,160 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* Prophecy group + cards (ProphecyGroup / ProphecyCard / ProphecyExpandToggle), in a study chapter
+     that LetterView renders: YAHUSHUA More Than a Man, Section One. */
+  .board-grid { grid-template-columns: 412px 412px 1fr; }
+  .mid { padding-top: 2px; margin-bottom: 16px; } /* the page ends at the bar's lower edge (letter.html) */
+  .glabel { margin: 26px 0 12px; font: 500 22px/1.22 var(--serif); color: var(--text); text-wrap: balance; }
+  .glabel:first-child { margin-top: 14px; }
+  .pcard { background: var(--surface); border-radius: 16px; }
+  [data-theme="light"] .pcard { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .pcard + .pcard { margin-top: 8px; }
+  .ph-head { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px 0 16px; }
+  .ph-head .tag { flex: 1; min-width: 0; font: 700 14px/1.25 var(--sans); color: var(--text-2); }
+  .pcard.open .ph-head .tag { color: var(--text); }
+  .ph-head > .i { color: var(--text-3); }
+  .dot.sm { width: 8px; height: 8px; border-radius: 4px; }
+  .t-intro { background: var(--text-3); } .t-ot { background: var(--dot-clay); } .t-nt { background: var(--dot-honey); } .t-vot { background: var(--dot-sky); }
+  .pc-body { padding: 0 16px 16px; }
+  .pc-body .sub { font: 500 18px/1.3 var(--serif); color: var(--text); text-wrap: balance; }
+  .pc-body .reading { font-size: 17px; line-height: 1.58; margin-top: 8px; }
+  .pc-body .reading p + p { margin-top: 12px; }
+  /* the expand / collapse-all button floats above the reading bar */
+  .fab { position: absolute; right: 16px; bottom: 94px; z-index: 5; height: 44px; padding: 0 18px 0 12px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-2); color: var(--text); font: 700 14px/1 var(--sans); box-shadow: var(--shadow); }
+  .fab .i { color: var(--accent); }
+  .fab.inline { position: relative; right: auto; bottom: auto; box-shadow: 0 0 0 1px var(--hairline); }
+  .side { display: flex; flex-direction: column; gap: 28px; }
+  .tags .pcard .ph-head .tag { color: var(--text); }
+  .fabs { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .fabs .one { display: flex; flex-direction: column; gap: 8px; }
+  .note-s { font: 400 13px/1.45 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  .note-s b { font-weight: 700; color: var(--text-2); }
+</style></head>
+<body data-size="1400x1120">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Prophecy group and cards</div>
+    <div class="meta">Study chapters only: YAHUSHUA More Than a Man, sections one to eleven (132 groups). A group is a title over up to four cards; each card opens and closes on its own, and one floating button opens or closes every card in the chapter. Cards start open.</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 · one card open, the rest closed -->
+    <div class="cell">
+      <div class="cap">One card open <small>After “Collapse”, the reader opened one card, so the button now offers Expand.</small></div>
+      <div class="rd-phone"><div class="screen">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:9%"></i></div><span class="pc">9%</span></div>
+        <div class="scroll mid">
+          <div class="glabel">YahuShua and God Are One</div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-ot"></span><span class="tag">Old Testament Prophecy</span><i data-i="chevron-right" class="sm"></i></div></div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-right" class="sm"></i></div></div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-vot"></span><span class="tag">Fulfillment in the Volumes of Truth</span><i data-i="chevron-right" class="sm"></i></div></div>
+
+          <div class="glabel">YahuShua Is Called Immanu El</div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-ot"></span><span class="tag">Old Testament Prophecy</span><i data-i="chevron-right" class="sm"></i></div></div>
+          <div class="pcard open">
+            <div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-down" class="sm"></i></div>
+            <div class="pc-body">
+              <div class="sub">YahuShua Was Called Immanu El</div>
+              <div class="reading"><p>So all this was done that it might be fulfilled which was spoken by The Lord through the prophet, saying: "Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanu El," which is translated, "God with us." -<span class="cite">Matthew 1:22-23</span></p></div>
+            </div>
+          </div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-vot"></span><span class="tag">Fulfillment in the Volumes of Truth</span><i data-i="chevron-right" class="sm"></i></div></div>
+
+          <div class="glabel">YahuShua Is God in the Flesh</div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-ot"></span><span class="tag">Old Testament Prophecy</span><i data-i="chevron-right" class="sm"></i></div></div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-right" class="sm"></i></div></div>
+          <div class="pcard"><div class="ph-head"><span class="dot sm t-vot"></span><span class="tag">Fulfillment in the Volumes of Truth</span><i data-i="chevron-right" class="sm"></i></div></div>
+        </div>
+        <span class="fab"><i data-i="chevron-down" class="sm"></i>Expand</span>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Preface</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Chapter 2</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 · every card open (the default) -->
+    <div class="cell">
+      <div class="cap">All cards open <small>The default. The button offers Collapse.</small></div>
+      <div class="rd-phone"><div class="screen">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:21%"></i></div><span class="pc">21%</span></div>
+        <div class="scroll mid">
+          <div class="glabel">YahuShua Is God in the Flesh</div>
+          <div class="pcard open">
+            <div class="ph-head"><span class="dot sm t-ot"></span><span class="tag">Old Testament Prophecy</span><i data-i="chevron-down" class="sm"></i></div>
+            <div class="pc-body">
+              <div class="sub">The Messiah Would Be God in the Flesh</div>
+              <div class="reading"><p>Therefore The Lord Himself will give you a sign: Behold, the virgin shall conceive and bear a Son, and shall call His name Immanu El. -<span class="cite">Isaiah 7:14</span></p></div>
+            </div>
+          </div>
+          <div class="pcard open">
+            <div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-down" class="sm"></i></div>
+            <div class="pc-body">
+              <div class="sub">YahuShua Was God in the Flesh</div>
+              <div class="reading">
+                <p>And The Word became flesh and dwelt among us, and we beheld His glory, the glory as of The Only Begotten of The Father, full of grace and truth. -<span class="cite">John 1:14</span></p>
+                <p>And without controversy great is the mystery of godliness: God was manifested in the flesh, justified in the Spirit, seen by angels, preached among the Gentiles, believed on in the world, received up in glory. -<span class="cite">1 Timothy 3:16</span></p>
+              </div>
+            </div>
+          </div>
+          <div class="pcard open">
+            <div class="ph-head"><span class="dot sm t-vot"></span><span class="tag">Fulfillment in the Volumes of Truth</span><i data-i="chevron-down" class="sm"></i></div>
+            <div class="pc-body">
+              <div class="sub">YahuShua Is God in the Flesh</div>
+              <div class="reading"><p>For I had sent to you My Son, in whom the fullness of God dwells, God in the flesh, Immanu El; a man without sin, blameless, who willingly gave up His life for all who have fallen under judgment, that those who are willing might pass from death to life, from darkness into The Light of Life. (An excerpt from <span class="lk">"Judgment, Transgression, and The Word" - Volume Two</span>)</p></div>
+            </div>
+          </div>
+        </div>
+        <span class="fab"><i data-i="rd-chevron-up" class="sm"></i>Collapse</span>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Preface</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Chapter 2</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 · tags + the toggle, at full size -->
+    <div class="side">
+      <div class="cell tags">
+        <div class="cap">Card tags <small>A small colour dot keeps the four kinds apart; the gold accent is not spent on them.</small></div>
+        <div class="pcard"><div class="ph-head"><span class="dot sm t-intro"></span><span class="tag">Introduction</span><i data-i="chevron-right" class="sm"></i></div></div>
+        <div class="pcard"><div class="ph-head"><span class="dot sm t-ot"></span><span class="tag">Old Testament Prophecy</span><i data-i="chevron-right" class="sm"></i></div></div>
+        <div class="pcard"><div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-right" class="sm"></i></div></div>
+        <div class="pcard"><div class="ph-head"><span class="dot sm t-vot"></span><span class="tag">Fulfillment in the Volumes of Truth</span><i data-i="chevron-right" class="sm"></i></div></div>
+        <div class="note-s"><b>Introduction</b> is supported by the code but no group in the current corpus has one. An open card shows its own sub-label (for example “The Messiah Would Be God in the Flesh”) above its passages.</div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Open and closed <small>Tap anywhere on a card's header.</small></div>
+        <div class="pcard open"><div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-down" class="sm"></i></div></div>
+        <div class="pcard"><div class="ph-head"><span class="dot sm t-nt"></span><span class="tag">Fulfilled in the New Testament</span><i data-i="chevron-right" class="sm"></i></div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Collapse / Expand all</div>
+        <div class="fabs">
+          <div class="one"><span class="fab inline"><i data-i="rd-chevron-up" class="sm"></i>Collapse</span><span class="note-s">“Collapse all cards”</span></div>
+          <div class="one"><span class="fab inline"><i data-i="chevron-down" class="sm"></i>Expand</span><span class="note-s">“Expand all cards”</span></div>
+        </div>
+        <div class="note-s">Floats at the lower right, above the reading bar, on any chapter that has prophecy groups. Each card's open or closed state is remembered.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

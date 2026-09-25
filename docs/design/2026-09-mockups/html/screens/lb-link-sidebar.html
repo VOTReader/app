@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .chapter { padding-top: 6px; }
+  .sechead { margin: 22px 0 10px; }
+  .reading p + p { margin-top: 10px; }
+  /* right-hand drawer (LinkSidebar): below the status bar, full height */
+  .lb-drawer { position: absolute; top: 34px; right: 0; bottom: 0; width: 350px; background: var(--surface); border-radius: 24px 0 0 24px; box-shadow: var(--shadow); padding: 8px 16px 20px; display: flex; flex-direction: column; }
+  [data-theme="light"] .lb-drawer { box-shadow: -18px 0 40px rgba(60,40,20,.18); }
+  .lb-drawer .lb-shead { padding-top: 6px; }
+  .lb-drawer .cnt { margin-top: 2px; }
+  .cards { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .lcard { background: var(--surface-2); border-radius: 16px; padding: 14px 16px 4px; }
+  .lcard .hd { display: flex; align-items: flex-start; gap: 8px; }
+  .lcard .hd > div { flex: 1; min-width: 0; }
+  .lcard .hd .i { color: var(--text-3); margin-top: 20px; }
+  .lcard .dir { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .lcard .ref { font: 500 19px/1.25 var(--serif); color: var(--text); margin-top: 2px; }
+  .lcard .mm { font: 400 13px/1.35 var(--sans); color: var(--text-3); margin-top: 3px; }
+  .lcard .pv { font: 400 16px/1.5 var(--serif); color: var(--text-2); margin-top: 10px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .lcard .pv b { font: 700 11px/1 var(--sans); color: var(--accent); vertical-align: .45em; margin-right: 3px; }
+  .lcard .ar { display: flex; align-items: center; margin: 6px -10px 0; }
+  .lcard .ar .btn { height: 44px; font-size: 14px; padding: 0 10px; }
+  .lcard .ar .btn.muted { color: var(--text-2); font-weight: 400; margin-left: auto; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">John 3 · NKJV</span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll chapter">
+    <div class="h1" style="font-size:40px">John 3</div>
+    <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+    <div class="reading">
+      <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+      <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”<span class="lb-mk src"><i data-i="link"></i></span></p>
+      <p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+      <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God.<span class="lb-mk src"><i data-i="link"></i></span> <span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</p>
+    </div>
+  </div>
+  <div class="scrim"></div>
+  <div class="lb-drawer">
+    <div class="lb-shead"><span class="h2">Links</span><span class="iconbtn"><i data-i="x"></i></span></div>
+    <div class="meta cnt">2 links</div>
+    <div class="cards">
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">from</div><div class="ref">The True Baptism</div><div class="mm">Volume Two · 2h ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div>
+        <div class="ar"><span class="btn text muted">Remove link</span></div>
+      </div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">to</div><div class="ref">Matthew 3:11</div><div class="mm">New Testament · 5d ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv"><b>11</b>I indeed baptize you with water unto repentance, but He who is coming after me is mightier than I, whose sandals I am not worthy to carry. He will baptize you with the Holy Spirit and fire.</div>
+        <div class="ar"><span class="btn text">Show more</span><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

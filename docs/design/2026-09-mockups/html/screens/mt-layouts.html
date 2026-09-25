@@ -1,0 +1,265 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="mt-common.css">
+<style>
+  /* scriptures-home in the three layouts scriptures.html does not show (ScripturesHome.jsx),
+     plus the Genre Grid before the Bible text has loaded. The hero is scriptures.html's, unchanged;
+     the layout button (aria "Change Scripture layout") sits in the top bar. */
+  .intro { padding-top: 4px; }
+  .trans { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .chip.small { height: 28px; padding: 0 8px 0 11px; gap: 3px; font-size: 13px; }
+  .cont { display: flex; margin-top: 18px; }
+  .cont .pill { height: 32px; padding: 0 13px 0 11px; border-radius: 16px; font-size: 13px; gap: 7px; }
+  .sect { margin: 28px 0 10px; }
+
+  .board-grid > .cell > .cap { min-height: 52px; }
+  /* the layout-cycle caption: names the layout just chosen, beside the button, then fades (1.5 s) */
+  .flash { position: absolute; top: 45px; right: 106px; z-index: 5; height: 34px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; background: var(--surface-3); color: var(--text); font: 700 14px/1 var(--sans); box-shadow: var(--shadow); white-space: nowrap; }
+
+  /* Compact List */
+  .gname { margin: 18px 0 8px; }
+  .gname.first { margin-top: 0; }
+  .cl .item { min-height: 48px; padding: 10px 16px; gap: 12px; }
+  .cl .bt { flex: 1; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .cl .meta { white-space: nowrap; }
+
+  /* Book Grid: every book, three across */
+  .bgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 28px; }
+  .bk { padding: 14px 8px 13px; min-height: 76px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+  .bk .bt { font: 500 17px/1.18 var(--serif); color: var(--text); text-wrap: balance; }
+  .bk .meta { margin-top: 5px; font-size: 12px; }
+
+  /* Canonical Scroll: bs-genre's book rows with the canonical number */
+  .cn { min-height: 80px; gap: 12px; padding: 14px 16px 14px 12px; }
+  .cn .n { width: 30px; flex: none; text-align: right; font: 700 16px/1 var(--sans); color: var(--text-3); align-self: flex-start; padding-top: 7px; }
+  .cn .ttl { display: block; font: 500 21px/1.2 var(--serif); color: var(--text); }
+  .cn .meta.sub { display: block; margin-top: 3px; }
+  .count { flex: none; text-align: right; font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .count b { display: block; font: 700 17px/1.1 var(--sans); color: var(--text-2); }
+
+  /* Genre Grid (scriptures.html) */
+  .genres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .gt { min-height: 84px; padding: 14px 16px 13px; display: flex; flex-direction: column; justify-content: space-between; }
+  .gt .nm { font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .gt .meta { margin-top: 6px; white-space: nowrap; }
+  .gt .meta .dash { color: var(--text-3); letter-spacing: .02em; }
+  .gt.wide { grid-column: 1 / -1; }
+
+  /* full-size close-up of the button and caption */
+  .closeup { display: flex; gap: 24px; align-items: flex-start; }
+  .crop { width: 412px; height: 214px; border-radius: 22px; overflow: hidden; position: relative; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); flex: none; }
+  .crop .screen { position: relative; height: 214px; }
+  .crop .lay { color: var(--text); background: var(--surface-2); }
+  .cycle { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+  .cycle .step { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 10px; background: var(--surface-2); color: var(--text-2); font: 400 14px/1 var(--sans); align-self: flex-start; }
+  .cycle .step.on { background: var(--surface-3); color: var(--text); font-weight: 700; }
+  .cycle .arr { padding-left: 14px; color: var(--text-3); height: 14px; }
+  .cycle .arr .i { width: 14px; height: 14px; }
+  .cycle .meta { margin-top: 6px; max-width: 200px; }
+</style></head>
+<body data-size="1400x1250">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Scriptures home, the other layouts</div>
+    <div class="meta">The Genre Grid is drawn in scriptures.html. The layout button cycles Genre Grid, Compact List, Book Grid, Canonical Scroll; Settings › Scripture Browser sets the same thing.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 309px)">
+
+    <!-- ───────── Compact List, just switched to (caption showing) ───────── -->
+    <div class="cell">
+      <div class="cap">Compact List<small>A dense single column, grouped by genre. The caption is showing because the reader has just tapped the layout button.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn lay"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span class="tabcount">1</span>
+        </div>
+        <span class="flash">Compact List</span>
+        <div class="scroll">
+          <div class="intro">
+            <div class="h1">The Scriptures of Truth</div>
+            <div class="trans"><span class="meta">New King James Version</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+            <div class="cont"><span class="pill"><i data-i="book-open" class="xs"></i>Continue: John 3</span></div>
+          </div>
+          <div class="label sect">Old Testament</div>
+          <div class="eyebrow gname first">The Law</div>
+          <div class="group cl">
+            <div class="item"><span class="bt">Genesis</span><span class="meta">50 chapters</span></div>
+            <div class="item"><span class="bt">Exodus</span><span class="meta">40 chapters</span></div>
+            <div class="item"><span class="bt">Leviticus</span><span class="meta">27 chapters</span></div>
+            <div class="item"><span class="bt">Numbers</span><span class="meta">36 chapters</span></div>
+            <div class="item"><span class="bt">Deuteronomy</span><span class="meta">34 chapters</span></div>
+          </div>
+          <div class="eyebrow gname">History</div>
+          <div class="group cl">
+            <div class="item"><span class="bt">Joshua</span><span class="meta">24 chapters</span></div>
+            <div class="item"><span class="bt">Judges</span><span class="meta">21 chapters</span></div>
+            <div class="item"><span class="bt">Ruth</span><span class="meta">4 chapters</span></div>
+            <div class="item"><span class="bt">1 Samuel</span><span class="meta">31 chapters</span></div>
+            <div class="item"><span class="bt">2 Samuel</span><span class="meta">24 chapters</span></div>
+            <div class="item"><span class="bt">1 Kings</span><span class="meta">22 chapters</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── Book Grid ───────── -->
+    <div class="cell">
+      <div class="cap">Book Grid<small>All 66 books, three across, in canonical order with no section breaks.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn lay"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="h1">The Scriptures of Truth</div>
+            <div class="trans"><span class="meta">New King James Version</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+            <div class="cont"><span class="pill"><i data-i="book-open" class="xs"></i>Continue: John 3</span></div>
+          </div>
+          <div class="bgrid">
+            <div class="card bk"><div class="bt">Genesis</div><div class="meta">50 chapters</div></div>
+            <div class="card bk"><div class="bt">Exodus</div><div class="meta">40 chapters</div></div>
+            <div class="card bk"><div class="bt">Leviticus</div><div class="meta">27 chapters</div></div>
+            <div class="card bk"><div class="bt">Numbers</div><div class="meta">36 chapters</div></div>
+            <div class="card bk"><div class="bt">Deuteronomy</div><div class="meta">34 chapters</div></div>
+            <div class="card bk"><div class="bt">Joshua</div><div class="meta">24 chapters</div></div>
+            <div class="card bk"><div class="bt">Judges</div><div class="meta">21 chapters</div></div>
+            <div class="card bk"><div class="bt">Ruth</div><div class="meta">4 chapters</div></div>
+            <div class="card bk"><div class="bt">1 Samuel</div><div class="meta">31 chapters</div></div>
+            <div class="card bk"><div class="bt">2 Samuel</div><div class="meta">24 chapters</div></div>
+            <div class="card bk"><div class="bt">1 Kings</div><div class="meta">22 chapters</div></div>
+            <div class="card bk"><div class="bt">2 Kings</div><div class="meta">25 chapters</div></div>
+            <div class="card bk"><div class="bt">1 Chronicles</div><div class="meta">29 chapters</div></div>
+            <div class="card bk"><div class="bt">2 Chronicles</div><div class="meta">36 chapters</div></div>
+            <div class="card bk"><div class="bt">Ezra</div><div class="meta">10 chapters</div></div>
+            <div class="card bk"><div class="bt">Nehemiah</div><div class="meta">13 chapters</div></div>
+            <div class="card bk"><div class="bt">Esther</div><div class="meta">10 chapters</div></div>
+            <div class="card bk"><div class="bt">Job</div><div class="meta">42 chapters</div></div>
+            <div class="card bk"><div class="bt">Psalms</div><div class="meta">150 chapters</div></div>
+            <div class="card bk"><div class="bt">Proverbs</div><div class="meta">31 chapters</div></div>
+            <div class="card bk"><div class="bt">Ecclesiastes</div><div class="meta">12 chapters</div></div>
+            <div class="card bk"><div class="bt">Song of Solomon</div><div class="meta">8 chapters</div></div>
+            <div class="card bk"><div class="bt">Isaiah</div><div class="meta">66 chapters</div></div>
+            <div class="card bk"><div class="bt">Jeremiah</div><div class="meta">52 chapters</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── Canonical Scroll ───────── -->
+    <div class="cell">
+      <div class="cap">Canonical Scroll<small>One long list numbered 01 to 66, each book with its traditional name.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn lay"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="h1">The Scriptures of Truth</div>
+            <div class="trans"><span class="meta">New King James Version</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+            <div class="cont"><span class="pill"><i data-i="book-open" class="xs"></i>Continue: John 3</span></div>
+          </div>
+          <div class="label sect">Old Testament</div>
+          <div class="list">
+            <div class="row cn"><span class="n">01</span><span class="txt"><span class="ttl">Genesis</span><span class="meta sub">The First Book of Moses</span></span><span class="count"><b>50</b>chapters</span></div>
+            <div class="row cn"><span class="n">02</span><span class="txt"><span class="ttl">Exodus</span><span class="meta sub">The Second Book of Moses</span></span><span class="count"><b>40</b>chapters</span></div>
+            <div class="row cn"><span class="n">03</span><span class="txt"><span class="ttl">Leviticus</span><span class="meta sub">The Third Book of Moses</span></span><span class="count"><b>27</b>chapters</span></div>
+            <div class="row cn"><span class="n">04</span><span class="txt"><span class="ttl">Numbers</span><span class="meta sub">The Fourth Book of Moses</span></span><span class="count"><b>36</b>chapters</span></div>
+            <div class="row cn"><span class="n">05</span><span class="txt"><span class="ttl">Deuteronomy</span><span class="meta sub">The Fifth Book of Moses</span></span><span class="count"><b>34</b>chapters</span></div>
+            <div class="row cn"><span class="n">06</span><span class="txt"><span class="ttl">Joshua</span><span class="meta sub">The Book of Joshua</span></span><span class="count"><b>24</b>chapters</span></div>
+            <div class="row cn"><span class="n">07</span><span class="txt"><span class="ttl">Judges</span><span class="meta sub">The Book of Judges</span></span><span class="count"><b>21</b>chapters</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── Genre Grid before the counts load ───────── -->
+    <div class="cell">
+      <div class="cap">Genre Grid, before the text loads<small>Chapter totals read “—” until the Bible text has downloaded. Book counts are known at once, and every tile still opens.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn lay"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="h1">The Scriptures of Truth</div>
+            <div class="trans"><span class="meta">New King James Version</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+            <div class="cont"><span class="pill"><i data-i="book-open" class="xs"></i>Continue: John 3</span></div>
+          </div>
+          <div class="label sect">Old Testament</div>
+          <div class="genres">
+            <div class="card gt"><div class="nm">The Law</div><div class="meta">5 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">History</div><div class="meta">12 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">Poetry &amp; Wisdom</div><div class="meta">5 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">Major Prophets</div><div class="meta">5 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt wide"><div class="nm">Minor Prophets</div><div class="meta">12 books · <span class="dash">—</span> chapters</div></div>
+          </div>
+          <div class="label sect">New Testament</div>
+          <div class="genres">
+            <div class="card gt"><div class="nm">Gospels</div><div class="meta">4 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">Acts</div><div class="meta">1 book · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">Paul’s Epistles</div><div class="meta">14 books · <span class="dash">—</span> chapters</div></div>
+            <div class="card gt"><div class="nm">General Epistles</div><div class="meta">7 books · <span class="dash">—</span> chapters</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── the button and its caption, full size ───────── -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Layout button and caption, full size<small>Tapping the button switches at once and names the new layout beside it for 1.5 seconds. Its label for TalkBack is “Change Scripture layout”; its tooltip reads “Layout: Genre Grid — tap to change”.</small></div>
+      <div class="closeup">
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="topbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <span class="spacer"></span>
+            <span class="iconbtn lay"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+            <span class="tabcount">1</span>
+          </div>
+          <span class="flash">Compact List</span>
+          <div class="scroll"><div class="intro"><div class="h1">The Scriptures of Truth</div>
+            <div class="trans"><span class="meta">New King James Version</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div></div></div>
+        </div></div>
+        <div class="cycle">
+          <span class="step">Genre Grid</span>
+          <span class="arr"><i data-i="chevron-down"></i></span>
+          <span class="step on">Compact List</span>
+          <span class="arr"><i data-i="chevron-down"></i></span>
+          <span class="step">Book Grid</span>
+          <span class="arr"><i data-i="chevron-down"></i></span>
+          <span class="step">Canonical Scroll</span>
+          <div class="meta">Each tap moves one step down, and the last returns to the Genre Grid.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Behaviour notes<small>From ScripturesHome.jsx and index.html</small></div>
+      <div class="note">
+        <ul>
+          <li>Opening this screen starts the Bible and Matthew downloads, so a tap on a book rarely waits. A book tapped before the text arrives opens “Loading Bible…” at once.</li>
+          <li><b>Genre Grid:</b> the Law, History, Poetry &amp; Wisdom, Major and Minor Prophets; Gospels, Acts, Paul’s Epistles, General Epistles, Revelation. Acts and Revelation go straight to the book’s chapter list; the others open a genre page. In every layout a one-chapter book (Obadiah, Philemon, 2 John, 3 John, Jude) opens its chapter.</li>
+          <li><b>Compact List</b> and <b>Canonical Scroll</b> carry an Old Testament and New Testament break; the <b>Book Grid</b> does not.</li>
+          <li>The translation line follows Settings › Bible Translation, e.g. “NKJV Restored Name” for NKJV-R.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

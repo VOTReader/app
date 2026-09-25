@@ -1,0 +1,221 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  .crop { height: 184px; }
+  .crop .topbar { gap: 0; }
+  .crop .slice { padding: 8px 20px 0; }
+  .crop .slice .h1 { font-size: 28px; margin-top: 6px; }
+  .crop .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(to bottom, transparent, var(--bg)); }
+  .w360 { width: 360px; } .w320 { width: 320px; }
+  [data-theme="dark"] .for-light, [data-theme="light"] .for-dark { display: none; }
+  .legend { width: 412px; }
+  .legend .h3 { font-size: 20px; }
+  .legend .sub { margin-top: 2px; }
+  .legend .note { margin-top: 12px; }
+  .legend .chipwrap { margin-top: 14px; }
+  .legend .chip.on .i { width: 15px; height: 15px; }
+  .rule { width: 412px; }
+  .rule p + p { margin-top: 10px; }
+  .rule .k { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 15px; vertical-align: middle; margin-right: 6px; }
+  .rule .k.p { background: var(--accent-soft); color: var(--accent); }
+  .rule .k.r { background: var(--accent); color: var(--accent-ink); }
+  .rule .k.q { background: var(--surface-2); color: var(--text-2); }
+  .rule .body b { color: var(--text); }
+</style></head>
+<body data-size="1396x1250">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Top bar · every configuration</div>
+    <div class="meta">NavButtons, ResumeReadingNavBtn and TabsNavBtn under the Settings that shape them. One control is primary in each bar: the Bookmark on a chapter or letter (it belongs to this page), the Reading Position Marker on browse screens (it takes you back to your reading). Back, Home and the tools stay quiet; the tab count is a neutral chip.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 412px); column-gap: 40px; row-gap: 30px">
+
+    <div class="cell">
+      <div class="cap">Letter · every icon on (default)<small>Back, Home · Settings, History, Search, Theme · Bookmark · tabs</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span><span class="iconbtn q"><i data-i="history" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Letter · trimmed in Settings<small>Settings Gear, History and Theme switched off</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Letter · this letter is bookmarked<small>The primary fills; a tap opens the bookmark’s options</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span><span class="iconbtn q"><i data-i="history" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm fill"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Chapter · arrows “In Top Nav”<small>Chapter &amp; Letter Arrows setting; History off so all fit</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="navarrows"><span class="navarrow"><i data-i="chevron-left" class="xs"></i></span><span class="navarrow"><i data-i="chevron-right" class="xs"></i></span></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="h1" style="font-size:36px">John 3</div><div class="eyebrow" style="margin-top:10px">Nicodemus and the New Birth</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Compact phone · 360 px<small>History steps back to Home to keep 44 px targets</small></div>
+      <div class="frame crop-top crop w360">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="h1" style="font-size:36px">John 3</div><div class="eyebrow" style="margin-top:10px">Nicodemus and the New Birth</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Smallest phones · under 340 px<small>Settings steps back too</small></div>
+      <div class="frame crop-top crop w320">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="h1" style="font-size:36px">John 3</div><div class="eyebrow" style="margin-top:10px">Nicodemus and the New Birth</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Browse · an index, reading in progress<small>The Reading Position Marker is the primary</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span><span class="iconbtn q"><i data-i="history" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="resume solo"><i data-i="sy-marker" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice"><div class="eyebrow">The Volumes of Truth</div><div class="h1" style="font-size:34px">Volume One</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Home<small>About on the left; no Back, no Home, no Settings or History</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="sy-info" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="resume solo"><i data-i="sy-marker" class="sm"></i></span><span class="tabcount">3</span>
+        </div>
+        <div class="slice lockup" style="padding-top:14px"><div class="t1">The Volumes of Truth</div><div class="t2">&amp; The Scriptures of Truth</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Search · the one exception<small>The field is the bar: no icons, no tab count</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+        </div>
+        <div class="slice" style="padding-top:2px"><div class="corpus" style="margin-top:0"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Tabs switched off<small>Settings › Search, Tabs &amp; History</small></div>
+      <div class="frame crop-top crop">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="settings" class="sm"></i></span><span class="iconbtn q"><i data-i="history" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span>
+          <span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span>
+          <span class="iconbtn primary" style="margin-right:4px"><i data-i="bookmark" class="sm"></i></span>
+        </div>
+        <div class="slice"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div></div>
+        <div class="fade"></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Where the choices live<small>Settings › Top-Nav Buttons, redrawn</small></div>
+      <div class="card legend">
+        <div class="h3">Top-Nav Buttons</div>
+        <div class="meta sub">Icons in the reading bar</div>
+        <p class="body note">Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px.</p>
+        <div class="chipwrap">
+          <span class="chip on"><i data-i="check"></i>Settings Gear</span><span class="chip on"><i data-i="check"></i>History</span>
+          <span class="chip on"><i data-i="check"></i>Bookmark</span><span class="chip on"><i data-i="check"></i>Theme</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">The rule<small>Same three weights in every bar</small></div>
+      <div class="card rule">
+        <p class="body"><span class="k p"><i data-i="bookmark" class="xs"></i></span><b>Primary on a page:</b> Bookmark, tinted.</p>
+        <p class="body"><span class="k r"><i data-i="sy-marker" class="xs"></i></span><b>Primary while browsing:</b> Reading Position Marker, filled.</p>
+        <p class="body"><span class="k q"><i data-i="search" class="xs"></i></span><b>Everything else:</b> quiet icons, 44 px targets.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

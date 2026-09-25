@@ -48,6 +48,16 @@ You are drawing high-fidelity mockups of VOTReader screens in the approved **Ves
   `.readbar > .rb`, `.tabbar > .tb(.on)`, `.mini` + `.playbtn`, `.pill`, `.dot` with `--dot-honey|sage|sky|rose|lavender|clay`,
   highlights `mark.hl-honey` and so on, `.ph` placeholder bars.
 - Spacing on an 8pt grid; screen gutter 20px (`.scroll` has it); 16px radii; touch targets of at least 44px.
+- **Ten mark colours**, as in the app: `--dot-` and `--hl-` for honey, sage, sky, rose, lavender, clay, red, teal,
+  brown and gray (app names: yellow, green, blue, pink, purple, orange, red, teal, brown, gray). Every wash pair
+  stays at least dE 6.5 apart in both themes.
+- **Warn and danger:** `--warn` (amber) marks a recoverable clear such as progress or history; `--danger` (a muted
+  rose) marks anything that deletes or overwrites the reader's own data. Both are tinted, never solid
+  (`.btn-warn`, `.btn-danger`), and their labels lead with the verb (Delete, Remove, Discard, Clear).
+- **Immersive views stay dark in both themes, as in the app:** the Scripture Web (its canvas is black by
+  construction) and the Garden photo viewer. On a board, put `data-theme="dark"` on those phones' screens.
+- **Listen lives in the hero** as the Listen pill under the title. When the hero has scrolled away, it may
+  collapse into the top bar as a headphones button.
 - Calm and uncluttered. It is a reverent reading app for older readers. Hierarchy comes from type and
   space, not from boxes and ornaments. No glows, no gradients except a subtle one on photo-like thumbnails.
 

@@ -1,0 +1,140 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .topbar .t2 { flex: 1; font: 400 16px/1.2 var(--sans); color: var(--text); padding-left: 4px; }
+  .lines .ph + .ph { margin-top: 20px; }
+  .poem { font: italic 400 18px/1.55 var(--serif); color: var(--text); }
+  .poem + .poem, .lines + .poem { margin-top: 18px; }
+  .poem.c { text-align: center; }
+  .poem .fn { font-style: normal; }
+  .closing { text-align: right; font: italic 600 18px/1.4 var(--serif); color: var(--text); margin-top: 16px; }
+  .orn { display: flex; align-items: center; gap: 14px; margin: 26px 0; color: var(--accent); }
+  .orn i { flex: 1; height: 1px; background: var(--hairline); }
+  .orn svg { width: 14px; height: 14px; }
+  .fnl .label { margin-bottom: 12px; }
+  .fni { display: flex; gap: 10px; padding: 10px 0; }
+  .fni + .fni { border-top: 1px solid var(--hairline); }
+  .fni .n { width: 22px; flex: none; font: 700 13px/1.4 var(--sans); color: var(--accent); }
+  .fni .b { flex: 1; min-width: 0; }
+  .fni .r { font: 700 14px/1.4 var(--sans); color: var(--text); }
+  .fni .v { margin-top: 4px; font: 400 16px/1.5 var(--serif); color: var(--text-2); }
+  .fni .ph { height: 8px; margin-top: 10px; }
+  .fni .ph + .ph { margin-top: 10px; }
+  .bnav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bcard { background: var(--surface); border-radius: 16px; padding: 14px 14px 16px; }
+  [data-theme="light"] .bcard { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .bcard .k { display: flex; align-items: center; gap: 4px; font: 400 13px/1.2 var(--sans); color: var(--text-3); }
+  .bcard .t { margin-top: 6px; font: 500 17px/1.28 var(--serif); color: var(--text); }
+  .bcard.next { text-align: right; }
+  .bcard.next .k { justify-content: flex-end; color: var(--accent); }
+  .bcard.off .t { color: var(--text-3); }
+  .rel { margin-top: 14px; padding: 14px 16px 6px; }
+  .rel .label { margin-bottom: 4px; }
+  .rel .ri { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 400 15px/1.3 var(--sans); color: var(--text); }
+  .rel .ri + .ri { border-top: 1px solid var(--hairline); }
+  .rel .ri span { flex: 1; }
+  .rel .ri .i { color: var(--text-3); }
+  .vtext p { font: 400 19px/1.62 var(--serif); color: var(--text); }
+  .sec { margin: 4px 0 12px; }
+  /* the one celebration */
+  .toast { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); height: 48px; border-radius: 24px; background: var(--surface-3); display: inline-flex; align-items: center; gap: 10px; padding: 0 20px 0 16px; font: 400 15px/1 var(--sans); color: var(--text); box-shadow: var(--shadow); white-space: nowrap; z-index: 5; }
+  .toast svg { width: 14px; height: 14px; color: var(--accent); }
+  /* index (screens/index.html) */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 22px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .prog { flex: 1; min-width: 0; }
+  .prog .progress { margin-top: 7px; }
+  .letters { border-radius: 0; }
+  .letters .item { align-items: flex-start; gap: 12px; padding: 19px 16px 19px 14px; }
+  .num { width: 62px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .num .d { display: block; margin-top: 3px; font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .num .x { font: 400 12px/1 var(--sans); color: var(--text-3); margin-left: -3px; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .item.cur { background: var(--accent-soft); }
+  .ttl .pill { margin-top: 12px; }
+</style></head>
+<body data-size="1056x1662">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5c.9 6.4 3.9 9.6 10.5 10.5-6.6.9-9.6 4.1-10.5 10.5-.9-6.4-3.9-9.6-10.5-10.5C8.1 11.1 11.1 7.9 12 1.5z"/></symbol>
+</svg>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">When a reading is finished</div>
+    <div class="meta">No pop-up and no score. Once 90% of the words have been on screen for long enough, the page is quietly marked read; the index shows it, and the way on waits at the foot of the page. A milestone, when one is crossed, is the only thing that speaks.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(3, 309px)"></div>
+</div>
+<script>
+  const SPARK = '<svg><use href="#x-spark"/></svg>';
+  const ORN = `<div class="orn"><i></i>${SPARK}<i></i></div>`;
+  const LETTER_BAR = `<div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span>
+      <span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>`;
+  const phone = (bar, body, over = '') => `<div class="phone-m"><div class="screen" style="position:relative">
+      <div class="status"></div>${bar}<div class="scroll">${body}</div>${over}</div></div>`;
+  const nav = (pk, pt, nk, nt, poff) => `<div class="bnav">
+      <div class="bcard ${poff ? 'off' : ''}"><div class="k"><i data-i="chevron-left" class="xs"></i>${pk}</div><div class="t">${pt}</div></div>
+      <div class="bcard next"><div class="k">${nk}<i data-i="chevron-right" class="xs"></i></div><div class="t">${nt}</div></div></div>`;
+
+  // Volume One · Letter 29 — its last lines, verbatim
+  const L29_END = `<div class="lines"><div class="ph" style="width:96%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:58%"></div></div>
+    <div class="poem">Therefore, lift up your eyes to the heavens,<br>And look upon the earth beneath...</div>
+    <div class="poem">For the heavens shall vanish away like smoke,<br>The earth will grow old like a garment,<br>And those who dwell in it shall<br>Pass away in like manner…</div>
+    <div class="poem">Yet My Salvation is forever,<br>And My righteousness shall never be abolished<span class="fn">11</span>...</div>
+    <div class="closing">Says The Lord.</div>
+    ${ORN}
+    <div class="fnl"><div class="label">Footnotes</div>
+      <div class="fni"><span class="n">1.</span><div class="b"><div class="r">Exodus 31:18</div><div class="ph" style="width:96%"></div><div class="ph" style="width:64%"></div></div></div>
+    </div>`;
+
+  const cells = [
+    ['The last lines', 'Nothing interrupts; the letter is marked read', phone(LETTER_BAR, L29_END)],
+    ['A milestone crossed', 'Only then: one pill, three seconds, never stacked', phone(LETTER_BAR, L29_END, `<span class="toast">${SPARK}Milestone: 50 readings finished</span>`)],
+    ['The way on', 'The last letter of a volume points to the next', phone(LETTER_BAR, `
+      <div class="fnl" style="padding-top:6px">
+        <div class="fni"><span class="n">10.</span><div class="b"><div class="r">Isaiah 51:4-5</div><div class="ph" style="width:98%"></div><div class="ph" style="width:71%"></div></div></div>
+        <div class="fni"><span class="n">11.</span><div class="b"><div class="r">Isaiah 51:6</div><div class="v">Lift up your eyes to the heavens, And look on the earth beneath. For the heavens will vanish away like smoke…</div></div></div>
+      </div>
+      <div style="height:22px"></div>
+      ${nav('Previous letter', 'Judge Not Others, For That By Which You Judge Is How You Shall Be Judged', 'Next · Volume Two', 'The Wide Path')}
+      <div class="card rel"><div class="label">Related Topics</div>
+        <div class="ri"><span>The Messiah</span><i data-i="chevron-right" class="xs"></i></div>
+        <div class="ri"><span>Regarding The Ten Commandments</span><i data-i="chevron-right" class="xs"></i></div>
+        <div class="ri"><span>The Coming of The Lord - “I AM COME”</span><i data-i="chevron-right" class="xs"></i></div>
+        <div class="ri"><span>Regarding the Day of The Lord</span><i data-i="chevron-right" class="xs"></i></div>
+      </div>`)],
+    ['Back on the index', 'Read, re-read, and a place kept for the unfinished', phone(`<div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="t2">The Volumes of Truth</span></div>`, `
+      <div class="idx"><div class="hdr"><div class="eyebrow">The Volumes of Truth</div><div class="h1">Volume One</div><div class="meta sub">29 letters · 2004–2006</div>
+        <div class="playrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span><div class="prog"><span class="meta">16 of 29 read</span><div class="progress"><i style="width:55%"></i></div></div></div></div>
+      <div class="group letters">
+        <div class="item"><div class="num"><b>24<span class="rd"></span></b><span class="d">1/29/05</span></div><div class="ttl">Clothed with The Presence of God</div><div class="dur">~3 min</div></div>
+        <div class="item"><div class="num"><b>25</b><span class="d">2/24/05</span></div><div class="ttl">Remember The Sabbath and Your God, and He Shall Remember You<div><span class="pill">62% · ~2 min left</span></div></div><div class="dur">~4 min</div></div>
+        <div class="item"><div class="num"><b>26<span class="rd"></span></b><span class="d">3/6/05</span></div><div class="ttl">Watch</div><div class="dur">~4 min</div></div>
+        <div class="item"><div class="num"><b>27<span class="rd"></span><span class="x">×2</span></b><span class="d">3/19/05</span></div><div class="ttl">Purify Your Faith</div><div class="dur">~2 min</div></div>
+        <div class="item"><div class="num"><b>28<span class="rd"></span></b><span class="d">3/26/05</span></div><div class="ttl">Judge Not Others, For That By Which You Judge Is How You Shall Be Judged</div><div class="dur">~1 min</div></div>
+        <div class="item cur"><div class="num"><b>29<span class="rd"></span></b><span class="d">3/28/05</span></div><div class="ttl">Embrace The Cornerstone, Wherein Flows Springs of Living Water</div><div class="dur">~2 min</div></div>
+      </div></div>`)],
+    ['The end of a chapter', 'Scripture ends the same way', phone(`<div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="t2">John 3 · NKJV</span>
+        <span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>`, `
+      <div class="lines" style="padding-top:8px"><div class="ph" style="width:92%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:47%"></div></div>
+      <div class="vtext" style="margin-top:20px"><p><span class="vnum">33</span>He who has received His testimony has certified that God is true. <span class="vnum">34</span>For He whom God has sent speaks the words of God, for God does not give the Spirit by measure. <span class="vnum">35</span>The Father loves the Son, and has given all things into His hand. <span class="vnum">36</span>He who believes in the Son has everlasting life; and he who does not believe the Son shall not see life, but the wrath of God abides on him.”</p></div>
+      ${ORN}
+      ${nav('Previous', 'John 2', 'Next', 'John 4')}`)],
+    ['The end of the letters', 'After the Holy Days, the way opens onto the Garden', phone(LETTER_BAR, `
+      <div class="lines" style="padding-top:8px"><div class="ph" style="width:100%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:61%"></div></div>
+      <div class="poem c" style="margin-top:26px">Behold, four are fulfilled:<br>Salvation assured, sin and death overcome, the Spirit given.</div>
+      <div class="poem c">Three are coming quickly:<br>Sin destroyed, evil bound, My seat taken, Judgment...</div>
+      <div class="poem c">A new day, even one thousand years...</div>
+      <div class="poem c">Then a short season, Consummation...</div>
+      <div class="poem c">An everlasting day in The Lord!</div>
+      ${ORN}
+      ${nav('Previous', 'Atonement', 'Next · A Return to the Garden', 'A Return to the Garden')}`)],
+  ];
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('');
+</script>
+</body></html>

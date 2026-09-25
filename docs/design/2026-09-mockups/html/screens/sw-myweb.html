@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: 915px; gap: 26px; }
+  .cell > .cap small { max-width: 900px; }
+</style></head>
+<body data-size="995x1108">
+<div class="board">
+  <div class="board-head"><div class="h2">My Web</div>
+    <div class="meta">The reader’s own links as threads between two rails: the Volumes along the top, the Bible along the bottom. Timothy’s threads, the Volumes’ own citations of Scripture, run faintly beneath as corpus context.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Your web<small>27 links. A gold ring joins two passages of Scripture, an amber dot two places in the Volumes, a coral ring-dot crosses between them. Every rail position and label is real; which links this reader made is illustrative.</small></div>
+      <div class="lf f100"><div class="ls" id="fA" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Both rails zoomed<small>Each rail pans and zooms on its own: Volume Two above, Isaiah below. A zoomed rail shows its own Reset. A thread whose far end is off screen rises toward it, then runs along the far rail.</small></div>
+      <div class="lf f100"><div class="ls" id="fB" data-theme="dark"></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawMyWeb, chromeHTML, footHTML, iconize, G, done } from './sw-lib.js';
+  const D = window.SW_DATA;
+  const TOP = 104, BOT = 330;
+  document.getElementById('fA').innerHTML = '<canvas></canvas>' + chromeHTML({ mode: 'myweb' }) + footHTML('myweb');
+  document.getElementById('fB').innerHTML = '<canvas></canvas>' + chromeHTML({ mode: 'myweb' }) + footHTML('myweb')
+    + `<span class="rreset" style="top:${TOP + 10}px"><i data-i="rotate-ccw"></i>Reset Volumes</span>`
+    + `<span class="rreset" style="top:${BOT - 42}px"><i data-i="rotate-ccw"></i>Reset Bible</span>`;
+  iconize();
+  drawMyWeb(document.querySelector('#fA canvas'), { topY: TOP, bottomY: BOT, rail: D.rail, under: D.under, links: D.links });
+  const isa = G.books.findIndex((b) => b.title === 'Isaiah');
+  const isaLo = G.books[isa].start, isaHi = G.books[isa + 1].start;
+  drawMyWeb(document.querySelector('#fB canvas'), { topY: TOP, bottomY: BOT, rail: D.rail, under: D.under, links: D.links,
+    bible: { camX: (isaLo + isaHi) / 2 + 60, ppv: 0.6 }, vol: { camX: 43.5, ppv: 17 } });
+  done();
+</script>
+</body></html>

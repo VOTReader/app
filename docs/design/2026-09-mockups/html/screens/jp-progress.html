@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .h1 { margin-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .sect { margin: 30px 0 10px; }
+  .hero { margin-top: 22px; padding: 20px 20px 22px; display: grid; grid-template-columns: 1fr 1fr; row-gap: 22px; column-gap: 16px; }
+  .stat b { display: block; font: 700 28px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .stat .lb { display: block; margin-top: 8px; font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .stat .meta { display: block; margin-top: 3px; }
+  .days { margin-top: 12px; padding: 16px 20px 18px; }
+  .days .hd { display: flex; justify-content: space-between; align-items: baseline; }
+  .days .hd span:first-child { font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .bars { display: flex; align-items: flex-end; justify-content: space-between; height: 64px; margin-top: 16px; }
+  .bars i { width: 16px; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--accent) 36%, var(--surface-3)); }
+  .bars i.w { background: var(--accent); }
+  .bars i.z { height: 3px !important; background: var(--surface-3); border-radius: 2px; }
+  .days .ax { display: flex; justify-content: space-between; margin-top: 8px; }
+  .ms { padding: 16px 16px 8px; }
+  .msl { display: flex; flex-wrap: wrap; gap: 8px; }
+  .m { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border-radius: 16px; background: var(--surface-2); color: var(--text-3); font: 400 13.5px/1 var(--sans); white-space: nowrap; }
+  .m svg { width: 12px; height: 12px; flex: none; }
+  .m.on { background: var(--accent-soft); color: var(--text); }
+  .m.on svg { color: var(--accent); }
+  .ms .btn.text { margin: 8px 0 0 -12px; font-size: 15px; }
+  .ms .btn.text .i { margin-left: -2px; }
+  .rd { padding: 18px 20px 6px; }
+  .rrow + .rrow { margin-top: 20px; }
+  .rrow .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .rrow .hd span:first-child { font: 400 16px/1.25 var(--sans); color: var(--text); }
+  .rrow .hd span:last-child { font: 700 15px/1 var(--sans); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .rrow .progress { margin-top: 10px; height: 4px; }
+  .rrow .meta { margin-top: 7px; }
+  .hist { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--hairline); margin: 20px -20px 0; padding: 16px 20px; }
+  .hist span:first-child { font: 400 16px/1.2 var(--sans); color: var(--text); }
+  .group .item .lb { flex: 1; font: 400 16px/1.25 var(--sans); color: var(--text); }
+  .group .item .n { font: 700 15px/1 var(--sans); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .listen { padding: 20px 20px 22px; display: grid; grid-template-columns: 1fr 1fr; row-gap: 22px; column-gap: 16px; }
+  .src { align-items: flex-start !important; }
+  .src .t { flex: 1; min-width: 0; }
+  .src .t b { display: block; font: 500 17px/1.3 var(--serif); color: var(--text); }
+  .src .t .meta { display: block; margin-top: 3px; }
+  .src .r { text-align: right; flex: none; padding-top: 2px; }
+  .src .r b { display: block; font: 700 15px/1 var(--sans); color: var(--text-2); }
+  .src .r .meta { display: block; margin-top: 5px; }
+  .endpad { height: 36px; }
+</style></head>
+<body data-size="412x2674">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5c.9 6.4 3.9 9.6 10.5 10.5-6.6.9-9.6 4.1-10.5 10.5-.9-6.4-3.9-9.6-10.5-10.5C8.1 11.1 11.1 7.9 12 1.5z"/></symbol>
+  <symbol id="x-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2.5"/></symbol>
+</svg>
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Library</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="eyebrow">Personal Study</div>
+      <div class="h1">My Progress</div>
+      <div class="body">Your reading, journaling, and study at a glance.</div>
+    </div>
+
+    <div class="card hero">
+      <div class="stat"><b>213</b><span class="lb">Read</span><span class="meta">chapters &amp; letters</span></div>
+      <div class="stat"><b>9</b><span class="lb">Entries</span><span class="meta">in your journal</span></div>
+      <div class="stat"><b>118.4k</b><span class="lb">Words read</span><span class="meta">across your reading</span></div>
+      <div class="stat"><b>214</b><span class="lb">Reading pace</span><span class="meta">words per minute</span></div>
+      <div class="stat"><b>9</b><span class="lb">Re-reads</span><span class="meta">letters &amp; chapters revisited</span></div>
+      <div class="stat"><b>9h 13m</b><span class="lb">Reading time</span><span class="meta">time actually spent reading</span></div>
+    </div>
+
+    <div class="card days">
+      <div class="hd"><span>Last 14 days</span><span class="meta">6,840 words this week</span></div>
+      <div class="bars" id="bars"></div>
+      <div class="meta ax"><span>Sep 12</span><span>Today</span></div>
+    </div>
+
+    <div class="label sect">Milestones</div>
+    <div class="card ms">
+      <div class="msl" id="msl"></div>
+      <span class="btn text">View all milestones<i data-i="chevron-right" class="sm"></i></span>
+    </div>
+
+    <div class="label sect">Reading</div>
+    <div class="card rd">
+      <div class="rrow"><div class="hd"><span>The Volumes of Truth</span><span>112 / 727</span></div><div class="progress"><i style="width:27.5%"></i></div><div class="meta">61.8k / 224.5k words</div></div>
+      <div class="rrow"><div class="hd"><span>New Testament</span><span>58 / 260</span></div><div class="progress"><i style="width:23.2%"></i></div><div class="meta">41.2k / 177.9k words</div></div>
+      <div class="rrow"><div class="hd"><span>Old Testament</span><span>31 / 929</span></div><div class="progress"><i style="width:3.3%"></i></div><div class="meta">19.4k / 592.6k words</div></div>
+      <div class="rrow"><div class="hd"><span>Studies</span><span>12 / 100</span></div><div class="progress"><i style="width:11.5%"></i></div><div class="meta">9.8k / 85.4k words</div></div>
+      <div class="hist"><span>Reading history</span><span class="meta">342 entries</span></div>
+    </div>
+
+    <div class="label sect">My Library</div>
+    <div class="group">
+      <div class="item"><span class="lb">Notes</span><span class="n">38</span></div>
+      <div class="item"><span class="lb">Highlights &amp; underlines</span><span class="n">124</span></div>
+      <div class="item"><span class="lb">Bookmarks</span><span class="n">17</span></div>
+      <div class="item"><span class="lb">Links</span><span class="n">9</span></div>
+    </div>
+
+    <div class="label sect">Journaling</div>
+    <div class="group">
+      <div class="item"><span class="lb">Words written</span><span class="n">3,120</span></div>
+      <div class="item"><span class="lb">Voice memos</span><span class="n">4 min</span></div>
+    </div>
+
+    <div class="label sect">Listening</div>
+    <div class="card listen">
+      <div class="stat"><b>46</b><span class="lb">Recordings played</span><span class="meta">times you pressed play</span></div>
+      <div class="stat"><b>31</b><span class="lb">Heard to the end</span><span class="meta">recordings finished</span></div>
+      <div class="stat"><b>5</b><span class="lb">Saved</span><span class="meta">recordings kept</span></div>
+    </div>
+
+    <div class="label sect">Most Annotated</div>
+    <div class="group">
+      <div class="item src"><span class="t"><b>Know That Which Has Been Poured Out, The Word of God</b><span class="meta">Volume One</span></span><span class="r"><b>7 marks</b><span class="meta">8.4 / 1k words</span></span></div>
+      <div class="item src"><span class="t"><b>The Wide Path</b><span class="meta">Volume Two</span></span><span class="r"><b>2 marks</b><span class="meta">7.8 / 1k words</span></span></div>
+      <div class="item src"><span class="t"><b>Death and Awakening</b><span class="meta">Volume One</span></span><span class="r"><b>4 marks</b><span class="meta">6.6 / 1k words</span></span></div>
+      <div class="item src"><span class="t"><b>John</b><span class="meta">Scripture</span></span><span class="r"><b>23 marks</b><span class="meta">1.2 / 1k words</span></span></div>
+      <div class="item src"><span class="t"><b>Isaiah</b><span class="meta">Scripture</span></span><span class="r"><b>11 marks</b><span class="meta">0.3 / 1k words</span></span></div>
+    </div>
+    <div class="endpad"></div>
+  </div>
+</div>
+<script>
+  // words read per day, oldest first; the last seven sum to the 6,840 in the header
+  const days = [1200, 0, 860, 2100, 0, 0, 1450, 980, 1640, 0, 2210, 740, 0, 1270];
+  const max = Math.max(...days);
+  document.getElementById('bars').innerHTML = days.map((w, i) =>
+    `<i class="${w === 0 ? 'z' : ''} ${i >= 7 ? 'w' : ''}" style="height:${w ? Math.max(8, Math.round(w / max * 100)) : 0}%"></i>`).join('');
+  // the ten featured milestones, in strip order (utils/achievements.js FEATURED_ACHIEVEMENTS)
+  const ms = [['First reading finished', 1], ['10 readings finished', 1], ['50 readings finished', 1], ['200 readings finished', 0],
+    ['10,000 words read', 1], ['100,000 words read', 1], ['500,000 words read', 0], ['One million words read', 0],
+    ['Returned to a reading', 1], ['25 re-readings', 0]];
+  document.getElementById('msl').innerHTML = ms.map(([l, on]) =>
+    `<span class="m ${on ? 'on' : ''}"><svg><use href="#${on ? 'x-spark' : 'x-ring'}"/></svg>${l}</span>`).join('');
+</script>
+</body></html>

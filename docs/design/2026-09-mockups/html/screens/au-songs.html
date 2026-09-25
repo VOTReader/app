@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .pg { padding-bottom: 128px; }
+  .ctl { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .ctl .btn { align-self: flex-start; }
+  .ctl .btn .i { width: 20px; height: 20px; }
+  .chips.scrollx { margin: 2px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); }
+  .chip .caret { font-size: 11px; margin-left: -2px; }
+  .au-sh.au-sh-mid { align-items: center; }
+  .au-sh .see { display: inline-flex; align-items: center; gap: 2px; }
+  .au-sh .see .i { width: 17px; height: 17px; }
+  .shelf { display: flex; align-items: center; gap: 12px; padding: 16px 10px 16px 16px; }
+  .shelf .au-t { flex: 1; }
+</style></head>
+<body data-size="412x2380">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Listening Library</span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+  </div>
+  <div class="scroll pg">
+    <div class="au-hero">
+      <div class="eyebrow">Sung by the flock</div>
+      <div class="h1">Songs of the Letters</div>
+      <div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div>
+    </div>
+    <div class="ctl">
+      <span class="btn primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7h3.2c2.2 0 3.6 1 4.9 3l1.8 3c1.2 2 2.7 3 4.9 3h2.2M3.5 17h3.2c1.6 0 2.8-.5 3.8-1.6M14 8.6c1-1.1 2.2-1.6 3.8-1.6h2.7"/><path d="M18 4.5l2.5 2.5L18 9.5M18 14.5l2.5 2.5-2.5 2.5"/></svg>Shuffle all songs</span>
+      <div class="search"><i data-i="search" class="sm"></i>Find a song, a letter, or a maker</div>
+      <div class="chips scrollx"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="caret">▾</span></span></div>
+    </div>
+
+    <div class="au-sh au-sh-mid"><div class="au-shc"><div class="h2">New from the flock</div></div><div class="au-tail"><span class="btn text see">See all<i data-i="chevron-right"></i></span></div></div>
+    <div class="au-list"><div class="au-song"><span class="au-cover k4 "></span><div class="au-cp"><div class="au-t">You Stepped In</div><div class="meta">Flock prayers</div></div><span class="au-len">5:33</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k2 "></span><div class="au-cp"><div class="au-t">Come Home</div><div class="meta">Inspired by the letters</div></div><span class="au-len">3:59</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k3 "></span><div class="au-cp"><div class="au-t">Lead Me To That Place</div><div class="meta">Inspired by the letters</div></div><span class="au-len">3:14</span><span class="au-rp"><i data-i="play"></i></span></div></div>
+
+    <div class="au-sh"><div class="au-shc"><div class="h2">Your songs</div></div></div>
+    <div class="au-list">
+      <div class="au-nav"><span class="au-mark fill"><i data-i="star"></i></span><div class="au-cp"><div class="au-t">Saved songs</div></div><span class="au-end"><b>4</b><i data-i="chevron-right"></i></span></div>
+      <div class="au-nav"><span class="au-mark"><i data-i="history"></i></span><div class="au-cp"><div class="au-t">Recently played songs</div></div><span class="au-end"><b>9</b><i data-i="chevron-right"></i></span></div>
+    </div>
+
+    <div class="au-sh"><div class="au-shc"><div class="h2">From the letters</div></div></div>
+    <div class="au-list"><div class="au-nav"><span class="au-mosaic"><span class="au-cover k1 "></span><span class="au-cover k2 "></span><span class="au-cover k6 "></span><span class="au-cover k3 "></span></span><div class="au-cp"><div class="au-t">Volume One</div><div class="meta">19 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k5 "></span><span class="au-cover k1 "></span><span class="au-cover k4 "></span><span class="au-cover k2 "></span></span><div class="au-cp"><div class="au-t">Volume Two</div><div class="meta">20 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k3 "></span><span class="au-cover k6 "></span><span class="au-cover k2 "></span><span class="au-cover k1 "></span></span><div class="au-cp"><div class="au-t">Volume Three</div><div class="meta">9 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k2 "></span><span class="au-cover k4 "></span><span class="au-cover k1 "></span><span class="au-cover note">♪</span></span><div class="au-cp"><div class="au-t">Volume Four</div><div class="meta">3 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k6 "></span><span class="au-cover k3 "></span><span class="au-cover k5 "></span><span class="au-cover k4 "></span></span><div class="au-cp"><div class="au-t">Volume Five</div><div class="meta">13 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k4 "></span><span class="au-cover k1 "></span><span class="au-cover k3 "></span><span class="au-cover k2 "></span></span><div class="au-cp"><div class="au-t">Volume Six</div><div class="meta">7 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k2 "></span><span class="au-cover k5 "></span><span class="au-cover k6 "></span><span class="au-cover k1 "></span></span><div class="au-cp"><div class="au-t">Volume Seven</div><div class="meta">24 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k1 "></span><span class="au-cover k4 "></span><span class="au-cover k2 "></span><span class="au-cover k5 "></span></span><div class="au-cp"><div class="au-t">The Lord's Rebuke</div><div class="meta">7 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k3 "></span><span class="au-cover k2 "></span><span class="au-cover k1 "></span><span class="au-cover k6 "></span></span><div class="au-cp"><div class="au-t">Words To Live By: Part One</div><div class="meta">109 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k5 "></span><span class="au-cover k6 "></span><span class="au-cover k4 "></span><span class="au-cover k3 "></span></span><div class="au-cp"><div class="au-t">Words To Live By: Part Two</div><div class="meta">60 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k6 "></span><span class="au-cover k1 "></span><span class="au-cover k2 "></span><span class="au-cover k4 "></span></span><div class="au-cp"><div class="au-t">The Blessed</div><div class="meta">31 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k2 "></span><span class="au-cover k3 "></span><span class="au-cover k5 "></span><span class="au-cover k6 "></span></span><div class="au-cp"><div class="au-t">Letters to The Lord's Little Flock</div><div class="meta">14 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mosaic"><span class="au-cover k4 "></span><span class="au-cover k5 "></span><span class="au-cover k1 "></span><span class="au-cover k3 "></span></span><div class="au-cp"><div class="au-t">Letters from Timothy</div><div class="meta">28 songs</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div></div>
+
+    <div class="au-list au-gap" style="margin-top:28px">
+      <div class="shelf"><div class="au-t">Inspired by the letters</div><span class="meta">490 songs</span><span class="au-end"><i data-i="chevron-right"></i></span></div>
+      <div class="shelf"><div class="au-t">Bible songs</div><span class="meta">50 songs</span><span class="au-end"><i data-i="chevron-right"></i></span></div>
+      <div class="shelf"><div class="au-t">Flock originals and prayers</div><span class="meta">198 songs</span><span class="au-end"><i data-i="chevron-right"></i></span></div>
+    </div>
+  </div>
+</div>
+<div class="au-bar">
+  <span class="au-tab"><i data-i="chevron-down"></i></span>
+  <div class="au-row">
+    <span class="playbtn"><i data-i="pause"></i></span>
+    <div class="au-main"><div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div><div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div></div>
+    <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span>
+  </div>
+  <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div>
+</div>
+</body></html>

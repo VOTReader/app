@@ -1,0 +1,150 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .sample { background: var(--bg); }
+  .sample .eyebrow { margin-bottom: 8px; }
+  .sample .reading { font-size: 19px; }
+  .sample .reading i, .sample .reading em { font-style: italic; }
+  .sample .reading .lead { font-weight: 700; font-style: italic; }
+  .sample .poem { margin-top: 14px; padding-left: 22px; }
+  .legend { display: flex; gap: 18px; margin-top: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .lb-mk { margin: 0; }
+  .llink { color: var(--accent); text-decoration: underline dotted 1.5px; text-underline-offset: 4px; }
+  /* LinkCard, drawn at the drawer's card width */
+  .lcard { width: 318px; background: var(--surface-2); border-radius: 16px; padding: 14px 16px 4px; }
+  .lcard .hd { display: flex; align-items: flex-start; gap: 8px; }
+  .lcard .hd > div { flex: 1; min-width: 0; }
+  .lcard .hd .i { color: var(--text-3); margin-top: 20px; }
+  .lcard .dir { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .lcard .ref { font: 500 19px/1.25 var(--serif); color: var(--text); margin-top: 2px; }
+  .lcard .mm { font: 400 13px/1.35 var(--sans); color: var(--text-3); margin-top: 3px; }
+  .lcard .pv { font: 400 16px/1.5 var(--serif); color: var(--text-2); margin-top: 10px; }
+  .lcard .pv.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .lcard .pv b { font: 700 11px/1 var(--sans); color: var(--accent); vertical-align: .45em; margin-right: 3px; }
+  .lcard .pv .from { font: 700 12px/1 var(--sans); color: var(--text-3); margin-right: 4px; }
+  .lcard .pv .ph { height: 9px; margin-top: 12px; }
+  .lcard .ar { display: flex; align-items: center; margin: 6px -10px 0; }
+  .lcard .ar .btn { height: 44px; font-size: 14px; padding: 0 10px; }
+  .lcard .ar .btn.muted { color: var(--text-2); font-weight: 400; margin-left: auto; }
+  .lcard.pressed { background: var(--surface-3); transform: scale(.99); }
+  .lcard.confirm .top { opacity: .45; }
+  .lcard.confirm .lb-confirm { margin: 12px -8px 12px; background: var(--surface-3); }
+  .lcard.confirm .lb-confirm .btn.secondary { background: var(--surface-2); }
+  .drawer { width: 318px; height: 250px; border-radius: 24px 0 0 24px; background: var(--surface); padding: 14px 16px; box-shadow: var(--shadow); }
+  [data-theme="light"] .drawer { box-shadow: 0 0 0 1px var(--hairline), 0 18px 40px rgba(60,40,20,.14); }
+  .drawer .body { text-align: center; margin-top: 64px; }
+</style></head>
+<body data-size="1424x1070">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Link marks and the link card</div>
+    <div class="meta">dom-links.js / LinkIcon.jsx mark linked words in the text; tapping a mark opens LinkSidebar, whose cards are LinkCard.jsx (the whole card is one role=link)</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 318px)">
+
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Marks in a letter<small>A small chain after the linked words; gold where you linked from</small></div>
+      <div class="sample">
+        <div class="eyebrow">Volume One · Letter 15</div>
+        <div class="reading">…even as you, My son, are most precious in My sight... <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God,</em><span class="lb-mk src"><i data-i="link"></i></span> <em>so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></div>
+        <div class="reading poem">Thus by their fruits you shall know them.<span class="lb-mk src"><i data-i="link"></i></span></div>
+        <div class="legend meta"><span><span class="lb-mk src"><i data-i="link"></i></span>You linked from here</span><span><span class="lb-mk"><i data-i="link"></i></span>Another passage links here</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Links here<small>A quieter mark on a destination</small></div>
+      <div class="sample">
+        <div class="eyebrow">Volume Three · Letter 28</div>
+        <div class="reading"><span class="lead">Thus says The Lord:</span> It is written, <em>that none shall enter The Kingdom of Heaven, unless they are born again.</em><span class="lb-mk"><i data-i="link"></i></span> <em>For all are born physically, of human parents, by great travail into a world of sin.</em></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Not your link<small>A letter the study itself cites (role=link)</small></div>
+      <div class="sample">
+        <div class="eyebrow">YahuShua The Messiah, The Lamb of God</div>
+        <div class="reading">From The Volumes of Truth, <span class="llink">"The Perfect Lamb" - Words to Live By: Part Two</span></div>
+        <div class="meta" style="margin-top:10px">Opens that letter. It has no chain mark and never appears in Links.</div>
+      </div>
+    </div>
+
+    <!-- row 2: card states -->
+    <div class="cell">
+      <div class="cap">At rest<small>On John 3:5; the other end is named</small></div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">from</div><div class="ref">The True Baptism</div><div class="mm">Volume Two · 2h ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div>
+        <div class="ar"><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Pressed<small>The whole card opens the passage</small></div>
+      <div class="lcard pressed">
+        <div class="hd"><div><div class="dir">from</div><div class="ref">The True Baptism</div><div class="mm">Volume Two · 2h ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div>
+        <div class="ar"><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Long passage<small>Three lines, then Show more</small></div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">to</div><div class="ref">Matthew 3:11</div><div class="mm">New Testament · 5d ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv clamp"><b>11</b>I indeed baptize you with water unto repentance, but He who is coming after me is mightier than I, whose sandals I am not worthy to carry. He will baptize you with the Holy Spirit and fire.</div>
+        <div class="ar"><span class="btn text">Show more</span><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Shown in full<small>Show less folds it back</small></div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">to</div><div class="ref">Matthew 3:11</div><div class="mm">New Testament · 5d ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv"><b>11</b>I indeed baptize you with water unto repentance, but He who is coming after me is mightier than I, whose sandals I am not worthy to carry. He will baptize you with the Holy Spirit and fire.</div>
+        <div class="ar"><span class="btn text">Show less</span><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <!-- row 3 -->
+    <div class="cell">
+      <div class="cap">Whole-letter link<small>No words on that end, so this end's words show</small></div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">to</div><div class="ref">Bear Much Fruit, the Harvest Is Near</div><div class="mm">Volume Two · 1w ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv"><span class="from">From:</span>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</div>
+        <div class="ar"><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">From your journal<small>Your own journal words (bars in this mockup)</small></div>
+      <div class="lcard">
+        <div class="hd"><div><div class="dir">from</div><div class="ref">Journal · Morning reading</div><div class="mm">Aug 14</div></div><i data-i="chevron-right" class="sm"></i></div>
+        <div class="pv"><div class="ph" style="width:98%"></div><div class="ph" style="width:92%"></div><div class="ph" style="width:47%"></div></div>
+        <div class="ar"><span class="btn text muted">Remove link</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Remove, confirmed<small>The card cannot open while asking</small></div>
+      <div class="lcard confirm">
+        <div class="top"><div class="hd"><div><div class="dir">from</div><div class="ref">The True Baptism</div><div class="mm">Volume Two · 2h ago</div></div><i data-i="chevron-right" class="sm"></i></div>
+          <div class="pv clamp">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div></div>
+        <div class="lb-confirm"><div class="q">Remove this link?</div>
+          <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm danger">Yes, remove</span></div></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Last link removed<small>The sidebar stays open, empty</small></div>
+      <div class="drawer">
+        <div class="lb-shead"><span class="h2">Links</span><span class="iconbtn"><i data-i="x"></i></span></div>
+        <div class="body">No links yet</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

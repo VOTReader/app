@@ -1,57 +1,41 @@
 <!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
 <script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
 <style>
-  body.landscape { width: 915px; height: 412px; }
-  canvas { position: absolute; inset: 0; width: 915px; height: 412px; }
-  .chrome { position: absolute; left: 20px; right: 20px; top: 14px; display: flex; align-items: flex-start; gap: 14px; }
-  .brand .h2 { font-size: 26px; }
-  .chrome .seg { width: 300px; margin: 2px auto 0; }
-  .right { display: flex; gap: 8px; margin-top: 2px; }
-  .card.pop { position: absolute; width: 250px; padding: 14px 16px; box-shadow: var(--shadow); }
-  .pop .ref { font: 500 18px/1.2 var(--serif); }
-  .pop .ref span { color: var(--accent); }
-  .pop q { display: block; font: italic 400 16px/1.4 var(--serif); color: var(--text-2); margin: 6px 0 10px; quotes: none; }
-  .foot { position: absolute; bottom: 10px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: center; }
-  .legend { display: flex; align-items: center; gap: 8px; }
-  .legend i { width: 90px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, rgb(212,175,90), rgb(201,132,143), rgb(134,169,201)); }
-  [data-theme="light"] .legend i { background: linear-gradient(90deg, rgb(123,45,38), rgb(150,105,40), rgb(60,92,125)); }
-  .credit { font: 400 10.5px/1 var(--sans); color: var(--text-3); }
-</style>
-<style>
-  .dsheet { position: absolute; left: 0; right: 0; bottom: 0; height: 196px; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 22px 16px; box-shadow: var(--shadow); }
-  .dsheet .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 2px; }
-  .dsheet .ref { font: 500 19px/1.2 var(--serif); margin-bottom: 4px; }
-  .dsheet .ref small { font: 400 12px/1 var(--sans); color: var(--text-3); margin-left: 6px; }
-  .dsheet .reading { font-size: 15.5px; line-height: 1.45; color: var(--text-2); }
-  .dsheet .acts { display: flex; gap: 10px; margin-top: 10px; }
-  .dsheet .grabber { margin-bottom: 8px; }
-  .x { position: absolute; right: 16px; top: 12px; }
-  .layer { position: absolute; left: 20px; top: 84px; display: flex; gap: 8px; align-items: center; }
-</style>
-</head>
-<body class="landscape">
-<canvas id="c"></canvas>
-<div class="chrome">
-  <div class="brand"><div class="h2">Scripture Web</div><div class="meta">1 thread selected</div></div>
-  <div class="seg"><span class="on">Scripture</span><span>My Web</span><span>Nearby</span></div>
-  <div class="right"><span class="chip"><i data-i="rotate-ccw" class="xs"></i> Reset</span></div>
-</div>
-<div class="dsheet">
-  <div class="grabber"></div>
-  <span class="iconbtn x"><i data-i="x"></i></span>
-  <div class="cols">
-    <div><div class="ref">Isaiah 53:5 <small>NKJV</small></div>
-      <div class="reading">But He was wounded for our transgressions, He was bruised for our iniquities; The chastisement for our peace was upon Him, And by His stripes we are healed.</div></div>
-    <div><div class="ref">1 Peter 2:24 <small>NKJV</small></div>
-      <div class="reading">who Himself bore our sins in His own body on the tree, that we, having died to sins, might live for righteousness— by whose stripes you were healed.</div></div>
-  </div>
-  <div class="acts"><span class="btn primary sm"><i data-i="book-open" class="sm"></i> Read Isaiah 53</span><span class="btn secondary sm"><i data-i="book-open" class="sm"></i> Read 1 Peter 2</span><span class="btn text sm"><i data-i="link" class="sm"></i> Save to My Web</span><span class="credit" style="margin-left:auto;align-self:center">Cross-references © OpenBible.info (CC-BY)</span></div>
-</div>
+  /* A thread tapped: the Connection sheet (ScriptureWebScreen.jsx DetailSheet). Its two ends side by side,
+     From and To, each opening in the reader; Follow takes the camera to the far end. Dark in both themes. */
+  .dsheet .hd { align-items: center; }
+  .dsheet .hd .go { margin-left: auto; min-height: 0; }
+  .dsheet .reading { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+</style></head>
+<body class="landscape" data-themes="dark">
+<div class="ls" id="f"></div>
 <script type="module">
-  import { draw, verseIndex } from '../kit/data/web-draw.js';
+  import { drawOverview, highlight, verseIndex, chromeHTML, iconize, tok, done } from './sw-lib.js';
+  const go = '<div class="acts"><span class="go">Open in reader ›</span></div>';
+  const f = document.getElementById('f');
+  f.innerHTML = '<canvas></canvas>' + chromeHTML({}) + `<div class="dsheet" role="dialog" aria-label="Connection details">
+      <div class="grabber"></div><span class="iconbtn x"><i data-i="x"></i></span>
+      <div class="hd"><span class="label">Connection</span><span class="meta">11,707 verses apart · weight 247</span><span class="go">Follow to 1 Peter 2:24 ›</span></div>
+      <div class="cols pair">
+        <div><div class="ce">From</div><div class="ref">Isaiah 53:5 <small>Old Testament · NKJV</small></div>
+          <div class="reading">But He was wounded for our transgressions, He was bruised for our iniquities; The chastisement for our peace was upon Him, And by His stripes we are healed.</div>${go}</div>
+        <div class="join"><i data-i="link"></i></div>
+        <div><div class="ce">To</div><div class="ref">1 Peter 2:24 <small>New Testament · NKJV</small></div>
+          <div class="reading">who Himself bore our sins in His own body on the tree, that we, having died to sins, might live for righteousness— by whose stripes you were healed.</div>${go}</div>
+      </div>
+    </div>`;
+  iconize();
   const a = verseIndex(22, 53, 5), b = verseIndex(59, 2, 24);
-  draw(document.getElementById('c'), { top: 80, baseline: 196, sel: [a, b], dim: 0.35 });
-  document.documentElement.dataset.drawn = '1';
+  // the web stands back behind the sheet: a veil of the ground over full-strength ink (a low `dim` rounds the
+  // faintest strokes into false hues), then the chosen thread in the selection look on top
+  const cv = f.querySelector('canvas');
+  const res = drawOverview(cv, { top: 80, baseline: 176 });
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.globalAlpha = 0.62; ctx.fillStyle = tok('--bg', cv); ctx.fillRect(0, 0, cv.clientWidth, 176); ctx.restore();
+  highlight(cv, res, 80, [[a, b]]);
+  done();
 </script>
 </body></html>

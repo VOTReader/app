@@ -1,0 +1,134 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .head { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .head .tt { display: flex; align-items: baseline; gap: 10px; }
+  .head .cnt { font-size: 15px; }
+  .sort { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 4px 0 12px; color: var(--text-2); font: 400 14px/1 var(--sans); }
+  .scroll > .seg { margin-top: 14px; }
+  .scroll > .search { margin-top: 12px; }
+  .search.typed { color: var(--text); }
+  .search.typed .i { color: var(--text-3); }
+  .search .x { margin-left: auto; color: var(--text-3); }
+  .caret { width: 2px; height: 22px; border-radius: 1px; background: var(--accent); margin-left: -8px; }
+  .entries { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .entry { padding: 14px 8px 16px 18px; }
+  .entry .top { display: flex; align-items: flex-start; gap: 4px; }
+  .entry .ttl { flex: 1; min-width: 0; padding-top: 3px; font: 500 20px/1.25 var(--serif); color: var(--text); }
+  .entry .more { width: 40px; height: 40px; margin-top: -6px; color: var(--text-3); }
+  .entry .when { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .entry .when .pin { color: var(--accent); }
+  .entry .pv { margin: 14px 10px 0 0; }
+  .entry .pv .ph { height: 8px; }
+  .entry .pv .ph + .ph { margin-top: 11px; }
+  .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .att { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 9px; border-radius: 14px; background: var(--surface-2); color: var(--text-2); font: 400 13px/1 var(--sans); white-space: nowrap; }
+  .att .i { color: var(--text-3); }
+  .fab { position: absolute; right: 20px; bottom: 26px; padding: 0 22px 0 18px; box-shadow: var(--shadow); }
+
+  /* empty states */
+  .empty { text-align: center; padding: 72px 18px 0; }
+  .empty .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 18px; }
+  .empty .body { margin-top: 8px; text-wrap: balance; }
+
+  /* unclaimed recordings */
+  .unc { margin-top: 16px; padding: 16px 16px 6px; }
+  .unc .hd { display: flex; gap: 12px; align-items: flex-start; }
+  .unc .hd .ic { width: 36px; height: 36px; border-radius: 18px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+  .unc .hd .body { color: var(--text); padding-top: 2px; }
+  .unc .rw { display: flex; align-items: center; gap: 8px; padding: 12px 0; min-height: 60px; }
+  .unc .rw + .rw { border-top: 1px solid var(--hairline); }
+  .unc .rw .meta { flex: 1; color: var(--text-2); font-size: 14px; }
+  .unc .rw .btn.sm { padding: 0 12px; }
+  .cstrip { flex: 1; display: flex; align-items: center; gap: 8px; }
+  .cstrip .q { flex: 1; font: 700 14px/1.3 var(--sans); color: var(--text); }
+  .cstrip .btn.sm { padding: 0 12px; }
+
+  /* sheets */
+  .sheet .item { display: flex; align-items: center; gap: 16px; min-height: 56px; font: 400 16px/1.2 var(--sans); color: var(--text); }
+  .sheet .item .i { color: var(--text-2); }
+  .sheet .item + .item { border-top: 1px solid var(--hairline); }
+  .sheet .item.danger, .sheet .item.danger .i { color: var(--danger); }
+  .steps { display: flex; gap: 6px; margin: 4px 0 12px; }
+  .steps b { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); }
+  .steps b.on { background: var(--accent); }
+  .sheet .q { margin-top: 6px; }
+  .sheet .casc { margin-top: 10px; }
+  .sheet .acts { display: flex; gap: 10px; margin-top: 22px; }
+  .sheet .acts .btn { flex: 1; }
+</style></head>
+<body data-size="1176x1392">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+</svg>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · hub states</div>
+    <div class="meta">Empty, pinned and search states, unclaimed recordings, entry options, and the three-step delete. Copy is the app's own.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 256px)"></div>
+</div>
+<script>
+  const PIN = '<svg class="i xs pin"><use href="#x-pin"/></svg>';
+  function card(t, when, bars, atts, pinned) {
+    return `<div class="card entry">
+      <div class="top"><div class="ttl">${t}</div><span class="iconbtn more"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+      <div class="meta when">${pinned ? PIN : ''}${when}</div>
+      <div class="pv"><div class="ph" style="width:${bars[0]}%"></div><div class="ph" style="width:${bars[1]}%"></div></div>
+      <div class="atts">${atts.map(a => `<span class="att"><i data-i="${a[0]}" class="xs"></i>${a[1]}</span>`).join('')}</div>
+    </div>`;
+  }
+  const CARDS = [
+    card('Morning reading', 'Sep 24 · 7:12 AM', [100, 74], [['book-open', '1 scripture'], ['image', '1 image'], ['mic', 'Voice · 0:42']], true),
+    card('Evening prayer', 'Sep 22 · 9:05 PM', [96, 52], [['mic', 'Voice · 1:36']]),
+    card('Notes on Letter 15', 'Sep 19 · 6:48 AM', [98, 81], [['scroll-text', '1 letter'], ['book-open', '2 scriptures']]),
+  ];
+  function hub({ count = '9 entries', tab = 'all', search = '<i data-i="search" class="sm"></i>Search entries…', searchCls = '', body = '', over = '', fab = true }) {
+    return `<div class="phone-s"><div class="screen">
+      <div class="status"></div>
+      <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+      <div class="scroll">
+        <div class="head"><div class="tt"><span class="h1">My Journal</span><span class="meta cnt">${count}</span></div>
+          <span class="sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+        <div class="seg"><span class="${tab === 'all' ? 'on' : ''}">All entries</span><span class="${tab === 'pinned' ? 'on' : ''}">Pinned</span></div>
+        <div class="search ${searchCls}">${search}</div>
+        ${body}
+      </div>
+      ${fab ? '<span class="btn primary fab"><i data-i="square-pen" class="sm"></i>New entry</span>' : ''}
+      ${over}
+    </div></div>`;
+  }
+  function empty(icon, title, hint) {
+    return `<div class="empty"><div class="badge">${icon}</div><div class="h2">${title}</div><div class="body">${hint}</div></div>`;
+  }
+  function sheet(inner) {
+    return `<div class="scrim"></div><div class="sheet"><div class="grabber"></div>${inner}</div>`;
+  }
+  function delStep(n, q, yes, last) {
+    return sheet(`<div class="meta">Step ${n} of 3</div>
+      <div class="steps">${[1, 2, 3].map(i => `<b class="${i <= n ? 'on' : ''}"></b>`).join('')}</div>
+      <div class="h2 q">${q}</div>
+      <div class="meta casc">This will also permanently delete 3 highlights and 1 note you placed inside this entry.</div>
+      <div class="acts"><span class="btn secondary">Cancel</span><span class="btn ${last ? 'btn-danger' : 'secondary'}">${yes}</span></div>`);
+  }
+  const cells = [
+    ['Empty journal', 'First open: the hint points at New entry', hub({ count: '0 entries', body: empty('<i data-i="notebook-pen" class="lg"></i>', 'No entries yet', 'Tap New entry below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.') })],
+    ['Pinned, none yet', 'The Pinned tab before anything is pinned', hub({ tab: 'pinned', body: empty('<svg class="i lg"><use href="#x-pin"/></svg>', 'No pinned entries', 'Pin your favorite or most-used journal entries here to access them easily.') })],
+    ['Search, no matches', 'Title, text and tags are searched', hub({ searchCls: 'typed', search: '<i data-i="search" class="sm"></i>harvest<span class="caret"></span><i data-i="x" class="sm x"></i>', body: empty('<i data-i="search" class="lg"></i>', 'No matches', 'Try a different search term.'), fab: false })],
+    ['Unclaimed recordings', 'A saved take no entry holds is offered back', hub({ body: `<div class="card unc">
+        <div class="hd"><span class="ic"><i data-i="mic" class="sm"></i></span><div class="body">2 recordings were saved but never attached to an entry.</div></div>
+        <div class="rw"><span class="meta">September 4, 2026 · 0:08</span><span class="btn secondary sm">Recover</span><span class="btn btn-danger sm">Discard</span></div>
+        <div class="rw"><div class="cstrip"><span class="q">Delete this recording?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, delete</span></div></div>
+      </div><div class="entries">${CARDS[0]}</div>` })],
+    ['Entry options', 'From a card’s ⋮ button', hub({ body: `<div class="entries">${CARDS.join('')}</div>`, fab: false, over: sheet(`
+        <div class="item"><i data-i="eye"></i>Open entry</div>
+        <div class="item"><i data-i="square-pen"></i>Edit entry</div>
+        <div class="item"><svg class="i"><use href="#x-pin"/></svg>Pin entry</div>
+        <div class="item danger"><i data-i="trash-2"></i>Delete entry</div>`) })],
+    ['Delete · step 1 of 3', 'Three confirmations, no typing', hub({ body: `<div class="entries">${CARDS.join('')}</div>`, fab: false, over: delStep(1, 'Delete this entry?', 'Continue') })],
+    ['Delete · step 2 of 3', '', hub({ body: `<div class="entries">${CARDS.join('')}</div>`, fab: false, over: delStep(2, 'Are you sure? This cannot be undone.', 'I am sure') })],
+    ['Delete · step 3 of 3', 'Only the last step is the danger action', hub({ body: `<div class="entries">${CARDS.join('')}</div>`, fab: false, over: delStep(3, 'Last step: permanently remove this entry?', 'Delete forever', true) })],
+  ];
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1] || '&nbsp;'}</small></div>${c[2]}</div>`).join('');
+</script>
+</body></html>

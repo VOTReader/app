@@ -2,7 +2,14 @@
 <link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
 <style>
   .topbar .title { padding-left: 12px; }
-  .topbar .btn.text { height: 44px; font-size: 15px; }
+  .topbar .btn.text { height: 44px; font-size: 15px; padding: 0 10px; }
+  /* Deduplicate is inert when no two tabs show the same place (the app then drops the "· N") */
+  .topbar .btn.text.off { opacity: .4; }
+  /* Close all is a recoverable clear of reading places (the app asks "Close all 4 tabs?" first): tinted warn */
+  .topbar .btn-warn { margin: 0 8px 0 4px; flex: none; }
+  /* ⋮ Tab actions: top-right of the preview, far from the × (as dl-common.css draws it) */
+  .tmenu { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; z-index: 2;
+    background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text-2); }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 8px; }
   .tab { height: 260px; border-radius: 16px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
   [data-theme="light"] .tab { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
@@ -37,6 +44,8 @@
   .mtiles span b { position: absolute; left: 7px; bottom: 7px; width: 52%; height: 4px; border-radius: 2px; background: var(--surface-3); }
   .mtiles span b::before { content: ''; position: absolute; left: 0; top: -14px; width: 9px; height: 9px; border-radius: 5px; background: var(--accent-soft); }
 
+  /* the Scripture Web is immersive and stays dark in both themes: its preview carries data-theme="dark" on a black canvas */
+  .pv.web { background: var(--bg); }
   .arcs { position: absolute; left: 12px; top: 46px; width: 156px; height: 154px; }
   .arcs path { fill: none; stroke-width: 1.2; stroke-linecap: round; }
   .arcs .a { stroke: var(--accent); }
@@ -51,14 +60,15 @@
 <div class="screen">
   <div class="status"></div>
   <div class="topbar">
-    <span class="title">4 tabs</span>
-    <span class="btn text">Close all</span>
+    <span class="title">4 / 50 tabs open</span>
+    <span class="btn text off">Deduplicate</span>
+    <span class="btn sm btn-warn">Close all</span>
   </div>
   <div class="scroll">
     <div class="grid">
 
       <div class="tab">
-        <div class="pv">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
           <div class="mph" style="width:56%;height:8px;border-radius:4px"></div>
           <div class="mph" style="width:34%"></div>
           <div class="mcont">
@@ -72,7 +82,7 @@
       </div>
 
       <div class="tab cur">
-        <div class="pv">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
           <div class="mm">Volume One</div>
           <div class="mt">Letter 15</div>
           <div class="mb">
@@ -98,7 +108,7 @@
       </div>
 
       <div class="tab">
-        <div class="pv">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
           <div class="mt big">John 3</div>
           <div class="mb">
             <div class="ln"><span class="vn">1</span><span class="mph" style="width:84%"></span></div>
@@ -120,7 +130,7 @@
       </div>
 
       <div class="tab">
-        <div class="pv">
+        <div class="pv web" data-theme="dark"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
           <div class="mph" style="width:50%;height:8px;border-radius:4px"></div>
           <div class="mph" style="width:30%"></div>
           <svg class="arcs" viewBox="0 0 156 154">

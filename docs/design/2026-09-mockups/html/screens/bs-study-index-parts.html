@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-study-index, parts branch (BibleStudyIndex.jsx: preface + an accordion of parts;
+     one part open at a time, auto-opened on the part that holds the reading position) */
+  .intro { padding-top: 8px; }
+  .intro .h1 { margin-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .intro .meta { margin-top: 8px; }
+  .parts { margin-top: 22px; }
+  .pre .ttl { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .pre .meta { display: block; margin-top: 2px; }
+  .prt { align-items: flex-start; }
+  .prt .txt { padding-top: 1px; }
+  .prt .no { display: block; font: 700 12px/1.2 var(--sans); color: var(--text-3); letter-spacing: .02em; }
+  .prt .ttl { display: block; margin-top: 3px; font: 500 21px/1.2 var(--serif); color: var(--text); }
+  .prt .meta { display: block; margin-top: 4px; }
+  .prt .i { margin-top: 8px; color: var(--text-3); }
+  .open { background: var(--surface); border-radius: 16px; overflow: hidden; }
+  [data-theme="light"] .open { box-shadow: 0 1px 2px rgba(60,40,20,0.05); }
+  .open .prt { display: flex; gap: 14px; padding: 14px 16px; background: var(--accent-soft); }
+  .open .prt .no { color: var(--accent); }
+  .open .prt .i { color: var(--accent); }
+  .sub .item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 16px 14px; min-height: 56px; }
+  .sub .item + .item { border-top: 1px solid var(--hairline); }
+  .num { width: 44px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .sub .t { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .sub .item.cur { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .sub .item.cur .num b { color: var(--accent); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Studies</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="eyebrow">Bible/Letter Study</div>
+      <div class="h1">YAHUSHUA More Than a Man</div>
+      <div class="body">YahuShua Is The Fulfillment of All Messianic Prophecy</div>
+      <div class="meta">Extensive Bible/Letter Study · 3 parts</div>
+    </div>
+    <div class="list parts">
+      <div class="row pre">
+        <span class="txt"><span class="ttl">Preface</span></span>
+        <span class="rd"></span>
+      </div>
+      <div class="row prt">
+        <span class="txt"><span class="no">Part 1</span><span class="ttl">The Fulfillment of All Things</span><span class="meta">YahuShua The Messiah · 12 sections</span></span>
+        <i data-i="chevron-down" class="sm"></i>
+      </div>
+      <div class="row prt">
+        <span class="txt"><span class="no">Part 2</span><span class="ttl">God in the Flesh</span><span class="meta">YahuShua The Messiah · 7 sections</span></span>
+        <i data-i="chevron-down" class="sm"></i>
+      </div>
+      <div class="open">
+        <div class="prt">
+          <span class="txt" style="flex:1"><span class="no">Part 3</span><span class="ttl">The Lamb of God</span><span class="meta">YahuShua The Messiah · 11 sections</span></span>
+          <i data-i="chevron-down" class="sm" style="transform:rotate(180deg)"></i>
+        </div>
+        <div class="sub">
+          <div class="item">
+            <div class="num"><b>20<span class="rd"></span></b></div>
+            <div class="t">Anointing and Entry into Jerusalem</div>
+          </div>
+          <div class="item">
+            <div class="num"><b>21<span class="rd"></span></b></div>
+            <div class="t">Tuesday Night, Passover</div>
+          </div>
+          <div class="item cur">
+            <div class="num"><b>22</b></div>
+            <div class="t">Late Tuesday Night / Early Wednesday Morning, Passover</div>
+          </div>
+          <div class="item">
+            <div class="num"><b>23</b></div>
+            <div class="t">Wednesday Morning, Passover</div>
+          </div>
+          <div class="item">
+            <div class="num"><b>24</b></div>
+            <div class="t">Wednesday Morning and Afternoon, Passover</div>
+          </div>
+          <div class="item">
+            <div class="num"><b>25</b></div>
+            <div class="t">Wednesday Afternoon, Passover (The Crucifixion)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,191 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .ycol { gap: 22px; }
+  .ycol > .label { margin-bottom: -6px; }
+  .ycol > .label + .cell { margin-top: 0; }
+  .sub { font: 400 13px/1.3 var(--sans); color: var(--text-3); margin: 6px 0 -10px; }
+  /* the Your Data page behind the escape toast, as screens/yourdata.html draws it */
+  .ydp .hero { text-align: center; padding: 14px 12px 0; }
+  .ydp .hero .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 16px; }
+  .ydp .hero .body { margin-top: 8px; text-wrap: balance; }
+  .ydp .sum { margin-top: 28px; padding: 20px 20px 18px; }
+  .ydp .counts { display: grid; grid-template-columns: 1fr 1fr; row-gap: 20px; column-gap: 16px; }
+  .ydp .counts b { display: block; font: 700 28px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; }
+  .ydp .counts .meta { display: block; margin-top: 6px; }
+  .ydp .sum .divider { margin: 20px 0 14px; }
+  .ydp .sum .last { display: flex; align-items: center; gap: 8px; }
+  .ydp .acts { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .ydp .foot { margin: 22px 20px 0; text-align: center; text-wrap: balance; }
+  .screen .toast.float { bottom: 28px; width: 372px; }
+</style></head>
+<body data-size="1812x1396">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · backup and import toasts</div>
+    <div class="meta">Every toast the backup flows show, in the app’s words, grouped by flow. They rise from the bottom of whatever screen is open. “Stays” means it remains until the next step replaces it; the others fade after the time given.</div>
+  </div>
+
+  <div class="ycols">
+    <!-- Export -->
+    <div class="ycol w412">
+      <div class="label">Export</div>
+      <div class="cell">
+        <div class="cap">Preparing<small>Stays until the save dialog opens.</small></div>
+        <div class="toast"><span class="spin"></span><span class="grow">Preparing export…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Part of the data would not read<small>3.5 s. Names what failed. Nothing is saved.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Export aborted — could not read: journal media. Nothing was saved. Please try again; if this repeats, your device storage may be failing.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Too big to restore<small>Stays. The backup’s index would pass the 16 MiB restore limit.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Saving<small>Stays until the file is written.</small></div>
+        <div class="toast"><span class="spin"></span><span class="grow">Saving backup…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Saved<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="circle-check" class="sm ok"></i><span class="grow">Backup saved.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Saved, with recent changes missing<small>Stays. With one: “1 recent change … saving it”.</small></div>
+        <div class="toast"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Backup saved — 2 recent changes may be missing; your device could not finish saving them before the backup was taken.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Saved, near the Android limit<small>Stays. Joins the line above when both apply.</small></div>
+        <div class="toast"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Backup saved. Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Failed while writing<small>3.5 s. The half-written file is removed.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Export failed while writing. Please try again.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Failed<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Export failed. Please try again.</span></div>
+      </div>
+    </div>
+
+    <!-- Import: reading the file -->
+    <div class="ycol w412">
+      <div class="label">Import · reading the file</div>
+      <div class="sub">Before the confirm sheet. Nothing has changed yet.</div>
+      <div class="cell">
+        <div class="cap">Cut short<small>5 s. The confirm sheet opens right after it.</small></div>
+        <div class="toast"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Warning: this backup was cut short — the media past that point could not be read. Everything else can still be imported.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Failed its integrity check<small>5 s. The confirm sheet opens right after it.</small></div>
+        <div class="toast"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Warning: this backup failed its integrity check — some data may be corrupted. It can still be imported.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Not a backup<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">This file does not look like a VOTReader backup.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Corrupt or incomplete<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">This backup file is corrupt or incomplete and could not be read.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Too large<small>3.5 s. A file over 50 MB in the older text format.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Could not open · Android<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Import failed — could not open the file. Please try again.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Could not read · Android<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Import failed: could not read file.</span></div>
+      </div>
+    </div>
+
+    <!-- Import: applying -->
+    <div class="ycol w412">
+      <div class="label">Import · after Import &amp; Overwrite</div>
+      <div class="cell">
+        <div class="cap">Importing<small>Stays until the import settles.</small></div>
+        <div class="toast"><span class="spin"></span><span class="grow">Importing… please wait.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Storage not ready<small>3.5 s. Nothing was changed.</small></div>
+        <div class="toast"><i data-i="yd-hourglass" class="sm warn"></i><span class="grow">Storage is temporarily unavailable. Please try again in a moment.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Incomplete<small>3.5 s. No reload: the page stays up for another try.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Import incomplete — 2 stores failed to save. Please retry the import and don’t close the app.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Completed with problems<small>Stays; the app reloads after 5 s, time enough to read it.</small></div>
+        <div class="toast"><i data-i="yd-triangle-alert" class="sm warn"></i><span class="grow">Import completed — 1 section skipped (invalid: vot-links); some records didn’t restore (media 14/15). Reloading…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Complete<small>The app reloads into the restored data after 0.6 s.</small></div>
+        <div class="toast"><i data-i="circle-check" class="sm ok"></i><span class="grow">Import complete. Reloading…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Failed · Android<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Import failed — the file may be corrupt or incomplete. Please try again.</span></div>
+      </div>
+    </div>
+
+    <!-- Verify, Clear, any; the escape offer -->
+    <div class="ycol w412">
+      <div class="label">Verify · Clear · any backup action</div>
+      <div class="cell">
+        <div class="cap">Verify: checking<small>Stays until the Verify Result row appears.</small></div>
+        <div class="toast"><span class="spin"></span><span class="grow">Checking backup…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear: done<small>The app reloads, empty, after 0.6 s.</small></div>
+        <div class="toast"><i data-i="circle-check" class="sm ok"></i><span class="grow">All personal data cleared. Reloading…</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear: did not finish<small>3.5 s.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Clear did not finish. Please try again.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Busy in another tab<small>3.5 s. Export, Verify, Clear, or the import’s last step, while a second tab of the web app is mid-backup.</small></div>
+        <div class="toast"><i data-i="yd-hourglass" class="sm"></i><span class="grow">Another backup operation is running in a different tab. Please wait for it to finish.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Save-dialog escape · web<small>When the save dialog has gone unanswered for a while. Stays until the dialog answers either way. It is the only thing on screen in that moment.</small></div>
+        <div class="toast"><i data-i="yd-hourglass" class="sm"></i><span class="grow">Still waiting for the save dialog.<span class="act">Save the file the usual way</span></span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">The escape, in place</div>
+        <div class="phone-s"><div class="screen">
+          <div class="status"></div>
+          <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+          <div class="scroll ydp">
+            <div class="hero">
+              <div class="badge"><i data-i="shield-check" class="lg"></i></div>
+              <div class="h2">Your data stays on this phone</div>
+              <div class="body">Nothing leaves this device unless you export it.</div>
+            </div>
+            <div class="card sum">
+              <div class="counts">
+                <div><b>124</b><span class="meta">Highlights</span></div>
+                <div><b>38</b><span class="meta">Notes</span></div>
+                <div><b>17</b><span class="meta">Bookmarks</span></div>
+                <div><b>9</b><span class="meta">Journal entries</span></div>
+                <div><b>12</b><span class="meta">Photos</span></div>
+                <div><b>3</b><span class="meta">Voice memos</span></div>
+              </div>
+              <div class="divider"></div>
+              <div class="meta last"><i data-i="history" class="xs"></i>Last backup: September 20</div>
+            </div>
+            <div class="acts">
+              <span class="btn primary block is-off"><i data-i="download" class="sm"></i>Export a backup (.json)</span>
+              <span class="btn secondary block is-off"><i data-i="upload" class="sm"></i>Import a backup</span>
+            </div>
+          </div>
+          <div class="toast float"><i data-i="yd-hourglass" class="sm"></i><span class="grow">Still waiting for the save dialog.<span class="act">Save the file the usual way</span></span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

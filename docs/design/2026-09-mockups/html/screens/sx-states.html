@@ -1,0 +1,162 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sx-icons.js"></script>
+<link rel="stylesheet" href="sx-common.css">
+<style>
+  .crop { width: 412px; border-radius: 22px; overflow: hidden; background: var(--bg); position: relative; box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+  .crop > .screen { height: auto; padding-bottom: 22px; }
+  .dymx { text-align: center; padding: 56px 16px 0; }
+  .dymx .glyph { width: 64px; height: 64px; border-radius: 32px; background: var(--surface-2); color: var(--text-3); display: grid; place-items: center; margin: 0 auto 20px; }
+  .dymx .h2 { font-size: 23px; text-wrap: balance; }
+  .dymx .ask { margin-top: 14px; font: 400 17px/1.4 var(--sans); color: var(--text-2); }
+  .dymx .ask .lnk { display: inline-block; padding: 11px 2px; font-weight: 700; color: var(--accent); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+  .err + .err { margin-top: 10px; }
+  .sblock .h3 { font-size: 20px; }
+  .row2 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 412px); column-gap: 40px; margin-top: 6px; }
+</style></head>
+<body data-size="1848x1566">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search · states between the lines</div>
+    <div class="meta">The rarer moments, in the app’s own words: a near-miss book name, an address answered while the index is still being built, the two ways search can fail, and the small indicators. The index here holds 33,096 entries (the reader on NKJV) and fills in steps of 2,000.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 412px); column-gap: 40px; row-gap: 30px">
+
+    <div class="cell">
+      <div class="cap">Did you mean · “psamls”<small>A short single word, nothing found, one book close by</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q">psamls</span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="dymx">
+            <div class="glyph"><i data-i="search"></i></div>
+            <div class="h2">No results for “psamls”</div>
+            <div class="ask">Did you mean <span class="lnk">Psalms</span>?</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">An address during the build<small>“john 3” gets its card at once; the bar carries on above it</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">john 3<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sblock">
+            <div class="h3">Building search index…</div>
+            <div class="progress"><i style="width:54%"></i></div>
+            <div class="meta cnt">18,000 / 33,096</div>
+          </div>
+          <div class="direct"><span class="ic"><i data-i="book-open" class="sm"></i></span><span class="t"><b>John 3</b><span>Open chapter</span></span><i data-i="chevron-right"></i></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Search could not start<small>The engine never loaded: the message, and nothing else</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="err"><i data-i="sx-circle-alert" class="sm"></i><div class="body">Search couldn't start. Try closing and reopening the app — your data is safe.</div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A failed build, then a failed search<small>The engine’s own words, raw; the message here is an example</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q">shepherd</span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="err"><i data-i="sx-circle-alert" class="sm"></i><div class="raw">Cannot read properties of undefined (reading 'segments')</div></div>
+          <div class="err"><i data-i="sx-circle-alert" class="sm"></i><div class="raw">Error: Cannot read properties of undefined (reading 'segments')</div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="row2">
+      <div class="cell">
+        <div class="cap">Searching…<small>The last results stay in place underneath; their count steps aside</small></div>
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="sbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <div class="search focus"><i data-i="search" class="sm"></i><span class="q">mercy seat<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+          </div>
+          <div class="scroll">
+            <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+            <div class="sline"><span class="meta">Searching…</span><div class="progress indet"><i></i></div></div>
+            <div class="label sec">Best Matches</div>
+            <div class="res" style="padding-bottom:0">
+              <div class="kl"><span class="label">Letter</span></div>
+              <div class="ttl">Treasuries of Wrath and Mercy</div>
+              <div class="meta loc">Volume Five · Letter 19</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Building · starting<small>Before the first count arrives; the page waits under it</small></div>
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="sbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+          </div>
+          <div class="scroll">
+            <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+            <div class="sblock"><div class="spinrow"><div class="spin"></div><div class="h3">Building search index…</div></div></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Building · counting<small>First open, or a new translation; later opens restore it at once</small></div>
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="sbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+          </div>
+          <div class="scroll">
+            <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+            <div class="sblock"><div class="h3">Building search index…</div><div class="progress"><i style="width:36%"></i></div><div class="meta cnt">12,000 / 33,096</div></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">A word during the build<small>“shepherd” waits inside the engine: no Searching…, no list</small></div>
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="sbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <div class="search focus"><i data-i="search" class="sm"></i><span class="q">shepherd<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+          </div>
+          <div class="scroll">
+            <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+            <div class="sblock"><div class="h3">Building search index…</div><div class="progress"><i style="width:79%"></i></div><div class="meta cnt">26,000 / 33,096</div></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

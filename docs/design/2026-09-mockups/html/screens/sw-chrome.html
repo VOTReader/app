@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: 915px; gap: 22px; }
+  .cell > .cap small { max-width: 900px; }
+  .crop.h78 { width: 915px; height: 78px; } .crop.h104 { width: 915px; height: 106px; } .crop.h200 { width: 915px; height: 206px; }
+  .chip.open { background: var(--surface-3); color: var(--text); }
+  .menu { position: absolute; z-index: 5; right: 197px; top: 54px; width: 290px; background: var(--surface-2); border-radius: 16px; padding: 6px; box-shadow: var(--shadow); }
+  .menu .opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 11px; }
+  .menu .opt.on { background: var(--surface-3); }
+  .menu .opt .tx { flex: 1; }
+  .menu .opt b { display: block; font: 700 15px/1.2 var(--sans); color: var(--text); }
+  .menu .opt span { display: block; margin-top: 2px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .menu .opt .i { color: var(--accent); margin-top: 1px; }
+</style></head>
+<body data-size="995x1924">
+<div class="board">
+  <div class="board-head"><div class="h2">Scripture Web · top bar and controls</div>
+    <div class="meta">Every configuration of the strip, at full size, dark in both themes as in the app. The web floats under it; the ruler and the key along the bottom are the web’s legend, not controls, so they stay when the controls hide.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Scripture, Famous (the default)<small>Back, the title and the count shown; the switch between the two webs; then the strip in the app’s order: Nearby, the density, Reset; then the two corner tools, How to read this web (?) and Hide controls.</small></div>
+      <div class="crop h78"><div class="ls" id="s1" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Essential, just chosen<small>The count follows the density, and a status line under the title says what the choice means for 3.6 seconds.</small></div>
+      <div class="crop h104"><div class="ls" id="s2" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Famous, just chosen</div>
+      <div class="crop h104"><div class="ls" id="s3" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">The density, open<small>The two choices carry the same explanations the status line gives.</small></div>
+      <div class="crop h200"><div class="ls" id="s4" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Nearby open<small>Nearby is its own button, not a third web: pressed, it opens the list of what is near the middle of the view (drawn on the Nearby board), and the switch still says which web it reads.</small></div>
+      <div class="crop h78"><div class="ls" id="s5" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">My Web<small>The count of the reader’s links. Nearby stays in its place; Corpus context takes the density’s and shows or hides Timothy’s threads (2,095 of them) under the reader’s own.</small></div>
+      <div class="crop h78"><div class="ls" id="s6" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">My Web, Corpus context off</div>
+      <div class="crop h78"><div class="ls" id="s7" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">My Web, no links yet<small>An invitation instead of a count of zero.</small></div>
+      <div class="crop h104"><div class="ls" id="s8" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Controls hidden<small>Only the way back stays, quiet, in the same corner. The books along the bottom and the colour key remain.</small></div>
+      <div class="lf f100"><div class="ls" id="s9" data-theme="dark"></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawOverview, chromeHTML, footHTML, iconize, done } from './sw-lib.js';
+  const put = (id, html) => { document.getElementById(id).innerHTML = html; };
+  put('s1', chromeHTML({}));
+  put('s2', chromeHTML({ density: 'Essential', meta: '15,402 connections' }) + '<div class="hint" role="status"><i class="dot"></i>Essential — only the strongest connections</div>');
+  put('s3', chromeHTML({}) + '<div class="hint" role="status"><i class="dot"></i>Famous — the famous view — about 64,000 connections</div>');
+  put('s4', '<canvas></canvas>' + chromeHTML({ densityOpen: true }) + `<div class="menu" role="listbox">
+      <div class="opt"><span class="i" style="width:18px"></span><div class="tx"><b>Essential</b><span>only the strongest connections</span></div></div>
+      <div class="opt on"><i data-i="check" class="sm"></i><div class="tx"><b>Famous</b><span>the famous view — about 64,000 connections</span></div></div></div>`);
+  put('s5', chromeHTML({ nearby: true }));
+  put('s6', chromeHTML({ mode: 'myweb' }));
+  put('s7', chromeHTML({ mode: 'myweb', corpus: false }));
+  put('s8', chromeHTML({ mode: 'myweb', meta: 'No links yet — select any text and tap Link.', two: true }));
+  put('s9', '<canvas></canvas>' + '<span class="quiet"><i data-i="sw-hide"></i></span>' + footHTML('canon'));
+  iconize();
+  drawOverview(document.querySelector('#s4 canvas'), { top: 92, baseline: 346 });
+  drawOverview(document.querySelector('#s9 canvas'), { top: 92, baseline: 346 });
+  done();
+</script>
+</body></html>

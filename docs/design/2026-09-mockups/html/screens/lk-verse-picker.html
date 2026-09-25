@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(3, 412px); }
+</style></head>
+<body data-size="1364x1100">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Select Text: the verse picker</div>
+    <div class="meta">VersePickerScreen.jsx · opens when a link's target is a Bible chapter with no verse yet · here the reader links “Born Again” (Volume Three) to John 15, the passage its footnote cites</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- A: nothing selected -->
+    <div class="cell">
+      <div class="cap">Nothing selected yet<small>The footer waits for a verse; the hint says how to pick one</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>Born Again</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">John 15</div><div class="meta">Bible Chapter</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find a verse by its words…</div></div>
+          <div class="pk-hint"><i data-i="lk-pointer" class="sm"></i>Highlight any portion, or tap a verse number to grab the whole verse.</div>
+          <div class="pk-verses">
+            <p><span class="vn">1</span>“I am the true vine, and My Father is the vinedresser.</p>
+            <p><span class="vn">2</span>Every branch in Me that does not bear fruit He takes away; and every branch that bears fruit He prunes, that it may bear more fruit.</p>
+            <p><span class="vn">3</span>You are already clean because of the word which I have spoken to you.</p>
+            <p><span class="vn">4</span>Abide in Me, and I in you. As the branch cannot bear fruit of itself, unless it abides in the vine, neither can you, unless you abide in Me.</p>
+            <p><span class="vn">5</span>“I am the vine, you are the branches. He who abides in Me, and I in him, bears much fruit; for without Me you can do nothing.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn off">Select a verse to continue</span></div>
+      </div></div>
+    </div>
+
+    <!-- B: part of a verse -->
+    <div class="cell">
+      <div class="cap">Part of a verse<small>Drag across the words; the preview quotes exactly what is held</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>Born Again</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">John 15</div><div class="meta">Bible Chapter</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find a verse by its words…</div></div>
+          <div class="pk-prev">every branch that bears fruit He prunes, that it may bear more fruit</div>
+          <div class="pk-verses">
+            <p><span class="vn">1</span>“I am the true vine, and My Father is the vinedresser.</p>
+            <p><span class="vn">2</span>Every branch in Me that does not bear fruit He takes away; and <span class="lk-handle a"></span><mark class="lk-sel">every branch that bears fruit He prunes, that it may bear more fruit</mark><span class="lk-handle b"></span>.</p>
+            <p><span class="vn">3</span>You are already clean because of the word which I have spoken to you.</p>
+            <p><span class="vn">4</span>Abide in Me, and I in you. As the branch cannot bear fruit of itself, unless it abides in the vine, neither can you, unless you abide in Me.</p>
+            <p><span class="vn">5</span>“I am the vine, you are the branches. He who abides in Me, and I in him, bears much fruit; for without Me you can do nothing.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link this selection</span></div>
+      </div></div>
+    </div>
+
+    <!-- C: filtered + whole verse -->
+    <div class="cell">
+      <div class="cap">Filtered, then a whole verse<small>“fruit” keeps 5 of John 15's 27 verses; tapping 5 grabs all of it</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>Born Again</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">John 15</div><div class="meta">Bible Chapter</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i><span class="typed">fruit</span><span class="cnt">5 of 27</span><i data-i="x" class="sm x"></i></div></div>
+          <div class="pk-prev">“I am the vine, you are the branches. He who abides in Me, and I in him, bears much fruit; for without Me you can do nothing.</div>
+          <div class="pk-verses">
+            <p><span class="vn">2</span>Every branch in Me that does not bear fruit He takes away; and every branch that bears fruit He prunes, that it may bear more fruit.</p>
+            <p><span class="vn">4</span>Abide in Me, and I in you. As the branch cannot bear fruit of itself, unless it abides in the vine, neither can you, unless you abide in Me.</p>
+            <p class="grab"><span class="vn">5</span>“I am the vine, you are the branches. He who abides in Me, and I in him, bears much fruit; for without Me you can do nothing.</p>
+            <p><span class="vn">8</span>By this My Father is glorified, that you bear much fruit; so you will be My disciples.</p>
+            <p><span class="vn">16</span>You did not choose Me, but I chose you and appointed you that you should go and bear fruit, and that your fruit should remain, that whatever you ask the Father in My name He may give you.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link this selection</span></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

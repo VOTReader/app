@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: 915px; gap: 26px; }
+  .cell > .cap small { max-width: 900px; }
+  .ptr { position: absolute; z-index: 4; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 12px; border: 2px solid var(--text); box-shadow: 0 0 0 3px var(--bg); }
+  .panel.ch { width: 404px; }
+</style></head>
+<body data-size="995x1094">
+<div class="board">
+  <div class="board-head"><div class="h2">Connections here</div>
+    <div class="meta">A tap where several threads run within a finger’s width of each other asks which one was meant, instead of guessing. The candidates stay lit until one is chosen.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Scripture Web<small>Four threads from Isaiah 53 to 1 Peter stand almost on top of each other at the overview. Each row names both ends, its votes and its reach; choosing one opens its detail sheet.</small></div>
+      <div class="lf f100"><div class="ls" id="fA" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">My Web<small>Two of Timothy’s threads leave Isaiah 53:4 side by side: one to a letter in Volume Four, one to a chapter of the Lamb of God study.</small></div>
+      <div class="lf f100"><div class="ls" id="fB" data-theme="dark"></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawOverview, drawMyWeb, overviewArch, overviewPoint, chromeHTML, footHTML, iconize, vid, tok, isLight, done } from './sw-lib.js';
+  const D = window.SW_DATA;
+  const x = '<span class="iconbtn x" role="button" aria-label="Close connection choices"><i data-i="x"></i></span>';
+  const row = (a, b, m) => `<div class="rw"><div class="tx"><div class="a">${a}<span>↕</span>${b}</div><div class="b">${m}</div></div><i data-i="chevron-right" class="chev"></i></div>`;
+  const A = document.getElementById('fA'), B = document.getElementById('fB');
+  A.innerHTML = '<canvas></canvas>' + chromeHTML({}) + footHTML('canon') + `<span class="ptr" id="pA"></span>
+    <div class="panel ch" id="cA" role="dialog" aria-label="Connections here">${x}
+      <div class="head"><div class="t">Connections here</div><div class="sub">Several threads are close together. Choose the one you meant.</div></div>
+      <div class="rows">${row('Isaiah 53:5', '1 Peter 2:24', '247 votes · 11,707 verses apart')}${row('Isaiah 53:4', '1 Peter 2:24', '155 votes · 11,708 verses apart')}${row('Isaiah 53:5', '1 Peter 3:18', '130 votes · 11,726 verses apart')}${row('Isaiah 53:6', '1 Peter 2:25', '123 votes · 11,707 verses apart')}</div></div>`;
+  B.innerHTML = '<canvas></canvas>' + chromeHTML({ mode: 'myweb' }) + footHTML('myweb') + `<span class="ptr" id="pB"></span>
+    <div class="panel ch" id="cB" role="dialog" aria-label="Connections here">${x}
+      <div class="head"><div class="t">Connections here</div><div class="sub">Several threads are close together. Choose the one you meant.</div></div>
+      <div class="rows">${row('Isaiah 53:4', 'Without Spot or Blemish', 'Vol IV')}${row('Isaiah 53:4', 'Wednesday Morning and Afternoon, Passover', 'Lamb')}</div></div>`;
+  iconize();
+  // the canon: the four candidates lit in the accent, thin, the rest untouched
+  const cv = A.querySelector('canvas');
+  const res = drawOverview(cv, { top: 92, baseline: 346, dim: 0.7 });
+  const pairs = [['Isaiah 53:5', '1 Peter 2:24'], ['Isaiah 53:4', '1 Peter 2:24'], ['Isaiah 53:5', '1 Peter 3:18'], ['Isaiah 53:6', '1 Peter 2:25']].map(([p, q]) => [vid(p), vid(q)]);
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.strokeStyle = tok('--accent', cv); ctx.lineWidth = 1.4;
+  for (const [p, q] of pairs) { overviewArch(ctx, res.X, res.baseline, 92, p, q); ctx.stroke(); }
+  ctx.restore();
+  const pt = overviewPoint(res.X, res.baseline, 92, pairs[0][0], pairs[0][1], 0.62);
+  Object.assign(document.getElementById('pA').style, { left: pt.x + 'px', top: pt.y + 'px' });
+  Object.assign(document.getElementById('cA').style, { left: '32px', top: '70px' });
+  // My Web: the two threads from Isaiah 53:4, lit; the rest of the context stands back
+  const v4 = vid('Isaiah 53:4'), idx = [];
+  for (let k = 0; k < D.under.length; k += 3) if (D.under[k] === v4) idx.push(k / 3);
+  const r = drawMyWeb(B.querySelector('canvas'), { topY: 104, bottomY: 330, rail: D.rail, under: D.under, links: D.links, underFocus: idx, dimLinks: true });
+  const fx = r.X(v4);
+  Object.assign(document.getElementById('pB').style, { left: (fx + 4) + 'px', top: '300px' });
+  Object.assign(document.getElementById('cB').style, { left: (fx - 426) + 'px', top: '120px' });
+  done();
+</script>
+</body></html>

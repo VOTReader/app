@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-study-index, flat branch (BibleStudyIndex.jsx: a study with no parts).
+     Pinned header; the list below is scrolled to the reader's place. */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 20px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .body { margin-top: 8px; }
+  .prog { margin-top: 18px; }
+  .prog .progress { margin-top: 7px; }
+  .chs { border-radius: 0; }
+  .chs .item { align-items: flex-start; gap: 12px; padding: 18px 16px 18px 14px; }
+  .num { width: 44px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .item.cur { background: var(--accent-soft); }
+  .item.cur .num b { color: var(--accent); }
+  .sbar { position: absolute; right: 4px; top: 560px; width: 3px; height: 150px; border-radius: 2px; background: var(--text-3); opacity: .35; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Studies</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">Bible/Letter Study</div>
+      <div class="h1">YahuShua The Messiah, The Lamb of God</div>
+      <div class="body">The True Chronology of The Messiah's Crucifixion and Resurrection</div>
+      <div class="prog"><span class="meta">16 parts · 8 read</span><div class="progress"><i style="width:50%"></i></div></div>
+    </div>
+    <div class="group chs">
+      <div class="item">
+        <div class="num"><b>4<span class="rd"></span></b></div>
+        <div class="ttl">Late Tuesday Night / Early Wednesday Morning, Passover</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>5<span class="rd"></span></b></div>
+        <div class="ttl">Wednesday Morning, Passover</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>6<span class="rd"></span></b></div>
+        <div class="ttl">Wednesday Morning and Afternoon, Passover</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>7<span class="rd"></span></b></div>
+        <div class="ttl">Wednesday Afternoon, Passover (The Crucifixion)</div>
+      </div>
+      <div class="item cur">
+        <div class="num"><b>8</b></div>
+        <div class="ttl">Wednesday Evening Near Sundown, Passover (The Burial)</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>9</b></div>
+        <div class="ttl">Three Days and Three Nights in the Tomb</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>10</b></div>
+        <div class="ttl">Saturday Evening at Sundown, Beginning of the Feast of Firstfruits</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>11</b></div>
+        <div class="ttl">Early Sunday Morning, the Feast of Firstfruits (The Resurrection)</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sbar"></div>
+</body></html>

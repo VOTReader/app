@@ -1,0 +1,1271 @@
+# VOTReader UI surface inventory (read-only sweep)
+
+**Scope and conventions**
+- All paths are under `app/src/main/assets`.
+- **index.html has no inline About, onboarding or tour UI.** It holds only:
+  - the boot splash;
+  - the shared label constants: translations, scripture layouts, arrow layouts, genres, study names, search badges and group names, quick picks, and Hidden Manna titles.
+- **Where things live:**
+  - About is a routed screen.
+  - The tour is `TourPrompt` + `TourOverlay`, driven by `app/src/main/assets/src/utils/tour-steps.js`.
+  - The route table is `app/src/main/assets/src/ui/screen-routes.jsx` (`buildScreenRoutes`). An unknown screen id falls back to Home, and every screen is wrapped in `ErrorBoundary`.
+- **Types used:** Screen (routed), Sub-view, Sheet, Rail (a sheet docked as a right panel on wide screens), Modal, Popover, Toolbar, Banner, Toast, Coach mark, Tour stop, Inline state.
+- **Tour numbering:** the welcome card has no number. The next 11 cards are numbered "N of 11", and that count includes the closing card.
+
+---
+
+## 1. Home & navigation
+
+- **1. Boot splash** (Splash)
+  - Source: `app/src/main/assets/index.html` and `app/src/main/assets/src/components/HydrationGate.jsx` (`HydrationGate`).
+  - Reached: cold start, until the stores hydrate.
+  - Labels: "VOTReader".
+- **2. Home screen** (Screen, route `home`)
+  - Source: `app/src/main/assets/src/ui/screens/HomeScreen.jsx` (`HomeScreen`).
+  - Reached: normal launch after first run, any "Home" button, the fallback for unknown routes, and tour stops 1 and 4.
+  - Labels: h1 "The Volumes of Truth", "&", h2 "The Scriptures of Truth", plus an ornament.
+  - Nav: no Back and no Home. Left: info button "About VOTReader". Right: Search and Theme. The Resume marker and Tabs button come from ScreenLayout.
+  - States: History off hides "Recent reading" and the History tile. Search off hides the search entry points.
+- **3. Home quick-access row** (button row; same file)
+  - Labels: "Search library", "Recent reading" (only with History on), "Notes", "Bookmarks", "Scripture Web".
+- **4. Home tile grid** (9 reorderable cards; same file). Each is eyebrow / title / detail:
+  - "Prophetic Letters" / "The Volumes of Truth" / "Letters from The Lord, Our God and Savior"
+  - "The Holy Bible" / "The Scriptures of Truth" / "Genesis to Revelation · <translation>"
+  - "Topics & Doctrines" / "Answers Only God Can Give" / "The Lord sets the record straight"
+  - "Study Editions" / "Studies" / "Letter Studies · Matthew Study Bible"
+  - "Audio Readings" / "Listening Library" / "The Letters & Scriptures, read aloud"
+  - "Sung by the Flock" / "Songs of the Letters" / "1,082 songs from the words of the letters" (fallback "Songs from the words of the letters")
+  - "Personal Study" / "Library" / "Notes, journal & bookmarks"
+  - "App Configuration" / "Settings" / "Display, themes & preferences"
+  - "Recently Visited" / "History" / "Resume where you left off" (hidden when History is off)
+  - States: resting; hint "Hold to rearrange"; press glow; drag ghost plus vibration; keyboard Alt+Arrow with live status "<title> moved up." / "<title> moved down."
+- **5. Surprise Me button** (floating action button)
+  - Source: HomeScreen.jsx and `app/src/main/assets/src/hooks/use-surprise.js`.
+  - Labels: dice icon; caption "Surprise Me"; aria "Surprise Me — open a random chapter or letter".
+  - Status lines: "Preparing a reading…" and "Could not prepare a reading. Check your connection and try Surprise Me again."
+  - States: busy/disabled while preparing; hidden when the setting is off. The destination opens with a "surprise flash".
+- **6. Standard top nav** (toolbar on every screen that is not immersive)
+  - Source, all in `app/src/main/assets/src/ui/components/`: `ScreenLayout.jsx`, `LibraryNav.jsx`, `NavButtons.jsx`, `HomeBtn.jsx`, `ThemeBtn.jsx`.
+  - Back: "‹" (title "← X", aria "Back to X").
+  - Other buttons: "Home"; optional arrows "‹"/"›" (aria "Previous"/"Next"); gear "Settings"; "History" (reading accent colour); "Search"; bookmark; theme "Switch to light theme"/"Switch to dark theme".
+  - States: the optional icons follow Settings › Top-Nav Buttons. On compact phones History stays on Home, and below 340px Settings does too. Arrows appear here only in the "In Top Nav" layout.
+- **7. Tabs button** (nav button)
+  - Source: `app/src/main/assets/src/ui/components/TabsNavBtn.jsx`.
+  - Labels: "▢" plus a count that caps at "99+"; aria "Open tabs (N open)".
+  - States: hidden when Tabs is disabled.
+- **8. Tabs coach mark** (coach mark; same file)
+  - Reached: shown once, only when more than one tab is open.
+  - Labels: "Tap to switch tabs"; × "Dismiss hint".
+- **9. Reading Position Marker** (nav button)
+  - Source: `app/src/main/assets/src/ui/components/ResumeReadingNavBtn.jsx`.
+  - Labels: "Reading Position Marker"; gold lines-with-pointer glyph.
+  - States: hidden on reading, utility and library screens; can be turned off in Settings.
+- **10. Chapter bookmark button** (nav button)
+  - Source: `app/src/main/assets/src/ui/components/ChapterBookmarkBtn.jsx`.
+  - Labels: outline icon "Bookmark this chapter" opens the create sheet; filled icon "Open bookmark options" opens the popover.
+- **11. Tap-through back pill** (inline pill)
+  - Source: `app/src/main/assets/src/hooks/use-from-letter-stack.js` and `use-navigate-to-link.js`, rendered by the reading views and the journal viewer.
+  - Labels: "‹ Back to <title>" (for letters, "‹ Back to <vol · title>").
+  - States: stacks across several hops. It is absent after opening from History or from a shared link, because those navigations are silent.
+- **12. Volumes home** (Screen, route `volumes-home`)
+  - Source: `app/src/main/assets/src/ui/screens/VolumesHome.jsx`.
+  - Header: "Prophetic Letters" / "The Volumes of Truth" / "Letters from The Lord, Our God and Savior".
+  - "The Seven Volumes": each row reads "N Letters · <years>". Years: One 2004 – 2006, Two 2004 – 2010, Three 2006 – 2010, Four 2010 – 2011, Five 2011 – 2014, Six 2011 – 2014, Seven 2005 – 2014.
+  - "Collections":
+    - "The Lord's Rebuke" · "Correction & Warning"
+    - "Words To Live By: Part One" · "Words of Wisdom"
+    - "Part Two" · "More Words of Wisdom"
+    - "The Blessed" · "Blessings & Promises"
+    - "Letters to The Little Flock"
+    - "Letters from Timothy" · "A Servant's Pen"
+    - "Regarding The Holy Days" · "Appointed Times"
+  - Garden tile: "A Return to The Garden" / "209 Pages · A Visual Journey".
+  - States: locked tiles show "Coming Soon".
+- **13. Volume and collection letter index** (Screen, 14 routes)
+  - Source: `app/src/main/assets/src/ui/components/VolumeLetterIndex.jsx`.
+  - Routes and headers:
+    - `vot-one-index`, `vot-index` (Volume Two), `vot-three-index` through `vot-seven-index`
+    - `vot-timothy-index`: "Letters from Timothy", eyebrow "The Volumes of Truth"
+    - `vot-flock-index`: "Letters to The Lord's Little Flock"
+    - `vot-rebuke-index`: "The Lord's Rebuke", eyebrow "A Testament Against The World"
+    - `wtlb-one-index`: "Words To Live By", eyebrow "Part One · Words of Wisdom"
+    - `wtlb-two-index`: eyebrow "Part Two · More Words of Wisdom"
+    - `blessed-index`: "The Blessed", eyebrow "Blessings & Promises"
+  - Labels: back "Volumes"; "Play All"; compilation chips "Play <label>"; "Preface" card; dates; read check.
+  - States: two-column layout for WTLB; read or unread; reading chip.
+- **14. Reading-time chip** (chip on index cards and history rows)
+  - Source: `app/src/main/assets/src/ui/components/ReadingMinChip.jsx`.
+  - Labels: "~7 min" (not started) or "62% · ~3 min left" (in progress).
+  - States: hidden when the word counters are not loaded.
+- **15. Scriptures home** (Screen, route `scriptures-home`)
+  - Source: `app/src/main/assets/src/ui/screens/ScripturesHome.jsx`.
+  - Labels: the eyebrow is the translation name; title "The Scriptures of Truth".
+  - Layout-cycle button: aria "Change Scripture layout", title "Layout: X — tap to change", with a live flash caption.
+  - The four layouts:
+    - "Genre Grid": tiles "N Books · N Chapters", showing "—" before load
+    - "Compact List"
+    - "Book Grid": three columns
+    - "Canonical Scroll": books 01–66 with subtitles such as "The First Book of Moses"
+- **16. Scripture genre** (Screen, route `scripture-genre`)
+  - Source: `app/src/main/assets/src/ui/screens/ScriptureGenre.jsx`.
+  - Labels: eyebrow "Old Testament" or "New Testament"; book cards "N Chapters".
+  - Genres: The Law, History, Poetry & Wisdom, Major Prophets, Minor Prophets, Gospels, Acts, Paul's Epistles, General Epistles, Revelation.
+- **17. Bible chapter grid** (Screen, route `bible-idx`)
+  - Source: `app/src/main/assets/src/ui/screens/ChapterIndex.jsx`.
+  - Loading state: "Loading Bible…".
+  - Labels: eyebrow "Scriptures of Truth"; book title and subtitle; "Listen".
+  - Cards: number; title or "Chapter N"; flag "Bookmarked"; reading chip; "✓ ×N" (times read).
+- **18. Swipe page peeks** (gesture preview)
+  - Source: `app/src/main/assets/src/ui/components/pager-preview.jsx` and `app/src/main/assets/src/hooks/use-pager-gesture.js`.
+  - Behaviour: the real neighbouring page, rendered inert, slides in from the edge. There is no peek at either end.
+- **19. Desktop keyboard** (not visual)
+  - Source: `app/src/main/assets/src/hooks/use-desktop-keyboard.js`.
+  - "/" or Ctrl+F opens Search; the arrow keys move between chapters or letters. Web only.
+- **20. Shared passage deep link** (entry path)
+  - Source: `app/src/main/assets/src/hooks/use-shared-passage-link.js`.
+  - Behaviour: a URL with `?p=` jumps silently to the passage with a landing flash. A key that doesn't resolve opens nothing, and no error is shown.
+- **21. Exit toast** (toast)
+  - Source: `app/src/main/assets/src/utils/root-exit-toast.js`.
+  - Labels: "Press back again to exit". Shows for 2 seconds as an uppercase pill, on web/PWA only.
+
+## 2. Reading: letters
+
+- **22. Letter view** (Screen)
+  - Routes: `vot-one-letter`, `vot-letter` … `vot-rebuke-letter`, `hm-letter`, the letter form of `holy-days-entry`, and study chapters.
+  - Source: `app/src/main/assets/src/ui/screens/LetterView.jsx` (`LetterView`).
+  - Reached: index card, search, link, history, bookmark, tab, and tour stops 1–3 (a Volume One letter).
+  - Nav: back is the volume label (fallback "Library"); arrows "Previous letter"/"Next letter"; bookmark; journal chip.
+- **23. Letter hero**
+  - Eyebrow: "<Volume> · Letter N", "Preface", or "Chapter N" (study mode).
+  - Also: title, subtitle, and the "Listen" pill.
+  - States: Listen is hidden when there is no recording. During read-along the title gets a gold lead-in wash.
+- **24. Letter meta block**
+  - Fields: date, from, spoken, for, note, "Addendum to <link>", preamble. Any subset can appear.
+- **25. Letter body variants**
+  - Block kinds: section intro, intro paragraph, headings, paragraphs, poetry, closing, cover image, study images with captions.
+  - Inline: footnote bubbles, in-app letter links, scripture refs, marks, note and link icons.
+  - States: landing flash; read-along sentence wash; font and size from Settings.
+- **26. Prophecy group and cards** (collapsible cards)
+  - Source: `app/src/main/assets/src/ui/components/ProphecyGroup.jsx`, `ProphecyCard.jsx`, `ProphecyExpandToggle.jsx`.
+  - Tags: "Introduction", "Old Testament Prophecy", "Fulfilled in the New Testament", "Fulfillment in the Volumes of Truth".
+  - Controls: ▼ chevron; toggle "Collapse"/"Expand" (title "Collapse all cards"/"Expand all cards").
+- **27. Letter bottom prev/next cards** (the reading bottom nav)
+  - Default: "‹ Previous Letter" / "Next Letter ›".
+  - At boundaries: "‹ Previous · X", "‹ Previous Book", "Next · X ›", "Next Book ›". An empty slot shows "—".
+- **28. Letter related cards**
+  - Sections: "Also Read", "Related Topics", "Bible Study".
+  - "Audio": "♪ Audio Recording", "♪ Listen on SoundCloud".
+  - "Videos": "▶ <label>", "▶ Video (with voice over)", "▶ Video (excerpts set to music)", "▶ Official YouTube Channel".
+  - Each section appears only when there is data for it.
+- **29. WTLB and Blessed entry view** (Screen)
+  - Routes: `wtlb-one-entry` ("Part One"), `wtlb-two-entry` ("Part Two"), `blessed-entry` ("The Blessed").
+  - Source: `app/src/main/assets/src/ui/screens/WtlbEntryView.jsx`.
+  - Labels: back is the part label; eyebrow "<part> · N"; attribution links "[From “X” ~ Volume N]"; refs as footnote bubbles or "(ref)"; nav refs "[Esther 4]"; "Footnotes"; bottom "‹ Previous" / "Next ›".
+  - States: landing pulse.
+- **30. Sticky chapter nav** (toolbar)
+  - Source: `app/src/main/assets/src/ui/components/StickyChapterNav.jsx`.
+  - Labels: ‹ › with aria "Previous/Next chapter", "Previous/Next letter" or "Previous/Next entry".
+  - States: disabled at either end.
+- **31. Edge arrow layouts** (defined in index.html; chosen in Settings)
+  - "Split · Left + Right": "Arrows on opposite edges of the content. Default."
+  - "Right-handed": "Both arrows tucked on the right for one-thumb reach."
+  - "Left-handed": "Both arrows tucked on the left for one-thumb reach."
+  - "In Top Nav": "Small bubble arrows inside the top nav bar."
+  - "Hidden": "Hide both arrows. Use the bottom prev/next cards."
+- **32. Auto-scroll transport** (floating pill)
+  - Source: `app/src/main/assets/src/ui/components/AutoScrollControl.jsx` and `app/src/main/assets/src/hooks/use-autoscroll.js`.
+  - Controls: "−" (slower); play/pause ("Start auto-scroll"/"Pause auto-scroll"); "+" (faster); timer button "Adjust the pause before the next page" (only with Auto-Continue on).
+  - Readout by state:
+    - idle: "~N wpm · N lines/min"
+    - running: "~N min left", "~Ns left" or "Reading"
+    - at the end: "End of text"
+- **33. Auto-scroll end-dwell and pause row** (sub-states)
+  - End-dwell: "−", "Next in N"/"Next…", "+", "Cancel".
+  - Pause row: "Pause", −, "None" or "2.5s", +.
+  - States: the pill dims after 3 seconds.
+- **34. Scrollbar content marker** (scroll decoration)
+  - Source: `ScreenLayout.jsx`. Turned on and off with Settings "Scrollbar Content Marker". Its appearance was not verified.
+- **35. Fullscreen reading** (mode plus toast)
+  - Source: `app/src/main/assets/src/hooks/use-fullscreen-gesture.js`.
+  - Reached: double-tap an open area.
+  - Toast: "Fullscreen on. Double-tap or double-click an open area to return to regular view."
+- **36. Hidden Manna letter** (Screen, route `hm-letter`)
+  - Reached: only through the "HM" badge in Matthew study notes. Back returns to that Matthew chapter.
+  - Titles: "The Promise", "I Have Purged; Behold, I Shall Wipe Away and Restore", "Woe to Dallas".
+- **37. Dead letter** (inline error in screen-routes.jsx)
+  - Labels: "This letter is no longer available." with "Back to the list".
+
+## 3. Reading: Bible
+
+- **38. Bible chapter view** (Screen, route `bible-ch`)
+  - Source: `app/src/main/assets/src/ui/screens/BibleChapterView.jsx`.
+  - Reached: chapter grid, search, links, "Go to Scripture", and tour stop 8 (John 3).
+  - Labels: back is the book name; eyebrow "<Book> · Chapter N"; verse numbers; "Listen".
+  - States: poetry layout; Hebrew-letter headings in Psalm 119; surprise flash; landing flash; read-along verse wash; the Restored Names treatment (strings not verified).
+- **39. Chapter title toggle**
+  - Tap the title ("Tap to hide chapter title") to hide it; "+ Show chapter title" brings it back. The default comes from Settings "Chapter Titles".
+- **40. Section headings toggle**
+  - "Tap to hide headings" hides them; "+ Show section headings" brings them back.
+- **41. Verse inline icons**
+  - Source: `app/src/main/assets/src/ui/components/LinkIcon.jsx` (title "N link"/"N links") and `BookmarkIcon.jsx` (title "Bookmark"/"N bookmarks").
+  - They open the link sidebar and the bookmark popover.
+- **42. Bible bottom prev/next**
+  - Labels: "‹ Previous", "‹ Previous Book", "Next ›", "Next Book ›".
+- **43. Translations** (content variants)
+  - Source: `app/src/main/assets/src/data/translations.js` and index.html.
+  - "NKJV": "New King James Version — default"
+  - "NKJV-R": "NKJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach"
+  - "WEB": "World English Bible — modern, public domain · ~2% shorter than NKJV"
+  - "BSB": "Berean Standard Bible — modern literal · ~6% shorter than NKJV"
+  - "HNV": "Hebrew Names Version — names restored (Yeshua, Mattityahu) · ~2% shorter than NKJV"
+  - "KJV": "King James Version 1769 — traditional · ~2% longer than NKJV"
+  - "KJV-R": same pattern as NKJV-R
+  - "ASV": "American Standard Version 1901 — classical literal · ~2% longer than NKJV"
+  - "LSV": "Literal Standard Version — uses YHWH for the Name · ~3% longer than NKJV"
+  - "YLT": "Young's Literal Translation 1898 — hyper-literal · ~3% longer than NKJV"
+- **44. Missing chapter** (inline error)
+  - Labels: "<Book> has N chapters, so there is no chapter N." (or "has one chapter") with "Open <Book>".
+- **45. Journal chip** (nav chip)
+  - Source: `app/src/main/assets/src/renderer/dom-journal-chip.jsx` (`JournalChip`).
+  - Labels: gold journal glyph with a count badge; title "1 journal entry"/"N journal entries"; aria "Journal entries".
+  - Shown only when an entry references this letter or bookmark. It opens item 142.
+
+## 4. Footnotes & cross-refs
+
+- **46. Footnote bubble** (inline marker in LetterView and WtlbEntryView)
+  - States: normal, or flashed after a jump back from the list.
+- **47. Footnote sheet** (sheet or rail)
+  - Source: `app/src/main/assets/src/ui/components/FootnoteSheet.jsx` and `SheetHandle.jsx`.
+  - Labels: "Footnote N of M"; ‹ › "Previous footnote"/"Next footnote"; the ref; the verse; "Also see"; "Open external link".
+  - Handle: "‹" close plus a grab bar.
+  - States:
+    - Missing verse: "Verse text isn’t available for this reference. The footnote points to <ref>, but no matching entry was found in this letter’s scripture dictionary."
+    - Empty: "This footnote has no content attached."
+    - Rail mode on wide screens (docked and non-modal).
+- **48. Go to Scripture button**
+  - Source: `app/src/main/assets/src/ui/components/GoToRefButton.jsx`.
+  - Labels: "Go to Scripture" + ref + "›". A compound ref is split into several buttons.
+- **49. Open in App button**
+  - Source: `app/src/main/assets/src/ui/components/InAppLinkButton.jsx`.
+  - Labels: "Open in App" + title + "›".
+- **50. Letter inline scripture sheet** (sheet or rail, in LetterView and WtlbEntryView)
+  - Labels: "Scripture Reference", the citation, "Go to Scripture".
+  - Missing: "Verse text not available in app data".
+- **51. Matthew scripture sheet** (sheet or rail)
+  - Source: `app/src/main/assets/src/ui/components/ScriptureSheet.jsx`.
+  - Labels: "Scripture Reference · <ref>".
+- **52. Footnotes list** (end-of-text section)
+  - Source: `app/src/main/assets/src/ui/components/FootnoteListSection.jsx` and `ExpandableVerse.jsx`.
+  - Labels: "Footnotes"; items "N." with the ref; "Read more ▼"/"Show less ▲"; "Also see:".
+  - Missing states: " — verse text not available"; "(no content attached)".
+  - Row title: "Jump back to footnote N in the body".
+- **53. Inline reference echoes** (pills)
+  - Source: `app/src/main/assets/src/ui/components/InlineEcho.jsx`.
+  - Labels: "↑ <ref>", title "See note at <ref>".
+- **54. Landing flash** (transient highlight)
+  - The target verse or range flashes after following a link, a search hit, or Scripture Web "Open in reader".
+
+## 5. Annotation
+
+- **55. Annotation hint** (hint pill)
+  - Source: `app/src/main/assets/src/ui/components/AnnotationHint.jsx`.
+  - Labels: "Hold your finger on any line for a moment. A small bar appears: Highlight, or Note."; × "Dismiss tip".
+  - When: 2.5 seconds after load, only for users with zero marks, notes and bookmarks. It gives way to the tour and the audio bar. Dismissal is permanent.
+- **56. Selection toolbar** (floating toolbar)
+  - Source: `app/src/main/assets/src/ui/sheets/SelectionToolbar.jsx`. Role label "Text selection actions".
+  - Style buttons: three "A" buttons (Highlight, Underline, "Squiggle underline").
+  - Swatches: 10, with aria "<color> <style>" (yellow, green, pink, red, orange, blue, purple, teal, brown, gray).
+  - Also: "✕" remove; a row "Listen from here".
+  - Actions: "Note", "Link", "Copy", "Share", "Search", "Bookmark".
+  - States:
+    - Placement: flips below the selection when needed, follows scroll, and auto-scrolls at the edges while handles are dragged.
+    - A multi-verse variant.
+    - "✕" appears only over an existing mark.
+    - "Listen from here" appears only when a recording exists.
+    - Link is hidden when there is no container.
+- **57. Remove-mark confirm** (inline confirm)
+  - Question: "Remove this highlight?", or "Remove this highlight and its note? The note text will be deleted.", or "…and N notes?".
+  - Buttons: "Cancel" / "Yes, remove".
+- **58. Copy and share toasts**
+  - "Copied"
+  - "Copied instead. Paste the passage where you want to share it."
+- **59. Copy fallback sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/CopyFallbackSheet.jsx`.
+  - Title: "Couldn’t copy" or "Couldn’t share".
+  - Help: "Copy the selected passage below, or try again."; if still blocked, "Still blocked. Press and hold the passage, choose Select all, then Copy."
+  - A textarea "The passage"; buttons "Try again" and "Close".
+- **60. Annotation action chip** (popover)
+  - Source: `app/src/main/assets/src/ui/sheets/AnnotationActionChip.jsx`.
+  - Reached: a brief tap on an existing mark that is not a note.
+  - Labels: "Color", "Style", "Note" (only if the mark isn't a note yet), "Remove".
+  - Sub-states: colour picker (‹ + 10 swatches); style picker (‹ + three "A"); confirm "Remove this highlight/underline/squiggle?" with "Yes, remove".
+- **61. Mark rendering** (inline)
+  - 3 styles × 10 colours; note-anchored marks; icon-only notes ("No color").
+- **62. Note sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/NoteSheet.jsx`.
+  - Header: colour dot "Change note color"; title "Note", "New note" or "Edit note"; "⋯" "Options".
+  - Body: the “quote”, the date, a style row, notebook chips, "Add note text", and a textarea "Write your note…".
+  - Notebook row: "Add to notebook…" or the notebook names. Footer: "Cancel"/"Save".
+  - States:
+    - Colour picker: ‹, a blank swatch "No color (icon only)", and 10 colours.
+    - Discard confirm: "Discard this note?" or "Discard changes?", with "Yes, discard".
+- **63. Note ⋯ menu**
+  - Items: "Edit note", "Change color", "Add to notebook…"/"Manage notebooks…", "Share", "Delete note" (confirms "Delete this note?").
+  - Toasts: "Copied instead. Paste the note where you want to share it." and "Couldn’t share or copy. Select the note’s text to copy it by hand."
+- **64. Notebook picker**
+  - Source: `app/src/main/assets/src/ui/sheets/NotebookPickerSheet.jsx`.
+  - Title: "Add to Notebook" or "Manage Notebooks".
+  - Create row: "New notebook name…" + "Create".
+  - Empty: "No notebooks yet. Type a name above to create your first one."
+  - Delete: × "Delete notebook", confirming "Delete “X”? Notes will move to Uncategorized."
+  - Footer: "Cancel"/"Save" (disabled title "No changes to save"). Discard confirm: "Discard changes?".
+- **65. Multi-note popover**
+  - Source: `app/src/main/assets/src/ui/sheets/MultiNotePopover.jsx`.
+  - Labels: "N notes here".
+  - Rows: swatch, preview (or the “quote”, or "Empty note"), date · notebooks.
+  - States: flips above when needed.
+- **66. New/Edit Bookmark sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/BookmarkCreateSheet.jsx`.
+  - Title: "New Bookmark" or "Edit Bookmark".
+  - Save: ✓ "Save bookmark"/"Save changes". When disabled: "Add a label"/"No changes to save".
+  - Label field: "Label", placeholder "A short name for this bookmark…".
+  - Edit mode only: "Open Source" and "Delete" (confirms "Delete bookmark?").
+- **67. Bookmark popover**
+  - Source: `app/src/main/assets/src/ui/sheets/BookmarkPopover.jsx`.
+  - Content: the label or "(no label)", the date, and any legacy thought.
+  - Actions: "Open", "Delete" (confirms "Delete this bookmark?").
+- **68. ConfirmStrip pattern**
+  - Source: `app/src/main/assets/src/ui/components/ConfirmStrip.jsx`.
+  - Labels: a question, "Cancel", and the default yes button "Yes, delete".
+- **69. Sheet crash toast**
+  - Source: `app/src/main/assets/src/ui/components/AppShellSheets.jsx`.
+  - Labels: "That panel hit a problem and closed — your data is safe."
+  - After 3 crashes in 10 seconds, the sheets stay down.
+
+## 6. Search
+
+- **70. Search screen** (Screen, route `search`)
+  - Source: `app/src/main/assets/src/ui/screens/SearchScreen.jsx` and `app/src/main/assets/src/hooks/use-search.js`.
+  - Labels: "‹"; input "Search scriptures, volumes, studies…"; "✕".
+- **71. Corpus tabs**: "All" / "Scriptures" / "Volumes".
+- **72. Scope chip**: "⌕ Search in X" or "✓ Scoped to X ✕".
+- **73. Index build**: "Building search index…" with an "N / M" bar.
+- **74. Index error**: "Search couldn't start. Try closing and reopening the app — your data is safe."
+- **75. Suggestion dropdown** (this is the search "overlay"): rows of kind, label and hint, including slash commands.
+- **76. Empty hero**: "Search everything" / "Verses, letters, study notes, footnotes — across all 66 books and every Volume."
+- **77. Recent chips**: "Recent", each with ✕. The confirm reads "Remove “X” from recent searches?" / "Yes, remove".
+- **78. Quick picks**: "Beatitudes", "Armor of God", "Love Chapter", "Faith Chapter", "Shepherd Psalm", "Ten Commandments", "Great Commission", "Fruit of the Spirit", "New Jerusalem", "Four Horsemen", "Valley of Dry Bones".
+- **79. Searching**: "Searching…".
+- **80. Results header**: "Found N matches across M sections" (capped at "400+"); sort "Book order"/"Relevance".
+- **81. Direct-hit cards**: "Named passage — open", "Open chapter", "Open letter", "Open book index".
+- **82. Best Matches**: "Best Matches".
+- **83. Result groups**: "<label> · N matches" with a ▸ chevron.
+  - Group labels: "Matthew Study Bible", "Scriptures", "Matthew · Notes", "Volume One" through "Volume Seven", "Letters from Timothy", "Lord's Little Flock", "The Lord's Rebuke", "The Blessed", "WTLB · Part One", "WTLB · Part Two", "Holy Days", "Answers Only God Can Give", "Bible Studies", "Letters", "Other".
+- **84. Result card**
+  - Source: `app/src/main/assets/src/ui/components/SrchCard.jsx`, `SrchSnippet.jsx`, `SrchGroup.jsx`.
+  - Kind badges: "Verse", "Chapter", "Heading", "Study Note", "Cross-Ref", "Letter", "Footnote", "WTLB", "Blessed", "Holy Day", "Answers", "Study".
+  - Also: a translation badge, a heading badge, a location line, and a snippet with <mark>.
+- **85. Did-you-mean**: "No results for “q” — did you mean <Book>?"
+- **86. No results**: "No results for “q”".
+- **87. Error**: "Error: <msg>".
+- **88. Slash commands**
+  - "/random" "Random verse or letter"
+  - "/home" "Go home"
+  - "/settings" "Open settings"
+  - "/scriptures" "Go to scriptures"
+  - "/volumes" "Go to volumes"
+  - "/clear history" "Clear search history"
+  - "/clear" "Clear current search"
+  - "/help" "Show search help"
+  - "/rebuild index" "Rebuild search index"
+- **89. Search from selection**: the toolbar's "Search" opens this screen with the selected text.
+
+## 7. Links
+
+- **90. Link picker** (sheet)
+  - Source: `app/src/main/assets/src/ui/sheets/LinkPicker.jsx` and `app/src/main/assets/src/hooks/use-link-picker-orchestration.js`.
+  - Title: "Create a Link", "Embed a Card" or "Embed an Excerpt". Close/Done: ×.
+  - Header: "Linking from <src>" plus the “excerpt”. Tabs: "Search" / "Browse" / "Recent".
+- **91. Link picker: Search tab**
+  - Input: "Search titles & references…" or "Search any phrase in the text…".
+  - Scope: "Titles & refs" / "Full text". Corpus chips: "All" / "Scriptures" / "Volumes".
+  - Sections: "Recent", "Titles & places", "In the text".
+  - States:
+    - "Search to link"
+    - "No titles match" with "Search the full text instead"
+    - "Preparing text search — the first run can take a few seconds…"
+    - "Type at least three letters to search the text."
+    - "Nothing in the text matches" / "Nothing in <corpus> matches" with "Search every corpus instead"
+  - Row icons: OT, NT, SB, LS, and collection abbreviations.
+- **92. Link picker: Browse tab**
+  - Entries: "The Holy Bible" (N books), "Matthew Study Bible", the collections (N entries), and the studies.
+  - A "‹" crumb and a chapter grid. Loading: "Loading the library…".
+- **93. Link picker: Recent tab**
+  - Help: "Tap either end of a link to use that place again."
+  - Rows: "From" ⇄ "To".
+  - Empty: "No links yet" + "Links you create will appear here, so you can link to the same places again in one tap."
+- **94. Link-created strip**: "Link created · <target>" + "Undo".
+- **95. Verse picker** (full screen)
+  - Source: `app/src/main/assets/src/ui/sheets/VersePickerScreen.jsx`.
+  - Header: "Select Text". Breadcrumb: "Linking from X", "Choose scripture to link" or "Choose scripture to insert".
+  - Subtitle: "Bible Chapter" or "Matthew Study Bible".
+  - Filter: "Find a verse by its words…" with "N of M".
+  - Hint: "Highlight any portion, or tap a verse number to grab the whole verse."
+  - Footer: "Select a verse to continue" (disabled), "Link this selection" or "Insert this selection".
+  - States: "No verse in this chapter contains “q”."; not found shows "Select Verse" + "Chapter not found.".
+- **96. Letter excerpt picker** (full screen)
+  - Source: `app/src/main/assets/src/ui/sheets/LetterExcerptPickerScreen.jsx`.
+  - Find: "Find in this letter/entry/chapter…" with "N of M"/"0 found" and ‹ ›.
+  - Hint: "Long-press and drag to select an excerpt — or use the button below to link the whole <noun>."
+  - Footer: "Link this excerpt", "Insert this excerpt" or "Link the whole letter" (entry and chapter variants).
+  - States: a gold wash on find hits; not found shows "Select Text to Link" + "Letter not found.".
+- **97. Link sidebar** (side sheet)
+  - Source: `app/src/main/assets/src/ui/sheets/LinkSidebar.jsx`.
+  - Labels: "Links"; × "Close links"; "1 link"/"N links"; empty "No links yet".
+- **98. Link card**
+  - Source: `app/src/main/assets/src/ui/components/LinkCard.jsx`.
+  - Labels: "to " or "from " + label; chain icon; category; date; preview (with a "From: " fallback); "Show more"/"Show less".
+  - Remove: "Remove link", confirming "Remove this link?" / "Yes, remove".
+- **99. My Links** (Screen, route `links-index`)
+  - Source: `app/src/main/assets/src/ui/screens/LinksScreen.jsx`.
+  - Labels: "My Links"; "Search links…".
+  - Sort cycle: "Sort: Newest ↓" → "Sort: Oldest ↑" → "Sort: Source A-Z" → "Sort: Target A-Z".
+  - Rows: "SOURCE"/"TARGET", with "(unknown)" for a missing end.
+  - Empty: "No Links Yet" + "Select text in any letter or Bible chapter, tap Link in the toolbar, and pick a destination. Your links will appear here."
+  - Broken callout: "N link(s) point to content that can no longer be found (a source or target was deleted). Long-press a link to remove it."
+- **100. Link row action sheet**: "Open Source", "Open Target", "Delete Link".
+
+## 8. Library: notes, bookmarks, highlights
+
+- **101. Library hub** (Screen, route `library`)
+  - Source: `app/src/main/assets/src/ui/screens/LibraryScreen.jsx`.
+  - Labels: "Personal Study" / "Library" / "Your collected notes, reflections, and saved passages."
+- **102. Library tiles** (reorderable). Each is eyebrow / title / empty text / guide:
+  - "My Notes" / "Notes" / "No notes yet" / "Long-press text in any chapter and tap Note."
+  - "My Links" / "Links" / "No links yet" / "Select text, tap Link, and pick a destination."
+  - "My Journal" / "Journal" / "No entries yet" / "Tap "New Entry" in the Journal to write your first reflection."
+  - "My Bookmarks" / "Bookmarks" / "No bookmarks yet" / "Select text and tap Bookmark in the toolbar."
+  - "My Marks" / "Highlights & Underlines" / "No marks yet" / "Select a passage and tap a color to highlight or underline it."
+  - "My Progress" / "Progress" / "Nothing read yet" or "N read" / "Chapters you read are counted here."
+  - "My Journey" / "Milestones" / "None reached yet" or "N of M reached" / "Reading, listening, and study all count toward these."
+  - "The Whole Counsel" / "Scripture Web" / "63,418 cross-references"
+- **103. My Notes: Notebooks tab** (route `notes-index`)
+  - Source: `app/src/main/assets/src/ui/screens/NotesIndexScreen.jsx`.
+  - Labels: "My Notes" + count; tabs "Notebooks" / "All Notes"; card "Default Uncategorized"; notebook cards with a colour dot.
+  - New notebook: "+ New Notebook", with a form "Notebook name…" and "Cancel"/"Create".
+- **104. My Notes: All Notes tab**
+  - Labels: "Search notes…"; "Share as Text"; sort.
+  - Empty: "No Notes Yet" + "Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here."
+  - No matches: "No Matches".
+- **105. Notebook detail**
+  - Labels: "‹ Back to Notebooks"; "Share"; "Rename" (Save/Cancel); "Color" (gold default + 10); "Delete" (confirms "Delete “X”? Notes will move to Uncategorized.").
+  - Empty: "Nothing here yet" + "Notes that aren't in any notebook will appear here." or "Add notes to this notebook from the ⋯ menu on any note."
+- **106. Note row**
+  - Source: `app/src/main/assets/src/ui/components/NoteRow.jsx`.
+  - Content: swatch; segmented source line ("Go to X"); date; expandable body and anchor; notebook chips (+N).
+- **107. Notes export toasts**
+  - Source: `app/src/main/assets/src/utils/notes-export.js`.
+  - "Notes exported." / "Export failed. Please try again."
+- **108. My Bookmarks** (route `bookmarks-index`)
+  - Source: `app/src/main/assets/src/ui/screens/BookmarksScreen.jsx`.
+  - Labels: "My Bookmarks"; "Search bookmarks…".
+  - Sort cycle: "Sort: Newest ↓" → "Sort: Oldest ↑" → "Sort: Source A-Z" → "Sort: Label A-Z".
+  - Rows: source, label or "(no label)", thought, date, ⋯.
+  - Empty: "No Bookmarks Yet" + "Select text in any letter or Bible chapter, then tap Bookmark in the toolbar. Your bookmarks will appear here."
+- **109. Bookmark row sheet**: "Open Bookmark", "Edit Label" (an inline "Bookmark label" field), "Delete Bookmark".
+- **110. My Marks** (route `highlights-index`)
+  - Source: `app/src/main/assets/src/ui/screens/HighlightsScreen.jsx`.
+  - Labels: "My Marks" / "Highlights & Underlines" / "N marks"; "Search marks…"; sort.
+  - Filters: "Type" chips "All"/"Highlights"/"Underlines"/"Squiggles"; "Color" "All" plus colour dots.
+  - Rows: swatch shape, source, "Highlight"/"Underline"/"Squiggle", quote, date.
+  - Empty: "No Marks Yet" + "Select any passage while reading and tap a color to highlight or underline it. Your marks collect here."
+
+## 9. Journal
+
+- **111. Journal hub** (route `journal-home`)
+  - Source: `app/src/main/assets/src/ui/screens/JournalHubScreen.jsx`.
+  - Labels: "My Journal"; "N entries"; tabs "All Entries"/"Pinned"; "Search entries…"; "Sort: Newest ↓"/"Sort: Oldest ↑"; floating button "New Entry" (tour stop 5).
+- **112. Journal card**
+  - Content: mood stripe; ⋯; title or "Untitled"; date · time; pin; preview; attachment chips; "#tags".
+- **113. Journal empty states**
+  - "No Entries Yet" + "Tap "New Entry" below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings."
+  - "No Pinned Entries" + "Pin your favorite or most-used journal entries here to access them easily."
+  - "No Matches".
+- **114. Unclaimed recordings banner**
+  - Text: "1 recording was saved but never attached to an entry." (N variant).
+  - Rows: date · length, with "Recover"/"Discard". Discard confirms "Delete this recording?".
+- **115. Card menu**: "Open Entry", "Edit Entry", "Pin Entry"/"Unpin Entry", "Delete Entry".
+- **116. Three-step delete** (header "Step N of 3")
+  - Steps: "Delete this entry?" → "Are you sure? This cannot be undone." → "Last step: permanently remove this entry?".
+  - Cascade note: "This will also permanently delete <summary> you placed inside this entry."
+  - Buttons: "Cancel", "Continue", "I am sure", "Delete forever".
+- **117. Journal editor** (route `journal-editor`)
+  - Source: `app/src/main/assets/src/ui/screens/JournalEditorScreen.jsx`.
+  - Labels: back "Done"; "Saved"/"Saving…"; "Title"; long date · time; floating "+" (insert).
+  - States: draft recovery (UI strings not verified); an empty new entry is deleted on exit.
+- **118. Text block**: "Start writing…".
+- **119. Heading block**: h2.
+- **120. Quote block**: "Quoted text…" / "Citation (optional)".
+- **121. Divider block**: "❖  ❖  ❖".
+- **122. Image block**: "Caption (optional)"; when excerpted, "From: <entry>".
+- **123. Audio block**: an editable voice memo.
+- **124. Card blocks**: letter, chapter, verse, bookmark, note, journal and notebook cards.
+- **125. Block controls**: × "Delete block" (confirms "Delete this block?"); grip "Drag to reorder".
+- **126. Journal toasts**
+  - "Could not save that image."
+  - "Voice memo removed." / "Image removed." / "Block deleted.", each with "Undo" for 6 seconds.
+- **127. Insert sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/JournalInsertSheet.jsx`. Title "Insert".
+  - "From the Library":
+    - "Card" "Embed a chapter or letter title"
+    - "Excerpt" "Embed a portion — pick word-precise text"
+  - "From Your Annotations":
+    - "Bookmark" "Pull in a saved passage"
+    - "Note" "Reference one of your annotations"
+    - "Journal Entry" "Link to another journal entry"
+    - "Notebook" "Link to a notebook of notes"
+  - "Capture":
+    - "Image" "From device gallery"
+    - "Voice Recording" "Record a memo or prayer"
+  - "Text":
+    - "Body Text" "A new line to write freely"
+    - "Divider" "3-diamond ornament"
+  - Spine codes: BK, NT, JR, NB, IMG, REC, “ ”, H, TXT.
+- **128. Pick Bookmark**: "Search bookmarks…"; "No bookmarks yet."; "No matches.".
+- **129. Pick Note**: "Search notes…"; "No notes yet.".
+- **130. Link a Journal Entry**: "Search journal entries…"; "No other journal entries yet.".
+- **131. Pick from Entry**: "Link the Whole Entry" ("Inserts a card that opens this entry"), "or pick a specific block". Empty: "This entry has no embeddable blocks yet.".
+- **132. Link a Notebook**: "No notebooks yet — Uncategorized is always available.".
+- **133. Recording: requesting**
+  - Source: `app/src/main/assets/src/ui/sheets/JournalRecordingSheet.jsx`.
+  - Labels: "Voice Recording"; "Requesting microphone access…" with "Cancel".
+- **134. Recording: recording/paused**
+  - Labels: "Recording"/"Paused"; m:ss; a 48-bar waveform; "Cancel", "Pause"/"Resume", "Finish".
+  - Discard confirm: "Discard this recording?". Recording stops at 5 minutes.
+- **135. Recording: review**
+  - Labels: "Review Recording"; "0:12 / 1:03"; scrubbable waveform; play; × "Discard"; ✓ "Save".
+- **136. Recording: errors** (each with "Close"/"Try again")
+  - "Nothing was recorded. Try again and speak after the timer starts."
+  - "Failed to save recording."
+  - "Could not read the recording from the device."
+  - "That recording is empty — nothing was captured. Try again and speak after the timer starts."
+  - "Storage is full. Free up space before recording."
+  - "Recording is not supported in this browser."
+  - "Microphone access was not granted."
+  - "Microphone permission denied. Enable mic access for this app, then try again."
+  - "Could not start the recorder. Please try again."
+  - "Microphone request timed out. If a permission prompt appeared, please try again."
+  - "Could not request microphone access."
+  - "Recording failed."
+- **137. Journal viewer** (route `journal-viewer`)
+  - Source: `app/src/main/assets/src/ui/screens/JournalViewerScreen.jsx`.
+  - Labels: ⋯ "Entry options" (the card menu without "Open"); "‹ Back to <entry>"; title or "Untitled"; date · time · "Pinned".
+- **138. Viewer card blocks**
+  - Letter card: eyebrow, " · Excerpt", ›; unresolved fallback "Letter".
+  - Verse block: " · Excerpt", or "Verse text not available offline."
+  - Journal card: "Linked Entry", or "(Deleted)".
+  - Journal excerpt: "From: <title>".
+  - Inline gold {{ref}} and [[…]] links.
+- **139. Viewer media blocks**
+  - Image: blank while loading; "Image missing" if gone.
+  - Audio: play; waveform "Seek"; caption or "Voice memo"; "m:ss / m:ss"; "Recording missing" if gone.
+- **140. Entry not found**: "Entry Not Found" + "This journal entry may have been deleted."
+- **141. Journal milestone toast**
+  - Source: `app/src/stores/journal-stats-store.js`.
+  - Labels: "✦ Milestone: <label>".
+- **142. Journal inbound sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/JournalInboundSheet.jsx`.
+  - Labels: "1 journal entry"/"N journal entries" · <label>; rows with title, date, preview.
+  - Empty: "No journal entries reference this yet."
+
+## 10. Progress, milestones & history
+
+- **143. History** (route `history`)
+  - Source: `app/src/main/assets/src/ui/screens/HistoryScreen.jsx`.
+  - Labels: "Reading Activity" / "History"; "Search history…" with "No visits match"/"N visits match".
+  - Groups: "Today", "Yesterday", "<Weekday> · <Mon D>", month names, years, "Week of <Mon D>".
+- **144. History empty**: "✦", "The scroll is blank.", "Every chapter, letter, and study you visit will land here — a trail of what the Spirit has led you through. Begin reading and this will populate."
+- **145. History entry card**
+  - Source: `app/src/main/assets/src/ui/components/HistoryEntryCard.jsx`.
+  - Content: number; label; title or "Letter N"/"Part N"/"Chapter N"; reading chip; time ago; "N visits".
+- **146. My Progress** (route `my-progress`)
+  - Source: `app/src/main/assets/src/ui/screens/MyProgressScreen.jsx`.
+  - Labels: "My Progress" / "Your reading, journaling, and study at a glance."
+- **147. Hero stats**: "Read", "Reading Streak", "Journal Streak", "Entries", "Words Read", "Reading Pace", "Re-reads", "Reading Time".
+- **148. 14-day chart**: "Last 14 days"; "N words this week".
+- **149. Milestones strip**: "View all milestones ›".
+- **150. Reading section**
+  - Per-section rows, then "Reading history".
+  - Notes: "Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings." or "Loading your library…".
+- **151. Library, Journaling and Listening sections**
+  - "My Library" counts.
+  - "Journaling": "Words written", "Voice memos".
+  - "Listening": "Recordings Played", "Heard to the End", "Saved".
+- **152. Most Annotated**: the list, or empty "Nothing marked yet — press and hold any text while reading to highlight it."
+- **153. Milestones** (route `milestones`; back label "Progress" or "Library")
+  - Source: `app/src/main/assets/src/ui/screens/MilestonesScreen.jsx`.
+  - Labels: "Your journey" / "Milestones" / "Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required."
+  - Summary: "N of M reached" with a bar; "Hide reached" with "N still to reach"; category jump chips.
+  - All reached: "Every milestone here has been reached."
+- **154. Milestone categories**
+  - Source: `app/src/main/assets/src/utils/achievements.js`.
+  - Categories: Words Read, Readings Finished, Scripture Chapters, Letters & Entries, Returnings, Reading Streak, Days of Devotion, Deep Days, Strong Weeks, Highlights & Underlines, Notes, Bookmarks, Links, Journal, Journal Streak, Listening, Heard to the End, Saved Recordings.
+  - Rows: "✦" or "·", then "Reached" or "value / threshold".
+- **155. Read marks on indexes**: read check and "✓ ×N" (see 13 and 17).
+
+## 11. Tabs
+
+- **156. Tabs overview** (full-screen layer; nav has Back and Home only)
+  - Source: `app/src/main/assets/src/ui/sheets/TabsOverview.jsx`, mounted by `app/src/main/assets/src/ui/components/AppShellOverlays.jsx`.
+  - Labels: "Reading Places" / "Tabs" / "✦" / "N / MAX tabs open" (MAX is 50 in use-tab-actions.js).
+  - Actions: "Clear All"; "Deduplicate · N" (title "No duplicate tabs"/"Merge N duplicate tabs"); "+ New Tab".
+- **157. Tab card**
+  - Controls: ⋮ "Tab actions"; × "Close tab".
+  - Thumbnail: the page, or a ✦ placeholder (theme-flipped, letterboxed).
+  - Content: pin icon; "Tab N / total"; title; subtitle; progress bar.
+  - States: active, pressing, dragging, pinned.
+- **158. Clear-all confirm**: "Close all N tabs?" / "Yes, close all".
+- **159. Tab action sheet**
+  - Source: `app/src/main/assets/src/ui/sheets/TabActionSheet.jsx`. Title "Tab N" / "Tab actions".
+  - "Rename tab…": desc "Give this tab a name of your own; it sticks until you clear it." or "Custom name: “X”. Clear the field to go back to the automatic name."; inline field "Tab name" with Save/Cancel.
+  - "Pin tab"/"Unpin tab".
+  - "Close other tabs": "Keep only this tab open. N other tabs will be closed."; confirms "Close N other tabs?" / "Yes, close them".
+  - "Close tabs to the right": confirms "Close N tabs after this one?".
+  - "Cancel".
+- **160. Tab toasts**
+  - Source: `app/src/main/assets/src/hooks/use-tab-actions.js`.
+  - "Tab limit reached (MAX). Close a tab to open a new one."
+  - "Tab closed." + "Undo" (6 seconds).
+- **161. Disable-tabs prompt** (modal, in AppShellOverlays.jsx)
+  - Eyebrow: "You keep closing your last tab". Title: "Disable tabs?".
+  - Body: "Tabs let you juggle multiple reading places — a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings — your open tabs will be waiting."
+  - Buttons: "Keep Tabs On" / "Disable Tabs".
+- (Tabs coach mark: see 8.)
+
+## 12. Audio & read-along
+
+- **162. Listen buttons**
+  - Source: `app/src/main/assets/src/ui/components/AudioPlayButton.jsx`.
+  - Labels: "Listen", "Play All", "Play <label>".
+- **163. Coverage badge**
+  - Source: `app/src/main/assets/src/ui/components/CoverageBadge.jsx` and `app/src/main/assets/src/utils/audio-coverage.js`.
+  - "Read-along": "Recorded and timed — the words light as they are read."
+  - "Listening only": "Recorded, but the words are not timed, so nothing lights as it plays."
+  - "No recording": "No recording exists for this yet — it can still be read."
+  - Detail: "N of M parts".
+- **164. Mini-player**
+  - Source: `app/src/main/assets/src/ui/components/AudioPlayerBar.jsx`.
+  - Controls: pull-tab; play/pause (with a loading state); summary button "Open listening controls" (tour stop 9).
+  - Summary text: title (when crossing volumes, prefixed like "Volume Two · "), " · part", "<collection> · <reader>", "· 3 of 12", "m:ss / m:ss".
+  - Also: seek; prev (becomes "Restart" for a single track); next; close.
+- **165. Mini-player in song mode**: cover; subline "Loading…", "Not on this phone" or the version; a 3px progress line; "Next song".
+- **166. Listening desk** (the full player sheet)
+  - Source: `app/src/main/assets/src/ui/components/AudioManagerSheet.jsx`.
+  - Labels: "Listening now"; title with ›; "Open the reading"; head line (fallbacks "The Volumes of Truth", "Untitled recording"); "Save"/"Saved".
+  - The "‹" handle closes it (tour stop 10).
+- **167. Voice card**
+  - Chips: "Voice" or "Audio Bible".
+  - Note: "Switches this recording/chapter — starts it again, and the queue follows."
+- **168. Voice switch confirm**
+  - "Switching voice rebuilds this into a full queue. Continue?" or "…rebuilds this queue and drops your changes to it. Continue?"
+  - Button: "Yes, switch".
+- **169. Seek and transport**: "Playback position"; times ("—" when unknown); "−15", prev, play, next, "+15".
+- **170. Speed control**
+  - Source: `app/src/main/assets/src/ui/components/AudioSpeedControl.jsx`.
+  - Labels: "Speed"; readout "1.37×" (tap to type a value); − slider +; presets 0.75× to 2×.
+- **171. Sleep timer**
+  - Readout: "Off", "N min left" or "Ends after this track".
+  - Chips: "15m", "30m", "60m", "End of track", "Clear".
+- **172. Queue**
+  - Header: "Queue" with "N of M", "1 recording" or "Resuming…".
+  - Controls: "Clear upcoming"; "Show 40 earlier"/"Show N later".
+  - Rows: the current row shows "Playing now"; each row has ↑ ↓ ×.
+  - Empty: "Play a collection to line up more recordings. Your current recording will resume where you leave it."
+- **173. Listening Library hub** (route `audio-library`)
+  - Source: `app/src/main/assets/src/ui/screens/AudioLibraryScreen.jsx`.
+  - Labels: "Your listening shelf" / "Listening Library" / "A quiet place for the recordings you return to, the ones you just heard, and every source waiting to be explored."
+- **174. Now card**
+  - Status: "Playing now", "Connecting..." or "Paused". Button: "Pause"/"Resume".
+  - Also: star; open-text link; "Streaming".
+- **175. Now card when idle**
+  - Labels: "Ready when you are" / "Choose your next recording".
+  - Body: "Your last recording is ready to pick up again." or "Save a favorite or browse a source to begin."
+  - Buttons: "Resume last" / "Browse".
+- **176. Saved row**: "Saved recordings", with "N kept · travels with your backup" or "Tap the star beside any recording to keep it".
+- **177. "On this phone" row**: Android only.
+- **178. Recent section**
+  - Labels: "Pick up again" / "Recently played" / "Your latest starts, newest first." (or "Your listening trail will appear here.").
+  - Controls: "Clear history"; collapse; "Show all N".
+  - Empty: "Start a recording and it will appear here, ready for an easy return."
+- **179. Browse section**
+  - Header: "Explore the source" / "Browse the recordings" / "Open a source to hear it letter by letter, or book by book."
+  - Sources:
+    - "The Volumes of Truth": "N collections · the Letters read aloud"
+    - "Songs of the Letters": "N songs · made by the flock", with a "Songs" badge
+    - "Bible/Letter Studies": "N studies · N with audio"
+  - Editions:
+    - "KJV · Biblical Restoration Ministries"
+    - "NKJV · The Word of Promise (Dramatized)"
+    - "WEB · World English Bible"
+    - "Matthew · The Scriptures of Truth (read by Benjamin)" ("Corrected Version by Timothy, with The Lord")
+    - "John · The Gospel of John (film audio, no read-along)" ("Film audio, listening only")
+- **180. Shelf row**
+  - Source: `app/src/main/assets/src/ui/components/AudioShelf.jsx`.
+  - Status: "2:10 left", "Finished", "Just now", "N min ago", "Saved".
+  - Controls: star; × "Remove from recently played".
+- **181. Volumes audio** (route `audio-library-volumes`)
+  - Source: `app/src/main/assets/src/ui/screens/AudioVolumesScreen.jsx`.
+  - Labels: "Collection by collection"/"Collections"; "Choose a collection to hear it letter by letter, in reading order."
+  - Row status: "Loading recordings…", "Recordings available" or "No recordings yet".
+- **182. Collection** (route `audio-library-collection`; back "The Volumes", "Studies" or "Listening Library")
+  - Source: `app/src/main/assets/src/ui/screens/AudioCollectionScreen.jsx`.
+  - Count lines: "All N letters have recordings", "N of M letters have recordings" or "All N books"; "Text only: …".
+  - Actions: "Play all" or "Play the N on this phone"; "Download all".
+  - Sections: "In longer sittings"/"Compilations"; "In order"/"Book by book"; disclosures "N voices" and "N chapters".
+- **183. Collection empty and unknown**
+  - "No recordings here yet. They arrive as each reading is finished."
+  - "N letters await recording."
+  - Unknown source: "Recordings" + "This source has no recordings to show. Step back to the Listening Library to choose another."
+- **184. Download controls** (Android only)
+  - Source: `app/src/main/assets/src/ui/components/OfflineAudioControls.jsx`.
+  - Per row: "On this phone · 18 MB", "Needs a connection", "Downloading N%" + Cancel, "Not enough room on this phone"/"Download failed" + Retry, "Download · 18 MB".
+  - Per collection: "All on this phone"; "Downloading · N of M on this phone".
+- **185. Download confirm**
+  - Labels: "Download X?"; "Free space on this phone: X"; "Not enough room: free some space on the phone first."; "Keep VOTReader open until it finishes."
+  - Buttons: "Cancel" / "Download <size>".
+- **186. On this phone** (route `audio-library-offline`)
+  - Source: `app/src/main/assets/src/ui/screens/AudioOfflineScreen.jsx`.
+  - Labels: "They play with no signal."; "Downloaded"/"Recordings"; "Remove".
+  - Empty: "Nothing is on this phone yet. Download a recording from its row in a collection, or a whole collection at once, and it plays with no signal."
+  - Remove all: confirms "Remove all N recordings (size) from this phone?" / "They can be downloaded again." with "Keep them" / "Yes, remove all".
+- **187. Saved recordings** (route `audio-library-saved`)
+  - Source: `app/src/main/assets/src/ui/screens/AudioSavedScreen.jsx`.
+  - Labels: "Saved recordings" / "The recordings you chose to keep — they travel with your VOTReader backup."; "Find a recording" + "Clear"; "Keep close"/"Your shelf".
+  - Empty: "No saved recordings match “q”." or "Use the star beside any recording to keep it here…".
+- **188. Studies audio** (route `audio-library-studies`)
+  - Source: `app/src/main/assets/src/ui/screens/AudioStudiesScreen.jsx`.
+  - Labels: "Bible/Letter Studies" / "Listen to a recorded study chapter by chapter, in reading order. The others open to read."; "N with audio · M to read"; "· Playing chapter N".
+  - Badge: "Read study" ("Not recorded yet: opens the study to read"). Loading: "Loading the studies…".
+- **189. Read-along highlight** (no DOM of its own)
+  - Source: `app/src/main/assets/src/ui/components/ReadAlongHighlight.jsx`.
+  - Behaviour: a gold wash on the current sentence or verse; a lead-in wash on the title; the page follows the voice.
+- **190. Audio toasts**
+  - Source: `app/src/main/assets/src/utils/audio-player.js`.
+  - "Playing audio requires an internet connection."
+  - "Couldn’t load this track."
+  - "Paused while the screen was off: the phone would have played it silently. Press play to go on."
+  - "Sleep timer ended. Playback paused."
+
+## 13. Songs
+
+- **191. Songs hub** (route `audio-library-songs`; back is Home, Listening Library, Search or Back)
+  - Source: `app/src/main/assets/src/ui/screens/AudioSongsScreen.jsx`.
+  - Labels: "Sung by the flock" / "Songs of the Letters" / "Songs made by members of the flock with Suno, from the words of The Volumes of Truth."
+- **192. Loading and error**: skeleton "Loading songs"; error "Songs need a connection the first time." + "Try again".
+- **193. Shuffle and find**: "Shuffle all songs" or "Shuffle <Style> (N)"; "Find a song, a letter, or a maker".
+- **194. Style chips**: "All", "Worship", "Pop", "Hip-hop", "Cinematic", "Folk", and "More ▾", which opens the "More styles" sheet.
+- **195. Find results**: "Songs"; empty "No song by that name. Try a word from the letter."
+- **196. Hub shelves**
+  - "New from the flock" + "See all ›"
+  - "Your songs": "Saved songs", "Recently played songs"
+  - "From the letters": tiles with a 4-cover mosaic
+  - "Inspired by the letters", "Bible songs", "Flock originals and prayers"
+- **197. List frame**
+  - Labels: "N songs · N min"; "Play all"/"Shuffle".
+  - Empty states: "Tap Save on any song and it will wait here.", "Songs you play will appear here.", "No songs yet.", "No songs from this letter yet.", "No songs here yet."
+- **198. Song page**
+  - Source: `app/src/main/assets/src/ui/screens/SongPage.jsx`.
+  - Eyebrow: "Song" or "Song · N versions". A large cover.
+  - Letter link: "From the letter: <title> ›".
+  - Shelf line: the letter's collection, or "A Bible song" / "A flock original" / "A flock prayer" / "Inspired by the letters".
+  - Makers: "Made with Suno · by X and Y, and others" or "Made with Suno · by members of the flock".
+  - Buttons: "Play"/"Pause"; "Save"/"Saved".
+- **199. Song versions**: "Versions"; rows show the version name (or "Version") and length; after 4 rows, "Show all N versions ›".
+- **200. Song lyrics**
+  - Labels: "Lyrics" (4-line preview); "Show all lyrics"/"Show less".
+  - Footer: "Words from the letter “X” · lyrics transcribed" or "Lyrics transcribed". Or "Instrumental".
+- **201. More from this letter**: "More songs from this letter" (3 shown) + "All N songs of this letter ›".
+- **202. Song gone**: "This song is no longer shared."
+- **203. Listening desk in song mode**
+  - Source: `app/src/main/assets/src/ui/components/SongDeskParts.jsx`.
+  - Labels: "Open the letter ›"; "Versions" chips + "All N ›" (ChoiceSheet "Versions").
+  - Note: "Switches to another version of this song, from the start."
+  - Transport: Shuffle, Previous, Play, Next, Repeat ("Repeat all"/"Repeat one").
+  - "Lyrics" with "Follow along"; "Instrumental".
+- **204. Song parts**
+  - Source: `app/src/main/assets/src/ui/components/SongParts.jsx`.
+  - Cover with a ♪ fallback; a round ▶ that fills gold while playing; the ChoiceSheet.
+
+## 14. Studies & Matthew
+
+- **205. Studies home** (route `studies-home`)
+  - Source: `app/src/main/assets/src/ui/screens/StudiesHome.jsx`.
+  - Labels: "In-Depth Bible Studies" / "Studies" / "Bible/Letter Studies & The VOT Matthew Study Bible".
+  - Card metas: "N Chapters · Inline Commentary", "Reference", "N Parts · Bible Study", "Coming Soon".
+  - External card: "↗" "External Site" "AnswersOnlyGodCanGive.com".
+- **206. Studies states**: "Loading studies…"; "Letter Studies coming soon."; "Couldn’t load studies." or "Some studies couldn’t load." with "Try again".
+- **207. Study index** (route `bible-study-index`)
+  - Source: `app/src/main/assets/src/ui/screens/BibleStudyIndex.jsx`.
+  - Labels: "Bible/Letter Study"; a single-part card, or an accordion of parts ("Part N"); "Loading…".
+- **208. Study chapter** (route `bible-study-chapter`)
+  - Source: `app/src/main/assets/src/ui/screens/BibleStudyChapterView.jsx`.
+  - This is LetterView in study mode: eyebrow "Chapter N", preamble "Part N", prev/next continuing across parts, "Loading…".
+- **209. Study names**: "YAHUSHUA MORE THAN A MAN — STUDY", "ODDS CHART — STUDY", "THE LAMB OF GOD — STUDY", "STATE OF THE DEAD — STUDY", "GRACE AND THE LAW — STUDY", "THE TRINITY EXPOSED — STUDY", "PURITY — STUDY".
+- **210. Matthew index** (route `matthew-idx`; ChapterIndex.jsx)
+  - Loading: "Loading Matthew…". Cards add a "N.N× notes" chip.
+- **211. Matthew chapter** (route `matthew-ch`)
+  - Source: `app/src/main/assets/src/ui/screens/MatthewChapterView.jsx` and `ChapterView.jsx`.
+  - Labels: hero "Chapter N"; summary toggle "Tap to hide summary"/"+ Show summary"; "Further Study".
+- **212. Study notes mode**
+  - Source: `app/src/main/assets/src/ui/components/ModeToggle.jsx`.
+  - Labels: "Study Notes" with "PDF" / "Inline" / "Off".
+- **213. PDF-mode panels**
+  - Source: `app/src/main/assets/src/ui/components/StudyPanels.jsx`.
+  - Labels: "Scripture References"; "Volumes of Truth Notes"; badge "HM" (title "Hidden Manna — The Word of The Lord Spoken to Timothy").
+- **214. Inline-mode notes**
+  - Source: `app/src/main/assets/src/ui/components/InlineNotes.jsx`, with the HM badge and echo pills "↑ <ref>".
+
+## 15. Answers & Holy Days
+
+- **215. Answers home** (route `answers-home`)
+  - Source: `app/src/main/assets/src/ui/screens/AnswersHome.jsx`.
+  - Labels: "Topics & Doctrines" / "Answers Only God Can Give" / "The Lord sets the record straight concerning a variety of topics, doctrines and traditions".
+- **216. Ask box**: "What does The Lord say about…" (screen-reader label "Search the topics").
+- **217. Ten Commandments tablets**
+  - Header: "The Ten Commandments"; tablets "I – V" and "VI – X".
+  - Items: "No other gods", "No idols", "His name in vain", "The Sabbath", "Honor parents", "Do not murder", "No adultery", "Do not steal", "No false witness", "Do not covet".
+- **218. Commandment sheet**: "The First Commandment" (and so on), the label, the verse, an Exodus ref button, "N topics" / "N passages".
+- **219. Browse by subject** (each tile shows "N topics · ex1, ex2…")
+  - "The Lord & His Messiah"
+  - "His Word & His Prophets"
+  - "Sin, Repentance & Salvation"
+  - "Walking With God"
+  - "Churches & Doctrines of Men"
+  - "The End of This Age"
+  - "Death, Judgment & The Kingdom"
+  - "The Nations & Creation"
+  - "Marriage, Family & Body"
+- **220. A–Z entry**: "Every Topic, A–Z" / "All N in one list". Footer: "Gathered from answersonlygodcangive.com. Every passage opens the letter it came from."
+- **221. Ask results**
+  - Cards: "The topic"/"Topics" with marked snippets and "From “X” ~ Volume N".
+  - Summary lines: "Also spoken of in"/"Spoken of in"; "N passages, across M topics"; "N more topics".
+  - Empty: "Nothing in Answers speaks of “q”." + "Search the whole library for “q”".
+- **222. Answers subject** (route `answers-subject`): "N topics · M passages"; "Most spoken of first".
+- **223. Answers A–Z** (route `answers-az`): letter jump nav (#, A–Z).
+- **224. Answers entry** (route `answers-entry`; WtlbEntryView)
+  - Labels: "Answers · <filed>"; "Related Topics"; "View on answersonlygodcangive.com".
+- **225. Holy Days index** (route `holy-days-index`)
+  - Source: `app/src/main/assets/src/ui/components/HolyDaysPlaylistHeader.jsx`.
+  - Labels: "Audio Playlist"/"Listen on Bandcamp"; "Video Playlist"/"Watch on YouTube"; "Regarding The Holy Days"; eyebrow "The Appointed Times".
+- **226. Holy Days entry** (route `holy-days-entry`): rendered as WtlbEntryView (footnotes mode) or LetterView, depending on the entry.
+
+## 16. Scripture Web
+
+- **227. Scripture Web screen** (route `scripture-web`; immersive canvas)
+  - Source: `app/src/main/assets/src/ui/screens/ScriptureWebScreen.jsx`.
+  - Labels: aria "The Scripture Web — an interactive map of cross-references".
+  - Reached: Home quick row, Library tile. Tour stop 4 only points at the Home button.
+- **228. Loading**: "Weaving the web…".
+- **229. Top bar**
+  - Labels: "Back"; title "The Scripture Web" or "My Web".
+  - Subtitle: "N connections", "No links yet — select any text and tap Link.", or "N links you have made".
+- **230. Controls strip**
+  - Segment "Scripture"/"My web" (aria "Which web"); "Nearby".
+  - Canon mode: density select "Essential"/"Famous". My Web mode: "Corpus context · N" (aria "Show the curated corpus connections").
+  - "Reset" (aria "Reset the view").
+- **231. Density hint flash**: "Essential — only the strongest connections" or "Famous — the famous view — about 64,000 connections".
+- **232. Hide controls** (bottom-right icon)
+  - Labels: "Hide controls" (toggle). It hides the top bar and strip but keeps the ruler and legend.
+- **233. Guide**
+  - "?" opens "How to read this web", with six bullets and "Got it":
+    - "Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are."
+    - "Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom."
+    - "Pinch or press + to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back."
+    - "Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse."
+    - "Drag the web down to look up into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps."
+    - "Reset brings you home."
+- **234. My Web empty panel**: "Your web is still being woven." + "Select text anywhere in the app, tap Link, and pick where it goes. The silver threads are the Volumes’ own citations." + × "Dismiss".
+- **235. Hover/press tip chip**
+  - Eyebrows: "Connection", "Your link", "Timothy’s thread", "Chapter", "Verse", "Bundle". Two refs are joined by "↕".
+  - Meta by kind:
+    - "N verses apart · weight N"
+    - link kinds "Within scripture", "Within the Volumes", "Scripture ↔ Volumes"
+    - "N verses · N connections"
+    - "N of M connections not drawn here · tap to open"
+    - "N connections converge here · tap to open"
+    - fallback "Corpus passage"
+- **236. Connection chooser**
+  - Labels: "Connections here"; "Several threads are close together. Choose the one you meant."
+  - Rows: "<A> ↕ <B>" with "N votes · N verses apart", or "<Book N> — where its threads go".
+  - Close: × "Close connection choices".
+- **237. Nearby list**
+  - Eyebrow: "Your nearby links", "Under the lens · <Book N>", "Nearby · <Book N>" or "Nearby connections".
+  - Meta: "N connections · the strongest N below; the chapter row lists where they all go." or "Select a connection to focus it and open its passages."
+  - Empty: "No nearby connections at this location."
+  - Close: × "Close nearby connections".
+- **238. Detail sheet**
+  - Eyebrow: "Your link", "Timothy’s thread", "Connection", "Bundle · <label>", "Chapter" or "Verse".
+  - Bundle meta: "N connections here, N not drawn at this zoom. Choose where they go to see them." or "N connections converge here. Choose where they go to follow them."
+  - Follow button: "Follow to <ref> ›".
+  - Group rows: "N thread(s) · N not drawn · weight N" (pressed state).
+  - Cards: eyebrow ("Source"/"Target", "Scripture"/"Corpus", "From"/"To", "Verse", "Chapter"), label, category, preview, "Open in reader ›". A chain glyph sits between cards; a card with no destination is disabled and reads "(unknown)".
+- **239. Legend**
+  - Canon mode: "nearby" [gradient] "across the canon" + "bars below — chapter length".
+  - My Web mode: "yours" · "within scripture" / "within the Volumes" / "across" (each with a pin shape), then "Timothy’s" · "footnotes" / "study notes" / "Words To Live By" / "studies", plus the chapter-length key.
+- **240. Canvas ruler**: book names; chapter numerals; verse ticks when zoomed; chapter-length histogram under the baseline; the chapter under the centre is lit (the "lens").
+- **241. Height ruler** (left edge): "30 · a chapter", "1,000 · a book", "15,000 · a testament", "31,102 · the canon", plus a live "~N verses".
+- **242. Height scroll bar** (right edge): a track with height ticks; the thumb turns gold once the view leaves the baseline; tap the track to jump.
+- **243. Bundle count pills**: counts under the baseline where 2 or more threads meet (past the overview).
+- **244. Thread reference labels**: refs at a thread's feet, or along its body when zoomed close.
+- **245. My Web rails**
+  - Volumes rail on top, Bible rail at the bottom.
+  - Short names: "Vol I"–"Vol VII", "Rebuke", "WTLB I", "WTLB II", "Blessed", "Flock", "Timothy", "Holy Days", "Manna", "MTaM", "Odds", "Lamb", "SotD", "Grace", "Trinity", "Purity".
+  - "Reset Volumes" / "Reset Bible" appear when a rail is zoomed.
+- **246. Screen-reader announcements**
+  - "Following the line to X", "Showing the strongest again.", "N threads to X shown.", "Zoomed all the way in".
+  - Help text: "Drag to move through scripture. Pinch or scroll to zoom, or use the plus and minus keys…"
+- **247. Load error**: "The Scripture Web couldn’t load." + "Try again".
+- **248. No-WebGL panel** (only when the graph data is also missing)
+  - Title: "The web can’t be drawn right now."
+  - Body: "This needs WebGL2. If the device just recovered from a graphics reset, trying again usually works; otherwise every cross-reference is still reachable from the reader’s footnotes and links."
+  - Buttons: "Try again" / "Go back".
+- **249. Fallback list**
+  - Source: `app/src/main/assets/src/ui/scripture-web/WebFallbackList.jsx`.
+  - Header: "‹ Back"; "Scripture Web"; "Connections from <Book N>".
+  - Chapter stepper: ‹ › ("Previous chapter"/"Next chapter").
+  - Note: "The map can’t be drawn on this device right now." + "Try again".
+  - List: "Connected passages" with "N connections"; cards "Verse N · N connections"; rows show the ref, a tier "Essential"/"Famous", and the verse text.
+  - Empty: "Nothing in the Famous view connects to <Book N>."
+
+## 17. Garden
+
+- **250. Garden warning** (modal in AppShellOverlays.jsx; only before the first Garden entry)
+  - Title: "Before You Begin".
+  - Body: "A Return to The Garden contains 209 high-resolution photographs totaling approximately <size> at the selected quality. Pages stream from the internet as you read and are cached on your device.", followed by Wi-Fi and free-storage advice.
+  - Picker: "Image Quality", hint "You can change this anytime from the Settings menu."
+  - Buttons: "Go Back" / "Proceed".
+- **251. Quality tiers**
+  - Source: `app/src/main/assets/src/utils/garden.js`.
+  - "Mobile" ~110 MB: "2160px · Screen-native; light on cell data"
+  - "Standard" ~180 MB: "2880px · Balanced default — great at 1× and 1.5× zoom"
+  - "Native" ~320 MB: "3600px · Full source detail; no upscaling"
+  - "Ultra" ~680 MB: "4600px · Maximum quality — for pixel-peepers"
+- **252. Garden viewer** (route `garden-view`; immersive)
+  - Source: `app/src/main/assets/src/ui/screens/GardenView.jsx`.
+  - Labels: back; counter "N / 209"; prev/next arrows.
+  - Gestures: pinch, pan, double-tap and wheel zoom; swipe to flip.
+- **253. Page jump**: tapping the counter shows an input "1–209" with "/ 209".
+- **254. Page loading and failure**: "Loading page N..."; "Failed to load — check your connection" + "Try again".
+
+## 18. Settings (every group)
+
+- **255. Settings shell** (route `settings`; nav Back, no gear)
+  - Source: `app/src/main/assets/src/ui/screens/SettingsScreen.jsx`.
+  - Labels: "Settings" / "Shape the way you read, listen, and move through the library."; summary Theme / Text / Typeface; "Changes save on this device".
+- **256. Find settings**
+  - Field: "Find settings", placeholder "Try font, audio, or backup"; "Clear filter".
+  - Status: "N matching groups", or "No matching settings. Try font, audio, backup, or clear the filter."
+- **257. Row patterns**
+  - Source: `app/src/main/assets/src/ui/components/SettingsRow.jsx` and `SelectField.jsx`.
+  - Toggle rows with an "i" description.
+  - Select rows open a bottom sheet: eyebrow, title, ✦, and options with ✓ and a description.
+  - Also chips and sliders. Dependent rows disappear when their parent is off.
+- **258. Appearance** ("Theme, text size & reading font")
+  - "Light Theme".
+  - "Text Size": "Standard" or "N%", with "Reset" and the preview “Your word is a lamp to my feet and a light to my path.”
+- **259. Reading Font** (25 fonts, each shown in its own face)
+  - Source: `app/src/main/assets/src/ui/components/FontPickerRow.jsx`.
+  - Fonts: System Serif, EB Garamond, Cormorant Garamond, Cardo, Gentium Book Plus, Rosarivo, Crimson Pro, Sorts Mill Goudy, Old Standard TT, IM Fell English, Libre Baskerville, Lora, Literata, Merriweather, Gelasio, Source Serif 4, Noto Serif, Spectral, Vollkorn, Alegreya, Bitter, Neuton, Playfair Display, Atkinson Hyperlegible, Lexend.
+- **260. Reading** ("Translation, headings & reading aids")
+  - "Bible Translation": the 10 translations, with Restored Name info and an AI disclaimer.
+  - "Chapter Titles"; "Section Headings".
+  - "Restored Names": hidden when both titles and headings are off.
+  - "Chapter & Letter Arrows": the 5 layouts.
+  - "Scripture Browser": probably the 4 layouts ("Books grouped by genre with collapsible sections (default)", "Dense single-column list — fastest to scan", "Flat three-column grid of every book", "One long scroll in canonical reading order"). The option set was not matched to this row directly.
+- **261. Reading (continued)**
+  - "Inline Reference Echoes", "Scrollbar Content Marker", "Reading Position Marker".
+  - "Reading Streak Dwell Time": 3, 5, 10, 15, 20, 30, 45 or 60 s, with descriptions from "Counts almost immediately" to "Requires a full minute of reading".
+  - "Surprise Me Button", "Keep Screen On While Reading", "Double-Tap / Click Fullscreen".
+- **262. Listening** ("Voices, speed & read-along")
+  - "Bible Audio": the editions ("Per-chapter audiobook · … · KJV text"), plus "Off" ("Hide the Bible Listen button").
+  - "Letter Voice": "Automatic", "Read by Benjamin", "Read by Timothy", "Text-to-speech", "AI reading with music".
+  - "Default Speed": 0.75× to 2×, described as "Normal speed", "Slower than recorded" or "Faster than recorded".
+  - "Read-Along Highlight"; "Turn the Page with the Audio"; "Follow the Voice" (dependent).
+- **263. Auto-Scroll** ("Hands-free reading")
+  - "Auto-Scroll".
+  - "Scroll Speed": 4–40 lines/min, Reset to 16.
+  - "Auto-Continue", and under it "Auto-Continue Pause": 0–15 s, Reset to 2.5 s.
+- **264. Top-Nav Buttons** ("Icons in the reading bar")
+  - Note: "Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px."
+  - Chips: "Settings Gear", "History", "Bookmark", "Theme".
+- **265. Search, Tabs & History** ("Find, multitask, revisit")
+  - "Search", with "Synonym Search" and "Filter Stop Words in Search" under it.
+  - "Tabs"; "History".
+  - "Reading history" "N entries" + "Clear History" (confirms "Clear all reading history?" / "Yes, clear").
+- **266. A Return to The Garden** ("Image quality"): "Image Quality" select with the 4 tiers.
+- **267. Your Data: version and platform**
+  - "App version" + "Check". Possible values:
+    - "Checking…"
+    - "… — the version installed on this device. New versions arrive by installing an update, not over the web."
+    - "Installed app build — updates arrive by installing a new APK, not over the web."
+    - "Not yet managed by the offline service worker on this device."
+    - "— could not reach the server to compare."
+    - "— up to date with the published version."
+    - "— an update is available (X). Reopen the app to apply it."
+  - "Platform": "Android (App)", "Safari", "Safari (Home Screen App)", "Firefox", "Chrome", "Edge" or "Web Browser".
+- **268. Your Data: storage**: "Total app data"; "Your data" ("Calculating…"); "Growth" (a trend sentence plus a bar chart).
+- **269. Your Data: protection** ("Protection" + "Protect now"). Possible values:
+  - "Active — your data is protected from automatic browser cleanup."
+  - "Browser denied protection. Export regularly as a backup."
+  - "Not active — tap "Protect now"…"
+  - "Persistence API unavailable on this browser."
+  - "Your data is saved on this device. Export a backup regularly to keep it safe."
+- **270. Your Data: backup actions**: "Export Your Data"/"Export"; "Import from Backup"/"Import"; "Verify a Backup"/"Verify".
+- **271. Verify result** (row with "Dismiss"; ok or warning styling)
+  - Source: `app/src/main/assets/src/utils/backup-verify.js`.
+  - Summary: "Backup from <date>: N notes, N highlights, N journal entries, N bookmarks — N records across N data stores, plus N media files (size)."
+  - Endings:
+    - "Integrity check passed — the file looks intact."
+    - "Contents read back correctly. (No checksum — this backup predates integrity checksums; your next Export will include one.)"
+    - "Older text-format backup — contents read back correctly (this format carries no checksum)."
+    - "WARNING: the media in this backup could not be read all the way through…"
+    - "WARNING: the integrity check FAILED…"
+    - "WARNING: unexpected bytes at the end of the file…"
+    - "WARNING: this backup could not be checked…"
+  - Failures:
+    - "This file does not look like a VOTReader backup."
+    - "Could not open the file. Please try again."
+    - "This backup could not be checked — the app could not read the file all the way through. Please try again."
+    - "That file is too large to be a VOTReader backup (over 50 MB)."
+    - "This backup file is corrupt or incomplete and could not be read."
+- **272. Import confirm sheet**
+  - Title: "Import from Backup".
+  - Body: "Importing the backup from <date> will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.… This cannot be undone."
+  - Buttons: "Cancel" / "Import & Overwrite".
+- **273. Diagnostic Log**: "Diagnostic Log" "N entries".
+- **274. Wipe dialog**
+  - Entry: danger zone "Clear All Personal Data" / "Clear All My Data".
+  - Dialog: "Delete All Personal Data"; "Type DELETE to confirm."; "Cancel" / "Delete Everything".
+- **275. Backup and import toasts**
+  - "Another backup operation is running in a different tab. Please wait for it to finish."
+  - "Preparing export…"
+  - "Export aborted — could not read: <x>. Nothing was saved…"
+  - "Export aborted — the backup index is over the 16 MiB restore limit…"
+  - "Saving backup…"
+  - "Backup saved.", or "Backup saved — N recent change(s) may be missing…", optionally with the Android size note
+  - "Export failed while writing. Please try again."
+  - "Export failed. Please try again."
+  - "Importing… please wait."
+  - "Storage is temporarily unavailable. Please try again in a moment."
+  - "Import incomplete — N store(s) failed to save…"
+  - "Import completed — <problems>. Reloading…" / "Import complete. Reloading…"
+  - "Warning: this backup was cut short…"
+  - "Warning: this backup failed its integrity check…"
+  - "This backup file is corrupt or incomplete and could not be read."
+  - "This file does not look like a VOTReader backup."
+  - "Import failed — could not open the file. Please try again."
+  - "Import failed: could not read file."
+  - "That file is too large to import (over 50 MB)…"
+  - "Import failed — the file may be corrupt or incomplete. Please try again."
+  - "Checking backup…"
+  - "All personal data cleared. Reloading…"
+  - "Clear did not finish. Please try again."
+- **276. Save-dialog escape toast** (stays until dismissed): "Still waiting for the save dialog." + button "Save the file the usual way".
+- **277. Mark as Read** ("Reading progress by book")
+  - Source: `app/src/main/assets/src/ui/components/ClearProgressRow.jsx`.
+  - Toggle. When on, a table appears:
+    - Section rows with "Clear" (confirms "Clear read marks and saved positions in "X"?").
+    - Genre subheaders.
+    - Per-book "N / M" + "Clear".
+    - "All Scriptures" + "Clear All" (confirms "Clear all read marks and saved positions? Reading totals and streaks are kept.").
+- **278. Help** ("Show me around & About")
+  - "Show me around" + note "A short tour of the app: eleven stops, about three minutes. It points at the real buttons; you can leave at any time."
+
+## 19. Onboarding, About, tour & hints
+
+- **279. About, page 1** (route `about`; a fresh install lands here)
+  - Source: `app/src/main/assets/src/ui/screens/AboutScreen.jsx`.
+  - Title: "About VOTReader". Body:
+    - "The Volumes of Truth are the Word of The Lord, given through His servant Timothy."
+    - "This reader was made by a disciple for personal study; it is not the canonical source."
+    - "Your notes, journal, and highlights stay on this device — use Settings → Export to back them up."
+    - "For the canonical text, audio, video, and PDFs, visit thevolumesoftruth.com."
+    - "Cross-reference data from OpenBible.info, used under CC-BY."
+  - Chrome: dots "Page 1 of 2"; "Continue".
+- **280. About, page 2**: "What You Can Do".
+  - "The Library":
+    - "The complete Volumes of Truth corpus."
+    - "The entire Bible in ten translations, including two custom Restored Name editions."
+    - "Every PDF, Bible study, and letter study."
+    - "A Listening Library — the Letters and the Bible, read aloud."
+  - "Your Tools":
+    - "Highlight, underline, bookmark, and note — anywhere."
+    - "A private journal with photos, voice memos, and a full feature suite — kept on your device."
+    - "Full-text search across the entire library."
+    - "Fully offline to read. Tapping Listen streams that recording, and the Return to the Garden images load the same way, from this app’s own release files — your own data never leaves this device."
+  - Button: "Begin Reading". Back is page-aware.
+- **281. About, return visit**: from Home's "About VOTReader" info button. It is the only way back in.
+- **282. Tour prompt strip** (on Home)
+  - Source: `app/src/main/assets/src/ui/components/TourPrompt.jsx`.
+  - Labels: "New here?"; "Let me show you around: eleven short stops, about three minutes."
+  - Buttons: "Show me around", "Maybe later"; link "Don’t show this again".
+- **283. Tour overlay chrome**
+  - Source: `app/src/main/assets/src/ui/components/TourOverlay.jsx`, `app/src/main/assets/src/utils/tour-controller.js`, `app/src/main/assets/src/utils/tour-steps.js`.
+  - Visuals: four dim panes, a gold ring, an arrow. The card has eyebrow "N of 11 · <label>", title, text and tip.
+  - Buttons: "Skip" ("Leave the tour"), "Back" ("Previous stop"), and the primary button.
+  - States:
+    - "One moment…" while loading.
+    - "I could not find it on this screen. Press Next to go on." when the target is missing.
+    - The card docks for press, demo and listening stops.
+    - An "after" text replaces the body once the user acts.
+- **284. Tour welcome** (no number)
+  - Eyebrow "Show me around"; "Welcome to VOTReader".
+  - Text: "This is a short tour: eleven stops, about three minutes. You can leave at any time with Skip, and see it again from Settings."
+  - Button: "Start".
+- **285. Tour 1, The Letters** (Home)
+  - Title: "The Letters live here".
+  - Text: "Tap a Volume, then a letter. Tap this tile now, or press Next and I will open one for you."
+- **286. Tour 2, Listen** (a letter; rings the Listen pill)
+  - Title: "Hear it read aloud".
+  - Text: "Press Listen. The words light up as they are read, and the page follows along."
+  - Tip: "Tap it now, or press Next and I will do it for you."
+  - After: "Hear it? The words light up as they are read, and the page follows along. Press Next when you are ready."
+- **287. Tour 3, Highlight** (rings a paragraph; paints a demo highlight but saves nothing)
+  - Title: "Mark what speaks to you".
+  - Text: the gesture sentence + " Your highlights and notes collect in the Library."
+  - Tip: "Try it now, or press Next and I will show you."
+  - After: "See the colour? Hold on any line to do this yourself, any time. Press Next when you are ready."
+- **288. Tour 4, The Scripture Web** (Home quick row)
+  - Title: "See the Scriptures as a web".
+  - Text: "Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible's threads. My Web holds the links you make yourself."
+  - Tip: "Tap a thread to read both ends."
+- **289. Tour 5, Journal** (Journal hub; rings New Entry)
+  - Title: "Keep your own notes in the Journal".
+  - Text: "Your Journal is in the Library. Tap New Entry to write one. It saves by itself as you write."
+- **290. Tour 6, Your Data** (Settings, Your Data group; rings Export)
+  - Title: "Keep a backup".
+  - Text: "Your notes stay on your device. One tap on Export saves a backup file. Import brings it back."
+- **291. Tour 7, Settings** (Reading group; rings the Surprise Me row)
+  - Title: "Make it yours".
+  - Text: "Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use."
+- **292. Tour 8, The Scriptures** (John 3)
+  - Title: "The Bible too, verse by verse".
+  - Text: "I opened John 3 for you: Home › The Scriptures of Truth › Gospels › John › 3. Press Listen and the verses light up one by one as they are read."
+  - After: "Hear it? Each verse lights up as it is read. Press Next when you are ready."
+- **293. Tour 9, The Player** (rings the mini-player, then the voice row)
+  - Title: "Whatever is playing lives here".
+  - Text: "The bar at the bottom shows what is being read. Tap it to open the player."
+  - Tip: "Tap it now, or press Next and I will open it for you."
+  - After: "Tap another edition under Listening now: the chapter starts again in that voice, and the rest follow. Pause, skip or slow the reading here. Press Next when ready."
+- **294. Tour 10, Back to the Words** (rings the sheet's ‹)
+  - Title: "Close the player, keep listening".
+  - Text: "Tap ‹ at the top of the player to put it away. The reading goes on."
+  - After: "You are back with the words, and they keep lighting up as they are read. A letter's reader is changed the same way. Press Next when you are ready."
+- **295. Tour 11, closing card**
+  - Title: "That's the tour".
+  - Text: "You can see this tour again from Settings › Help. The reading goes on. Enjoy your reading."
+  - "Done" keeps the audio playing; Skip, Escape and Back stop it.
+- **296. Safari 7-day modal** (iOS Safari)
+  - Source: `app/src/main/assets/src/ui/components/SafariFlows.jsx` (`Safari7DayModal`).
+  - Title: "Before you start saving".
+  - Body: "Safari may delete your saved notes and highlights if you don't visit for 7 days. To keep your data safe, add VOTReader to your Home Screen."
+  - Disclosure: "How to add to Home Screen" reveals "In Safari: File > Add to Dock" or "Tap the Share button > Add to Home Screen".
+  - Button: "I understand the risk".
+- **297. iOS home-screen welcome card** (`IosPwaWelcomeCard`)
+  - Title: "Welcome to VOTReader!".
+  - Steps: "Open VOTReader in Safari (not this app)", "Go to Settings > Export", "Come back here > Settings > Import".
+  - Buttons: "I'll import my data" / "I'm new — skip this".
+- Other hints covered elsewhere: annotation hint (55), tabs coach mark (8), fullscreen toast (35), Scripture Web guide and density flash (231, 233), Garden warning (250), disable-tabs prompt (161).
+
+## 20. System states & errors
+
+- **298. Offline page** (web/PWA, when a navigation misses the cache while offline)
+  - Source: `app/src/main/assets/offline.html`.
+  - Labels: page title "VOTReader — Offline"; h1 "VOTReader"; "You are offline. Open the app while connected to the internet to cache content for offline use."; "Try Again".
+- **299. Lazy screen loading**: "Loading…" while the Settings/Search/Garden, Web, Personal Study and Listening bundles load.
+- **300. Corpus loading**: "Loading Bible…", "Loading Matthew…", "Loading…".
+- **301. Section load error**: "Couldn’t load this section." + "Try again".
+- **302. Crash screen**
+  - Source: `app/src/main/assets/src/components/ErrorBoundary.jsx`.
+  - Labels: "Something went wrong" / "This page hit an unexpected problem and could not finish loading. Your notes and data are safe." / "Reload App".
+- **303. Repeated crash**: after 2 or more crashes it adds "Reset to Home" + "This screen keeps failing. Use Reset to Home to return to the home screen — your saved notes and data are not affected."
+- **304. Storage banner: newer version**
+  - Source: `app/src/main/assets/src/ui/components/StorageHealthBanner.jsx`.
+  - Text: "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: install the latest version. Changes you make here won't be saved."
+- **305. Storage banner: save failed**: "Your last change couldn't be saved — storage is full. Your work is still on screen but won't be kept if you close the app. Export your data now." + "Export now".
+- **306. Storage banner: private window**: "You're in a private window. Nothing you save here will be kept when you close it."
+- **307. Storage banner: almost full**: "Storage is almost full — X remaining. Your data may not save. Export now to avoid losing it." + "Export now".
+- **308. Storage banner: running low** (amber): "Storage is running low — X remaining. New notes and recordings may not save." + "Export data".
+- **309. Storage banner: slow** (amber): "Storage is slow to load — recent changes are kept on screen and will be saved automatically once it catches up."
+- **310. Storage write toast**
+  - Source: `app/src/main/assets/src/utils/storage-health.js`.
+  - Text: "Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup."
+- **311. Offline library banner: incomplete** (gold)
+  - Source: `app/src/main/assets/src/ui/components/OfflineLibraryBanner.jsx`.
+  - Text: "Offline library incomplete. N files did not download." + "Retry" + ✕.
+- **312. Offline library banner: downloading**: "Downloading N missing files…".
+- **313. Offline library banner: complete**: "Offline library complete.".
+- **314. Offline library banner: still missing**: "…N files are still missing. Connect to the internet, then retry.".
+- **315. Update toasts**
+  - Source: `app/src/main/assets/src/utils/update-toast.js`.
+  - "VOTReader was just updated." (4 seconds).
+  - "VOTReader was just updated. Tap to continue listening." (8 seconds, tappable).
+- **316. Update install failure**
+  - Source: `app/src/main/assets/src/utils/sw-register.js`.
+  - Text: "A new version failed to install (<url>). Still running the current version."
+- **317. Restore guard** (stays until dismissed)
+  - Source: `app/src/main/assets/src/hooks/use-restore-guard.js`.
+  - Text: "Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data)."
+- **318. Missing-content states** (one list so a designer can do a single pass)
+  - Link ends "(unknown)"; "(Deleted)" linked entry; "Image missing"; "Recording missing".
+  - "Verse text not available offline."; "This song is no longer shared."
+  - Unknown audio source; "Entry Not Found"; dead letter (37); missing chapter (44).
+  - An unknown route silently goes to Home.
+
+---
+
+## Flags: inconsistencies and easily missed surfaces
+
+**Inconsistencies found in the code**
+- **"/help" does nothing.** The search command "/help" ("Show search help") is listed, but it has no handler.
+- **Songs "Read with music" is never shown.** The 'readings' frame exists in `app/src/main/assets/src/utils/songs-route.js`, but nothing renders it.
+- **Settings › Help has no About link.** Its subtitle says "Show me around & About", but the group only has "Show me around". After first run, About is reachable only from Home's info button.
+- **The Scripture Web guide mentions a "+" button that no longer exists.** The guide says "Pinch or press + to zoom in", but the on-screen −/+ buttons were removed (`sw-chrome-trim.test.jsx` checks that "Zoom in"/"Zoom out" are absent). "+" now only works as a keyboard key, so phone users have no "+" to press.
+- **A garbled Verify message.** The integrity-failure result says "Your data here still imported-readable" (in `backup-verify.js`).
+- **Two different "can't draw the web" designs.** The dead-end panel (248) appears only when the graph data is also missing; otherwise the fallback list (249) is shown.
+- **History opens pages with no back pill.** It navigates silently, unlike every other tap-through. Shared `?p=` links behave the same way.
+- **Home hard-codes the song count.** The Songs tile says "1,082 songs…", while the Songs hub counts from the live catalog.
+- **Three different delete-confirm patterns:**
+  - typing "DELETE" to wipe all data;
+  - a three-step confirm for a journal entry;
+  - a single ConfirmStrip everywhere else.
+- **A stale comment.** `app/src/main/assets/src/app.jsx` still mentions a removed "welcome modal".
+- **Tour count.** "Eleven stops" counts the closing card but not the welcome card.
+
+**Rarely seen surfaces a designer would likely miss**
+- Hidden Manna letters, reachable only through the "HM" badge.
+- The tabs coach mark, and the disable-tabs prompt (after repeatedly closing the last tab).
+- iOS-only screens: the Safari 7-day modal and the home-screen welcome card.
+- Android-only screens: the offline library banner, all download controls and confirms, "On this phone", and the mini-player's "Not on this phone".
+- Rail mode for the footnote and scripture sheets on wide screens.
+- Swipe peeks.
+- The read-along lead-in wash on the title.
+- The unclaimed-recordings banner in the Journal.
+- The broken-links callout in My Links.
+- Queue paging ("Show 40 earlier") and "Resuming…".
+- The voice-switch confirm.
+- The song skin of the mini-player and the song-mode listening desk.
+- Matthew's "N.N× notes" chip.
+- The Scripture layout-cycle caption.
+- The Settings find filter, including its no-match text.
+- Dependent Settings rows that disappear.
+- The Verify result row, the save-dialog escape toast, and the sheet crash toast.
+- All six storage banners.
+- The "Still blocked" copy fallback.
+- The web-only exit toast, and "Tap to continue listening" after an update.
+- The "Reset to Home" crash state.
+- Scripture Web's count pills, height ruler, height scroll bar, rail resets and fallback list.
+- The Answers commandment sheet.
+- The Garden page-jump input.
+
+**Not checked string-by-string:** the Restored Names treatment in BibleChapterView, the look of the scrollbar content marker, the Journal draft-recovery UI, the Scripture Web "rotated" layout class, and which Settings row the scripture layout options belong to.

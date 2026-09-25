@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: 256px 256px 256px 440px; column-gap: 34px; }
+  .col { display: flex; flex-direction: column; gap: 26px; }
+  .span2 { grid-column: span 2; }
+  .board-grid > .span2:nth-last-child(2) .panel { max-width: 546px; }
+  .empty { padding: 6px 2px 0; font: 400 15px/1.5 var(--sans); color: var(--text-3); }
+  .empty b { color: var(--text); font-weight: 700; }
+  .search.typed { color: var(--text); }
+  .search.typed .q { flex: 1; }
+  .search.typed .clr { color: var(--accent); font-weight: 700; font-size: 14px; }
+  .au-sh .h2 small { white-space: nowrap; }
+  .au-mark.dim { color: var(--text-3); }
+  .panel { background: var(--surface); border-radius: 16px; padding: 18px; }
+  [data-theme="light"] .panel { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .panel .au-sh { margin-top: 0; }
+  .panel .au-hero + .au-sh { margin-top: 22px; }
+  .au-list.inset { background: var(--surface-2); }
+  .au-list.inset .btn.secondary { background: var(--surface-3); }
+  .au-list.inset .au-rp { background: var(--surface-3); }
+  .au-rec.pad { align-items: center; padding: 12px 8px 12px 12px; }
+  .au-rec.pad > .au-rp { margin-top: 0; }
+</style></head>
+<body data-size="1380x1000">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Saved, On this phone, Volumes and Studies · states</div>
+    <div class="meta">Empty shelves, a search with no match, and what the lists say while the lazy recordings and studies load.</div>
+  </div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Saved · no match<small>The count reads "0 of 6"</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll">
+  <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">Saved recordings</div><div class="body">The recordings you chose to keep — they travel with your VOTReader backup.</div><div class="search typed" style="margin-top:18px"><i data-i="search" class="sm"></i><span class="q">grace</span><span class="clr">Clear</span></div></div>
+  <div class="au-sh"><div class="au-shc"><div class="eyebrow">Keep close</div><div class="h2">Your shelf <small>0 of 6</small></div><div class="meta">Starred recordings, newest first.</div></div></div>
+  <div class="empty">No saved recordings match <b>“grace”</b>.</div>
+</div></div></div></div>
+    <div class="cell"><div class="cap">Saved · empty<small>Nothing starred yet</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll">
+  <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">Saved recordings</div><div class="body">The recordings you chose to keep — they travel with your VOTReader backup.</div><div class="search" style="margin-top:18px"><i data-i="search" class="sm"></i>Find a recording</div></div>
+  <div class="au-sh"><div class="au-shc"><div class="eyebrow">Keep close</div><div class="h2">Your shelf <small>0</small></div><div class="meta">Your favorites will wait here.</div></div></div>
+  <div class="empty">Use the star beside any recording to keep it here. Saved recordings travel with your VOTReader backup.</div>
+</div></div></div></div>
+    <div class="cell"><div class="cap">On this phone · empty<small>Android app only</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll">
+  <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">On this phone</div><div class="body">Recordings you download play with no signal.</div></div>
+  <div class="au-sh"><div class="au-shc"><div class="eyebrow">Downloaded</div><div class="h2">Recordings <small>0</small></div></div></div>
+  <div class="empty">Nothing is on this phone yet. Download a recording from its row in a collection, or a whole collection at once, and it plays with no signal.</div>
+</div></div></div></div>
+    <div class="col">
+      <div class="cell"><div class="cap">Volumes · recordings still loading</div><div class="au-list"><div class="au-nav"><span class="au-mark"><i data-i="music"></i></span><div class="au-cp"><div class="au-t">Volume One</div><div class="meta">Loading recordings…</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mark"><i data-i="music"></i></span><div class="au-cp"><div class="au-t">Volume Two</div><div class="meta">Loading recordings…</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div><div class="au-nav"><span class="au-mark"><i data-i="music"></i></span><div class="au-cp"><div class="au-t">Volume Three</div><div class="meta">Loading recordings…</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div></div></div>
+      <div class="cell"><div class="cap">Volumes · a collection with no recording</div><div class="au-list"><div class="au-nav"><span class="au-mark dim"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="6.5"/></svg></span><div class="au-cp"><div class="au-t">Regarding The Holy Days</div><div class="meta">No recordings yet</div></div><span class="au-end"><i data-i="chevron-right"></i></span></div></div></div>
+    </div>
+    <div class="cell span2"><div class="cap">Studies · the registry still loading</div><div class="panel"><div class="au-sh"><div class="au-shc"><div class="eyebrow">Study by study</div><div class="h2">Studies <small>0</small></div></div></div><div class="empty" style="padding-top:0">Loading the studies…</div></div></div>
+    <div class="cell span2"><div class="cap">On this phone · one recording<small>Its own Remove is the whole job, so there is no Remove all</small></div><div class="panel">
+  <div class="body" style="margin:0 0 16px">1 recording · 5.8 MB. They play with no signal.</div>
+  <div class="au-sh"><div class="au-shc"><div class="eyebrow">Downloaded</div><div class="h2">Recordings <small>1</small></div></div></div>
+  <div class="au-list inset"><div class="au-rec pad"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Know That Which Has Been Poured Out, The Word of God</div><div class="meta" style="margin-top:3px">5.8 MB</div></div><span class="btn sm btn-warn rm">Remove</span></div></div>
+</div></div>
+  </div>
+</div>
+</body></html>

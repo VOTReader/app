@@ -1,0 +1,249 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="st-settings.css"><link rel="stylesheet" href="st-reading-fonts.css"><script src="../kit/kit.js"></script>
+<style>
+  .cols { display: flex; gap: 32px; align-items: flex-start; }
+  .col { width: 412px; display: flex; flex-direction: column; gap: 30px; }
+  .cell > .cap small { max-width: 400px; }
+  .psheet { width: 412px; }
+  /* Reading Font: each name in its own face (FontPickerRow labelStyle) */
+  .fonts .ol { font-size: 19px; font-weight: 400; letter-spacing: 0; line-height: 1.25; }
+  .fonts .opt.on .ol { font-weight: 400; }
+  .fonts .opt { min-height: 54px; padding: 8px 0; }
+  /* in-context fragments for the confirmations */
+  .frag { width: 412px; background: var(--bg); padding: 0; }
+  .frag .group { width: 412px; }
+  .frag .set .hd { min-height: 36px; }
+  .frag .confirm { margin: 0 16px 16px; }
+  .shd { display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 14px; }
+  .shd .dis { color: var(--text-2); flex: none; margin-top: 3px; }
+  .shd .pt { flex: 1; min-width: 0; }
+  .shd .pl { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .row2 { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .row2 .progress { flex: 1; }
+  .tally { font: 400 13px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row2 .tally { min-width: 72px; text-align: right; }
+  .brow { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 44px; min-height: 46px; }
+  .brow .bl { flex: 1; min-width: 0; font: 400 15px/1.3 var(--sans); color: var(--text); }
+  .brow .tally { min-width: 54px; text-align: right; }
+  .cl { flex: none; height: 32px; padding: 0 8px; display: inline-flex; align-items: center; font: 700 14px/1 var(--sans); color: var(--text-2); }
+  .cl.is-off { color: var(--text-3); opacity: .45; }
+  .genre { padding: 12px 16px 4px 44px; }
+  .inrow { margin: 4px 12px 12px 44px; }
+  .ptotal { display: flex; align-items: flex-start; gap: 12px; padding: 18px 16px 14px; background: var(--surface-2); }
+  .ptotal .pt { flex: 1; min-width: 0; }
+  .ptotal .pl { font: 700 16px/1.3 var(--sans); color: var(--text); }
+  .ptotal-wrap { background: var(--surface-2); padding-bottom: 16px; }
+  .ptotal-wrap .confirm { margin: 0 16px; }
+  .btn.xs { height: 34px; border-radius: 17px; padding: 0 14px; font-size: 14px; }
+</style></head>
+<body data-size="1840x2087">
+<!--st-icons--><svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-triangle-alert" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol></svg><!--/st-icons-->
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Settings · pickers and clear confirmations</div>
+    <div class="meta">Every choice sheet Settings opens, with each option in the app’s own words and the current choice marked, then the clear confirmations in the warning colour. Sheets are drawn at full length; on a phone they scroll above the page.</div>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Reading font<small>Appearance › Reading Font. 26 faces in picker order, each name set in its own face. Default: System Serif.</small></div>
+        <div class="psheet fonts">
+          <div class="grabber"></div>
+          <div class="eyebrow">Appearance</div>
+          <div class="h2">Reading Font</div>
+          <div class="opt on"><div class="ot"><div class="ol" style="font-family:serif">System Serif</div><div class="od">Your device’s own serif — the original look</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'EB Garamond'">EB Garamond</div><div class="od">The app’s classic garamond</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Cormorant Garamond'">Cormorant Garamond</div><div class="od">Refined garamond, light and graceful</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Cardo'">Cardo</div><div class="od">Scholarly face favored for scripture</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Gentium Book Plus'">Gentium Book Plus</div><div class="od">Bible-translation staple</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Rosarivo'">Rosarivo</div><div class="od">Made for scripture typesetting</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Crimson Pro'">Crimson Pro</div><div class="od">Old-style book face</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Sorts Mill Goudy'">Sorts Mill Goudy</div><div class="od">Old-style Goudy revival</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Old Standard TT'">Old Standard TT</div><div class="od">Classical scholarship look</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'IM Fell English'">IM Fell English</div><div class="od">Antique English bible print</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Libre Baskerville';font-size:17px">Libre Baskerville</div><div class="od">Classic Baskerville, tuned for screens</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Lora'">Lora</div><div class="od">Calm contemporary serif</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Literata'">Literata</div><div class="od">Made for long e-book reading</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Merriweather';font-size:17px">Merriweather</div><div class="od">Sturdy screen serif</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Gelasio'">Gelasio</div><div class="od">Familiar Georgia feel</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Source Serif 4'">Source Serif 4</div><div class="od">Clear modern text serif</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Noto Serif';font-size:18px">Noto Serif</div><div class="od">Balanced, familiar serif</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Spectral'">Spectral</div><div class="od">Airy, elegant text face</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Vollkorn'">Vollkorn</div><div class="od">Warm bread-and-butter serif</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Alegreya'">Alegreya</div><div class="od">Lively literary rhythm</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Bitter';font-size:18px">Bitter</div><div class="od">Slab serif, high clarity</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Neuton';font-size:20px">Neuton</div><div class="od">Compact, warm, unhurried</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Playfair Display'">Playfair Display</div><div class="od">Ornate high-contrast display</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Atkinson Hyperlegible';font-size:17px">Atkinson Hyperlegible</div><div class="od">Sans built for low vision</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol" style="font-family:'Lexend';font-size:17px">Lexend</div><div class="od">Sans tuned for reading ease</div></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Reset a slider<small>Auto-Scroll. Reset needs no confirmation; it wakes only once a value leaves its default, and puts it straight back.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Scroll Speed</div></div><span class="num">24 lines/min</span></div>
+            <div class="sl">
+              <div class="slc">
+                <div class="track"><div class="slider"><i style="width:55.6%"></i><b style="left:55.6%"></b></div></div>
+                <div class="scale"><span>4</span><span>40 lines/min</span></div>
+              </div>
+              <span class="btn text sm">Reset</span>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Bible translation<small>Reading › Bible Translation. 10 texts. Default: NKJV.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Reading</div>
+          <div class="h2">Bible Translation</div>
+          <div class="opt on"><div class="ot"><div class="ol">NKJV</div><div class="od">New King James Version — default</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">NKJV-R</div><div class="od">NKJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">WEB</div><div class="od">World English Bible — modern, public domain · ~2% shorter than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">BSB</div><div class="od">Berean Standard Bible — modern literal · ~6% shorter than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">HNV</div><div class="od">Hebrew Names Version — names restored (Yeshua, Mattityahu) · ~2% shorter than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">KJV</div><div class="od">King James Version 1769 — traditional · ~2% longer than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">KJV-R</div><div class="od">KJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">ASV</div><div class="od">American Standard Version 1901 — classical literal · ~2% longer than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">LSV</div><div class="od">Literal Standard Version — uses YHWH for the Name · ~3% longer than NKJV</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">YLT</div><div class="od">Young’s Literal Translation 1898 — hyper-literal · ~3% longer than NKJV</div></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Chapter &amp; letter arrows<small>Reading › Chapter &amp; Letter Arrows. The saved default is Hidden, although the Split row still says “Default.”</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Reading</div>
+          <div class="h2">Chapter Arrows</div>
+          <div class="opt"><div class="ot"><div class="ol">Split · Left + Right</div><div class="od">Arrows on opposite edges of the content. Default.</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Right-handed</div><div class="od">Both arrows tucked on the right for one-thumb reach.</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Left-handed</div><div class="od">Both arrows tucked on the left for one-thumb reach.</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">In Top Nav</div><div class="od">Small bubble arrows inside the top nav bar.</div></div></div>
+          <div class="opt on"><div class="ot"><div class="ol">Hidden</div><div class="od">Hide both arrows. Use the bottom prev/next cards.</div></div><i data-i="check" class="sm ck"></i></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Scripture browser<small>Reading › Scripture Browser. Default: Genre Grid.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Reading</div>
+          <div class="h2">Scripture Browser</div>
+          <div class="opt on"><div class="ot"><div class="ol">Genre Grid</div><div class="od">Books grouped by genre with collapsible sections (default)</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">Compact List</div><div class="od">Dense single-column list — fastest to scan</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Book Grid</div><div class="od">Flat three-column grid of every book</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Canonical Scroll</div><div class="od">One long scroll in canonical reading order</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Reading streak dwell time<small>Reading › Reading Streak Dwell Time. Default: 20 seconds.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Reading</div>
+          <div class="h2">Reading Streak Dwell Time</div>
+          <div class="opt"><div class="ot"><div class="ol">3 seconds</div><div class="od">Counts almost immediately</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">5 seconds</div><div class="od">Very quick</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">10 seconds</div><div class="od">Quick</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">15 seconds</div><div class="od">Moderate</div></div></div>
+          <div class="opt on"><div class="ot"><div class="ol">20 seconds</div><div class="od">Standard (default)</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">30 seconds</div><div class="od">Relaxed</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">45 seconds</div><div class="od">Deliberate</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">60 seconds</div><div class="od">Requires a full minute of reading</div></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear reading history<small>Search, Tabs &amp; History. The button gives way to the question; nothing clears until Yes.</small></div>
+        <div class="frag">
+          <div class="group">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">Reading history</div><div class="val">86 entries</div></div></div>
+            </div>
+            <div class="confirm"><div class="q"><i data-i="triangle-alert" class="sm"></i><span>Clear all reading history?</span></div>
+              <div class="acts"><span class="btn quiet sm">Cancel</span><span class="btn warn sm">Yes, clear</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear one book<small>Mark as Read. The row itself becomes the question.</small></div>
+        <div class="frag"><div class="group" style="padding:10px 0">
+          <div class="brow"><span class="bl">Volume Two</span><span class="tally">29 / 29</span><span class="cl">Clear</span></div>
+          <div class="confirm inrow"><div class="q"><i data-i="triangle-alert" class="sm"></i><span>Clear read marks and saved positions for “Volume Three”?</span></div>
+            <div class="acts"><span class="btn quiet sm">Cancel</span><span class="btn warn sm">Yes, clear</span></div></div>
+          <div class="brow"><span class="bl">Volume Four</span><span class="tally">0 / 29</span><span class="cl is-off">Clear</span></div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear a whole section<small>Mark as Read. Every book in the section.</small></div>
+        <div class="frag"><div class="group">
+          <div class="shd">
+            <i data-i="chevron-right" class="sm dis"></i>
+            <div class="pt"><div class="pl">New Testament</div><div class="row2"><div class="progress"><i style="width:24.6%"></i></div><span class="tally">64 / 260</span></div></div>
+          </div>
+          <div class="confirm" style="margin:2px 16px 16px 44px"><div class="q"><i data-i="triangle-alert" class="sm"></i><span>Clear read marks and saved positions in “New Testament”?</span></div>
+            <div class="acts"><span class="btn quiet sm">Cancel</span><span class="btn warn sm">Yes, clear</span></div></div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Clear all progress<small>Mark as Read › All Scriptures. Totals and streaks survive.</small></div>
+        <div class="frag"><div class="group ptotal-wrap">
+          <div class="ptotal">
+            <div class="pt"><div class="pl">All Scriptures</div><div class="row2"><div class="progress"><i style="width:10.6%"></i></div><span class="tally">213 / 2016</span></div></div>
+          </div>
+          <div class="confirm"><div class="q"><i data-i="triangle-alert" class="sm"></i><span>Clear all read marks and saved positions? Reading totals and streaks are kept.</span></div>
+            <div class="acts"><span class="btn quiet sm">Cancel</span><span class="btn warn sm">Yes, clear</span></div></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Bible audio<small>Listening › Bible Audio. Every offered edition, then Off. Default: KJV · Biblical Restoration Ministries.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Listening</div>
+          <div class="h2">Bible Audio</div>
+          <div class="opt on"><div class="ot"><div class="ol">KJV · Biblical Restoration Ministries</div><div class="od">Per-chapter audiobook · KJV text</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">NKJV · The Word of Promise (Dramatized)</div><div class="od">Per-chapter audiobook · NKJV text</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">WEB · World English Bible</div><div class="od">Per-chapter audiobook · WEB text</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Matthew · The Scriptures of Truth (read by Benjamin)</div><div class="od">Per-chapter audiobook · Corrected Version by Timothy, with The Lord</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">John · The Gospel of John (film audio, no read-along)</div><div class="od">Per-chapter audiobook · Film audio, listening only</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Off</div><div class="od">Hide the Bible Listen button</div></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Letter voice<small>Listening › Letter Voice. Readers in the app’s reader rank. Default: Automatic.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Listening</div>
+          <div class="h2">Letter Voice</div>
+          <div class="opt on"><div class="ot"><div class="ol">Automatic</div><div class="od">Each recording’s primary reading</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">Read by Benjamin</div><div class="od">Prefer this reading wherever it exists</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Read by Timothy</div><div class="od">Prefer this reading wherever it exists</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">Text-to-speech</div><div class="od">Prefer this reading wherever it exists</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">AI reading with music</div><div class="od">Prefer this reading wherever it exists</div></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Default speed<small>Listening › Default Speed, after the listening desk left 1.37×. The desk sets any 1% step from 0.50× to 3.00×; Settings lists that value once, in order, beside the six presets. Default: 1×.</small></div>
+        <div class="psheet">
+          <div class="grabber"></div>
+          <div class="eyebrow">Listening</div>
+          <div class="h2">Default Speed</div>
+          <div class="opt"><div class="ot"><div class="ol">0.75×</div><div class="od">Slower than recorded</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">1×</div><div class="od">Normal speed</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">1.25×</div><div class="od">Faster than recorded</div></div></div>
+          <div class="opt on"><div class="ot"><div class="ol">1.37×</div><div class="od">Faster than recorded</div></div><i data-i="check" class="sm ck"></i></div>
+          <div class="opt"><div class="ot"><div class="ol">1.5×</div><div class="od">Faster than recorded</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">1.75×</div><div class="od">Faster than recorded</div></div></div>
+          <div class="opt"><div class="ot"><div class="ol">2×</div><div class="od">Faster than recorded</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

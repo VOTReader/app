@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid.top { grid-template-columns: 915px; }
+  .board-grid.chips { grid-template-columns: repeat(3, 289px); gap: 26px 24px; }
+  .chips .tip { position: relative; max-width: 265px; }
+  .chips .cell > .cap { min-height: 34px; }
+  .ptr { position: absolute; z-index: 4; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 11px; border: 2px solid var(--text); opacity: .8; }
+</style></head>
+<body data-size="995x1514">
+<div class="board">
+  <div class="board-head"><div class="h2">Scripture Web · the tip</div>
+    <div class="meta">What a thread, a verse, a chapter or a count pill says under the finger or the pointer, before anything is tapped. It names; it never dims the web.</div></div>
+  <div class="board-grid top">
+    <div class="cell"><div class="cap">In place<small>Pressing or hovering a thread brightens it alone and names both ends.</small></div>
+      <div class="lf f100"><div class="ls" id="f" data-theme="dark"></div></div></div>
+  </div>
+  <div class="board-grid chips">
+    <div class="cell"><div class="cap">Connection</div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Connection</div><div class="r">Isaiah 53:5</div><div class="ar">↕</div><div class="r">1 Peter 2:24</div><div class="m">11,707 verses apart · weight 247</div></div></div></div>
+    <div class="cell"><div class="cap">Your link · within scripture</div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Your link</div><div class="r">John 3:16</div><div class="ar">↕</div><div class="r">Romans 5:8</div><div class="m">Within scripture</div></div></div></div>
+    <div class="cell"><div class="cap">Your link · within the Volumes</div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Your link</div><div class="r">All Have Been Purchased... Yet Few Have Accepted, Few Are Chosen</div><div class="ar">↕</div><div class="r">Grafted In</div><div class="m">Within the Volumes</div></div></div></div>
+    <div class="cell"><div class="cap">Your link · across</div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Your link</div><div class="r">Death and Awakening</div><div class="ar">↕</div><div class="r">John 6:40</div><div class="m">Scripture ↔ Volumes</div></div></div></div>
+    <div class="cell"><div class="cap">Timothy’s thread<small>The source of the citation, then the collection it sits in.</small></div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Timothy’s thread</div><div class="r">Isaiah 53:4</div><div class="ar">↕</div><div class="r">Without Spot or Blemish</div><div class="m">footnotes · Vol IV</div></div></div></div>
+    <div class="cell"><div class="cap">Timothy’s thread, far end unresolved</div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Timothy’s thread</div><div class="r">Isaiah 53:9</div><div class="ar">↕</div><div class="r" style="color:var(--text-3)">Corpus passage</div><div class="m">studies · Lamb</div></div></div></div>
+    <div class="cell"><div class="cap">Chapter<small>Over a chapter on the ruler.</small></div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Chapter</div><div class="r">Isaiah 53</div><div class="m">12 verses · 239 connections</div></div></div></div>
+    <div class="cell"><div class="cap">Verse<small>Over a verse tick, zoomed in.</small></div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Verse</div><div class="r">Isaiah 53:5</div><div class="m">27 connections</div></div></div></div>
+    <div class="cell"><div class="cap">Bundle<small>Over a count pill.</small></div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Bundle</div><div class="r">Isaiah 53:5</div><div class="m">27 connections converge here · tap to open</div></div></div></div>
+    <div class="cell"><div class="cap">Bundle, some not drawn<small>Legacy wording: every thread is drawn now, so this line no longer appears.</small></div>
+      <div class="tray" data-theme="dark"><div class="tip"><div class="label">Bundle</div><div class="r">Isaiah 53:5</div><div class="m">12 of 27 connections not drawn here · tap to open</div></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawOverview, overviewPoint, overviewArch, chromeHTML, footHTML, iconize, vid, tok, isLight, done } from './sw-lib.js';
+  const f = document.getElementById('f');
+  f.innerHTML = '<canvas></canvas>' + chromeHTML({}) + footHTML('canon')
+    + `<span class="ptr" id="ptr"></span><div class="tip" id="tip"><div class="label">Connection</div><div class="r">Isaiah 53:5</div><div class="ar">↕</div><div class="r">1 Peter 2:24</div><div class="m">11,707 verses apart · weight 247</div></div>`;
+  iconize();
+  const cv = f.querySelector('canvas');
+  const res = drawOverview(cv, { top: 92, baseline: 346 });
+  const a = vid('Isaiah 53:5'), b = vid('1 Peter 2:24');
+  // hover: the thread brightened, nothing dimmed, no feet marked (that is a tap)
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = isLight(cv) ? 'rgba(123,45,38,.95)' : 'rgba(239,232,218,.9)';
+  overviewArch(ctx, res.X, res.baseline, 92, a, b); ctx.stroke(); ctx.restore();
+  const p = overviewPoint(res.X, res.baseline, 92, a, b, 0.3);
+  const ptr = document.getElementById('ptr'); ptr.style.left = p.x + 'px'; ptr.style.top = p.y + 'px';
+  const tip = document.getElementById('tip'); tip.style.left = (p.x + 16) + 'px'; tip.style.top = (p.y + 16) + 'px';
+  done();
+</script>
+</body></html>

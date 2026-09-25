@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .scrim { z-index: 4; }
+  .guide { position: absolute; z-index: 6; left: 50%; top: 62px; transform: translateX(-50%); width: 720px;
+    background: var(--surface); border-radius: 22px; padding: 18px 24px 18px; box-shadow: var(--shadow); }
+  .guide .t { font: 500 21px/1.2 var(--serif); color: var(--text); margin-bottom: 10px; }
+  .guide ul { list-style: none; }
+  .guide li { position: relative; padding-left: 18px; font: 400 14px/1.42 var(--sans); color: var(--text-2); }
+  .guide li + li { margin-top: 5px; }
+  .guide li::before { content: ''; position: absolute; left: 3px; top: 8px; width: 5px; height: 5px; border-radius: 3px; background: var(--accent); }
+  .guide li b { color: var(--text); font-weight: 700; }
+  .guide .ft { position: absolute; right: 22px; bottom: 16px; }
+</style></head>
+<body class="landscape" data-themes="dark">
+<div class="ls" id="f"></div>
+<script type="module">
+  import { drawOverview, chromeHTML, footHTML, iconize, done } from './sw-lib.js';
+  const f = document.getElementById('f');
+  f.innerHTML = '<canvas></canvas>' + chromeHTML({ guide: true }) + footHTML('canon') + '<div class="scrim"></div>'
+    + `<div class="guide" role="dialog" aria-labelledby="gt">
+      <div class="t" id="gt">How to read this web</div>
+      <ul>
+        <li>Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are.</li>
+        <li>Colour is distance: warm threads join near neighbours, blue ones cross the whole Bible. The books run along the bottom.</li>
+        <li>Pinch or double-tap to zoom in (on a keyboard, press <b>+</b>). Past the overview, the chapter under the middle is lit and the rest stands back.</li>
+        <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
+        <li>Drag the web down to look up into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
+        <li><b>Reset</b> brings you home.</li>
+      </ul>
+      <div class="ft"><span class="btn primary sm">Got it</span></div>
+    </div>`;
+  iconize();
+  drawOverview(f.querySelector('canvas'), { top: 92, baseline: 346 });
+  done();
+</script>
+</body></html>

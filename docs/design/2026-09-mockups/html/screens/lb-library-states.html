@@ -1,0 +1,119 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .hub { padding-top: 6px; }
+  .hub .display { margin-top: 4px; }
+  .hub > .body { margin-top: 10px; max-width: 330px; text-wrap: balance; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; position: relative; }
+  .tile { position: relative; min-height: 130px; padding: 16px; border-radius: 18px; background: var(--surface); display: flex; flex-direction: column; }
+  [data-theme="light"] .tile { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .tile .ic { color: var(--text-2); }
+  .tile .nm { margin-top: auto; padding-top: 16px; font: 500 20px/1.2 var(--serif); color: var(--text); }
+  .tile .dt { margin-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .tile .chev { position: absolute; right: 12px; top: 15px; color: var(--text-3); }
+  /* first run: each empty tile carries its one-line guide */
+  .tiles.first .tile { min-height: 0; }
+  .tiles.first .tile .nm { margin-top: 0; padding-top: 14px; }
+  .tile .gd { margin-top: 8px; font: 400 13px/1.4 var(--sans); color: var(--text-2); }
+  /* rearranging */
+  .tile.slot { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text-3) 40%, transparent) !important; }
+  .tile.ghost { position: absolute; left: 14px; top: 18px; width: 180px; height: 130px; transform: scale(1.05); z-index: 3; box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  [data-theme="light"] .tile.ghost { box-shadow: 0 0 0 2px var(--accent), 0 18px 40px rgba(60,40,20,.22); }
+  .tile.press { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); overflow: hidden; }
+  .tile.press::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 62%; background: var(--accent); border-radius: 0 2px 2px 0; }
+  .tstate { width: 180px; }
+  .col { display: flex; flex-direction: column; gap: 22px; }
+  .note { max-width: 250px; }
+</style></head>
+<body data-size="1100x900">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Library: first run and rearranging</div>
+    <div class="meta">LibraryScreen.jsx · empty tiles carry a one-line guide · press and hold a tile to move it</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 309px 309px 1fr">
+
+    <div class="cell">
+      <div class="cap">First run<small>Every tile empty; its guide says how to fill it</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll hub">
+          <div class="eyebrow">Personal Study</div>
+          <div class="display">Library</div>
+          <div class="body">Your collected notes, reflections, and saved passages.</div>
+          <div class="tiles first">
+            <div class="tile"><i data-i="sticky-note" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Notes</div><div class="dt">No notes yet</div><div class="gd">Long-press text in any chapter and tap Note.</div></div>
+            <div class="tile"><i data-i="link" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Links</div><div class="dt">No links yet</div><div class="gd">Select text, tap Link, and pick a destination.</div></div>
+            <div class="tile"><i data-i="notebook" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Journal</div><div class="dt">No entries yet</div><div class="gd">Tap “New Entry” in the Journal to write your first reflection.</div></div>
+            <div class="tile"><i data-i="bookmark" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Bookmarks</div><div class="dt">No bookmarks yet</div><div class="gd">Select text and tap Bookmark in the toolbar.</div></div>
+            <div class="tile"><i data-i="highlighter" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Highlights</div><div class="dt">No marks yet</div><div class="gd">Select a passage and tap a color to highlight or underline it.</div></div>
+            <div class="tile"><i data-i="lb-chart" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Progress</div><div class="dt">Nothing read yet</div><div class="gd">Chapters you read are counted here.</div></div>
+            <div class="tile"><i data-i="star" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Milestones</div><div class="dt">None reached yet</div><div class="gd">Reading, listening, and study all count toward these.</div></div>
+            <div class="tile"><i data-i="scripture-web" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Scripture Web</div><div class="dt">63,418 cross-references</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Rearranging<small>Bookmarks lifted and carried to the first slot; the others make room</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll hub">
+          <div class="eyebrow">Personal Study</div>
+          <div class="display">Library</div>
+          <div class="body">Your collected notes, reflections, and saved passages.</div>
+          <div class="tiles">
+            <div class="tile slot"></div>
+            <div class="tile"><i data-i="sticky-note" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Notes</div><div class="dt">23 notes</div></div>
+            <div class="tile"><i data-i="link" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Links</div><div class="dt">12 links</div></div>
+            <div class="tile"><i data-i="notebook" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Journal</div><div class="dt">9 entries</div></div>
+            <div class="tile"><i data-i="highlighter" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Highlights</div><div class="dt">124 marks</div></div>
+            <div class="tile"><i data-i="lb-chart" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Progress</div><div class="dt">186 read</div></div>
+            <div class="tile"><i data-i="star" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Milestones</div><div class="dt">23 of 89 reached</div></div>
+            <div class="tile"><i data-i="scripture-web" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Scripture Web</div><div class="dt">63,418 cross-references</div></div>
+            <div class="tile ghost"><i data-i="bookmark" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+              <div class="nm">Bookmarks</div><div class="dt">7 bookmarks</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Holding<small>The line fills while the finger stays down</small></div>
+        <div class="tile press tstate"><i data-i="bookmark" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+          <div class="nm">Bookmarks</div><div class="dt">7 bookmarks</div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Lifted<small>Follows the finger until it is let go</small></div>
+        <div class="tile tstate" style="transform: scale(1.05); transform-origin: left top; box-shadow: 0 0 0 2px var(--accent), var(--shadow)"><i data-i="bookmark" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+          <div class="nm">Bookmarks</div><div class="dt">7 bookmarks</div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Order is kept<small>Saved on this device</small></div>
+        <div class="meta note">The new order is remembered the next time the Library opens. Scripture Web has no guide: it is never empty.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* Answers › Every Topic, A–Z: a letter jump grid, then one group per letter */
+  .intro { padding-top: 4px; }
+  .intro .h1 { margin-top: 6px; }
+  .intro .meta { margin-top: 8px; }
+  /* every letter present in the list; 44 px keys, all visible at once */
+  .jump { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 20px; }
+  .jump span { height: 44px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; font: 500 19px/1 var(--serif); color: var(--text-2); }
+  [data-theme="light"] .jump span { box-shadow: 0 1px 2px rgba(60,40,20,0.05); }
+  .lt { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 0 8px 2px; padding-right: 42px; }
+  .lt b { font: 500 24px/1 var(--serif); color: var(--text); }
+  .lt .meta { font-size: 12px; }
+  .topics .item { min-height: 52px; padding: 12px 12px 12px 16px; gap: 12px; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .cnt { width: 26px; text-align: right; flex: none; font: 400 14px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .topics .chev { color: var(--text-3); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="eyebrow">Answers Only God Can Give</div>
+      <div class="h1">Every Topic, A–Z</div>
+      <div class="meta">121 topics · 1636 passages</div>
+    </div>
+
+    <div class="jump" aria-label="Jump to a letter">
+      <span>#</span><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span>
+      <span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
+      <span>P</span><span>R</span><span>S</span><span>T</span><span>U</span><span>V</span><span>W</span>
+    </div>
+
+    <div class="lt"><b>#</b><span class="meta">Passages</span></div>
+    <div class="group topics">
+      <div class="item"><span class="ttl">The 144,000 Witnesses</span><span class="cnt">22</span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+
+    <div class="lt"><b>A</b></div>
+    <div class="group topics">
+      <div class="item"><span class="ttl">Abortion</span><span class="cnt">33</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Adding to or Taking Away From The Word of God</span><span class="cnt">22</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Adultery Committed Against Him</span><span class="cnt">20</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Adultery Committed in Marriage</span><span class="cnt">1</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Adultery of the Heart</span><span class="cnt">2</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Africa</span><span class="cnt">2</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">Another Messiah</span><span class="cnt">18</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">The Antichrist</span><span class="cnt">8</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">The Apostle Paul</span><span class="cnt">1</span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="item"><span class="ttl">The Ascension and The Blessed Hope</span><span class="cnt">5</span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+  </div>
+</div>
+</body></html>

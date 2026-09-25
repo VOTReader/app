@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .cell > .cap { min-height: 48px; }
+  .ycol > .cell .label { margin-bottom: 10px; }
+  .dz-head { display: flex; align-items: center; gap: 10px; }
+  .dz-head .i { color: var(--yd-danger); flex: none; }
+  /* the dialog sits on the keyboard: its field has focus the moment it opens */
+  .sheet.onkbd { bottom: 286px; padding-bottom: 18px; box-shadow: none; }
+  .yds .dz { font-weight: 700; color: var(--yd-danger); }
+  .prompt { margin-top: 16px; font: 400 14px/1.4 var(--sans); color: var(--text-2); }
+  .prompt b { color: var(--text); font-weight: 700; letter-spacing: 0.08em; }
+  .field { margin-top: 10px; height: 54px; border-radius: 14px; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--accent);
+    display: flex; align-items: center; justify-content: center; gap: 2px; font: 700 19px/1 var(--sans); letter-spacing: 0.2em; color: var(--text); }
+  .field .plc { color: var(--text-3); font-weight: 400; }
+  .field .caret { width: 2px; height: 24px; border-radius: 1px; background: var(--accent); flex: none; }
+  .field .caret.after { margin-left: -2px; }
+  .yds .stack-btns { margin-top: 18px; }
+  .page-top { padding-top: 6px; }
+  .page-top .label { margin: 4px 0 10px; }
+</style></head>
+<body data-size="1166x892">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · Clear all personal data</div>
+    <div class="meta">Settings › Your Data › Danger zone. The one delete in the app that asks you to type a word. Delete Everything wakes only when the field says DELETE (in any letter case).</div>
+  </div>
+
+  <div class="ycols">
+    <div class="ycol w412">
+      <div class="cell">
+        <div class="cap">The danger zone<small>The last group on the Your Data page. Its button opens the dialog.</small></div>
+        <div>
+          <div class="label">Danger zone</div>
+          <div class="group danger-card"><div class="set">
+            <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+            <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.</div>
+            <span class="btn danger block">Clear All My Data</span>
+          </div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">While a backup action runs<small>Export, Import, Verify and Clear wait for one another. The button rests until the running one ends.</small></div>
+        <div class="group danger-card"><div class="set">
+          <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+          <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.</div>
+          <span class="btn danger block is-off">Clear All My Data</span>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Dialog · empty<small>The field has focus, so the keyboard is up in capitals. Delete Everything rests.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll page-top">
+          <div class="label">Danger zone</div>
+          <div class="group danger-card"><div class="set">
+            <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+            <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache.</div>
+          </div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet yds onkbd">
+          <div class="grabber"></div>
+          <div class="h2">Delete All Personal Data</div>
+          <div class="p">This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults. <span class="dz">This cannot be undone.</span> Export your data first if you want a backup.</div>
+          <div class="prompt">Type <b>DELETE</b> to confirm.</div>
+          <div class="field"><span class="caret"></span><span class="plc">DELETE</span></div>
+          <div class="stack-btns">
+            <span class="btn danger block is-off">Delete Everything</span>
+            <span class="btn secondary block">Cancel</span>
+          </div>
+        </div>
+        <div class="kbd caps"></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Dialog · filled<small>DELETE typed: the button wakes. Enter on the keyboard does the same.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Your data</span></div>
+        <div class="scroll page-top">
+          <div class="label">Danger zone</div>
+          <div class="group danger-card"><div class="set">
+            <div class="dz-head"><i data-i="yd-triangle-alert" class="sm"></i><div class="lbl">Clear All Personal Data</div></div>
+            <div class="help">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache.</div>
+          </div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet yds onkbd">
+          <div class="grabber"></div>
+          <div class="h2">Delete All Personal Data</div>
+          <div class="p">This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults. <span class="dz">This cannot be undone.</span> Export your data first if you want a backup.</div>
+          <div class="prompt">Type <b>DELETE</b> to confirm.</div>
+          <div class="field"><span>DELETE</span><span class="caret after"></span></div>
+          <div class="stack-btns">
+            <span class="btn danger block">Delete Everything</span>
+            <span class="btn secondary block">Cancel</span>
+          </div>
+        </div>
+        <div class="kbd caps"></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<script>
+  // Fill each .kbd with a plain keyboard in capitals (the field asks for autoCapitalize="characters").
+  document.addEventListener('DOMContentLoaded', function () {
+    var ic = function (n, cls) { return '<svg class="i sm ' + (cls || '') + '"><use href="#i-' + n + '"/></svg>'; };
+    var rows = [
+      'Q W E R T Y U I O P'.split(' '),
+      'A S D F G H J K L'.split(' '),
+      ['shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'del'],
+      ['?123', ',', ' ', '.', 'go']
+    ];
+    document.querySelectorAll('.kbd').forEach(function (k) {
+      var html = '';
+      rows.forEach(function (r, ri) {
+        html += '<div class="kr' + (ri === 1 ? ' mid' : '') + '">';
+        r.forEach(function (c) {
+          if (c === 'shift') { html += '<span class="k fn on">' + ic('yd-arrow-big-up', 'fill') + '</span>'; return; }
+          if (c === 'del') { html += '<span class="k fn">' + ic('yd-delete') + '</span>'; return; }
+          if (c === 'go') { html += '<span class="k go">' + ic('check') + '</span>'; return; }
+          var cls = 'k' + (c === '?123' || c === ',' || c === '.' ? ' fn' : '') + (c === ' ' ? ' space' : '');
+          html += '<span class="' + cls + '">' + (c === ' ' ? '' : c) + '</span>';
+        });
+        html += '</div>';
+      });
+      k.innerHTML = html;
+    });
+  });
+</script>
+</body></html>

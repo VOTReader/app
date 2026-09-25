@@ -1,0 +1,191 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* The end-of-letter footnote list (FootnoteListSection + ExpandableVerse) and Matthew's inline
+     reference echoes (InlineEcho). List rows are Volume One, Letter 11 "Death and Awakening". */
+  .board-grid { grid-template-columns: repeat(3, 412px); }
+  .col { display: flex; flex-direction: column; gap: 28px; }
+  .endpage { padding: 0 var(--gutter) 28px; }
+  .poem { margin-top: 14px; }
+  .sect { margin: 30px 0 10px; }
+  /* list rows */
+  .fnl .item { align-items: flex-start; gap: 14px; padding: 16px 16px 16px 14px; position: relative; }
+  .fnl .n { width: 26px; height: 26px; border-radius: 13px; flex: none; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font: 700 12px/1 var(--sans); margin-top: -1px; }
+  .fnl .c { flex: 1; min-width: 0; }
+  .fnl .ref { font: 700 14px/1.35 var(--sans); color: var(--text); }
+  .fnl .v { margin-top: 5px; font: 400 16px/1.5 var(--serif); color: var(--text-2); }
+  .fnl .v .vnum { margin-right: 3px; }
+  .fnl .ntx { font: italic 400 16px/1.5 var(--serif); color: var(--text-2); }
+  .fnl .miss { font: italic 400 15px/1.45 var(--serif); color: var(--text-3); }
+  .more { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; font: 700 13px/1 var(--sans); color: var(--accent); vertical-align: 1px; white-space: nowrap; }
+  .more .i { width: 14px; height: 14px; }
+  .gos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .go { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 8px 0 12px; border-radius: 16px; background: var(--surface-2); color: var(--text); font: 700 13px/1 var(--sans); white-space: nowrap; }
+  .go .i { color: var(--text-3); }
+  .fnl .xlink { margin-top: 12px; }
+  .fnl .extl { margin-top: 12px; }
+  .also { margin-top: 14px; font: 400 12px/1.2 var(--sans); color: var(--text-3); }
+  .also + .xlink { margin-top: 6px; }
+  /* jump back */
+  .fnl .item.press { background: var(--surface-2); }
+  .fnl .item.press .n { background: var(--accent); color: var(--accent-ink); }
+  .fnl .item.press .go { background: var(--surface-3); }
+  .tip { position: relative; align-self: flex-start; margin-left: 40px; padding: 9px 12px; border-radius: 10px; background: var(--surface-3); color: var(--text); font: 400 13px/1.3 var(--sans); box-shadow: var(--shadow); }
+  .tip::after { content: ''; position: absolute; left: 22px; bottom: -6px; width: 12px; height: 12px; background: var(--surface-3); transform: rotate(45deg); border-radius: 2px; }
+  .jump { display: flex; align-items: center; gap: 8px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .jump .i { color: var(--accent); }
+  .bodycrop { padding: 18px 20px 20px; }
+  .bodycrop .reading { font-size: 19px; }
+  /* echoes */
+  .mt { padding: 18px 20px 20px; }
+  .mt .reading { font-size: 18px; line-height: 1.6; }
+  .nblock { margin: 10px 0 0 18px; padding: 12px 14px; border-radius: 12px; background: var(--surface); }
+  .nblock .ph { height: 8px; }
+  .nblock .ph + .ph { margin-top: 10px; }
+  .echo { display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0 18px; height: 30px; padding: 0 12px 0 9px; border-radius: 15px; background: var(--accent-soft); color: var(--text-2); font: 400 13px/1 var(--sans); white-space: nowrap; }
+  .echo .i { color: var(--accent); width: 14px; height: 14px; }
+  .note-s { font: 400 13px/1.45 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  .note-s b { font-weight: 700; color: var(--text-2); }
+</style></head>
+<body data-size="1400x1442">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Footnotes list</div>
+    <div class="meta">Under the letter's last line, every footnote once more, in order. Each row is a button that jumps back to its bubble in the text. Rows: Volume One, Letter 11, “Death and Awakening”, which has every kind.</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 · the list -->
+    <div class="cell">
+      <div class="cap">The list <small>Notes, links, scripture, a long verse folded, and “Also see:”</small></div>
+      <div class="rd-frame"><div class="screen tall" style="min-height:0">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:94%"></i></div><span class="pc">94%</span></div>
+        <div class="endpage">
+          <div class="poem">
+            <div>Those who have done good, to the resurrection of life...</div>
+            <div class="sb"></div>
+            <div>And those who have done evil, to the resurrection of judgment...</div>
+            <div class="sb"></div>
+            <div>I AM THE LORD.</div>
+          </div>
+          <div class="label sect">Footnotes</div>
+          <div class="group fnl">
+            <div class="item">
+              <span class="n">1</span>
+              <div class="c">
+                <div class="ntx">See: "Q &amp; A: What is the State of the Dead?"</div>
+                <div class="xlink"><span class="b"><span class="e">Open in App</span><span class="t">The State of the Dead and The Fate of the Wicked: The False Doctrine of Hell and Eternal Torment Exposed</span></span><i data-i="chevron-right" class="sm"></i></div>
+                <div class="extl">Open external link<i data-i="rd-arrow-up-right"></i></div>
+              </div>
+            </div>
+            <div class="item">
+              <span class="n">2</span>
+              <div class="c">
+                <div class="ntx">See: "Regarding the Second Death"</div>
+                <div class="extl">Open external link<i data-i="rd-arrow-up-right"></i></div>
+              </div>
+            </div>
+            <div class="item">
+              <span class="n">3</span>
+              <div class="c">
+                <div class="ref">Revelation 20:6</div>
+                <div class="v">Blessed and holy is he who has part in the first resurrection. Over such the second death has no power, but they shall be priests of God and of Christ, and shall reign with Him a thousand years.</div>
+                <div class="gos"><span class="go">Open Revelation 20<i data-i="chevron-right" class="xs"></i></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="cut"><span>Scrolled past 4-7</span></div>
+          <div class="group fnl">
+            <div class="item">
+              <span class="n">8</span>
+              <div class="c">
+                <div class="ref">1 Thessalonians 4:16-17</div>
+                <div class="v"><span class="vnum">16</span>For the Lord Himself will descend from heaven with a shout, with the voice of an archangel, and with the trumpet of God. And t…<span class="more">Read more<i data-i="chevron-down"></i></span></div>
+                <div class="gos"><span class="go">Open 1 Thessalonians 4<i data-i="chevron-right" class="xs"></i></span></div>
+                <div class="also">Also see:</div>
+                <div class="xlink"><span class="b"><span class="e">Open in App</span><span class="t">The Judgment of God Is True and Without Question, Yet the Error of the People Is Great</span></span><i data-i="chevron-right" class="sm"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="orn">✦</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 · read more / show less, and jump back -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Read more, then Show less <small>A verse longer than 130 characters folds, when at least 20 words would be hidden.</small></div>
+        <div class="group fnl">
+          <div class="item">
+            <span class="n">8</span>
+            <div class="c">
+              <div class="ref">1 Thessalonians 4:16-17</div>
+              <div class="v"><span class="vnum">16</span>For the Lord Himself will descend from heaven with a shout, with the voice of an archangel, and with the trumpet of God. And the dead in Christ will rise first. <span class="vnum">17</span>Then we who are alive and remain shall be caught up together with them in the clouds to meet the Lord in the air. And thus we shall always be with the Lord.<span class="more">Show less<i data-i="rd-chevron-up"></i></span></div>
+              <div class="gos"><span class="go">Open 1 Thessalonians 4<i data-i="chevron-right" class="xs"></i></span></div>
+              <div class="also">Also see:</div>
+              <div class="xlink"><span class="b"><span class="e">Open in App</span><span class="t">The Judgment of God Is True and Without Question, Yet the Error of the People Is Great</span></span><i data-i="chevron-right" class="sm"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Jump back <small>The whole row is the button. On a computer its tooltip names the move.</small></div>
+        <div class="tip">Jump back to footnote 3 in the body</div>
+        <div class="group fnl">
+          <div class="item press">
+            <span class="n">3</span>
+            <div class="c">
+              <div class="ref">Revelation 20:6</div>
+              <div class="v">Blessed and holy is he who has part in the first resurrection. Over such the second death has no power, but they shall be priests of God and of Christ, and shall reign with Him a thousand years.</div>
+              <div class="gos"><span class="go">Open Revelation 20<i data-i="chevron-right" class="xs"></i></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="jump"><i data-i="rd-arrow-up" class="sm"></i>The page scrolls up until bubble 3 sits mid-screen:</div>
+        <div class="rd-frame bodycrop"><div class="reading"><p>Blessed and holy are those who take part in the first resurrection. <em>For over them the second death</em><span class="fn">2</span> <em>has no power, as it is written.</em><span class="fn">3</span></p></div></div>
+      </div>
+    </div>
+
+    <!-- 3 · missing text, no content, echoes -->
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Verse text missing <small>The reference is not in the letter's own verse list, and the Bible has not loaded yet (Volume Six, Letter 13).</small></div>
+        <div class="group fnl">
+          <div class="item">
+            <span class="n">1</span>
+            <div class="c">
+              <div><span class="ref">1 Kings 22</span><span class="miss"> — verse text not available</span></div>
+              <div class="gos"><span class="go">Open 1 Kings 22<i data-i="chevron-right" class="xs"></i></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">No content attached <small>A note footnote with no text, link or address.</small></div>
+        <div class="group fnl">
+          <div class="item">
+            <span class="n">4</span>
+            <div class="c"><div class="miss">(no content attached)</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Inline reference echoes <small>Matthew Study Bible, notes shown inline. A note on 5:3-4, 6, 8 sits under verse 4; verses 6 and 8 each carry a pill that scrolls back up to it.</small></div>
+        <div class="rd-frame mt">
+          <div class="reading"><p><span class="vnum">6</span>Blessed are those who hunger and thirst for righteousness, for they shall be filled.</p></div>
+          <div class="nblock"><div class="ph" style="width:46%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:71%"></div></div>
+          <span class="echo"><i data-i="rd-arrow-up"></i>5:3-4, 6, 8 — Words To Live By: Part Two</span>
+        </div>
+        <div class="note-s">Its tooltip reads “See note at 5:3-4, 6, 8”. The verse's own notes (drawn as bars here) sit between the verse and the pill. Settings › Inline Reference Echoes turns the pills off.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

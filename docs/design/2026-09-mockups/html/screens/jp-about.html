@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .ab { padding-top: 6px; }
+  .ab .eyebrow { margin-bottom: 6px; }
+  .lead { margin-top: 18px; font: 400 21px/1.45 var(--serif); color: var(--text); text-wrap: pretty; }
+  .facts { margin-top: 24px; }
+  .facts .item { align-items: flex-start; padding: 16px 16px 16px 14px; }
+  .facts .ic { width: 36px; height: 36px; border-radius: 18px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; margin-top: 1px; }
+  .facts .tx { flex: 1; font: 400 15px/1.45 var(--sans); color: var(--text); }
+  .facts a, .credit a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .credit { margin-top: 22px; padding: 0 4px; }
+  .credit .i { color: var(--text-3); margin-top: 1px; }
+  .ver { margin-top: 6px; padding: 0 4px; }
+  .ver .i { color: var(--text-3); }
+  .ver span { font-variant-numeric: tabular-nums; }
+  .foot { position: absolute; left: 20px; right: 20px; bottom: 26px; }
+  .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .dots b { width: 8px; height: 8px; border-radius: 4px; background: var(--surface-3); }
+  .dots b.on { width: 22px; background: var(--accent); }
+</style></head>
+<body>
+<div class="screen" style="position:relative">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+  </div>
+  <div class="scroll ab">
+    <div class="h1">About VOTReader</div>
+    <div class="lead">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</div>
+
+    <div class="group facts">
+      <div class="item"><span class="ic"><i data-i="graduation-cap" class="sm"></i></span><span class="tx">This reader was made by a disciple for personal study; it is not the canonical source.</span></div>
+      <div class="item"><span class="ic"><i data-i="shield-check" class="sm"></i></span><span class="tx">Your notes, journal, and highlights stay on this device — use Settings → Export to back them up.</span></div>
+      <div class="item"><span class="ic"><i data-i="book-open" class="sm"></i></span><span class="tx">For the canonical text, audio, video, and PDFs, visit <a>thevolumesoftruth.com</a>.</span></div>
+    </div>
+
+    <div class="meta credit"><span>Cross-reference data from <a>OpenBible.info</a>, used under <span style="white-space:nowrap">CC-BY</span>.</span></div>
+    <div class="meta ver"><span>Version v1.0.2 · c1c091ff9f · corpus c61</span></div>
+  </div>
+  <div class="foot">
+    <div class="dots"><b class="on"></b><b></b></div>
+    <span class="btn primary block">Continue</span>
+  </div>
+</div>
+</body></html>

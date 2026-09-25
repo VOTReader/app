@@ -1,0 +1,1044 @@
+{
+ "home": {
+  "title": "Home",
+  "note": "Opens on where you left off. All nine destinations: eight rows plus History through Recent, About in the top bar, and Surprise Me with its dice.",
+  "source": "src/ui/screens/HomeScreen.jsx"
+ },
+ "home-tabs": {
+  "title": "Home, shortcuts docked",
+  "note": "The same Home with its shortcut row (Recent, Notes, Bookmarks, Scripture Web) docked at the bottom for the thumb.",
+  "source": "src/ui/screens/HomeScreen.jsx"
+ },
+ "tabs": {
+  "title": "Tabs",
+  "note": "Every card with its ⋮ Tab actions and ×, 4 / 50 tabs open, Deduplicate and Close all.",
+  "source": "src/ui/sheets/TabsOverview.jsx"
+ },
+ "history": {
+  "title": "History",
+  "note": "A calm trail of what you read.",
+  "source": "src/ui/screens/HistoryScreen.jsx"
+ },
+ "volumes": {
+  "title": "The Volumes",
+  "source": "src/ui/screens/VolumesHome.jsx"
+ },
+ "index": {
+  "title": "Letter index",
+  "note": "Scrolled to where you are.",
+  "source": "src/ui/screens/ChapterIndex.jsx"
+ },
+ "letter": {
+  "title": "A letter",
+  "note": "Letter 15, verbatim: the shared top bar (back, bookmark, tabs), the Listen pill in the hero, and footnote bubbles where the letter has them.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "letter-focus": {
+  "title": "Fullscreen reading",
+  "note": "Double-tap fullscreen: the status bar hides, the top bar stays, and the Auto-Scroll control floats.",
+  "source": "src/hooks/use-fullscreen-gesture.js"
+ },
+ "scriptures": {
+  "title": "The Scriptures of Truth",
+  "source": "src/ui/screens/ScripturesHome.jsx"
+ },
+ "bible-select": {
+  "title": "Selecting text",
+  "note": "The annotation toolbar with six calm colours.",
+  "source": "src/ui/sheets/SelectionToolbar.jsx"
+ },
+ "sheet": {
+  "title": "Footnote sheet"
+ },
+ "sheet-stack": {
+  "title": "Footnote carousel"
+ },
+ "search": {
+  "title": "Search results",
+  "note": "faith: Found 400+ matches across 18 sections, All / Scriptures / Volumes, Relevance or Book order.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "highlights": {
+  "title": "Highlights",
+  "source": "src/ui/screens/HighlightsScreen.jsx"
+ },
+ "journal": {
+  "title": "Journal entry",
+  "source": "src/ui/screens/JournalEditorScreen.jsx"
+ },
+ "player": {
+  "title": "Now playing",
+  "note": "The spoken sentence washed in gold."
+ },
+ "player-sleep": {
+  "title": "Sleep timer"
+ },
+ "media": {
+  "title": "Lock-screen player"
+ },
+ "studies": {
+  "title": "Studies",
+  "source": "src/ui/screens/StudiesHome.jsx"
+ },
+ "answers": {
+  "title": "Answers Only God Can Give",
+  "source": "src/ui/screens/AnswersHome.jsx"
+ },
+ "web": {
+  "title": "Scripture Web",
+  "note": "Essential density; Isaiah 53:5 ↔ 1 Peter 2:24 selected.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "web-thread": {
+  "title": "Thread detail",
+  "note": "Both passages, verbatim NKJV."
+ },
+ "web-prophecy": {
+  "title": "Prophecy layer (concept)",
+  "note": "A concept only: the 51 messianic prophecy pairs already ship in the app's Scripture Web data but are never drawn.",
+  "source": "src/data/scripture-web-data.js"
+ },
+ "settings": {
+  "title": "Settings",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "appearance": {
+  "title": "Appearance"
+ },
+ "yourdata": {
+  "title": "Your data"
+ },
+ "onboarding": {
+  "title": "Welcome",
+  "note": "One calm screen instead of four pop-ups.",
+  "source": "index.html (About card)"
+ },
+ "components": {
+  "title": "Components"
+ },
+ "icons": {
+  "title": "Icons"
+ },
+ "appicon": {
+  "title": "App icon concepts"
+ },
+ "widget": {
+  "title": "Widgets (concept)",
+  "note": "A concept only: the app has no home-screen widget and no daily reading."
+ },
+ "st-reading": {
+  "title": "Settings › Reading",
+  "note": "Every Reading row: translation with the Restored Name note open, headings with Restored Names nested, the arrow and Scripture Browser layouts, reading aids and screen.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-listening": {
+  "title": "Settings › Listening",
+  "note": "Bible Audio, Letter Voice, Default Speed and the three read-along switches, with Follow the Voice nested under Read-Along Highlight.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-autoscroll": {
+  "title": "Settings › Auto-Scroll",
+  "note": "Drawn switched on so every control shows: Scroll Speed 4–40 lines/min, Auto-Continue and its pause, each with Reset.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-navbar": {
+  "title": "Settings › Top-Nav Buttons",
+  "note": "Which optional icons sit in the reading bar, each row showing the icon it controls.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-search-tabs-history": {
+  "title": "Settings › Search, Tabs & History",
+  "note": "Search with its two dependent rows, Tabs, History, and Clear History.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-garden": {
+  "title": "Settings › A Return to The Garden",
+  "note": "The four Image Quality tiers inline, Standard selected.",
+  "source": "src/utils/garden.js"
+ },
+ "st-about-data": {
+  "title": "Settings › Your Data, lower half",
+  "note": "Below Export and Import: Verify, Storage with growth, Protect now, App version, Platform, Diagnostic Log and the Danger zone.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-mark-as-read": {
+  "title": "Settings › Mark as Read",
+  "note": "Reading progress by book, with Clear per section and Clear All. Totals are real; read counts are placeholders.",
+  "source": "src/ui/components/ClearProgressRow.jsx"
+ },
+ "st-help": {
+  "title": "Settings › Help",
+  "note": "Show me around: a tour of eleven stops, about three minutes.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-find": {
+  "title": "Find settings",
+  "note": "The filter in use: matches for speed, history and marker, and the no-match line with Clear filter.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "st-pickers": {
+  "title": "Settings choice sheets",
+  "note": "Every select sheet, including all 26 reading fonts each set in its own face, plus the amber clear-progress and clear-history confirms.",
+  "source": "src/ui/components/SelectField.jsx"
+ },
+ "st-states": {
+  "title": "Settings: rows that come and go",
+  "note": "Dependent rows hidden when their switch is off, Mark as Read off, the progress table loading, and empty history.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "jp-journal-hub": {
+  "title": "My Journal",
+  "note": "Entries with date, pin, preview and attachment chips; All entries and Pinned, search, sort and New entry. The reader's writing is placeholder bars.",
+  "source": "src/ui/screens/JournalHubScreen.jsx"
+ },
+ "jp-journal-hub-states": {
+  "title": "My Journal: states",
+  "note": "Empty, no pinned entries, no matches, the unclaimed-recordings banner, the entry menu and the three-step delete.",
+  "source": "src/ui/screens/JournalHubScreen.jsx"
+ },
+ "jp-journal-viewer": {
+  "title": "Reading an entry",
+  "note": "A pinned entry with an inline John 3:3 chip, the verse block, a Letter 15 excerpt card, a photo, a voice memo and a chapter card.",
+  "source": "src/ui/screens/JournalViewerScreen.jsx"
+ },
+ "jp-journal-viewer-menu": {
+  "title": "Entry viewer: menu and missing media",
+  "note": "The ⋮ menu, a linked entry reached with its back pill, Image missing, Recording missing and Entry not found.",
+  "source": "src/ui/screens/JournalViewerScreen.jsx"
+ },
+ "jp-journal-editor-states": {
+  "title": "Editor states",
+  "note": "Reorder, the delete-block strip, the undo toast, the Insert sheet, a photo attached, recording, review and the microphone errors.",
+  "source": "src/ui/screens/JournalEditorScreen.jsx"
+ },
+ "jp-progress": {
+  "title": "My Progress",
+  "note": "A calm record: stats, the last 14 days, milestones, reading per collection, library, journaling, listening, most annotated. Proposal: the two streak cells are left out.",
+  "source": "src/ui/screens/MyProgressScreen.jsx"
+ },
+ "jp-milestones": {
+  "title": "Milestones",
+  "note": "N of M reached, Hide reached, jump chips and progress rows. Proposal: the two streak categories are left out, so it counts 80 where the app counts 89.",
+  "source": "src/ui/screens/MilestonesScreen.jsx"
+ },
+ "jp-progress-states": {
+  "title": "Progress: states",
+  "note": "Hide reached, all reached, a new reader, the loading, Mark-as-Read-off and nothing-marked notes, and the milestone pill.",
+  "source": "src/ui/screens/MyProgressScreen.jsx"
+ },
+ "jp-garden": {
+  "title": "A Return to The Garden",
+  "note": "The full-screen page viewer on page 12 of 209. Photographs are placeholder blocks.",
+  "source": "src/ui/screens/GardenView.jsx"
+ },
+ "jp-garden-states": {
+  "title": "Garden: page states",
+  "note": "Loading a page, a failed page with Try again, zoomed in, and the last page.",
+  "source": "src/ui/screens/GardenView.jsx"
+ },
+ "jp-about": {
+  "title": "About VOTReader, page 1",
+  "note": "The personal-study disclaimer, thevolumesoftruth.com and the OpenBible.info CC-BY credit, with the version line moved in from Settings.",
+  "source": "src/ui/screens/AboutScreen.jsx"
+ },
+ "jp-about-2": {
+  "title": "About VOTReader, page 2",
+  "note": "What You Can Do: The Library and Your Tools, then Begin Reading.",
+  "source": "src/ui/screens/AboutScreen.jsx"
+ },
+ "jp-reading-complete": {
+  "title": "Finishing a reading",
+  "note": "The end of a letter, a milestone crossed, on to Volume Two, the index afterwards, the end of John 3, and Holy Days leading on to the Garden.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "fb-answers-az": {
+  "title": "Answers: every topic, A–Z",
+  "note": "121 topics and 1,636 passages, a letter-jump grid, then each letter's topics with passage counts.",
+  "source": "src/ui/screens/AnswersHome.jsx"
+ },
+ "fb-answers-subject": {
+  "title": "Answers: one subject",
+  "note": "The Lord & His Messiah: 13 topics, 211 passages, most spoken of first.",
+  "source": "src/ui/screen-routes.jsx"
+ },
+ "fb-answers-entry": {
+  "title": "Answers: a topic",
+  "note": "THERE IS NO OTHER, verbatim: the dedication, passages with their source lines, an inline cite chip and a footnote bubble, footnotes, related topics.",
+  "source": "src/ui/screens/WtlbEntryView.jsx"
+ },
+ "fb-answers-cite-sheet": {
+  "title": "Inline cite sheet",
+  "note": "Tapping (Colossians 1:19) in a Format B entry: the NKJV verse and Open Colossians 1, with the chip still lit above.",
+  "source": "src/ui/screens/WtlbEntryView.jsx"
+ },
+ "fb-commandment-sheet": {
+  "title": "The First Commandment",
+  "note": "From the tablets on Answers home: the verse, the Exodus 20:3 button and the topics that speak of it.",
+  "source": "src/ui/screens/AnswersHome.jsx"
+ },
+ "fb-wtlb-index": {
+  "title": "Words To Live By, Part One",
+  "note": "The two-column index scrolled to entry 70, with Play all and the part chips.",
+  "source": "src/ui/components/VolumeLetterIndex.jsx"
+ },
+ "fb-wtlb-entry": {
+  "title": "Words To Live By: an entry",
+  "note": "Walk Humbly with Your God: prose, the Micah 6:8 cite chip, centred stanzas and the Previous and Next cards.",
+  "source": "src/ui/screens/WtlbEntryView.jsx"
+ },
+ "fb-blessed-index": {
+  "title": "The Blessed",
+  "note": "All eight entries with Play all.",
+  "source": "src/ui/components/VolumeLetterIndex.jsx"
+ },
+ "fb-blessed-entry": {
+  "title": "The Blessed: an entry",
+  "note": "Blessed Are Those Who Seek Me, verse set apart by the text's own † marks.",
+  "source": "src/ui/screens/WtlbEntryView.jsx"
+ },
+ "fb-holy-days-index": {
+  "title": "Regarding The Holy Days",
+  "note": "Play all, the audio and video playlists, and each entry with where it was gathered from.",
+  "source": "src/ui/components/HolyDaysPlaylistHeader.jsx"
+ },
+ "fb-holy-days-entry": {
+  "title": "Holy Days entry, Format A",
+  "note": "Do This in Remembrance of Me: a letter-style entry with numbered footnote bubbles.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "fb-holy-days-entry-b": {
+  "title": "Holy Days entry, Format B",
+  "note": "Consider My Love: verse with inline citations and no dedication.",
+  "source": "src/ui/screens/WtlbEntryView.jsx"
+ },
+ "fb-states": {
+  "title": "Collections: states",
+  "note": "Loading, Couldn’t load this section, a letter no longer available, verse text missing, an entry opened from Search, the collection's ends, and an expanded footnote.",
+  "source": "src/ui/screen-routes.jsx"
+ },
+ "bs-genre": {
+  "title": "A genre: the Gospels",
+  "note": "Each book with its chapter count and its own subtitle from the data.",
+  "source": "src/ui/screens/ScriptureGenre.jsx"
+ },
+ "bs-book": {
+  "title": "John: chapter index",
+  "note": "Real chapter titles and minutes, read dots, a bookmark, a chapter in progress, Listen and 1 of 21 read.",
+  "source": "src/ui/screens/ChapterIndex.jsx"
+ },
+ "bs-chapter-read": {
+  "title": "John 2",
+  "note": "The whole chapter in NKJV: section headings, verse numbers, a highlight, the reader's link and bookmark marks, Previous and Next.",
+  "source": "src/ui/screens/BibleChapterView.jsx"
+ },
+ "bs-translation": {
+  "title": "Translation and Bible Audio",
+  "note": "All ten translations including NKJV-R and KJV-R, the audio editions with Off, and the Restored Name note.",
+  "source": "src/data/translations.js"
+ },
+ "bs-study-index": {
+  "title": "Study index: The Lamb of God",
+  "note": "A flat list scrolled to chapter 8, in progress.",
+  "source": "src/ui/screens/BibleStudyIndex.jsx"
+ },
+ "bs-study-index-parts": {
+  "title": "Study index in parts: More Than a Man",
+  "note": "The Preface and the parts as an accordion, Part 3 open.",
+  "source": "src/ui/screens/BibleStudyIndex.jsx"
+ },
+ "bs-study-chapter": {
+  "title": "Study chapter: The Burial",
+  "note": "The Lamb of God, chapter 8: its image placeholder, heading, Matthew 27:57-61 and Isaiah 53:9.",
+  "source": "src/ui/screens/BibleStudyChapterView.jsx"
+ },
+ "bs-study-preface": {
+  "title": "Study preface",
+  "note": "The Lamb of God Preface under its cover placeholder.",
+  "source": "src/ui/screens/BibleStudyChapterView.jsx"
+ },
+ "bs-matthew-index": {
+  "title": "Matthew Study Bible: chapters",
+  "note": "Chapters 21–25 with the notes-weight chips, one in progress and one bookmarked.",
+  "source": "src/ui/screens/ChapterIndex.jsx"
+ },
+ "bs-matthew-chapter": {
+  "title": "Matthew 3, study notes on",
+  "note": "Verses 1–10 with the floating Study notes control, PDF selected.",
+  "source": "src/ui/screens/MatthewChapterView.jsx"
+ },
+ "bs-hidden-manna": {
+  "title": "Hidden Manna: Woe to Dallas",
+  "note": "Reached only from a Matthew study note: arriving with the Back to Matthew 23 breadcrumb and the quoted passage marked, and its end with no previous or next.",
+  "source": "src/data/hidden-manna.js"
+ },
+ "bs-collections": {
+  "title": "Little Flock, Timothy and The Lord's Rebuke",
+  "note": "The three letter-collection indexes, with real titles.",
+  "source": "src/ui/components/VolumeLetterIndex.jsx"
+ },
+ "bs-states": {
+  "title": "Bible and studies: states",
+  "note": "Loading, Couldn’t load this section, a chapter that doesn't exist, a letter no longer available. These screens have no top bar in the app, so system Back is the only way out.",
+  "source": "src/ui/screen-routes.jsx"
+ },
+ "au-library": {
+  "title": "Listening Library",
+  "note": "The shelf, full scroll: now playing, Saved and On this phone, Recently played, and Browse with the three sources and five Bible editions.",
+  "source": "src/ui/screens/AudioLibraryScreen.jsx"
+ },
+ "au-library-states": {
+  "title": "Listening Library: states",
+  "note": "First run, Resume last, connecting, paused, and Recently played folded away.",
+  "source": "src/ui/screens/AudioLibraryScreen.jsx"
+ },
+ "au-collection": {
+  "title": "A collection: Volume One",
+  "note": "Letter 15 playing with its two voices open, the download lines, Play all and Download all (Android).",
+  "source": "src/ui/screens/AudioCollectionScreen.jsx"
+ },
+ "au-collection-states": {
+  "title": "Collections: states",
+  "note": "A Bible edition by book, a part-recorded study, no signal, compilations downloading or failed, and both empty messages.",
+  "source": "src/ui/screens/AudioCollectionScreen.jsx"
+ },
+ "au-volumes": {
+  "title": "Listen by collection",
+  "note": "The 14 collections in reading order. Hidden Manna is absent, as intended.",
+  "source": "src/ui/screens/AudioVolumesScreen.jsx"
+ },
+ "au-studies": {
+  "title": "Studies to listen to",
+  "note": "The seven studies: 2 with audio, 5 to read, one playing chapter 5.",
+  "source": "src/ui/screens/AudioStudiesScreen.jsx"
+ },
+ "au-saved": {
+  "title": "Saved recordings",
+  "note": "The recordings the reader chose to keep, with Find.",
+  "source": "src/ui/screens/AudioSavedScreen.jsx"
+ },
+ "au-offline": {
+  "title": "On this phone",
+  "note": "Downloaded recordings with Remove and Remove all (Android).",
+  "source": "src/ui/screens/AudioOfflineScreen.jsx"
+ },
+ "au-lists-states": {
+  "title": "Listening lists: states",
+  "note": "No match, nothing saved, nothing on the phone, loading, no recordings yet, and a single download.",
+  "source": "src/ui/screens/AudioSavedScreen.jsx"
+ },
+ "au-songs": {
+  "title": "Songs of the Letters",
+  "note": "Shuffle, Find, style chips, New from the flock, Your songs, the letter tiles and shelves. Real titles from the public catalog; covers are abstract.",
+  "source": "src/ui/screens/AudioSongsScreen.jsx"
+ },
+ "au-songs-states": {
+  "title": "Songs: states",
+  "note": "Loading, the first-time connection message, the Worship filter, no match, and the song page playing.",
+  "source": "src/ui/screens/AudioSongsScreen.jsx"
+ },
+ "au-song": {
+  "title": "A song: Elect and Precious",
+  "note": "15 versions, the letter it comes from, Versions, and a four-line lyrics preview as placeholder bars.",
+  "source": "src/ui/screens/SongPage.jsx"
+ },
+ "au-mini-states": {
+  "title": "The reading bar",
+  "note": "Playing, paused, buffering, couldn't load, no connection, a single recording, crossing volumes and a compilation; the pull-tab; the audio toasts.",
+  "source": "src/ui/components/AudioPlayerBar.jsx"
+ },
+ "au-mini-offline": {
+  "title": "Downloads beside the bar",
+  "note": "The six download lines under a recording, the states beside Play all, and the offline-library strip messages.",
+  "source": "src/ui/components/OfflineAudioControls.jsx"
+ },
+ "au-readalong": {
+  "title": "Read-along",
+  "note": "Letter 15 mid-read-along: the clause timed at 2:45 is washed gold, with the auto-scroll pill and the bar.",
+  "source": "src/ui/components/ReadAlongHighlight.jsx"
+ },
+ "au-readalong-states": {
+  "title": "Read-along: states",
+  "note": "Follow the Voice's band, the lead-in on the title, Listen from here, scrolling by hand, auto-scroll, and John 3 with verse 3 washed.",
+  "source": "src/hooks/use-autoscroll.js"
+ },
+ "lb-library": {
+  "title": "Library",
+  "note": "The Personal Study hub with all eight tiles filled: notes, links, journal, bookmarks, highlights, progress, milestones and the Scripture Web.",
+  "source": "src/ui/screens/LibraryScreen.jsx"
+ },
+ "lb-library-states": {
+  "title": "Library: states",
+  "note": "First-run guide text on every tile, and a tile being pressed, lifted and dragged to a new place.",
+  "source": "src/ui/screens/LibraryScreen.jsx"
+ },
+ "lb-links": {
+  "title": "Links",
+  "note": "Six link cards, each source and target joined by a thread: passages cut at two lines, a whole-letter target and a journal source.",
+  "source": "src/ui/screens/LinksScreen.jsx"
+ },
+ "lb-links-states": {
+  "title": "Links: states",
+  "note": "No matches, No links yet, the four sorts, Show more and Show less, and Remove this link?",
+  "source": "src/ui/screens/LinksScreen.jsx"
+ },
+ "lb-link-picker": {
+  "title": "Create a link: search",
+  "note": "Step by step: select text and tap Link, recent picks, search by reference, by title and in the full text, with the corpus chips.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lb-link-picker-browse": {
+  "title": "Create a link: browse",
+  "note": "Browse with real counts, the Bible's books, John's chapter grid, Volume Two's letters, the Recent tab, and Embed a card from the Journal.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lb-link-sidebar": {
+  "title": "Links beside the text",
+  "note": "John 3 with its link marks and the Links drawer holding two cards.",
+  "source": "src/ui/sheets/LinkSidebar.jsx"
+ },
+ "lb-link-card": {
+  "title": "Link marks and cards",
+  "note": "Marks in the text (gold where you linked from, dim where something links to you), the card at rest, pressed, long and expanded, the From: fallback, and the empty drawer.",
+  "source": "src/ui/components/LinkCard.jsx"
+ },
+ "lb-notes": {
+  "title": "Notes: notebooks",
+  "note": "Uncategorized plus four colour-tagged notebooks, and New notebook. Names are examples.",
+  "source": "src/ui/screens/NotesIndexScreen.jsx"
+ },
+ "lb-notes-notebook": {
+  "title": "A notebook",
+  "note": "Share, Rename, Color and Delete, search, sort and five notes. Note text is placeholder bars.",
+  "source": "src/ui/screens/NotesIndexScreen.jsx"
+ },
+ "lb-notes-states": {
+  "title": "Notes: states",
+  "note": "All notes and Share as text, No notes yet, an empty notebook, no matches, the new-notebook form, rename, colour, delete, the exported file, the export toasts and the back pill.",
+  "source": "src/ui/screens/NotesIndexScreen.jsx"
+ },
+ "lb-note-sheet": {
+  "title": "The note sheet",
+  "note": "A note open, editing, a new note, 3 notes here, the annotation chip at rest, the note icons, and the sheets' crash toast.",
+  "source": "src/ui/sheets/NoteSheet.jsx"
+ },
+ "lb-bookmarks": {
+  "title": "Bookmarks",
+  "note": "The bookmark list with sort and search.",
+  "source": "src/ui/screens/BookmarksScreen.jsx"
+ },
+ "lb-bookmarks-states": {
+  "title": "Bookmarks: states",
+  "note": "The options sheet, the delete confirm, renaming a label in place, no matches, No bookmarks yet and the four sorts.",
+  "source": "src/ui/screens/BookmarksScreen.jsx"
+ },
+ "lb-bookmark-popover": {
+  "title": "Bookmark sheet and popover",
+  "note": "A new bookmark from a selection, a whole-chapter bookmark, editing (Save waits for a change), delete, and the popover for two bookmarks in one place.",
+  "source": "src/ui/sheets/BookmarkCreateSheet.jsx"
+ },
+ "lb-copy-fallback": {
+  "title": "Couldn’t copy",
+  "note": "Couldn’t copy, Couldn’t share, Still blocked, and the Copied and Copied instead toasts.",
+  "source": "src/ui/sheets/CopyFallbackSheet.jsx"
+ },
+ "lb-journal-inbound": {
+  "title": "Journal entries about this passage",
+  "note": "The inbound sheet with two entries, its empty line, and the journal mark with its count. Nothing in the app opens this sheet yet.",
+  "source": "src/ui/sheets/JournalInboundSheet.jsx"
+ },
+ "dl-splash": {
+  "title": "Boot splash",
+  "note": "Only the word VOTReader in EB Garamond, set exactly where Android's own launch icon sits so the two splashes hand over in place. No spinner.",
+  "source": "src/components/HydrationGate.jsx"
+ },
+ "dl-home-reorder": {
+  "title": "Rearranging Home",
+  "note": "Hold to rearrange, a pressed row, a row lifted over its landing place, and keyboard reordering with its live status line.",
+  "source": "src/ui/screens/HomeScreen.jsx"
+ },
+ "dl-tab-sheet": {
+  "title": "Tab actions",
+  "note": "The tab action sheet over the Tabs overview, with the rename field open.",
+  "source": "src/ui/sheets/TabActionSheet.jsx"
+ },
+ "dl-tab-sheet-states": {
+  "title": "Tabs: confirms and states",
+  "note": "Close others, close to the right and close all, a pinned tab with its own name, the tab toasts with Undo, and five tab card states.",
+  "source": "src/ui/sheets/TabActionSheet.jsx"
+ },
+ "dl-disable-tabs": {
+  "title": "Tabs coach mark and Disable tabs?",
+  "note": "Tap to switch tabs on Home, and the prompt that appears after closing the last tab again and again.",
+  "source": "src/ui/components/AppShellOverlays.jsx"
+ },
+ "dl-garden-gate": {
+  "title": "Before you begin: the Garden",
+  "note": "The one-time notice before the Garden: Wi-Fi and storage advice, and the four image-quality tiers with their sizes.",
+  "source": "src/utils/garden.js"
+ },
+ "dl-garden-jump": {
+  "title": "Garden: jump to a page",
+  "note": "The page-jump box, a page loading and a page that failed, plus the counter's states.",
+  "source": "src/ui/screens/GardenView.jsx"
+ },
+ "dl-ios": {
+  "title": "iPhone and iPad: keeping your data",
+  "note": "The Safari 7-day warning with How to add to Home Screen open, and the Home Screen welcome card with its three steps.",
+  "source": "src/ui/components/SafariFlows.jsx"
+ },
+ "sy-search-idle": {
+  "title": "Search: ready",
+  "note": "The field focused, All / Scriptures / Volumes, Search everything, recent searches and the 11 quick picks; and a first visit with no Recent row.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sy-search-typing": {
+  "title": "Search: as you type",
+  "note": "Suggestions for 'g' and 'ma', and 'john 3:16' going straight to its chapter. Suggestions and counts are real output from the app's search engine.",
+  "source": "src/hooks/use-search.js"
+ },
+ "sy-search-filters": {
+  "title": "Search: filters and sort",
+  "note": "'faith' four ways: Scriptures by best match and in book order, and Volumes open and collapsed, with real counts.",
+  "source": "src/ui/components/SrchGroup.jsx"
+ },
+ "sy-search-noresults": {
+  "title": "Search: no results",
+  "note": "No results in All and in Scriptures. The app offers no next step; the caption notes All would find 22 matches for the second.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sy-search-loading": {
+  "title": "Search: building the index",
+  "note": "Building search index… starting and at 18,000 of 32,025, then Searching… over faded results.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sy-topbar-variants": {
+  "title": "The top bar, ten ways",
+  "note": "Letter, trimmed, bookmarked, arrows in the bar, 360 px, under 340 px, browse, Home, Search and tabs off: one primary control per page.",
+  "source": "src/ui/components/NavButtons.jsx"
+ },
+ "sy-sticky-nav": {
+  "title": "Chapter arrows",
+  "note": "The five arrow layouts on John 3, and Genesis 1 with Previous disabled.",
+  "source": "src/ui/components/StickyChapterNav.jsx"
+ },
+ "sy-autoscroll": {
+  "title": "Auto-scroll",
+  "note": "The pill running, dimmed, and counting down to the next chapter with Cancel; seven pill states at full size.",
+  "source": "src/ui/components/AutoScrollControl.jsx"
+ },
+ "sy-bottom-nav": {
+  "title": "The end of a page",
+  "note": "The end of a letter and of a book, a footnote landing with its Back band, and the reading chain crossing from Revelation into Volume One.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "sy-tour": {
+  "title": "The tour",
+  "note": "The prompt strip, the welcome and all eleven stops in the tour's own words, as calm coach marks with a ring and progress dots.",
+  "source": "src/utils/tour-steps.js"
+ },
+ "sy-hints-toasts": {
+  "title": "Hints and toasts",
+  "note": "The highlight hint, Copied, the tabs bubble, Hold to rearrange, the offline strip in four phases, and every toast grouped by kind.",
+  "source": "src/ui/components/AnnotationHint.jsx"
+ },
+ "sy-errors": {
+  "title": "Loading and errors",
+  "note": "The splash, Loading Bible…, Couldn’t load this section, a letter that is gone, a missing chapter, and the offline page.",
+  "source": "offline.html"
+ },
+ "sy-surprise": {
+  "title": "Surprise Me",
+  "note": "The button at the foot of Home, Preparing a reading…, the result (Psalm 121, verbatim), the failure line and its Settings row.",
+  "source": "src/hooks/use-surprise.js"
+ },
+ "yd-version": {
+  "title": "Your Data: version, platform, protection",
+  "note": "The App version row in all seven states, every Platform value, Protection in its six states, and the storage rows loading, unavailable and on day one.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "yd-verify": {
+  "title": "Verify a backup: every result",
+  "note": "Three passes, Checking backup…, four warnings and six failures. The garbled ending is rewritten; the old wording is noted on the board.",
+  "source": "src/utils/backup-verify.js"
+ },
+ "yd-import": {
+  "title": "Import from Backup",
+  "note": "The overwrite confirm three ways: standard, low on space, and just after the cut-short warning.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "yd-wipe": {
+  "title": "Delete all personal data",
+  "note": "The danger-zone card, paused while another backup runs, and the type-DELETE dialog empty and filled.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "yd-toasts": {
+  "title": "Backup and import toasts",
+  "note": "All 27, grouped by flow with how long each stays, plus the save-dialog escape toast.",
+  "source": "src/utils/backup.js"
+ },
+ "yd-storage": {
+  "title": "Storage health",
+  "note": "The six storage banners in priority order, the write toast and the restore guard, alone and in place.",
+  "source": "src/ui/components/StorageHealthBanner.jsx"
+ },
+ "yd-updates": {
+  "title": "Updates",
+  "note": "Just updated, Tap to continue listening, and the install-failure line.",
+  "source": "src/utils/update-toast.js"
+ },
+ "yd-crash": {
+  "title": "When something breaks",
+  "note": "The crash screen, the repeated crash with Reset to Home, the lazy Loading… state and Couldn’t load this section.",
+  "source": "src/components/ErrorBoundary.jsx"
+ },
+ "yd-diagnostic": {
+  "title": "Diagnostic Log",
+  "note": "The row with four entries, with one, and absent in a clean session. It only describes itself; there is no list to open.",
+  "source": "src/ui/screens/SettingsScreen.jsx"
+ },
+ "jn-blocks": {
+  "title": "The editor, every block",
+  "note": "Text, heading, quote, divider, images, a voice memo and every card kind (letter, excerpt, chapter, verse, bookmark, note, entry, notebook), each with its grip and delete.",
+  "source": "src/ui/screens/JournalEditorScreen.jsx"
+ },
+ "jn-reorder": {
+  "title": "Editor: moving and removing",
+  "note": "A block mid-drag, Delete this block?, Remove this voice memo?, Block deleted with Undo, Could not save that image, and a new empty entry.",
+  "source": "src/ui/screens/JournalEditorScreen.jsx"
+ },
+ "jn-insert": {
+  "title": "Insert",
+  "note": "The Insert sheet's four groups and ten rows, beside a table of what each opens.",
+  "source": "src/ui/sheets/JournalInsertSheet.jsx"
+ },
+ "jn-pickers": {
+  "title": "Insert: the five pickers",
+  "note": "Pick a bookmark, a note, a journal entry, part of an entry, or a notebook: each filled, then empty.",
+  "source": "src/ui/sheets/JournalInsertSheet.jsx"
+ },
+ "jn-recording": {
+  "title": "Recording a voice memo",
+  "note": "Asking for the microphone, recording with the live waveform, paused, the discard confirm, and review.",
+  "source": "src/ui/sheets/JournalRecordingSheet.jsx"
+ },
+ "jn-recording-errors": {
+  "title": "Recording: every error",
+  "note": "All twelve, grouped by cause (permission, device, storage, nothing captured), each with the buttons the app really offers.",
+  "source": "src/ui/sheets/JournalRecordingSheet.jsx"
+ },
+ "jn-delete": {
+  "title": "Deleting an entry",
+  "note": "Entry options, then the three steps with the note of what else goes with it, and step one for an empty entry.",
+  "source": "src/ui/screens/JournalHubScreen.jsx"
+ },
+ "jn-banners": {
+  "title": "Journal: banners and missing things",
+  "note": "Unclaimed recordings, Entry not found, missing media, and the milestone toast.",
+  "source": "src/stores/journal-stats-store.js"
+ },
+ "mt-layouts": {
+  "title": "Scriptures home: the other layouts",
+  "note": "Compact List, Book Grid, Canonical Scroll, and Genre Grid before its counts load, with the layout button and its caption.",
+  "source": "src/ui/screens/ScripturesHome.jsx"
+ },
+ "mt-chapter-toggles": {
+  "title": "Chapter title and headings hidden",
+  "note": "John 3 with its title hidden and with its headings hidden, each with its + Show control.",
+  "source": "src/ui/screens/BibleChapterView.jsx"
+ },
+ "mt-psalms": {
+  "title": "Psalms",
+  "note": "Psalm 23 in the poetry layout, and Psalm 119 with its Aleph, Beth and Gimel stanza headings.",
+  "source": "src/ui/screens/BibleChapterView.jsx"
+ },
+ "mt-restored": {
+  "title": "NKJV Restored Name",
+  "note": "Mark 1 with the restored Name from the overlay, beside plain NKJV. The app sets it as plain, unmarked text.",
+  "source": "src/data/translations.js"
+ },
+ "mt-matthew-modes": {
+  "title": "Matthew: study notes PDF, Inline, Off",
+  "note": "Matthew 23 in each mode, the HM note that leads to Hidden Manna, the summary toggle, Further Study and the notes chip.",
+  "source": "src/ui/components/ModeToggle.jsx"
+ },
+ "mt-scripture-sheet": {
+  "title": "Matthew scripture sheet",
+  "note": "A single reference, and a two-passage citation with a button per passage.",
+  "source": "src/ui/components/ScriptureSheet.jsx"
+ },
+ "mt-studies-states": {
+  "title": "Studies home: states",
+  "note": "Loading, coming soon and both load errors, and the card metas. Most of these can never appear in today's app.",
+  "source": "src/ui/screens/StudiesHome.jsx"
+ },
+ "lk-verse-picker": {
+  "title": "Verse picker",
+  "note": "John 15 while linking from Born Again: nothing selected, part of verse 2 selected, and the word filter with verse 5 grabbed by its number.",
+  "source": "src/ui/sheets/VersePickerScreen.jsx"
+ },
+ "lk-verse-picker-states": {
+  "title": "Verse picker: states",
+  "note": "No verse contains the word, journal insert mode, the Matthew Study Bible, chapter not found, and every breadcrumb and footer wording.",
+  "source": "src/ui/sheets/VersePickerScreen.jsx"
+ },
+ "lk-excerpt-picker": {
+  "title": "Excerpt picker",
+  "note": "Born Again (Volume Three) linking from John 3:3: find with its hit washed, an excerpt held, and the next hit.",
+  "source": "src/ui/sheets/LetterExcerptPickerScreen.jsx"
+ },
+ "lk-excerpt-picker-states": {
+  "title": "Excerpt picker: states",
+  "note": "Whole entry and whole chapter, journal insert on Letter 15, 0 found, and letter not found.",
+  "source": "src/ui/sheets/LetterExcerptPickerScreen.jsx"
+ },
+ "lk-picker-search": {
+  "title": "Link picker: search in depth",
+  "note": "Recent picks, Titles & refs for 'repent', Full text 'born again' in Volumes, and a legend of every row badge.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lk-picker-search-states": {
+  "title": "Link picker: search states",
+  "note": "All seven states in the app's words, including Search the full text instead and Search every corpus instead.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lk-picker-browse": {
+  "title": "Link picker: browse, drilled down",
+  "note": "The library list, the Bible's books in canonical order, John's chapters, the Matthew grid, a study, and Loading the library…",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lk-picker-recent": {
+  "title": "Link picker: recent",
+  "note": "From ⇄ To rows, tapping either end to link at once, and No links yet.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lk-modes": {
+  "title": "Create a link, Embed a card, Embed an excerpt",
+  "note": "The picker's three modes side by side, each with what a pick does.",
+  "source": "src/hooks/use-link-picker-orchestration.js"
+ },
+ "lk-created": {
+  "title": "Link created",
+  "note": "Link created · Born Again with Undo, the sheet after Undo, and John 3 with its new link icon.",
+  "source": "src/ui/sheets/LinkPicker.jsx"
+ },
+ "lk-links-deep": {
+  "title": "Links: broken ends and row actions",
+  "note": "The broken-links callout with an (unknown) end, the row options sheet, Delete this link?, the four sorts, and the card's Remove this link?",
+  "source": "src/ui/screens/LinksScreen.jsx"
+ },
+ "ad-queue": {
+  "title": "The queue",
+  "note": "5 of 19 with heard rows dimmed, Playing now, reorder and remove, Clear upcoming, a 150-chapter queue paged, Resuming…, and empty.",
+  "source": "src/ui/components/AudioManagerSheet.jsx"
+ },
+ "ad-voice": {
+  "title": "Voice and edition",
+  "note": "The voice card and its note, the four-edition Audio Bible card on John 3, both switch confirms, and a one-voice letter.",
+  "source": "src/ui/components/AudioManagerSheet.jsx"
+ },
+ "ad-speed": {
+  "title": "Speed",
+  "note": "1.37× with − slider +, six presets, typing 1.6, and + disabled at 3×.",
+  "source": "src/ui/components/AudioSpeedControl.jsx"
+ },
+ "ad-coverage": {
+  "title": "Listen buttons and coverage",
+  "note": "Listen, Play all and the section chips, and the three coverage badges with their exact sentences.",
+  "source": "src/ui/components/CoverageBadge.jsx"
+ },
+ "ad-downloads": {
+  "title": "Downloads (Android)",
+  "note": "Every per-row and per-collection download state, the download confirm with its not-enough-room variant, and Remove all.",
+  "source": "src/ui/components/OfflineAudioControls.jsx"
+ },
+ "ad-song-desk": {
+  "title": "The desk in song mode",
+  "note": "Elect And Precious: the cover, Open the letter, Versions and the Versions sheet, the transport, and timed lyrics with Follow along.",
+  "source": "src/ui/components/SongDeskParts.jsx"
+ },
+ "ad-song-mini": {
+  "title": "The song bar",
+  "note": "Playing, paused, loading, Not on this phone, and a single song with no Next.",
+  "source": "src/ui/components/AudioPlayerBar.jsx"
+ },
+ "ad-song-browse": {
+  "title": "Finding songs",
+  "note": "Find results, the Worship filter, More styles with real counts, the shuffle buttons, the five empty lists, More songs from this letter, and a song no longer shared.",
+  "source": "src/ui/screens/AudioSongsScreen.jsx"
+ },
+ "an-toolbar": {
+  "title": "Selection toolbar, every state",
+  "note": "Highlight, over an existing mark, Underline, Squiggle, Listen from here, no markable text, flipped below, and across two verses.",
+  "source": "src/ui/sheets/SelectionToolbar.jsx"
+ },
+ "an-marks": {
+  "title": "The ten mark colours",
+  "note": "All ten in all three styles on real verses, in both themes, and every note case. Every wash pair is at least dE 6.5 apart.",
+  "source": "src/ui/sheets/SelectionToolbar.jsx"
+ },
+ "an-chip-states": {
+  "title": "Mark chip: colour, style, remove",
+  "note": "The chip's colour picker, style picker and remove question, and the toolbar's three remove wordings.",
+  "source": "src/ui/sheets/AnnotationActionChip.jsx"
+ },
+ "an-note-sub": {
+  "title": "Note colour, menu and discard",
+  "note": "Change color with No color, the ⋯ menu, Delete this note?, the share toasts, and both discard questions.",
+  "source": "src/ui/sheets/NoteSheet.jsx"
+ },
+ "an-notebook-picker": {
+  "title": "Notebook picker",
+  "note": "Add to Notebook, Manage Notebooks, creating one, empty, delete and discard.",
+  "source": "src/ui/sheets/NotebookPickerSheet.jsx"
+ },
+ "an-confirms": {
+  "title": "Confirms, and one way to confirm",
+  "note": "The ConfirmStrip variants and toasts, and a proposal: one wording and one muted rose for every delete, where more weight means more steps, not new words.",
+  "source": "src/ui/components/ConfirmStrip.jsx"
+ },
+ "rd-letter-anatomy": {
+  "title": "Anatomy of a letter",
+  "note": "Every meta and body kind the letter view renders, assembled from real passages of four letters and two studies.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "rd-prophecy": {
+  "title": "Prophecy cards",
+  "note": "One card open and all open, the four card tags, and Collapse / Expand all.",
+  "source": "src/ui/components/ProphecyGroup.jsx"
+ },
+ "rd-related": {
+  "title": "The end of a letter",
+  "note": "Closing, footnotes, Previous and Next, then Also Read, Related Topics, Bible Study, Audio and Videos.",
+  "source": "src/ui/screens/LetterView.jsx"
+ },
+ "rd-footnotes-list": {
+  "title": "Footnotes list",
+  "note": "Volume One, Letter 11 in full: Read more, jump back, the missing-text lines, and an echo pill.",
+  "source": "src/ui/components/FootnoteListSection.jsx"
+ },
+ "rd-footnote-states": {
+  "title": "Footnote sheet: states",
+  "note": "Missing verse text, no content, a compound footnote split into three buttons, Open in App, Also see, and the inline Scripture Reference sheet.",
+  "source": "src/ui/components/FootnoteSheet.jsx"
+ },
+ "rd-rail": {
+  "title": "Footnote rail on a wide screen",
+  "note": "The letter on the left and the footnote docked on the right with no dimming. Today's app docks it only at 1640 px and wider.",
+  "source": "src/ui/components/FootnoteSheet.jsx"
+ },
+ "rd-arrows": {
+  "title": "Chapter and letter arrows",
+  "note": "The five layouts on the same page, with their labels from the app.",
+  "source": "index.html"
+ },
+ "rd-flows": {
+  "title": "Moving through the reading",
+  "note": "The back pill across two hops, the landing flash, the swipe peek, a swipe across into Words To Live By, fullscreen and the journal chip.",
+  "source": "src/hooks/use-from-letter-stack.js"
+ },
+ "sx-slash": {
+  "title": "Search commands",
+  "note": "Typing / lists eight of the nine commands; /r shows the ninth. /help has no handler in the app.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sx-scope": {
+  "title": "Search in one book",
+  "note": "born again opened from John 3: offered, then scoped (70 matches in 1 section), with chip samples.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sx-direct": {
+  "title": "Straight to a passage",
+  "note": "john 3 alone, revelation above its text hits, the Beatitudes quick pick, and all four card kinds.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sx-kinds": {
+  "title": "Result cards, every kind",
+  "note": "One card per kind badge with the translation and heading badges, location and marked snippet. Five of these kinds no longer occur in today's index.",
+  "source": "src/ui/components/SrchCard.jsx"
+ },
+ "sx-groups": {
+  "title": "Results in sections",
+  "note": "mercy capped at 400+: Best Matches, five sections open and the rest closed, in Book order.",
+  "source": "src/ui/components/SrchGroup.jsx"
+ },
+ "sx-recent": {
+  "title": "Recent searches",
+  "note": "Twelve recent searches, the Yes, remove confirm, and what /clear history does.",
+  "source": "src/ui/screens/SearchScreen.jsx"
+ },
+ "sx-states": {
+  "title": "Search: rare states",
+  "note": "Did you mean Psalms?, a reference typed while the index builds, Search couldn't start, a failed build, Searching…, and the build bar.",
+  "source": "src/hooks/use-search.js"
+ },
+ "sx-from-selection": {
+  "title": "Search from a selection",
+  "note": "The real six-action toolbar with Search pressed, then Search opened on the selected words with Search in John offered.",
+  "source": "src/ui/sheets/SelectionToolbar.jsx"
+ },
+ "sx-answers-ask": {
+  "title": "Asking Answers",
+  "note": "death (full results), tithe (topics that mention it) and nicodemus (the empty state), verbatim from answers.js.",
+  "source": "src/ui/screens/AnswersHome.jsx"
+ },
+ "sx-in-list": {
+  "title": "Searching inside lists",
+  "note": "History, Links, Notes, Bookmarks, Marks, Journal, Saved recordings and Songs mid-search, each with its no-match wording.",
+  "source": "src/ui/screens/HistoryScreen.jsx"
+ },
+ "sw-loading": {
+  "title": "Weaving the web",
+  "note": "The loading state over a faint outline of the dome.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-chrome": {
+  "title": "Scripture Web controls",
+  "note": "The top bar and controls in every setup: Famous, Essential, the density menu, Nearby, My Web with Corpus context, and controls hidden.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-guide": {
+  "title": "How to read this web",
+  "note": "The six bullets and Got it. The zoom line is corrected: the on-screen + button no longer exists.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-myweb": {
+  "title": "My Web",
+  "note": "The reader's links between the Volumes rail and the Bible rail, all 2,095 of Timothy's threads, the legend, and both rails zoomed with Reset.",
+  "source": "src/ui/scripture-web/rail-renderer.js"
+ },
+ "sw-myweb-empty": {
+  "title": "My Web, empty",
+  "note": "Your web is still being woven, over Timothy's threads.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-tips": {
+  "title": "Thread tips",
+  "note": "One tip in place over the web, and all ten tip variants.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-chooser": {
+  "title": "Connections here",
+  "note": "Choosing among close threads on the Scripture web and in My Web.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-nearby": {
+  "title": "Nearby",
+  "note": "The list under the lens on Isaiah 53, with its other headings and its empty line.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-detail": {
+  "title": "Thread details",
+  "note": "Bundle, Chapter, Verse, Your link, Timothy's thread, and an end that can't be opened.",
+  "source": "src/ui/screens/ScriptureWebScreen.jsx"
+ },
+ "sw-sky": {
+  "title": "Into the sky",
+  "note": "Isaiah 53 zoomed about 1,100×, from the baseline up past a chapter, a book and a testament: the height ruler and bar, count pills, far-end refs and the lit chapter.",
+  "source": "src/ui/scripture-web/web-renderer.js"
+ },
+ "sw-fail": {
+  "title": "When the web can't be drawn",
+  "note": "The load error, the no-WebGL panel, the fallback list and its empty line, and one proposed design for every failure.",
+  "source": "src/ui/scripture-web/WebFallbackList.jsx"
+ }
+}

@@ -4,8 +4,6 @@
   .topbar .btn.text { height: 44px; padding: 0 14px; font-size: 16px; }
   .entry { padding-top: 6px; }
   .entry .date { margin-top: 6px; }
-  .ref { margin-top: 16px; color: var(--text); }
-  .ref .i { color: var(--accent); }
   /* body lines sit on the reading rhythm (19px / 1.62 = ~31px per line) */
   .para { margin-top: 26px; }
   .para .ph + .ph { margin-top: 20px; }
@@ -26,8 +24,9 @@
   .wave { display: flex; align-items: center; gap: 3px; height: 24px; }
   .wave span { width: 3px; border-radius: 2px; background: var(--text-3); }
   .memo .len { font: 400 13px/1 var(--sans); color: var(--text-2); }
-  .saved { position: absolute; left: 20px; bottom: 70px; display: flex; align-items: center; gap: 6px; }
-  .fmt { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: var(--surface-2); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; color: var(--text-2); }
+  /* the editor's chrome as jn-blocks.html draws it: the save state, and the one floating + that opens Insert */
+  .saved { position: absolute; left: 20px; bottom: 42px; display: flex; align-items: center; gap: 6px; }
+  .fab { position: absolute; right: 20px; bottom: 22px; width: 56px; height: 56px; border-radius: 28px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; box-shadow: var(--shadow); }
 </style></head>
 <body>
 <div class="screen">
@@ -40,8 +39,7 @@
   <div class="scroll">
     <div class="entry">
       <div class="h1">Morning reading</div>
-      <div class="meta date">Thursday, September 24</div>
-      <span class="chip ref"><i data-i="link" class="xs"></i>John 3:3</span>
+      <div class="meta date">September 24, 2026 · 7:12 AM</div>
     </div>
 
     <div class="para">
@@ -71,13 +69,6 @@
     </div>
   </div>
   <div class="meta saved"><i data-i="circle-check" class="xs"></i>Saved on this device</div>
-  <div class="fmt">
-    <span class="iconbtn"><i data-i="bold"></i></span>
-    <span class="iconbtn"><i data-i="italic"></i></span>
-    <span class="iconbtn"><i data-i="list"></i></span>
-    <span class="iconbtn"><i data-i="image"></i></span>
-    <span class="iconbtn"><i data-i="mic"></i></span>
-    <span class="iconbtn"><i data-i="link"></i></span>
-  </div>
+  <span class="fab"><i data-i="plus"></i></span>
 </div>
 </body></html>

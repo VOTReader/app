@@ -5,9 +5,10 @@
   .head .tt { display: flex; align-items: baseline; gap: 10px; }
   .head .cnt { font-size: 15px; }
   .sort { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 4px 0 12px; color: var(--text-2); font: 400 14px/1 var(--sans); }
-  .scroll > .chips { margin-top: 18px; }
-  .chip.cd { padding: 0 15px; }
-  .chip.cd .dot { width: 14px; height: 14px; border-radius: 7px; }
+  /* colour filter: All, then the ten mark colours in the app's order (the dots the toolbar uses) */
+  .cfilter { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .cfilter .chip { flex: none; margin-right: 4px; }
+  .cfilter .sw { width: 24px; height: 24px; border-radius: 12px; flex: none; background: var(--c); }
   .hls { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
   .hl { position: relative; overflow: hidden; padding: 16px 18px 14px 22px; }
   .hl::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
@@ -34,14 +35,10 @@
       <span class="sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span>
     </div>
 
-    <div class="chips">
+    <div class="cfilter">
       <span class="chip on">All</span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-honey)"></span></span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-sage)"></span></span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-sky)"></span></span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-rose)"></span></span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-lavender)"></span></span>
-      <span class="chip cd"><span class="dot" style="background:var(--dot-clay)"></span></span>
+      <span class="sw" style="--c:var(--dot-honey)"></span><span class="sw" style="--c:var(--dot-sage)"></span><span class="sw" style="--c:var(--dot-rose)"></span><span class="sw" style="--c:var(--dot-red)"></span><span class="sw" style="--c:var(--dot-clay)"></span>
+      <span class="sw" style="--c:var(--dot-sky)"></span><span class="sw" style="--c:var(--dot-lavender)"></span><span class="sw" style="--c:var(--dot-teal)"></span><span class="sw" style="--c:var(--dot-brown)"></span><span class="sw" style="--c:var(--dot-gray)"></span>
     </div>
 
     <div class="hls">
@@ -55,7 +52,7 @@
       </div>
       <div class="card hl" style="--c:var(--dot-rose)">
         <div class="reading q it">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</div>
-        <div class="meta ref"><span>Volume One · Letter 15</span><i data-i="sticky-note" class="xs"></i></div>
+        <div class="meta ref"><span>Volume One · Letter 15</span></div>
       </div>
       <div class="card hl" style="--c:var(--dot-sky)">
         <div class="reading q">“But He was wounded for our transgressions, He was bruised for our iniquities…”</div>

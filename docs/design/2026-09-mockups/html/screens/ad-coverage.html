@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="ad-shared.css"><script src="../kit/kit.js"></script><script src="ad-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: 412px 412px 412px; column-gap: 48px; }
+  .sec { margin-top: 6px; }
+  .sec .h3 { font-size: 21px; }
+  .sec .meta { margin-top: 3px; }
+  .crop .eyebrow + .h1 { margin-top: 6px; }
+  .crop .h1 { font-size: 28px; }
+  .crop .btnrow { display: flex; gap: 8px; margin-top: 18px; overflow: hidden; margin-right: -20px; }
+  .crop .btnrow .btn.sm, .crop .btnrow .chip { height: 36px; flex: none; }
+  .crop .btnrow .chip { border-radius: 18px; }
+  .crop .btnrow .chip .i { color: var(--text-3); }
+  .btn.sm .i.xs { width: 14px; height: 14px; }
+  /* legend */
+  .lg { padding: 18px 18px 20px; }
+  .lg .body { margin-top: 12px; color: var(--text); }
+  .lg .meta { margin-top: 10px; }
+  /* study rows, as the approved Studies screen */
+  .row .ttl { display: block; font: 500 17px/1.25 var(--serif); color: var(--text); }
+  .row .meta { display: block; margin-top: 3px; }
+  .row { align-items: flex-start; }
+  .row .chev { margin-top: 14px; }
+  .thumb { background:
+      radial-gradient(100% 90% at 24% 18%, color-mix(in srgb, var(--tint) 40%, transparent), transparent 72%),
+      linear-gradient(150deg, color-mix(in srgb, var(--tint) 20%, var(--surface-3)), var(--surface-2)); }
+  .t2 { --tint: var(--dot-sage); } .t4 { --tint: var(--dot-sky); } .t5 { --tint: var(--dot-clay); }
+  /* library source rows, as the au- Listening Library */
+  .src { display: flex; align-items: flex-start; gap: 14px; padding: 14px 10px 14px 14px; }
+  .src + .src { border-top: 1px solid var(--hairline); }
+  .mark { width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .mark .i { width: 20px; height: 20px; }
+  .src .cp { flex: 1; min-width: 0; }
+  .src .t { font: 500 17px/1.28 var(--serif); color: var(--text); }
+  .src .meta { margin-top: 3px; }
+  .src .chev { color: var(--text-3); margin-top: 10px; }
+  .notes { padding: 18px 20px; }
+  .notes p { font: 400 14px/1.45 var(--sans); color: var(--text-2); }
+  .notes p + p { margin-top: 10px; }
+  .notes b { color: var(--text); }
+</style></head>
+<body data-size="1420x1215">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Listen buttons and coverage badges</div>
+    <div class="meta">Where a recording starts, and the one word a row wears about it. The word carries the meaning, never the colour; the sentence behind each word is what a screen reader hears.</div>
+  </div>
+
+  <div class="sec"><div class="h3">Starting a recording</div></div>
+  <div class="board-grid">
+    <div class="cell">
+      <div class="cap">Listen<small>A letter, a Words To Live By entry, a Bible chapter. Always the one word; the player names the reader</small></div>
+      <div class="crop">
+        <div class="eyebrow">Volume One · Letter 15 · 12/13/04</div>
+        <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+        <div class="btnrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="cap">Play all<small>At the head of a collection's letters: all of it, in reading order</small></div>
+      <div class="crop">
+        <div class="eyebrow">The Volumes of Truth</div>
+        <div class="h1">Volume One</div>
+        <div class="btnrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span></div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="cap">Play a section<small>Words To Live By's long recordings, one chip each; heard as “Play Part 1 · Intro–19”</small></div>
+      <div class="crop">
+        <div class="eyebrow">Part One · Words of Wisdom</div>
+        <div class="h1">Words To Live By</div>
+        <div class="btnrow">
+          <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+          <span class="chip"><i data-i="play" class="xs fill"></i>Part 1 · Intro–19</span>
+          <span class="chip"><i data-i="play" class="xs fill"></i>Part 2 · 20–39</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec"><div class="h3">Can it be read along?</div></div>
+  <div class="board-grid">
+    <div class="card lg">
+      <span class="cb ra"><i data-i="headphones"></i>Read-along</span>
+      <p class="body">Recorded and timed — the words light as they are read.</p>
+      <p class="meta">Shown on studies, the studies shelf, and the KJV, NKJV, WEB and Matthew editions</p>
+    </div>
+    <div class="card lg">
+      <span class="cb lo"><i data-i="ad-volume"></i>Listening only</span>
+      <p class="body">Recorded, but the words are not timed, so nothing lights as it plays.</p>
+      <p class="meta">The Gospel of John film: its narration is a translation the app does not carry</p>
+    </div>
+    <div class="card lg">
+      <span class="cb nr"><i data-i="book-open"></i>No recording</span>
+      <p class="body">No recording exists for this yet — it can still be read.</p>
+      <p class="meta">A study with no recorded chapter, such as Grace AND The Law</p>
+    </div>
+  </div>
+
+  <div class="sec"><div class="h3">In place</div></div>
+  <div class="board-grid">
+    <div class="cell">
+      <div class="cap">Studies<small>A partly recorded study keeps its badge and says how much: 14 of 16 parts</small></div>
+      <div class="crop">
+        <div class="list">
+          <div class="row"><span class="thumb t5"></span>
+            <span class="txt"><span class="ttl">YahuShua The Messiah, The Lamb of God</span><span class="meta">16 Parts · Bible Study</span>
+              <span class="cb-wrap"><span class="cb ra"><i data-i="headphones"></i>Read-along</span><span class="cb-detail">14 of 16 parts</span></span></span>
+            <i data-i="chevron-right" class="chev sm"></i></div>
+          <div class="row"><span class="thumb t2"></span>
+            <span class="txt"><span class="ttl">Purity - Bible/Letter Study</span><span class="meta">6 Parts · Bible Study</span>
+              <span class="cb-wrap"><span class="cb ra"><i data-i="headphones"></i>Read-along</span></span></span>
+            <i data-i="chevron-right" class="chev sm"></i></div>
+          <div class="row"><span class="thumb t4"></span>
+            <span class="txt"><span class="ttl">Grace AND The Law (Bible/Letter Study)</span><span class="meta">7 Parts · Bible Study</span>
+              <span class="cb-wrap"><span class="cb nr"><i data-i="book-open"></i>No recording</span></span></span>
+            <i data-i="chevron-right" class="chev sm"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="cap">Listening Library sources<small>Each source row says what its recordings can do before the tap</small></div>
+      <div class="crop flush">
+        <div class="q-list">
+          <div class="src"><span class="mark"><i data-i="graduation-cap"></i></span><div class="cp"><div class="t">Bible/Letter Studies</div><div class="meta">7 studies · 2 with audio</div><div class="cb-wrap"><span class="cb ra"><i data-i="headphones"></i>Read-along</span></div></div><i data-i="chevron-right" class="chev sm"></i></div>
+          <div class="src"><span class="mark"><i data-i="book-open"></i></span><div class="cp"><div class="t">NKJV · The Word of Promise (Dramatized)</div><div class="meta">66 books · chapter by chapter</div><div class="cb-wrap"><span class="cb ra"><i data-i="headphones"></i>Read-along</span></div></div><i data-i="chevron-right" class="chev sm"></i></div>
+          <div class="src"><span class="mark"><i data-i="headphones"></i></span><div class="cp"><div class="t">John · The Gospel of John (film audio, no read-along)</div><div class="meta">1 book · Film audio, listening only</div><div class="cb-wrap"><span class="cb lo"><i data-i="ad-volume"></i>Listening only</span></div></div><i data-i="chevron-right" class="chev sm"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="cap">How the word is chosen<small>One rule for every library screen</small></div>
+      <div class="card notes">
+        <p><b>Read-along</b> when a recording ships and its words are timed. A study with some chapters recorded is still read-along; the count beside it keeps that honest.</p>
+        <p><b>Listening only</b> when an edition declares its recording untimed. Painting words it cannot match would be worse than painting none.</p>
+        <p><b>No recording</b> when nothing is recorded. The row still opens to read.</p>
+        <p>The count appears only for a partly recorded study, never when all or none of it is recorded.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

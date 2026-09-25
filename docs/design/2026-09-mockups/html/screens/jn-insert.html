@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .ins { top: 92px; padding-bottom: 14px; }
+  .ins .label:first-of-type { margin-top: 6px; }
+  .spec { padding: 6px 22px 14px; }
+  .spec .gl { margin: 18px 0 2px; }
+  .spec .gl:first-child { margin-top: 12px; }
+  .sr { display: grid; grid-template-columns: 40px 214px 1fr 44px; column-gap: 14px; align-items: center; padding: 12px 0; }
+  .sr + .sr { border-top: 1px solid var(--hairline); }
+  .sr .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; }
+  .sr .nm b { display: block; font: 700 15px/1.25 var(--sans); color: var(--text); }
+  .sr .nm span { display: block; margin-top: 3px; font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .sr .does { font: 400 14px/1.4 var(--sans); color: var(--text-2); }
+  .sr .does em { font-style: normal; color: var(--text); }
+  .sr .bdg { justify-self: end; }
+  .sr .none { justify-self: end; width: 40px; text-align: center; color: var(--text-3); font: 400 15px/1 var(--sans); }
+  .colh { display: grid; grid-template-columns: 40px 214px 1fr 44px; column-gap: 14px; padding: 16px 0 4px; }
+  .colh span { font: 400 12px/1.2 var(--sans); color: var(--text-3); }
+  .colh span:last-child { text-align: right; }
+  .foot { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--hairline); display: grid; gap: 10px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; }
+  .lg { display: inline-flex; align-items: center; gap: 8px; font: 400 13px/1 var(--sans); color: var(--text-2); }
+  .lg .bdg { width: auto; min-width: 34px; height: 26px; padding: 0 7px; border-radius: 7px; font-size: 11px; }
+</style></head>
+<body data-size="1240x1130">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · Insert</div>
+    <div class="meta">The floating + opens Insert. Rows with › open a picker; the others act at once. A new block always lands below the paragraph holding the caret, which stays whole.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 412px 700px; column-gap: 48px">
+    <div class="cell"><div class="cap">The sheet<small>Four groups, ten rows, each with its own description</small></div><div id="phone"></div></div>
+    <div class="cell"><div class="cap">What each row does<small>And the spine code its picker gives each row it lists</small></div><div class="panel spec" id="spec"></div></div>
+  </div>
+</div>
+<script>
+  const row = (icon, label, desc, drill) => `<div class="it"><span class="ic">${JN.ic('jn-ins-' + icon, 'sm')}</span><span class="tx"><b>${label}</b><span>${desc}</span></span>${drill ? '<i data-i="chevron-right" class="sm chev"></i>' : ''}</div>`;
+  const ROWS = [
+    ['From the Library', [
+      ['card', 'Card', 'Embed a chapter or letter title', true, 'Opens <em>the link picker</em> for a letter or chapter; adds a card with its title', null],
+      ['excerpt', 'Excerpt', 'Embed a portion — pick word-precise text', true, 'Opens <em>the link picker</em>, then the word picker; adds a letter excerpt or verse block', null],
+    ]],
+    ['From your annotations', [
+      ['bookmark', 'Bookmark', 'Pull in a saved passage', true, 'Opens <em>Pick Bookmark</em>; adds a bookmark card', 'BK'],
+      ['note', 'Note', 'Reference one of your annotations', true, 'Opens <em>Pick Note</em>; adds a note card', 'NT'],
+      ['journal', 'Journal entry', 'Link to another journal entry', true, 'Opens <em>Link a Journal Entry</em>, then <em>Pick from Entry</em>; adds the whole entry as a card, or one of its blocks', 'JR'],
+      ['notebook', 'Notebook', 'Link to a notebook of notes', true, 'Opens <em>Link a Notebook</em>; adds a notebook card', 'NB'],
+    ]],
+    ['Capture', [
+      ['image', 'Image', 'From device gallery', false, 'Opens the device gallery; the photo is saved at once', 'IMG'],
+      ['audio', 'Voice recording', 'Record a memo or prayer', false, 'Opens <em>the recording sheet</em>; adds a voice memo', 'REC'],
+    ]],
+    ['Text', [
+      ['body', 'Body text', 'A new line to write freely', false, 'Adds an empty paragraph', 'TXT'],
+      ['divider', 'Divider', '3-diamond ornament', false, 'Adds ❖ ❖ ❖', null],
+    ]],
+  ];
+
+  const sheet = JN.sheet(JN.shead('Insert') + ROWS.map(g => `<div class="label">${g[0]}</div>` + g[1].map(r => row(r[0], r[1], r[2], r[3])).join('')).join(''), 'tall ins');
+  const B = JN.blk;
+  document.getElementById('phone').innerHTML = `<div class="phone-l">${JN.editor({
+    body: B('text', JN.para([100, 96, 99, 93, 57])) + B('text focus', JN.para([98, 100, 90, 41], true)) + B('media', JN.photo(''), { noDel: true }),
+    fab: false, over: sheet })}</div>`;
+
+  document.getElementById('spec').innerHTML =
+    `<div class="colh"><span></span><span>Row</span><span>What it does</span><span>Code</span></div>` +
+    ROWS.map((g, gi) => `<div class="label gl" ${gi === 0 ? 'style="margin-top:8px"' : ''}>${g[0]}</div>` + g[1].map(r => `<div class="sr">
+      <span class="ic">${JN.ic('jn-ins-' + r[0], 'sm')}</span>
+      <span class="nm"><b>${r[1]}</b><span>${r[2]}</span></span>
+      <span class="does">${r[4]}</span>
+      ${r[5] ? `<span class="bdg">${r[5]}</span>` : '<span class="none">—</span>'}
+    </div>`).join('')).join('') +
+    `<div class="foot">
+      <div class="legend">${[['TXT', 'paragraph'], ['H', 'heading'], ['“ ”', 'quote'], ['IMG', 'image'], ['REC', 'voice memo']].map(l => `<span class="lg"><span class="bdg">${l[0]}</span>${l[1]}</span>`).join('')}</div>
+      <div class="note">Inside Pick from Entry, each block of the chosen entry wears one of these. Heading and quote blocks exist only in older entries; no row here makes them. Card and Excerpt list their results with the link picker's own badges.</div>
+    </div>`;
+</script>
+</body></html>

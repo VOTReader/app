@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  /* behind: the end of The Volumes of Truth, where the Garden is entered (volumes.html rows) */
+  .vol .num { width: 40px; height: 40px; border-radius: 20px; flex: none; background: var(--surface-2); display: grid; place-items: center; color: var(--accent); }
+  .vol .ttl { display: block; font: 500 18px/1.25 var(--serif); color: var(--text); }
+  .vol .meta { display: block; margin-top: 2px; }
+  .behind { padding-top: 6px; }
+
+  .scrim { z-index: 10; }
+  .sheet { z-index: 11; }
+  .sheet .h2 { margin: 2px 0 10px; }
+  .gbody .body { color: var(--text-2); text-wrap: pretty; }
+  .gbody b { color: var(--text); font-weight: 700; }
+  .adv { display: flex; gap: 12px; margin-top: 12px; }
+  .adv .i { color: var(--text-2); flex: none; margin-top: 1px; }
+  .adv p { font: 400 14px/1.45 var(--sans); color: var(--text-2); text-wrap: pretty; }
+  .adv b { color: var(--text); font-weight: 700; }
+  .qlab { margin-top: 22px; }
+  .qhint { margin-top: 4px; }
+
+  /* the four tiers: the same rows as Settings › A Return to The Garden (st-garden) */
+  .tiers { margin-top: 6px; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .opt + .opt { border-top: 1px solid var(--hairline); }
+  .opt .ot { flex: 1; min-width: 0; }
+  .opt .oh { display: flex; align-items: baseline; gap: 10px; }
+  .opt .ol { flex: 1; font: 400 16px/1.3 var(--sans); color: var(--text); }
+  .opt .om { font: 400 14px/1 var(--sans); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .opt .od { font: 400 13px/1.4 var(--sans); color: var(--text-3); margin-top: 3px; text-wrap: pretty; }
+  .opt .ckw { width: 22px; flex: none; display: grid; place-items: center; align-self: flex-start; margin-top: 1px; color: var(--accent); }
+  .opt.on .ol { color: var(--accent); font-weight: 700; }
+
+  .gacts { display: flex; gap: 10px; margin-top: 14px; }
+  .gacts .btn { flex: 1; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll behind">
+    <div class="list">
+      <div class="row vol"><span class="num"><i data-i="calendar" class="sm"></i></span>
+        <span class="txt"><span class="ttl">Holy Days</span><span class="meta">Letters for the feasts</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row vol"><span class="num"><i data-i="sunrise" class="sm"></i></span>
+        <span class="txt"><span class="ttl">A Return to The Garden</span><span class="meta">209 Pages · A Visual Journey</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="h2">Before you begin</div>
+  <div class="gbody">
+    <p class="body"><em>A Return to The Garden</em> contains <b>209 high-resolution photographs</b> totaling approximately <b>180 MB</b> at the selected quality. Pages stream from the internet as you read and are cached on your device.</p>
+    <div class="adv"><i data-i="wifi" class="sm"></i><p>For the best experience, connect to <b>Wi-Fi</b> before proceeding. Mobile data charges may apply otherwise.</p></div>
+    <div class="adv"><i data-i="dl-hard-drive" class="sm"></i><p>Please also ensure your device has sufficient <b>free storage</b> available to cache the full collection.</p></div>
+  </div>
+
+  <div class="label qlab">Image quality</div>
+  <div class="meta qhint">You can change this anytime from the Settings menu.</div>
+  <div class="tiers">
+    <div class="opt">
+      <div class="ot"><div class="oh"><span class="ol">Mobile</span><span class="om">~110 MB</span></div><div class="od">2160px · Screen-native; light on cell data</div></div>
+      <span class="ckw"></span>
+    </div>
+    <div class="opt on">
+      <div class="ot"><div class="oh"><span class="ol">Standard</span><span class="om">~180 MB</span></div><div class="od">2880px · Balanced default — great at 1× and 1.5× zoom</div></div>
+      <span class="ckw"><i data-i="check" class="sm"></i></span>
+    </div>
+    <div class="opt">
+      <div class="ot"><div class="oh"><span class="ol">Native</span><span class="om">~320 MB</span></div><div class="od">3600px · Full source detail; no upscaling</div></div>
+      <span class="ckw"></span>
+    </div>
+    <div class="opt">
+      <div class="ot"><div class="oh"><span class="ol">Ultra</span><span class="om">~680 MB</span></div><div class="od">4600px · Maximum quality — for pixel-peepers</div></div>
+      <span class="ckw"></span>
+    </div>
+  </div>
+
+  <div class="gacts">
+    <span class="btn secondary">Go back</span>
+    <span class="btn primary">Proceed</span>
+  </div>
+</div>
+</body></html>

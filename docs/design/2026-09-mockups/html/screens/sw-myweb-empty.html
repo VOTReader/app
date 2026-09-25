@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  /* text on the canvas, no box: Timothy's threads run behind it, a ground-coloured halo keeps it legible */
+  .empty { position: absolute; z-index: 4; left: 50%; top: 222px; transform: translate(-50%, -50%); width: 470px; text-align: center;
+    text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg), 0 0 14px var(--bg), 0 0 22px var(--bg); }
+  .empty .t { font: 500 24px/1.2 var(--serif); color: var(--text); }
+  .empty .b { margin-top: 8px; font: 400 15px/1.55 var(--sans); color: var(--text-2); text-wrap: balance; }
+  .empty .b b { color: var(--text); }
+  .empty .x { position: absolute; right: -40px; top: -16px; width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center;
+    background: var(--surface-2); color: var(--text-2); text-shadow: none; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .empty .x .i { width: 18px; height: 18px; }
+</style></head>
+<body class="landscape" data-themes="dark">
+<div class="ls" id="f"></div>
+<script type="module">
+  import { drawMyWeb, chromeHTML, footHTML, iconize, done } from './sw-lib.js';
+  const D = window.SW_DATA;
+  const f = document.getElementById('f');
+  f.innerHTML = '<canvas></canvas>' + chromeHTML({ mode: 'myweb', meta: 'No links yet — select any text and tap Link.', two: true }) + footHTML('myweb')
+    + `<div class="empty" role="note">
+        <span class="x" role="button" aria-label="Dismiss"><i data-i="x"></i></span>
+        <div class="t">Your web is still being woven.</div>
+        <div class="b">Select text anywhere in the app, tap <b>Link</b>, and pick where it goes. The silver threads are the Volumes’ own citations.</div>
+      </div>`;
+  iconize();
+  drawMyWeb(f.querySelector('canvas'), { topY: 104, bottomY: 330, rail: D.rail, under: D.under, links: [] });
+  done();
+</script>
+</body></html>

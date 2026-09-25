@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="an-common.css"><script src="an-icons.js"></script>
+<style>
+  .sheet { --ring-gap: var(--surface); }
+  .sheet .an-cf .btn.secondary { background: var(--surface-3); }
+  /* colour picker: takes the body's place */
+  .pk-hd { display: flex; align-items: center; gap: 4px; margin: 10px 0 4px -10px; }
+  .pk-hd .t { font: 700 15px/1.2 var(--sans); color: var(--text); }
+  .pk-none { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 14px; border-radius: 14px; background: var(--surface-2); font: 400 16px/1.2 var(--sans); color: var(--text); }
+  .pk-none .meta { font-size: 14px; }
+  .pk-none .an-sw { width: 30px; height: 30px; border-radius: 15px; }
+  .pk-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px 4px; margin-top: 18px; padding-bottom: 6px; }
+  .pk-grid .it { display: flex; flex-direction: column; align-items: center; gap: 8px; font: 400 13px/1.2 var(--sans); color: var(--text-2); }
+  .pk-grid .it.cur { color: var(--text); font-weight: 700; }
+  .pk-grid .an-sw { width: 36px; height: 36px; border-radius: 18px; }
+  /* edit mode swatches: blank + ten */
+  .ns-sws { display: flex; justify-content: space-between; align-items: center; height: 34px; margin-top: 12px; }
+  .ns-sws .an-sw { width: 26px; height: 26px; border-radius: 13px; }
+  .ns-tags .ns-tag .i.teal { color: var(--an-teal); }
+  .ta .last { display: flex; align-items: center; gap: 3px; margin-top: 16px; }
+  .ta .last .ph { flex: none; }
+  .sheet .an-cf.inline { margin-top: 16px; }
+  /* full-size pieces */
+  .comp { width: 372px; }
+  .comp .an-acts { margin-top: 0; }
+  .comp .an-acts .grp { background: var(--surface); }
+  [data-theme="light"] .comp .an-acts .grp { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+</style></head>
+<body data-size="1456x1380">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">The note sheet’s sub-sheets: colour, the ⋯ menu, discard and share</div>
+    <div class="meta">NoteSheet.jsx. Reading and editing a note are drawn by lb-; these are the panels that open inside it. The note is the reader’s own, so its words are placeholder bars.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(5, 256px)" id="grid"></div>
+</div>
+<script>
+  (function () {
+    var C = ['yellow','green','pink','red','orange','blue','purple','teal','brown','gray'];
+    var bg = '<div class="status"></div>'
+      + '<div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>'
+      + '<div class="scroll an-page"><div class="h1" style="font-size:40px">John 3</div><div class="eyebrow sechead">Nicodemus and the New Birth</div><div class="reading">'
+      + '<p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>'
+      + '<p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, <mark class="mk hl c-yellow">unless one is born of water and the Spirit, he cannot enter the kingdom of God.</mark><span class="nmk c-yellow"><i data-i="sticky-note"></i></span></p>'
+      + '<p><span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit. <span class="vnum">7</span>Do not marvel that I said to you, ‘You must be born again.’</p>'
+      + '</div></div><div class="scrim"></div>';
+    function ph(ws) { return ws.map(function (w) { return '<div class="ph" style="width:' + w + '%"></div>'; }).join(''); }
+    var head = function (title, dot, menu) {
+      return '<div class="grabber"></div><div class="ns-head"><span class="ns-dot' + (dot === 'blank' ? ' blank' : '') + '"></span><span class="h3">' + title + '</span>'
+        + (menu === false ? '' : '<span class="iconbtn' + (menu === 'on' ? ' on' : '') + '"><i data-i="ellipsis-vertical"></i></span>') + '</div>';
+    };
+    var anchor5 = '<div class="ns-anchor">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>';
+    var tags = '<div class="ns-tags"><span class="ns-tag"><i data-i="an-folder" class="teal"></i><span class="ph" style="width:74px"></span></span><span class="ns-tag"><i data-i="an-folder"></i><span class="ph" style="width:92px"></span></span></div>';
+    var readTop = head('Note', 'c', 'off') + anchor5 + '<div class="meta ns-date">2d ago</div>';
+    var menuList = function (nb) {
+      return '<div class="an-acts"><div class="grp">'
+        + '<div class="a"><i data-i="an-pencil"></i>Edit note</div><div class="a"><i data-i="an-palette"></i>Change color</div>'
+        + (nb ? '<div class="a"><i data-i="an-folder"></i>Manage notebooks…</div>' : '<div class="a"><i data-i="an-folder-plus"></i>Add to notebook…</div>')
+        + '<div class="a"><i data-i="share-2"></i>Share</div></div>'
+        + '<div class="grp"><div class="a dz"><i data-i="trash-2"></i>Delete note</div></div></div>';
+    };
+    var picker = function (cur, blank) {
+      return '<div class="pk-hd"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="t">Change color</span></div>'
+        + (blank ? '<div class="pk-none"><span class="an-sw blank' + (cur === 'blank' ? ' on' : '') + '"></span><span>No color <span class="meta">(icon only)</span></span></div>' : '')
+        + '<div class="pk-grid">' + C.map(function (c) { return '<span class="it' + (c === cur ? ' cur' : '') + '"><span class="an-sw c-' + c + (c === cur ? ' on' : '') + '"></span>' + c + '</span>'; }).join('') + '</div>';
+    };
+    var editSheet = function (o) {
+      return head(o.title, o.dot, false)
+        + '<div class="ns-anchor clamp">' + o.anchor + '</div>'
+        + '<div class="label ns-lab">Style and colour</div>'
+        + '<div class="ns-styles"><span class="an-sty hl on"><span>A</span></span><span class="an-sty ul"><span>A</span></span><span class="an-sty sq"><span>A</span></span></div>'
+        + '<div class="ns-sws"><span class="an-sw blank' + (o.cur === 'blank' ? ' on' : '') + '"></span>' + C.map(function (c) { return '<span class="an-sw c-' + c + (c === o.cur ? ' on' : '') + '"></span>'; }).join('') + '</div>'
+        + '<div class="ta">' + ph(o.text) + '<div class="last"><div class="ph" style="width:' + o.last + '%"></div><span class="caret"></span></div></div>'
+        + '<div class="nbrow"><i data-i="an-folder" class="sm"></i><span class="grow">' + o.nb + '</span><i data-i="chevron-right" class="sm"></i></div>'
+        + '<div class="an-cf inline"><span class="q">' + o.q + '</span><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, discard</span></div></div>';
+    };
+    var toast = function (t) { return '<div class="an-toast ph-pos">' + t + '</div>'; };
+    var cells = [
+      ['Change color', 'Header dot or ⋯ menu; a tap recolours, then goes back', 'c-yellow', readTop + picker('yellow', true), ''],
+      ['On an underline or squiggle', 'They always show a colour, so No color is not offered', 'c-blue',
+        head('Note', 'c', 'off') + '<div class="ns-anchor">“For God so loved the world”</div><div class="meta ns-date">Jan 14</div>' + picker('blue', false), ''],
+      ['The ⋯ menu', 'Read mode only; Delete sits apart', 'c-yellow', head('Note', 'c', 'on') + anchor5 + '<div class="meta ns-date">2d ago</div><div class="ns-body">' + ph([97, 88, 52]) + '</div>' + menuList(false), ''],
+      ['Delete, asked first', 'The menu becomes the question', 'c-yellow', head('Note', 'c', 'on') + anchor5 + '<div class="meta ns-date">2d ago</div><div class="ns-body">' + ph([97, 88, 52]) + '</div>'
+        + '<div class="an-cf inline" style="margin-top:16px"><span class="q">Delete this note?</span><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, delete</span></div></div>', ''],
+      ['Share: copied instead', 'No share sheet on this device; the note stays open', 'c-yellow', readTop + tags + '<div class="ns-body">' + ph([98, 93, 99, 61]) + '</div>',
+        toast('Copied instead. Paste the note where you want to share it.')],
+      ['Discard a new note', 'Cancel, Back or a tap outside with unsaved words', 'c-blank', editSheet({ title: 'New note', dot: 'blank', cur: 'blank',
+        anchor: '“Do not marvel that I said to you, ‘You must be born again.’”', text: [96, 91], last: 38, nb: 'Add to notebook…', q: 'Discard this note?' }), ''],
+      ['Discard changes', 'Editing a saved note; confirming returns to reading it', 'c-yellow', editSheet({ title: 'Edit note', dot: 'c', cur: 'yellow',
+        anchor: '“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”', text: [97, 94, 99], last: 46,
+        nb: '<span class="ph" style="width:70px"></span><span class="ph" style="width:88px"></span>', q: 'Discard changes?' }), ''],
+      ['Share: could not', 'Neither share nor copy worked; shown for six seconds', 'c-yellow', readTop + tags + '<div class="ns-body">' + ph([98, 93, 99, 61]) + '</div>',
+        toast('Couldn’t share or copy. Select the note’s text to copy it by hand.')]
+    ];
+    var h = '';
+    cells.forEach(function (c) {
+      h += '<div class="cell"><div class="cap">' + c[0] + '<small>' + c[1] + '</small></div><div class="phone-s"><div class="screen">' + bg
+        + '<div class="sheet ' + c[2] + '">' + c[3] + '</div>' + c[4] + '</div></div></div>';
+    });
+    h += '<div class="cell" style="grid-column: span 2"><div class="cap">Full size<small>The menu once the note is filed, then the two share toasts</small></div>'
+      + '<div class="stack" style="width:372px">'
+      + '<div class="comp">' + menuList(true) + '</div>'
+      + '<div class="an-toast">Copied instead. Paste the note where you want to share it.</div><div class="an-toast">Couldn’t share or copy. Select the note’s text to copy it by hand.</div>'
+      + '</div></div>';
+    document.getElementById('grid').innerHTML = h;
+  })();
+</script>
+</body></html>

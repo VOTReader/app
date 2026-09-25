@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid.top { grid-template-columns: 915px; }
+  .board-grid.parts { grid-template-columns: repeat(3, 289px); gap: 24px; }
+  .cell > .cap small { max-width: 900px; }
+  .side { right: 12px; top: 66px; bottom: 12px; width: 400px; overflow: hidden; }
+  .side .rows { max-height: 262px; }
+  .parts .tray { align-self: stretch; }
+  .parts .panel { position: relative; padding-left: 14px; }
+  .parts .panel .t { font-size: 17.5px; }
+  .parts .rows .rw .a { font-size: 15px; }
+  .stack2 { display: flex; flex-direction: column; gap: 22px; }
+  .rows .rw.lead .a, .rows .rw.lead .b { white-space: normal; text-wrap: balance; }
+  .more { font: 400 12.5px/1 var(--sans); color: var(--text-3); padding: 9px 0 3px 4px; }
+</style></head>
+<body data-size="995x1104">
+<div class="board">
+  <div class="board-head"><div class="h2">Nearby</div>
+    <div class="meta">The web read as a list: what is near the middle of the view, strongest first, for a reader who would rather choose from words than aim at threads. It reads the lens when there is one. Nearby is its own button in the strip, beside the density; pressed, it opens this list.</div></div>
+  <div class="board-grid top">
+    <div class="cell"><div class="cap">Under the lens · Isaiah 53<small>Zoomed in, the list reads the lit chapter. Its first row opens where all 239 threads go, by chapter; the rest are its threads, strongest first (36 at most).</small></div>
+      <div class="lf f100"><div class="ls" id="f" data-theme="dark"></div></div></div>
+  </div>
+  <div class="board-grid parts">
+    <div class="cell"><div class="cap">At the overview<small>No lens yet: the chapter under the middle.</small></div>
+      <div class="tray" data-theme="dark"><div class="panel"><span class="iconbtn x"><i data-i="x"></i></span>
+        <div class="head"><div class="t">Nearby · Psalms 103</div><div class="sub">266 connections · the strongest 36 below; the chapter row lists where they all go.</div></div>
+        <div class="rows">
+          <div class="rw lead"><div class="tx"><div class="a">Psalms 103 — where its threads go</div><div class="b">22 verses · 266 connections · to 169 chapters</div></div><i data-i="chevron-right" class="chev"></i></div>
+          <div class="rw"><div class="tx"><div class="a">Psalms 103:5<span>↕</span>Isaiah 40:31</div><div class="b">264 votes · 2,897 verses apart</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">Exodus 34:6<span>↕</span>Psalms 103:8</div><div class="b">110 votes · 13,055 verses apart</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">Exodus 15:26<span>↕</span>Psalms 103:3</div><div class="b">104 votes · 13,606 verses apart</div></div></div>
+        </div></div></div></div>
+    <div class="cell"><div class="cap">My Web<small>The reader’s own links, in the order they were made.</small></div>
+      <div class="tray" data-theme="dark"><div class="panel"><span class="iconbtn x"><i data-i="x"></i></span>
+        <div class="head"><div class="t">Your nearby links</div><div class="sub">Select a connection to focus it and open its passages.</div></div>
+        <div class="rows">
+          <div class="rw"><div class="tx"><div class="a">Death and Awakening<span>↕</span>John 6:40</div><div class="b">Scripture ↔ Volumes</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">Isaiah 53:5<span>↕</span>1 Peter 2:24</div><div class="b">Within scripture</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">All Have Been Purchased... Yet Few Have Accepted, Few Are Chosen<span>↕</span>Grafted In</div><div class="b">Within the Volumes</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">Isaiah 58:13<span>↕</span>Do This in Remembrance of Me</div><div class="b">Scripture ↔ Volumes</div></div></div>
+          <div class="rw"><div class="tx"><div class="a">John 3:16<span>↕</span>Romans 5:8</div><div class="b">Within scripture</div></div></div>
+        </div></div></div></div>
+    <div class="stack2">
+      <div class="cell"><div class="cap">Nothing here<small>My Web with no links and Corpus context off.</small></div>
+        <div class="tray" data-theme="dark"><div class="panel"><span class="iconbtn x"><i data-i="x"></i></span>
+          <div class="head"><div class="t">Your nearby links</div><div class="sub">Select a connection to focus it and open its passages.</div></div>
+          <div class="empty-line">No nearby connections at this location.</div></div></div></div>
+      <div class="cell"><div class="cap">The fallback heading<small>Scripture Web, only on an empty graph.</small></div>
+        <div class="tray" data-theme="dark"><div class="panel"><span class="iconbtn x"><i data-i="x"></i></span>
+          <div class="head"><div class="t">Nearby connections</div><div class="sub">Select a connection to focus it and open its passages.</div></div>
+          <div class="empty-line">No nearby connections at this location.</div></div></div></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { drawZoom, chromeHTML, footHTML, iconize, vid, done } from './sw-lib.js';
+  const f = document.getElementById('f');
+  const row = (a, b, m) => `<div class="rw"><div class="tx"><div class="a">${a}<span>↕</span>${b}</div><div class="b">${m}</div></div></div>`;
+  f.innerHTML = '<canvas></canvas>' + chromeHTML({ nearby: true }) + footHTML('canon')
+    + `<div class="panel side" role="dialog" aria-label="Nearby connections"><span class="iconbtn x"><i data-i="x"></i></span>
+      <div class="head"><div class="t">Under the lens · Isaiah 53</div><div class="sub">239 connections · the strongest 36 below; the chapter row lists where they all go.</div></div>
+      <div class="rows">
+        <div class="rw lead"><div class="tx"><div class="a">Isaiah 53 — where its threads go</div><div class="b">12 verses · 239 connections · to 119 chapters</div></div><i data-i="chevron-right" class="chev"></i></div>
+        ${row('Isaiah 53:5', '1 Peter 2:24', '247 votes · 11,707 verses apart')}${row('Isaiah 53:4', '1 Peter 2:24', '155 votes · 11,708 verses apart')}
+        ${row('Isaiah 53:5', '1 Peter 3:18', '130 votes · 11,726 verses apart')}${row('Isaiah 53:6', '1 Peter 2:25', '123 votes · 11,707 verses apart')}
+        ${row('Isaiah 53:5', 'Matthew 20:28', '111 votes · 5,104 verses apart')}
+      </div></div>`;
+  iconize();
+  drawZoom(f.querySelector('canvas'), { camX: vid('Isaiah 53:1') + 6, ppv: 6, camY: 0, base: 322, inset: 72, pills: true, elevator: true });
+  done();
+</script>
+</body></html>

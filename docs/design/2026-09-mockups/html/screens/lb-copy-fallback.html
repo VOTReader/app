@@ -1,0 +1,102 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .chapter { padding-top: 6px; }
+  .sechead { margin: 22px 0 10px; }
+  .reading p + p { margin-top: 10px; }
+  .reading em { font-style: italic; }
+  .cf .h2 { margin-top: 4px; }
+  .cf .help { margin-top: 8px; font: 400 16px/1.45 var(--sans); color: var(--text-2); }
+  .cf .help.warn { color: var(--text); }
+  .cf .help.warn b { color: var(--accent); }
+  .cf .box { margin-top: 16px; max-height: 190px; overflow: hidden; padding: 14px 16px; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--accent); font: 400 18px/1.55 var(--serif); color: var(--text); }
+  .cf .box .all { background: color-mix(in srgb, var(--accent) 26%, transparent); border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .cf .box .n { font: 700 11px/1 var(--sans); color: var(--accent); vertical-align: .5em; margin-right: 3px; }
+  .cf .acts { display: flex; gap: 10px; margin-top: 18px; }
+  .cf .acts .btn.primary { flex: 1; }
+  .cf .acts .btn.secondary { padding: 0 26px; }
+  .col { display: flex; flex-direction: column; gap: 14px; }
+</style></head>
+<body data-size="1400x900">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">When Copy or Share is refused</div>
+    <div class="meta">CopyFallbackSheet.jsx · the passage stays on screen, already selected, with Try again · a second refusal switches to the by-hand route</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 309px 309px 309px 1fr">
+
+    <div class="cell">
+      <div class="cap">Couldn’t copy<small>Opens with the passage selected</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading"><p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</p></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet cf">
+          <div class="grabber"></div>
+          <div class="h2">Couldn’t copy</div>
+          <div class="help">Copy the selected passage below, or try again.</div>
+          <div class="box"><span class="all"><span class="n">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="n">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</span></div>
+          <div class="acts"><span class="btn primary">Try again</span><span class="btn secondary">Close</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Couldn’t share<small>Same sheet after a refused share</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="headphones"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll lb-letter"><div class="eyebrow">Volume One · Letter 15</div><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div data-lb-paras="5,4"></div></div>
+        <div class="scrim"></div>
+        <div class="sheet cf">
+          <div class="grabber"></div>
+          <div class="h2">Couldn’t share</div>
+          <div class="help">Copy the selected passage below, or try again.</div>
+          <div class="box"><span class="all"><em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></span></div>
+          <div class="acts"><span class="btn primary">Try again</span><span class="btn secondary">Close</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Still blocked<small>A second refusal: the by-hand way</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading"><p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet cf">
+          <div class="grabber"></div>
+          <div class="h2">Couldn’t copy</div>
+          <div class="help warn"><b>Still blocked.</b> Press and hold the passage, choose Select all, then Copy.</div>
+          <div class="box"><span class="all"><span class="n">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="n">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</span></div>
+          <div class="acts"><span class="btn primary">Try again</span><span class="btn secondary">Close</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">What follows<small>Toasts from the same action</small></div>
+      <div class="col">
+        <div class="lb-toast solo">Copied</div>
+        <div class="meta">Try again worked: the sheet closes.</div>
+        <div class="lb-toast solo" style="margin-top:10px">Copied instead. Paste the passage where you want to share it.</div>
+        <div class="meta">Share could not open, but copying did, so no sheet is needed.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="lb-common.js"></script>
+</body></html>

@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .tailpad { height: 132px; }
+</style></head>
+<body data-size="412x2840">
+<script>JN.writeSprite()</script>
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Journal</span>
+    <span class="btn text">Done</span>
+  </div>
+  <div class="scroll">
+    <div class="ed-head">
+      <div class="h1">Morning reading</div>
+      <div class="meta date">September 24, 2026 · 7:12 AM</div>
+    </div>
+    <div class="blocks" id="blocks"></div>
+    <div class="tailpad"></div>
+  </div>
+  <div class="meta saved"><i data-i="circle-check" class="xs"></i>Saved on this device</div>
+  <span class="fab" id="fab"></span>
+</div>
+<script>
+  const B = JN.blk;
+  const card = (inner, cls = '') => B('card-blk', `<div class="card ${cls}">${inner}</div>`);
+  const chev = '<i data-i="chevron-right" class="sm chev"></i>';
+  const tz = (a, b) => `<div class="tz"><div class="ph" style="width:${a}%"></div><div class="ph" style="width:${b}%"></div></div>`;
+  document.getElementById('blocks').innerHTML = [
+    // text, heading, text
+    B('text', JN.para([100, 96, 99, 62])),
+    B('text', '<div class="ph hd" style="width:46%"></div>', { style: 'margin-top:34px' }),
+    B('text', JN.para([98, 100, 93, 41])),
+    // quote: the reader's quoted words, citation left empty
+    B('text', '<div class="quote"><div class="ph" style="width:100%"></div><div class="ph" style="width:84%"></div><div class="cite">Citation (optional)</div></div>'),
+    // divider
+    B('orn-blk', '<div class="orn">❖ ❖ ❖</div>'),
+    // image with a caption
+    B('media', JN.photo('') + '<div class="capf"><div class="ph" style="width:62%"></div></div>', { noDel: true }),
+    // an image embedded from another entry
+    B('media', '<span class="pill from">From: Evening prayer</span>' + JN.photo('b') + '<div class="capf">Caption (optional)</div>', { noDel: true }),
+    // voice memo: its own delete sits in the pill
+    B('memo-blk', JN.memo('0:42', 7), { noDel: true }),
+    B('text', JN.para([100, 72])),
+    // letter card (title only)
+    card(`<div class="top"><span class="meta">Volume One</span><span class="meta">11/15/04</span></div><div class="h3">Death and Awakening</div>${chev}`, 'emb'),
+    // letter excerpt
+    card(`<div class="top"><span class="meta">Volume One · Excerpt</span><span class="meta">10/17/04</span></div><div class="h3">Humility and The Word of God</div>
+      <div class="reading ex">Therefore, as blades of grass are beset with dew in the cool of the night, even till the morning, so shall I beset you with My words; each word a glistening drop from Heaven, every letter a shining jewel.</div>${chev}`, 'emb'),
+    // chapter card
+    card(`<div class="meta">Bible Chapter</div><div class="h3">Isaiah 40</div>${chev}`, 'emb'),
+    // verse block
+    card(`<div class="meta">John 3:16</div><div class="reading txt">For God so loved the world that He gave His only begotten Son, that whoever believes in Him should not perish but have everlasting life.</div>${chev}`, 'emb'),
+    // bookmark card: title is the bookmark's label (the words it was made on); the body is the reader's thought
+    card(`<div class="meta">Bookmark</div><div class="h3">My son, I am The Answer you search for, I am The Truth you seek.</div>${tz(100, 58)}${chev}`, 'emb'),
+    // note card: titled by where the note is anchored; the body is the reader's note
+    card(`<div class="meta">My Note</div><div class="h3">John 3:16-17</div>${tz(100, 76)}${chev}`, 'emb'),
+    // another journal entry
+    card(`<div class="meta">Linked Entry</div><div class="h3">Evening prayer</div>${tz(100, 64)}${chev}`, 'emb'),
+    // notebook
+    card(`<span class="ic">${JN.ic('jn-ins-notebook', 'sm')}</span><div class="t"><div class="meta">Notebook</div><div class="h3">Sabbath</div></div><i data-i="chevron-right" class="sm chev"></i>`, 'nbc'),
+    // one block embedded from another entry
+    card(`<div class="src">From: Notes on Letter 15</div><div class="tz" style="margin-top:14px"><div class="ph" style="width:100%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:47%"></div></div>`, 'emb'),
+    // the empty paragraph the editor keeps at the end, holding the caret
+    B('text focus', '<div class="lastline" style="margin-top:0"><span class="caret"></span></div>', { style: 'margin-top:30px' }),
+  ].join('');
+  document.getElementById('fab').innerHTML = JN.ic('jn-plus');
+</script>
+</body></html>

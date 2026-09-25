@@ -1,0 +1,16 @@
+{
+ "name": "r4-studies",
+ "refs": [
+  "out/r2-home/home-r2-refined.png",
+  "../html/renders/studies-dark.png"
+ ],
+ "preamble": "Image 1 is the approved VOTReader design system ('Vesper', dark): its palette, typography (book serif for titles and reading, humanist sans for UI), filled surfaces, radii and single antique-gold accent. Image 2 is an ACCURATE HTML mockup of one screen, with the exact real content, labels, counts and structure.",
+ "images": [
+  {
+   "file": "studies-r4.png",
+   "prompt": "Redraw Image 2 as a polished, high-fidelity Android phone screen mockup in Image 1's visual language. Keep EVERY element of Image 2: every label, title, count, date, chip, button and list row, with exactly the same wording and order, and the same layout skeleton. You may refine spacing, depth, typographic finesse, icon quality and small details of polish. Do not add any new text, rows, features or decorations; grey placeholder bars in Image 2 must stay placeholder bars. Portrait, flat front view, thin phone outline at most, no hands, no perspective. All text crisp and correctly spelled.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "max_primary": 95,
+ "max_weekly": 60
+}

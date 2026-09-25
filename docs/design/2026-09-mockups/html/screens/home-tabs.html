@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
 <style>
   /* slim top bar: search + tabs only */
   .topbar.slim { height: 48px; padding-right: 12px; }
@@ -28,11 +28,15 @@
   .cols .meta { display: block; margin-top: 2px; }
   .surprise { display: flex; justify-content: center; margin-top: 8px; }
   .surprise .btn { height: 40px; }
+  /* Home's own quick-access row, docked at the foot (shortcuts, not a tab bar: nothing is "current") */
+  .tabbar .tb { width: 88px; white-space: nowrap; }
+  .tabbar .tb .nudge { transform: translateY(-3px); }
 </style></head>
-<body>
-<div class="screen">
+<body data-size="412x1030">
+<div class="screen tall">
   <div class="status"></div>
   <div class="topbar slim">
+    <span class="iconbtn"><i data-i="sy-info"></i></span>
     <span class="spacer"></span>
     <span class="iconbtn"><i data-i="search"></i></span>
     <span class="tabcount">1</span>
@@ -62,15 +66,17 @@
       <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
       <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
       <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Library</span><span class="meta">Notes, journal &amp; bookmarks</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Settings</span><span class="meta">Display, themes &amp; preferences</span></span><i data-i="chevron-right" class="chev sm"></i></div>
     </div>
 
-    <div class="surprise"><span class="btn text"><i data-i="shuffle" class="sm"></i>Surprise me</span></div>
+    <div class="surprise"><span class="btn text"><i data-i="sy-dice" class="sm"></i>Surprise Me</span></div>
   </div>
   <div class="tabbar">
-    <span class="tb on"><i data-i="house"></i>Home</span>
-    <span class="tb"><i data-i="book-open"></i>Read</span>
-    <span class="tb"><i data-i="headphones"></i>Listen</span>
-    <span class="tb"><i data-i="library"></i>Library</span>
+    <span class="tb"><i data-i="history"></i>Recent</span>
+    <span class="tb"><i data-i="notebook-pen"></i>Notes</span>
+    <span class="tb"><i data-i="bookmark"></i>Bookmarks</span>
+    <span class="tb"><i data-i="scripture-web" class="nudge"></i>Scripture Web</span>
   </div>
 </div>
 </body></html>
