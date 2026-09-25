@@ -99,11 +99,12 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
     expect(USE_SETTINGS).toMatch(/document\.body\.classList\.toggle\("light",\s*theme === "light"\)/);
   });
 
-  it('calibration: in the dark theme a pill resolves to the cream the live walk read (18.02:1)', () => {
+  // The calmer dark (2026-09-25) moved --ink-cream-dim from #f2ede5 (18.02:1) to #e0d9cc; the pill follows.
+  it('calibration: in the dark theme a pill resolves to the shared cream ink (14.97:1)', () => {
     const root = mountChrome();
     const ink = inkOf(root.querySelector(SITES['pill .sw-btn']));
-    expect(ink).toEqual([0xf2, 0xed, 0xe5]);
-    expect(onBlack(ink)).toBeCloseTo(18.02, 1);
+    expect(ink).toEqual([0xe0, 0xd9, 0xcc]);
+    expect(onBlack(ink)).toBeCloseTo(14.97, 1);
   });
 
   /* The chrome rule and :root's dark set spelled the same seven literals twice (chrome-light,

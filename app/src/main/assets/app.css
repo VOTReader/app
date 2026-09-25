@@ -218,7 +218,7 @@
         color: var(--gold); font-size: var(--fs-12); padding: 0.3rem 0.7rem;
         cursor: pointer; white-space: nowrap;
       }
-      .sh-banner-btn-primary { background: rgba(232,192,80,0.12); }
+      .sh-banner-btn-primary { background: rgba(214,179,95,0.12); }
       .sh-banner-amber .sh-banner-btn { border-color: rgba(209,143,46,0.55); color: #d18f2e; }
       .sh-banner-amber .sh-banner-btn-primary { background: rgba(209,143,46,0.12); }
       .sh-banner-danger .sh-banner-btn { border-color: rgba(192,57,43,0.5); color: var(--danger); }
@@ -391,19 +391,28 @@
            chrome rule used to copy the literals verbatim — two definitions that
            must agree — so both sites now read these, and sw-chrome-light.test.js
            refuses a colour literal in that rule. Change a value HERE only. */
-        --ink-gold:        #e8c050;
-        --ink-gold-bright: #f5d86a;
-        --ink-gold-dim:    #d0a838;
-        --ink-gold-faint:  rgba(232,192,80,0.14);
-        --ink-gold-border: rgba(232,192,80,0.38);
-        --ink-cream-dim:   #f2ede5;
-        --ink-cream-muted: #ccc4b4;
+        /* THE CALMER DARK (2026-09-25; the redesign's round 2 - Codex image mockups, brief
+           "substantially more professional and healthy", D:/Swarm/calls/ux-0925/). The page stays TRUE
+           BLACK (the 08-03 owner call above) and every raised surface still sits at black; what changes
+           is what sits on it. Pure-white text and a vivid yellow-gold on #000 are the two glare sources
+           of long night reading, so the ink is a warm off-white and an older, softer gold (was #e8c050 /
+           #f5d86a / #d0a838, cream-dim #f2ede5, cream-muted #ccc4b4), and the gold hairline drops from
+           0.38 to 0.24 alpha so the 225 outlined boxes recede. Ratios on #000 / --bg3 stay far above AA:
+           gold 10.4:1, gold-dim 8.3, cream-dim 15.0, cream-muted 9.4 (app-css.contrast.test.js). The
+           Scripture Web chrome shares these, so it follows; its canvas draws its own gold from JS. */
+        --ink-gold:        #d6b35f;
+        --ink-gold-bright: #e8c977;
+        --ink-gold-dim:    #c29f57;
+        --ink-gold-faint:  rgba(214,179,95,0.13);
+        --ink-gold-border: rgba(214,179,95,0.24);
+        --ink-cream-dim:   #e0d9cc;
+        --ink-cream-muted: #b9b1a1;
         --gold:        var(--ink-gold);
         --gold-bright: var(--ink-gold-bright);
         --gold-dim:    var(--ink-gold-dim);
         --gold-faint:  var(--ink-gold-faint);
         --gold-border: var(--ink-gold-border);
-        --gold-glow:   rgba(232,192,80,0.50);
+        --gold-glow:   rgba(214,179,95,0.45);
         /* The QUIET hairline — the neutral sibling of --gold-border, for a
            card or pill that should have an edge without announcing it.
            C2-D [D8], 2026-08-10: thirteen rules across app.css, the Journal
@@ -421,12 +430,12 @@
            and footer already draw. tools/check-css-tokens.js now fails the build
            on any var(--name) with no declaration and no fallback. */
         --border:      rgba(200,164,86,0.16);
-        --cream:       #ffffff;
+        --cream:       #ece6db;   /* was #ffffff: warm off-white, 16.8:1 on #000 (the calmer dark, above) */
         --cream-dim:   var(--ink-cream-dim);
         --cream-muted: var(--ink-cream-muted);
-        --study-note:  rgba(232,192,80,0.10);
-        --study-border: rgba(232,192,80,0.24);
-        --reading-wash: rgba(232,192,80,0.20);   /* the read-along wash: ::highlight(vot-reading) and a song's current lyric line */
+        --study-note:  rgba(214,179,95,0.10);
+        --study-border: rgba(214,179,95,0.24);
+        --reading-wash: rgba(214,179,95,0.20);   /* the read-along wash: ::highlight(vot-reading) and a song's current lyric line */
         --radius:      6px;
         --transition:  0.2s ease;
 
@@ -619,7 +628,7 @@
          blue, the reader whatever the engine chose). Text over the band is forced to the theme's body
          ink so the gold description text keeps AA: computed on the blended band, dark #4a3d1a white
          10.6:1, light #d4c8ac input-text 9.2:1 (gold on it would read 3.8:1). */
-      ::selection { background: rgba(232,192,80,0.32); color: var(--cream); }
+      ::selection { background: rgba(214,179,95,0.32); color: var(--cream); }
       body.light ::selection { background: rgba(122,92,16,0.28); color: var(--input-text); }
       /* Wave-0: the ring previously stopped at buttons/links/cards. The
          role selectors above extend the SAME token to the remaining
@@ -2362,7 +2371,7 @@
     .prophecy-card.pc-ot .prophecy-card-tag { color:rgba(255,180,120,1); }
     .prophecy-card.pc-ot .prophecy-card-sublabel { color:rgba(255,180,120,0.8); }
     /* NT: gold (matches scripture hero #211700) */
-    .prophecy-card.pc-nt { border-color:rgba(232,192,80,0.4); background:rgba(232,192,80,0.06); }
+    .prophecy-card.pc-nt { border-color:rgba(214,179,95,0.4); background:rgba(214,179,95,0.06); }
     .prophecy-card.pc-nt .prophecy-card-tag { color:var(--gold); }
     .prophecy-card.pc-nt .prophecy-card-sublabel { color:var(--gold-dim); }
     /* VOT: deep blue (matches volume hero #09122e) */
@@ -2807,7 +2816,7 @@
       font-style: italic;
       font-weight: 500;
       font-size: var(--fs-24);
-      color: #f5d86a;
+      color: var(--gold-bright);
       text-align: center;
       line-height: 1;
       margin: 0 0 0.05rem;
@@ -3179,7 +3188,7 @@
        and revealed on demand by the ⓘ button. Far denser than the old
        one-bordered-box-per-row layout. */
     .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
-    .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(232,192,80,0.13); }
+    .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(214,179,95,0.13); }
     .settings-card > .settings-row:last-child { border-bottom:none; }
     /* Danger zone (Clear All Personal Data) — visibly set apart from the
        routine Export/Import rows above it: breathing room + a red-tinted
@@ -5310,7 +5319,7 @@
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: transform 0.12s, box-shadow 0.12s;
     }
-    .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(232,192,80,0.25); }
+    .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(214,179,95,0.25); }
     .note-sheet-color-dot:active { transform: scale(0.92); }
     .note-sheet-title {
       flex: 1;
@@ -6375,7 +6384,7 @@
       border: none; background: transparent;
       width: 100%; text-align: left;
     }
-    .multinote-row + .multinote-row { border-top: 1px solid rgba(232,192,80,0.10); }
+    .multinote-row + .multinote-row { border-top: 1px solid rgba(214,179,95,0.10); }
     .multinote-row:active { background: var(--gold-faint); }
     @media (hover: hover) { .multinote-row:hover { background: var(--gold-faint); } }
     .multinote-row-swatch {
@@ -6460,7 +6469,7 @@
       display: flex; align-items: center; justify-content: center;
       gap: 0.6rem;
       padding: 6px 1rem;
-      background: rgba(232,192,80,0.04);
+      background: rgba(214,179,95,0.04);
       position: relative;
     }
     /* Visible ⋯ options button (mirrors .bkm-row-more) — pinned to the mid
@@ -6536,7 +6545,7 @@
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s;
     }
-    .link-action-btn + .link-action-btn { border-top: 1px solid rgba(232,192,80,0.06); }
+    .link-action-btn + .link-action-btn { border-top: 1px solid rgba(214,179,95,0.06); }
     .link-action-btn:active { background: var(--gold-faint); color: var(--gold); }
     @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
     .link-action-btn svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--gold-dim); }
@@ -6801,7 +6810,7 @@
       animation: selectSheetSlideUp 0.18s cubic-bezier(0.32,0.72,0,1);
     }
     .bkm-popover-item {
-      border-bottom: 1px solid rgba(232,192,80,0.08);
+      border-bottom: 1px solid rgba(214,179,95,0.08);
     }
     .bkm-popover-item:last-child { border-bottom: none; }
     .bkm-popover-label {

@@ -350,7 +350,8 @@ describe('app.css — the Settings ⓘ button paints a ring smaller than its hit
 describe('app.css — ::selection is gold in both themes, app-wide', () => {
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   it('one app-wide rule per theme, in the gold family', () => {
-    expect(bare).toMatch(/\n\s*::selection\s*\{[^}]*rgba\(232,\s*192,\s*80,/);
+    // The dark gold is the calmer #d6b35f (214,179,95) since 2026-09-25; the selection tint follows it.
+    expect(bare).toMatch(/\n\s*::selection\s*\{[^}]*rgba\(214,\s*179,\s*95,/);
     expect(bare).toMatch(/body\.light ::selection\s*\{[^}]*rgba\(122,\s*92,\s*16,/);
   });
   it('the picker no longer carries its own blue ::selection (the link-blue chips beside it are a different family and stay)', () => {
