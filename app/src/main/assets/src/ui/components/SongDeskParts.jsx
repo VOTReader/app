@@ -153,7 +153,24 @@ export function SongLyricsCard({ song, time }) {
   const [follow, setFollow] = React.useState(true);
   const boxRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const synced = !!(lyrics && lyrics.synced);
-  const now = synced ? lyricLineAt(lyrics.lines, time) : -1;
+  // n3-10: the player tells the page the time once a second, so the wash moved
+  // up to a second late. While the song plays, read the element's own clock each
+  // frame (getPreciseTime, as the read-along does) and re-render only when the
+  // line changes; paused, the page's time is exact enough.
+  const playing = AudioPlayer.getState().status === 'playing';
+  const [liveLine, setLiveLine] = React.useState(-1);
+  React.useEffect(() => {
+    if (!synced || !playing || typeof requestAnimationFrame !== 'function' || typeof AudioPlayer.getPreciseTime !== 'function') return undefined;
+    let raf = 0;
+    const tick = () => {
+      const i = lyricLineAt(lyrics.lines, AudioPlayer.getPreciseTime());
+      setLiveLine((prev) => (prev === i ? prev : i));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); setLiveLine(-1); };
+  }, [synced, playing, lyrics]);
+  const now = synced ? (playing && liveLine >= 0 ? liveLine : lyricLineAt(lyrics.lines, time)) : -1;
   React.useEffect(() => {
     const box = boxRef.current;
     if (!box || !follow || now < 0) return;

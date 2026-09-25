@@ -200,6 +200,32 @@ describe('the listening desk in song mode (final-04)', () => {
     expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
 
+  /* n3-10 (sweep 2): the player tells the page the time once a second, and the
+     wash moved only then, up to a second late on a line. While a song plays, the
+     card now reads the element's own clock each frame (getPreciseTime, as the
+     read-along does). */
+  it('(n3-10) the wash reaches the next line between the player’s once-a-second updates', async () => {
+    const rafPrev = globalThis.requestAnimationFrame;
+    const cafPrev = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 16);
+    globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+    try {
+      playFamilyA();
+      emit('playing');
+      const desk = openDesk();
+      expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
+      at(14);
+      expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('Come, love awaits you');
+      el().readyState = 4;                           // a playing element has its metadata (getPreciseTime reads it then)
+      el().currentTime = 15.3;                       // no timeupdate yet: the page's clock still says 14
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');
+    } finally {
+      globalThis.requestAnimationFrame = rafPrev;
+      globalThis.cancelAnimationFrame = cafPrev;
+    }
+  });
+
   it('a song whose lyrics are not synced never paints a line', async () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa2' }); });
     const desk = openDesk();
