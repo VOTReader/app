@@ -74,6 +74,17 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        // ap1 (improvement sweep v10-02; Corbin 2026-09-24 22:1x): the build for the owner's daily
+        // phone. A copy of debug - same debug signing, applicationId and versionCode - with debugging
+        // OFF: BuildConfig.DEBUG is false, so no WebView remote debugging (MainActivity) and the
+        // redacting BoundedLogTree instead of DebugTree (VOTReaderApp). Same key and versionCode mean
+        // `adb install -r app-daily.apk` upgrades an installed debug build in place and keeps its data.
+        // Never move the phone to release signing in place: that needs an uninstall, which wipes the
+        // journal. Test devices (S22, emulators) keep `debug`.
+        create("daily") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+        }
     }
 
     // AGP 8.0+ disabled automatic BuildConfig generation; re-enable so

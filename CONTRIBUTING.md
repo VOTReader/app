@@ -193,13 +193,19 @@ git push origin HEAD:main
 
 ### Getting it onto the phone
 
-A push does not reach the owner's phone: the owner tests the installed APK. Build and install it yourself:
+A push does not reach the owner's phone: the owner tests the installed APK. Build and install it yourself. His
+phone (the Pixel 9 Pro) runs the `daily` build: debug's key and versionCode with debugging off, so it upgrades
+his install in place and keeps his data:
 
 ```sh
 npm run build
-./gradlew :app:assembleDebug
-adb install -r -d "D:/VOTReader-build/<checkout-name>/app/outputs/apk/debug/app-debug.apk"
+./gradlew :app:assembleDaily
+adb -s <pixel-serial> install -r "D:/VOTReader-build/<checkout-name>/app/outputs/apk/daily/app-daily.apk"
 ```
+
+Test devices (the S22, emulators) take `:app:assembleDebug` and `apk/debug/app-debug.apk`, which WebView DevTools
+and `run-as` can reach. Never install a release-signed build over the owner's app: that needs an uninstall, and
+an uninstall wipes his journal.
 
 The APK lands outside the repo, under `D:\VOTReader-build\<checkout-name>\` (from `vot.buildDir`). Install the
 file your own build just wrote, never one from a remembered path: an APK another checkout built installs the wrong
