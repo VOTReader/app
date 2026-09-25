@@ -262,6 +262,15 @@ function resolveLetter(parsed) {
   const all = [col.preface, ...col.letters].filter(Boolean);
   const loose = all.filter((l) => titleMatches(parsed.title, l.title));
   if (loose.length === 1) return { col, letter: loose[0], note: 'matched by fuzzy title' };
+  // Several fuzzy hits: the parenthesis-stripping leg makes "I Am Calling You Out!
+  // (Part 2)..." match (Part 1) too. A single hit that still matches with the
+  // parentheses KEPT (exact or long common prefix) is the letter (sweep-2 n8-02:
+  // Timothy's ten V7.067 Part 2 section files, misnumbered upstream).
+  const strict = loose.filter((l) => {
+    const a = normkey(parsed.title), b = normkey(l.title), n = Math.min(a.length, b.length);
+    return a === b || (n >= 20 && (a.startsWith(b.slice(0, n)) || b.startsWith(a.slice(0, n))));
+  });
+  if (strict.length === 1) return { col, letter: strict[0], note: 'matched by fuzzy title (parentheses kept)' };
   return { err: loose.length > 1 ? `fuzzy title matches ${loose.length}` : 'no title match' };
 }
 
