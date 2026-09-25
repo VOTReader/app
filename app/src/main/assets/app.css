@@ -5541,9 +5541,11 @@
     .note-edit-nb-row svg { flex-shrink: 0; width: 14px; height: 14px; stroke: var(--gold-dim); }
 
     /* ══════════════════════════════════════════════════════════════
-       LIBRARY SCREEN — top-level destination with 4 sub-spaces.
-       Notes is active; Journal / Bookmarks / Highlights & Underlines
-       render as professional Coming-Soon placeholders.
+       LIBRARY SCREEN — the reader's own things, one row each (the
+       redesign, 2026-09-25, Codex mockup r4 take 1): icon, name, one
+       line (what it holds, or how to start it while it is empty), the
+       count at the right, a chevron. Same language as the Answers topic
+       rows. The header classes are shared with My Progress.
        ════════════════════════════════════════════════════════════ */
     .library-screen {
       max-width: 40rem; margin: 0 auto;
@@ -5567,94 +5569,100 @@
       text-align: center; margin-bottom: 2rem;
     }
     .library-grid {
-      display: grid;
-      /* Same fold as .genre-columns: two tiles until 6.5rem outgrows half the row (a11y-ux-6). */
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, max(6.5rem, calc(50% - 0.5rem))), 1fr));
-      gap: 0.85rem;
+      display: flex; flex-direction: column;
       max-width: 32.5rem;
       margin: 0 auto;
+      border-top: 1px solid var(--border);
+      container: library-list / inline-size;
     }
     .library-tile {
       position: relative;
-      display: flex; flex-direction: column;
-      gap: 0.4rem;
-      padding: 1.4rem 1.2rem 1.3rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
+      display: flex; align-items: center;
+      gap: 0.85rem;
+      width: 100%;
+      min-height: 4.25rem;
+      padding: 0.8rem 0.25rem;
+      background: none;
+      border: 0; border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      color: var(--cream-dim);
       cursor: pointer; text-align: left;
+      font-family: var(--font-body);
       -webkit-tap-highlight-color: transparent;
-      transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
-      min-height: 130px;
+      transition: background 0.18s ease;
     }
     @media (hover: hover) {
-      .library-tile:hover { border-color: var(--gold); background: var(--gold-faint); }
+      .library-tile:hover { background: var(--gold-faint); }
+      .library-tile:hover .library-tile-title { color: var(--gold-bright); }
     }
-    .library-tile:active { transform: scale(0.985); }
-    .library-tile.placeholder {
-      cursor: default; opacity: 0.55;
-    }
-    .library-tile.placeholder:active { transform: none; }
-    @media (hover: hover) {
-      .library-tile.placeholder:hover { border-color: var(--gold-border); background: var(--bg2); }
-    }
+    .library-tile:active { background: var(--gold-faint); }
+    .library-tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    /* A fixed box: the 24 px icon does not grow with Text Size, so neither does its column. */
     .library-tile-icon {
       display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px;
+      flex: 0 0 auto;
+      width: 32px; height: 32px;
       color: var(--gold);
-      margin-bottom: 0.2rem;
     }
-    .library-tile-icon svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-    .library-tile.placeholder .library-tile-icon { color: var(--cream-muted); }
-    .library-tile-eyebrow {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing:0.1em; text-transform: uppercase;
-      color: var(--gold-dim);
+    .library-tile-icon svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .library-tile-main {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center;
+      gap: 0.85rem;
     }
-    .library-tile.placeholder .library-tile-eyebrow { color: var(--cream-muted); }
+    .library-tile-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+    /* When the list is under 16rem wide (a Text Size past about 120 % on a
+       360 px phone) every row puts its count under its words. Held beside
+       them, it squeezed them into a word-per-line column ("Rea/ding",
+       measured at 180 %); wrapping row by row mixed the two layouts in one
+       list at 130 %. rem, so the switch scales with the type. The drag ghost
+       lives outside this container and copies the row's computed layout
+       (LibraryScreen onEngage). */
+    @container library-list (max-width: 16rem) {
+      .library-tile-main { flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+    }
     .library-tile-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
-      letter-spacing: 0.06em; color: var(--gold);
-      line-height: 1.2;
+      font-size: var(--fs-18); line-height: 1.3;
+      color: var(--cream-dim);
     }
-    .library-tile.placeholder .library-tile-title { color: var(--cream-dim); }
+    /* The second line: what the row holds, or (while it is empty, Wave 0's
+       guide) how to start it. One style for both, so an empty row reads as
+       an invitation, not an error. */
+    .library-tile-desc, .library-tile-guide {
+      font-size: var(--fs-14); line-height: 1.4;
+      color: var(--cream-muted);
+    }
+    .library-tile-title, .library-tile-desc, .library-tile-guide { overflow-wrap: break-word; }
+    /* The count: a bare figure (its unit is in an sr-only span), so every
+       row's number lines up in one column. An empty row shows none. */
     .library-tile-detail {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-      line-height: 1.35;
-      margin-top: auto;
-    }
-    /* Wave 0 — empty-tile "how X happens" caption (LibraryScreen guide).
-       Sits under the italic detail line; non-italic, plainer, dimmer. */
-    .library-tile-guide {
-      font-family: var(--font-body);
-      font-size: var(--fs-12); color: var(--cream-dim);
-      line-height: 1.3; opacity: 0.85;
+      flex: 0 0 auto;
+      font-size: var(--fs-15); color: var(--cream-muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
     .library-tile-arrow {
-      position: absolute; top: 1.1rem; right: 1.1rem;
-      font-family: var(--font-body); font-size: var(--fs-20);
-      color: var(--gold-dim); opacity: 0.6;
-      line-height: 1;
+      flex: 0 0 auto;
+      font-size: var(--fs-20); line-height: 1;
+      color: var(--gold-dim);
     }
-    .library-tile.placeholder .library-tile-arrow { display: none; }
 
     /* ── Library drag-to-reorder (mirrors Home + TabsOverview) ──── */
-    .library-tile.pressing {
-      border-color: var(--gold-dim);
-      box-shadow: 0 0 14px rgba(200,164,86,0.18), inset 0 0 0 1px rgba(200,164,86,0.15);
-    }
+    .library-tile.pressing { background: var(--gold-faint); }
     .library-tile.pressing::after {
-      content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 0%;
+      content: ''; position: absolute; left: 0; bottom: -1px; height: 2px; width: 0%;
       background: linear-gradient(90deg, var(--gold-dim), var(--gold), var(--gold-bright));
-      border-radius: 0 0 0 2px;
       animation: libPressFill 1s linear forwards;
     }
     @keyframes libPressFill { to { width: 100%; } }
     .library-tile.dragging { opacity: 0 !important; pointer-events: none; }
+    /* The lifted row is a clone floating over the list: a row has no fill of
+       its own, so the ghost carries one or the rows beneath show through it. */
     .library-tile.drag-flying {
-      border-color: var(--gold); border-radius: 12px; cursor: grabbing;
-      box-shadow: 0 20px 44px rgba(0,0,0,0.65), 0 0 32px rgba(200,164,86,0.32), 0 0 0 1px var(--gold);
+      background: var(--bg2);
+      border: 1px solid var(--gold); border-radius: 12px; cursor: grabbing;
+      padding-left: 0.75rem; padding-right: 0.75rem;
+      box-shadow: 0 20px 44px rgba(0,0,0,0.65), 0 0 32px rgba(214,179,95,0.32), 0 0 0 1px var(--gold);
     }
     body.light .library-tile.drag-flying {
       box-shadow: 0 20px 44px rgba(0,0,0,0.18), 0 0 28px rgba(122,92,16,0.28), 0 0 0 1px var(--gold);

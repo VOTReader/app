@@ -116,6 +116,65 @@ describe('Scripture Web is reachable from the Library, and no longer says it is 
   });
 });
 
+/* The redesign (2026-09-25, Codex mockup r4 take 1): one row each, the count at the right. The
+   visible count is a bare figure so the column of numbers lines up; its unit rides an sr-only span,
+   so a screen reader still hears "12 notes". An empty row shows no count at all (its guide line
+   teaches instead) and says "No notes yet" to a screen reader only. */
+describe('LibraryScreen — a row per thing, the count at the right', () => {
+  const visible = (el) => [...el.childNodes]
+    .filter((n) => !(n.nodeType === 1 && n.classList.contains('sr-only')))
+    .map((n) => n.textContent).join('');
+
+  it('a row with something shows a bare count, its description, and no guide', () => {
+    setupGlobals({ NoteStore: fakeStore({ count: () => 1204 }) });
+    renderLibrary();
+    const row = tileEl('Notes');
+    const count = row.querySelector('.library-tile-detail');
+    expect(count.classList.contains('sr-only')).toBe(false);
+    expect(visible(count)).toBe('1,204');
+    expect(count.textContent).toBe('1,204 notes');            // what a screen reader hears
+    expect(row.querySelector('.library-tile-desc').textContent).toBe('Your notes on passages');
+    expect(row.querySelector('.library-tile-guide')).toBeNull();
+  });
+
+  it('an empty row shows no count and teaches instead; a screen reader hears that it is empty', () => {
+    setupGlobals();
+    renderLibrary();
+    const row = tileEl('Bookmarks');
+    const count = row.querySelector('.library-tile-detail');
+    expect(count.classList.contains('sr-only')).toBe(true);
+    expect(count.textContent).toBe('No bookmarks yet');
+    expect(row.querySelector('.library-tile-desc')).toBeNull();
+    expect(row.querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
+  });
+
+  it('Progress and Milestones keep their words on the figure', () => {
+    setupGlobals({ NoteStore: fakeStore({ count: () => 1 }) });
+    renderLibrary({ totalReadCount: 27 });
+    expect(visible(tileEl('Progress').querySelector('.library-tile-detail'))).toBe('27 read');
+    expect(visible(tileEl('Milestones').querySelector('.library-tile-detail'))).toMatch(/^\d+ of \d+$/);
+  });
+
+  it('Scripture Web has no count and no empty state, just its size on the line', () => {
+    setupGlobals();
+    renderLibrary();
+    const row = tileEl('Scripture Web');
+    expect(row.querySelector('.library-tile-detail')).toBeNull();
+    expect(row.querySelector('.library-tile-desc').textContent).toBe('63,418 cross-references');
+  });
+
+  it('no row carries a "My …" eyebrow, and the icon and chevron are hidden from screen readers', () => {
+    setupGlobals();
+    renderLibrary();
+    expect(document.querySelector('.library-tile-eyebrow')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/My Notes|My Marks|The Whole Counsel/);
+    for (const row of document.querySelectorAll('.library-tile')) {
+      expect(row.querySelector('.library-tile-icon').getAttribute('aria-hidden')).toBe('true');
+      expect(row.querySelector('.library-tile-arrow').getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+});
+
 describe('LibraryScreen — empty-tile guidance captions', () => {
   /* The tiles that CAN be empty: every tile but Scripture Web, which ships full (63,418
      cross-references) and so has nothing to explain. Its "Still under construction." caption of

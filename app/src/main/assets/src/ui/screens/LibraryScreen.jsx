@@ -1,10 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════
    LibraryScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
+   One row per thing the reader keeps (the redesign, 2026-09-25, Codex
+   mockup r4 take 1): icon, name, one line, the count at the right. The
+   line says what the row holds, or while it is empty (Wave 0's guide) how
+   to start it; an empty row shows no count, and screen readers hear
+   "No notes yet" from an sr-only detail instead.
+
    Drag-to-reorder: same imperative DOM / long-press architecture as
-   HomeScreen (1D reference) and TabsOverview (2D grid). The 6 tiles are
-   in a 2-column grid, so sibling shifts use full 2D FLIP (naturalRectsRef
-   holds real viewport coords; diagonal cross-row moves work for free).
+   HomeScreen (1D reference) and TabsOverview (2D grid). The sibling
+   shifts keep their 2D FLIP (nearest centre, real viewport coords), which
+   serves one column of rows as the special case it is.
 
    Order is persisted via LibraryOrderStore (IDB, key vot-library-order).
 
@@ -60,15 +66,24 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
 
   // ── Tile metadata (static) ──────────────────────────────────────────
   // Defined inline so the SVG JSX resolves in component scope.
-  // Wave 0: each EMPTY tile also carries `guide` — a one-line "how X
-  // happens" caption in the voice of the destination screen's own empty
-  // state (NotesIndexScreen / BookmarksScreen / LinksScreen /
-  // HighlightsScreen / JournalHubScreen). Rendered only while the tile
-  // is empty; real counts replace it.
+  //   count  the figure at the right, null while the row is empty
+  //   unit   read after it by a screen reader only (" notes"), so the
+  //          visible figures line up in one column
+  //   empty  what a screen reader hears for an empty row
+  //   desc   the second line while the row has something
+  //   guide  Wave 0: the second line while it is EMPTY, a one-line "how X
+  //          happens" in the voice of the destination screen's own empty
+  //          state (NotesIndexScreen / BookmarksScreen / LinksScreen /
+  //          HighlightsScreen / JournalHubScreen)
+  const tally = (n, one, many) => ({
+    count: n > 0 ? n.toLocaleString('en-US') : null,
+    unit: ' ' + (n === 1 ? one : many),
+    empty: 'No ' + many + ' yet',
+  });
   const TILES_BY_ID = {
     notes: {
-      id: 'notes', eyebrow: 'My Notes', title: 'Notes',
-      detail: noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes')),
+      id: 'notes', title: 'Notes', ...tally(noteCount, 'note', 'notes'),
+      desc: 'Your notes on passages',
       guide: noteCount === 0 ? 'Long-press text in any chapter and tap Note.' : null,
       onClick: onOpenNotes,
       icon: (
@@ -81,8 +96,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     links: {
-      id: 'links', eyebrow: 'My Links', title: 'Links',
-      detail: linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links')),
+      id: 'links', title: 'Links', ...tally(linkCount, 'link', 'links'),
+      desc: 'Passages you joined together',
       guide: linkCount === 0 ? 'Select text, tap Link, and pick a destination.' : null,
       onClick: onOpenLinks,
       icon: (
@@ -93,8 +108,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     journal: {
-      id: 'journal', eyebrow: 'My Journal', title: 'Journal',
-      detail: journalCount === 0 ? 'No entries yet' : (journalCount + (journalCount === 1 ? ' entry' : ' entries')),
+      id: 'journal', title: 'Journal', ...tally(journalCount, 'entry', 'entries'),
+      desc: 'Your dated reflections',
       guide: journalCount === 0 ? 'Tap "New Entry" in the Journal to write your first reflection.' : null,
       onClick: onOpenJournal,
       icon: (
@@ -106,8 +121,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     bookmarks: {
-      id: 'bookmarks', eyebrow: 'My Bookmarks', title: 'Bookmarks',
-      detail: bookmarkCount === 0 ? 'No bookmarks yet' : (bookmarkCount + (bookmarkCount === 1 ? ' bookmark' : ' bookmarks')),
+      id: 'bookmarks', title: 'Bookmarks', ...tally(bookmarkCount, 'bookmark', 'bookmarks'),
+      desc: 'Places to come back to',
       guide: bookmarkCount === 0 ? 'Select text and tap Bookmark in the toolbar.' : null,
       onClick: onOpenBookmarks,
       icon: (
@@ -117,8 +132,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     highlights: {
-      id: 'highlights', eyebrow: 'My Marks', title: 'Highlights & Underlines',
-      detail: highlightCount === 0 ? 'No marks yet' : (highlightCount + (highlightCount === 1 ? ' mark' : ' marks')),
+      id: 'highlights', title: 'Highlights & Underlines', ...tally(highlightCount, 'mark', 'marks'),
+      desc: 'Passages you marked',
       guide: highlightCount === 0 ? 'Select a passage and tap a color to highlight or underline it.' : null,
       onClick: onOpenHighlights,
       icon: (
@@ -129,8 +144,10 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     progress: {
-      id: 'progress', eyebrow: 'My Progress', title: 'Progress',
-      detail: !totalReadCount ? 'Nothing read yet' : (totalReadCount + ' read'),
+      id: 'progress', title: 'Progress',
+      count: totalReadCount ? totalReadCount.toLocaleString('en-US') + ' read' : null, unit: '',
+      empty: 'Nothing read yet',
+      desc: 'Your reading at a glance',
       guide: !totalReadCount ? 'Chapters you read are counted here.' : null,
       onClick: onOpenProgress,
       icon: (
@@ -143,8 +160,10 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     milestones: {
-      id: 'milestones', eyebrow: 'My Journey', title: 'Milestones',
-      detail: !milestones.earned ? 'None reached yet' : (milestones.earned + ' of ' + milestones.total + ' reached'),
+      id: 'milestones', title: 'Milestones',
+      count: milestones.earned ? milestones.earned + ' of ' + milestones.total : null, unit: ' reached',
+      empty: 'None reached yet',
+      desc: 'Reading, listening and study',
       guide: !milestones.earned ? 'Reading, listening, and study all count toward these.' : null,
       onClick: onOpenMilestones,
       icon: (
@@ -154,8 +173,10 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       ),
     },
     'scripture-web': {
-      id: 'scripture-web', eyebrow: 'The Whole Counsel', title: 'Scripture Web',
-      detail: '63,418 cross-references',
+      id: 'scripture-web', title: 'Scripture Web',
+      // Never empty and nothing of the reader's to count: the line carries its size.
+      count: null, unit: '', empty: null,
+      desc: '63,418 cross-references',
       // No guide: the "Still under construction." caption of 2026-09-05 left with the
       // Home shortcut's return (2026-09-11) — the tour teaches the web now, and a tile
       // one screen away saying it is not ready would contradict it.
@@ -297,6 +318,17 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
             'transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)',
             'transform:scale(1.05)',
           ].join(';');
+          // A large Text Size stacks each row's count under its words through an
+          // @container query on the list; the ghost lives on <body>, outside that
+          // container, so it copies the row's computed layout to look the same.
+          const srcMain = el.querySelector('.library-tile-main');
+          const ghostMain = ghost.querySelector('.library-tile-main');
+          if (srcMain && ghostMain) {
+            const cs = getComputedStyle(srcMain);
+            ghostMain.style.flexDirection = cs.flexDirection;
+            ghostMain.style.alignItems = cs.alignItems;
+            ghostMain.style.gap = cs.gap;
+          }
           document.body.appendChild(ghost);
           g.data.ghost = ghost;
         }
@@ -365,12 +397,21 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
               }}
               onDragStart={(e) => e.preventDefault()}
             >
-              <span className="library-tile-icon">{tile.icon}</span>
-              <span className="library-tile-eyebrow">{tile.eyebrow}</span>
-              <span className="library-tile-title">{tile.title}</span>
-              <span className="library-tile-detail">{tile.detail}</span>
-              {tile.guide && <span className="library-tile-guide">{tile.guide}</span>}
-              <span className="library-tile-arrow">›</span>
+              <span className="library-tile-icon" aria-hidden="true">{tile.icon}</span>
+              {/* main: the words and the count, which wraps under them when a large
+                  Text Size leaves no room beside them (app.css). */}
+              <span className="library-tile-main">
+                <span className="library-tile-text">
+                  <span className="library-tile-title">{tile.title}</span>
+                  {tile.guide
+                    ? <span className="library-tile-guide">{tile.guide}</span>
+                    : <span className="library-tile-desc">{tile.desc}</span>}
+                </span>
+                {tile.count != null
+                  ? <span className="library-tile-detail">{tile.count}{tile.unit ? <span className="sr-only">{tile.unit}</span> : null}</span>
+                  : tile.empty && <span className="library-tile-detail sr-only">{tile.empty}</span>}
+              </span>
+              <span className="library-tile-arrow" aria-hidden="true">›</span>
             </button>
           ))}
         </div>

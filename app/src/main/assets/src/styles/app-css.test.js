@@ -187,6 +187,42 @@ describe('app.css — a Settings group line shows its values whole', () => {
   });
 });
 
+/* THE LIBRARY IS A LIST (redesign, 2026-09-25, Codex mockup r4 take 1). Eight
+   bordered cards in two columns became one column of rows on hairlines, in the
+   Answers topic rows' language, with every count in one right-hand column. */
+describe('app.css — the Library is one column of rows', () => {
+  it('stacks the rows on hairlines, not cards in a grid', () => {
+    const list = ruleBlock(CSS, '.library-grid {');
+    expect(list).toMatch(/flex-direction:\s*column/);
+    expect(list).not.toMatch(/grid-template-columns/);
+    const row = ruleBlock(CSS, '.library-tile {');
+    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+    expect(row).toMatch(/background:\s*none/);
+    expect(row).toMatch(/min-height:\s*4\.25rem/);
+  });
+  it('lines the counts up (tabular figures, never wrapped)', () => {
+    const count = ruleBlock(CSS, '.library-tile-detail {');
+    expect(count).toMatch(/font-variant-numeric:\s*tabular-nums/);
+    expect(count).toMatch(/white-space:\s*nowrap/);
+  });
+  it('at a large Text Size every row puts its count under its words, all at once', () => {
+    // 180 % on 360 px, with the count held beside them: "Rea/ding, liste/ning" one per line.
+    // Row-by-row wrapping mixed both layouts in one list at 130 %, so the LIST decides (a
+    // container query, in rem so the switch scales with the type).
+    expect(ruleBlock(CSS, '.library-grid {')).toMatch(/container:\s*library-list\s*\/\s*inline-size/);
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).toMatch(
+      /@container library-list \(max-width:\s*\d+(\.\d+)?rem\)\s*\{\s*\.library-tile-main\s*\{[^}]*flex-direction:\s*column/);
+    expect(ruleBlock(CSS, '.library-tile-icon {')).toMatch(/width:\s*32px/);   // the icon's column does not grow
+  });
+  it('the lifted row carries its own fill (a row has none, so the list would show through it)', () => {
+    expect(ruleBlock(CSS, '.library-tile.drag-flying {')).toMatch(/background:\s*var\(--bg2\)/);
+  });
+  it('the per-card eyebrows are gone', () => {
+    expect(CSS).not.toMatch(/\.library-tile-eyebrow/);
+  });
+});
+
 /* REM-SCALED CHROME MUST NOT SCALE PAST THE SCREEN (design-perf, launch-day live
    read 2026-09-05, measured through the real slider with --font-scale asserted
    at each site). At Text Size 1.8 on a 360x800 phone: the "New here?" strip was
@@ -580,7 +616,7 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
 describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
     '.hni-eyebrow', '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
-    '.volumes-landing .genre-col-label', '.library-eyebrow', '.library-tile-eyebrow', '.audio-library-eyebrow',
+    '.volumes-landing .genre-col-label', '.library-eyebrow', '.audio-library-eyebrow',
     '.audio-library-section-head span', '.milestones-eyebrow', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
     '.prg-stat-label', '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
