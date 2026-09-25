@@ -18,12 +18,28 @@ import { chapterConnections } from '../../utils/scripture-web/chapter-connection
 
 const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
 
+/* n6-05: where to reopen after the list sends the reader away. Following a
+   connection reads a verse, which History records, so the screen's
+   initialChapter (History's newest chapter) came back as the chapter just
+   visited, and Try again remounts the list: both lost the reader's place.
+   Set by those two exits, used once by the next mount; any other way in
+   opens on History's chapter as before. */
+/** @type {number | null} */
+let resumeChapter = null;
+
+/** Tests only: forget the resume point between cases. */
+export function _resetFallbackPlace() { resumeChapter = null; }
+
 /**
  * @param {{ graph: any, initialChapter: number, onOpen: (ref: any) => void,
  *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string }} props
  */
 export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText }) {
-  const [ci, setCi] = React.useState(initialChapter);
+  const [ci, setCi] = React.useState(() => {
+    const at = resumeChapter;
+    resumeChapter = null;
+    return at != null && graph.chapters[at] ? at : initialChapter;
+  });
   const data = React.useMemo(() => chapterConnections(graph, ci), [graph, ci]);
   const ch = graph.chapters[ci];
   const book = ch ? graph.books[ch[0]] : null;
@@ -46,7 +62,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       </div>
       <div className="swf-note">
         <span>The map can’t be drawn on this device right now.</span>
-        <button type="button" className="swf-retry" onClick={onRetry}>Try again</button>
+        <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onRetry(); }}>Try again</button>
       </div>
       <div className="swf-count-row">
         <h2 className="swf-h2">Connected passages</h2>
@@ -61,7 +77,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
           <ul className="swf-rows">
             {grp.rows.map((row) => (
               <li key={row.index}>
-                <button type="button" className="swf-row" onClick={() => onOpen(row.other)}
+                <button type="button" className="swf-row" onClick={() => { resumeChapter = ci; onOpen(row.other); }}
                   aria-label={row.other.label + (row.tier === 'essential' ? ', essential' : ', famous')}>
                   <span className="swf-row-top">
                     <span className="swf-ref">{row.other.label}</span>

@@ -31,8 +31,10 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 });
 
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { _resetFallbackPlace } from '../scripture-web/WebFallbackList.jsx';
 
 afterEach(() => {
+  _resetFallbackPlace();   // a followed row sets where the next list opens (n6-05)
   delete window.SCRIPTURE_WEB_DATA;
   delete /** @type {any} */ (globalThis).HistoryStore;
   delete /** @type {any} */ (HTMLCanvasElement.prototype).clientWidth;
