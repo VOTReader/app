@@ -17,7 +17,7 @@ export function ReadCheck({ count }) {
   );
 }
 
-export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns, onPlayAll, sections, onPlaySection }) {
+export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns, onPlayAll, sections, onPlaySection, headerExtra }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -63,6 +63,8 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
         {sections && onPlaySection && (
           <AudioSectionChips sections={sections} onPlay={onPlaySection} />
         )}
+        {/* A collection's own extras under its title (Holy Days' two playlists). */}
+        {headerExtra || null}
       </div>
       <div className={`chapter-cards${columns === 2 ? " two-col" : ""}`}>
         {preface && (columns === 2 ? (

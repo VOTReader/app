@@ -1069,28 +1069,25 @@
       .vol-index-ornament-diamond {
         width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0;
       }
-      /* Holy Days playlist buttons */
-      .hd-playlists {
-        display: flex; gap: 0.9rem; margin: 0.75rem auto 2rem; max-width: 42.5rem;
-        flex-wrap: wrap; justify-content: center; padding-top: 0.5rem;
-      }
+      /* Holy Days' two playlists (the redesign, 2026-09-25). They were two boxed
+         tiles ABOVE the page's own title, most of a phone's first screen; now two
+         quiet link rows under the title and Play All (VolumeLetterIndex's
+         headerExtra), the Library rows' language, with a ↗ for leaving the app. */
+      .hd-playlists { max-width: 26rem; margin: 1.25rem auto 0; text-align: left; border-top: 1px solid var(--border); }
       .hd-playlist-btn {
-        flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column;
-        align-items: center; gap: 0.4rem; padding: 1.1rem 1rem;
-        background: linear-gradient(180deg, var(--gold-faint), transparent);
-        border: 1px solid var(--gold-border); border-radius: 12px;
-        color: var(--cream); text-decoration: none; cursor: pointer;
-        transition: border-color 0.18s, background 0.18s, transform 0.18s;
+        display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; column-gap: 0.75rem; align-items: center;
+        min-height: 3.25rem; box-sizing: border-box; padding: 0.55rem 0.2rem;
+        border-bottom: 1px solid var(--border); color: var(--cream-dim); text-decoration: none; cursor: pointer;
+        transition: background 0.18s;
       }
-      @media (hover: hover) { .hd-playlist-btn:hover { border-color: var(--gold); transform: translateY(-1px); } }
-      .hd-playlist-btn svg { width: 26px; height: 26px; color: var(--gold); margin-bottom: 0.25rem; }
-      .hd-playlist-label {
-        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.18em;
-        text-transform: uppercase; color: var(--gold);
+      .hd-playlist-btn::after { content: '↗'; grid-column: 3; grid-row: 1 / span 2; color: var(--gold-dim); font-size: var(--fs-16); }
+      @media (hover: hover) {
+        .hd-playlist-btn:hover { background: var(--gold-faint); }
+        .hd-playlist-btn:hover .hd-playlist-label { color: var(--gold-bright); }
       }
-      .hd-playlist-sub {
-        font-size: var(--fs-12); color: var(--cream-dim); font-style: italic; letter-spacing: 0.04em;
-      }
+      .hd-playlist-btn svg { grid-column: 1; grid-row: 1 / span 2; width: 20px; height: 20px; color: var(--gold); }
+      .hd-playlist-label { grid-column: 2; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
+      .hd-playlist-sub { grid-column: 2; font-family: var(--font-body); font-size: var(--fs-13); color: var(--cream-muted); }
 
       /* ── AUDIO PLAYER — streaming letters (bar + pills + chips) ── */
       /* The mini-player (AudioPlayerBar) is PINNED CHROME: fixed to the
@@ -1805,8 +1802,8 @@
       }
 
       /* Listen / Play All pill (AudioPlayButton). In-flow content, so --fs-*:
-         these SHOULD scale with Text Size. Same faint-gold gradient plate as
-         .hd-playlist-btn, so both themes fall out of the vars. */
+         these SHOULD scale with Text Size. A faint-gold gradient plate built
+         from the vars, so both themes fall out of them. */
       .hero-play-pill {
         position: relative;
         display: inline-flex; align-items: center; gap: 0.5em;

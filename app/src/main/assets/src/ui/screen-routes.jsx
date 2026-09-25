@@ -1419,8 +1419,8 @@ export function buildScreenRoutes({
 
     'holy-days-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <HolyDaysPlaylistHeader />
-        <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
+        {/* The playlists sit under the title and Play All (2026-09-25), not above the page. */}
+        <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} headerExtra={<HolyDaysPlaylistHeader />} />
       </ScreenLayout>
     )),
 
