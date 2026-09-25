@@ -1362,6 +1362,26 @@ function sectionsFor(volKey) {
 }
 
 /**
+ * A volume's range compilations as the tracks they play: what playSection queues (from its start index) and what a
+ * compilation's Download saves (item 8 follow-up), so the two can never name different files. One keyless track a
+ * file (a section keeps key null: one file, one resume position).
+ *
+ * @param {string} volKey
+ * @param {string | null} [collectionLabel]
+ * @returns {Track[]}
+ */
+function sectionTracks(volKey, collectionLabel) {
+  return (sectionsFor(volKey) || []).map((s) => ({
+    key: null,
+    title: s[0] || '',
+    sub: collectionLabel || null,
+    url: trackUrl(s[1]),
+    readerCode: s[2] || '',
+    partLabel: null,
+  }));
+}
+
+/**
  * Human label for a reader code, or null when unknown. The names live in
  * audio-track.js's AUDIO_READERS registry — one source of truth shared with the
  * listening desk's Voice chips and the Settings default-reader options.
@@ -2432,24 +2452,18 @@ function playCollection(opts) {
  * @returns {void}
  */
 function playSection(volKey, index, collectionLabel) {
-  const sections = sectionsFor(volKey);
-  if (!sections || !sections.length) return;
-  const startIndex = Math.max(0, Math.min(index || 0, sections.length - 1));
-  if (_offlineRefuses(sections.slice(startIndex).map((s) => ({ url: trackUrl(s[1]) })))) { _toast(OFFLINE_MSG); return; }
+  const all = sectionTracks(volKey, collectionLabel);
+  if (!all.length) return;
+  const startIndex = Math.max(0, Math.min(index || 0, all.length - 1));
+  const queue = all.slice(startIndex);
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return; }
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
   _rememberOutgoingPosition();
   _setPendingRestore(null);
   _setSource({ mode: 'section', volKey, label: collectionLabel || null, startIndex });
-  _state.queue = sections.slice(startIndex).map((s) => ({
-    key: null,
-    title: s[0] || '',
-    sub: collectionLabel || null,
-    url: trackUrl(s[1]),
-    readerCode: s[2] || '',
-    partLabel: null,
-  }));
+  _state.queue = queue;
   _state.qi = 0;
   _countPlay();
   _start();
@@ -3240,6 +3254,7 @@ export const AudioPlayer = {
   firstReaderCode,
   collectionHasAudio,
   sectionsFor,
+  sectionTracks,
   readerLabel,
   renditionsFor,
   setPreferredReader,

@@ -354,7 +354,8 @@ describe('a recordings screen in the phone app: downloads', () => {
     expect(store.download.mock.calls[all][0].map((t) => t.url)).not.toContain(URL_OF('sec1'));
   });
 
-  it('with no signal, a compilation not on the phone is marked unavailable, and one on the phone plays', () => {
+  // That a saved compilation then PLAYS with no signal is the player's side (audio-player.test.js, item 8 describe).
+  it('with no signal, a compilation not on the phone is marked unavailable, and one on the phone is not', () => {
     const store = fakeStore();
     store.statusOf = (u) => (u === URL_OF('sec2') ? 'saved' : 'none');
     store.isSaved = (u) => u === URL_OF('sec2');
@@ -365,8 +366,6 @@ describe('a recordings screen in the phone app: downloads', () => {
     expect(comps[0].querySelector('.offline-row').textContent).toMatch(/Needs a connection/);
     expect(comps[1].classList.contains('is-unavailable')).toBe(false);
     expect(comps[1].querySelector('.offline-row').textContent).toMatch(/On this phone/);
-    fireEvent.click(screen.getByRole('button', { name: /Part 2 · 3/ }));
-    expect(queueUrls()).toEqual([URL_OF('sec2')]);
   });
 
   it('with no signal, a row not on the phone is marked unavailable', () => {

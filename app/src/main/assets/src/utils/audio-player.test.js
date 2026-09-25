@@ -359,6 +359,14 @@ describe('audio-player — playSection', () => {
     expect(el().src).toBe(URL_OF('sec2'));
   });
 
+  it('sectionTracks names the very files playSection queues (what a compilation\'s Download saves, item 8)', () => {
+    const tracks = AudioPlayer.sectionTracks('wtlb1', 'Words To Live By');
+    expect(tracks.map((t) => t.url)).toEqual([URL_OF('sec1'), URL_OF('sec2'), URL_OF('sec3')]);
+    AudioPlayer.playSection('wtlb1', 1, 'Words To Live By');
+    expect(AudioPlayer.getState().queue).toEqual(tracks.slice(1));
+    expect(AudioPlayer.sectionTracks('wtlb2')).toEqual([]);
+  });
+
   it('clamps an out-of-range index and no-ops for a collection with no sections', () => {
     AudioPlayer.playSection('wtlb1', 99);
     expect(AudioPlayer.getState().qi).toBe(0);
@@ -1703,6 +1711,18 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     expect(AudioPlayer.getState().status).toBe('loading');
     expect(el().src).toBe(URL_OF('idC'));
     expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+  });
+
+  it('a downloaded compilation plays with no signal, and one not on the phone is refused', async () => {
+    await downloaded(['sec2']);
+    setOnline(false);
+    AudioPlayer.playSection('wtlb1', 1);
+    expect(AudioPlayer.getState().status).toBe('loading');
+    expect(el().src).toBe(URL_OF('sec2'));
+    AudioPlayer.stop();
+    AudioPlayer.playSection('wtlb1', 2);
+    expect(AudioPlayer.getState().queue).toHaveLength(0);
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBeTruthy();
   });
 
   it('Play all with no signal starts at the first downloaded recording', async () => {

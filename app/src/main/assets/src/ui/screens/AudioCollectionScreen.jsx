@@ -130,6 +130,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
   const missing = items.length - playable.length;
   const sections = bible || study ? null : AudioPlayer.sectionsFor(volKey);
+  // What each compilation plays is what its Download saves (AudioPlayer.sectionTracks, item 8 follow-up).
+  const sectionOwn = sections && offline && typeof AudioPlayer.sectionTracks === 'function' ? AudioPlayer.sectionTracks(volKey, label) : [];
   // Per ROW, through the one rule every Listening Library surface uses: a
   // collection that declares a letter screen, or any Bible edition (whose
   // tracks open the book's chapter in the reader). The screen-level `!bible`
@@ -216,12 +218,25 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
         {sections ? (
           <section className="audio-library-section" aria-labelledby="audio-collection-sections">
             <div className="audio-library-section-head"><div><span>In longer sittings</span><h2 id="audio-collection-sections">Compilations</h2></div></div>
-            <div className="audio-collection-chips">
-              {sections.map((section, index) => (
-                <button key={section[1] || index} type="button" onClick={() => AudioPlayer.playSection(volKey, index, label)}>
-                  <PlayIcon /><span>{section[0]}</span>
-                </button>
-              ))}
+            <div className={'audio-collection-chips' + (offline ? ' has-offline' : '')}>
+              {sections.map((section, index) => {
+                const chip = (
+                  <button key={section[1] || index} type="button" onClick={() => AudioPlayer.playSection(volKey, index, label)}>
+                    <PlayIcon /><span>{section[0]}</span>
+                  </button>
+                );
+                if (!offline) return chip;
+                // In the phone app a compilation is a recording like any row (item 8 follow-up): the same line
+                // beside it, saved under a name that says which collection it is on the On this phone shelf.
+                const own = sectionOwn[index] ? [sectionOwn[index]] : [];
+                const unavailable = !online && !(own.length && offline.isSaved(own[0].url));
+                return (
+                  <div key={section[1] || index} className={'audio-collection-compilation' + (unavailable ? ' is-unavailable' : '')}>
+                    {chip}
+                    <OfflineRowStatus tracks={own} name={(label ? label + ' · ' : '') + section[0]} />
+                  </div>
+                );
+              })}
             </div>
           </section>
         ) : null}
