@@ -22,6 +22,8 @@
    set, not a second table. See that module's FEATURED block.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { isMarkKind } from '../../utils/mark-kinds.js';
+
 /* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
    Study bundle) and reads buildAchievements / collectAchievementSnapshot / onIdle from the window slots
    bundle-d fills — one copy of each law, and no second module state. */
@@ -168,7 +170,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
   const markCount = (() => {
     const seen = {};
     Object.keys(annData).forEach((k) => (annData[k] || []).forEach((a) => {
-      if (a.kind === 'highlight' || a.kind === 'underline') seen[a.groupId || a.id] = 1;
+      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
     }));
     return Object.keys(seen).length;
   })();

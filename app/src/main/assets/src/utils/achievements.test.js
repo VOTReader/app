@@ -178,6 +178,11 @@ describe('achievements — collectAchievementSnapshot (live, guarded)', () => {
     };
     expect(collectAchievementSnapshot({}).marks).toBe(2);
   });
+
+  it('a squiggle is a mark too (v05-04)', () => {
+    window.AnnotationStore = { all: () => ({ 'bible:john:11': [{ id: 's1', kind: 'squiggle' }, { id: 'n1', kind: 'note' }] }) };
+    expect(collectAchievementSnapshot({}).marks).toBe(1);
+  });
 });
 
 /* ── ONE ENGINE (owner decision 2026-08-10) ───────────────────────────────

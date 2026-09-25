@@ -4,7 +4,9 @@
 
 /* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
    Study bundle) and reads normalizeExcerptDisplay from the window slots
-   bundle-d fills — one copy of each law, and no second module state. */
+   bundle-d fills — one copy of each law, and no second module state.
+   mark-kinds.js is the exception: pure, stateless, a few lines (v05-04). */
+import { isMarkKind } from '../../utils/mark-kinds.js';
 
 /* Self-contained CSS injection (segregated from the main stylesheet,
    same pattern as journal-styles.js). All classes prefixed `hlx-`. */
@@ -44,6 +46,9 @@
   R.push('.hlx-row:hover { background: var(--bg3); border-color: var(--gold-border); }');
   R.push('.hlx-row:active { transform: scale(0.995); }');
   R.push('.hlx-swatch { flex-shrink: 0; width: 14px; height: 14px; border-radius: 4px; margin-top: 3px; border: 1px solid rgba(255,255,255,0.12); }');
+  // A squiggle's swatch is a wavy stroke in the mark's colour (an inline SVG wave, v05-04),
+  // sitting where the underline swatch's line sits.
+  R.push('.hlx-swatch.is-squiggle { background: transparent !important; border: none; border-radius: 0; width: 16px; height: 8px; margin-top: 7px; display: flex; }');
   R.push('.hlx-swatch.is-underline { background: transparent !important; border-radius: 0; height: 0; margin-top: 10px; border: none; border-bottom: 3px solid; width: 16px; }');
   R.push('.hlx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }');
   R.push('.hlx-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }');
@@ -84,7 +89,7 @@ export function _collectMarks() {
     var arr = data[hlKey] || [];
     for (var i = 0; i < arr.length; i++) {
       var a = arr[i];
-      if (a.kind !== 'highlight' && a.kind !== 'underline') continue;
+      if (!isMarkKind(a.kind)) continue;
       var gid = a.groupId || a.id;
       var g = groups[gid];
       if (!g) {
@@ -115,6 +120,7 @@ export function HighlightRow(props) {
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
   var hex = _hlColorHex(m.color);
   var isUnderline = m.kind === 'underline';
+  var isSquiggle = m.kind === 'squiggle';
   return (
     <div
       className="hlx-row"
@@ -123,13 +129,19 @@ export function HighlightRow(props) {
       onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); props.onNavigate && props.onNavigate(m); } }}
     >
       <span
-        className={'hlx-swatch' + (isUnderline ? ' is-underline' : '')}
-        style={isUnderline ? { borderBottomColor: hex } : { background: hex }}
-      />
+        className={'hlx-swatch' + (isUnderline ? ' is-underline' : isSquiggle ? ' is-squiggle' : '')}
+        style={isUnderline ? { borderBottomColor: hex } : isSquiggle ? undefined : { background: hex }}
+      >
+        {isSquiggle && (
+          <svg width="16" height="8" viewBox="0 0 16 8" aria-hidden="true" focusable="false">
+            <path d="M0 4 Q2 0 4 4 T8 4 T12 4 T16 4" fill="none" stroke={hex} strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        )}
+      </span>
       <span className="hlx-body">
         <span className="hlx-top">
           <span className="hlx-source">{sourceLabel}</span>
-          <span className="hlx-kind">{isUnderline ? 'Underline' : 'Highlight'}</span>
+          <span className="hlx-kind">{isUnderline ? 'Underline' : isSquiggle ? 'Squiggle' : 'Highlight'}</span>
         </span>
         {m.text && <span className="hlx-text">{'“'}{m.text}{'”'}</span>}
         {date && <span className="hlx-date">{date}</span>}
@@ -255,6 +267,7 @@ export function HighlightsScreen(props) {
               {typeChip('all', 'All')}
               {typeChip('highlight', 'Highlights')}
               {typeChip('underline', 'Underlines')}
+              {typeChip('squiggle', 'Squiggles')}
             </div>
             {/* Granular color filter — always available, the actual color dots
                 just like the highlight/underline picker. Tap a dot to show only

@@ -15,6 +15,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
+import { isMarkKind } from '../../utils/mark-kinds.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -52,7 +53,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     const data = AnnotationStore.all() || {};
     const seen = {};
     Object.keys(data).forEach(k => (data[k] || []).forEach(a => {
-      if (a.kind === 'highlight' || a.kind === 'underline') seen[a.groupId || a.id] = 1;
+      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
     }));
     return Object.keys(seen).length;
   })();

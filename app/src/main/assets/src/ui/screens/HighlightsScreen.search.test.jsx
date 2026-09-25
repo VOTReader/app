@@ -90,7 +90,7 @@ describe('HighlightsScreen — search-box parity [C9]', () => {
     show();
     expect(document.querySelector('.hlx-sort-row .notes-index-sort-btn').textContent).toBe('Sort: Newest ↓');
     expect([...document.querySelectorAll('.hlx-type-chip')].map((c) => c.textContent))
-      .toEqual(['All', 'Highlights', 'Underlines']);
+      .toEqual(['All', 'Highlights', 'Underlines', 'Squiggles']); // v05-04 added Squiggles
   });
 });
 

@@ -34,6 +34,8 @@
    public recording corpus.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { isMarkKind } from './mark-kinds.js';
+
 /**
  * @typedef {Object} AchievementSnapshot
  * @property {number} words          - lifetime words read (measured)
@@ -430,7 +432,7 @@ export function collectAchievementSnapshot(readItems) {
     const seen = new Set();
     for (const k of Object.keys(all)) {
       for (const a of (all[k] || [])) {
-        if (a && (a.kind === 'highlight' || a.kind === 'underline')) seen.add(a.groupId || a.id);
+        if (a && isMarkKind(a.kind)) seen.add(a.groupId || a.id);
       }
     }
     marks = seen.size;

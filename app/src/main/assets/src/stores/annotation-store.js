@@ -22,7 +22,7 @@ import { mergeAnnotationsStore } from './store-merge.js';
  * @typedef {{
  *   id: string,
  *   groupId: string,
- *   kind: 'highlight' | 'underline' | 'note',
+ *   kind: 'highlight' | 'underline' | 'squiggle' | 'note',
  *   color: string,
  *   start: number,
  *   end: number,
@@ -40,7 +40,7 @@ import { mergeAnnotationsStore } from './store-merge.js';
 
 /* AnnotationStore — segment-level records. Aliased as HighlightStore for
    back-compat with existing call sites. Every entry has a kind field
-   ('highlight' | 'underline' | 'note') and a groupId (always present;
+   ('highlight' | 'underline' | 'squiggle' | 'note') and a groupId (always present;
    single-segment annotations get a unique groupId == id at create time). */
 export const AnnotationStore = extendStore(
   CachedStore('vot-annotations', /** @type {AnnotationData} */ ({}), { idb: true, crossTabMerge: mergeAnnotationsStore }),
@@ -190,7 +190,7 @@ export const AnnotationStore = extendStore(
      * Caller is responsible for creating/removing the corresponding
      * NoteStore record — this method only touches AnnotationStore.
      * @param {string} groupId
-     * @param {'highlight' | 'underline' | 'note'} kind
+     * @param {'highlight' | 'underline' | 'squiggle' | 'note'} kind
      * @returns {void}
      */
     convertGroup(groupId, kind) {
