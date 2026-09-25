@@ -91,9 +91,19 @@ async function freshProfile(tag, { downloads } = {}) {
   }
   await page.goto(BASE, { waitUntil: 'load' });
   await booted(page);
-  await clickIf(page, 'Continue'); await clickIf(page, 'Begin Reading');
+  // The first-run About pages, clicked through until Home shows. One click each right after
+  // boot missed when About rendered a beat late (the answers lane: 1 run in 3 locally), and
+  // the profile stayed on About page 1 - which hides the Settings gear.
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    const home = await page.evaluate(() => /Personal Study/.test(document.body.textContent || ''));
+    if (home) break;
+    if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading'))) await sleep(250);
+  }
+  need(await page.evaluate(() => /Personal Study/.test(document.body.textContent || '')), `${tag}: never reached Home past the first-run pages`);
   await hydrated(page);
-  await clickIf(page, 'Maybe later');   // the tour offer over Home on a first visit
+  // The tour offer over Home on a first visit can also arrive a beat late.
+  for (let i = 0; i < 8 && !(await clickIf(page, 'Maybe later')); i++) await sleep(250);
   return { ctx, page, errors };
 }
 
