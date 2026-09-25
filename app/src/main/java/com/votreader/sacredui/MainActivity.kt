@@ -213,7 +213,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override val offlineAudio: OfflineAudioStore get() = OfflineAudioStore.shared(this)
     // Streaming audio: anchor the process in a mediaPlayback foreground service
     // for as long as JS reports playback. Never throws (see setActive's KDoc).
-    override fun setAudioKeepAlive(active: Boolean) = AudioKeepAliveService.setActive(this, active)
+    override fun setAudioKeepAlive(active: Boolean): Boolean = AudioKeepAliveService.setActive(this, active)
     // Contextual POST_NOTIFICATIONS ask (API 33+, once per process) so the
     // media card can show. Launcher registration happens in onCreate; the
     // binder-thread caller (setAudioActive) is hopped to UI here.

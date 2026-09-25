@@ -127,13 +127,16 @@ class AppInterface(
      * refuses to start costs nothing but a WARN — the WebView path is unchanged.
      */
     @JavascriptInterface
-    fun setAudioActive(active: Boolean) {
+    fun setAudioActive(active: Boolean): Boolean {
         vm.streamAudioActive = active
-        host.setAudioKeepAlive(active)
+        val held = host.setAudioKeepAlive(active)
         // First playback of a session is the contextual moment to ask for
         // POST_NOTIFICATIONS (API 33+ media card). One-shot per process,
         // no-op when already granted — see BridgeHost's KDoc.
         if (active) host.ensureNotificationsPermission()
+        // The page's answer (sf1, 2026-09-24): false = Android refused the
+        // service, so a hidden page pauses rather than play on muted.
+        return held
     }
 
     /**

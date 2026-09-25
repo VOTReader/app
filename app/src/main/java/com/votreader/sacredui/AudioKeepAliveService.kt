@@ -189,6 +189,7 @@ class AudioKeepAliveService : Service() {
                 } else {
                     startForeground(NOTIFICATION_ID, notification)
                 }
+                foreground = true
             }
             if (!npPlaying) {
                 // PAUSED: standard media-app demotion. The service stays up
@@ -200,6 +201,7 @@ class AudioKeepAliveService : Service() {
                 // makes the swipe stop the service cleanly, and the next
                 // playing edge re-foregrounds via setActive(true).
                 stopForeground(STOP_FOREGROUND_DETACH)
+                foreground = false
                 try {
                     getSystemService(NotificationManager::class.java)
                         ?.notify(NOTIFICATION_ID, notification)
@@ -216,6 +218,10 @@ class AudioKeepAliveService : Service() {
             // is what the platform ANRs/crashes the app over, and playback does
             // not depend on us.
             Timber.w(e, "audio keep-alive startForeground failed — WebView keep-alive still active")
+            // With the service gone and the app in the background, Android 17 mutes the WebView while its clock
+            // runs: tell the page, which pauses honestly while hidden rather than play on in silence (sf1,
+            // 2026-09-24). On screen the page ignores it (nothing is muted there).
+            if (isBackgroundRefusal(e)) commandSink?.invoke(CMD_REFUSED, 0L)
             stopEverything()
         }
         return START_NOT_STICKY
@@ -233,6 +239,7 @@ class AudioKeepAliveService : Service() {
 
     override fun onDestroy() {
         running = false
+        foreground = false
         if (noisyRegistered) {
             try { unregisterReceiver(noisyReceiver) } catch (_: Exception) { /* teardown best-effort */ }
             noisyRegistered = false
@@ -245,6 +252,7 @@ class AudioKeepAliveService : Service() {
 
     private fun stopEverything() {
         stopForeground(STOP_FOREGROUND_REMOVE)
+        foreground = false
         stopSelf()
     }
 
@@ -417,6 +425,22 @@ class AudioKeepAliveService : Service() {
         private var running = false
 
         /**
+         * True while the running service holds the foreground (between a successful startForeground and a
+         * stopForeground / destroy). [setActive] reads it: a second startForegroundService for a service already
+         * in the foreground is at best a no-op and, from the background (screen off, at every track seam), a
+         * refusal whose throw took the card down (sf1, 2026-09-24).
+         */
+        @Volatile
+        private var foreground = false
+
+        /** The transport command that tells the page Android refused the service from the background (sf1). */
+        const val CMD_REFUSED = "refused"
+
+        /** A background foreground-service start refused by the platform (API 31+), not a bug of ours. */
+        fun isBackgroundRefusal(e: Throwable): Boolean =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e is android.app.ForegroundServiceStartNotAllowedException
+
+        /**
          * True between [setActive]`(true)` and the service's [onCreate].
          *
          * `startForegroundService` is ASYNCHRONOUS — it enqueues the start and
@@ -477,10 +501,13 @@ class AudioKeepAliveService : Service() {
          * restriction. [ACTION_STOP] remains handled for an explicit
          * intent-driven stop.
          */
-        fun setActive(context: Context, active: Boolean) {
+        fun setActive(context: Context, active: Boolean): Boolean {
             try {
                 val intent = Intent(context, AudioKeepAliveService::class.java)
                 if (active) {
+                    // Already in the foreground (a track seam, a resume): nothing to start, and from the
+                    // background a second startForegroundService is refused (sf1).
+                    if (running && foreground) return true
                     ContextCompat.startForegroundService(context, intent)
                     // Only once the start is actually enqueued — a throw above
                     // must not leave a pending flag behind. onCreate has not run
@@ -493,8 +520,11 @@ class AudioKeepAliveService : Service() {
                     startPending = false
                     context.stopService(intent)
                 }
+                return true
             } catch (e: Throwable) {
                 Timber.w(e, "audio keep-alive %s failed", if (active) "start" else "stop")
+                // The page hears a refused start and pauses honestly while hidden (sf1).
+                return false
             }
         }
 

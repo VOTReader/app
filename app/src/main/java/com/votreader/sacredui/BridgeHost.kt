@@ -142,7 +142,7 @@ interface BridgeHost {
      * Called inline on the binder thread: starting a service is not UI work, and
      * the implementation never throws.
      */
-    fun setAudioKeepAlive(active: Boolean)
+    fun setAudioKeepAlive(active: Boolean): Boolean
 
     /**
      * The process's downloaded-recordings store (listening item 8), or null on a host without one (tests, an older

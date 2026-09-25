@@ -285,7 +285,7 @@ function _setStatus(next) {
   // (emulator-5554, 2026-09-04). The app is in the foreground for the whole tour and the tour
   // stops what it started, so the keep-alive buys nothing there; the reader's next Listen after
   // the tour raises the ask as before. TourController is a bundle-b global; absent on a bare host.
-  if (next === 'playing') { if (!_tourShowing()) _setAudioActive(true); }
+  if (next === 'playing') _raiseKeepAlive();
   else if (next === 'idle') _setAudioActive(false);
   _syncMediaSessionState(next);
   _notify();
@@ -298,7 +298,42 @@ function _setStatus(next) {
  * this from end(); idempotent (Kotlin's ask is one-shot per process, keep-alive is a no-op when on).
  */
 function syncKeepAlive() {
-  if (_state.status === 'playing' && !_tourShowing()) _setAudioActive(true);
+  if (_state.status === 'playing') _raiseKeepAlive();
+}
+
+/** @returns {boolean} true while the page is hidden: the screen off, or another app in front */
+function _hidden() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/**
+ * Raise the keep-alive for playback starting or running (held back while the tour shows, see _setStatus). When
+ * Android refuses the service with the page hidden, the recording would play MUTED on Android 17 (a background app
+ * with no media foreground service is silenced, and the player is never told) while its clock ran: chapters marked
+ * heard, places lost. It pauses instead, once this start settles, and the return says why (sf1, 2026-09-24).
+ * @returns {void}
+ */
+function _raiseKeepAlive() {
+  if (_tourShowing()) return;
+  if (!_setAudioActive(true) && _hidden()) setTimeout(_pauseUnheard, 0);
+}
+
+/** Set by an honest pause while hidden; the next return to the screen says why playback stopped. */
+let _pausedUnheard = false;
+const PAUSED_UNHEARD_MSG = 'Paused while the screen was off: the phone would have played it silently. Press play to go on.';
+
+/** The honest pause (sf1): only while hidden, and only what is playing or starting. */
+function _pauseUnheard() {
+  if (!_hidden() || (_state.status !== 'playing' && _state.status !== 'loading')) return;
+  _pausedUnheard = true;
+  pauseIfPlaying();
+}
+
+/** Back on screen: raise the keep-alive again if playback runs (a no-op in native when it holds), and say why an
+ *  honest pause happened (sf1). */
+function _onVisible() {
+  syncKeepAlive();
+  if (_pausedUnheard) { _pausedUnheard = false; _toast(PAUSED_UNHEARD_MSG); }
 }
 
 /** @returns {boolean} true while "Show me around" is on screen. */
@@ -363,12 +398,16 @@ function _toast(text) {
  * PlatformBridge when it does.
  *
  * @param {boolean} active
+ * @returns {boolean} false only when the APK says Android refused the service (sf1)
  */
 function _setAudioActive(active) {
   try {
     const b = typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge;
-    if (b && typeof b.setAudioActive === 'function') b.setAudioActive(active);
+    // The APK answers whether the service holds (sf1); false is the one refusal. An older shell answers nothing,
+    // the PWA has no bridge: both read as held, as before.
+    if (b && typeof b.setAudioActive === 'function') return b.setAudioActive(active) !== false;
   } catch (_e) { /* PWA has no bridge / native threw — keep-alive is best-effort */ }
+  return true;
 }
 
 /* ── Media Session (lock screen + headset controls) ───────────────────── */
@@ -630,6 +669,9 @@ function _installNativeTransport() {
       // is a toggle.
       else if (cmd === 'pause') pauseIfPlaying();
       else if (cmd === 'play') { if (_state.status === 'paused') toggle(); }
+      // Native lost the playback service while the page is hidden (a refused foreground start): the honest pause.
+      // On screen nothing is muted, so it is never a toggle (sf1).
+      else if (cmd === 'refused') _pauseUnheard();
       else toggle();
     } catch (_e) { /* a bad system command must never crash the player */ }
   };
@@ -658,6 +700,11 @@ function _ensureEl() {
   // Only downgrade a genuinely-playing element: our own stop()/track-switch
   // pauses fire this too, and they've already set the status they want.
   el.addEventListener('pause', () => {
+    // A recording's END fires 'pause' too (the spec: paused, then 'pause' with ended already true, then 'ended'):
+    // a seam, not the listener's pause. Filed as one, it told native "not playing" at every seam, the keep-alive
+    // left the foreground and, with the screen off, could not come back, so Android 17 muted the next chapter
+    // while its clock ran (sf1, 2026-09-24). 'ended' owns the seam, including the pause a sleep-at-end asks for.
+    if (el.ended) return;
     _markPaused();
   });
   el.addEventListener('durationchange', () => {
@@ -1254,8 +1301,9 @@ function _start() {
   // WebView's media unless streamAudioActive, so a screen turned off during the
   // cold start (1-2 s over TLS, 20 s in a stall) stopped the letter before it
   // began. The app is in the foreground at the tap, so starting the service is
-  // legal; the tour guard is the same one _setStatus applies.
-  if (!_tourShowing()) _setAudioActive(true);
+  // legal; the tour guard is the same one _setStatus applies. At a seam with the screen off it is not, and a
+  // refusal pauses honestly instead of playing muted (sf1).
+  _raiseKeepAlive();
   _notify();
   _mediaSession(track);
   _pauseOtherDomAudio(null);
@@ -3484,7 +3532,7 @@ function _flushOnHide() {
 if (typeof window !== 'undefined') {
   const g = _g();
   if (typeof g.__votAudioPlayerRetire === 'function') g.__votAudioPlayerRetire();
-  const onVisibility = () => { if (document.visibilityState === 'hidden') _flushOnHide(); };
+  const onVisibility = () => { if (document.visibilityState === 'hidden') _flushOnHide(); else _onVisible(); };
   window.addEventListener('vot:before-update-reload', _onBeforeUpdateReload);
   window.addEventListener('pagehide', _flushOnHide);
   document.addEventListener('visibilitychange', onVisibility);
