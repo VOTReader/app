@@ -66,10 +66,11 @@ function keepingWords(p) {
 }
 
 /**
- * The song page's keep card (the picture's third panel).
- * @param {{ ids: string[], noteKey: string, versions?: number }} props
+ * The song page's keep card (the picture's third panel). On the phone, a quiet Remove takes the song off it
+ * (W2-06: the Kept list and Settings were the only ways).
+ * @param {{ ids: string[], noteKey: string, versions?: number, title?: string }} props
  */
-export function SongKeepCard({ ids, noteKey, versions = 1 }) {
+export function SongKeepCard({ ids, noteKey, versions = 1, title = '' }) {
   const keep = useSongKeep();
   const online = useSongsOnline();
   const avail = keep.availability();
@@ -101,7 +102,11 @@ export function SongKeepCard({ ids, noteKey, versions = 1 }) {
           <span className="song-keep-icon is-round"><KeptIcon /></span>
           <div className="song-keep-copy">
             <p className="song-keep-text">On this phone</p>
-            <p className="song-keep-sub">{(p.total > 1 ? p.total + ' versions · ' : '') + formatSongBytes(p.bytes)}</p>
+            <div className="song-keep-kept-line">
+              <p className="song-keep-sub">{(p.total > 1 ? p.total + ' versions · ' : '') + formatSongBytes(p.bytes)}</p>
+              <button type="button" className="song-keep-quiet" onClick={() => { void keep.remove(list); }}
+                aria-label={'Remove ' + (title || (p.total > 1 ? 'these songs' : 'this song')) + ' from this phone'}>Remove</button>
+            </div>
           </div>
         </div>
       </section>
@@ -185,6 +190,52 @@ export function SongKeepAction({ ids, noteKey, label }) {
     <div className="song-keep-action">
       {body}
       {avail === 'ok' && !online && p.kept < p.total && !p.busy ? <p className="song-keep-note">Needs a connection</p> : null}
+      {note ? <p className="song-keep-note" role="status">{note}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * The desk's quiet keep row for the song playing (K3: a single-version song had no visible way to its Keep):
+ * "Keep on this phone · 3 MB", then "Keeping… Cancel", then "On this phone · Remove". Nothing on an iPhone tab or
+ * where keeping is not possible (the song page says why).
+ * @param {{ id: string, title?: string }} props
+ */
+export function SongKeepQuiet({ id, title = '' }) {
+  const keep = useSongKeep();
+  const online = useSongsOnline();
+  if (!id || keep.availability() !== 'ok') return null;
+  const list = [id];
+  const noteKey = 'keep-desk-' + id;
+  const p = keep.progressOf(list);
+  const note = keep.noteFor(noteKey);
+  const name = title || 'this song';
+  let body;
+  if (p.kept === p.total) {
+    body = (
+      <>
+        <span className="song-desk-keep-state"><KeepIcon /><span>On this phone</span></span>
+        <button type="button" className="song-keep-quiet" onClick={() => { void keep.remove(list); }} aria-label={'Remove ' + name + ' from this phone'}>Remove</button>
+      </>
+    );
+  } else if (p.busy) {
+    body = (
+      <>
+        <span className="song-desk-keep-state" role="status"><KeepIcon /><span>Keeping…</span></span>
+        <button type="button" className="song-keep-quiet" onClick={() => keep.cancel(list)}>Cancel</button>
+      </>
+    );
+  } else {
+    body = (
+      <button type="button" className="song-keep-quiet song-desk-keep-go" disabled={!online} onClick={() => { void keep.keep(list, noteKey); }}
+        aria-label={'Keep ' + name + ' on this phone · ' + formatSongBytes(p.needBytes)}>
+        <KeepIcon /><span>{online ? 'Keep on this phone · ' + formatSongBytes(p.needBytes) : 'Keeping needs a connection'}</span>
+      </button>
+    );
+  }
+  return (
+    <div className="song-desk-keep">
+      {body}
       {note ? <p className="song-keep-note" role="status">{note}</p> : null}
     </div>
   );

@@ -17,6 +17,8 @@ import { songThumbUrl, songById, familyById, SONGS_HOST, SongCatalog } from '../
 import { songIdOfKey } from '../../utils/audio-track.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
+import { SongKeep } from '../../utils/song-keep.js';
+import { KeepIcon } from './SongKeepParts.jsx';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -134,19 +136,24 @@ export function SongPlayButton({ playing, label, onClick, className = '' }) {
  * affordance and the pause state, and is the row's accessible control (the row-wide hit area is a pointer
  * convenience, out of the tab order like the bar's pull-tab). A family with more than one version carries a
  * tappable "N versions ›" in its second line (44 px tall) that opens its song page. `children` sit before the ▶
- * (the Kept list's Remove).
+ * (the Kept list's Remove). A row whose song is kept on this phone leads its second line with a quiet ⤓ "On this
+ * phone" (W2-02): offline, those are the rows that play.
  * @param {{ key?: any, song: any, title: string, line?: string, versions?: number, onVersions?: () => void, len?: string,
  *   current?: boolean, playing?: boolean, onPlay: () => void, children?: any }} props
  */
 export function SongListRow({ song, title, line = '', versions = 0, onVersions, len = '', current = false, playing = false, onPlay, children = null }) {
+  // Each row hears the keep store itself: the letter card and the hub draw rows without subscribing to it.
+  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  const kept = !!(song && song.id) && SongKeep.isKept(song.id);
   return (
     <div className={'songs-row song-tap-row' + (current ? ' is-current' : '')}>
       <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} />
       <SongCover song={song} />
       <span className="songs-row-copy">
         <strong>{title}</strong>
-        {line || (versions > 1 && onVersions) ? (
+        {line || kept || (versions > 1 && onVersions) ? (
           <span className="songs-row-line">
+            {kept ? <span className="songs-row-kept" title="On this phone"><KeepIcon /><span className="sr-only">On this phone</span></span> : null}
             {line ? <small>{line}</small> : null}
             {versions > 1 && onVersions ? (
               <button type="button" className="songs-row-versions" onClick={(event) => { event.stopPropagation(); onVersions(); }} aria-label={'All ' + versions + ' versions of ' + title}>

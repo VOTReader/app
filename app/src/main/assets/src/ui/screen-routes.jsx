@@ -538,7 +538,14 @@ export function buildScreenRoutes({
   // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
   // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
   window.__openSongs = (frames, label) => {
-    if (screen === SONGS_SCREEN) { setAudioColKey(encodeSongsRoute(/** @type {any[]} */ (decodeSongsRoute(audioColKey)).concat(frames))); return; }
+    if (screen === SONGS_SCREEN) {
+      // W2-03: the page already on top is not stacked again (its copy made the first Back go nowhere).
+      const stack = decodeSongsRoute(audioColKey);
+      const top = stack[stack.length - 1];
+      const fresh = (frames || []).filter((f, i) => i > 0 || !(f && top && f.k === top.k && (f.v || '') === (top.v || '')));
+      if (fresh.length) setAudioColKey(encodeSongsRoute(/** @type {any[]} */ (stack).concat(fresh)));
+      return;
+    }
     _openSongs(frames, { screen, letterId, label: label || (screen === 'home' ? '' : _audioTextFrom(screen)) });
   };
 

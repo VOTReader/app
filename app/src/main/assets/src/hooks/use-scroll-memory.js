@@ -40,6 +40,8 @@
                        the restore effect on entry→entry nav).
      activeTab       — active-tab object (useTabs); scrollPositions are
                        read from here to restore scroll on screen change.
+                       On the Songs screen its audioColKey names the frame
+                       on top, and each frame keeps its own place (W2-01).
      activeTabIdx    — active tab index (useTabs); in the restore-effect
                        dep array so a tab switch also triggers restore.
      updateActiveTab — stable updater (useTabs); the sole dep of
@@ -126,6 +128,38 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid, jid) {
     return pfx + '-' + lid;
   }
   return scr;
+}
+
+// ── The Songs screens' frames (W2-01, Songs walk 2026-09-25) ───────────────
+// Songs of the Letters is ONE routed screen ('audio-library-songs') whose
+// stack of frames (the hub, a list, a song page, the readings) rides the
+// tab's audioColKey as `songs:<json>` (utils/songs-route.js). With the bare
+// screen name as its key the whole stack shared one scroll place: a song page
+// pushed over a list scrolled to 2398 px opened at the list's offset, clamped
+// to its own bottom, with the cover, the title and PLAY off screen. Each frame
+// is its own place here: the path of kinds and values, never the hub's Find
+// words or chip (typing must not re-key the hub, or every keystroke would
+// restore). A new frame has nothing saved, so it opens at the top; Back finds
+// the frame below where it was left. Unreadable stacks read as the hub.
+const SONGS_SCREEN_NAME = 'audio-library-songs';
+
+/** @param {unknown} colKey @returns {string} */
+function songsPlaceOf(colKey) {
+  var frames = null;
+  if (typeof colKey === 'string' && colKey.lastIndexOf('songs:', 0) === 0) {
+    try { frames = JSON.parse(colKey.slice(6)); } catch (_e) { frames = null; }
+  }
+  if (!Array.isArray(frames) || !frames.length) return 'hub';
+  return frames.map(function (f) {
+    var k = f && typeof f.k === 'string' ? f.k : '?';
+    return f && typeof f.v === 'string' ? k + ':' + f.v : k;
+  }).join('>');
+}
+
+/** The scroll key of what is on screen: getScrollKey, with the Songs frame appended on the Songs screen. */
+function scrollKeyOf(scr, bid, cnum, lid, sid, scid, jid, songsPlace) {
+  var key = getScrollKey(scr, bid, cnum, lid, sid, scid, jid);
+  return scr === SONGS_SCREEN_NAME ? key + '|' + songsPlace : key;
 }
 
 // ── CONTENT-ANCHOR capture / restore ───────────────────────────────────────
@@ -313,8 +347,10 @@ export function useScrollMemory({
   surpriseAnchor,
   tabsOverviewOpen,
 }) {
+  // The Songs screen's frame (W2-01): '' elsewhere, so no other screen's restore re-fires on an audioColKey change.
+  const songsPlace = screen === SONGS_SCREEN_NAME ? songsPlaceOf(activeTab && activeTab.audioColKey) : '';
   // ── Refs ───────────────────────────────────────────────────────────────
-  const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId));
+  const scrollKeyRef = React.useRef(scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace));
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   // Last REAL scroll position, stamped on every scroll event. The debounced
   // flush only fires 120 ms after scrolling STOPS — navigating inside that
@@ -425,7 +461,7 @@ export function useScrollMemory({
   // shifted the offset — async content / images). Cleanup cancels a stale rAF so a
   // rapid re-fire can't fight the next restore.
   React.useLayoutEffect(() => {
-    const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId);
+    const key = scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace);
     // NAV-TIME EXACT CAPTURE: commit the live stash for the key being LEFT,
     // before the new screen's restore runs. The debounced flush alone loses
     // any scrolling done within 120 ms of the nav tap (its timeout fires
@@ -456,7 +492,11 @@ export function useScrollMemory({
     // actually drives the scroll.
     if (surpriseAnchor && (screen === 'bible-ch' || screen === 'matthew-ch')) return;
 
-    const saved = activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
+    // A Songs frame pushed on top of the one being left is newly entered: it opens at the top even when it was
+    // visited before (W2-01). Returning to a frame (Back, or back onto the screen) restores as everywhere else.
+    const songsPush = !!songsPlace && typeof prevKey === 'string' && prevKey.lastIndexOf(SONGS_SCREEN_NAME + '|', 0) === 0 &&
+      key.lastIndexOf(prevKey + '>', 0) === 0;
+    const saved = songsPush ? null : activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
     // Hand the full saved record to startRestore — it prefers the content anchor
     // (robust to reflow / font-size / content-visibility), falls back to the
     // pixel y, and handles the legacy plain-number + null shapes. It also owns
@@ -465,7 +505,7 @@ export function useScrollMemory({
     // supersedes the restore.
     return startRestore(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, activeTabIdx]);
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace, activeTabIdx]);
 
   // ── Effect 4: publish saved positions for the pager's inert neighbor peek ─
   // The finger-follow swipe's neighbor peek (ScreenLayout `inert`) renders the

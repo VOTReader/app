@@ -105,7 +105,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
         </button>
       </div>
       {/* K1 (picture r2-more-screens, third panel): the whole family, sized from the catalog. */}
-      <SongKeepCard ids={versions.map((v) => v.id)} noteKey={'keep-fam-' + fam.id} versions={versions.length} />
+      <SongKeepCard ids={versions.map((v) => v.id)} noteKey={'keep-fam-' + fam.id} versions={versions.length} title={fam.t} />
 
       {versions.length > 1 ? (
         <section className="songs-section" aria-labelledby="song-versions">

@@ -553,3 +553,63 @@ describe('useScrollMemory — vot:before-update-reload', () => {
     }
   });
 });
+
+/* W2-01 (Songs walk 2026-09-25): the Songs screens are ONE routed screen whose frames (hub, a list, a song page)
+   ride the tab's audioColKey. With one scroll key for the whole stack, a song page pushed from a list scrolled to
+   2398 px opened at the bottom of the page (the list's offset, clamped), cover, title and PLAY off screen. Each
+   frame of the stack is its own scroll place: a new frame opens at the top, Back puts the list where it was. */
+describe('useScrollMemory — the Songs screens scroll per frame (W2-01)', () => {
+  const SONGS = 'audio-library-songs';
+  const route = (frames) => 'songs:' + JSON.stringify(frames);
+  const HUB = { k: 'hub' };
+  const LIST = { k: 'list', v: 'col:wtlb1' };
+
+  it('a song page pushed over a scrolled list opens at the top, and Back puts the list where it was', () => {
+    tab.audioColKey = route([HUB, LIST]);
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    settleRestoreRaf();
+    act(() => { scrollTo(1398); });
+    tab.audioColKey = route([HUB, LIST, { k: 'song', v: 'elect-and-precious' }]);
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    expect(el.scrollTop).toBe(0);
+    act(() => { scrollTo(120); });
+    tab.audioColKey = route([HUB, LIST]);
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    expect(el.scrollTop).toBe(1398);
+  });
+
+  it('a song page entered again (pushed, not returned to) opens at the top, not where it was last left', () => {
+    tab.audioColKey = route([HUB, LIST]);
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    settleRestoreRaf();
+    const song = route([HUB, LIST, { k: 'song', v: 'elect-and-precious' }]);
+    tab.audioColKey = song;
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    act(() => { scrollTo(527); });
+    tab.audioColKey = route([HUB, LIST]);
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    tab.audioColKey = song;
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    expect(el.scrollTop).toBe(0);
+  });
+
+  it('a list opened from the scrolled hub opens at the top', () => {
+    tab.audioColKey = route([HUB]);
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    settleRestoreRaf();
+    act(() => { scrollTo(900); });
+    tab.audioColKey = route([HUB, { k: 'readings' }]);
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    expect(el.scrollTop).toBe(0);
+  });
+
+  it('the hub remembering its Find words is the same place: no restore fires while typing', () => {
+    tab.audioColKey = route([HUB]);
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    settleRestoreRaf();
+    act(() => { scrollTo(300); });
+    tab.audioColKey = route([{ k: 'hub', q: 'consider my love' }]);
+    rerender(baseProps({ screen: SONGS, letterId: null }));
+    expect(el.scrollTop).toBe(300);
+  });
+});

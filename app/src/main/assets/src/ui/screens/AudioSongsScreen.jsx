@@ -329,8 +329,29 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const [style, setStyle] = React.useState(frame.st || '');
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [allTiles, setAllTiles] = React.useState(false);
-  // A frame restored or pushed with a query (Search's shortcut row) refills the box.
-  React.useEffect(() => { setQuery(frame.q || ''); setStyle(frame.st || ''); }, [frame.q, frame.st]);
+  // A frame restored or pushed with a query (Search's shortcut row) refills the box. The hub's own write-back
+  // below echoes here too, so the box is only reset when the frame says something else.
+  React.useEffect(() => {
+    setQuery((q) => (q === (frame.q || '') ? q : frame.q || ''));
+    setStyle(frame.st || '');
+  }, [frame.q, frame.st]);
+  // W2-07: the Find words and the chip live in the hub's frame as they change (a short pause after typing), so
+  // a letter opened from the desk and Back return to the same results. Only while the hub is on top: a list
+  // opened over it writes its own frame first (`open`), and unmounting drops a write still waiting.
+  const replaceTopRef = React.useRef(onReplaceTop);
+  replaceTopRef.current = onReplaceTop;
+  const hubFrame = () => {
+    const keep = { k: 'hub' };
+    if (query.trim()) keep.q = query;
+    if (style) keep.st = style;
+    return keep;
+  };
+  React.useEffect(() => {
+    if ((frame.q || '') === (query.trim() ? query : '') && (frame.st || '') === style) return undefined;
+    const t = setTimeout(() => replaceTopRef.current(hubFrame()), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hubFrame reads query and style, the deps
+  }, [query, style, frame.q, frame.st]);
 
   const styles = cat.styles();
   const styleCounts = React.useMemo(() => {
@@ -358,10 +379,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   };
   // Leaving the hub keeps its Find box and chip in its frame, so Back returns to the same results.
   const open = (next) => {
-    const keep = { k: 'hub' };
-    if (query.trim()) keep.q = query.trim();
-    if (style) keep.st = style;
-    onReplaceTop(keep);
+    onReplaceTop(hubFrame());
     onPush(next);
   };
   const playResults = (song) => {
@@ -562,11 +580,13 @@ function SongsList({ frame, library, playingId, active, onPush }) {
         ) : null}
         {keptList && ids.length ? (
           askingRemoveAll ? (
-            <div className="song-keep-confirm" role="group" aria-label="Remove all kept songs">
-              <p>{'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone? They can be kept again.'}</p>
-              <div className="song-keep-confirm-actions">
-                <button type="button" className="songs-outline-action" onClick={() => setAskingRemoveAll(false)}>Keep them</button>
-                <button type="button" className="songs-shuffle" onClick={() => { void keep.removeAll(); setAskingRemoveAll(false); }}>Remove all</button>
+            // W2-05: the Downloads screen's own strip (AudioOfflineScreen), words and buttons alike.
+            <div className="offline-confirm" role="group" aria-label="Remove all kept songs">
+              <p className="offline-confirm-title">{'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone?'}</p>
+              <p className="offline-confirm-line">They can be kept again.</p>
+              <div className="offline-confirm-actions">
+                <button type="button" className="offline-confirm-cancel" onClick={() => setAskingRemoveAll(false)}>Keep them</button>
+                <button type="button" className="offline-confirm-go" onClick={() => { void keep.removeAll(); setAskingRemoveAll(false); }}>Yes, remove all</button>
               </div>
             </div>
           ) : (

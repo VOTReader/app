@@ -284,7 +284,12 @@ signal; the controls are `ui/components/SongKeepParts.jsx`.
   `navigator.storage.persist()`. An iPhone Safari tab (not on the Home Screen) is told to add
   the app instead (Safari clears a site's storage after about a week unused).
 - Offline, a kept song plays; one that is not kept shows "Not on this phone" on the bar for
-  3 s (paused), then the next kept song plays; with none kept the offline notice stands.
+  3 s (paused), then the next kept song plays; with no kept song ahead a song says "This song
+  isn't on this phone. Songs you keep play without internet." with "Kept songs ›" (K3; a
+  reading keeps the readings' notice). Kept rows carry a quiet ⤓ "On this phone"; the desk in
+  song mode has a quiet Keep / "On this phone · Remove" row, the kept song page a Remove.
+- A song goes on Recently played when it first really plays ('playing'), not at the tap: an
+  offline skip over a song that never played does not file it (K3, device check 09-25).
 - The bytes never ride the backup (user-data-parity exempts `offline-songs` by name); the
   ids do, as `songKept` in `vot-audio-library`, so after a restore the Kept list offers
   "Download your N songs again (X MB)".

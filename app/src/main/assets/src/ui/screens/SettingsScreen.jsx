@@ -755,8 +755,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (storageInfo.usage == null) return 'Storage info partially unavailable.';
     const used = formatBytes(storageInfo.usage);
     return storageInfo.quota != null
-      ? `About ${used} of ${formatBytes(storageInfo.quota)} — everything this app stores on the device, including the offline library and Garden images.`
-      : `About ${used} — everything this app stores on the device, including the offline library and Garden images.`;
+      ? `About ${used} of ${formatBytes(storageInfo.quota)} — everything this app stores on the device, including the offline library, songs kept on this phone and Garden images.`
+      : `About ${used} — everything this app stores on the device, including the offline library, songs kept on this phone and Garden images.`;
   })();
   const userDataDisplayText = (() => {
     if (userData == null) return 'Calculating…';
@@ -764,7 +764,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     const mediaPart = userData.mediaCount > 0
       ? ` (includes ${userData.mediaCount} journal ${userData.mediaCount === 1 ? 'item' : 'items'} — ${formatBytes(userData.media)})`
       : '';
-    return `About ${total}${mediaPart} — your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here.`;
+    return `About ${total}${mediaPart} — your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here. Kept songs are not in it; a restore offers to download them again.`;
   })();
 
   const [wipeConfirm, setWipeConfirm] = React.useState(false);

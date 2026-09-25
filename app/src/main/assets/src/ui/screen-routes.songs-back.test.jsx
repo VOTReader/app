@@ -100,6 +100,17 @@ describe('the desk’s Song page link', () => {
     expect(p.setScreen).not.toHaveBeenCalled();
   });
 
+  it('(W2-03) pressed on that same song page it is a no-op: no copy of the page, no dead Back', () => {
+    const key = encodeSongsRoute([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
+    const p = makeRoutes({ screen: SONGS_SCREEN, audioColKey: key });
+    window.__openSongs([{ k: 'song', v: 'fam-a' }], '');
+    expect(p.setAudioColKey).not.toHaveBeenCalled();
+    expect(p.setScreen).not.toHaveBeenCalled();
+    // Another song's page still goes on top.
+    window.__openSongs([{ k: 'song', v: 'fam-b' }], '');
+    expect(decodeSongsRoute(p.setAudioColKey.mock.calls[0][0])).toEqual([{ k: 'hub' }, { k: 'song', v: 'fam-a' }, { k: 'song', v: 'fam-b' }]);
+  });
+
   it('from a letter it opens the Songs screen, the way back named for that letter', () => {
     document.title = 'Be Born Again — VOTReader';
     const p = makeRoutes({ screen: 'wtlb-entry', letterId: 'be-born-again' });

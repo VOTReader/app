@@ -4,7 +4,8 @@
    in place of its reading pieces while the current track is a song:
 
      SongDeskHead       a 72 px cover, LISTENING NOW, the title, the version,
-                        "Open the letter ›" (only for a medium/high link) and Save
+                        "Open the letter ›" (only for a medium/high link), "Song
+                        page ›", the quiet keep row (K3) and Save
      SongVersionsCard   the Voice card's grammar for a song's versions: up to 4
                         chips and "All N ›" (a choice sheet); switching starts
                         the chosen version from 0:00 and keeps the rest of the queue
@@ -26,6 +27,7 @@ import {
   useSongLyrics, lyricLineAt,
 } from './SongParts.jsx';
 import { PlayIcon, PauseIcon, StarIcon, hasTextDestination } from './AudioShelf.jsx';
+import { SongKeepQuiet } from './SongKeepParts.jsx';
 
 /** How many version chips show before "All N ›". */
 const VERSION_CHIPS = 4;
@@ -76,6 +78,7 @@ export function SongDeskHead({ current, song, saved, onToggleSave, onClose }) {
             ) : null}
           </div>
         ) : null}
+        {song && song.id ? <SongKeepQuiet id={song.id} title={title} /> : null}
       </div>
       <button type="button" className={'audio-manager-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} aria-label={saved ? 'Remove from saved songs' : 'Save song'} onClick={onToggleSave}>
         <StarIcon filled={saved} />

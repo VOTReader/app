@@ -266,6 +266,21 @@ describe('Listening group', () => {
     } finally { delete window.__openSongs; }
   });
 
+  it('(K3) the storage lines say where kept songs are counted: in the app data, not in Your data', async () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      useStorageInfo: () => ({ status: 'ready', usage: 5e8, quota: 2e9, persisted: true }),
+      measureUserData: () => Promise.resolve({ total: 2e6, structured: 2e6, media: 0, mediaCount: 0 }),
+    });
+    renderSettings();
+    await act(async () => { await Promise.resolve(); });
+    const value = (label) => [...document.querySelectorAll('.settings-row')]
+      .find((r) => r.querySelector('.settings-row-label') && r.querySelector('.settings-row-label').textContent === label)
+      .querySelector('.settings-data-value').textContent;
+    expect(value('Total app data')).toContain('songs kept on this phone');
+    expect(value('Your data')).toContain('Kept songs are not in it');
+  });
+
   it('no keep store on this browser, no Songs kept row', () => {
     renderSettings();
     expect(groupRowLabels('Listening')).not.toContain('Songs kept on this phone');

@@ -128,9 +128,9 @@ setup effect.
 - **Consumers:** `hooks/use-android-back.js` (the `audio-library-songs` arm: pop one Songs frame from `audioColKey`, else leave by the navOrigin)
 
 ### `__openSongs`
-- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: `(frames, label) => _openSongs(frames, { screen, letterId, label })`; on the Songs screen itself the frames go on top of its stack instead, so Back returns to the list; an empty label names the page it was opened from, W-03)
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: `(frames, label) => _openSongs(frames, { screen, letterId, label })`; on the Songs screen itself the frames go on top of its stack instead, so Back returns to the list, and a frame equal to the one already on top is dropped, W2-03; an empty label names the page it was opened from, W-03)
 - **Cleanup:** none — the next build overwrites it
-- **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's songs; Back returns to that letter, the back pill naming it); `ui/screens/SettingsScreen.jsx` (K1: Listening → "Songs kept on this phone · Manage ›" opens the Kept list; Back returns to Settings); `ui/components/SongDeskParts.jsx` (K2: the desk's song title and "Song page ›" open the playing song's page)
+- **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's songs; Back returns to that letter, the back pill naming it); `ui/screens/SettingsScreen.jsx` (K1: Listening → "Songs kept on this phone · Manage ›" opens the Kept list; Back returns to Settings); `ui/components/SongDeskParts.jsx` (K2: the desk's song title and "Song page ›" open the playing song's page); `utils/audio-player.js` (K3: the offline "This song isn't on this phone" toast's "Kept songs ›" opens the Kept list)
 
 ---
 

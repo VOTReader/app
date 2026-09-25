@@ -29,7 +29,7 @@
    globalThis read is identical at runtime and immune to that ordering.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { showToast } from './toast.js';
+import { showToast, hideToast } from './toast.js';
 import { OfflineAudio } from './offline-audio.js';
 import { SongKeep } from './song-keep.js';
 import { loadAudioSyncSections } from './sync-loaders.js';
@@ -146,6 +146,9 @@ const SONG_SKIP_MSG = "Couldn't play this song. Skipping to the next.";
 const SONG_OFFLINE_SKIP_MS = 3000;
 /** The pending offline skip past a song not on the phone (cleared by any new start or a stop). */
 let _offlineSkipTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
+/** A song the listener put on waits here until it really plays, then goes on Recently played (device check 09-25:
+ *  an offline skip over a song that never played put it on the shelf). */
+let _songRecordPending = false;
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
@@ -449,6 +452,31 @@ function _downloadedReading(track) {
 /** @param {string} text */
 function _toast(text) {
   showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'assertive' });
+}
+
+/** The toast a song not kept on this phone raises offline (W2-02); its own id, so its class and button stay its own. */
+export const SONG_OFFLINE_TOAST_ID = 'vot-toast-song-offline';
+
+/**
+ * Offline and refused: a song says it is not on this phone and links to the kept songs (they play); a reading
+ * keeps the readings' notice. Static words only in the markup (showToast's html is for trusted markup).
+ * @param {Track | { key?: string } | null | undefined} track
+ */
+function _offlineNotice(track) {
+  if (!_isSong(/** @type {any} */ (track))) { _toast(OFFLINE_MSG); return; }
+  showToast({
+    id: SONG_OFFLINE_TOAST_ID, className: 'vot-toast vot-toast-action', durationMs: 6000, ariaLive: 'assertive',
+    html: 'This song isn’t on this phone. Songs you keep play without internet. <button type="button" class="vot-escape-btn">Kept songs ›</button>',
+  });
+  const el = typeof document !== 'undefined' ? document.getElementById(SONG_OFFLINE_TOAST_ID) : null;
+  const btn = el && el.querySelector('button');
+  if (btn) {
+    btn.onclick = () => {
+      hideToast(SONG_OFFLINE_TOAST_ID);
+      const open = typeof window !== 'undefined' ? /** @type {any} */ (window).__openSongs : null;
+      if (typeof open === 'function') open([{ k: 'list', v: 'kept' }], '');
+    };
+  }
 }
 
 /**
@@ -777,6 +805,7 @@ function _ensureEl() {
 
   el.addEventListener('playing', () => {
     _setStatus('playing');
+    _recordSongStart();
     const t = _state.queue[_state.qi];
     if (t && t.url !== _usageStartedUrl) { _usageStartedUrl = t.url; _usage('listen_start'); }
   });
@@ -1409,7 +1438,7 @@ function _start() {
       // under a bar naming this one, its clock saved as this one's place (the refutation of 2026-09-24, M1).
       _releaseEl();
       _persist();
-      _toast(OFFLINE_MSG);
+      _offlineNotice(track);
       return;
     }
     if (_isSong(track)) {
@@ -2619,10 +2648,9 @@ function _countPlay() {
     // A song goes on the SONGS shelf, by id, and counts no lifetime play: the
     // 30-row recent shelf is where a reader finds the letter they were hearing,
     // and one evening of shuffle must not flush it or inflate My Progress.
-    if (_isSong(track)) {
-      if (typeof library.recordSongPlayed === 'function') library.recordSongPlayed(songIdOfKey(track.key));
-      return;
-    }
+    // The shelf takes it only once it plays (_recordSongStart, on 'playing').
+    _songRecordPending = _isSong(track);
+    if (_songRecordPending) return;
     try {
       if (track && typeof library.recordPlayed === 'function') library.recordPlayed(track);
     } catch (_e) { /* recent-history failures must not interfere with listening */ }
@@ -2630,6 +2658,22 @@ function _countPlay() {
       if (typeof library.countPlay === 'function') library.countPlay();
     } catch (_e) { /* the milestones counter must never stand between a tap and audio */ }
   } catch (_e) { /* no library bridge at all — nothing to record */ }
+}
+
+/**
+ * The song the listener put on, filed on the songs shelf when it first really plays: an offline skip over a song
+ * that never played does not put it there, and the song that does play is the one filed. Once per tap.
+ * @returns {void}
+ */
+function _recordSongStart() {
+  if (!_songRecordPending) return;
+  const track = _state.queue[_state.qi];
+  if (!_isSong(track)) return;
+  _songRecordPending = false;
+  try {
+    const library = _library();
+    if (library && typeof library.recordSongPlayed === 'function') library.recordSongPlayed(songIdOfKey(track.key));
+  } catch (_e) { /* the shelf must never stand between a song and its sound */ }
 }
 
 /**
@@ -2923,7 +2967,7 @@ function playSongs(opts) {
   }
   const queue = _songTracks(songQueue(desc));
   if (!queue.length) return false;
-  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
+  if (_offlineRefuses(queue)) { _offlineNotice(queue[0]); return false; }
   _rememberOutgoingPosition();   // R8b — the reading being left keeps its place
   _setPendingRestore(null);
   _setSource(desc);
@@ -3116,7 +3160,7 @@ function playTrack(track) {
   // R8b — a NEW queue replacing this one is a boundary like any other:
   // without this the outgoing recording loses up to five seconds (the
   // throttle window) every time the listener starts something else.
-  if (_offlineRefuses([normalized])) { _toast(OFFLINE_MSG); return; }
+  if (_offlineRefuses([normalized])) { _offlineNotice(normalized); return; }
   _rememberOutgoingPosition();
   _setPendingRestore(null);
   _setSource({ mode: 'custom', volKey: '', label: normalized.sub });
@@ -3644,6 +3688,7 @@ function stop() {
   _clearSleepTimer(false);
   _stopWarming();
   _clearOfflineSkip();
+  _songRecordPending = false;
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';

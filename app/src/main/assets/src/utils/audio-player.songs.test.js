@@ -164,6 +164,7 @@ describe('songs are gated out of reading credit and counters', () => {
     const lib = library();
     globalThis.AudioLibraryStore = lib;
     AudioPlayer.playSongs({ filter: {}, startId: 'bbbbbbbbbbb1' });
+    el().dispatchEvent(new Event('playing'));
     expect(lib.recordSongPlayed).toHaveBeenCalledWith('bbbbbbbbbbb1');
     expect(lib.recordPlayed).not.toHaveBeenCalled();
     expect(lib.countPlay).not.toHaveBeenCalled();
@@ -543,6 +544,48 @@ describe('songs kept on this phone (K1)', () => {
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     expect(AudioPlayer.playSongs({ filter: { family: 'fam-a' } })).toBe(false);
     expect(AudioPlayer.getState().status).toBe('idle');
+  });
+
+  it('(device check) a song goes on Recently played only once it plays: an offline skip over it never records it', async () => {
+    vi.useFakeTimers();
+    const lib = library();
+    globalThis.AudioLibraryStore = lib;
+    await keptOnWeb(['aaaaaaaaaaa2']);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });   // a1 is not kept: "Not on this phone", then a2
+    expect(lib.recordSongPlayed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(3000);
+    expect(lib.recordSongPlayed).not.toHaveBeenCalled();     // loading is not playing
+    el().dispatchEvent(new Event('playing'));
+    expect(lib.recordSongPlayed).toHaveBeenCalledTimes(1);
+    expect(lib.recordSongPlayed).toHaveBeenCalledWith('aaaaaaaaaaa2');
+    el().dispatchEvent(new Event('playing'));                 // a resume is not a second play
+    expect(lib.recordSongPlayed).toHaveBeenCalledTimes(1);
+  });
+
+  it('(W2-02) offline, a tapped song that is not kept says so and links to the kept songs; a reading keeps its words', async () => {
+    await keptOnWeb(['aaaaaaaaaaa1']);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    window.__openSongs = vi.fn();
+    try {
+      // The kept song sits BEFORE the tapped one, as on the walk's Recently played list.
+      AudioPlayer.playSongs({ ids: ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'], startId: 'bbbbbbbbbbb1', label: 'Recently played songs' });
+      const toast = document.getElementById('vot-toast-song-offline');
+      expect(toast && toast.classList.contains('show')).toBe(true);
+      expect(toast.textContent).toContain('This song isn’t on this phone. Songs you keep play without internet.');
+      const link = toast.querySelector('button');
+      expect(link.textContent).toBe('Kept songs ›');
+      link.click();
+      expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'list', v: 'kept' }], '');
+      expect(toast.classList.contains('show')).toBe(false);
+      // Nothing kept in the queue at all: the same words, not the readings' notice.
+      toast.remove();
+      AudioPlayer.playSongs({ ids: ['bbbbbbbbbbb1'] });
+      expect(document.getElementById('vot-toast-song-offline').textContent).toContain('This song isn’t on this phone.');
+      // A reading offline keeps its own notice.
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+      expect(document.getElementById('vot-toast-audio').textContent).toBe('Playing audio requires an internet connection.');
+    } finally { delete window.__openSongs; }
   });
 
   it('a stop before the skip lands cancels it', async () => {

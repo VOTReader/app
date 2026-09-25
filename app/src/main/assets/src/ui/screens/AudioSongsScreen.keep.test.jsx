@@ -158,7 +158,7 @@ describe('Keep on this phone -- lists, the hub row and the Kept list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
     const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
     expect(strip.textContent).toContain('Remove all 1 song (3 MB) from this phone?');
-    await act(async () => { fireEvent.click(within(strip).getByRole('button', { name: 'Remove all' })); });
+    await act(async () => { fireEvent.click(within(strip).getByRole('button', { name: 'Yes, remove all' })); });
     expect(store.map.size).toBe(0);
     expect(screen.getByText(/Songs you keep play here with no signal/)).toBeTruthy();
   });
@@ -167,5 +167,57 @@ describe('Keep on this phone -- lists, the hub row and the Kept list', () => {
     await install({ kept: [], listed: ['aaaaaaaaaaa1', 'aaaaaaaaaaa2'] });
     renderScreen([{ k: 'list', v: 'kept' }]);
     expect(screen.getByRole('button', { name: 'Download your 2 songs again (6 MB)' })).toBeTruthy();
+  });
+});
+
+/* K3 (Songs walk W2, 2026-09-25): which rows are on the phone, a Remove on a kept song's page, the Remove all
+   strip in the app's own confirm grammar, and the hub's Find words kept in its frame. */
+describe('K3 -- kept rows, Remove on the page, the Remove all strip, Find kept', () => {
+  it('(W2-02) a kept song\'s row carries a quiet On this phone mark; the others do not', async () => {
+    await install({ kept: ['aaaaaaaaaaa1'] });
+    library.songRecent = () => ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'];
+    renderScreen([{ k: 'list', v: 'recent' }]);
+    const rows = [...document.querySelectorAll('.songs-row')];
+    const byTitle = (t) => rows.find((r) => r.querySelector('strong').textContent === t);
+    const mark = byTitle('Come, Love Awaits You').querySelector('.songs-row-kept');
+    expect(mark).not.toBeNull();
+    expect(mark.textContent).toContain('On this phone');
+    expect(byTitle('Lead Me To That Place').querySelector('.songs-row-kept')).toBeNull();
+  });
+
+  it('(W2-06) a kept song\'s page card has a quiet Remove that takes it off the phone', async () => {
+    await install({ kept: ['bbbbbbbbbbb1'] });
+    renderScreen([{ k: 'song', v: 'fam-b' }]);
+    expect(screen.getByRole('heading', { name: 'Available offline' })).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove Lead Me To That Place from this phone' })); });
+    expect(store.map.has('bbbbbbbbbbb1')).toBe(false);
+    expect(screen.getByRole('heading', { name: 'Keep for offline listening' })).toBeTruthy();
+  });
+
+  it('(W2-05) Remove all asks in the Downloads screen\'s strip: Keep them, Yes, remove all', async () => {
+    await install({ kept: ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'] });
+    renderScreen([{ k: 'list', v: 'kept' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
+    const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
+    expect(strip.className).toContain('offline-confirm');
+    expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('offline-confirm-cancel');
+    const go = within(strip).getByRole('button', { name: 'Yes, remove all' });
+    expect(go.className).toBe('offline-confirm-go');
+    expect(go.className).not.toContain('songs-shuffle');
+    await act(async () => { fireEvent.click(go); });
+    expect(store.map.size).toBe(0);
+  });
+
+  it('(W2-07) the hub keeps its Find words in its frame as they are typed, so a letter and Back find them there', async () => {
+    await install();
+    vi.useFakeTimers();
+    try {
+      const onReplaceTop = vi.fn();
+      render(<AudioSongsScreen route={[{ k: 'hub' }]} onPush={vi.fn()} onReplaceTop={onReplaceTop} onBack={vi.fn()} rootBackLabel="Home"
+        onSearch={() => {}} onHistory={() => {}} onSettings={() => {}} theme="dark" onThemeChange={() => {}} />);
+      fireEvent.change(screen.getByPlaceholderText('Find a song, a letter, or a maker'), { target: { value: 'consider my love' } });
+      act(() => { vi.advanceTimersByTime(600); });
+      expect(onReplaceTop).toHaveBeenLastCalledWith({ k: 'hub', q: 'consider my love' });
+    } finally { vi.useRealTimers(); }
   });
 });

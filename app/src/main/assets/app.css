@@ -1768,10 +1768,21 @@
       .song-keep-restore { margin-top: .9rem; padding: .75rem .9rem; border: 1px solid var(--gold); border-radius: 10px; }
       .song-keep-restore p { margin: 0; color: var(--cream); font-size: var(--fs-16); }
       .song-keep-restore .song-keep-action { margin-top: .6rem; }
-      .song-keep-confirm { margin-top: .8rem; padding: .8rem .9rem; border: 1px solid var(--gold); border-radius: 10px; background: var(--bg3); }
-      .song-keep-confirm p { margin: 0 0 .7rem; color: var(--cream); font-size: var(--fs-16); }
-      .song-keep-confirm-actions { display: flex; gap: .6rem; }
-      .song-keep-confirm-actions > button { flex: 1 1 0; width: auto; }
+      /* K3: the Kept list's Remove all asks in the Downloads screen's strip (.offline-confirm); only its spacing here. */
+      .songs-list-hero .offline-confirm { margin-top: .8rem; text-align: left; }
+      /* W2-02: a kept song's row leads its second line with a quiet ⤓ (its words are for screen readers). */
+      .songs-row-kept { flex: none; display: inline-flex; align-items: center; color: var(--gold); }
+      .songs-row-kept .song-keep-svg { width: 15px; height: 15px; stroke-width: 2.1; }
+      /* W2-06 + the desk's keep row: a quiet underlined Remove / Keep beside "On this phone". */
+      .song-keep-quiet { flex: none; min-height: 44px; padding: 0 .2rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-15); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+      .song-keep-quiet:disabled { opacity: .5; cursor: default; text-decoration: none; }
+      .song-keep-quiet:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .song-keep-kept-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 .6rem; }
+      .song-desk-keep { display: flex; align-items: center; flex-wrap: wrap; gap: 0 .6rem; margin-top: -.3rem; }
+      .song-desk-keep-state, .song-desk-keep-go { display: inline-flex; align-items: center; gap: .35rem; color: var(--cream-dim); font-size: var(--fs-15); }
+      .song-desk-keep-go { color: var(--gold); }
+      .song-desk-keep .song-keep-svg { width: 17px; height: 17px; color: var(--gold); }
+      .song-desk-keep .song-keep-note { flex-basis: 100%; }
       .letter-songs-card .song-keep-action { margin-top: .5rem; }
       .song-keep-cancel:focus-visible, .song-keep-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */

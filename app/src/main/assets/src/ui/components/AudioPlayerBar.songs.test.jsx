@@ -209,6 +209,34 @@ describe('the listening desk in song mode (final-04)', () => {
     } finally { delete window.__openSongs; }
   });
 
+  it('(K3) a single-version song reaches its Keep from the desk: Keep · size, then On this phone · Remove', async () => {
+    const { SongKeep } = await import('../../utils/song-keep.js');
+    const map = new Map();
+    globalThis.OfflineSongsStore = {
+      all: async () => [...map.values()], get: async (id) => map.get(id) || null,
+      put: async (r) => { map.set(r.id, r); }, delete: async (id) => { map.delete(id); },
+    };
+    if (!globalThis.indexedDB) globalThis.indexedDB = {};
+    SongKeep._reset();
+    await SongKeep.ready();
+    const keepSpy = vi.spyOn(SongKeep, 'keep').mockImplementation(async () => {});
+    try {
+      act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
+      const desk = openDesk();
+      fireEvent.click(within(desk).getByRole('button', { name: 'Keep Lead Me To That Place on this phone · 3 MB' }));
+      expect(keepSpy).toHaveBeenCalledWith(['bbbbbbbbbbb1'], 'keep-desk-bbbbbbbbbbb1');
+      keepSpy.mockRestore();
+      map.set('bbbbbbbbbbb1', { id: 'bbbbbbbbbbb1', blob: new Blob([new Uint8Array(4)]), bytes: 3000000, sha256: '', keptAt: 1 });
+      SongKeep._reset();
+      await act(async () => { await SongKeep.ready(); });
+      cleanup();
+      const desk2 = openDesk();
+      expect(desk2.querySelector('.song-desk-keep').textContent).toContain('On this phone');
+      await act(async () => { fireEvent.click(within(desk2).getByRole('button', { name: 'Remove Lead Me To That Place from this phone' })); });
+      expect(map.has('bbbbbbbbbbb1')).toBe(false);
+    } finally { keepSpy.mockRestore(); delete globalThis.OfflineSongsStore; SongKeep._reset(); }
+  });
+
   it('the Versions card switches to another version from the start and keeps the queue after it', () => {
     playFamilyA();
     at(40);
