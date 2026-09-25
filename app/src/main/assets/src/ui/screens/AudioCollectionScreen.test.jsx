@@ -331,6 +331,42 @@ describe('a recordings screen in the phone app: downloads', () => {
     renderScreen('one');
     expect(document.querySelector('.offline-row')).toBeNull();
     expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
+    // The compilations stay the plain chips they were.
+    expect(document.querySelector('.audio-collection-compilation')).toBeNull();
+    expect(screen.getByRole('button', { name: /Part 2 · 3/ })).toBeTruthy();
+  });
+
+  /* A compilation is a recording too (Corbin 09-22: save per recording): each chip gets the rows' line. */
+  it('each compilation says what the phone holds and downloads its own file', () => {
+    const store = fakeStore();
+    renderScreen('one');
+    const comps = [...document.querySelectorAll('.audio-collection-compilation')];
+    expect(comps).toHaveLength(2);
+    for (const c of comps) expect(c.querySelector('.offline-row').textContent).toMatch(/^Download/);
+    expect(store.requestSizes).toHaveBeenCalledWith([URL_OF('sec1')]);
+    fireEvent.click(comps[1].querySelector('.offline-row-download'));
+    // Named for the shelf with its collection: "Part 2 · 3" alone says nothing on "On this phone".
+    expect(store.download.mock.calls[0][0]).toEqual([{ url: URL_OF('sec2'), key: '', title: 'Volume One · Part 2 · 3' }]);
+    // Download all stays the letters (a compilation is the same words again, in one long file).
+    const all = store.download.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /download all/i }));
+    fireEvent.click(document.querySelector('.offline-confirm-go'));
+    expect(store.download.mock.calls[all][0].map((t) => t.url)).not.toContain(URL_OF('sec1'));
+  });
+
+  it('with no signal, a compilation not on the phone is marked unavailable, and one on the phone plays', () => {
+    const store = fakeStore();
+    store.statusOf = (u) => (u === URL_OF('sec2') ? 'saved' : 'none');
+    store.isSaved = (u) => u === URL_OF('sec2');
+    setOnline(false);
+    renderScreen('one');
+    const comps = [...document.querySelectorAll('.audio-collection-compilation')];
+    expect(comps[0].classList.contains('is-unavailable')).toBe(true);
+    expect(comps[0].querySelector('.offline-row').textContent).toMatch(/Needs a connection/);
+    expect(comps[1].classList.contains('is-unavailable')).toBe(false);
+    expect(comps[1].querySelector('.offline-row').textContent).toMatch(/On this phone/);
+    fireEvent.click(screen.getByRole('button', { name: /Part 2 · 3/ }));
+    expect(queueUrls()).toEqual([URL_OF('sec2')]);
   });
 
   it('with no signal, a row not on the phone is marked unavailable', () => {
