@@ -105,6 +105,24 @@ describe('lazy screen stylesheets (n7-08)', () => {
     expect(window.__screensF.error).toBe(false);
   });
 
+  it('a sheet stalled on a bad connection holds the screen back 8 s at most; a second load adds no second preload', async () => {
+    vi.useFakeTimers();
+    try {
+      window.__loadScreensG().catch(() => {});
+      await vi.advanceTimersByTimeAsync(7900);
+      expect(scripts()).toEqual([]);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(scripts()).toEqual(['dist/bundle-g.js']);
+      document.head.querySelector('script[src="dist/bundle-g.js"]').onerror();   // the script fails; the reader taps Try again
+      window.__loadScreensG().catch(() => {});
+      window.__loadScreensG().catch(() => {});
+      await vi.advanceTimersByTimeAsync(0);
+      expect(document.head.querySelectorAll('link[rel="preload"]').length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a new worker claiming the page while the sheet loads: reload, never the NEW build\'s script', async () => {
     window.__loadScreensE();
     await flush();

@@ -82,13 +82,13 @@ const BUDGETS = [
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   // 2026-09-25 (n7-08): the tree had grown to 335,980 B, 20 under this ceiling. Measured first: 91.5 KB
   // of it styled only lazy screens. tools/split-lazy-css.mjs now moves the rules only bundle-e/-f/-g/-h
-  // can use, whose move provably keeps the cascade, into dist/screens-X.min.css (46.5 KB), loaded
-  // beside each bundle. Re-baselined DOWN to what stays render-blocking: 289,543 x 1.15 -> 333,000.
-  { file: 'app.min.css', measured: 289543, max: 333000 },   // render-blocking <link> in index.html
+  // can use, whose move provably keeps the cascade, into dist/screens-X.min.css (50 KB), loaded
+  // beside each bundle. Re-baselined DOWN to what stays render-blocking: 285,867 x 1.15 -> 328,800.
+  { file: 'app.min.css', measured: 285867, max: 328800 },   // render-blocking <link> in index.html
   { file: 'screens-e.min.css', measured: 8156, max: 9400 },   // Settings/Search/Garden rules, loaded with bundle-e
   { file: 'screens-f.min.css', measured: 15359, max: 17700 }, // the Scripture Web's rules, with bundle-f
   { file: 'screens-g.min.css', measured: 15283, max: 17600 }, // the Personal Study screens' rules, with bundle-g
-  { file: 'screens-h.min.css', measured: 7772, max: 9000 },   // the Listening Library's and Songs' rules, with bundle-h
+  { file: 'screens-h.min.css', measured: 11473, max: 13200 },   // the Listening Library's and Songs' rules, with bundle-h
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
   // Settings/Search work since the last baseline had eaten the margin down to 973 bytes,

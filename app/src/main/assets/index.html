@@ -56,7 +56,7 @@
        Settings > Your Data. No device id, no search or error text. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-2gDw+HTwJgFqmwbNaA7TdGaw2jmfdK6QVid1u16FpfA=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-wpfKNv1CWMB1e+0D8pLGbmpe1flD2VS9BrnGcAMQPiE=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-2gDw+HTwJgFqmwbNaA7TdGaw2jmfdK6QVid1u16FpfA=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -206,8 +206,8 @@
     // rules of app.css only its screens use (tools/split-lazy-css.mjs moves them
     // out of the render-blocking dist/app.min.css). The script runs only once
     // its stylesheet has landed, so the screen never draws unstyled. A
-    // stylesheet that fails to load does not fail the screen: it draws with the
-    // boot sheet alone, and the next load() asks for it again.
+    // stylesheet that fails, or has not landed in 8 s, does not hold the screen
+    // back: it draws with the boot sheet alone (a late sheet still applies).
     var cssDone = null;
     var loadCss = function() {
       if (!cssPath) return Promise.resolve();
@@ -217,6 +217,7 @@
         link.rel = 'stylesheet';
         link.href = cssPath;
         link.setAttribute('data-lazy-css', '');
+        setTimeout(done, 8000);   // a stalled request: the screen waits no longer than this
         link.onload = function() { done(); };
         link.onerror = function() {
           if (link.parentNode) link.parentNode.removeChild(link);
@@ -283,7 +284,7 @@
         // The routes draw a lazy screen the moment its component exists, not on
         // the notify below: so the script RUNS only after its stylesheet has
         // landed, while a preload fetches it alongside.
-        if (cssPath) {
+        if (cssPath && !document.querySelector('link[rel="preload"][href="' + bundlePath + '"]')) {
           var pre = document.createElement('link');
           pre.rel = 'preload';
           pre.setAttribute('as', 'script');

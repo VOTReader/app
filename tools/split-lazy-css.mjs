@@ -63,7 +63,9 @@ async function fileBundles() {
   /** @type {Map<string, Set<string>>} */
   const out = new Map();
   for (const [b, entry] of Object.entries({ ...EAGER_BUNDLES, ...LAZY_BUNDLES })) {
-    const r = await esbuild.build({ entryPoints: [join(ASSETS, entry)], bundle: true, write: false, metafile: true, format: 'iife', target: 'chrome108', logLevel: 'silent' });
+    // absWorkingDir: the metafile's paths are relative to it, and they are joined to ROOT below.
+    const r = await esbuild.build({ entryPoints: [join(ASSETS, entry)], absWorkingDir: ROOT, bundle: true, write: false, metafile: true, format: 'iife', target: 'chrome108', logLevel: 'silent' });
+    if (Object.keys(r.metafile.inputs).length < 2) throw new Error('[split-lazy-css] esbuild found no inputs for bundle-' + b + ' (' + entry + ')');
     for (const input of Object.keys(r.metafile.inputs)) {
       const key = norm(join(ROOT, input));
       if (!out.has(key)) out.set(key, new Set());
@@ -73,7 +75,7 @@ async function fileBundles() {
   return out;
 }
 
-/** Every file that can put a class name on the page: the web source, index.html, the Kotlin shell. */
+/** Every file that can put a class name on the page: the web source and index.html (the Kotlin shell injects none). */
 function sourceFiles() {
   const out = [];
   const walk = (dir, re) => {
@@ -86,7 +88,6 @@ function sourceFiles() {
   };
   walk(join(ASSETS, 'src'), /\.(jsx?|mjs)$/);
   for (const e of readdirSync(ASSETS, { withFileTypes: true })) if (e.isFile() && /\.(js|html)$/.test(e.name)) out.push(join(ASSETS, e.name));
-  walk(join(ROOT, 'app', 'src', 'main', 'java'), /\.(kt|java)$/);
   return out;
 }
 
@@ -372,7 +373,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const check = process.argv.includes('--check');
   const cssPath = join(DIST, 'app.min.css');
   const full = readFileSync(cssPath, 'utf8');
-  if (Object.keys(LAZY_BUNDLES).some((x) => existsSync(join(DIST, lazyCssName(x)))) && /\/\* split-lazy-css \*\//.test(full)) {
+  if (/\/\* split-lazy-css \*\//.test(full)) {
     console.error('[split-lazy-css] dist/app.min.css is already split (run build:css first).');
     process.exit(1);
   }
