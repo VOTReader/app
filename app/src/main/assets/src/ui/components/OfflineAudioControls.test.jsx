@@ -202,6 +202,16 @@ describe('On this phone (the shelf)', () => {
     expect(s.removeAll).toHaveBeenCalledTimes(1);
   });
 
+  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own Remove is the whole job.
+  it('a shelf of one offers no Remove all', () => {
+    const s = fakeStore();
+    save(s, 'a', 18_000_000, 'I Am The Passover');
+    const { container, queryByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(1);
+    expect(getByRole('button', { name: /^remove i am the passover/i })).toBeTruthy();
+    expect(queryByRole('button', { name: /^remove all/i })).toBeNull();
+  });
+
   it('an empty shelf says how to fill it', () => {
     fakeStore();
     const { container } = render(<AudioOfflineScreen onBack={() => {}} />);

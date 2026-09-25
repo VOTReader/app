@@ -336,6 +336,40 @@ describe('a recordings screen in the phone app: downloads', () => {
     expect(screen.getByRole('button', { name: /Part 2 · 3/ })).toBeTruthy();
   });
 
+  /* Codex critique of the built screens (2026-09-24, 1): with no signal, Play all plays only what is on the phone (the
+     player passes over the rest), so the button says that instead of promising the whole collection. */
+  it('with no signal, Play all names what is on the phone', () => {
+    const store = fakeStore();
+    let saved = [URL_OF('idA')];
+    store.isSaved = (u) => saved.includes(u);
+    store.statusOf = (u) => (saved.includes(u) ? 'saved' : 'none');
+    setOnline(false);
+    const view = renderScreen('one');
+    expect(screen.getByRole('button', { name: /^Play the one on this phone$/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Play all$/ })).toBeNull();
+    // Both parts of letter C on the phone too: two letters.
+    saved = [URL_OF('idA'), URL_OF('idC1'), URL_OF('idC2')];
+    view.rerender(
+      <AudioCollectionScreen volKey="one" onBack={() => {}} onOpenText={() => {}} onSearch={() => {}}
+        onHistory={() => {}} onSettings={() => {}} theme="dark" onThemeChange={() => {}} />
+    );
+    expect(screen.getByRole('button', { name: /^Play the 2 on this phone$/ })).toBeTruthy();
+  });
+
+  it('with no signal and nothing on the phone, and with a signal, it stays Play all', () => {
+    fakeStore();
+    setOnline(false);
+    renderScreen('one');
+    expect(screen.getByRole('button', { name: /^Play all$/ })).toBeTruthy();
+    cleanup();
+    setOnline(true);
+    const store = fakeStore();
+    store.isSaved = () => true;
+    store.statusOf = () => 'saved';
+    renderScreen('one');
+    expect(screen.getByRole('button', { name: /^Play all$/ })).toBeTruthy();
+  });
+
   /* A compilation is a recording too (Corbin 09-22: save per recording): each chip gets the rows' line. */
   it('each compilation says what the phone holds and downloads its own file', () => {
     const store = fakeStore();
