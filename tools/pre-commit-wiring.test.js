@@ -23,7 +23,7 @@
  * run real paths through it, which is behaviour, not formatting.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, writeFileSync, unlinkSync, mkdtempSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, mkdtempSync, existsSync, mkdirSync } from 'fs';
 import { execFileSync, spawnSync } from 'child_process';
 import { resolve, dirname, join, delimiter } from 'path';
 import { tmpdir } from 'os';
@@ -51,7 +51,8 @@ function runHookWithStaged(paths) {
   const idx = join(mkdtempSync(join(tmpdir(), 'vot-hook-')), 'index');
   // A private index at HEAD makes a developer's uncommitted work read as UNSTAGED,
   // which Step 0b (v12-04) refuses; these cases are about other gates.
-  const env = { ...process.env, GIT_INDEX_FILE: idx, VOT_HOOK_TEST_NO_STAGE_GUARD: '1' };
+  // GATE_SKIP: never wait on the machine's gates.lock (Step 0a) from inside the suite.
+  const env = { ...process.env, GIT_INDEX_FILE: idx, VOT_HOOK_TEST_NO_STAGE_GUARD: '1', GATE_SKIP: '1' };
   try {
     execFileSync('git', ['read-tree', 'HEAD'], { cwd: root, env });
     execFileSync('git', ['add', '--', ...paths], { cwd: root, env });
@@ -69,9 +70,9 @@ function runHookWithStaged(paths) {
  * test-only skip for Step 0b; `pathFirst` puts a directory at the front of PATH.
  * Returns the combined output and the exit status.
  */
-function runHookWithBlob(path, content, { guard = true, pathFirst = null } = {}) {
+function runHookWithBlob(path, content, { guard = true, pathFirst = null, env: extra = {} } = {}) {
   const idx = join(mkdtempSync(join(tmpdir(), 'vot-hook-')), 'index');
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
+  const env = { ...process.env, GIT_INDEX_FILE: idx, GATE_SKIP: '1', ...extra };
   if (!guard) env.VOT_HOOK_TEST_NO_STAGE_GUARD = '1';
   if (pathFirst) {
     const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';   // Windows spells it Path
@@ -156,6 +157,37 @@ describe('pre-commit: the bundles are rebuilt before the tests read them (v12-03
     expect(vitest).toBeGreaterThan(-1);
     expect(builds[0], 'the build must come before the tests that read dist/').toBeLessThan(vitest);
   });
+});
+
+describe('pre-commit: one heavy gate run machine-wide (Step 0a, crash brief 2026-09-24)', () => {
+  // The laptop bugchecked twice on 09-24 while a full vitest ran on 23 of 24 threads beside other lanes'
+  // gates. D:/Swarm/tools/gate.sh (this machine only; CI never runs hooks) holds locks/gates.lock (the
+  // lanes' mkdir + who-file lock) for the hook's run and caps VITEST_MAX_WORKERS at 8. A lock left by a dead
+  // run is cleared, which is what these cases stage: a temp lock whose holder pid does not exist.
+  const GATE_SH = 'D:/Swarm/tools/gate.sh';
+  const deadLock = () => {
+    const lock = join(mkdtempSync(join(tmpdir(), 'vot-gate-')), 'gates.lock').replace(/\\/g, '/');
+    mkdirSync(lock);
+    writeFileSync(lock + '/who', 'ghost pid=999999 since=2026-09-24T11:00:00 what=pre-commit\n');
+    return lock;
+  };
+  const gateEnv = (lock) => ({ GATE_SKIP: '', GATE_HELD_BY: '', GATE_LOCK: lock });
+
+  it.skipIf(!existsSync(GATE_SH))('takes the gate lock for its run and gives it back at exit', () => {
+    const lock = deadLock();
+    const onDisk = readFileSync(resolve(root, '.gitignore'), 'utf8');
+    const { out } = runHookWithBlob('.gitignore', onDisk + '\n# gate wiring\n', { env: gateEnv(lock) });
+    expect(out).toContain('[gate] clearing a stale');
+    expect(existsSync(lock), 'released when the hook exits').toBe(false);
+  }, 120_000);
+
+  it.skipIf(!existsSync(GATE_SH))('leaves the lock alone for a commit of docs only', () => {
+    const lock = deadLock();
+    const onDisk = readFileSync(resolve(root, 'AGENTS.md'), 'utf8');
+    const { out } = runHookWithBlob('AGENTS.md', onDisk + '\n', { env: gateEnv(lock) });
+    expect(out).not.toContain('[gate]');
+    expect(existsSync(lock), 'a docs-only commit never touches the lock').toBe(true);
+  }, 120_000);
 });
 
 describe('pre-commit gate wiring', () => {

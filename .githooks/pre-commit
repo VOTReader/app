@@ -132,6 +132,19 @@ staged=$(git diff --cached --name-only "$against")
 # setup-python pins 3.13) keeps `python`. Every Python step below runs $PYBIN.
 if command -v py >/dev/null 2>&1 && py -3.13 -c "" >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
 
+# ─── Step 0a: one heavy gate run machine-wide, tests on 8 workers (crash brief 2026-09-24) ──
+# The laptop bugchecked twice on 09-24 while a full vitest ran on 23 of 24 threads (vitest 4
+# defaults to CPUs - 1) beside other lanes' gates. D:/Swarm/tools/gate.sh waits for the lanes'
+# D:/Swarm/locks/gates.lock (mkdir + who-file), holds it until this hook exits, and defaults
+# VITEST_MAX_WORKERS to 8. It never waits on this lane's own wrapper or a parent that holds the
+# lock, and never removes a lock it cannot prove dead (it runs without it after 10 min instead).
+# A commit of only .md/.txt files skips it; so does a machine without D:/Swarm (CI runs no hooks).
+# Tests: python D:/Swarm/tools/test_gate.py and the Step 0a cases in tools/pre-commit-wiring.test.js.
+gate_heavy=$(printf '%s\n' "$staged" | grep -vE '^$|\.(md|txt)$' || true)
+if [ -n "$gate_heavy" ] && [ -f D:/Swarm/tools/gate.sh ]; then
+  . D:/Swarm/tools/gate.sh && gate_take pre-commit
+fi
+
 # ─── Step 0b: the commit is the INDEX; every gate reads the WORKING TREE (v12-04) ──
 # Lint, tsc, vitest and Step 5's rebuild all read files on disk, and Step 5
 # stages the dist/ it builds from them. A bundle source with UNSTAGED edits
