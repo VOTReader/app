@@ -34,11 +34,13 @@ describe('POST /v1/b', () => {
   it('stores a valid batch once; a resend is ignored and counted as a duplicate', async () => {
     expect(await ingest(post(batch(1)), env, NOW)).toEqual([204, 'stored']);
     expect(await ingest(post(batch(1)), env, NOW)).toEqual([200, 'duplicate']);
-    expect(rows('SELECT id, country, d FROM batches')).toEqual([{ id: uuid(1), country: 'NZ', d: 1 }]);
+    expect(rows('SELECT id, country, d, recv_at FROM batches')).toEqual([{ id: uuid(1), country: '', d: 1, recv_at: Date.parse('2026-09-25T00:00:00Z') }]);
     expect(rows('SELECT reason, n FROM rejects')).toEqual([{ reason: 'duplicate', n: 1 }]);
   });
 
-  it('keeps no IP and no device id: the table has no column that could hold one', () => {
+  it('keeps no IP, no country and no device id; the receive time only to the day', async () => {
+    await ingest(post(batch(9)), env, NOW + 1234);
+    expect(rows('SELECT country, recv_at FROM batches')).toEqual([{ country: '', recv_at: Date.parse('2026-09-25T00:00:00Z') }]);
     const cols = rows('PRAGMA table_info(batches)').map((c) => c.name);
     expect(cols).not.toContain('ip');
     expect(cols.filter((c) => /ip|device|user|ua/i.test(c))).toEqual([]);
@@ -52,8 +54,10 @@ describe('POST /v1/b', () => {
     expect((await ingest(post('{not json'), env, NOW))[0]).toBe(400);
     expect((await ingest(post(batch(5, { c: { 'steal|x': 1 } })), env, NOW))[0]).toBe(422);
     expect((await ingest(post(batch(6, { day: '2026-01-01' })), env, NOW))[0]).toBe(422);
+    expect((await ingest(post(batch(8, { rate: 1e-300 })), env, NOW))[0]).toBe(422);
     expect(rows('SELECT COUNT(*) AS n FROM batches')[0].n).toBe(0);
-    expect(rows('SELECT SUM(n) AS n FROM rejects')[0].n).toBe(7);
+    expect(rows('SELECT SUM(n) AS n FROM rejects')[0].n).toBe(8);
+    expect(rows("SELECT reason FROM rejects WHERE reason LIKE 'invalid:event%'")).toEqual([{ reason: 'invalid:event' }]);
   });
 
   it('clamps a buggy client\'s huge numbers', async () => {

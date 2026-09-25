@@ -1,6 +1,6 @@
 /* us1: the app's anonymous usage counts - flags, the offline queue, sending, opt-out, guards. */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createUsageStats, usageGuarded, usagePlatform, USAGE_STORAGE_KEY, USAGE_ENABLED_KEY } from './usage-stats.js';
+import { createUsageStats, usageGuarded, usagePlatform, USAGE_STORAGE_KEY, USAGE_ENABLED_KEY, USAGE_NOTICE_KEY } from './usage-stats.js';
 import { validateBatch } from './usage-schema.js';
 
 function memStorage() {
@@ -22,6 +22,7 @@ function make(over = {}) {
 }
 beforeEach(() => {
   storage = memStorage();
+  storage.setItem(USAGE_NOTICE_KEY, '1'); // the reader has seen the first-run notice (tested below without it)
   clock = new Date(2026, 8, 25, 9, 0).getTime(); // Fri 25 Sep 2026, local time
   sent = [];
   status = 204;
@@ -66,6 +67,7 @@ describe('active-reader flags (no device id)', () => {
     expect(sent.map((b) => [b.day, b.c])).toEqual([
       ['2026-10-24', {}],
       ['2026-10-24', { 'open|a': 1 }],
+      ['2026-10-25', {}],
       ['2026-10-25', { 'open|b': 1 }],
     ]);
     expect(sent.filter((b) => b.day === '2026-10-25')[0].act).toMatchObject({ d: 1 });
@@ -77,11 +79,11 @@ describe('the offline queue', () => {
     const s = make({ fetch: async () => { throw new Error('offline'); } });
     await s.start();
     for (const day of [26, 27, 28]) { at(2026, 8, day); s.count('open', `d${day}`); await s.flush('timer'); }
-    expect(s.snapshot().queued.length).toBe(4);
+    expect(s.snapshot().queued.length).toBe(7); // each day: its flags batch + its counts batch
     const online = make(); // a fresh session reads the stored queue
     clock += 7 * 3600e3;   // past every backoff step
     await online.flush('online');
-    expect(sent.map((b) => b.day)).toEqual(['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28']);
+    expect(sent.map((b) => b.day)).toEqual(['2026-09-25', '2026-09-26', '2026-09-26', '2026-09-27', '2026-09-27', '2026-09-28', '2026-09-28']);
     expect(online.snapshot().queued).toEqual([]);
   });
 
@@ -186,8 +188,47 @@ describe('opt-out and guards', () => {
     expect(snap.endpoint).toBe('https://stats.votreader.workers.dev/v1/b');
     expect(snap.queued[0].act).toMatchObject({ d: 1 });
     expect(snap.today.c).toEqual({ 'open|x': 1 });
+    storage.removeItem(USAGE_NOTICE_KEY);
     expect(s.needsNotice()).toBe(true);
     s.markNoticed();
     expect(s.needsNotice()).toBe(false);
+  });
+});
+
+describe('what can be linked, and when anything may leave (us1 refutation)', () => {
+  it('the day\'s flags travel in a batch with no counts, and counts in batches with no flags', async () => {
+    const s = make();
+    s.count('open', 'letter:v1-12'); // counted before start: must not ride with the flags
+    await s.start();
+    await s.flush('timer');
+    for (const b of sent) {
+      if (b.act) expect(b.c).toEqual({});
+      else expect(Object.keys(b.c).length).toBeGreaterThan(0);
+    }
+    expect(sent.filter((b) => b.act).length).toBe(1);
+  });
+
+  it('nothing is sent before the first-run notice has been shown, not even by the hidden-page beacon', async () => {
+    storage.removeItem(USAGE_NOTICE_KEY);
+    const s = make();
+    await s.start(); s.count('open', 'x'); await s.flush('timer'); await s.flush('hidden');
+    expect(sent).toEqual([]);
+    expect(beacons).toEqual([]);
+    expect(s.snapshot().queued.length).toBe(2); // kept, not lost
+    s.markNoticed();
+    await s.flush('timer');
+    expect(sent.length).toBe(2);
+  });
+
+  it('Clear All resets the queue and the install record, but not the reader\'s switch', async () => {
+    const s = make({ fetch: async () => { throw new Error('offline'); } });
+    await s.start(); s.count('open', 'x'); await s.flush('timer');
+    s.setEnabled(false); s.setEnabled(true);
+    s.reset();
+    expect(s.snapshot()).toMatchObject({ queued: [], today: null });
+    await s.start();
+    expect(s.snapshot().queued[0].act).toMatchObject({ first: 1 }); // a wiped app is a new install
+    s.setEnabled(false); s.reset();
+    expect(s.isEnabled()).toBe(false);
   });
 });

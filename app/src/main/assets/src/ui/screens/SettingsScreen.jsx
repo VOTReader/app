@@ -1841,6 +1841,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         try { if (window.DiagnosticLog) window.DiagnosticLog.warn('settings', 'Clear All: failed to delete ' + failedCaches.join(', ')); } catch (_e) { /* best-effort */ }
       }
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
+      // us1: a wiped app is a new install to the usage counts; the reader's on/off choice stays.
+      try { if (window.UsageStats) window.UsageStats.reset(); } catch (_e) { /* stats never block a wipe */ }
       // Wave-0: was alert('All personal data cleared…') — a native blocking
       // dialog. Same toast-then-reload pattern the import path uses: the
       // persistent toast renders first, the 600ms delay lets it paint.

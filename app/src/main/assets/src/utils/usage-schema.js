@@ -8,7 +8,7 @@
    One batch = one device-day:
      { v: 1, id: '<uuid>', day: 'YYYY-MM-DD', plat: 'apk'|'pwa'|'web',
        ver: '<CACHE_VERSION>', cv: '<CORPUS_VERSION>', rate: 1,
-       act: { d, w, m, first, iw } | null,     // Brave-style active flags, no device id
+       act: { d, w, m, first, iw } | null,     // Brave-style active flags, no device id; sent in a batch of its own (c: {})
        c: { '<name>|<key>': <number>, ... } }  // counters and summed seconds
 
    What is NOT here, by design: any device id, the IP, search text, crash text,
@@ -18,7 +18,7 @@ export const USAGE_VERSION = 1;
 
 /** Every counter name the Worker accepts, with the ceiling one batch may carry. */
 export const USAGE_EVENTS = {
-  open: 5000,          // key: letter:<vol>:<id> | bible:<edition>:<book> | study:<id> | answers:<topic> | song:<id>
+  open: 5000,          // key: letter:<id> | bible:<bookId> | study:<id>
   read_done: 5000,     // same keys, from the read tracker's credit
   listen_s: 86400,     // key: <kind>:<edition or vol>; media seconds
   listen_start: 5000,  // key: kind
@@ -73,8 +73,10 @@ export function validateBatch(raw, today) {
   for (const f of ['ver', 'cv']) {
     if (raw[f] != null && (typeof raw[f] !== 'string' || !VER_RE.test(raw[f]))) return { ok: false, error: f };
   }
+  // Sampling is reserved in the format but not used: only 1 is accepted, so a crafted
+  // tiny rate cannot blow a count up in the rollup (value / rate).
   const rate = raw.rate == null ? 1 : raw.rate;
-  if (typeof rate !== 'number' || !(rate > 0 && rate <= 1)) return { ok: false, error: 'rate' };
+  if (rate !== 1) return { ok: false, error: 'rate' };
 
   let act = null;
   if (raw.act != null) {
@@ -97,7 +99,7 @@ export function validateBatch(raw, today) {
     const bar = k.indexOf('|');
     const name = bar < 0 ? k : k.slice(0, bar);
     const key = bar < 0 ? '' : k.slice(bar + 1);
-    if (!Object.prototype.hasOwnProperty.call(USAGE_EVENTS, name)) return { ok: false, error: `event ${name.slice(0, 20)}` };
+    if (!Object.prototype.hasOwnProperty.call(USAGE_EVENTS, name)) return { ok: false, error: 'event' };
     if (!USAGE_KEY_RE.test(key)) return { ok: false, error: 'key' };
     if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return { ok: false, error: 'value' };
     c[`${name}|${key}`] = Math.min(Math.round(n), USAGE_EVENTS[name]);

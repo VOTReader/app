@@ -382,7 +382,13 @@ async function runAttempt(url) {
     }
     // us1: the usage counts are loaded and guarded, and nothing went to the stats host.
     const usageGuard = await page.evaluate(() => (window.UsageStats ? window.UsageStats.isGuarded() : 'absent'));
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    // A real hidden page (the beacon path): visibilityState reads 'hidden', then the event.
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    await page.evaluate(() => { delete document.visibilityState; });
     if (usageGuard !== true || statsRequests.length) {
       report.ok = false;
       report.summary += ` | USAGE STATS NOT SILENT (guard ${usageGuard}, ${statsRequests.length} request(s))`;

@@ -760,8 +760,9 @@ function _ensureEl() {
     // displayed (whole-second) clock actually changes.
     const sec = Math.floor(_state.time);
     if (sec !== _lastTick) {
-      // us1: media seconds heard; a seek (a jump over 2 s) is not listening.
-      if (sec - _lastTick > 0 && sec - _lastTick <= 2 && !el.paused) _usage('listen_s', sec - _lastTick);
+      // us1: media seconds heard; a seek (a jump over 4 s: past a 1 Hz tick at the fastest
+      // rate, the native player's hidden cadence) is not listening.
+      if (sec - _lastTick > 0 && sec - _lastTick <= 4 && !el.paused) _usage('listen_s', sec - _lastTick);
       _lastTick = sec;
       _syncMediaSessionPosition();
       _notify();

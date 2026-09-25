@@ -6,7 +6,8 @@ Corbin said yes on 2026-09-24 (anonymous counts, a first-run notice, the "no tel
 
 - `POST /v1/b` takes one device-day batch as `text/plain` JSON (no CORS preflight; `sendBeacon` works). The format and its
   validator live in `app/src/main/assets/src/utils/usage-schema.js`, shared with the app. Only the two app origins are
-  accepted. A batch is stored once per id (a resend is ignored). Cloudflare's country is kept; the IP never is.
+  accepted. A batch is stored once per id (a resend is ignored). Neither the IP nor the country is kept, and the
+  receive time only to the day, so rows cannot be lined up into one device's history.
 - `GET /dash?k=<DASH_KEY>` is the phone dashboard. The key is a Worker secret; the full link is in
   `D:\Swarm\lanes\docs\out\stats-dashboard-link.txt`, never in the repo. Without the key it is a 404.
 - A nightly cron (03:17 UTC) recomputes the last 36 days of rollups; raw batches go after 90 days, rollups after 25 months.

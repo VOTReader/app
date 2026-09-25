@@ -16,7 +16,11 @@
      the queue on 2xx, is dropped on a 4xx, and waits on backoff otherwise.
    - Active readers are counted without an id: the first use of a day carries
      d / w / m / first flags (first that day / ISO week / month / ever), the way
-     Brave's usage ping does.
+     Brave's usage ping does. The flags travel in a batch of their own, with no
+     counts, so the install week (the one per-device constant) never sits beside
+     what was read; the server keeps neither the IP nor the country, and the
+     receive time only to the day.
+   - Nothing is sent until the first-run notice has been shown.
 
    What it never sends: a device id, the words searched, error messages,
    anything the reader wrote. The format is utils/usage-schema.js.
@@ -125,7 +129,12 @@ export function createUsageStats(o = {}) {
     const o = state.open;
     state.open = null;
     if (!o || (!o.act && !Object.keys(o.c).length)) return;
-    state.sealed.push({ v: USAGE_VERSION, id: uuid(), day: o.day, plat, ver: version.ver, cv: version.cv, rate: 1, act: o.act, c: o.c });
+    // The day's active flags travel ALONE, with no counts, and the counts travel without
+    // the flags: the one field that is the same for a device every day (its install week)
+    // never sits beside what it read (us1 refutation).
+    const base = { v: USAGE_VERSION, day: o.day, plat, ver: version.ver, cv: version.cv, rate: 1 };
+    if (o.act) state.sealed.push({ ...base, id: uuid(), act: o.act, c: {} });
+    if (Object.keys(o.c).length) state.sealed.push({ ...base, id: uuid(), act: null, c: o.c });
     while (state.sealed.length > MAX_SEALED || (state.sealed.length > 1 && JSON.stringify(state.sealed).length > MAX_QUEUE_BYTES)) {
       state.sealed.shift();
     }
@@ -160,7 +169,9 @@ export function createUsageStats(o = {}) {
     if (!USAGE_KEY_RE.test(k)) k = 'other';
     const b = bucket();
     let slot = `${name}|${k}`;
-    if (!(slot in b.c) && Object.keys(b.c).length >= USAGE_LIMITS.maxKeys - 1) slot = `${name}|other`;
+    // Room for one '<name>|other' per event name inside the server's key ceiling.
+    const room = USAGE_LIMITS.maxKeys - Object.keys(USAGE_EVENTS).length;
+    if (!(slot in b.c) && Object.keys(b.c).length >= room) slot = `${name}|other`;
     b.c[slot] = Math.min((b.c[slot] || 0) + n, USAGE_EVENTS[name]);
     dirty = true;
     save(false);
@@ -172,6 +183,8 @@ export function createUsageStats(o = {}) {
     bucket(); // today's active flags exist even on a day with no counted event
     seal();
     save(true);
+    // Nothing leaves before the reader has seen the first-run notice (us1 refutation).
+    if (read(USAGE_NOTICE_KEY) !== '1') return;
     if (!state.sealed.length || sending) return;
     const t = now().getTime();
     if (reason !== 'hidden' && state.retry.at > t) return;
@@ -241,6 +254,12 @@ export function createUsageStats(o = {}) {
       const open = state.open ? { v: USAGE_VERSION, id: '(assigned when sent)', day: state.open.day, plat, ver: version.ver, cv: version.cv, rate: 1, act: state.open.act, c: state.open.c } : null;
       return { endpoint, queued: state.sealed.slice(), today: open };
     },
+    /** Clear All Personal Data: forget the queue and the day/install record (a wiped app is a new install); the switch stays. */
+    reset() {
+      state = { open: null, sealed: [], last: null, iw: null, retry: { at: 0, n: 0 } };
+      dirty = true;
+      save(true);
+    },
     /** First-run notice: shown once, then remembered. */
     needsNotice: () => enabled() && read(USAGE_NOTICE_KEY) !== '1',
     markNoticed() { write(USAGE_NOTICE_KEY, '1'); },
@@ -272,13 +291,14 @@ export function installUsageStats(win = typeof window !== 'undefined' ? window :
   const begin = async () => {
     let v = null;
     try { v = getVersion ? await getVersion() : null; } catch (_e) { v = null; }
-    run(() => stats.start(v));
+    // The notice first: nothing is sent until it has been shown.
     run(() => {
       if (showNotice && stats.needsNotice()) {
         showNotice(USAGE_NOTICE_TEXT);
         stats.markNoticed();
       }
     });
+    run(() => stats.start(v));
   };
   if (typeof win.requestIdleCallback === 'function') win.requestIdleCallback(() => begin(), { timeout: 10000 });
   else win.setTimeout?.(begin, 3000);

@@ -2,8 +2,8 @@
    ─────────────────────────────────────────────────────────
    POST /v1/b   one device-day batch (text/plain JSON, the shape in
                 app/src/main/assets/src/utils/usage-schema.js). Validated, clamped,
-                stored once per batch id (a resend is ignored). The country comes
-                from Cloudflare; the IP is never read or stored.
+                stored once per batch id (a resend is ignored). Neither the IP nor
+                the country is read or stored, and the receive time is kept to the day.
    GET  /dash   Corbin's phone page, behind a secret link (?k=DASH_KEY).
    cron         nightly rollup of the last 36 days into metrics / actives /
                 cohorts; raw batches kept 90 days, rollups 25 months.
@@ -48,9 +48,10 @@ export async function ingest(request, env, now = Date.now()) {
   ).bind(
     b.id, b.day, b.plat, b.ver, b.cv, b.rate,
     b.act ? a.d : null, b.act ? a.w : null, b.act ? a.m : null, b.act ? a.first : null, b.act ? a.iw : null,
-    String(request.cf?.country || '').slice(0, 2),
+    '', // no country: with the install week it could pick one device out of a small readership (us1 refutation)
     request.headers.get('X-Stats-Dev') === '1' ? 1 : 0,
-    now, JSON.stringify(b.c),
+    Math.floor(now / 86400000) * 86400000, // the receive DAY only: a queue flushed at once must not line up
+    JSON.stringify(b.c),
   ).run();
   if (!res.meta || res.meta.changes === 0) { await reject(env, now, 'duplicate'); return [200, 'duplicate']; }
   return [204, 'stored'];

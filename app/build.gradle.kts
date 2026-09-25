@@ -56,7 +56,14 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        // us1 (U5): the build's own version, not a fixed "1.0" - the service worker's CACHE_VERSION
+        // (a content hash of the web build, e.g. v1.0.2-4c7f32a9b1), so Android's app info, the usage
+        // counts and Settings' App version row all name the same build. versionCode stays 1: the
+        // owner's phone updates in place (adb install -r), which a higher code would not need but a
+        // lower one would refuse.
+        versionName = providers.fileContents(layout.projectDirectory.file("src/main/assets/service-worker.js"))
+            .asText.map { Regex("const CACHE_VERSION = '([^']+)'").find(it)?.groupValues?.get(1) ?: "1.0" }
+            .getOrElse("1.0")
     }
 
     buildTypes {
